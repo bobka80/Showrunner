@@ -1,0 +1,303 @@
+<div id="location-modal-overlay" class="modal-overlay" style="display: none; z-index: 7000;">
+  <div class="modal" style="width: 600px; max-width: 95%;">
+    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Set Project Location</h3>
+    <div style="display:flex; gap:10px; margin-bottom: 15px; position:relative;">
+       <input type="text" id="modal-location-input" placeholder="Type an address, venue, or click the map..." style="flex:1; padding:12px; padding-right:35px; background:#1a1a1e; color:#fff; border:1px solid #333; border-radius:6px; box-sizing:border-box;" onkeydown="if(event.key === 'Enter') window.updateMapPreview()">
+       <button onclick="document.getElementById('modal-location-input').value=''; if(window.leafletMarker && window.leafletMap) { window.leafletMap.removeLayer(window.leafletMarker); window.leafletMarker = null; }" style="position:absolute; right: 95px; top: 50%; transform: translateY(-50%); background:transparent; border:none; color:#888; cursor:pointer; font-weight:bold; font-size:16px;" title="Clear Address">X</button>
+       <button id="map-search-btn" class="btn-outline" style="margin:0; width:80px;" onclick="window.updateMapPreview()">SEARCH</button>
+    </div>
+    <div id="modal-leaflet-map" style="width:100%; height:400px; background:#111; border:1px solid #333; border-radius:6px; overflow:hidden; position:relative; z-index:1;">
+       <div id="modal-map-placeholder" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; justify-content:center; align-items:center; color:#555; pointer-events:none; font-weight:bold; z-index: 999; background: #111;">Loading Map Engine...</div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:12px; margin-top: 15px;">
+       <button class="btn-close" onclick="window.closeLocationModal()">CANCEL</button>
+       <button class="btn-main" onclick="window.saveLocationModal()">APPLY TO PROJECT</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * 02_Project_Editor_Map.html
+ * Domain: Location Geocoding Map & 14-Day Weather Forecast Widget.
+ */
+
+// ==========================================
+// --- LOCATION & WEATHER ENGINE ---
+// ==========================================
+// @INDEX: MAP_ENGINE -> Leaflet Geocoding & Weather
+
+window.leafletMap = null;
+window.leafletMarker = null;
+
+window.WAREHOUSE_ORIGIN = { lat: 42.665702, lng: 23.256019 };
+window.SOFIA_RING_ROAD_POLYGON = [
+    [42.7533, 23.3241], // North (Iliyantsi)
+    [42.7300, 23.4116], // Northeast (Vrazhdebna)
+    [42.6680, 23.4270], // East (Kazichene)
+    [42.6250, 23.3850], // Southeast (Mladost / Lozen)
+    [42.6050, 23.3361], // South (Bistritsa junction)
+    [42.6280, 23.2820], // Southwest (Boyana)
+    [42.6620, 23.2320], // West (Gorna Banya / Knyazhevo)
+    [42.7110, 23.2180], // Northwest (Lyulin)
+    [42.7483, 23.2671]  // North Northwest (Obelya)
+];
+
+window.isPointInPolygon = function(lat, lng, polygon) {
+    let x = lng, y = lat;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        let xi = polygon[i][1], yi = polygon[i][0];
+        let xj = polygon[j][1], yj = polygon[j][0];
+        let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+};
+
+window.calculateDistanceAndZone = async function(lat, lng) {
+    let inSofiaCheckbox = document.getElementById('edit-proj-in-sofia');
+    let distanceInput = document.getElementById('edit-proj-distance');
+    if (!inSofiaCheckbox || !distanceInput) return;
+
+    let inSofia = window.isPointInPolygon(lat, lng, window.SOFIA_RING_ROAD_POLYGON);
+    
+    inSofiaCheckbox.checked = inSofia;
+    window.isProjectDirty = true;
+    
+    if (inSofia) {
+        distanceInput.value = '';
+        distanceInput.placeholder = '0';
+    } else {
+        distanceInput.value = '';
+        distanceInput.placeholder = '...';
+        try {
+            // OSRM expects coordinates in lon,lat
+            let osrmUrl = `https://router.project-osrm.org/route/v1/driving/${window.WAREHOUSE_ORIGIN.lng},${window.WAREHOUSE_ORIGIN.lat};${lng},${lat}?overview=false`;
+            let res = await fetch(osrmUrl);
+            let data = await res.json();
+            if (data.routes && data.routes.length > 0) {
+                let distanceMeters = data.routes[0].distance;
+                distanceInput.value = (distanceMeters / 1000).toFixed(1);
+            } else {
+                distanceInput.value = '';
+                distanceInput.placeholder = '0';
+            }
+        } catch (e) {
+            console.error("OSRM Routing failed:", e);
+            distanceInput.value = '';
+            distanceInput.placeholder = '0';
+        }
+    }
+    
+    if (typeof toggleDistanceInput === 'function') toggleDistanceInput();
+};
+
+window.updateMapPreview = async function() {
+    let val = document.getElementById('modal-location-input').value.trim();
+    if (!val || !window.leafletMap) return;
+    
+    let searchBtn = document.getElementById('map-search-btn');
+    if (searchBtn) searchBtn.innerText = "WAIT";
+
+    try {
+        let res = await fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(val) + "&limit=1");
+        let data = await res.json();
+        
+        if (data && data.length > 0) {
+            let lat = parseFloat(data[0].lat);
+            let lon = parseFloat(data[0].lon);
+            
+            window.leafletMap.setView([lat, lon], 16);
+            if (window.leafletMarker) {
+                window.leafletMarker.setLatLng([lat, lon]);
+            } else {
+                window.leafletMarker = L.marker([lat, lon]).addTo(window.leafletMap);
+            }
+                
+            window.calculateDistanceAndZone(lat, lon);
+        } else {
+            alert("Location not found. Try a different search term.");
+        }
+    } catch(e) {
+        console.error("Map search error: ", e);
+    }
+    if (searchBtn) searchBtn.innerText = "SEARCH";
+};
+
+window.openLocationMap = function() {
+    const loc = document.getElementById('edit-proj-location').value;
+    document.getElementById('modal-location-input').value = loc;
+    document.getElementById('location-modal-overlay').style.display = 'flex';
+    
+    if (!window.leafletMap) {
+        setTimeout(() => {
+            window.leafletMap = L.map('modal-leaflet-map').setView([51.505, -0.09], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(window.leafletMap);
+            document.getElementById('modal-map-placeholder').style.display = 'none';
+
+            window.leafletMap.on('click', async function(e) {
+                let lat = e.latlng.lat; let lng = e.latlng.lng;
+                if (window.leafletMarker) window.leafletMarker.setLatLng([lat, lng]);
+                else window.leafletMarker = L.marker([lat, lng]).addTo(window.leafletMap);
+                
+                window.calculateDistanceAndZone(lat, lng);
+                
+                document.getElementById('modal-location-input').value = "Locating...";
+                try {
+                    let res = await fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng);
+                    let data = await res.json();
+                    if (data && data.display_name) document.getElementById('modal-location-input').value = data.display_name;
+                    else document.getElementById('modal-location-input').value = lat.toFixed(5) + ", " + lng.toFixed(5);
+                } catch(err) { document.getElementById('modal-location-input').value = lat.toFixed(5) + ", " + lng.toFixed(5); }
+            });
+            
+            if (loc.trim() !== "") window.updateMapPreview();
+        }, 200);
+    } else {
+        setTimeout(() => {
+            window.leafletMap.invalidateSize();
+            if (loc.trim() !== "") window.updateMapPreview();
+            else if (window.leafletMarker) { window.leafletMap.removeLayer(window.leafletMarker); window.leafletMarker = null; }
+        }, 200);
+    }
+};
+
+window.closeLocationModal = function() {
+    document.getElementById('location-modal-overlay').style.display = 'none';
+};
+
+window.saveLocationModal = function() {
+    let val = document.getElementById('modal-location-input').value.trim();
+    let mainInput = document.getElementById('edit-proj-location');
+    if (window.leafletMarker) {
+        let pos = window.leafletMarker.getLatLng();
+        document.getElementById('edit-proj-lat').value = pos.lat;
+        document.getElementById('edit-proj-lng').value = pos.lng;
+    }
+    if (mainInput.value !== val) {
+        mainInput.value = val;
+        window.isProjectDirty = true;
+    }
+    window.closeLocationModal();
+    if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
+};
+
+window.updateLiveWeatherWidget = async function() {
+    let isOutdoor = document.getElementById('edit-proj-outdoor').checked;
+    let container = document.getElementById('weather-widget-container');
+    if (!container) return;
+    
+    // Add horizontal scroll listener on first run
+    if (!container.hasWheelListener) {
+        container.addEventListener('wheel', function(e) {
+            if (container.scrollWidth > container.clientWidth) {
+                e.preventDefault();
+                container.scrollLeft += e.deltaY;
+            }
+        });
+        container.hasWheelListener = true;
+    }
+
+    if (!isOutdoor) {
+        container.style.display = 'none';
+        return;
+    }
+
+    let lat = document.getElementById('edit-proj-lat').value;
+    let lng = document.getElementById('edit-proj-lng').value;
+    let locText = document.getElementById('edit-proj-location').value.trim();
+    
+    let sDateStr = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+    let eDateStr = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : sDateStr;
+
+    if ((!lat || !lng) && locText && sDateStr) {
+        try {
+            let res = await fetch("https://nominatim.openstreetmap.org/search?format=json&q=" + encodeURIComponent(locText) + "&limit=1");
+            let data = await res.json();
+            if (data && data.length > 0) {
+                lat = parseFloat(data[0].lat);
+                lng = parseFloat(data[0].lon);
+                document.getElementById('edit-proj-lat').value = lat;
+                document.getElementById('edit-proj-lng').value = lng;
+                if (!window.currentReadinessState) window.currentReadinessState = {};
+                window.currentReadinessState.coords = { lat: lat, lng: lng };
+            }
+        } catch(e) { console.error("Auto-geocode failed:", e); }
+    }
+
+    if (!lat || !lng || !sDateStr) {
+        container.style.display = 'flex';
+        container.innerHTML = '<div style="color:#a1a1aa; font-size:10px; padding:4px; text-align:center;">Set Map Location & Date</div>';
+        return;
+    }
+
+    container.style.display = 'flex';
+    container.innerHTML = '<div style="color:#10b981; font-size:10px; padding:4px; text-align:center;">Fetching...</div>';
+
+    try {
+        let url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lng + "&daily=weathercode,temperature_2m_max,temperature_2m_min,windspeed_10m_max,precipitation_probability_max&timezone=auto&forecast_days=14";
+        let res = await fetch(url);
+        let data = await res.json();
+        
+        if (!data || !data.daily) throw new Error("No data");
+        
+        let daily = data.daily;
+        let html = '';
+        let sDate = new Date(sDateStr + "T00:00:00Z");
+        let eDate = new Date(eDateStr + "T23:59:59Z");
+        let hasForecast = false;
+        
+        for (let i = 0; i < daily.time.length; i++) {
+            let dStr = daily.time[i];
+            let dObj = new Date(dStr + "T12:00:00Z"); 
+            
+            if (dObj >= sDate && dObj <= eDate) {
+                hasForecast = true;
+                let code = daily.weathercode[i];
+                let maxT = daily.temperature_2m_max[i];
+                let minT = daily.temperature_2m_min[i];
+                let wind = daily.windspeed_10m_max[i];
+                let rainProb = daily.precipitation_probability_max[i] || 0;
+                
+                let icon = 'SUN'; let desc = 'Clear'; 
+                if (code == null) { icon = 'CLR'; desc = 'Unknown'; } 
+                else if (code >= 1 && code <= 3) { icon = 'CLOUD'; desc = 'Cloudy'; }
+                else if (code >= 45 && code <= 48) { icon = 'FOG'; desc = 'Fog'; } 
+                else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) { icon = 'RAIN'; desc = 'Rain'; }
+                else if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) { icon = 'SNOW'; desc = 'Snow'; }
+                else if (code >= 95) { icon = 'STORM'; desc = 'Storm'; }
+                
+                let alertBorder = '';
+                if (maxT > 35 || maxT < 5 || wind > 40 || rainProb > 50) {
+                    alertBorder = 'border-top: 2px solid #ef4444;';
+                } else {
+                    alertBorder = 'border-top: 2px solid #333;';
+                }
+                
+                let dayName = dObj.toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', timeZone: 'UTC'});
+                
+                html += '<div style="background:#0a0a0c; ' + alertBorder + ' border-radius:4px; padding:6px 10px; display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap: 10px; min-width:140px; height:100%; box-sizing:border-box; flex-shrink:0;">' +
+                    '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-width: 45px;">' +
+                        '<div style="color:#a1a1aa; font-size:11px; font-weight:bold; text-transform:uppercase;">' + dayName + '</div>' +
+                        '<div style="font-size:11px; font-weight:bold; color:#f59e0b; margin-top:2px;" title="' + desc + '">' + icon + '</div>' +
+                    '</div>' +
+                    '<div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:center; flex:1;">' +
+                        '<div style="color:#fff; font-size:14px; font-weight:bold; line-height:1.2; white-space:nowrap;">' + Math.round(maxT) + 'C<span style="color:#888; font-weight:normal; font-size:11px; margin-left:4px;">' + Math.round(minT) + 'C</span></div>' +
+                        '<div style="color:#06b6d4; font-size:12px; font-weight:bold; margin-top:3px; white-space:nowrap;" title="Max Wind Speed">Wind: ' + Math.round(wind) + ' <span style="font-weight:normal; opacity:0.7; font-size:10px;">km/h</span></div>' +
+                        '<div style="color:#3b82f6; font-size:12px; font-weight:bold; margin-top:1px; white-space:nowrap;" title="Chance of Rain">Rain: ' + rainProb + '<span style="font-weight:normal; opacity:0.7; font-size:10px;">%</span></div>' +
+                    '</div>' +
+                '</div>';
+            }
+        }
+        
+        if (hasForecast) {
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '<div style="color:#a1a1aa; font-size:10px; padding:4px; text-align:center;">Outside 14-day window.</div>';
+        }
+    } catch (e) {
+        container.innerHTML = '<div style="color:#ef4444; font-size:10px; padding:4px; text-align:center;">Failed to load.</div>';
+    }
+};
+</script>

@@ -1,0 +1,506 @@
+<!-- @INDEX: FORMS -> Crew & IAM Provisioning -->
+<div id="add-member-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
+  <div class="modal" style="max-width: 600px; width: 95%;">
+    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">👤 Provision New User</h3>
+    <div style="display:flex; gap:10px; margin-bottom: 15px;">
+        <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Full Name</div><input type="text" id="add-member-name" placeholder="John Doe" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></div>
+        <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Email Address</div><input type="email" id="add-member-email" placeholder="john@company.com" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></div>
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Passcode (6)</div><input type="text" id="add-member-pass" placeholder="••••••" maxlength="6" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; letter-spacing: 2px; text-align:center;"></div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom: 20px; padding-top: 15px; border-top: 1px solid #333;">
+        <div style="flex:0.6;"><div class="input-label" style="font-size: 12px;">Pay Mult.</div><input type="number" step="0.1" id="add-member-mult" value="1.0" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #10b981; color:#10b981; font-weight:bold; border-radius:4px; text-align:center;"></div>
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Assignment (Role)</div><select id="add-member-assign" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Department</div><select id="add-member-dept" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Meal Preference</div><select id="add-member-meal" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom: 20px; padding-top: 15px; border-top: 1px solid #333;">
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">DATA: Role Name</div><select id="add-member-role" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('add-member-modal-overlay').style.display='none';">CANCEL</button>
+      <button id="btn-submit-member" class="btn-add" style="width:auto; margin:0;" onclick="submitNewMember()">ADD TO ROSTER</button>
+    </div>
+  </div>
+</div>
+
+<div id="edit-member-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
+  <div class="modal" style="max-width: 750px; width: 95%;">
+    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">✏️ Edit Crew Profile</h3>
+    <input type="hidden" id="edit-member-uid">
+    <div style="display:flex; gap:10px; margin-bottom: 15px;">
+        <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Full Name</div><input type="text" id="edit-member-name" disabled style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#27272a; border:1px solid #3f3f46; color:#a1a1aa; border-radius:4px;"></div>
+        <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Email Address</div><input type="email" id="edit-member-email" disabled style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#27272a; border:1px solid #3f3f46; color:#a1a1aa; border-radius:4px;"></div>
+        <div style="flex:0.6;"><div class="input-label" style="font-size: 12px;">Pay Mult.</div><input type="number" step="0.1" id="edit-member-mult" value="1.0" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #10b981; color:#10b981; font-weight:bold; border-radius:4px; text-align:center;"></div>
+        <div style="flex:1.5;">
+            <div class="input-label" style="font-size: 12px;">Passcode (6)</div>
+            <div style="position:relative; width:100%;">
+                <input type="password" id="edit-member-pass" maxlength="6" style="width:100%; box-sizing:border-box; margin:0; padding:12px; padding-right:35px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; letter-spacing: 2px; text-align:center;">
+                <button type="button" style="position:absolute; right:5px; top:50%; transform:translateY(-50%); background:none; border:none; color:#a1a1aa; cursor:pointer; font-size:16px; padding:0; margin:0;" onclick="togglePassVisibility('edit-member-pass', this)">👁️</button>
+            </div>
+        </div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom: 20px; padding-top: 15px; border-top: 1px solid #333;">
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Assignment (Role)</div><select id="edit-member-assign" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"></select></div>
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Department</div><select id="edit-member-dept" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"></select></div>
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Meal Preference</div><select id="edit-member-meal" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"></select></div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom: 20px; padding-top: 15px; border-top: 1px solid #333;">
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">DATA: Role Name</div><select id="edit-member-role" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"></select></div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; align-items: center; justify-content: space-between;">
+      <button class="btn-delete" style="width:auto; margin:0;" onclick="deleteUserFromEdit()">DELETE USER</button>
+      <div style="display:flex; gap:12px; flex: 1; justify-content: flex-end;">
+        <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('edit-member-modal-overlay').style.display='none';">CANCEL</button>
+        <button id="btn-submit-edit" class="btn-main req-sys_manage_users" style="width:auto; margin:0;" onclick="submitEditMember()">SAVE PROFILE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="iam-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
+  <div class="modal" style="max-width: 680px; width: 95%;">
+    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">🔑 Role Matrix Editor</h3>
+    
+    <div style="display:flex; gap:10px; margin-bottom:15px; align-items:flex-end;">
+      <div style="flex:1;">
+        <div class="input-label" style="font-size: 13px;">Select Role</div>
+        <div style="display:flex; gap: 10px;">
+            <select id="role-select" style="flex:1; padding:14px; box-sizing:border-box; background:#111; color:#10b981; border:1px solid #10b981; font-weight:bold; font-size:14px;" onchange="if(typeof handleRoleSelectionChange === 'function') handleRoleSelectionChange()">
+                <option value="NEW" style="display:none;"></option>
+            </select>
+            <button class="btn-green" style="width: 50px; margin: 0; padding: 0; font-size: 24px; display:flex; align-items:center; justify-content:center;" onclick="document.getElementById('role-select').value='NEW'; if(typeof handleRoleSelectionChange === 'function') handleRoleSelectionChange();">+</button>
+        </div>
+      </div>
+    </div>
+    
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+        <div style="flex:2;">
+            <div class="input-label" style="font-size: 13px;">Role Name (Edit or New)</div>
+            <input type="text" id="role-name" placeholder="Enter Role Name" style="width:100%; padding:14px; box-sizing:border-box; font-size:14px; background:#111; color:#fff; border:1px solid #333;">
+        </div>
+        <div style="flex:1;">
+            <div class="input-label" style="font-size: 13px;">System Access</div>
+            <select id="role-sysAccess" style="width:100%; padding:14px; box-sizing:border-box; background:#111; color:#fff; border:1px solid #333; font-size:14px;">
+                <option value="CREW">CREW (Standard Worker)</option>
+                <option value="EDITOR">EDITOR (Logistics / Ops)</option>
+                <option value="MANAGER">MANAGER (Global Oversight)</option>
+                <option value="ADMIN">ADMIN (System Admin)</option>
+                <option value="ROOT">ROOT (Master Override)</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="input-label" style="font-size: 13px;">Logic Keys & Permissions</div>
+    
+    <div style="display:grid; grid-template-columns: 30px 1fr; gap: 12px; align-items:center; background: #18181b; padding: 20px; border-radius: 6px; border: 1px solid #3f3f46; max-height: 50vh; overflow-y: auto; overflow-x: hidden;">
+      
+      <!-- GLOBAL VIEWS -->
+      <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Global Database Views</div>
+      <input type="checkbox" id="db_view_assets" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_assets').click()">View Asset Registry</div>
+      <input type="checkbox" id="db_view_vehicles" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_vehicles').click()">View Vehicles Directory</div>
+      <input type="checkbox" id="db_view_warehouses" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_warehouses').click()">View Warehouse Roots</div>
+      <input type="checkbox" id="db_view_clients" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_clients').click()">View Clients Directory</div>
+      
+      <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
+
+      <!-- LOGISTICS & EVENTS -->
+      <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Events & Logistics</div>
+      <input type="checkbox" id="event_create_standard" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_create_standard').click()">Create Standard Events</div>
+      
+      <input type="checkbox" id="event_create_crossrent" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_create_crossrent').click()">Create Cross-Rent Events</div>
+
+      <input type="checkbox" id="event_edit_timeline" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_edit_timeline').click()">Edit Event Timeline & Phases</div>
+      
+      <input type="checkbox" id="event_assets_window" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_assets_window').click()">Access Event Assets Window (Pack Gear)</div>
+
+      <input type="checkbox" id="event_view_pricing" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#10b981; font-size:15px; font-weight:bold; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_view_pricing').click()">💵 View Pricing/Offers in Assets Window</div>
+
+      <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
+
+      <input type="checkbox" id="view_month_roster" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('view_month_roster').click()">View Master Month Roster Matrix</div>
+
+      <input type="checkbox" id="view_logistics" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('view_logistics').click()">View Live Logistics Phase Tracking</div>
+
+      <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
+
+      <!-- TASKS -->
+      <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Tasks & Freelancers</div>
+      <input type="checkbox" id="task_manage_global" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('task_manage_global').click()">Manage Global Workbox Tasks</div>
+
+      <input type="checkbox" id="task_manage_personal" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('task_manage_personal').click()">Mark Self-Assigned Tasks as Done</div>
+
+      <input type="checkbox" id="Is_Tunneling" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;"> 
+      <div style="color:#f59e0b; font-size:15px; font-weight:bold; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('Is_Tunneling').click()">🛡️ Freelancer Node-Lock (Tunneling)</div>
+
+      <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
+
+      <!-- FINANCIALS -->
+      <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Financials & Deep Vault</div>
+      <input type="checkbox" id="hr_view_rates" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('hr_view_rates').click()">HR: View Crew Day-Rates & Details</div>
+
+      <input type="checkbox" id="fin_view_roi" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('fin_view_roi').click()">Financials: View Project ROI & Margin</div>
+
+      <input type="checkbox" id="fin_view_internal" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('fin_view_internal').click()">Financials: View Deep Vault Internal Prices</div>
+
+    </div>
+    
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: space-between; align-items: center;">
+      <button id="btn-duplicate-role" class="btn-green" style="width:auto; margin:0; display:none;" onclick="if(typeof duplicateRole === 'function') duplicateRole()">DUPLICATE ROLE</button>
+      <button id="btn-delete-role" class="btn-delete" style="width:auto; margin:0; display:none;" onclick="if(typeof deleteRole === 'function') deleteRole()">DELETE ROLE</button>
+      <div style="display:flex; gap:12px; flex:1; justify-content: flex-end;">
+        <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('iam-modal-overlay').style.display='none';">CANCEL</button>
+        <button id="btn-save-role" class="btn-main req-sys_manage_roles" style="width:auto; margin:0;" onclick="submitRole()">SAVE ROLE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: FORMS -> Asset Provisioning & QR -->
+<div id="asset-modal-overlay" class="modal-overlay" style="z-index: 3500; display:none;">
+  <div class="modal" style="max-width: 1200px; width: 95%; max-height: 90vh; overflow-y: hidden; display:flex; flex-direction:row; gap: 20px;">
+    
+    <!-- Main Form Content -->
+    <div style="flex:2; overflow-y:auto; padding-right:15px; display:flex; flex-direction:column;">
+      <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">📦 Provision Asset</h3>
+
+      <div id="audit-checklist-panel" style="display:none; background: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; border-radius: 6px; padding: 10px; margin-bottom: 15px;">
+        <div style="font-size: 11px; font-weight: bold; color: #3b82f6; margin-bottom: 8px; text-transform: uppercase;">Audit Checklist (Touch fields to verify)</div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <span id="chk-name" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Name ✖</span>
+            <span id="chk-level" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Nesting Lvl ✖</span>
+            <span id="chk-qty" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Quantity ✖</span>
+            <span id="chk-loc" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Location ✖</span>
+            <span id="chk-dims" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Dims ✖</span>
+            <span id="chk-weight" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Weight ✖</span>
+            <span id="chk-dept" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Department ✖</span>
+            <span id="chk-owner" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Owner ✖</span>
+            <span id="chk-tags" class="audit-chk-badge" style="background:#ef4444; color:#fff; padding:3px 8px; border-radius:4px; font-size:10px; font-weight:bold; transition:0.2s;">Tags ✖</span>
+        </div>
+    </div>
+    <div style="display:flex; gap:15px; flex-wrap: wrap; flex:1;">
+        <!-- Column 1: System Critical -->
+        <div style="flex:1; min-width: 200px; display: flex; flex-direction: column; gap: 10px;">
+            <h4 style="color:#10b981; margin:0; font-size:11px; text-transform:uppercase; letter-spacing:1px;">System</h4>
+            <div style="display:flex; gap:10px; width:100%;">
+                <div style="flex:2; min-width:0;">
+                    <div class="input-label" style="margin-bottom:4px;">Asset Name *</div>
+                    <div style="position: relative; width: 100%; background: #111; border-radius: 4px;">
+                        <input type="text" id="asset-name-ghost" disabled style="position: absolute; top:0; left:0; width: 100%; box-sizing: border-box; padding:10px; margin:0; background: transparent; border: 1px solid transparent; color: #555; z-index: 1; pointer-events: none; font-family: inherit; font-size: inherit;">
+                        <input type="text" id="asset-name" onfocus="if(window.markAuditField) markAuditField('name')" oninput="handleAssetNameInput()" onkeydown="handleAssetNameKeydown(event)" autocomplete="off" placeholder="e.g. Martin Mac Aura" style="position: relative; width: 100%; box-sizing: border-box; padding:10px; border: 1px solid #10b981; margin:0; box-shadow: inset 0 0 5px rgba(16,185,129,0.15); background: transparent; z-index: 2; color: #fff; font-family: inherit; font-size: inherit;">
+                    </div>
+                </div>
+                <div style="flex:0.8; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Unit # *</div><input type="text" id="asset-unit-number" placeholder="e.g. 01" style="width: 100%; box-sizing: border-box; padding:10px; border: 1px solid #10b981; margin:0; box-shadow: inset 0 0 5px rgba(16,185,129,0.15);"></div>
+                <div style="flex:0.8; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Quantity</div><input type="number" id="asset-quantity" onfocus="if(window.markAuditField) markAuditField('qty')" value="1" min="1" style="width: 100%; box-sizing: border-box; padding:10px; border: 1px solid #10b981; margin:0; box-shadow: inset 0 0 5px rgba(16,185,129,0.15);"></div>
+            <input type="hidden" id="asset-capacity" value="">
+            </div>
+            <div style="display:flex; gap:10px; width:100%;">
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">RFID / Barcode Tag</div><input type="text" id="asset-rfid" placeholder="Scan tag or type ID..." style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Serial Number</div><input type="text" id="asset-serial" placeholder="S/N..." style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+            </div>
+            <div style="width:100%;"><div class="input-label" style="margin-bottom:4px;">Manufacturer / Brand</div><input type="text" id="asset-manufacturer" onfocus="if(window.markAuditField) markAuditField('manufacturer')" placeholder="e.g. Martin" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+            <div style="display:flex; gap:10px; width:100%;">
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Nesting Level *</div>
+                    <select id="asset-level" onchange="handleNestingLevelChange()" onfocus="if(window.markAuditField) markAuditField('level')" style="width: 100%; margin:0; box-sizing: border-box; padding:10px; border: 1px solid #10b981; box-shadow: inset 0 0 5px rgba(16,185,129,0.15);">
+                        <option value="6">6 - Asset</option>
+                        <option value="5">5 - Bundle / Pouch</option>
+                        <option value="4">4 - Inner Case / Pelican</option>
+                        <option value="3">3 - Master Case / Workbox</option>
+                    </select>
+                </div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Asset Type *</div>
+                    <select id="asset-type" onchange="if(typeof handleAssetTypeChange === 'function') handleAssetTypeChange()" style="width: 100%; margin:0; box-sizing: border-box; padding:10px; border: 1px solid #10b981; box-shadow: inset 0 0 5px rgba(16,185,129,0.15);">
+                        <option value="Physical">Physical</option>
+                        <option value="Bulk">Bulk</option>
+                        <option value="Virtual">Virtual / Preset</option>
+                    </select>
+                    <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11px; color:#f59e0b; cursor:pointer; font-weight:bold;">
+                        <input type="checkbox" id="asset-is-consumable" onchange="if(typeof handleAssetTypeChange === 'function') handleAssetTypeChange()" style="margin:0; accent-color:#f59e0b; width:14px; height:14px;">
+                        Is Consumable (Fractional Usage)
+                    </label>
+                </div>
+            </div>
+            <div style="width:100%;"><div class="input-label" style="margin-bottom:4px;">Department</div><select id="asset-department" onfocus="if(window.markAuditField) markAuditField('dept')" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"><option value="">None</option></select></div>
+        </div>
+
+        <!-- Column 2: Logistics -->
+        <div style="flex:1; min-width: 200px; display: flex; flex-direction: column; gap: 10px;">
+            <h4 style="color:#3b82f6; margin:0; font-size:11px; text-transform:uppercase; letter-spacing:1px;">Logistics & Storage</h4>
+            <div style="display:flex; gap:10px; width:100%;">
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Warehouse</div><select id="asset-wh" onfocus="if(window.markAuditField) markAuditField('loc')" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;" onchange="updateAssetZones()"><option value="">Select...</option></select></div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Zone</div><select id="asset-zone" onfocus="if(window.markAuditField) markAuditField('loc')" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;" disabled onchange="updateAssetAreas()"><option value="">Select...</option></select></div>
+            </div>
+            <div style="width:100%;"><div class="input-label" style="margin-bottom:4px;">Area</div><select id="asset-area" onfocus="if(window.markAuditField) markAuditField('loc')" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;" disabled><option value="">Select...</option></select></div>
+        <div style="width:100%;"><div class="input-label" style="margin-bottom:4px;">Length (m) <span style="font-size:10px; color:#888; font-weight:normal; text-transform:none; margin-left:5px;">(For Cables / Truss)</span></div><input type="number" step="0.1" id="asset-length" onfocus="if(window.markAuditField) markAuditField('length')" placeholder="e.g. 5.0" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+            <div style="display:flex; gap:10px; width:100%; align-items:flex-end;">
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Net Weight (kg)</div><input type="number" step="0.1" id="asset-weight" onfocus="if(window.markAuditField) markAuditField('weight')" placeholder="0.0" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Dimensions (L*W*H)</div><input type="text" id="asset-dims" onfocus="if(window.markAuditField) markAuditField('dims')" placeholder="cm" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Power Draw (W)</div><input type="number" step="0.1" id="asset-power" placeholder="0.0" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+            </div>
+            <div style="width:100%; margin-top:10px;"><div class="input-label" style="margin-bottom:4px;">Owner / Vendor (Cross-Rent)</div><select id="asset-vendor" onfocus="if(window.markAuditField) markAuditField('owner')" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"><option value="">Internal (Owned)</option></select></div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:15px; flex-wrap: wrap; margin-top: 15px; padding-top: 15px; border-top: 1px solid #333;">
+        <!-- Column 3: Administrative -->
+        <div style="flex:1; min-width: 200px; display: flex; flex-direction: column; gap: 10px;">
+            <h4 style="color:#f59e0b; margin:0; font-size:11px; text-transform:uppercase; letter-spacing:1px;">Administrative</h4>
+            <div style="display:flex; gap:10px; width:100%;">
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Purchase Price</div><input type="number" step="0.01" id="asset-price" onfocus="if(window.markAuditField) markAuditField('price')" placeholder="0.00" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Rental Price / Day</div><input type="number" step="0.01" id="asset-rental" onfocus="if(window.markAuditField) markAuditField('rental')" placeholder="0.00" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+            </div>
+            <div style="display:flex; gap:10px; width:100%;">
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Date Bought</div><input type="date" id="asset-date-bought" onclick="this.showPicker()" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Lifecycle State</div>
+                    <select id="asset-lifecycle" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;">
+                        <option value="Active">Active</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Retired">Retired</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Column 4: Maint & Auto -->
+        <div style="flex:1; min-width: 200px; display: flex; flex-direction: column; gap: 10px;">
+            <h4 style="color:#a855f7; margin:0; font-size:11px; text-transform:uppercase; letter-spacing:1px;">Maintenance & Auto</h4>
+            <div style="display:flex; gap:10px; width:100%;">
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Last Prophylactic</div><input type="date" id="asset-last-service" onclick="this.showPicker()" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+                <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Service Interval (Mo)</div><input type="number" id="asset-service-interval" value="12" placeholder="e.g. 12" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
+            </div>
+            <div>
+                <div class="input-label" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>Rule Words (Tags)</span>
+                    <button class="btn-outline btn-sm" style="margin:0; border-color:var(--accent); color:var(--accent); padding:2px 6px !important;" onclick="if(window.markAuditField) markAuditField('tags'); openTagSelector(event)">+ ADD</button>
+                </div>
+                <div id="asset-tags-list" style="display:flex; flex-wrap:wrap; align-content:flex-start; gap:5px; margin-top:5px; min-height: 80px; background:#111; border:1px solid #333; border-radius:4px; padding:8px;"></div>
+                <input type="hidden" id="asset-tags-hidden" value="[]">
+            </div>
+        </div>
+    </div>
+
+      <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+        <button class="btn-close" style="width:auto; margin:0;" onclick="if(typeof closeAssetModal === 'function') closeAssetModal(false); else document.getElementById('asset-modal-overlay').style.display='none';">CANCEL</button>
+        <button class="btn-main req-db_edit_assets" style="width:auto; margin:0;" onclick="saveAsset()">SAVE ASSET</button>
+      </div>
+    </div>
+
+    <!-- Kit Builder Side Panel -->
+    <div id="kit-builder-panel" style="flex:1; display:none; flex-direction:column; background:#111; border-left:1px solid #333; margin:-30px; margin-left:0; padding:20px; overflow-y:auto;">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding-bottom:10px; margin-bottom:15px;">
+            <h4 style="color:#a855f7; margin:0; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Kit Builder Engine</h4>
+            <select id="kit-builder-mode" onchange="if(typeof renderKitBuilder === 'function') renderKitBuilder()" style="padding:4px 8px; font-size:11px; background:#111; color:#10b981; border:1px solid #10b981; border-radius:4px; width:auto; margin:0; font-weight:bold; cursor:pointer;">
+                <option value="fluid">🌊 FLUID KIT (Template)</option>
+                <option value="fixed">🔒 FIXED RACK (Exact Units)</option>
+            </select>
+        </div>
+        
+        <div class="input-label" style="margin-bottom:8px;">Add Custom Item (Text)</div>
+        <div style="position:relative; margin-bottom:8px;">
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="kit-builder-new-component" placeholder="e.g. Dust Cover, Power Cable" style="flex:1; padding:8px; font-size:11px; margin:0; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:4px;" oninput="if(typeof handleUntrackedInput === 'function') handleUntrackedInput()" onfocus="if(typeof handleUntrackedInput === 'function') handleUntrackedInput()">
+                <button class="btn-add btn-sm" style="width:auto; margin:0; padding:8px 12px !important;" onclick="addUntrackedComponentToKit()">ADD</button>
+                <button id="kit-builder-memorize-btn" class="btn-outline btn-sm" style="width:auto; margin:0; padding:8px 12px !important; display:none; border-color:#a855f7; color:#a855f7;" onclick="if(typeof memorizeUntrackedComponent === 'function') memorizeUntrackedComponent()">MEMORIZE</button>
+            </div>
+            <div id="untracked-memory-dropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; background:#1a1a1e; border:1px solid #333; max-height:200px; overflow-y:auto; z-index:100; border-radius:4px; margin-top:4px; box-shadow: 0 4px 12px rgba(0,0,0,0.8);"></div>
+        </div>
+
+        <div class="input-label" style="margin-bottom:8px; margin-top:10px;">Search Database (Models)</div>
+        <div style="position:relative; margin-bottom:8px;">
+            <input type="text" id="kit-builder-child-search" placeholder="Search for assets to add..." oninput="filterKitBuilderChildSearch()" onfocus="filterKitBuilderChildSearch()" style="width:100%; padding:8px; font-size:11px; margin:0; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:4px; box-sizing:border-box;">
+            <div id="kit-builder-child-dropdown" style="display:none; position:absolute; top:100%; left:0; width:100%; background:#1a1a1e; border:1px solid #333; max-height:200px; overflow-y:auto; z-index:100; border-radius:4px; margin-top:4px; box-shadow: 0 4px 12px rgba(0,0,0,0.8);"></div>
+        </div>
+        <div id="kit-builder-components-list" style="display:flex; flex-direction:column; gap:5px; margin-top:15px; padding-top:15px; border-top:1px solid #333;"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="tag-selector-menu" style="display:none; position:absolute; background:#1a1a1e; border:1px solid #444; border-radius:6px; padding:10px; z-index:9999; box-shadow:0 10px 25px rgba(0,0,0,0.8); width:250px; max-height:300px; overflow-y:auto;">
+   <div style="font-size:10px; color:#888; margin-bottom:10px; font-weight:bold; text-transform:uppercase;">Select Tags</div>
+   <div id="tag-selector-tree"></div>
+</div>
+
+<div id="qr-studio-modal" class="modal-overlay" style="z-index: 6000; display:none;">
+  <div class="modal" style="max-width: 1800px; width: 98vw; height: 95vh; max-height: 95vh; display: flex; flex-direction: column;">
+    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">🖨️ QR Label Print Studio</h3>
+
+    <div style="display:flex; gap:20px; flex:1; overflow:hidden;">
+        <!-- Left: Settings & Aliasing -->
+        <div style="width: 320px; min-width: 320px; display:flex; flex-direction:column; gap:15px; border-right:1px solid #333; padding-right:15px; overflow-y:auto; overflow-x:hidden;">
+            <h4 style="color:#10b981; margin:0; font-size:12px; text-transform:uppercase;">1. Page Layout</h4>
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;"><div class="input-label">Paper Size</div><select id="qr-page-size" onchange="updateQRPreview()" style="padding:10px; margin:0;"><option value="A4">A4</option><option value="A3">A3</option></select></div>
+                <div style="flex:1;"><div class="input-label">Orientation</div><select id="qr-page-orient" onchange="updateQRPreview()" style="padding:10px; margin:0;"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;"><div class="input-label">Columns</div><input type="number" id="qr-cols" value="5" min="1" oninput="updateQRPreview()" style="padding:10px; margin:0;"></div>
+                <div style="flex:1;"><div class="input-label">Rows</div><input type="number" id="qr-rows" value="8" min="1" oninput="updateQRPreview()" style="padding:10px; margin:0;"></div>
+            </div>
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;"><div class="input-label">Frame Width (mm)</div><input type="number" id="qr-label-w" value="35" min="10" oninput="updateQRPreview()" style="padding:10px; margin:0;"></div>
+                <div style="flex:1;"><div class="input-label">Frame Height (mm)</div><input type="number" id="qr-label-h" value="35" min="10" oninput="updateQRPreview()" style="padding:10px; margin:0;"></div>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div style="flex:1;">
+                    <div class="input-label">Case Manifest Format</div>
+                    <select id="qr-manifest-format" onchange="updateQRPreview()" style="padding:10px; margin:0;">
+                        <option value="A7">A7 (8 per page)</option>
+                        <option value="A6">A6 (4 per page)</option>
+                    </select>
+                </div>
+            </div>
+
+            <h4 style="color:#3b82f6; margin:0; font-size:12px; text-transform:uppercase; margin-top:5px;">2. Element Styling</h4>
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1;"><div class="input-label">QR Size (mm)</div><input type="number" id="qr-size-mm" value="25" min="10" oninput="updateQRPreview()" style="padding:10px; margin:0;"></div>
+                <div style="flex:1;"><div class="input-label">Font Size (px)</div><input type="number" id="qr-font-px" value="10" min="6" oninput="updateQRPreview()" style="padding:10px; margin:0;"></div>
+            </div>
+            <div>
+                <div class="input-label">Text Position</div>
+                <select id="qr-text-pos" onchange="updateQRPreview()" style="padding:10px; margin:0;">
+                    <option value="bottom">Below QR Code</option>
+                    <option value="top">Above QR Code</option>
+                    <option value="none">No Text (QR Only)</option>
+                </select>
+            </div>
+
+            <h4 style="color:#a855f7; margin:0; font-size:12px; text-transform:uppercase; margin-top:5px;">3. Smart Aliasing</h4>
+            <p style="font-size:11px; color:#888; margin:0 0 15px 0;">Override the printed name for grouped items. Unit numbers are auto-appended.</p>
+            <div id="qr-alias-list" style="display:flex; flex-direction:column; gap:10px; padding-right:5px; padding-bottom: 20px;"></div>
+        </div>
+
+        <!-- Right: Live Preview -->
+        <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; background:#111; border-radius: 8px; padding: 15px; border: 1px solid #333;">
+             <div style="display:flex; justify-content:space-between; align-items:center; margin:0 0 10px 0;">
+                 <h4 style="color:#f59e0b; margin:0; font-size:12px; text-transform:uppercase;">4. Live Print Preview</h4>
+                 <button class="btn-outline btn-sm" onclick="scaleQRPreview()" style="margin:0; padding:4px 10px !important;">FIT TO SCREEN</button>
+             </div>
+             <div id="qr-preview-container" style="flex:1; overflow:hidden; background:#0a0a0c; border: 1px inset #222; border-radius: 6px; position: relative;">
+                 <div id="qr-preview-wrapper" style="position:absolute; top:0; left:0; transform-origin: 0 0; transition: transform 0.05s linear;">
+                 </div>
+             </div>
+             <div style="text-align:center; color:#a1a1aa; font-size:11px; margin-top:10px; font-weight:bold;" id="qr-preview-info">Loading preview... (Scroll to zoom, Click & drag to pan)</div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="closeQRStudio()">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="executeQRPrint()">🖨️ CONFIRM & PRINT</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: FORMS -> Warehouse Roots -->
+<div id="root-modal-overlay" class="modal-overlay" style="z-index: 3500; display:none;">
+  <div class="modal" style="max-width: 500px; width: 95%;">
+    <h3 id="root-modal-title" style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">🏭 Provision Root (Level 0)</h3>
+    <input type="hidden" id="root-id">
+    <div style="display:flex; gap:10px; margin-bottom: 10px;">
+        <div style="flex:2;"><div class="input-label">Location Name *</div><input type="text" id="root-name" placeholder="e.g. Main HQ" style="padding:10px;"></div>
+        <div style="flex:1;"><div class="input-label">Type *</div>
+            <select id="root-type" style="padding:10px;">
+                <option value="Warehouse">Warehouse</option>
+                <option value="Truck">Mobile Truck</option>
+            </select>
+        </div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom: 10px;">
+        <div style="flex:1;"><div class="input-label">Max Payload (kg)</div><input type="number" id="root-kg" placeholder="e.g. 12000" style="padding:10px;"></div>
+        <div style="flex:1;"><div class="input-label">Max Volume (m³)</div><input type="number" id="root-m3" placeholder="e.g. 40" style="padding:10px;"></div>
+    </div>
+    <div style="margin-bottom: 10px;"><div class="input-label">Physical Address / License Plate</div><input type="text" id="root-address" placeholder="e.g. 123 Tech Lane" style="padding:10px;"></div>
+    <div style="margin-bottom: 10px;">
+        <div class="input-label">Google Maps Link (URL)</div>
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="root-map-url" placeholder="https://maps.google.com/..." style="padding:10px; flex:1; margin:0;">
+            <button class="btn-outline" style="width:auto; margin:0; border-color:#3b82f6; color:#3b82f6;" onclick="window.open('https://maps.google.com/?q=' + encodeURIComponent(document.getElementById('root-address').value), '_blank')" title="Search Address on Maps">📍 PINPOINT ON MAP</button>
+        </div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+      <button id="btn-del-root" class="btn-delete" style="width:auto; margin:0; margin-right:auto; display:none;" onclick="deleteRoot()">DELETE</button>
+      <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('root-modal-overlay').style.display='none';">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="saveRoot()">SAVE ROOT</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: FORMS -> Clients -->
+<div id="client-modal-overlay" class="modal-overlay" style="z-index: 4000; display:none;">
+  <div class="modal" style="max-width: 500px; width: 95%;">
+    <h3 id="client-modal-title" style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">🤝 Provision New Client</h3>
+    <input type="hidden" id="client-uid">
+    <div class="input-label">Client Name *</div>
+    <input type="text" id="client-name" placeholder="e.g. Acme Corp" style="margin-bottom:10px;">
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="flex:1;"><div class="input-label">Contact Email</div><input type="email" id="client-email" placeholder="contact@acme.com"></div>
+      <div style="flex:1;"><div class="input-label">Phone</div><input type="text" id="client-phone" placeholder="+1 555 123 4567"></div>
+    </div>
+    <div class="input-label">Notes</div>
+    <textarea id="client-notes" rows="3" style="width:100%; padding:10px; background:#27272a; border:1px solid #333; color:#fff; border-radius:6px; resize:vertical; font-family: inherit; box-sizing: border-box; margin-bottom: 10px;"></textarea>
+    <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; border-top: 1px solid #333; padding-top: 15px;">
+      <button class="btn-delete" id="btn-del-client" style="margin:0; margin-right:auto; display:none;" onclick="deleteClient()">DELETE</button>
+      <button class="btn-close" onclick="document.getElementById('client-modal-overlay').style.display='none'">CANCEL</button>
+      <button class="btn-main" id="btn-save-client" onclick="saveClient()">SAVE CLIENT</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: FORMS -> Vehicles -->
+<div id="vehicle-modal-overlay" class="modal-overlay" style="z-index: 6000; display:none;">
+  <div class="modal" style="max-width: 600px; width: 95%;">
+    <h3 id="veh-modal-title" style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">🚛 Provision Vehicle</h3>
+    <input type="hidden" id="veh-id">
+    
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom: 15px; color:#f59e0b; font-weight:bold; font-size:12px;">
+        <input type="checkbox" id="veh-generic" onchange="toggleGenericVehicle()" style="width:18px; height:18px; margin:0; accent-color:#f59e0b;">
+        Generic / Random Rental Truck (Hide Plate & Model)
+    </label>
+
+    <div class="input-label">Vehicle / Fleet Name *</div>
+    <input type="text" id="veh-name" placeholder="e.g. Main 18-Wheeler or Generic 20ft Box" style="margin-bottom:10px;">
+
+    <div id="veh-specific-fields" style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="flex:1;"><div class="input-label">License Plate</div><input type="text" id="veh-plate" placeholder="ABC-1234"></div>
+      <div style="flex:1;"><div class="input-label">Make / Model</div><input type="text" id="veh-model" placeholder="e.g. Mercedes Sprinter"></div>
+    </div>
+
+    <div style="margin-bottom:15px;">
+      <div class="input-label">Owner / Vendor</div>
+      <input type="text" id="veh-vendor" placeholder="Internal or Rental Co. Name">
+    </div>
+
+    <h4 style="color:#3b82f6; margin:0 0 10px 0; font-size:11px; text-transform:uppercase; letter-spacing:1px; border-top:1px solid #333; padding-top:15px;">Cargo Dimensions (Loading Area)</h4>
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="flex:1;"><div class="input-label">Length (m)</div><input type="number" step="0.1" id="veh-l" placeholder="0.0" oninput="calcVehicleVolume()"></div>
+      <div style="flex:1;"><div class="input-label">Width (m)</div><input type="number" step="0.1" id="veh-w" placeholder="0.0" oninput="calcVehicleVolume()"></div>
+      <div style="flex:1;"><div class="input-label">Height (m)</div><input type="number" step="0.1" id="veh-h" placeholder="0.0" oninput="calcVehicleVolume()"></div>
+    </div>
+    <div style="display:flex; gap:10px; margin-bottom:10px;">
+      <div style="flex:1;"><div class="input-label">Max Payload (kg)</div><input type="number" id="veh-kg" placeholder="0"></div>
+      <div style="flex:1;"><div class="input-label">Max Volume (m³)</div><input type="number" step="0.1" id="veh-vol" placeholder="0.0"></div>
+      <div style="flex:1;"><div class="input-label">Tail Lift Cap. (kg)</div><input type="number" id="veh-lift" placeholder="0 (Optional)"></div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; align-items:center; gap:10px; border-top: 1px solid #333; padding-top: 15px; margin-top: 10px;">
+      <button class="btn-delete" id="btn-del-veh" style="margin:0; margin-right:auto; display:none;" onclick="deleteVehicle()">DELETE</button>
+      <button class="btn-close" onclick="document.getElementById('vehicle-modal-overlay').style.display='none'">CANCEL</button>
+      <button class="btn-main" id="btn-save-veh" onclick="saveVehicle()">SAVE VEHICLE</button>
+    </div>
+  </div>
+</div>

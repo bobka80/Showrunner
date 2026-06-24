@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en-GB"> <head>
+  <base target="_top">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <?!= include('Styles'); ?>
+
+</head>
+<body>
+
+<!-- @INDEX: SHELL -> Mobile Dashboard -->
+<!-- MOBILE DASHBOARD SHELL (Takes over on phones) -->
+<div id="mobile-dashboard" style="display:none;">
+    <div id="mobile-header" style="height:60px; background:var(--bg-sidebar); border-bottom:1px solid #333; display:flex; align-items:center; padding:0 15px; flex-shrink:0;">
+        <button id="mobile-back-btn" class="btn-outline" onclick="goMobileHome()" style="border:none; color:var(--accent); font-weight:bold; font-size:12px; display:none; background:transparent !important;">⬅ BACK</button>
+        <div id="mobile-title" style="flex:1; text-align:center; font-weight:900; font-size:16px; color:#fff;">COMMAND CENTER</div>
+        <div style="width:60px;"></div> 
+    </div>
+
+    <div id="mobile-view-home" class="mobile-view" style="display:flex; flex-direction:column; gap:15px; padding: 20px; flex:1; overflow-y:auto;">
+       <div style="text-align:center; padding:20px 0;">
+           <div style="font-size: 40px; margin-bottom: 10px;">⚡</div>
+           <h1 style="color:var(--text-main); margin:0;">SHOWRUNNER</h1>
+           <p style="color:var(--text-muted); font-size:12px; margin-top:5px;">Mobile Command</p>
+       </div>
+       <button class="btn-outline btn-mobile-nav" onclick="openMobileEvents()">📅 EVENTS DIRECTORY</button>
+       <button class="btn-outline btn-mobile-nav" onclick="openMobileRFID()">📡 MAP RFID TAGS</button>
+       <button class="btn-outline btn-mobile-nav" onclick="openMobileNotifs()">🔔 NOTIFICATIONS <span id="mobile-notif-badge" style="background:#ef4444; color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; margin-left:auto; display:none;"></span></button>
+    </div>
+
+    <div id="mobile-view-events" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+       <div id="mobile-event-list" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+
+    <div id="mobile-view-rfid" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow-y:auto; padding:20px; gap:15px;">
+       <!-- Desktop-Parity Search Header -->
+       <div style="background:#1a1a1e; border:1px solid #333; padding:15px; border-radius:8px; display:flex; flex-direction:column; gap:10px; flex-shrink:0;">
+           <div style="display:flex; justify-content:space-between; align-items:center;">
+               <span style="color:#10b981; font-weight:900; font-size:12px;">ASSET REGISTRY</span>
+               <button class="btn-outline btn-sm" style="border-color:#10b981; color:#10b981; margin:0;" onclick="startNFCScan()">📡 SCAN HELP</button>
+           </div>
+           <input type="text" id="mobile-search-name" placeholder="Search Asset Name..." style="padding:12px; background:#111; color:#fff; border:1px solid #444; border-radius:6px; font-size:14px;" oninput="renderMobileRFIDList()">
+           <input type="text" id="mobile-search-tag" placeholder="Search Tag or Dept..." style="padding:12px; background:#111; color:#fff; border:1px solid #444; border-radius:6px; font-size:14px;" oninput="renderMobileRFIDList()">
+       </div>
+       <!-- Infinite Mobile Asset List -->
+       <div id="mobile-rfid-list" style="flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+
+    <div id="mobile-view-notifs" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+       <div id="mobile-notifs-container" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:10px;"></div>
+       <div style="padding:15px; background:var(--bg-sidebar); border-top:1px solid #333;"><button class="btn-delete" style="width:100%; font-size:14px!important;" onclick="clearAllNotifs(); goMobileHome();">CLEAR ALL</button></div>
+    </div>
+</div>
+
+<div class="dashboard">
+  <!-- @INDEX: SHELL -> Global Left Nav -->
+  <!-- LEFT GLOBAL NAVIGATION BAR -->
+  <div id="left-nav-bar" style="width: 60px; min-width: 60px; background: var(--bg-dark); border-right: 1px solid #1a1a1f; display: flex; flex-direction: column; align-items: center; padding: 15px 0; z-index: 9999; box-sizing: border-box;">
+      
+      <!-- Top Section (Popups) -->
+      <div style="display: flex; flex-direction: column; gap: 5px; width: 100%; align-items: center;">
+          <div id="nav-notif-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="openNotifDrawer()" onmouseleave="closeNotifDrawer()">
+              <button class="nav-icon-btn" onclick="toggleNotifDropdown()" title="Notifications">
+                  <div style="position: relative; display: inline-flex;">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                      <span id="floating-notif-badge" style="display:none; position: absolute; top: -6px; right: -8px; background: #ef4444; color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 10px; font-weight: 900; box-shadow: 0 0 8px rgba(239,68,68,0.8);">0</span>
+                  </div>
+              </button>
+              <div id="notif-drawer-wrapper" style="position: absolute; left: 60px; top: 0; width: 350px; background: var(--bg-cell); border: 1px solid #333; border-radius: 0 8px 8px 0; display: none; flex-direction: column; overflow: hidden; text-align: left; z-index: 100; box-shadow: 10px 10px 30px rgba(0,0,0,0.8);">
+                  <div style="padding: 12px 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; background: #111;">
+                      <span style="color: #fff; font-weight: 900; font-size: 13px;">NOTIFICATIONS</span>
+                  </div>
+                  <div id="notif-dropdown-list" style="max-height: 66vh; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
+                  <div style="padding: 10px; border-top: 1px solid #333; text-align: center; background: #111;">
+                      <button class="btn-delete btn-sm" style="width: 100%; margin:0;" onclick="clearAllNotifs()">✖ CLEAR ALL</button>
+                  </div>
+              </div>
+          </div>
+
+          <div id="nav-task-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('task-drawer-wrapper').style.display='flex'" onmouseleave="document.getElementById('task-drawer-wrapper').style.display='none'">
+              <button class="nav-icon-btn" title="Global Tasks" onclick="openTaskModal()">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+              </button>
+              <div id="task-drawer-wrapper" style="position: absolute; left: 60px; top: 0; width: 320px; background: #1a1a1e; border: 1px solid #333; border-radius: 0 8px 8px 0; display: none; flex-direction: column; overflow: hidden; z-index: 100; box-shadow: 10px 5px 25px rgba(0,0,0,0.8);">
+                  <div style="padding: 12px 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; background: #111;">
+                      <span style="color: var(--accent); font-weight: 900; font-size: 12px;">ACTIVE TASKS</span>
+                      <button class="btn-outline btn-sm" style="margin:0; border-color:var(--accent); color:var(--accent);" onclick="openTaskModal()">+ ADD</button>
+                  </div>
+                  <div id="tasks-list" style="max-height: 66vh; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
+              </div>
+          </div>
+      </div>
+
+      <div style="height: 25px;"></div>
+
+      <!-- Middle Section (Full Screen Operations) -->
+      <div style="display: flex; flex-direction: column; gap: 5px; width: 100%; align-items: center;">
+          <button id="nav-btn-dashboard" class="nav-icon-btn nav-active" onclick="activateDashboardView()" title="Toggle Calendar / List View">
+              <svg id="nav-icon-cal" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <svg id="nav-icon-list" style="display: none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+              <svg id="nav-icon-project" style="display: none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </button>
+          
+          <div id="asset-conflict-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('asset-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('asset-conflict-drawer').style.display='none'">
+              <button id="nav-btn-availability" class="nav-icon-btn" onclick="openAvailabilityDashboard()" title="Global Availability & Fleet">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                  <div id="asset-conflict-badges" style="position: absolute; right: 2px; top: 2px; display: flex; flex-direction: column; gap: 2px; pointer-events: none;"></div>
+              </button>
+              <div id="asset-conflict-drawer" style="display: none; position: absolute; left: 60px; top: 0; width: 320px; background: #1a1a1e; border: 1px solid #333; border-radius: 0 8px 8px 0; box-shadow: 10px 5px 25px rgba(0,0,0,0.8); z-index: 100; flex-direction: column; overflow: hidden;">
+                  <div style="background: #111; padding: 12px 15px; font-weight: 900; font-size: 12px; border-bottom: 1px solid #333; color: #ef4444;">🚨 ASSET SHORTAGES</div>
+                  <div id="asset-conflict-drawer-list" style="max-height: 400px; overflow-y: auto; padding: 0;">
+                      <div style="padding: 15px; text-align: center; color: #888; font-size: 11px;">No active asset shortages.</div>
+                  </div>
+              </div>
+          </div>
+
+          <div id="crew-conflict-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('crew-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('crew-conflict-drawer').style.display='none'">
+              <button id="nav-btn-roster" class="nav-icon-btn" onclick="openMonthRoster()" title="Month Roster & Crew Conflicts">
+                  <div style="position: relative; display: inline-flex;">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="7" y1="14" x2="17" y2="14"></line><line x1="11" y1="18" x2="21" y2="18"></line></svg>
+                      <div id="crew-conflict-badges" style="position: absolute; right: -6px; top: -6px; display: flex; flex-direction: column; gap: 2px; pointer-events: none;"></div>
+                  </div>
+              </button>
+              <div id="crew-conflict-drawer" style="display: none; position: absolute; left: 60px; bottom: 0; width: 320px; background: #1a1a1e; border: 1px solid #333; border-radius: 0 8px 8px 0; box-shadow: 10px -5px 25px rgba(0,0,0,0.8); z-index: 100; flex-direction: column; overflow: hidden;">
+                  <div style="background: #111; padding: 12px 15px; font-weight: 900; font-size: 12px; border-bottom: 1px solid #333; color: #f59e0b;">⚠️ CREW CONFLICTS</div>
+                  <div id="crew-conflict-drawer-list" style="max-height: 400px; overflow-y: auto; padding: 0;">
+                      <div style="padding: 15px; text-align: center; color: #888; font-size: 11px;">No active crew conflicts.</div>
+                  </div>
+              </div>
+          </div>
+
+          <button id="nav-btn-financials" class="nav-icon-btn" onclick="if(typeof openFinancialsHub === 'function') openFinancialsHub()" title="Financials & Payroll">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          </button>
+      </div>
+
+      <div style="flex: 1;"></div>
+
+      <!-- Bottom Section (Settings) -->
+      <div style="display: flex; flex-direction: column; gap: 5px; width: 100%; align-items: center;">
+
+          <? if (userAccess === 'ROOT' || userAccess === 'Admin' || userAccess === 'ADMIN' || userAccess === 'Manager' || userAccess === 'MANAGER') { ?>
+          
+          <div id="nav-settings-container" style="position: relative; width: 100%; display: flex; justify-content: center;">
+              <button id="nav-btn-settings" class="nav-icon-btn" onclick="toggleContextualSettings()" title="Contextual Visual Settings">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+              </button>
+              <div id="settings-drawer-wrapper" style="display: none; position: absolute; left: 60px; bottom: 0; width: 380px; background: #1a1a1e; border: 1px solid #333; border-radius: 0 8px 8px 0; box-shadow: 10px -5px 35px rgba(0,0,0,0.9); z-index: 100000; flex-direction: column; overflow: hidden; max-height: 90vh;">
+                  <div style="background: #111; padding: 12px 15px; font-weight: 900; font-size: 13px; border-bottom: 1px solid #333; color: #10b981; display: flex; justify-content: space-between; align-items: center;">
+                      <span id="settings-drawer-title">⚙️ VISUAL SETTINGS</span>
+                      <button class="btn-close btn-sm" style="margin: 0;" onclick="closeContextualSettings()">✖</button>
+                  </div>
+                  <div id="settings-drawer-content" style="padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; background: #1a1a1e; margin-bottom: 10px;">
+                      <div id="settings-empty-state" style="color:#888; font-size:12px; text-align:center; padding: 20px;">No settings available for this view.</div>
+                  </div>
+              </div>
+          </div>
+
+          <button id="nav-btn-manager" class="nav-icon-btn" onclick="openManagerSettings()" title="User Profile / Manager Hub">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </button>
+          
+          <button id="nav-btn-master" class="nav-icon-btn" onclick="openMasterSettings()" title="Master Settings">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
+          <? } ?>
+      </div>
+  </div>
+
+  <div id="calendar-container">
+      <div id="calendar"></div>
+      <div id="desktop-event-list" style="display:none; flex:1; overflow-y:auto; padding:25px; flex-direction:column; background:var(--bg-dark);"></div>
+  </div>
+</div>
+
+<meta name="user-access" content="<?= userAccess ?>">
+<meta name="user-name" content="<?= userName ?>">
+<meta name="user-permissions" content="<?= userPermissionsB64 ?>">
+
+<script>
+  console.log("🔥 APP BOOT VERSION: 2026-06-18 22:56");
+  const USER_ACCESS = document.querySelector('meta[name="user-access"]').content;
+  const ACTIVE_USER_NAME = document.querySelector('meta[name="user-name"]').content;
+  
+  let USER_PERMISSIONS = {};
+  try {
+      const b64Data = document.querySelector('meta[name="user-permissions"]').content;
+      if (b64Data) {
+          USER_PERMISSIONS = JSON.parse(atob(b64Data));
+      }
+  } catch(e) {
+      console.error("Failed to parse user permissions", e);
+  }
+  
+  if (USER_ACCESS === 'ROOT') document.body.classList.add('perm-root');
+  for (const [key, value] of Object.entries(USER_PERMISSIONS)) {
+     if (value === true || value === "true") document.body.classList.add('perm-' + key);
+  }
+
+  // Evaluate Access Tiers
+  const isAdmin = (USER_ACCESS === 'ROOT' || USER_ACCESS === 'ADMIN');
+  const isManagerOrAbove = (isAdmin || USER_ACCESS === 'MANAGER');
+  
+  // Financials Icon Visibility: Must be Manager+ AND have Finance permissions (or be Admin)
+  const hasFinPerm = USER_PERMISSIONS.fin_view_roi === true || USER_PERMISSIONS.fin_view_internal === true || USER_PERMISSIONS.hr_view_rates === true;
+  const showFinancials = isManagerOrAbove && (isAdmin || hasFinPerm);
+  const finBtn = document.getElementById('nav-btn-financials');
+  if (finBtn && !showFinancials) finBtn.style.display = 'none';
+
+  // Master and Visual Settings Visibility: Must have Database permissions (or be Admin)
+  const hasDbPerm = USER_PERMISSIONS.db_view_assets === true || USER_PERMISSIONS.db_view_vehicles === true || USER_PERMISSIONS.db_view_warehouses === true || USER_PERMISSIONS.db_view_clients === true;
+  const showMaster = isAdmin || hasDbPerm;
+  const masterBtn = document.getElementById('nav-btn-master');
+  const settingsContainer = document.getElementById('nav-settings-container');
+  if (masterBtn && !showMaster) masterBtn.style.display = 'none';
+  if (settingsContainer && !isAdmin) settingsContainer.style.display = 'none';
+</script>
+
+<?!= include('00a_UI_Layers'); ?>
+<?!= include('00b_UI_Hubs'); ?>
+<?!= include('00c_UI_Forms'); ?>
+<?!= include('00d_UI_Visuals'); ?>
+<?!= include('00e_UI_Modals'); ?>
+<?!= include('07_Core_Globals'); ?>
+<?!= include('07b_Grid_Engine'); ?>
+<?!= include('07c_Generalization_Engine'); ?>
+<?!= include('01a_Calendar_Core'); ?>
+<?!= include('01b_Calendar_Tasks'); ?>
+<?!= include('01c_Calendar_Mini'); ?>
+<?!= include('01d_Calendar_Mobile'); ?>
+<?!= include('02_Project_Editor_Core'); ?>
+<?!= include('02_Project_Editor_Map'); ?>
+<?!= include('02_Project_Editor_Logistics'); ?>
+<?!= include('02a_Project_Equipment'); ?>
+<?!= include('02d_Equipment_Render'); ?>
+<?!= include('02e1_Logic_State'); ?>
+<?!= include('02e2_Logic_CRUD'); ?>
+<?!= include('02e3_Logic_Clipboard'); ?>
+<?!= include('02e4_Logic_Containers'); ?>
+<?!= include('02e5_Logic_Sync'); ?>
+<?!= include('02b_Project_Syntax'); ?>
+<?!= include('02c_Project_Operations'); ?>
+<?!= include('02g_Project_Reports'); ?>
+<?!= include('03a_Timeline_Boot'); ?>
+<?!= include('03b_Timeline_Shifts'); ?>
+<?!= include('03c_Timeline_Phases'); ?>
+<?!= include('03d_Timeline_Crew'); ?>
+<?!= include('03e_Timeline_UX'); ?>
+<?!= include('04_Month_Roster'); ?>
+<?!= include('04b_Equipment_Tracker'); ?>
+<?!= include('05_Warehouse_Engine'); ?>
+<?!= include('05a_Truck_Arrangement'); ?>
+<?!= include('05b_Loadin_Plan'); ?>
+<?!= include('06_System_Admin'); ?>
+<?!= include('06a_Admin_IAM'); ?>
+<?!= include('06b1_Admin_Assets_Core'); ?>
+<?!= include('06b2_Admin_Assets_Form'); ?>
+<?!= include('06b3_Admin_Assets_Audit'); ?>
+<?!= include('06b4_Admin_Assets_QR'); ?>
+<?!= include('06c_Admin_Visuals'); ?>
+<?!= include('06d_Admin_Fleet'); ?>
+<?!= include('06e_Admin_Automation'); ?>
+<?!= include('06f_Admin_Audit'); ?>
+<?!= include('08_Conflict_Manager'); ?>
+<?!= include('09_Financials_Hub'); ?>
+
+</body>
+</html>

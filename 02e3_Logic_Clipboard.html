@@ -1,0 +1,282 @@
+<script>
+/**
+ * 02e3_Logic_Clipboard.html
+ * Domain: Cut, Copy, and Paste Engine for bulk asset manipulation.
+ */
+
+// @INDEX: PA_LOGIC -> Cut/Copy/Paste Engine
+window.cutSelectedPa = function() {
+    try {
+    let anyCut = false;
+    currentProjectAssets.forEach(pa => { pa.isCopied = false; pa.isCut = false; delete pa.cutQty; delete pa.copiedQty; });
+    if (window.selectedPaIndices.size > 0) {
+        let indices = Array.from(window.selectedPaIndices);
+        for (let idx of indices) {
+            if (currentProjectAssets[idx]) {
+                let pa = currentProjectAssets[idx];
+                let maxQ = parseInt(pa.qty, 10);
+                let qToCut = maxQ;
+                if (indices.length === 1 && maxQ > 1 && window.selectedSummedIds.size === 0) {
+                    let input = prompt(`How many units to CUT? (1 - ${maxQ})`, maxQ);
+                    if (input === null) { currentProjectAssets.forEach(p => p.isCut = false); return; }
+                    qToCut = parseInt(input, 10);
+                    if (isNaN(qToCut) || qToCut <= 0 || qToCut > maxQ) return alert("Invalid quantity.");
+                }
+                pa.isCut = true;
+                if (qToCut < maxQ) pa.cutQty = qToCut;
+                anyCut = true;
+            }
+        }
+            // --- FIX: Handle sublist group selection ---
+            if (indices.length > 0 && currentProjectAssets[indices[0]]) {
+                let pa = currentProjectAssets[indices[0]];
+                let groupItems = currentProjectAssets.filter(p => p.location === pa.location && p.formula === pa.formula);
+                if (groupItems.length > 1) {
+                    groupItems.forEach(item => { if (!item.isCut) { item.isCut = true; anyCut = true; } });
+                }
+            }
+        window.selectedPaIndices.clear();
+    }
+    if (window.selectedSummedIds.size > 0) {
+        let ids = Array.from(window.selectedSummedIds);
+        for (let id of ids) {
+            let matchingPas = currentProjectAssets.filter(pa => pa.assetId === id && pa.formula === "Standalone");
+            let totalQ = matchingPas.reduce((sum, p) => sum + parseInt(p.qty, 10), 0);
+            let qToCut = totalQ;
+            if (ids.length === 1 && totalQ > 1 && window.selectedPaIndices.size === 0) {
+                let input = prompt(`How many units to CUT? (1 - ${totalQ})`, totalQ);
+                if (input === null) { currentProjectAssets.forEach(p => p.isCut = false); return; }
+                qToCut = parseInt(input, 10);
+                if (isNaN(qToCut) || qToCut <= 0 || qToCut > totalQ) return alert("Invalid quantity.");
+            }
+            let rem = qToCut;
+            matchingPas.forEach(pa => {
+                if (rem <= 0) return;
+                let pq = parseInt(pa.qty, 10);
+                pa.isCut = true;
+                if (pq > rem) { pa.cutQty = rem; rem = 0; }
+                else { rem -= pq; }
+            });
+            anyCut = true;
+        }
+        window.selectedSummedIds.clear();
+    }
+    window.lastSelectedPaIndex = null;
+    window.lastSelectedSummedId = null;
+    if (anyCut) renderProjectAssetsUI();
+    } catch(err) { console.error("cutSelectedPa Error:", err); alert("Error cutting items: " + err.message); }
+}
+
+window.copySelectedPa = function() {
+    try {
+    let anyCopied = false;
+    currentProjectAssets.forEach(pa => { pa.isCut = false; pa.isCopied = false; delete pa.cutQty; delete pa.copiedQty; });
+    if (window.selectedPaIndices.size > 0) {
+        let indices = Array.from(window.selectedPaIndices);
+        for (let idx of indices) {
+            if (currentProjectAssets[idx]) {
+                let pa = currentProjectAssets[idx];
+                let maxQ = parseInt(pa.qty, 10);
+                let qToCopy = maxQ;
+                if (indices.length === 1 && maxQ > 1 && window.selectedSummedIds.size === 0) {
+                    let input = prompt(`How many units to COPY? (1 - ${maxQ})`, maxQ);
+                    if (input === null) { currentProjectAssets.forEach(p => p.isCopied = false); return; }
+                    qToCopy = parseInt(input, 10);
+                    if (isNaN(qToCopy) || qToCopy <= 0 || qToCopy > maxQ) return alert("Invalid quantity.");
+                }
+                pa.isCopied = true;
+                if (qToCopy < maxQ) pa.copiedQty = qToCopy;
+                anyCopied = true;
+            }
+        }
+            // --- FIX: Handle sublist group selection ---
+            if (indices.length > 0 && currentProjectAssets[indices[0]]) {
+                let pa = currentProjectAssets[indices[0]];
+                let groupItems = currentProjectAssets.filter(p => p.location === pa.location && p.formula === pa.formula);
+                if (groupItems.length > 1) {
+                    groupItems.forEach(item => { if (!item.isCopied) { item.isCopied = true; anyCopied = true; } });
+                }
+            }
+        window.selectedPaIndices.clear();
+    }
+    if (window.selectedSummedIds.size > 0) {
+        let ids = Array.from(window.selectedSummedIds);
+        for (let id of ids) {
+            let matchingPas = currentProjectAssets.filter(pa => pa.assetId === id && pa.formula === "Standalone");
+            let totalQ = matchingPas.reduce((sum, p) => sum + parseInt(p.qty, 10), 0);
+            let qToCopy = totalQ;
+            if (ids.length === 1 && totalQ > 1 && window.selectedPaIndices.size === 0) {
+                let input = prompt(`How many units to COPY? (1 - ${totalQ})`, totalQ);
+                if (input === null) { currentProjectAssets.forEach(p => p.isCopied = false); return; }
+                qToCopy = parseInt(input, 10);
+                if (isNaN(qToCopy) || qToCopy <= 0 || qToCopy > totalQ) return alert("Invalid quantity.");
+            }
+            let rem = qToCopy;
+            matchingPas.forEach(pa => {
+                if (rem <= 0) return;
+                let pq = parseInt(pa.qty, 10);
+                pa.isCopied = true;
+                if (pq > rem) { pa.copiedQty = rem; rem = 0; }
+                else { rem -= pq; }
+            });
+            anyCopied = true;
+        }
+        window.selectedSummedIds.clear();
+    }
+    window.lastSelectedPaIndex = null;
+    window.lastSelectedSummedId = null;
+    if (anyCopied) renderProjectAssetsUI();
+    } catch(err) { console.error("copySelectedPa Error:", err); alert("Error copying items: " + err.message); }
+}
+
+window.pasteClipboardPa = function() {
+    try {
+    let targetLoc = window.activePaTarget ? window.activePaTarget.location : null;
+    let targetForm = window.activePaTarget ? window.activePaTarget.formula : null;
+
+    let toPasteCuts = currentProjectAssets.filter(pa => pa.isCut);
+    let toPasteCopies = currentProjectAssets.filter(pa => pa.isCopied);
+    let toPaste = [...toPasteCuts, ...toPasteCopies];
+    if (toPaste.length === 0) return;
+
+    let remainingAssets = currentProjectAssets.filter(pa => !pa.isCut || (pa.isCut && pa.cutQty && pa.cutQty < pa.qty));
+    let itemsToInsert = [];
+    
+    toPasteCuts.forEach(pa => {
+        if (pa.cutQty && pa.cutQty < pa.qty) {
+            let splitClone = JSON.parse(JSON.stringify(pa));
+            splitClone.qty = pa.cutQty;
+            splitClone.isCut = false;
+            delete splitClone.cutQty;
+            pa.qty = parseInt(pa.qty, 10) - parseInt(pa.cutQty, 10);
+            pa.isCut = false;
+            delete pa.cutQty;
+            itemsToInsert.push(splitClone);
+        } else {
+            pa.isCut = false;
+            delete pa.cutQty;
+            itemsToInsert.push(pa);
+        }
+    });
+
+    toPasteCopies.forEach(pa => {
+        let clone = JSON.parse(JSON.stringify(pa));
+        clone.isCopied = false;
+        if (clone.copiedQty) clone.qty = clone.copiedQty;
+        delete clone.copiedQty;
+        pa.isCopied = false;
+        delete pa.copiedQty;
+        itemsToInsert.push(clone);
+    });
+
+    if (targetLoc !== null) {
+        itemsToInsert.forEach(pa => {
+            pa.location = targetLoc;
+            pa.formula = targetForm;
+        });
+        remainingAssets.push(...itemsToInsert);
+    } else { // Paste as new group(s)
+        let isCopyOperation = toPasteCopies.length > 0;
+
+        if (isCopyOperation) {
+            let regularPasteItems = [];
+            let shortagePasteItems = [];
+            
+            let copiedGroups = {};
+            itemsToInsert.filter(item => toPasteCopies.some(c => c.assetId === item.assetId && c.location === item.location && c.formula === item.formula))
+                         .forEach(item => {
+                let key = item.location + "|||" + item.formula;
+                if (!copiedGroups[key]) copiedGroups[key] = [];
+                copiedGroups[key].push(item);
+            });
+
+            for (const key in copiedGroups) {
+                let groupItems = copiedGroups[key];
+                let originalLocation = groupItems[0].location;
+
+                let baseLoc = originalLocation;
+                let counter = 1;
+                let match;
+                if ((match = baseLoc.match(/^(.*)\s*\((\d+)\)$/))) {
+                    baseLoc = match[1].trim();
+                    counter = parseInt(match[2], 10) + 1;
+                }
+                let newLoc = `${baseLoc} (${counter})`;
+                while (currentProjectAssets.some(p => p.location === newLoc) || regularPasteItems.some(p => p.location === newLoc)) {
+                    counter++;
+                    newLoc = `${baseLoc} (${counter})`;
+                }
+                let newForm = newLoc + " Formula";
+                
+                let newShortageLoc = newLoc;
+                let newShortageForm = newLoc + " Subrent Formula";
+
+                groupItems.forEach(item => {
+                    let asset = globalAssets.find(a => a.id === item.assetId);
+                    if (!asset) return;
+                    let requestedQty = parseInt(item.qty, 10);
+                    let maxQty = asset.type === 'Bulk' ? (parseInt(asset.totalQuantity, 10) || 1) : 1;
+                    let alreadyAssigned = currentProjectAssets.filter(p => p.assetId === asset.id && !p.isShortage).reduce((sum, p) => sum + parseInt(p.qty, 10), 0);
+                    let overlappingQty = window.overlappingAllocations ? (window.overlappingAllocations[asset.id] || 0) : 0;
+                    let availableQty = Math.max(0, maxQty - alreadyAssigned - overlappingQty);
+                    let qtyToPaste = Math.min(requestedQty, availableQty);
+                    let shortQty = requestedQty - qtyToPaste;
+
+                    if (qtyToPaste > 0) {
+                        let clone = JSON.parse(JSON.stringify(item));
+                        clone.qty = qtyToPaste; clone.location = newLoc; clone.formula = newForm;
+                        regularPasteItems.push(clone);
+                    }
+                    if (shortQty > 0) {
+                        let shortClone = JSON.parse(JSON.stringify(item));
+                        shortClone.qty = shortQty; shortClone.location = newShortageLoc; shortClone.formula = newShortageForm; shortClone.isShortage = true;
+                        shortagePasteItems.push(shortClone);
+                    }
+                });
+            }
+            itemsToInsert = itemsToInsert.filter(item => !toPasteCopies.some(c => c.assetId === item.assetId && c.location === item.location && c.formula === item.formula));
+            itemsToInsert.push(...regularPasteItems, ...shortagePasteItems);
+        }
+        
+        let targetIdx = remainingAssets.length;
+        if (window.selectedPaIndices.size > 0) {
+            let minSelIdx = Math.min(...Array.from(window.selectedPaIndices));
+            let targetObj = currentProjectAssets[minSelIdx];
+            let remIdx = remainingAssets.indexOf(targetObj);
+            if (remIdx !== -1) targetIdx = remIdx;
+        }
+        remainingAssets.splice(targetIdx, 0, ...itemsToInsert);
+    }
+
+    let merged = [];
+    remainingAssets.forEach(pa => {
+        let existing = merged.find(m => m.assetId === pa.assetId && m.location === pa.location && m.formula === pa.formula && m.isAuto === pa.isAuto && m.isShortage === pa.isShortage);
+        if (existing && existing !== pa) {
+            existing.qty = parseInt(existing.qty, 10) + parseInt(pa.qty, 10);
+        } else if (!merged.includes(pa)) {
+            merged.push(pa);
+        }
+    });
+    currentProjectAssets = merged;
+    
+    currentProjectAssets.forEach(pa => pa.isCopied = false);
+
+    window.selectedPaIndices.clear();
+    window.selectedSummedIds.clear();
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+    } catch(err) { console.error("pasteClipboardPa Error:", err); alert("Error pasting items: " + err.message); }
+}
+
+window.cancelCutPa = function() {
+    currentProjectAssets.forEach(pa => {
+        pa.isCut = false;
+        pa.isCopied = false;
+            delete pa.cutQty;
+            delete pa.copiedQty;
+    });
+    window.selectedPaIndices.clear();
+    window.selectedSummedIds.clear();
+    renderProjectAssetsUI();
+};
+</script>

@@ -1,0 +1,147 @@
+<script>
+/**
+ * 08_Conflict_Manager.html
+ * Domain: Conflict resolution, notification drawer, and deep linking.
+ */
+
+let globalConflicts = [];
+
+// @INDEX: CONFLICTS -> Render Triage Drawer
+function renderConflicts(conflicts) {
+    globalConflicts = conflicts || [];
+    
+    let assetCounts = { red: 0, yellow: 0, grey: 0 };
+    let crewCounts = { red: 0, yellow: 0, grey: 0 };
+    
+    // 1. Calculate Badges based on RAW conflict math
+    globalConflicts.forEach(c => {
+        let target = c.isAsset ? assetCounts : crewCounts;
+        if (c.acknowledged) target.grey++;
+        else if (c.level === 'red') target.red++;
+        else target.yellow++;
+    });
+    
+    // 2. Compress & Group Conflicts for the Visual Drawer
+    let groupedAsset = {};
+    let groupedCrew = {};
+    
+    globalConflicts.forEach(c => {
+        if (c.acknowledged) return; // Hide acknowledged from drawer, but keep in badges
+        let key = c.groupKey || c.id;
+        let targetGroup = c.isAsset ? groupedAsset : groupedCrew;
+        
+        if (!targetGroup[key]) {
+            targetGroup[key] = {
+                id: c.id,
+                type: c.type,
+                level: c.level,
+                title: c.title || (c.isAsset ? 'Asset Shortages' : 'Crew Rest Violations'),
+                projectId: c.projectId,
+                pairNames: c.pairNames || 'Multiple Events',
+                isAsset: c.isAsset,
+                items: new Set(),
+                count: 0
+            };
+        }
+        
+        // Elevate severity if a red hides in a yellow group
+        let levels = {'yellow':1, 'orange':2, 'red':3};
+        if (levels[c.level] > levels[targetGroup[key].level]) {
+            targetGroup[key].level = c.level;
+            targetGroup[key].type = c.type; 
+            targetGroup[key].title = c.title || targetGroup[key].title;
+        }
+        
+        targetGroup[key].count++;
+        if (c.isAsset && c.entityName) targetGroup[key].items.add(c.entityName);
+    });
+    
+    const sortGroups = (groups) => Object.values(groups).sort((a,b) => {
+        let aW = a.level === 'red' ? 2 : (a.level === 'orange' ? 1 : 0);
+        let bW = b.level === 'red' ? 2 : (b.level === 'orange' ? 1 : 0);
+        return bW - aW;
+    });
+    
+    let assetDisplay = sortGroups(groupedAsset);
+    let crewDisplay = sortGroups(groupedCrew);
+
+    const generateHtml = (displayGroups) => {
+        let html = '';
+        displayGroups.forEach(g => {
+            let dotColor = (g.level === 'red' ? '#ef4444' : (g.level === 'orange' ? '#f97316' : '#f59e0b'));
+            let actionWord = (g.level === 'red') ? 'shortages' : 'turnaround overlaps';
+            let desc = g.isAsset 
+                ? `<b>${g.count}x</b> ${actionWord} between ${g.pairNames}. Includes: ${Array.from(g.items).slice(0, 3).join(', ')}${g.items.size > 3 ? '...' : ''}` 
+                : `<b>${g.count}x</b> rest violations or overlaps between ${g.pairNames}.`;
+            html += `
+            <div class="conflict-item" onclick="routeConflict('${g.type}', null, '${g.projectId}')">
+                <div class="conflict-item-title">
+                    <span style="display:flex; align-items:center; gap:6px;"><div style="width:8px; height:8px; border-radius:50%; background:${dotColor};"></div> ${escapeHTML(g.title)} (${g.count})</span>
+                    <button class="btn-outline btn-sm" style="border:none; color:#888; padding: 2px 6px !important; margin: 0; font-size: 11px !important; opacity:0.8; background:transparent !important;" onmouseover="this.style.color='#fff'; this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.color='#888'; this.style.background='transparent'" onclick="event.stopPropagation(); muteConflict('${g.projectId}', '${g.type}')" title="Ignore this conflict">✖ IGNORE</button>
+                </div>
+                <div class="conflict-item-desc">${desc}</div>
+            </div>`;
+        });
+        return html;
+    };
+
+    let assetHtml = generateHtml(assetDisplay);
+    if (assetHtml === '') assetHtml = '<div style="padding: 15px; text-align: center; color: #888; font-size: 13px;">No active asset shortages.</div>';
+    
+    let crewHtml = generateHtml(crewDisplay);
+    if (crewHtml === '') crewHtml = '<div style="padding: 15px; text-align: center; color: #888; font-size: 13px;">No active crew conflicts.</div>';
+
+    let aList = document.getElementById('asset-conflict-drawer-list');
+    if (aList) aList.innerHTML = assetHtml;
+    
+    let cList = document.getElementById('crew-conflict-drawer-list');
+    if (cList) cList.innerHTML = crewHtml;
+
+    const setBadges = (id, counts) => {
+        let el = document.getElementById(id);
+        if (!el) return;
+        let bHtml = '';
+        if (counts.red > 0) bHtml += `<div class="conflict-badge-red">${counts.red}</div>`;
+        if (counts.yellow > 0) bHtml += `<div class="conflict-badge-yellow">${counts.yellow}</div>`;
+        if (counts.grey > 0) bHtml += `<div class="conflict-badge-grey">${counts.grey}</div>`;
+        el.innerHTML = bHtml;
+    };
+
+    setBadges('asset-conflict-badges', assetCounts);
+    setBadges('crew-conflict-badges', crewCounts);
+}
+
+function routeConflict(type, entityId, projectId) {
+    if (typeof closeModals === 'function') closeModals();
+    
+    if (type === 'HARD_SHORTAGE' || type === 'SOFT_TURNAROUND') {
+        // Deep Route to Asset Vault
+        document.getElementById('edit-folder-id').value = projectId;
+        let ev = null;
+        if (typeof calendar !== 'undefined' && calendar) ev = calendar.getEventById(projectId);
+        if (ev) {
+            document.getElementById('edit-proj-name').value = ev.title;
+        } else {
+            try {
+                let p = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}').projects?.find(x => x.id === projectId);
+                if (p) document.getElementById('edit-proj-name').value = p.title;
+            } catch(e) {}
+        }
+        if (typeof openProjectAssetsModal === 'function') openProjectAssetsModal();
+    } else {
+        // Deep Route to Shift Timeline
+        if (typeof goToEventTimeline === 'function') goToEventTimeline(projectId, 'main');
+    }
+}
+
+window.muteConflict = function(projectId, type) {
+    if (!confirm("Are you sure you want to ignore this conflict? It will be hidden from the active drawer.")) return;
+    
+    google.script.run
+        .withSuccessHandler(res => {
+            if (typeof refreshData === 'function') refreshData(); // Instantly update the UI and badges
+        })
+        .withFailureHandler(err => alert("Error muting conflict: " + err.message))
+        .acknowledgeConflict(projectId, type, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+};
+</script>

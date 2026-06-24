@@ -1,0 +1,993 @@
+<script>
+/**
+ * 01a_Calendar_Core.html
+ * Domain: Main dashboard landing, global event fetching, and core rendering.
+ */
+
+window.activeProjectContext = null;
+
+window.setDashboardIcon = function(mode) {
+    let cal = document.getElementById('nav-icon-cal');
+    let list = document.getElementById('nav-icon-list');
+    let proj = document.getElementById('nav-icon-project');
+    let btn = document.getElementById('nav-btn-dashboard');
+    if (!cal || !list || !proj || !btn) return;
+    
+    cal.style.display = 'none';
+    list.style.display = 'none';
+    proj.style.display = 'none';
+    
+    if (mode === 'project') {
+        proj.style.display = 'block';
+        btn.title = "Return to Active Project";
+        btn.classList.add('nav-active');
+    } else if (mode === 'list') {
+        list.style.display = 'block';
+        btn.title = "Switch to Calendar View";
+    } else {
+        cal.style.display = 'block';
+        btn.title = "Switch to List View";
+    }
+};
+
+// ==========================================
+// --- SYSTEM BOOT SEQUENCE (BACKGROUND LOAD) ---
+// ==========================================
+// @INDEX: BOOT -> System Boot Sequence
+document.addEventListener('DOMContentLoaded', function() {
+
+  // ==========================================
+  // 1. ROSTER AUTO-LOAD & STRICT TRAP ENGINE
+  // ==========================================
+  google.script.url.getLocation(function(location) {
+      if (location.parameter && location.parameter.roster === 'true') {
+          setTimeout(() => {
+              openMonthRoster(); 
+              let lockStyle = document.createElement('style');
+              lockStyle.innerHTML = `
+                  #calendar-container, .sidebar, .fc-header-toolbar { display: none !important; }
+                  .mr-canvas, .mr-row, .mr-cell, .shift-block { pointer-events: none !important; }
+                  button[onclick*="close"], button[onclick*="Calendar"], .btn-main { display: none !important; }
+                  #month-roster-layer { display: flex !important; pointer-events: auto !important; width: calc(100vw - 60px); height: 100vh; position: fixed; top: 0; left: 60px; z-index: 9999; background: var(--bg-dark); }
+              `;
+              document.head.appendChild(lockStyle);
+          }, 500); 
+      }
+  });
+
+  const isMobile = window.innerWidth <= 768;
+
+  // ==========================================
+  // --- MAIN DASHBOARD CALENDAR ---
+  // ==========================================
+  // @INDEX: CALENDAR -> Main Dashboard Calendar Config
+  calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+      initialView: isMobile ? 'listWeek' : 'dayGridMonth', 
+      headerToolbar: { 
+        left: 'prev,next today customToggleStrips', 
+        center: 'title', 
+            right: '' 
+      },
+      customButtons: {
+        customToggleStrips: {
+          text: 'STRIPS',
+          click: function() {
+            document.getElementById('calendar').classList.toggle('show-strips');
+            let btn = document.querySelector('.fc-customToggleStrips-button');
+            if(btn) btn.classList.toggle('active-strips');
+          }
+        }
+      },
+      height: '100%', 
+      dayMaxEvents: false, 
+      eventDisplay: 'block', 
+      
+      // AUTO-SWITCH ON DEVICE ROTATION / RESIZE
+      windowResize: function(arg) {
+        if (window.innerWidth <= 768 && calendar.view.type === 'dayGridMonth') {
+          calendar.changeView('listWeek');
+        } else if (window.innerWidth > 768 && calendar.view.type === 'listWeek') {
+          calendar.changeView('dayGridMonth');
+        }
+      },
+
+      // ==========================================
+      // --- MAIN CALENDAR MINI-GANTT RENDERER ---
+      // ==========================================
+      eventContent: function(arg) {
+        if (arg.event.extendedProps.isRollup) {
+          let s = arg.event.extendedProps.status;
+          let rawDbStatus = String(arg.event.extendedProps.rawDbData.status || 'Draft').toUpperCase();
+          let isCancelled = (rawDbStatus === 'CANCELLED');
+          let pType = arg.event.extendedProps.rawDbData.type || 'Event';
+          
+          let bgHex = isCancelled ? 'rgba(30, 30, 34, 0.9)' : 'rgba(20, 20, 22, 0.9)';
+          
+          let textCol = isCancelled ? '#666666' : '#ffffff';
+          
+          let ledColor = '#a1a1aa'; // Default Draft (Grey)
+          if (isCancelled) ledColor = '#ef4444'; // Cancelled (Red)
+          else if (rawDbStatus === 'APPROVED') ledColor = '#10b981'; // Approved (Green)
+          else if (rawDbStatus === 'NOT APPROVED') ledColor = '#f97316'; // Not Approved (Orange)
+          
+          // Fetch dynamic border color from visual settings via CSS variables
+          let typeKey = pType.toLowerCase();
+          if (typeKey !== 'meeting' && typeKey !== 'cross rent') typeKey = 'event';
+          let borderVar = `var(--cal-color-${typeKey.replace(/\s+/g, '-')})`;
+          if (isCancelled) borderVar = '#333333';
+          
+          let rules = (typeof globalManagerConfig !== 'undefined' && globalManagerConfig.rules) ? globalManagerConfig.rules : [];
+          let totalRules = rules.length;
+          let pbHtml = '';
+          let pbWidth = 0;
+          if (totalRules > 0) {
+              pbWidth = 14; 
+              let state = arg.event.extendedProps.rawDbData.checklistState || {};
+                if (typeof state === 'string') {
+                    try { state = JSON.parse(state); } catch(e) { state = {}; }
+                }
+              let checkedCount = 0;
+              rules.forEach(r => { if(state[r.taskName] && state[r.taskName].checked) checkedCount++; });
+              
+              let pct = (checkedCount / totalRules) * 100;
+              let pbColor = '#52525b';
+              if (pct > 0 && pct < 100) pbColor = '#3b82f6';
+              if (pct === 100) pbColor = '#10b981';
+              
+              pbHtml = `
+              <div style="position: absolute; right: 6px; top: 6px; bottom: 6px; width: 10px; z-index: 20; pointer-events: auto; cursor: pointer;" onclick="openChecklistModal('${arg.event.id}', event)" title="Tasks: ${Math.round(pct)}%">
+                 <div style="width: 100%; height: 100%; background: rgba(0,0,0,0.6); border: 1px solid #000; border-radius: 4px; overflow: hidden; pointer-events: none; position: relative; box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);">
+                    <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: ${pct}%; background: ${pbColor}; transition: height 0.3s, background-color 0.3s; box-shadow: inset 0 0 2px rgba(255,255,255,0.4);"></div>
+                 </div>
+              </div>`;
+          }
+          
+          // Reads Live from Database
+          let readiness = arg.event.extendedProps.rawDbData.readinessState || {};
+
+          let bList = '';
+          // Crew (C)
+          if (readiness.crew === 'draft') bList += `<div style="background:#facc15; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">C</div>`;
+          else if (readiness.crew === 'finished') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 2px #4ade80; font-size:10px; font-weight:bold;">C</div>`;
+
+          // Equipment (E)
+          if (readiness.eq === 'draft') bList += `<div style="background:#facc15; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">E</div>`;
+          else if (readiness.eq === 'finished' || readiness.eq === 'packed_human') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 3px #4ade80; font-size:10px; font-weight:bold;">E</div>`;
+          else if (readiness.eq === 'packed_auto') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 3px #f97316; font-size:10px; font-weight:bold;">E</div>`;
+
+          // Trucks (T)
+          if (readiness.truck === 'assigned') bList += `<div style="background:#facc15; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">T</div>`;
+          else if (readiness.truck === 'arranged_human') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 3px #4ade80; font-size:10px; font-weight:bold;">T</div>`;
+          else if (readiness.truck === 'arranged_auto') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 3px #f97316; font-size:10px; font-weight:bold;">T</div>`;
+
+          let badgesHtml = '';
+          let badgesWidth = 0;
+          if (bList !== '') {
+              badgesWidth = 65; // Reserve space for the badges
+              let bRight = totalRules > 0 ? 20 : 6;
+              badgesHtml = `<div style="position:absolute; right:${bRight}px; top:0; bottom:0; display:flex; gap:4px; align-items:center; z-index:20; pointer-events:auto; font-size:10px; font-weight:900; font-family: sans-serif;">${bList}</div>`;
+          }
+          
+          let rightBound = (6 + pbWidth + badgesWidth) + 'px';
+
+          let safeTitle = typeof escapeHTML === 'function' ? escapeHTML(arg.event.title) : String(arg.event.title).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+          return { html: `
+            <div class="event-custom-frame" style="--event-border-color: ${borderVar}; --bg-hex: ${bgHex}; --text-col: ${textCol}; position: relative; width: 100%; height: var(--cal-event-height, 42px); border-radius: 4px; overflow: hidden; cursor: pointer; box-sizing: border-box;">
+               
+               <div class="solid-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${borderVar}; z-index:0;"></div>
+               <div class="hover-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${bgHex}; z-index:0;"></div>
+               <div class="bars-wrapper" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1;"></div>
+               
+               <div class="event-custom-title" style="position: absolute; left: 6px; right: ${rightBound}; top: 0; bottom: 0; display: flex; align-items: center; font-size: var(--cal-font-size, 12px); font-weight: 900; z-index: 10; white-space: nowrap; pointer-events: none;">
+                   <div style="width:8px; height:8px; border-radius:50%; background:${ledColor}; margin-right:6px; box-shadow: 0 0 4px ${ledColor}; flex-shrink:0;"></div>
+                   <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">${safeTitle}</span>
+               </div>
+               ${pbHtml}
+               ${badgesHtml}
+            </div>`
+          };
+        }
+      },
+      
+      eventDidMount: function(info) {
+        if (info.event.extendedProps.isRollup && info.view.type === 'dayGridMonth') {
+           requestAnimationFrame(() => {
+           try {
+               let row = info.el.closest('tr, .fc-daygrid-row');
+               if (!row) return; 
+               
+               let days = Array.from(row.querySelectorAll('[data-date]'));
+               if (days.length === 0 && row.previousElementSibling) {
+                   days = Array.from(row.previousElementSibling.querySelectorAll('[data-date]'));
+               }
+               if (days.length === 0) return;
+
+               const parseD = (str) => {
+                   if (!str) return null;
+                   let cleanStr = typeof str === 'string' ? str.split('T')[0] : String(str).split('T')[0];
+                   let pts = cleanStr.split('-');
+                   if (pts.length === 3) {
+                       let d = new Date(Date.UTC(pts[0], pts[1]-1, pts[2]));
+                       if (!isNaN(d.getTime())) return d;
+                   }
+                   let fallback = new Date(cleanStr);
+                   if (!isNaN(fallback.getTime())) return fallback;
+                   return null;
+               };
+
+               let pFirst = parseD(days[0].getAttribute('data-date'));
+               let pLast = parseD(days[days.length - 1].getAttribute('data-date'));
+               if (!pFirst || !pLast) return;
+
+               let rowStartEpoch = pFirst.getTime();
+               let rowEndEpoch = pLast.getTime();
+
+               let minD = parseD(info.event.startStr);
+               if (!minD) return;
+               let minEpoch = minD.getTime(); 
+               
+               let maxEpoch = minEpoch;
+               if (info.event.endStr) {
+                   let maxD = parseD(info.event.endStr);
+                   if (maxD) maxEpoch = maxD.getTime() - 86400000;
+               }
+
+               let segStartEpoch = Math.max(minEpoch, rowStartEpoch);
+               let segEndEpoch = Math.min(maxEpoch, rowEndEpoch);
+               if (segStartEpoch > segEndEpoch) return;
+               
+               let segTotalDays = Math.round((segEndEpoch - segStartEpoch) / 86400000) + 1;
+               if (segTotalDays <= 0) segTotalDays = 1;
+
+               const getPct = (dStartStr, dEndStr, sHr, eHr) => {
+                   let phaseStartD = parseD(dStartStr);
+                   if (!phaseStartD) return null;
+                   
+                   let phaseStart = phaseStartD.getTime() + (sHr * 3600000);
+                   let phaseEnd = phaseStartD.getTime() + (eHr * 3600000);
+                   if (dEndStr) {
+                       let phaseEndD = parseD(dEndStr);
+                       if (phaseEndD) phaseEnd = phaseEndD.getTime() - 86400000 + (eHr * 3600000);
+                   }
+                   
+                   if (phaseEnd <= segStartEpoch || phaseStart >= segEndEpoch + 86400000) return null;
+                   
+                   let visibleStart = Math.max(phaseStart, segStartEpoch);
+                   let visibleEnd = Math.min(phaseEnd, segEndEpoch + 86400000);
+                   
+                   let totalMs = (segTotalDays * 86400000);
+                   let leftPct = Math.max(0, ((visibleStart - segStartEpoch) / totalMs) * 100);
+                   let widthPct = Math.min(100 - leftPct, ((visibleEnd - visibleStart) / totalMs) * 100);
+                   
+                   return { left: leftPct, width: widthPct };
+               };
+
+               let p = info.event.extendedProps.phases;
+               if (!Array.isArray(p)) return;
+               
+               let mainC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['main'] ? PAINT_COLORS['main'].color : '#3b82f6';
+               let whC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['wh'] ? PAINT_COLORS['wh'].color : '#f97316';
+               let showC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['show'] ? PAINT_COLORS['show'].color : '#10b981';
+               let recoveryC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['recovery'] ? PAINT_COLORS['recovery'].color : '#a855f7';
+               let transitC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['transit'] ? PAINT_COLORS['transit'].color : '#06b6d4';
+               
+               let rawDbStatus = String(info.event.extendedProps.rawDbData.status || 'Draft').toUpperCase();
+               if (rawDbStatus === 'CANCELLED') {
+                   mainC = '#3f3f46';
+                   whC = '#27272a';
+                   showC = '#18181b';
+                   recoveryC = '#18181b';
+                   transitC = '#18181b';
+               }
+
+               let html = '';
+               p.forEach(block => {
+                   let pct = getPct(block.start, block.end, block.sHr, block.eHr);
+                   if (pct) {
+                       let bgHex = block.type === 'wh' ? whC : block.type === 'main' ? mainC : block.type === 'show' ? showC : block.type === 'transit' ? transitC : recoveryC;
+                       let top = '0', height = '20%';
+                       if (block.type === 'wh') { top = '0'; height = '20%'; }
+                       else if (block.type === 'transit') { top = '20%'; height = '20%'; }
+                       else if (block.type === 'main') { top = '40%'; height = '20%'; }
+                       else if (block.type === 'show') { top = '60%'; height = '20%'; }
+                       else if (block.type === 'recovery') { top = '80%'; height = '20%'; }
+                       
+                       html += `<div style="position: absolute; left: ${pct.left}%; width: ${pct.width}%; top: ${top}; height: ${height}; background: ${bgHex}; border-radius: 1px; z-index: 1;"></div>`;
+                   }
+               });
+
+               let wrapper = info.el.querySelector('.bars-wrapper');
+               if (wrapper) wrapper.innerHTML = html;
+               
+           } catch (err) {
+               console.error("DOM Rendering Blocked:", err);
+           }
+           });
+        }
+      },
+      
+      // CLICK LOGIC
+      dateClick: function(info) {
+          window.isProjectDirty = true;
+          window.activeProjectContext = 'NEW';
+          if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
+          document.getElementById('edit-modal-overlay').style.display = 'flex';
+          document.getElementById('edit-folder-id').value = 'NEW';
+          document.getElementById('edit-proj-name').value = '';
+          document.getElementById('edit-orig-title').innerText = "NEW DEPLOYMENT";
+          document.getElementById('edit-proj-version').value = '';
+          
+          if (document.getElementById('edit-proj-date')) document.getElementById('edit-proj-date').value = info.dateStr || '';
+          if (document.getElementById('edit-proj-end-date')) document.getElementById('edit-proj-end-date').value = info.dateStr || '';
+          
+          document.getElementById('display-event-status').innerText = 'DRAFT';
+          document.getElementById('edit-proj-type').value = 'Event';
+          document.getElementById('display-event-type').innerText = 'EVENT';
+          if(document.getElementById('edit-proj-client')) document.getElementById('edit-proj-client').value = '';
+          if(document.getElementById('restore-project-btn')) document.getElementById('restore-project-btn').style.display = 'none';
+          
+          if(document.getElementById('trash-dropdown')) document.getElementById('trash-dropdown').style.display = 'none';
+          if(document.getElementById('status-dropdown')) document.getElementById('status-dropdown').style.display = 'none';
+          if(document.getElementById('type-dropdown')) document.getElementById('type-dropdown').style.display = 'none';
+          
+          if (document.getElementById('edit-proj-outdoor')) document.getElementById('edit-proj-outdoor').checked = false;
+          if (document.getElementById('edit-proj-lat')) document.getElementById('edit-proj-lat').value = '';
+          if (document.getElementById('edit-proj-lng')) document.getElementById('edit-proj-lng').value = '';
+          if (document.getElementById('edit-proj-location')) document.getElementById('edit-proj-location').value = '';
+          if (document.getElementById('edit-proj-multiplier')) document.getElementById('edit-proj-multiplier').value = '1.0';
+          window.currentReadinessState = {};
+          if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
+          bootMiniCalendar(info.dateStr, 'NEW');
+      },
+      
+      eventClick: function(info) {
+          let ev = info.event;
+          let pId = ev.id;
+          
+          window.isProjectDirty = false;
+          window.activeProjectContext = pId;
+          if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
+          
+          document.getElementById('edit-modal-overlay').style.display = 'flex';
+          document.getElementById('edit-folder-id').value = pId; 
+          document.getElementById('edit-proj-version').value = ev.extendedProps.rawDbData.lastUpdated || '';
+          document.getElementById('edit-proj-name').value = ev.title; 
+          
+          if (document.getElementById('edit-proj-date')) document.getElementById('edit-proj-date').value = ev.extendedProps.rawDbData.start || '';
+          if (document.getElementById('edit-proj-end-date')) document.getElementById('edit-proj-end-date').value = ev.extendedProps.rawDbData.end || ev.extendedProps.rawDbData.start || '';
+          
+          let status = ev.extendedProps.rawDbData.status || 'DRAFT';
+          document.getElementById('display-event-status').innerText = status.toUpperCase();
+          
+          let pType = ev.extendedProps.rawDbData.type || 'Event';
+          document.getElementById('edit-proj-type').value = pType;
+          document.getElementById('display-event-type').innerText = pType.toUpperCase();
+          
+          let pClient = ev.extendedProps.rawDbData.client || '';
+          if(document.getElementById('edit-proj-client')) document.getElementById('edit-proj-client').value = pClient;
+          
+          let rawStatus = String(status).toUpperCase();
+          if (rawStatus === 'CANCELLED' || rawStatus === 'TRASHED') {
+              document.getElementById('restore-project-btn').style.display = 'block';
+          } else {
+              document.getElementById('restore-project-btn').style.display = 'none';
+          }
+          if(document.getElementById('trash-dropdown')) document.getElementById('trash-dropdown').style.display = 'none';
+          if(document.getElementById('status-dropdown')) document.getElementById('status-dropdown').style.display = 'none';
+          if(document.getElementById('type-dropdown')) document.getElementById('type-dropdown').style.display = 'none';
+          
+          // Grab the raw start date from the hidden memory
+          let originalStart = ev.extendedProps.rawDbData.start; 
+          document.getElementById('edit-orig-title').innerText = "Project: " + ev.extendedProps.fullTitle;
+          
+          if (document.getElementById('edit-proj-location')) document.getElementById('edit-proj-location').value = ev.extendedProps.rawDbData.locationUrl || '';
+          if (document.getElementById('edit-proj-multiplier')) document.getElementById('edit-proj-multiplier').value = ev.extendedProps.rawDbData.difficultyMultiplier || 1.0;
+
+          window.currentReadinessState = ev.extendedProps.rawDbData.readinessState || {};
+          let cState = window.currentReadinessState;
+          let isOutdoor = false;
+          if (cState.isOutdoor) isOutdoor = true;
+          if (document.getElementById('edit-proj-outdoor')) document.getElementById('edit-proj-outdoor').checked = isOutdoor;
+          
+          if (cState.coords) {
+              if (document.getElementById('edit-proj-lat')) document.getElementById('edit-proj-lat').value = cState.coords.lat || '';
+              if (document.getElementById('edit-proj-lng')) document.getElementById('edit-proj-lng').value = cState.coords.lng || '';
+          } else {
+              if (document.getElementById('edit-proj-lat')) document.getElementById('edit-proj-lat').value = '';
+              if (document.getElementById('edit-proj-lng')) document.getElementById('edit-proj-lng').value = '';
+          }
+          
+          if (document.getElementById('edit-proj-in-sofia')) document.getElementById('edit-proj-in-sofia').checked = cState.inSofia !== false;
+          if (document.getElementById('edit-proj-distance')) document.getElementById('edit-proj-distance').value = cState.distanceKm || "";
+          if(typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();
+          
+          if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
+
+          bootMiniCalendar(originalStart, pId);
+          if (typeof startPresencePing === 'function') startPresencePing(pId);
+          if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
+      }
+  });
+  calendar.render();
+  
+  let stripBtn = document.querySelector('.fc-customToggleStrips-button');
+  if (stripBtn) {
+      stripBtn.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; margin:auto;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 12 12 17 22 12"></polyline><polyline points="2 17 12 22 22 17"></polyline></svg>`;
+      stripBtn.title = "Toggle Event Strips";
+      stripBtn.style.padding = "0";
+      stripBtn.style.display = "flex";
+      stripBtn.style.alignItems = "center";
+      stripBtn.style.justifyContent = "center";
+  }
+  
+  document.getElementById('calendar-container').style.opacity = '0.4';
+  document.getElementById('calendar-container').style.pointerEvents = 'none';
+  
+  // ==========================================
+  // SURGICAL FIX: PHANTOM BOOT (INSTANT LOAD)
+  // ==========================================
+  try {
+      let phantom = localStorage.getItem('sm_phantom_payload');
+      if (phantom) {
+          let p = JSON.parse(phantom);
+          if (p.settings) {
+              if (p.settings.departments) SYSTEM_DEPARTMENTS = p.settings.departments;
+              if (p.settings.meals) SYSTEM_MEALS = p.settings.meals;
+              if (p.settings.tags) SYSTEM_TAGS = p.settings.tags;
+              if (p.settings.aliases) SYSTEM_ALIASES = p.settings.aliases;
+          }
+          if (p.visuals) {
+              let v = p.visuals;
+              let legacy = v.legacy || {};
+              
+              let tl = v.timeline || legacy;
+              if (tl.roles) ROLE_COLORS = tl.roles;
+              if (tl.phases) PHASE_PALETTE = tl.phases;
+              if (tl.sidebarWidth) CURRENT_SIDEBAR_WIDTH = tl.sidebarWidth;
+              if (tl.rowHeight) CURRENT_ROW_HEIGHT = tl.rowHeight;
+              if (tl.shiftHeight) SHIFT_HEIGHT = tl.shiftHeight;
+              if (tl.shiftFontSize) SHIFT_FONT_SIZE = tl.shiftFontSize;
+              if (tl.shiftFontWeight) SHIFT_FONT_WEIGHT = tl.shiftFontWeight;
+              if (tl.shiftFontStyle) SHIFT_FONT_STYLE = tl.shiftFontStyle;
+              if (tl.shiftTextDeco) SHIFT_TEXT_DECORATION = tl.shiftTextDeco;
+              if (tl.shiftTimeX !== undefined) SHIFT_TIME_X = tl.shiftTimeX;
+              if (tl.shiftTimeY !== undefined) SHIFT_TIME_Y = tl.shiftTimeY;
+              if (tl.shiftRoleX !== undefined) SHIFT_ROLE_X = tl.shiftRoleX;
+              if (tl.shiftRoleY !== undefined) SHIFT_ROLE_Y = tl.shiftRoleY;
+              
+              let cal = v.cal || legacy;
+              if (cal.calEventHeight) CAL_EVENT_HEIGHT = cal.calEventHeight;
+              if (cal.calFontSize) CAL_FONT_SIZE = cal.calFontSize;
+              if (cal.calBgIntensity !== undefined) CAL_BG_INTENSITY = cal.calBgIntensity;
+              if (cal.calColors) CAL_COLORS = cal.calColors;
+              
+              let mini = v.mini || legacy;
+              if (mini.paintColors) {
+                  PAINT_COLORS = mini.paintColors;
+                  if (!PAINT_COLORS['recovery']) PAINT_COLORS['recovery'] = { title: 'Recovery', color: '#a855f7' };
+                  if (!PAINT_COLORS['transit']) PAINT_COLORS['transit'] = { title: 'Transit', color: '#06b6d4' };
+              }
+              if (mini.miniEventHeight) MINI_EVENT_HEIGHT = mini.miniEventHeight;
+              if (mini.miniFontSize) MINI_FONT_SIZE = mini.miniFontSize;
+              
+              let mr = v.mr || {};
+              if (mr) MR_VISUAL_SETTINGS = mr;
+              
+              let asst = v.asset || legacy;
+              if (asst.rowPadding !== undefined) ASSET_ROW_PADDING = asst.rowPadding;
+              if (asst.fontSize !== undefined) ASSET_FONT_SIZE = asst.fontSize;
+              if (asst.colWidths !== undefined) ASSET_COL_WIDTHS = asst.colWidths;
+              if (asst.colGaps !== undefined) ASSET_COL_GAPS = asst.colGaps;
+              if (asst.colVisibility !== undefined) ASSET_COL_VISIBILITY = asst.colVisibility;
+              if (asst.colOrder !== undefined) ASSET_COL_ORDER = asst.colOrder;
+              
+              let paAsst = v.projectAsset || legacy;
+              if (paAsst.rowPadding !== undefined) PA_ROW_PADDING = paAsst.rowPadding;
+              if (paAsst.fontSize !== undefined) PA_FONT_SIZE = paAsst.fontSize;
+              if (paAsst.paSplitRatio !== undefined) PA_SPLIT_RATIO = paAsst.paSplitRatio;
+              if (paAsst.colWidths !== undefined) PA_COL_WIDTHS = paAsst.colWidths;
+              if (paAsst.colGaps !== undefined) PA_COL_GAPS = paAsst.colGaps;
+              if (paAsst.colVisibility !== undefined) PA_COL_VISIBILITY = paAsst.colVisibility;
+              if (paAsst.colOrder !== undefined) PA_COL_ORDER = paAsst.colOrder;
+              
+              let paVaultAsst = paAsst.paVault || legacy;
+              if (paVaultAsst.colWidths !== undefined) PA_VAULT_COL_WIDTHS = paVaultAsst.colWidths;
+              if (paVaultAsst.colGaps !== undefined) PA_VAULT_COL_GAPS = paVaultAsst.colGaps;
+              if (paVaultAsst.colVisibility !== undefined) PA_VAULT_COL_VISIBILITY = paVaultAsst.colVisibility;
+              if (paVaultAsst.colOrder !== undefined) PA_VAULT_COL_ORDER = paVaultAsst.colOrder;
+
+              applyVisualWidth(); 
+              initCalVisualsCSS();
+              initMiniVisualsCSS();
+              initMrVisualsCSS();
+          }
+          if (p.directory) globalRoles = p.directory.roles || [];
+          if (p.managerConfig) globalManagerConfig = p.managerConfig;
+          
+          applyRefreshPayload(p);
+          document.getElementById('calendar-container').style.opacity = '1';
+          document.getElementById('calendar-container').style.pointerEvents = 'auto';
+      }
+  } catch (e) { console.warn("Phantom boot bypassed."); }
+
+  google.script.run
+    .withFailureHandler(err => alert("Boot Error: " + err.message))
+    .withSuccessHandler(payload => {
+        if (payload.settings) {
+            if (payload.settings.departments) SYSTEM_DEPARTMENTS = payload.settings.departments;
+            if (payload.settings.meals) SYSTEM_MEALS = payload.settings.meals;
+            if (payload.settings.tags) SYSTEM_TAGS = payload.settings.tags;
+                if (payload.settings.aliases) SYSTEM_ALIASES = payload.settings.aliases;
+        }
+        if (payload.visuals) {
+            let v = payload.visuals;
+            let legacy = v.legacy || {};
+            
+            let tl = v.timeline || legacy;
+            if (tl.roles) ROLE_COLORS = tl.roles;
+            if (tl.phases) PHASE_PALETTE = tl.phases;
+            if (tl.sidebarWidth) CURRENT_SIDEBAR_WIDTH = tl.sidebarWidth;
+            if (tl.rowHeight) CURRENT_ROW_HEIGHT = tl.rowHeight;
+            if (tl.shiftHeight) SHIFT_HEIGHT = tl.shiftHeight;
+            if (tl.shiftFontSize) SHIFT_FONT_SIZE = tl.shiftFontSize;
+            if (tl.shiftFontWeight) SHIFT_FONT_WEIGHT = tl.shiftFontWeight;
+            if (tl.shiftFontStyle) SHIFT_FONT_STYLE = tl.shiftFontStyle;
+            if (tl.shiftTextDeco) SHIFT_TEXT_DECORATION = tl.shiftTextDeco;
+            if (tl.shiftTimeX !== undefined) SHIFT_TIME_X = tl.shiftTimeX;
+            if (tl.shiftTimeY !== undefined) SHIFT_TIME_Y = tl.shiftTimeY;
+            if (tl.shiftRoleX !== undefined) SHIFT_ROLE_X = tl.shiftRoleX;
+            if (tl.shiftRoleY !== undefined) SHIFT_ROLE_Y = tl.shiftRoleY;
+            
+            let cal = v.cal || legacy;
+            if (cal.calEventHeight) CAL_EVENT_HEIGHT = cal.calEventHeight;
+            if (cal.calFontSize) CAL_FONT_SIZE = cal.calFontSize;
+            if (cal.calBgIntensity !== undefined) CAL_BG_INTENSITY = cal.calBgIntensity;
+            if (cal.calColors) CAL_COLORS = cal.calColors;
+            
+            let mini = v.mini || legacy;
+            if (mini.paintColors) {
+                PAINT_COLORS = mini.paintColors;
+                if (!PAINT_COLORS['recovery']) PAINT_COLORS['recovery'] = { title: 'Recovery', color: '#a855f7' };
+                if (!PAINT_COLORS['transit']) PAINT_COLORS['transit'] = { title: 'Transit', color: '#06b6d4' };
+            }
+            if (mini.miniEventHeight) MINI_EVENT_HEIGHT = mini.miniEventHeight;
+            if (mini.miniFontSize) MINI_FONT_SIZE = mini.miniFontSize;
+            
+            let mr = v.mr || {};
+            if (mr) MR_VISUAL_SETTINGS = mr;
+            
+            let asst = v.asset || legacy;
+            if (asst.rowPadding !== undefined) ASSET_ROW_PADDING = asst.rowPadding;
+            if (asst.fontSize !== undefined) ASSET_FONT_SIZE = asst.fontSize;
+            if (asst.colWidths !== undefined) ASSET_COL_WIDTHS = asst.colWidths;
+            if (asst.colGaps !== undefined) ASSET_COL_GAPS = asst.colGaps;
+            if (asst.colVisibility !== undefined) ASSET_COL_VISIBILITY = asst.colVisibility;
+            if (asst.colOrder !== undefined) ASSET_COL_ORDER = asst.colOrder;
+            
+            let paAsst = v.projectAsset || legacy;
+            if (paAsst.rowPadding !== undefined) PA_ROW_PADDING = paAsst.rowPadding;
+            if (paAsst.fontSize !== undefined) PA_FONT_SIZE = paAsst.fontSize;
+            if (paAsst.paSplitRatio !== undefined) PA_SPLIT_RATIO = paAsst.paSplitRatio;
+            if (paAsst.colWidths !== undefined) PA_COL_WIDTHS = paAsst.colWidths;
+            if (paAsst.colGaps !== undefined) PA_COL_GAPS = paAsst.colGaps;
+            if (paAsst.colVisibility !== undefined) PA_COL_VISIBILITY = paAsst.colVisibility;
+            if (paAsst.colOrder !== undefined) PA_COL_ORDER = paAsst.colOrder;
+            
+            let paVaultAsst = paAsst.paVault || legacy;
+            if (paVaultAsst.colWidths !== undefined) PA_VAULT_COL_WIDTHS = paVaultAsst.colWidths;
+            if (paVaultAsst.colGaps !== undefined) PA_VAULT_COL_GAPS = paVaultAsst.colGaps;
+            if (paVaultAsst.colVisibility !== undefined) PA_VAULT_COL_VISIBILITY = paVaultAsst.colVisibility;
+            if (paVaultAsst.colOrder !== undefined) PA_VAULT_COL_ORDER = paVaultAsst.colOrder;
+
+            applyVisualWidth(); 
+            initCalVisualsCSS();
+            initMiniVisualsCSS();
+            initMrVisualsCSS();
+        }
+        if (payload.directory) {
+            globalRoles = payload.directory.roles || [];
+        }
+        if (payload.managerConfig) globalManagerConfig = payload.managerConfig;
+        applyRefreshPayload(payload);
+        document.getElementById('calendar-container').style.opacity = '1';
+        document.getElementById('calendar-container').style.pointerEvents = 'auto';
+        
+        // Save state for next Phantom Boot
+        try {
+            let cachePayload = Object.assign({}, payload);
+            localStorage.setItem('sm_phantom_payload', JSON.stringify(cachePayload));
+        } catch(e) {}
+    }).getBootPayload(ACTIVE_USER_NAME);
+    
+  // Async fetch clients for dropdowns & cache
+  try {
+      let cachedClients = localStorage.getItem('sm_clients_cache');
+      if (cachedClients) {
+          globalClients = JSON.parse(cachedClients) || [];
+          if (typeof updateClientDropdowns === 'function') updateClientDropdowns();
+      }
+  } catch(e) {}
+
+  google.script.run.withSuccessHandler(clients => {
+      if (typeof updateClientDropdowns === 'function') {
+          globalClients = clients || [];
+          try { localStorage.setItem('sm_clients_cache', JSON.stringify(globalClients)); } catch(e) {}
+          updateClientDropdowns();
+      }
+  }).getClientsVault();
+      
+  // Async fetch vehicles for dynamic timeline trucks & cache
+  try {
+      let cachedVehicles = localStorage.getItem('sm_fleet_cache');
+      if (cachedVehicles) {
+          globalVehicles = JSON.parse(cachedVehicles) || [];
+      }
+  } catch(e) {}
+
+  google.script.run.withSuccessHandler(veh => {
+      globalVehicles = veh || [];
+      try { localStorage.setItem('sm_fleet_cache', JSON.stringify(globalVehicles)); } catch(e) {}
+  }).getVehiclesVault();
+});
+
+// ==========================================
+// --- DASHBOARD DATA INTERCEPTOR (CONTOUR ENGINE) ---
+// ==========================================
+// @INDEX: DATA -> Contour Engine Interceptor
+function refreshData() {
+  document.getElementById('calendar-container').style.opacity = '0.4';
+  document.getElementById('calendar-container').style.pointerEvents = 'none';
+  google.script.run
+    .withFailureHandler(err => {
+        alert("Data Error: " + err.message);
+        document.getElementById('calendar-container').style.opacity = '1';
+        document.getElementById('calendar-container').style.pointerEvents = 'auto';
+    })
+    .withSuccessHandler(payload => {
+        applyRefreshPayload(payload);
+        document.getElementById('calendar-container').style.opacity = '1';
+        document.getElementById('calendar-container').style.pointerEvents = 'auto';
+        
+        // Update Phantom Cache with fresh contour data
+        try {
+            let phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+            phantom.projects = payload.projects; phantom.monthData = payload.monthData; phantom.tasks = payload.tasks; phantom.notifs = payload.notifs;
+            localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+        } catch(e) {}
+    }).getRefreshPayload(ACTIVE_USER_NAME);
+}
+
+function applyRefreshPayload(payload) {
+  try {
+  if (!payload) return;
+  calendar.removeAllEvents();
+  const events = [];
+
+  let mainC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['main'] ? PAINT_COLORS['main'].color : '#3b82f6';
+  let whC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['wh'] ? PAINT_COLORS['wh'].color : '#f97316';
+  let showC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['show'] ? PAINT_COLORS['show'].color : '#10b981';
+  let recoveryC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['recovery'] ? PAINT_COLORS['recovery'].color : '#a855f7';
+  let transitC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['transit'] ? PAINT_COLORS['transit'].color : '#06b6d4';
+
+  const parseD = (str) => {
+      if (!str) return null;
+      let cleanStr = typeof str === 'string' ? str.split('T')[0] : String(str).split('T')[0];
+      let pts = cleanStr.split('-');
+      if (pts.length === 3) {
+          let d = new Date(Date.UTC(pts[0], pts[1]-1, pts[2]));
+          if (!isNaN(d.getTime())) return d;
+      }
+      let fallback = new Date(cleanStr);
+      if (!isNaN(fallback.getTime())) return fallback;
+      return null;
+  };
+
+  if (payload.projects && Array.isArray(payload.projects)) {
+  payload.projects.forEach(p => {
+    let rawStatus = String(p.status || 'Draft').toUpperCase();
+    if (rawStatus === 'TRASHED') return;
+    
+    if (p.fragments && p.fragments.length > 0) {
+      let dates = p.fragments.map(f => parseD(f.date)).filter(d => d !== null);
+      if (dates.length === 0) return;
+
+      let minEpoch = Math.min(...dates.map(d => d.getTime()));
+      let maxEpoch = Math.max(...dates.map(d => d.getTime()));
+              
+      if (isNaN(minEpoch) || isNaN(maxEpoch)) return;
+      
+      let minD = new Date(minEpoch);
+      let startStr = minD.getUTCFullYear() + '-' + String(minD.getUTCMonth()+1).padStart(2,'0') + '-' + String(minD.getUTCDate()).padStart(2,'0');
+      
+      let endFc = new Date(maxEpoch + 86400000);
+      let endStr = endFc.getUTCFullYear() + '-' + String(endFc.getUTCMonth()+1).padStart(2,'0') + '-' + String(endFc.getUTCDate()).padStart(2,'0');
+
+      let phaseBlocks = [];
+      let sortedFrags = p.fragments.sort((a,b) => String(a.date || '').localeCompare(String(b.date || '')));
+      let typeMap = { 'WAREHOUSE': 'wh', 'MAIN_EVENT': 'main', 'SHOW_DAY': 'show', 'RECOVERY': 'recovery', 'TRANSIT': 'transit' };
+      
+      sortedFrags.forEach(f => {
+          let parsedD = parseD(f.date);
+          if (!parsedD) return;
+          let dTime = parsedD.getTime();
+          if (isNaN(dTime)) return;
+          let uiType = typeMap[f.type] || 'main';
+          
+          let parseTimeStrToFloat = (tStr, defaultVal) => {
+              if (!tStr) return defaultVal;
+              let s = String(tStr);
+              if (!s.includes(':')) { let num = parseFloat(s); return isNaN(num) ? defaultVal : num; }
+              let pts = s.split(':');
+              let h = parseInt(pts[0], 10);
+              let m = parseInt(pts[1], 10) || 0;
+              return isNaN(h) ? defaultVal : h + (m / 60);
+          };
+          
+          let sRaw = parseTimeStrToFloat(f.startTime, 0);
+          let eRaw = parseTimeStrToFloat(f.endTime, 24);
+          if (f.startTime === "00:00" && f.endTime === "23:59") eRaw = 24;
+          
+          let lastBlock = phaseBlocks.find(b => b.type === uiType && b.endEpoch === dTime && b.eHr === 24 && sRaw === 0);
+          if (lastBlock && sRaw === 0) {
+              lastBlock.endEpoch = dTime + 86400000;
+              lastBlock.eHr = eRaw;
+          } else {
+              phaseBlocks.push({ type: uiType, startEpoch: dTime, endEpoch: dTime + 86400000, sHr: sRaw, eHr: eRaw });
+          }
+
+          // Granular Timed Fragments for TimeGrid views
+          let sTime = f.startTime || "00:00";
+          let eTime = f.endTime || "23:59";
+          let fragStartStr = f.date + 'T' + sTime + ':00';
+          let fragEndStr = f.date + 'T' + eTime + ':00';
+          
+          if (f.date) {
+              let fType = typeMap[f.type] || 'main';
+              let bgHex = fType === 'wh' ? whC : fType === 'main' ? mainC : fType === 'show' ? showC : fType === 'transit' ? transitC : recoveryC;
+              let isCancelled = (rawStatus === 'CANCELLED');
+              
+              events.push({
+                  id: p.id + '_' + fType + '_' + Math.random(),
+                  title: p.title + ' (' + (PAINT_COLORS[fType] ? PAINT_COLORS[fType].title : fType) + ')',
+                  start: fragStartStr,
+                  end: fragEndStr,
+                  allDay: false,
+                  backgroundColor: isCancelled ? '#3f3f46' : bgHex,
+                  borderColor: isCancelled ? '#18181b' : bgHex,
+                  classNames: ['event-fragment', 'paint-' + fType],
+                  extendedProps: {
+                      isRollup: false,
+                      fullTitle: p.fullTitle,
+                      status: p.status,
+                      rawDbData: p,
+                      phaseType: fType
+                  }
+              });
+          }
+      });
+      
+      phaseBlocks.forEach(b => {
+          if (isNaN(b.startEpoch) || isNaN(b.endEpoch)) return;
+          b.start = new Date(b.startEpoch).toISOString().split('T')[0];
+          b.end = new Date(b.endEpoch).toISOString().split('T')[0];
+      });
+              
+      phaseBlocks = phaseBlocks.filter(b => b.start && b.end);
+
+      events.push({
+          id: p.id,
+          title: p.title,
+          start: startStr,
+          end: endStr,
+          allDay: true,
+          classNames: ['event-rollup'],
+          extendedProps: { 
+              isRollup: true, 
+              fullTitle: p.fullTitle, 
+              status: p.status, 
+              phases: phaseBlocks,
+              rawDbData: p 
+          }
+      });
+    }
+  });
+  
+  calendar.addEventSource(events);
+  }
+  
+  try { renderTasksAndNotifs(payload); } catch(e) { console.error(e); }
+  try { if (payload.conflicts && typeof renderConflicts === 'function') renderConflicts(payload.conflicts); } catch(e) { console.error(e); }
+  
+  let data = payload.monthData;
+  if (data && data.shifts && Array.isArray(data.shifts)) {
+  data.shifts.forEach(s => {
+     if (s.baseDate) {
+         let pts = String(s.baseDate).split('-');
+         let shiftEpoch = Date.UTC(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10)) + (Number(s.start) * 3600000);
+         let trueDate = new Date(shiftEpoch);
+         s.y = trueDate.getUTCFullYear(); s.m = trueDate.getUTCMonth(); s.d = trueDate.getUTCDate();
+         s.absStart = shiftEpoch / 3600000; s.absEnd = s.absStart + Number(s.duration);
+     }
+     // Apply matching visual colors natively
+     if (typeof isTruck === 'function' && isTruck(s.email)) {
+         s.color = '#e5e7eb'; s.textCol = '#18181b';
+     } else if (typeof ROLE_COLORS !== 'undefined' && ROLE_COLORS[s.role]) {
+         s.color = ROLE_COLORS[s.role].bg; s.textCol = ROLE_COLORS[s.role].text;
+     } else {
+         s.color = '#86efac'; s.textCol = '#064e3b';
+     }
+  });
+  globalRosterData = data;
+  if (document.getElementById('month-roster-layer').style.display === 'flex') renderMonthGrid();
+  }
+  
+  if (typeof renderMobileDashboard === 'function') renderMobileDashboard(payload);
+  if (typeof renderDesktopEventList === 'function') renderDesktopEventList(payload.projects);
+  } catch (err) { console.error("Refresh Render Error:", err); }
+}
+
+function activateDashboardView() {
+    let em = document.getElementById('edit-modal-overlay');
+    let sl = document.getElementById('shift-layer');
+    let am = document.getElementById('project-assets-modal-overlay');
+    let tm = document.getElementById('truck-modal-overlay');
+    let isProjectVisible = (em && em.style.display === 'flex') || (sl && sl.style.display === 'flex') || (am && am.style.display === 'flex') || (tm && tm.style.display === 'flex');
+
+    if (window.activeProjectContext) {
+        if (isProjectVisible) {
+                // Do nothing. Force the user to properly exit using Esc, Cancel, or Save.
+            return;
+        } else {
+            if (typeof closeModals === 'function') {
+                if (!closeModals()) return;
+            }
+            if (window.activePresenceModule === 'timeline') {
+                if (sl) sl.style.display = 'flex';
+            } else if (window.activePresenceModule === 'truck') {
+                if (tm) tm.style.display = 'flex';
+            } else if (window.activePresenceModule === 'assets') {
+                if (am) am.style.display = 'flex';
+            } else {
+                if (em) em.style.display = 'flex';
+            }
+            if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
+            return;
+        }
+    }
+
+    let dashboardBtn = document.getElementById('nav-btn-dashboard');
+    let wasAlreadyActive = dashboardBtn ? dashboardBtn.classList.contains('nav-active') : true;
+
+    let isModalOpen = false;
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+        if (m.id !== 'backup-modal-overlay' && m.id !== 'task-modal-overlay' && m.id !== 'task-crew-modal-overlay') {
+            if (m.style.display === 'flex' || m.style.display === 'block') isModalOpen = true;
+        }
+    });
+    if (sl && sl.style.display === 'flex') isModalOpen = true;
+    
+    ['master-settings-overlay', 'manager-settings-overlay', 'month-roster-layer', 'availability-modal-overlay', 'audit-studio-overlay', 'crew-manager-modal'].forEach(id => {
+        let el = document.getElementById(id);
+        if (el && (el.style.display === 'flex' || el.style.display === 'block')) isModalOpen = true;
+    });
+    
+    if (typeof closeModals === 'function') {
+        if (!closeModals()) return;
+    }
+    if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-dashboard');
+
+    if (!isModalOpen && wasAlreadyActive) {
+        toggleCalendarListView();
+    } else {
+        let listEl = document.getElementById('desktop-event-list');
+        let isList = listEl && listEl.style.display === 'flex';
+        if (typeof setDashboardIcon === 'function') setDashboardIcon(isList ? 'list' : 'calendar');
+    }
+}
+
+function toggleCalendarListView() {
+    let listEl = document.getElementById('desktop-event-list');
+    if (listEl && listEl.style.display === 'flex') {
+        switchCalendarView('dayGridMonth');
+    } else {
+        switchCalendarView('customList');
+    }
+}
+
+function switchCalendarView(viewName) {
+    let calEl = document.getElementById('calendar');
+    let listEl = document.getElementById('desktop-event-list');
+    let iconCal = document.getElementById('nav-icon-cal');
+    let iconList = document.getElementById('nav-icon-list');
+    let iconProj = document.getElementById('nav-icon-project');
+    
+    if (viewName === 'customList') {
+        if (calEl) calEl.style.display = 'none';
+        if (listEl) {
+            listEl.style.display = 'flex';
+            renderDesktopEventList();
+        }
+        if (iconCal) iconCal.style.display = 'none';
+        if (iconList) iconList.style.display = 'block';
+        if (iconProj) iconProj.style.display = 'none';
+        if (!window.activeProjectContext && typeof setDashboardIcon === 'function') setDashboardIcon('list');
+    } else {
+        if (listEl) listEl.style.display = 'none';
+        if (calEl) calEl.style.display = '';
+        if (iconList) iconList.style.display = 'none';
+        if (iconCal) iconCal.style.display = 'block';
+        if (iconProj) iconProj.style.display = 'none';
+        if (!window.activeProjectContext && typeof setDashboardIcon === 'function') setDashboardIcon('calendar');
+        if (calendar) {
+            calendar.changeView(viewName);
+            setTimeout(() => { 
+                calendar.updateSize(); 
+                calendar.render();
+                window.dispatchEvent(new Event('resize')); 
+            }, 50);
+        }
+    }
+}
+
+function renderDesktopEventList(projectsData) {
+    let listEl = document.getElementById('desktop-event-list');
+    if (!listEl) return;
+    
+    let projects = projectsData;
+    if (!projects) {
+        try { 
+            let phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}'); 
+            projects = phantom.projects || [];
+        } catch(e) {}
+    }
+    
+    let html = `<div style="display:flex; justify-content:space-between; align-items:center; padding: 0 10px 15px 10px; border-bottom: 1px solid #333; margin-bottom: 15px; flex-shrink: 0;">
+                    <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing: 1px;">📅 PROJECT DIRECTORY</div>
+                </div>`;
+                
+    let hasEvents = false;
+    if (projects && projects.length > 0) {
+        let sorted = [...projects].sort((a,b) => {
+            let d1 = a.start ? new Date(a.start).getTime() : 8640000000000000;
+            let d2 = b.start ? new Date(b.start).getTime() : 8640000000000000;
+            return d1 - d2;
+        });
+        
+        sorted.forEach(p => {
+            let rawStatus = String(p.status || 'Draft').toUpperCase();
+            if (rawStatus === 'TRASHED') return;
+            hasEvents = true;
+            let statusColor = '#a1a1aa'; 
+            if (rawStatus === 'APPROVED') statusColor = '#10b981';
+            else if (rawStatus === 'NOT APPROVED') statusColor = '#f97316';
+            else if (rawStatus === 'CANCELLED') statusColor = '#ef4444';
+            
+            let dateStr = p.start ? new Date(p.start).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' }) : 'No Date';
+            if (p.end && p.end !== p.start) dateStr += ' - ' + new Date(p.end).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+            
+            let typeKey = String(p.type || 'Event').toUpperCase();
+            let typeBadge = typeKey === 'EVENT' ? '' : `<span style="background:#333; color:#a1a1aa; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:bold; margin-left:8px;">${typeKey}</span>`;
+
+            let rules = (typeof globalManagerConfig !== 'undefined' && globalManagerConfig.rules) ? globalManagerConfig.rules : [];
+            let totalRules = rules.length;
+            let pbHtml = '';
+            if (totalRules > 0) {
+                let state = p.checklistState || {};
+                if (typeof state === 'string') { try { state = JSON.parse(state); } catch(e) { state = {}; } }
+                let checkedCount = 0;
+                rules.forEach(r => { if(state[r.taskName] && state[r.taskName].checked) checkedCount++; });
+                let pct = (checkedCount / totalRules) * 100;
+                let pbColor = '#52525b';
+                if (pct > 0 && pct < 100) pbColor = '#3b82f6';
+                if (pct === 100) pbColor = '#10b981';
+                pbHtml = `<div style="width: 60px; height: 6px; background: rgba(0,0,0,0.5); border: 1px solid #333; border-radius: 4px; overflow: hidden; margin-left: 10px;" title="Tasks: ${Math.round(pct)}%"><div style="height: 100%; width: ${pct}%; background: ${pbColor}; transition: width 0.3s;"></div></div>`;
+            }
+
+            html += `<div class="project-card" style="border-left: 4px solid ${statusColor}; padding: 15px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center; background: #151518; flex-shrink: 0;" onclick="triggerMobileEventClick('${p.id}')"><div><div style="font-weight:900; font-size:16px; color:#fff; margin-bottom:6px; display:flex; align-items:center;">${escapeHTML(p.title)} ${typeBadge}</div><div style="display:flex; align-items:center; gap: 15px; font-size:12px; color:#a1a1aa;"><span>📅 ${dateStr}</span><div style="display:flex; align-items:center;"><span style="color:${statusColor}; font-weight:bold;">${p.status.toUpperCase()}</span>${pbHtml}</div></div></div><button class="btn-outline btn-sm" style="border-color:#333; color:#a1a1aa; margin:0;" onmouseover="this.style.color='#fff'; this.style.borderColor='#fff'" onmouseout="this.style.color='#a1a1aa'; this.style.borderColor='#333'">OPEN PROJECT</button></div>`;
+        });
+    }
+    if (!hasEvents) html += '<div style="color:#888; text-align:center; padding:40px; font-size: 14px;">No active events found.</div>';
+    listEl.innerHTML = html;
+}
+</script>

@@ -1,0 +1,9 @@
+.agents/
+node_modules/
+.git/
+build.js
+watch.js
+scratch_*.js
+temp_*.js
+*.md
+

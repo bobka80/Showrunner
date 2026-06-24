@@ -1,0 +1,930 @@
+<script>
+/**
+ * 02e2_Logic_CRUD.html
+ * Domain: Asset Provisioning, Formula Syntax, and UI list mutations.
+ */
+
+// ==========================================
+// 🏗️ ARCHITECTURAL WARNING: SOFT ALLOCATION
+// ==========================================
+// The Project Planning UI relies strictly on SOFT ALLOCATION.
+// When adding items or auto-containers to a project, we only record the 
+// generic model and quantity (e.g. "4x Focus Spots"). 
+// We intentionally DO NOT lock in exact physical UIDs (e.g. "Spot #12") here.
+// Hard Allocation is strictly reserved for the Operations Phase (RFID Scanner) 
+// at the warehouse door. DO NOT attempt to bind specific physical UIDs during planning.
+// @INDEX: PA_LOGIC -> Asset Provisioning & Mutations
+
+window.insertIntoProjectAssets = function(newItem) {
+    if (window.overrideInsertIndex !== undefined && window.overrideInsertIndex !== null) {
+        currentProjectAssets.splice(window.overrideInsertIndex, 0, newItem);
+        window.overrideInsertIndex++;
+        return;
+    }
+    let lastIdx = -1;
+    for (let i = currentProjectAssets.length - 1; i >= 0; i--) {
+        let pa = currentProjectAssets[i];
+        if ((pa.location || "General") === (newItem.location || "General") && (pa.formula || "Standalone") === (newItem.formula || "Standalone")) {
+            lastIdx = i;
+            break;
+        }
+    }
+    if (lastIdx !== -1) currentProjectAssets.splice(lastIdx + 1, 0, newItem);
+    else currentProjectAssets.push(newItem);
+};
+
+window.addSelectedVaultPa = function() {
+    if (window.selectedVaultPaIds.size === 0) return;
+    let ids = Array.from(window.selectedVaultPaIds);
+    ids.forEach(id => { addPa(id, 1); });
+    window.selectedVaultPaIds.clear();
+    window.lastSelectedVaultPaId = null;
+    renderProjectAssetsUI();
+};
+
+window.deleteSelectedPa = function() {
+    let hasIndices = window.selectedPaIndices.size > 0;
+    let hasSummed = window.selectedSummedIds.size > 0;
+    if (!hasIndices && !hasSummed) return;
+    let total = window.selectedPaIndices.size + window.selectedSummedIds.size;
+    if (!confirm(`Remove ${total} selected item(s) from the project?`)) return;
+    
+    let toDelete = [];
+    if (hasIndices) {
+        window.selectedPaIndices.forEach(idx => {
+            if (currentProjectAssets[idx]) toDelete.push(currentProjectAssets[idx]);
+        });
+    }
+    
+    if (hasSummed) {
+        window.selectedSummedIds.forEach(id => {
+            currentProjectAssets.forEach(pa => {
+                if (pa.assetId === id && !toDelete.includes(pa)) toDelete.push(pa);
+            });
+        });
+    }
+    
+    currentProjectAssets = currentProjectAssets.filter(pa => !toDelete.includes(pa));
+    window.selectedPaIndices.clear(); window.lastSelectedPaIndex = null;
+    window.selectedSummedIds.clear(); window.lastSelectedSummedId = null;
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+};
+
+window.createNewSublistPa = function() {
+    let baseLoc = "New Location";
+    let loc = baseLoc;
+    let counter = 1;
+    while (currentProjectAssets.some(p => p.location === loc)) {
+        loc = `${baseLoc} (${counter})`;
+        counter++;
+    }
+    let form = loc + " Formula";
+    
+    window.activePaTarget = { location: loc, formula: form };
+    window.backupFormulaGroup = [];
+    
+    currentProjectAssets.push({
+        assetId: 'DUMMY', qty: 1, location: loc, formula: form, isEmptyGroup: true,
+        creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+    });
+    
+    renderProjectAssetsUI();
+};
+
+window.syncFormulaToItems = function(location, oldFormula) {
+    if (oldFormula === "Standalone") return "Standalone";
+    
+    let itemsInGroup = currentProjectAssets.filter(pa => pa.location === location && pa.formula === oldFormula);
+    
+    if (itemsInGroup.length === 0) {
+        if (window.activePaTarget && window.activePaTarget.location === location && window.activePaTarget.formula === oldFormula) {
+            return oldFormula;
+        }
+        return oldFormula;
+    }
+    
+    // Triangle of Truth: Deprecate static formula DB mutation.
+    // The visual string is generated dynamically by the UI.
+    // The pa.formula column now strictly acts as a stable sublist identifier/name.
+    let newForm = generateFormulaFromItems(location, itemsInGroup);
+    
+    return newForm;
+};
+
+function shouldAssetBeInFormula(asset) {
+    if (!asset || !asset.tags) return false;
+    let tArr = [];
+    try { tArr = JSON.parse(asset.tags); } catch(e) {}
+    if (tArr.length === 0) return false;
+    
+    let include = false;
+    for (let tId of tArr) {
+        let path = typeof getTagPathById === 'function' ? getTagPathById(tId) : [tId];
+        if (path) {
+            for (let pId of path) {
+                let pObj = getTagObj(pId);
+                if (pObj && pObj.inFormula) { include = true; break; }
+            }
+        } else {
+            let tObj = getTagObj(tId);
+            if (tObj && tObj.inFormula) { include = true; break; }
+        }
+        if (include) break;
+    }
+    return include;
+}
+
+function generateFormulaFromItems(location, assetsArray) {
+    if (!assetsArray || assetsArray.length === 0) return location + " = ";
+    let parsed = { location: location, items: [] };
+    
+    let aggMap = {};
+    
+    assetsArray.forEach(a => {
+        let asset = globalAssets.find(x => x.id === a.assetId);
+        if (!asset) return;
+        
+        if (!shouldAssetBeInFormula(asset)) return;
+        
+        let inheritCtx = [];
+        let modStr = asset.name;
+        let bestTrans = null;
+        let bestCode = null;
+        
+        try {
+            let tArr = JSON.parse(asset.tags || '[]');
+            if (tArr.length > 0) {
+                let tObj = getTagObj(tArr[tArr.length - 1]);
+                if (tObj) bestTrans = tObj.name;
+            }
+        } catch(e) {}
+
+        if (!bestTrans && typeof SYSTEM_ALIASES !== 'undefined') {
+            for (let [code, trans] of Object.entries(SYSTEM_ALIASES)) {
+                if (asset.name.toUpperCase().includes(trans.toUpperCase())) {
+                    if (!bestTrans || trans.length > bestTrans.length) bestTrans = trans;
+                }
+            }
+        }
+
+        if (bestTrans && typeof SYSTEM_ALIASES !== 'undefined') {
+            bestCode = bestTrans;
+            for (let [code, trans] of Object.entries(SYSTEM_ALIASES)) {
+                if (trans.toLowerCase() === bestTrans.toLowerCase() && code.length < bestCode.length) bestCode = code;
+            }
+        }
+
+        if (asset.length && parseFloat(asset.length) > 0) {
+            if (bestCode) inheritCtx = [bestCode.toLowerCase()];
+            else {
+                let baseName = asset.name;
+                let lenStrRegex = new RegExp('\\s*-?\\s*' + parseFloat(asset.length) + '\\s*m?', 'gi');
+                inheritCtx = [baseName.replace(lenStrRegex, '').trim().toLowerCase()];
+            }
+            modStr = asset.length + 'm';
+        } else {
+            inheritCtx = [];
+            if (bestTrans && asset.name.toLowerCase().trim() === bestTrans.toLowerCase().trim()) modStr = bestCode ? bestCode.toLowerCase() : bestTrans.toLowerCase();
+            else modStr = asset.name;
+        }
+        
+        let key = inheritCtx.join('|') + '|||' + modStr;
+        if (!aggMap[key]) {
+            aggMap[key] = { location: location, contexts: inheritCtx, qty: 0, mod: modStr, rawFormula: "Auto" };
+        }
+        aggMap[key].qty += parseInt(a.qty, 10) || 1;
+    });
+    
+    parsed.items = Object.values(aggMap);
+    
+    parsed.items.sort((a, b) => { let cA = a.contexts.join('|'); let cB = b.contexts.join('|'); return cA < cB ? -1 : (cA > cB ? 1 : 0); });
+    
+    if (typeof standardizeFormulaString === 'function') return standardizeFormulaString(parsed);
+    return location + " = ";
+}
+
+function modifyFormulaText(oldFormula, asset, delta, isRemove = false) {
+    if (!oldFormula.includes('=')) return oldFormula;
+    
+    if (!shouldAssetBeInFormula(asset)) return oldFormula;
+    
+    let parsed = null;
+    try { parsed = parseAssetSyntax(oldFormula); } catch(e) {}
+    if (!parsed || parsed.items.length === 0) return oldFormula;
+    
+    let found = false;
+    
+    for (let i = 0; i < parsed.items.length; i++) {
+        let item = parsed.items[i];
+        
+        let isExactMatch = (item.mod.trim().toLowerCase() === asset.name.trim().toLowerCase());
+        let matched = null;
+        
+        if (!isExactMatch) {
+            matched = typeof fuzzyMatchAsset === 'function' ? fuzzyMatchAsset(item.contexts, item.mod) : null;
+            let isPureDimension = /^\d+(\.\d+)?\s*([mM])?$/.test(item.mod.trim());
+            if (!matched && !isPureDimension) matched = typeof fuzzyMatchAsset === 'function' ? fuzzyMatchAsset([], item.mod) : null;
+            if (!matched && typeof globalAssets !== 'undefined') {
+                let nameLower = item.mod.toLowerCase().replace(/[^a-z0-9]/g, '');
+                matched = globalAssets.find(a => {
+                     let cw = a.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                     return cw === nameLower;
+            });
+            }
+        }
+        
+        if (isExactMatch || (matched && matched.id === asset.id)) {
+            let lengthValid = true;
+            if (asset.length && parseFloat(asset.length) > 0) {
+                let fullItemStr = (item.contexts.join(' ') + ' ' + item.mod).toLowerCase();
+                let lenStr = parseFloat(asset.length).toString();
+                if (!fullItemStr.match(new RegExp('\\b' + lenStr + 'm?\\b', 'i'))) {
+                    lengthValid = false;
+                }
+            } else if (!isExactMatch && matched) {
+                let fullItemStr = (item.contexts.join(' ') + ' ' + item.mod).toLowerCase();
+                let hasNumA = fullItemStr.match(/\d+/);
+                let hasNumB = asset.name.toLowerCase().match(/\d+/);
+                if (hasNumA && hasNumB && hasNumA[0] !== hasNumB[0]) lengthValid = false;
+            }
+            
+            if (lengthValid) {
+                let oldQty = parseInt(item.qty, 10) || 1;
+                let newQty = isRemove ? 0 : oldQty + delta;
+                
+                if (newQty <= 0) {
+                    parsed.items.splice(i, 1);
+                    i--; 
+                } else {
+                    item.qty = newQty;
+                }
+                found = true;
+                break;
+            }
+        }
+    }
+    
+    if (!found && delta > 0 && !isRemove) {
+        let inheritCtx = [];
+        let modStr = asset.name;
+        
+        let bestTrans = null;
+        let bestCode = null;
+        
+        try {
+            let tArr = JSON.parse(asset.tags || '[]');
+            if (tArr.length > 0) {
+                let tObj = getTagObj(tArr[tArr.length - 1]);
+                if (tObj) bestTrans = tObj.name;
+            }
+        } catch(e) {}
+
+        if (!bestTrans && typeof SYSTEM_ALIASES !== 'undefined') {
+            for (let [code, trans] of Object.entries(SYSTEM_ALIASES)) {
+                if (asset.name.toUpperCase().includes(trans.toUpperCase())) {
+                    if (!bestTrans || trans.length > bestTrans.length) bestTrans = trans;
+                }
+            }
+        }
+
+        if (bestTrans && typeof SYSTEM_ALIASES !== 'undefined') {
+            bestCode = bestTrans;
+            for (let [code, trans] of Object.entries(SYSTEM_ALIASES)) {
+                if (trans.toLowerCase() === bestTrans.toLowerCase() && code.length < bestCode.length) bestCode = code;
+            }
+        }
+
+        if (asset.length && parseFloat(asset.length) > 0) {
+            if (bestCode) {
+                inheritCtx = [bestCode.toLowerCase()];
+            } else {
+                let baseName = asset.name;
+                let lenStrRegex = new RegExp('\\s*-?\\s*' + parseFloat(asset.length) + '\\s*m?', 'gi');
+                baseName = baseName.replace(lenStrRegex, '').trim().toLowerCase();
+                inheritCtx = [baseName];
+            }
+            modStr = asset.length + 'm';
+        } else {
+            inheritCtx = [];
+            if (bestTrans && asset.name.toLowerCase().trim() === bestTrans.toLowerCase().trim()) {
+                modStr = bestCode ? bestCode.toLowerCase() : bestTrans.toLowerCase();
+            } else {
+                modStr = asset.name;
+            }
+        }
+        
+        let insertIdx = parsed.items.length;
+        if (inheritCtx.length > 0) {
+            for (let i = parsed.items.length - 1; i >= 0; i--) {
+                if (parsed.items[i].contexts.join('|') === inheritCtx.join('|')) {
+                    insertIdx = i + 1;
+                    break;
+                }
+            }
+        }
+
+        parsed.items.splice(insertIdx, 0, {
+            location: parsed.location,
+            contexts: inheritCtx,
+            qty: delta,
+            mod: modStr,
+            rawFormula: oldFormula
+        });
+    }
+    
+    if (typeof standardizeFormulaString === 'function') {
+        return standardizeFormulaString(parsed);
+    }
+    return oldFormula;
+}
+
+function addPa(assetId, qtyToAdd = 1) { 
+    window.selectedPaIndices.clear(); window.lastSelectedPaIndex = null;
+    let asset = globalAssets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    let isCons = (asset.isConsumable === true || asset.isConsumable === 'true');
+    let q = isCons ? (parseFloat(qtyToAdd) || 0) : (parseInt(qtyToAdd, 10) || 1);
+    if (q <= 0 && !isCons) q = 1;
+
+    let isDefaultAdd = (q === 1);
+    let cliInput = document.getElementById('pa-search-cli');
+    let currentVal = cliInput ? cliInput.value.trim() : '';
+    
+    let isTargetShortage = false;
+    if (window.activePaTarget) {
+        let sample = currentProjectAssets.find(pa => pa.location === window.activePaTarget.location && pa.formula === window.activePaTarget.formula);
+        if (sample && sample.isShortage) isTargetShortage = true;
+    }
+    
+    if (window.currentPaMode === 'packing') {
+        let cid = window.activeContainerTarget || "";
+        let match = currentProjectAssets.find(pa => pa.assetId === assetId && pa.formula === "Standalone" && pa.location === "General" && (pa.containerUid||"") === cid);
+        if (match) {
+            match.qty = isCons ? (parseFloat(match.qty) + q) : (parseInt(match.qty, 10) + q);
+        } else {
+            currentProjectAssets.push({
+                assetId: assetId, qty: q, formula: "Standalone", location: "General", containerUid: cid,
+                creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+            });
+        }
+        renderProjectAssetsUI();
+        return;
+    }
+
+    let targetForm = "Standalone";
+    let targetLoc = "General";
+    if (window.activePaTarget) {
+        targetForm = window.activePaTarget.formula;
+        targetLoc = window.activePaTarget.location;
+    }
+
+    // ==========================================
+    // MATRYOSHKA INTERCEPTOR: FLUID KITS VS FIXED RACKS
+    // ==========================================
+    // If the user adds a Case/Kit directly, intercept it and process based on its mode.
+    let isContainer = (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
+    
+    if (isContainer && window.currentPaMode !== 'packing') {
+        
+        if (asset.isFixedRack === true || asset.isFixedRack === 'true') {
+            // 🔒 FIXED RACK: Bypass Soft Allocation and Hard-Allocate exact physical units instantly
+            let rackCid = (targetForm !== 'Standalone') ? (asset.id + "|||" + targetForm) : asset.id;
+            
+            // 1. Add the Master Rack itself
+            window.insertIntoProjectAssets({ assetId: asset.id, qty: 1, formula: targetForm, location: targetLoc, isAuto: false, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+            
+            // 2. Add all specific permanently nested children
+            let exactChildren = globalAssets.filter(ga => ga.containerType === asset.id);
+            exactChildren.forEach(child => {
+                let cQty = child.type === 'Bulk' ? (parseInt(child.totalQuantity, 10) || 1) : 1;
+                window.insertIntoProjectAssets({ assetId: child.id, qty: cQty, formula: targetForm, location: targetLoc, containerUid: rackCid, isAuto: false, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+            });
+            
+            if (targetForm !== "Standalone" && typeof window.syncFormulaToItems === 'function') window.syncFormulaToItems(targetLoc, targetForm);
+            if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+            renderProjectAssetsUI();
+            return; // Abort standard exploder
+        }
+
+        // 🌊 FLUID KIT: Explode into Soft Demand children (System closes its eyes to physical UIDs)
+        let blueprint = [];
+        if (typeof window.GeneralizationEngine !== 'undefined') {
+            blueprint = window.GeneralizationEngine.generateBlueprint([asset.id], globalAssets);
+        }
+        
+        // Fallback to text manifest if the database didn't find physical children
+        if (blueprint.length === 0 && asset.components) {
+            blueprint = asset.components.split(',').map(c => {
+                let m = c.trim().match(/^(\d+)x\s+(.*)$/i);
+                if (m) return { qty: parseInt(m[1], 10), name: m[2].trim().toLowerCase() };
+                return { qty: 1, name: c.trim().toLowerCase() };
+            }).filter(c => c.name);
+        }
+
+        if (blueprint.length > 0) {
+            let itemsAdded = 0;
+            blueprint.forEach(comp => {
+                let targetName = String(comp.name).toLowerCase().trim();
+                let childAsset = globalAssets.find(ga => String(ga.name || '').toLowerCase().trim() === targetName);
+                
+                if (childAsset) {
+                    addPa(childAsset.id, comp.qty * q);
+                    itemsAdded++;
+                }
+            });
+            if (itemsAdded > 0) return; // Abort adding the empty case; recalcAutoContainers will spawn it naturally!
+        }
+    }
+
+    if (currentVal.includes('=')) {
+        let newForm = modifyFormulaText(currentVal, asset, q, false);
+        cliInput.value = newForm;
+        if (typeof handleUnifiedInput === 'function') handleUnifiedInput();
+        return;
+    }
+
+    // --- 📦 AUTO-BOXING CALCULATION ---
+    let autoFillBtn = document.getElementById('toggle-auto-fill-cases-btn');
+    let autoFillChecked = autoFillBtn ? autoFillBtn.dataset.active === 'true' : true;
+    
+    if (autoFillChecked && window.currentPaMode !== 'packing') {
+        let parentCase = asset.containerType ? globalAssets.find(a => a.id === asset.containerType) : (typeof getParentCaseForAsset === 'function' ? getParentCaseForAsset(asset.name) : null);
+        
+        if (parentCase) {
+            let caseSize = 1;
+            if (parentCase.capacity) caseSize = parseInt(parentCase.capacity, 10);
+            if ((!caseSize || caseSize <= 1) && parentCase.components) {
+                let comps = parentCase.components.split(',').map(c => {
+                    let m = c.trim().match(/^(\d+)x\s+(.*)$/i);
+                    if (m) return { qty: parseInt(m[1], 10), name: m[2].trim().toLowerCase() };
+                    return { qty: 1, name: c.trim().toLowerCase() };
+                });
+                let myComp = comps.find(c => c.name === String(asset.name || '').toLowerCase());
+                if (myComp && myComp.qty > 1) caseSize = myComp.qty;
+            }
+            
+            if (caseSize > 1) {
+                q = Math.ceil(q / caseSize) * caseSize;
+            }
+        }
+    }
+    // ----------------------------------
+    
+    let actualQ = 0;
+    let representativeAsset = asset;
+
+    if (asset.type === 'Bulk' || isCons) {
+        let maxQty = isCons ? 999999 : (parseInt(asset.totalQuantity, 10) || 1);
+        let alreadyAssigned = currentProjectAssets.filter(p => p.assetId === asset.id && !p.isShortage).reduce((sum, p) => sum + (isCons ? parseFloat(p.qty) || 0 : parseInt(p.qty, 10) || 0), 0);
+        let overlappingAssigned = window.overlappingAllocations ? (window.overlappingAllocations[asset.id] || 0) : 0;
+        let avail = isTargetShortage ? 999999 : Math.max(0, maxQty - alreadyAssigned - overlappingAssigned);
+        actualQ = isCons ? q : Math.min(q, avail); // Consumables bypass strict limits
+    } else {
+        let siblings = globalAssets.filter(a => a.name === asset.name && a.manufacturer === asset.manufacturer && a.status === asset.status);
+        let maxQty = siblings.length;
+        let allModelIds = new Set(siblings.map(s => s.id));
+        let alreadyAssigned = currentProjectAssets.filter(p => allModelIds.has(p.assetId) && !p.isShortage).reduce((sum, p) => sum + parseInt(p.qty, 10), 0);
+        let overlappingAssigned = 0;
+        if (window.overlappingAllocations) {
+            allModelIds.forEach(id => overlappingAssigned += (window.overlappingAllocations[id] || 0));
+        }
+        let avail = isTargetShortage ? 999999 : Math.max(0, maxQty - alreadyAssigned - overlappingAssigned);
+        actualQ = Math.min(q, avail);
+        if (siblings.length > 0) representativeAsset = siblings[0];
+    }
+
+    if (actualQ > 0) {
+        if (representativeAsset.type === 'Bulk' || isCons) {
+            let match = currentProjectAssets.find(pa => pa.assetId === representativeAsset.id && pa.formula === targetForm && pa.location === targetLoc);
+            if (match && targetForm !== "Standalone") {
+                match.qty = isCons ? (parseFloat(match.qty) + actualQ) : (parseInt(match.qty, 10) + actualQ);
+            } else {
+                let manMatch = currentProjectAssets.find(pa => pa.assetId === representativeAsset.id && pa.formula === "Standalone" && targetForm === "Standalone" && pa.location === targetLoc);
+                if (manMatch) {
+                    manMatch.qty = isCons ? (parseFloat(manMatch.qty) + actualQ) : (parseInt(manMatch.qty, 10) + actualQ);
+                } else {
+                        window.insertIntoProjectAssets({ assetId: representativeAsset.id, qty: actualQ, formula: targetForm, location: targetLoc, isShortage: isTargetShortage, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+                }
+            }
+        } else {
+            for (let k = 0; k < actualQ; k++) {
+                    window.insertIntoProjectAssets({ assetId: representativeAsset.id, qty: 1, formula: targetForm, location: targetLoc, isShortage: isTargetShortage, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+            }
+        }
+    }
+    
+    if (actualQ < q && !isTargetShortage) {
+        window.pendingShortages = [{
+            asset: asset,
+            shortQty: q - actualQ,
+            formula: targetForm
+        }];
+        processShortageQueue(targetLoc);
+    }
+
+    if (targetForm !== "Standalone" && typeof window.syncFormulaToItems === 'function') {
+        window.syncFormulaToItems(targetLoc, targetForm);
+    }
+
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI(); 
+}
+
+window.modifyPaIndices = function(indicesStr, delta) {
+    let indices = indicesStr.split(',').map(Number);
+    if (indices.length === 0) return;
+    
+    if (delta > 0) {
+        let idx = indices[0];
+        let pa = currentProjectAssets[idx];
+        if (!pa) return;
+        updateAssignedQty(pa.assetId, pa.location || "General", pa.formula || "Standalone", delta, pa.containerUid || null);
+    } else {
+        let removeCount = Math.abs(delta);
+        for (let i = 0; i < removeCount; i++) {
+            let validIdx = -1;
+            for (let j = indices.length - 1; j >= 0; j--) {
+                let pa = currentProjectAssets[indices[j]];
+                if (pa && parseInt(pa.qty, 10) > 0) {
+                    validIdx = indices[j];
+                    break;
+                }
+            }
+            if (validIdx === -1) break;
+            
+            let pa = currentProjectAssets[validIdx];
+            let loc = pa.location || "General";
+            let form = pa.formula || "Standalone";
+            
+            pa.qty = parseInt(pa.qty, 10) - 1;
+            if (pa.qty <= 0) {
+                currentProjectAssets.splice(validIdx, 1);
+                for (let k = 0; k < indices.length; k++) {
+                    if (indices[k] > validIdx) indices[k]--;
+                }
+            }
+            
+            if (form && form !== "Standalone" && typeof window.syncFormulaToItems === 'function') {
+                window.syncFormulaToItems(loc, form);
+            }
+        }
+        if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+        renderProjectAssetsUI();
+    }
+};
+
+window.removePaIndices = function(indicesStr) {
+    if (!confirm("Remove ALL assigned units from this group?")) return;
+    let indices = indicesStr.split(',').map(Number).sort((a,b) => b - a);
+    
+    let syncMap = {};
+    indices.forEach(idx => {
+        let pa = currentProjectAssets[idx];
+        if (pa) {
+            let loc = pa.location || "General";
+            let form = pa.formula || "Standalone";
+            if (form && form !== "Standalone") {
+                if (!syncMap[loc]) syncMap[loc] = new Set();
+                syncMap[loc].add(form);
+            }
+            currentProjectAssets.splice(idx, 1);
+        }
+    });
+    
+    Object.keys(syncMap).forEach(loc => {
+        syncMap[loc].forEach(form => {
+            if (typeof window.syncFormulaToItems === 'function') window.syncFormulaToItems(loc, form);
+        });
+    });
+    
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+};
+
+function updateAssignedQty(repAssetId, loc, form, delta, containerUid = null) {
+    window.selectedPaIndices.clear(); window.lastSelectedPaIndex = null;
+    let repAsset = globalAssets.find(a => a.id === repAssetId);
+    if (!repAsset) return;
+    if (delta > 0) {
+        let isGroupShortage = currentProjectAssets.some(pa => pa.location === loc && pa.formula === form && (containerUid === null || (pa.containerUid||"") === containerUid) && pa.isShortage);
+        
+        let siblings = globalAssets.filter(a => a.name === repAsset.name && a.manufacturer === repAsset.manufacturer && a.status === repAsset.status);
+        let maxQty = repAsset.type === 'Bulk' ? (parseInt(repAsset.totalQuantity, 10) || 1) : siblings.length;
+        let allModelIds = new Set(siblings.map(s => s.id));
+        if (repAsset.type === 'Bulk') allModelIds.add(repAsset.id);
+
+        let alreadyAssigned = currentProjectAssets.filter(p => allModelIds.has(p.assetId) && !p.isShortage).reduce((sum, p) => sum + parseInt(p.qty, 10), 0);
+        let overlappingAssigned = 0;
+        if (window.overlappingAllocations) {
+            allModelIds.forEach(id => overlappingAssigned += (window.overlappingAllocations[id] || 0));
+        }
+        
+        if (isGroupShortage || (alreadyAssigned + overlappingAssigned) < maxQty) {
+            let representativeId = repAsset.type === 'Bulk' ? repAsset.id : (siblings.length > 0 ? siblings[0].id : repAsset.id);
+            let targetCid = containerUid === null ? "" : containerUid;
+            if (repAsset.type === 'Bulk') {
+                let matchPa = currentProjectAssets.find(pa => pa.assetId === representativeId && pa.formula === form && pa.location === loc && (containerUid === null || (pa.containerUid||"") === containerUid));
+                if (matchPa) {
+                    matchPa.qty = parseInt(matchPa.qty, 10) + 1;
+                } else {
+                    window.insertIntoProjectAssets({ assetId: representativeId, qty: 1, formula: form, location: loc, containerUid: targetCid, isAuto: false, isShortage: isGroupShortage, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+                }
+            } else {
+                window.insertIntoProjectAssets({ assetId: representativeId, qty: 1, formula: form, location: loc, containerUid: targetCid, isAuto: false, isShortage: isGroupShortage, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+            }
+            if (form && form !== "Standalone") {
+                if (typeof window.syncFormulaToItems === 'function') window.syncFormulaToItems(loc, form);
+            }
+        } else {
+            window.pendingShortages = [{
+                asset: repAsset,
+                shortQty: 1,
+                formula: form
+            }];
+            processShortageQueue(loc);
+        }
+    } else {
+        let removeCount = Math.abs(delta);
+        for (let i = 0; i < removeCount; i++) {
+            let groupItems = currentProjectAssets.filter(pa => pa.location === loc && pa.formula === form && (containerUid === null || (pa.containerUid||"") === containerUid) && globalAssets.some(a => a.id === pa.assetId && a.name === repAsset.name && a.manufacturer === repAsset.manufacturer));
+            if (groupItems.length === 0) break;
+            let representativeId = repAsset.type === 'Bulk' ? repAsset.id : groupItems[0].assetId;
+            
+            let matchPa = currentProjectAssets.find(pa => pa.assetId === representativeId && pa.location === loc && pa.formula === form && (containerUid === null || (pa.containerUid||"") === containerUid));
+            if (matchPa) {
+                matchPa.qty = parseInt(matchPa.qty, 10) - 1;
+                if (matchPa.qty <= 0) {
+                    currentProjectAssets.splice(currentProjectAssets.indexOf(matchPa), 1);
+                }
+            }
+        }
+        if (form && form !== "Standalone") {
+            if (typeof window.syncFormulaToItems === 'function') window.syncFormulaToItems(loc, form);
+        }
+    }
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+}
+
+function updateFormulaDept(loc, form, newDept) {
+    currentProjectAssets.forEach(pa => {
+        let pLoc = pa.location || "General";
+        let pForm = pa.formula || "Standalone";
+        if (pLoc === loc && pForm === form) {
+            pa.overrideDept = newDept;
+        }
+    });
+    renderProjectAssetsUI();
+}
+
+function cancelFormulaEdit() {
+    if (window.activePaTarget) {
+        let loc = window.activePaTarget.location;
+        let form = window.activePaTarget.formula;
+        currentProjectAssets = currentProjectAssets.filter(pa => {
+            let pLoc = pa.location || "General";
+            let pForm = pa.formula || "Standalone";
+            return !(pLoc === loc && pForm === form);
+        });
+        
+        if (window.backupFormulaGroup && window.backupFormulaGroup.length > 0) {
+            currentProjectAssets.push(...window.backupFormulaGroup);
+        }
+    }
+    window.backupFormulaGroup = [];
+    window.activePaTarget = null;
+        if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+}
+
+function removeFormulaGroup(loc, form) {
+    if (!confirm("Remove all items in this formula group?")) return;
+    currentProjectAssets = currentProjectAssets.filter(pa => {
+        let pLoc = pa.location || "General";
+        let pForm = pa.formula || "Standalone";
+        return !(pLoc === loc && pForm === form);
+    });
+        if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+}
+
+function updateFormulaInline(loc, oldForm, newForm) {
+    newForm = newForm.replace(/[\n\r]/g, ' ').trim();
+    if (!newForm) return;
+    
+    let currentDerived = typeof generateFormulaFromItems === 'function' ? generateFormulaFromItems(loc, currentProjectAssets.filter(pa => pa.location === loc && pa.formula === oldForm)) : "";
+    if (newForm === currentDerived) return; // Ignore if string hasn't fundamentally changed
+
+    let fullNewForm = newForm;
+    if (!fullNewForm.includes('=')) {
+        fullNewForm = loc + " = " + newForm;
+    }
+
+    let firstIdx = -1;
+    for (let i = 0; i < currentProjectAssets.length; i++) {
+        let pLoc = currentProjectAssets[i].location || "General";
+        let pForm = currentProjectAssets[i].formula || "Standalone";
+        if (pLoc === loc && pForm === oldForm) {
+            firstIdx = i;
+            break;
+        }
+    }
+    if (firstIdx !== -1) window.overrideInsertIndex = firstIdx;
+
+    let backup = currentProjectAssets.filter(pa => {
+        let pLoc = pa.location || "General";
+        let pForm = pa.formula || "Standalone";
+        return (pLoc === loc && pForm === oldForm);
+    });
+
+    currentProjectAssets = currentProjectAssets.filter(pa => {
+        let pLoc = pa.location || "General";
+        let pForm = pa.formula || "Standalone";
+        return !(pLoc === loc && pForm === oldForm);
+    });
+
+    let cliInput = document.getElementById('pa-search-cli');
+    if (cliInput) {
+        cliInput.value = fullNewForm;
+        if (typeof executeSyntaxLive === 'function') executeSyntaxLive(fullNewForm);
+        
+        if (window.cliTempAssets && window.cliTempAssets.length > 0) {
+            if (typeof commitSyntaxCommand === 'function') commitSyntaxCommand();
+        } else {
+            currentProjectAssets.push(...backup);
+            alert("Invalid formula. Edit reverted.");
+            cliInput.value = '';
+            if (typeof executeSyntaxLive === 'function') executeSyntaxLive('');
+            renderProjectAssetsUI();
+        }
+    }
+    window.overrideInsertIndex = null;
+}
+
+window.updateLocationName = function(oldLoc, form, newLoc) {
+    newLoc = newLoc.trim();
+    if (!newLoc || newLoc === oldLoc) return;
+
+    let newForm = form;
+    if (form !== "Standalone") newForm = newLoc + " Formula";
+
+    currentProjectAssets.forEach(pa => {
+        let pLoc = pa.location || "General";
+        let pForm = pa.formula || "Standalone";
+        if (pLoc === oldLoc && pForm === form) {
+            pa.location = newLoc;
+            pa.formula = newForm;
+        }
+    });
+
+    if (window.activePaTarget && window.activePaTarget.location === oldLoc && window.activePaTarget.formula === form) {
+        window.activePaTarget.location = newLoc;
+        window.activePaTarget.formula = newForm;
+    }
+
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+};
+
+window.toggleGroupShortage = function(loc, form, isShort) {
+    currentProjectAssets.forEach(pa => {
+        let pLoc = pa.location || "General";
+        let pForm = pa.formula || "Standalone";
+        if (pLoc === loc && pForm === form) {
+            pa.isShortage = isShort;
+        }
+    });
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+};
+
+window.updateConsumableUsage = function(mode, targetId, newVal) {
+    let numVal = parseFloat(newVal);
+    if (isNaN(numVal) || numVal < 0) numVal = 0;
+    
+    if (mode === 'assigned') {
+        let paIndex = parseInt(targetId, 10);
+        let pa = currentProjectAssets[paIndex];
+        if (pa) {
+            pa.qty = numVal;
+            if (numVal === 0) currentProjectAssets.splice(paIndex, 1);
+        }
+    } else if (mode === 'summed') {
+        let groupItems = currentProjectAssets.filter(pa => (pa.formula || "Standalone") === "Standalone" && (pa.location || "General") === "General" && pa.assetId === targetId);
+        if (groupItems.length > 0) {
+            groupItems[0].qty = numVal;
+            if (numVal === 0) {
+                let matchIndex = currentProjectAssets.indexOf(groupItems[0]);
+                if (matchIndex > -1) currentProjectAssets.splice(matchIndex, 1);
+            }
+        } else if (numVal > 0) {
+            window.insertIntoProjectAssets({ assetId: targetId, qty: numVal, formula: "Standalone", location: "General", creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+        }
+    }
+    
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+};
+
+function updatePaQtyGeneric(assetId, delta) {
+    if (delta > 0) {
+        let repAsset = globalAssets.find(a => a.id === assetId);
+        if (!repAsset) return;
+        let siblings = repAsset.type === 'Bulk' ? [repAsset] : globalAssets.filter(a => a.name === repAsset.name && a.manufacturer === repAsset.manufacturer && a.status === repAsset.status);
+        let added = false;
+        for (let sib of siblings) {
+            let maxQty = sib.type === 'Bulk' ? (parseInt(sib.totalQuantity, 10) || 1) : 1;
+            let paMatches = currentProjectAssets.filter(pa => pa.assetId === sib.id);
+            let alreadyAssigned = paMatches.reduce((sum, pa) => sum + parseInt(pa.qty, 10), 0);
+            let overlappingAssigned = window.overlappingAllocations ? (window.overlappingAllocations[sib.id] || 0) : 0;
+            if ((alreadyAssigned + overlappingAssigned) < maxQty) {
+                if (sib.type === 'Bulk') {
+                    let match = currentProjectAssets.find(pa => pa.assetId === sib.id && pa.formula === "Standalone");
+                    if (match) match.qty = parseInt(match.qty, 10) + 1;
+                    else window.insertIntoProjectAssets({ assetId: sib.id, qty: 1, formula: "Standalone", location: "General" });
+                } else {
+                    window.insertIntoProjectAssets({ assetId: sib.id, qty: 1, formula: "Standalone", location: "General" });
+                }
+                added = true; break;
+            }
+        }
+        if (!added) {
+            window.pendingShortages = [{
+                asset: repAsset,
+                shortQty: 1,
+                formula: "Standalone"
+            }];
+            processShortageQueue("General");
+        }
+    } else {
+        let removeCount = Math.abs(delta);
+        for (let i = 0; i < removeCount; i++) {
+            let repAsset = globalAssets.find(a => a.id === assetId);
+            if (!repAsset) break;
+            let groupItems = currentProjectAssets.filter(pa => (pa.formula || "Standalone") === "Standalone" && (pa.location || "General") === "General" && globalAssets.some(a => a.id === pa.assetId && a.name === repAsset.name && a.manufacturer === repAsset.manufacturer));
+            if (groupItems.length > 0) {
+                let exactIdx = groupItems.findIndex(pa => pa.assetId === assetId);
+                let paToRemove = exactIdx > -1 ? groupItems[exactIdx] : groupItems[groupItems.length - 1]; 
+                let matchIndex = currentProjectAssets.indexOf(paToRemove);
+                if (matchIndex > -1) {
+                    let pa = currentProjectAssets[matchIndex];
+                    pa.qty = parseInt(pa.qty, 10) - 1;
+                    if (pa.qty <= 0) currentProjectAssets.splice(matchIndex, 1);
+                }
+            } else {
+                break;
+            }
+        }
+    }
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+}
+
+function removePaGeneric(assetId) {
+    if (!confirm("Remove ALL instances of this asset from Standalone gear?")) return;
+    currentProjectAssets = currentProjectAssets.filter(pa => {
+        let isStandalone = (pa.location || "General") === "General" && (pa.formula || "Standalone") === "Standalone";
+        return !(isStandalone && pa.assetId === assetId);
+    });
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+}
+
+function removePaGroup(idsStr, loc, form) {
+    if (!confirm("Remove ALL assigned units from this group?")) return;
+    let ids = idsStr.split(',');
+    
+    currentProjectAssets = currentProjectAssets.filter(pa => {
+        let matchesLoc = (pa.location || "General") === (loc || "General");
+        let matchesForm = (pa.formula || "Standalone") === (form || "Standalone");
+        return !(matchesLoc && matchesForm && ids.includes(pa.assetId));
+    });
+    
+    if (form && form !== "Standalone" && typeof window.syncFormulaToItems === 'function') {
+        window.syncFormulaToItems(loc, form);
+    }
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+}
+
+function removePa(idx) { 
+    let pa = currentProjectAssets[idx];
+    let oldLoc = pa ? (pa.location || "General") : "General";
+    let oldForm = pa ? (pa.formula || "Standalone") : "Standalone";
+    currentProjectAssets.splice(idx, 1); 
+    if (oldForm && oldForm !== "Standalone") {
+        if (typeof window.syncFormulaToItems === 'function') window.syncFormulaToItems(oldLoc, oldForm);
+    }
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI(); 
+}
+
+function addPaGroup(idsStr, qty = 1) {
+    let ids = idsStr.split(',');
+    if (ids.length > 0) {
+        addPa(ids[0], qty);
+    }
+}
+</script>

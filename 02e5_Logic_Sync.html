@@ -1,0 +1,438 @@
+<script>
+/**
+ * 02e5_Logic_Sync.html
+ * Domain: Network saving, delta calculations, and shortage resolution.
+ */
+
+// @INDEX: PA_LOGIC -> Shortage Queue Processing
+function processShortageQueue(parentLoc) {
+    if (!window.pendingShortages || window.pendingShortages.length === 0) return;
+    
+    let html = window.pendingShortages.map(s => `<li style="padding:4px 0; border-bottom:1px solid #333;"><b style="color:#ef4444;">${s.shortQty}x</b> ${s.asset.name}</li>`).join('');
+    document.getElementById('shortage-item-list').innerHTML = `<ul style="margin:0; padding:0; list-style:none;">${html}</ul>`;
+    
+    let subrentLocs = new Set();
+    currentProjectAssets.forEach(pa => {
+        if (pa.isShortage && pa.location) {
+            subrentLocs.add(pa.location);
+        }
+    });
+    
+    let sel = document.getElementById('shortage-vendor-select');
+    let selHtml = '<option value="SHORTAGE LIST">General Shortage List</option>';
+    subrentLocs.forEach(loc => {
+        if (loc.toUpperCase() !== "SHORTAGE LIST") {
+            selHtml += `<option value="${loc}">${loc}</option>`;
+        }
+    });
+    selHtml += '<option value="NEW">+ Specific Subrent Vendor...</option>';
+    sel.innerHTML = selHtml;
+    
+    document.getElementById('shortage-new-vendor-input').style.display = 'none';
+    document.getElementById('shortage-new-vendor-input').value = '';
+    window.shortageParentLoc = parentLoc || "General";
+    
+    document.getElementById('shortage-modal-overlay').style.display = 'flex';
+}
+
+function toggleShortageNewVendor() {
+    let sel = document.getElementById('shortage-vendor-select');
+    let inp = document.getElementById('shortage-new-vendor-input');
+    inp.style.display = (sel.value === 'NEW') ? 'block' : 'none';
+    if (sel.value === 'NEW') inp.focus();
+}
+
+function cancelShortages() {
+    window.pendingShortages = [];
+    document.getElementById('shortage-modal-overlay').style.display = 'none';
+}
+
+function confirmShortages() {
+    let sel = document.getElementById('shortage-vendor-select').value;
+    let newVendor = document.getElementById('shortage-new-vendor-input').value.trim();
+    let loc = "";
+    
+    if (sel === 'NEW') {
+        if (!newVendor) return alert("Please enter a vendor name.");
+        loc = newVendor.toUpperCase();
+    } else if (sel) {
+        loc = sel;
+    } else {
+        return alert("Please select a vendor.");
+    }
+    
+    try {
+        window.pendingShortages.forEach(s => {
+            let targetFormula = s.formula === "Standalone" ? "TEMPORARY_SHORT_" + Date.now() + Math.random() : "TEMPORARY_" + Date.now() + Math.random();
+            let existing = currentProjectAssets.find(pa => pa.assetId === s.asset.id && pa.location === loc && pa.formula === targetFormula);
+            if (existing) {
+                existing.qty = parseInt(existing.qty, 10) + s.shortQty;
+                existing.isShortage = true;
+            } else {
+                window.insertIntoProjectAssets({
+                            assetId: s.asset.id,
+                    qty: s.shortQty,
+                    formula: targetFormula,
+                    location: loc,
+                    isShortage: true,
+                    creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+                });
+            }
+        });
+        
+        let tempFormulas = [...new Set(currentProjectAssets.filter(pa => pa.location === loc && pa.formula.startsWith("TEMPORARY_")).map(pa => pa.formula))];
+        tempFormulas.forEach(tForm => {
+            if (typeof window.syncFormulaToItems === 'function') window.syncFormulaToItems(loc, tForm);
+        });
+        
+    } catch (err) { console.error("Shortage Logic Error: ", err); }
+    
+    window.pendingShortages = [];
+    document.getElementById('shortage-modal-overlay').style.display = 'none';
+    
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+    
+    let input = document.getElementById('pa-search-cli');
+    if (input) input.value = '';
+    if (typeof executeSyntaxLive === 'function') executeSyntaxLive('');
+}
+
+// ==========================================
+// --- PA CRUD & DATA MUTATION LOGIC ---
+// ==========================================
+
+// @INDEX: PA_DELTA -> Calculate Equipment Deltas
+window.calculatePaDeltas = function() {
+    let oldMap = {};
+    (window.originalProjectAssets || []).forEach(pa => {
+        let pForm = pa.formula || 'Standalone';
+        if (pa.isShortage) pForm = '[SHORT] ' + pForm;
+        if (pa.isGenericAuto && pa.formula !== 'Standalone') pForm = '[GEN_AUTO] ' + pForm;
+        else if (pa.isGenericAuto) pForm = 'Gen-Auto-Container';
+        else if (pa.isAuto && pa.formula !== 'Standalone') pForm = '[AUTO] ' + pForm;
+        else if (pa.isAuto) pForm = 'Auto-Container';
+        let k = `${pa.assetId}_@@@_${pa.location || 'General'}_@@@_${pForm}_@@@_${pa.containerUid || ''}`;
+        oldMap[k] = (oldMap[k] || 0) + parseInt(pa.qty, 10);
+    });
+    
+    let newMap = {};
+    currentProjectAssets.forEach(pa => {
+        let pForm = pa.formula || 'Standalone';
+        if (pa.isShortage) pForm = '[SHORT] ' + pForm;
+        if (pa.isGenericAuto && pa.formula !== 'Standalone') pForm = '[GEN_AUTO] ' + pForm;
+        else if (pa.isGenericAuto) pForm = 'Gen-Auto-Container';
+        else if (pa.isAuto && pa.formula !== 'Standalone') pForm = '[AUTO] ' + pForm;
+        else if (pa.isAuto) pForm = 'Auto-Container';
+        let k = `${pa.assetId}_@@@_${pa.location || 'General'}_@@@_${pForm}_@@@_${pa.containerUid || ''}`;
+        newMap[k] = (newMap[k] || 0) + parseInt(pa.qty, 10);
+    });
+    
+    let deltas = [];
+    let allKeys = new Set([...Object.keys(oldMap), ...Object.keys(newMap)]);
+    allKeys.forEach(k => {
+        let oldQ = oldMap[k] || 0;
+        let newQ = newMap[k] || 0;
+        let diff = newQ - oldQ;
+        if (diff !== 0) {
+            let pts = k.split('_@@@_');
+            let isBulk = false;
+            let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pts[0]) : null;
+            if (asset && asset.type === 'Bulk') isBulk = true;
+            deltas.push({ assetId: pts[0], location: pts[1], rawFormula: pts[2], containerUid: pts[3], deltaQty: diff, isBulk: isBulk, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+        }
+    });
+    return deltas;
+};
+
+window.isBackgroundSyncing = false;
+
+window.autoSaveAndExecute = function(callback, optimistic = true, failureCallback = null, forceSync = false) {
+    let deltas = window.calculatePaDeltas();
+    if (deltas.length === 0 && !forceSync) {
+        if (callback) callback();
+        return;
+    }
+
+    const projectId = document.getElementById('edit-folder-id').value;
+    window.isBackgroundSyncing = true;
+    
+    if (optimistic && callback && !forceSync) callback();
+
+    let origCursor = document.body.style.cursor;
+    if (!optimistic || forceSync) document.body.style.cursor = 'wait';
+
+    let syncFunc = () => {
+        let sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : "";
+        let eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : "";
+
+        google.script.run
+        .withFailureHandler(err => {
+            window.isBackgroundSyncing = false;
+            document.body.style.cursor = origCursor;
+            alert("Auto-Sync Failed: " + err.message);
+            if (failureCallback) failureCallback();
+        })
+        .withSuccessHandler(res2 => {
+            window.isBackgroundSyncing = false;
+            document.body.style.cursor = origCursor;
+            let serverAssets = res2.current || [];
+            window.overlappingAllocations = res2.overlapping || {};
+            
+            const processFormulas = (arr) => {
+                let exploded = [];
+                for (let i = arr.length - 1; i >= 0; i--) {
+                    let pa = arr[i];
+                    let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
+                    if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') {
+                        let parsedQty = parseInt(pa.qty, 10);
+                        if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
+                            arr.splice(i, 1);
+                            for (let k = 0; k < parsedQty; k++) {
+                                let newPa = {...pa, qty: 1};
+                                delete newPa.uid;
+                                exploded.push(newPa);
+                            }
+                        }
+                    }
+                }
+                if (exploded.length > 0) arr.push(...exploded);
+                
+                arr.forEach(pa => {
+                    if (pa.formula === 'Manual') pa.formula = 'Standalone';
+                    if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
+                    if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
+                    if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } 
+                    else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
+                    else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
+                    else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
+                });
+            };
+            
+            processFormulas(serverAssets);
+            
+            // Optimistic Healing Engine: Inject server UIDs into existing local memory without overwriting unsaved changes
+            let usedServerUids = new Set();
+            currentProjectAssets.forEach(localPa => {
+                if (localPa.uid) {
+                    usedServerUids.add(localPa.uid);
+                }
+            });
+            
+            currentProjectAssets.forEach(localPa => {
+                if (!localPa.uid) {
+                    let match = serverAssets.find(srv => 
+                        !usedServerUids.has(srv.uid) &&
+                        String(srv.assetId) === String(localPa.assetId) &&
+                        String(srv.location || 'General') === String(localPa.location || 'General') &&
+                        String(srv.formula || 'Standalone') === String(localPa.formula || 'Standalone')
+                    );
+                    if (match) {
+                        localPa.uid = match.uid;
+                        localPa.truckUid = match.truckUid;
+                        localPa.truckX = match.truckX;
+                        localPa.truckY = match.truckY;
+                        localPa.truckZ = match.truckZ;
+                        localPa.isRotated = match.isRotated;
+                        localPa.isStaged = match.isStaged;
+                        usedServerUids.add(match.uid);
+                    }
+                }
+            });
+            
+            let finalMerged = [];
+            currentProjectAssets.forEach(localPa => {
+                if (localPa.uid) {
+                    let srvExists = serverAssets.find(s => s.uid === localPa.uid);
+                    if (srvExists) finalMerged.push(localPa);
+                } else {
+                    finalMerged.push(localPa);
+                }
+            });
+            
+            serverAssets.forEach(srv => {
+                let localExists = finalMerged.find(l => l.uid === srv.uid);
+                if (!localExists) finalMerged.push(srv);
+            });
+            
+            currentProjectAssets = finalMerged;
+            window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+            processFormulas(currentProjectAssets);
+            processFormulas(window.originalProjectAssets);
+            
+            if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+            
+            if (typeof renderProjectAssetsUI === 'function' && window.activePresenceModule === 'assets') renderProjectAssetsUI();
+            if ((!optimistic || forceSync) && callback) callback();
+        }).getProjectAssets(projectId, sDate, eDate);
+    };
+
+    if (deltas.length > 0) {
+        google.script.run
+        .withFailureHandler(err => {
+            window.isBackgroundSyncing = false;
+            document.body.style.cursor = origCursor;
+            alert("Auto-Save Failed: " + err.message);
+            if (failureCallback) failureCallback();
+        })
+        .withSuccessHandler(res => {
+            syncFunc();
+        }).saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+    } else {
+        syncFunc();
+    }
+};
+
+function saveProjectAssets() {
+    if (window.currentOperationType) {
+        alert("⚠️ Please PAUSE the active operation before saving the equipment list.");
+        return;
+    }
+    
+    const projectId = document.getElementById('edit-folder-id').value;
+    let deltas = window.calculatePaDeltas();
+    
+    let btn = document.getElementById('btn-save-pa');
+    let origText = btn ? btn.innerText : "SAVE EQUIPMENT";
+
+    if (deltas.length === 0) {
+        if (btn) {
+            btn.innerText = "NO CHANGES";
+            setTimeout(() => { btn.innerText = origText; }, 1500);
+        }
+        return;
+    }
+
+    if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+    
+    let safetyTimer = setTimeout(() => {
+        if (btn) { btn.innerText = origText; btn.disabled = false; }
+        alert("Network Timeout: Asset save took too long.");
+    }, 30000);
+    
+    google.script.run
+    .withFailureHandler(err => {
+        clearTimeout(safetyTimer);
+        alert("Equipment Save Failed: " + err.message);
+        if (btn) { btn.innerText = origText; btn.disabled = false; }
+    })
+    .withSuccessHandler(res => {
+        clearTimeout(safetyTimer);
+        if (btn) { 
+            btn.innerText = "SAVED ✓"; 
+            setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
+        }
+        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets)); // Re-sync pristine state
+        
+        if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+    }).saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+}
+
+function recalcAutoContainers() {
+    if (!currentProjectAssets) return;
+    
+    let usedContainerUids = new Set();
+    currentProjectAssets.forEach(pa => {
+        if (pa.containerUid) usedContainerUids.add(pa.containerUid);
+    });
+    
+    // Backup existing auto containers to preserve UIDs and truck spatial data
+    let existingAuto = currentProjectAssets.filter(pa => pa.isAuto || pa.formula === 'Auto-Container');
+    currentProjectAssets = currentProjectAssets.filter(pa => !pa.isAuto && pa.formula !== 'Auto-Container');
+    
+    // 2. Identify fixtures that need packing
+    let fixturesToPack = [];
+    currentProjectAssets.forEach(pa => {
+        if (pa.isAuto) return; 
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        if (asset && asset.containerType && String(asset.containerType).trim() !== '') {
+            let pUuidMatch = globalAssets.find(p => p.id === asset.containerType);
+            let pNameMatch = globalAssets.find(p => String(p.name || '').toLowerCase().trim() === String(asset.containerType || '').toLowerCase().trim() && parseFloat(p.capacity) > 0);
+            let parent = pUuidMatch || pNameMatch;
+            if (parent && parent.capacity && parseFloat(parent.capacity) > 0) {
+                fixturesToPack.push({ pa, asset, parent });
+            }
+        }
+    });
+
+    let containerCounts = {};
+    fixturesToPack.forEach(f => {
+        let locKey = (f.pa.location || 'General') + "|||" + (f.pa.formula || 'Standalone');
+        if (!containerCounts[locKey]) containerCounts[locKey] = {};
+        if (!containerCounts[locKey][f.parent.id]) containerCounts[locKey][f.parent.id] = 0;
+        let isCons = (f.asset.isConsumable === true || f.asset.isConsumable === 'true');
+        containerCounts[locKey][f.parent.id] += isCons ? (parseFloat(f.pa.qty) || 0) : (parseInt(f.pa.qty, 10) || 0);
+    });
+    
+    Object.keys(containerCounts).forEach(locKey => {
+        let pts = locKey.split("|||");
+        let loc = pts[0];
+        let form = pts[1];
+        
+        Object.keys(containerCounts[locKey]).forEach(parentId => {
+            let parent = globalAssets.find(p => p.id === parentId);
+            let cap = parseFloat(parent.capacity) || 1;
+            let needed = Math.ceil(containerCounts[locKey][parentId] / cap);
+            
+
+
+            let manualQty = 0;
+            currentProjectAssets.forEach(pa => {
+                if (pa.assetId === parentId && !pa.isAuto && (pa.location || 'General') === loc && (pa.formula || 'Standalone') === form) {
+                    let isCons = (parent.isConsumable === true || parent.isConsumable === 'true');
+                    manualQty += isCons ? (parseFloat(pa.qty) || 0) : (parseInt(pa.qty, 10) || 0);
+                }
+            });
+            
+            let autoNeeded = needed - manualQty;
+            if (autoNeeded > 0) {
+                let validRecycled = existingAuto.filter(pa => pa.assetId === parentId && (pa.location || 'General') === loc && (pa.formula || 'Standalone') === form);
+                
+                existingAuto = existingAuto.filter(pa => !(pa.assetId === parentId && (pa.location || 'General') === loc && (pa.formula || 'Standalone') === form));
+                
+                let remainingNeeded = autoNeeded;
+                
+                validRecycled.forEach(recycled => {
+                    let rQty = parseInt(recycled.qty, 10) || 1;
+                    if (remainingNeeded > 0) {
+                        let take = Math.min(rQty, remainingNeeded);
+                        for (let k = 0; k < take; k++) {
+                            let clone = {...recycled, qty: 1};
+                            if (k > 0) { 
+                                delete clone.uid; delete clone.truckX; delete clone.truckY; delete clone.truckZ; 
+                            }
+                                if (typeof window.insertIntoProjectAssets === 'function') window.insertIntoProjectAssets(clone);
+                                else currentProjectAssets.push(clone);
+                        }
+                        remainingNeeded -= take;
+                    }
+                });
+                
+                if (remainingNeeded > 0) {
+                    for (let k = 0; k < remainingNeeded; k++) {
+                        if (typeof window.insertIntoProjectAssets === 'function') window.insertIntoProjectAssets({ assetId: parentId, qty: 1, formula: form, location: loc, isAuto: true });
+                        else currentProjectAssets.push({ assetId: parentId, qty: 1, formula: form, location: loc, isAuto: true });
+                    }
+                }
+            }
+
+            // EXPLICITLY LINK ITEMS WITHOUT SLICING
+            let cid = form !== 'Standalone' ? (parentId + "|||" + form) : parentId;
+            let itemsInGroup = fixturesToPack.filter(f => f.parent.id === parentId && (f.pa.location || 'General') === loc && (f.pa.formula || 'Standalone') === form && !f.pa.isExplicitlyUnpacked);
+            
+            itemsInGroup.forEach(f => {
+                f.pa.containerUid = cid;
+            });
+        });
+    });
+    
+    // FINAL STEP: Salvage any auto-containers that are actively holding cargo
+    existingAuto.forEach(leftover => {
+        let cid = (leftover.formula && leftover.formula !== 'Standalone') ? (leftover.assetId + "|||" + leftover.formula) : leftover.assetId;
+        if (usedContainerUids.has(cid)) {
+            if (typeof window.insertIntoProjectAssets === 'function') window.insertIntoProjectAssets(leftover);
+            else currentProjectAssets.push(leftover);
+        }
+    });
+}
+</script>

@@ -1,0 +1,304 @@
+<script>
+/**
+ * 01d_Calendar_Mobile.html
+ * Domain: Mobile Command Dashboard Logic
+ */
+
+// ==========================================
+// --- MOBILE COMMAND DASHBOARD LOGIC ---
+// ==========================================
+// @INDEX: MOBILE -> Dashboard & Views
+
+function goMobileHome() {
+    document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
+    document.getElementById('mobile-view-home').style.display = 'flex';
+    document.getElementById('mobile-back-btn').style.display = 'none';
+    document.getElementById('mobile-title').innerText = 'COMMAND CENTER';
+}
+
+function openMobileEvents() {
+    document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
+    document.getElementById('mobile-view-events').style.display = 'flex';
+    document.getElementById('mobile-back-btn').style.display = 'block';
+    document.getElementById('mobile-title').innerText = 'EVENTS DIRECTORY';
+}
+
+function openMobileRFID() {
+    if (USER_ACCESS !== 'ROOT' && USER_ACCESS !== 'Admin' && USER_ACCESS !== 'EDITOR') {
+        alert("Permission Denied: You need EDITOR credentials or higher to access the Asset Registry.");
+        return;
+    }
+
+    document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
+    document.getElementById('mobile-view-rfid').style.display = 'flex';
+    document.getElementById('mobile-back-btn').style.display = 'block';
+    document.getElementById('mobile-title').innerText = 'RFID MAPPING';
+
+    document.getElementById('mobile-search-name').value = '';
+    document.getElementById('mobile-search-tag').value = '';
+    document.getElementById('mobile-rfid-list').innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Fetching Vault Assets...</div>';
+
+    if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
+        google.script.run.withSuccessHandler(assets => {
+            globalAssets = assets || [];
+            renderMobileRFIDList();
+        }).getAssetRegistry(ACTIVE_USER_NAME);
+    } else {
+        renderMobileRFIDList();
+    }
+}
+
+function renderMobileRFIDList() {
+    let nameQ = document.getElementById('mobile-search-name').value.toLowerCase();
+    let tagQ = document.getElementById('mobile-search-tag').value.toLowerCase();
+    
+    let filtered = globalAssets.filter(a => a.type !== 'Bulk' && a.nestingLevel !== undefined && a.nestingLevel > 0);
+    
+    if (nameQ) filtered = filtered.filter(a => `${a.name} ${a.manufacturer || ''}`.toLowerCase().includes(nameQ));
+    if (tagQ) {
+        filtered = filtered.filter(a => {
+            let tagsArr = [];
+            try { tagsArr = JSON.parse(a.tags || '[]'); } catch(e){}
+            let hasTag = tagsArr.some(tId => {
+                let tObj = getTagObj(tId);
+                return tObj && tObj.name.toLowerCase().includes(tagQ);
+            });
+        let dObj = getDeptObj(a.department);
+        let hasDept = (dObj.name || '').toLowerCase().includes(tagQ);
+            return hasTag || hasDept;
+        });
+    }
+    
+    filtered.sort((a,b) => a.name.localeCompare(b.name));
+    let displayAssets = filtered.slice(0, 30); // 30 caps mobile memory limits cleanly
+    
+    let html = '';
+    displayAssets.forEach(a => {
+        let unit = a.unitNumber ? ` #${a.unitNumber}` : '';
+        let rfidVal = a.rfidTag || '';
+        let statusColor = rfidVal ? '#10b981' : '#f59e0b';
+        let safeName = typeof escapeHTML === 'function' ? escapeHTML(a.name) : a.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        let safeUnit = typeof escapeHTML === 'function' ? escapeHTML(unit) : unit.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        
+        html += `
+        <div style="background:#1a1a1e; border:1px solid #333; border-left:3px solid ${statusColor}; border-radius:6px; padding:15px; display:flex; flex-direction:column; gap:10px;">
+            <div style="font-size:14px; font-weight:bold; color:#fff; display:flex; justify-content:space-between;">
+                <span>${safeName}${safeUnit}</span>
+                <span style="font-size:10px; color:#888; font-weight:normal; background:#222; padding:2px 6px; border-radius:4px;">Lvl ${a.nestingLevel}</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+                <input type="text" id="mob-rfid-in-${a.id}" value="${rfidVal}" placeholder="Tap to scan..." style="flex:1; padding:12px; background:#111; color:#10b981; border:1px solid #444; border-radius:4px; font-size:14px; font-family:monospace; text-align:center;" onkeydown="if(event.key==='Enter') saveMobileRFIDInline('${a.id}')">
+                <button class="btn-main" style="padding:12px 15px!important; margin:0;" onclick="saveMobileRFIDInline('${a.id}')">💾</button>
+                <button class="btn-delete" style="padding:12px 15px!important; margin:0;" onclick="clearMobileRFIDInline('${a.id}')">✖</button>
+            </div>
+        </div>`;
+    });
+    
+    if (html === '') html = '<div style="padding:20px; text-align:center; color:#888;">No matching physical assets found.</div>';
+    else if (filtered.length > 30) html += `<div style="padding:10px; text-align:center; color:#888; font-size:11px;">Showing 30 of ${filtered.length} matches. Refine search.</div>`;
+    
+    document.getElementById('mobile-rfid-list').innerHTML = html;
+}
+
+function startNFCScan() {
+    let isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    let msg = "📡 NFC Scanner Setup:\n\n";
+    if (isIOS) {
+        msg += "🍎 iOS requires a paired Bluetooth RFID scanner. Tap any input box and scan to type instantly.";
+    } else {
+        msg += "🤖 ANDROID INSTRUCTIONS:\n\n";
+        msg += "1. Tap an asset's input box so your keyboard opens.\n";
+        msg += "2. Switch your active keyboard to 'Scanner Keyboard' (usually a small keyboard icon in the bottom corner of your screen).\n";
+        msg += "3. Once active, just tap the NFC tag to your phone. It will type the ID and save automatically!";
+    }
+    alert(msg);
+}
+
+function saveMobileRFIDInline(assetId) {
+    let input = document.getElementById('mob-rfid-in-' + assetId);
+    if (!input) return;
+    let newRfid = input.value.trim();
+    
+    if (!newRfid) return alert("Please enter or scan an RFID tag to save.");
+
+    let asset = globalAssets.find(a => a.id === assetId);
+    if (!asset) return alert("Asset not found.");
+
+    let payload = {
+        name: asset.name, unitNumber: asset.unitNumber, rfidTag: newRfid, manufacturer: asset.manufacturer,
+        containerType: asset.containerType, nestingLevel: asset.nestingLevel, type: asset.type,
+        department: asset.department, whId: asset.whId, zoneId: asset.zoneId, areaId: asset.areaId,
+        weight: asset.weight, dims: asset.dims, capacity: asset.capacity, length: asset.length,
+        power: asset.power, price: asset.price, rental: asset.rental, dateBought: asset.dateBought,
+        lifecycle: asset.status, lastService: asset.lastService, serviceInterval: asset.serviceInterval, tags: asset.tags
+    };
+
+    let btn = input.nextElementSibling;
+    let origText = btn.innerText;
+    btn.innerText = "⏳"; btn.disabled = true;
+
+    google.script.run.withSuccessHandler(res => {
+        btn.innerText = origText; btn.disabled = false;
+        if(res.success) {
+            asset.rfidTag = newRfid;
+            renderMobileRFIDList(); // Update the green validation border instantly
+        } else alert(res.error);
+    }).provisionNewAsset(ACTIVE_USER_NAME, payload, assetId, 1);
+}
+
+function clearMobileRFIDInline(assetId) {
+    if (!confirm("Remove RFID mapping for this asset?")) return;
+    
+    let asset = globalAssets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    let payload = {
+        name: asset.name, unitNumber: asset.unitNumber, rfidTag: "", manufacturer: asset.manufacturer,
+        containerType: asset.containerType, nestingLevel: asset.nestingLevel, type: asset.type,
+        department: asset.department, whId: asset.whId, zoneId: asset.zoneId, areaId: asset.areaId,
+        weight: asset.weight, dims: asset.dims, capacity: asset.capacity, length: asset.length,
+        power: asset.power, price: asset.price, rental: asset.rental, dateBought: asset.dateBought,
+        lifecycle: asset.status, lastService: asset.lastService, serviceInterval: asset.serviceInterval, tags: asset.tags
+    };
+
+    let input = document.getElementById('mob-rfid-in-' + assetId);
+    let btn = input.nextElementSibling.nextElementSibling;
+    let origText = btn.innerText;
+    btn.innerText = "⏳"; btn.disabled = true;
+
+    google.script.run.withSuccessHandler(res => {
+        btn.innerText = origText; btn.disabled = false;
+        if(res.success) {
+            asset.rfidTag = "";
+            renderMobileRFIDList();
+        } else alert(res.error);
+    }).provisionNewAsset(ACTIVE_USER_NAME, payload, assetId, 1);
+}
+
+function openMobileNotifs() {
+    document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
+    document.getElementById('mobile-view-notifs').style.display = 'flex';
+    document.getElementById('mobile-back-btn').style.display = 'block';
+    document.getElementById('mobile-title').innerText = 'NOTIFICATIONS';
+
+}
+
+function renderMobileDashboard(payload) {
+    let html = '';
+    if (payload.projects && payload.projects.length > 0) {
+        let sorted = [...payload.projects].sort((a,b) => {
+            let d1 = a.start ? new Date(a.start) : new Date(8640000000000000);
+            let d2 = b.start ? new Date(b.start) : new Date(8640000000000000);
+            return d1 - d2;
+        });
+        sorted.forEach(p => {
+            let rawStatus = String(p.status || 'Draft').toUpperCase();
+            if (rawStatus === 'TRASHED') return;
+            let statusColor = '#a1a1aa'; // Draft
+            if (rawStatus === 'APPROVED') statusColor = '#10b981';
+            else if (rawStatus === 'NOT APPROVED') statusColor = '#f97316';
+            else if (rawStatus === 'CANCELLED') statusColor = '#ef4444';
+            let dateStr = p.start ? new Date(p.start).toLocaleDateString() : 'No Date';
+            
+            let rules = (typeof globalManagerConfig !== 'undefined' && globalManagerConfig.rules) ? globalManagerConfig.rules : [];
+            let totalRules = rules.length;
+            let pbHtml = '';
+            if (totalRules > 0) {
+                let state = p.checklistState || {};
+                if (typeof state === 'string') { try { state = JSON.parse(state); } catch(e) { state = {}; } }
+                let checkedCount = 0;
+                rules.forEach(r => { if(state[r.taskName] && state[r.taskName].checked) checkedCount++; });
+                let pct = (checkedCount / totalRules) * 100;
+                let pbColor = '#52525b';
+                if (pct > 0 && pct < 100) pbColor = '#3b82f6';
+                if (pct === 100) pbColor = '#10b981';
+                pbHtml = `<div style="width: 100%; height: 4px; background: rgba(0,0,0,0.5); border-radius: 2px; overflow: hidden; margin-top: 10px;"><div style="height: 100%; width: ${pct}%; background: ${pbColor};"></div></div>`;
+            }
+
+            html += `
+            <div class="project-card" style="border-left: 4px solid ${statusColor}; padding: 15px; margin-bottom: 10px;" onclick="triggerMobileEventClick('${p.id}')">
+                <div style="font-weight:900; font-size:16px; color:#fff; margin-bottom:4px;">${p.title}</div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#a1a1aa;">
+                    <span>📅 ${dateStr}</span><span style="color:${statusColor}; font-weight:bold;">${p.status.toUpperCase()}</span>
+                </div>
+                ${pbHtml}
+            </div>`;
+        });
+    }
+    if (html === '') html = '<div style="color:#888; text-align:center; padding:20px;">No upcoming events.</div>';
+    document.getElementById('mobile-event-list').innerHTML = html;
+
+    let nHtml = ''; let unreadCount = 0; let nowTime = new Date().getTime();
+    if (payload.notifs) {
+        payload.notifs.forEach(n => {
+            let ts = new Date(n.timestamp).getTime();
+            if (ts > nowTime) return;
+            if(!n.isRead) unreadCount++;
+            let bg = n.isRead ? 'transparent' : 'rgba(244, 63, 94, 0.1)';
+            let border = n.isRead ? '#333' : '#f43f5e';
+            let dateStr = new Date(n.timestamp).toLocaleDateString();
+            nHtml += `<div id="notif-card-${n.id}" data-read="${n.isRead}" onclick="markNotifReadLocally('${n.id}')" style="background:${bg}; border:1px solid ${border}; padding:15px; border-radius:6px; margin-bottom:10px; cursor:pointer; transition: background 0.2s, border-color 0.2s;">
+                         <button onclick="event.stopPropagation(); dismissNotif('${n.id}')" title="Dismiss" style="float:right; background:none; border:none; color:#888; cursor:pointer; font-size:14px; padding:4px;">✖</button>
+                         <div style="font-size:14px; color:#fff; margin-bottom:8px; pointer-events:none;">${escapeHTML(n.message)}</div>
+                         <div style="font-size:11px; color:#888; pointer-events:none;">${dateStr}</div>
+                      </div>`;
+        });
+    }
+    if (nHtml === '') nHtml = '<div style="color:#888; text-align:center; padding:20px;">All caught up!</div>';
+    document.getElementById('mobile-notifs-container').innerHTML = nHtml;
+
+    let badge = document.getElementById('mobile-notif-badge');
+    if(badge) { if(unreadCount > 0) { badge.innerText = unreadCount; badge.style.display = 'inline-block'; } else badge.style.display = 'none'; }
+}
+
+function triggerMobileEventClick(pId) {
+    let p;
+    try {
+        let phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+        if (phantom && phantom.projects) p = phantom.projects.find(x => x.id === pId);
+    } catch(e) {}
+    
+    if (!p && calendar) {
+        let ev = calendar.getEventById(pId);
+        if (ev && ev.extendedProps) p = ev.extendedProps.rawDbData;
+    }
+
+    if (!p) return alert("Could not load event details.");
+
+    window.isProjectDirty = false;
+    window.activeProjectContext = pId;
+    if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
+
+    document.getElementById('edit-modal-overlay').style.display = 'flex';
+    document.getElementById('edit-folder-id').value = pId; 
+    document.getElementById('edit-proj-version').value = p.lastUpdated || '';
+    document.getElementById('edit-proj-name').value = p.title || p.fullTitle; 
+    
+    if (document.getElementById('edit-proj-date')) document.getElementById('edit-proj-date').value = p.start || '';
+    if (document.getElementById('edit-proj-end-date')) document.getElementById('edit-proj-end-date').value = p.end || p.start || '';
+    
+    let status = p.status || 'DRAFT';
+    document.getElementById('display-event-status').innerText = status.toUpperCase();
+    
+    let pType = p.type || 'Event';
+    document.getElementById('edit-proj-type').value = pType;
+    document.getElementById('display-event-type').innerText = pType.toUpperCase();
+    
+    if(document.getElementById('edit-proj-client')) document.getElementById('edit-proj-client').value = p.client || '';
+    if(document.getElementById('edit-proj-location')) document.getElementById('edit-proj-location').value = p.locationUrl || '';
+    
+    let rawStatus = String(status).toUpperCase();
+    if (rawStatus === 'CANCELLED' || rawStatus === 'TRASHED') document.getElementById('restore-project-btn').style.display = 'block';
+    else document.getElementById('restore-project-btn').style.display = 'none';
+    
+    if(document.getElementById('trash-dropdown')) document.getElementById('trash-dropdown').style.display = 'none';
+    if(document.getElementById('status-dropdown')) document.getElementById('status-dropdown').style.display = 'none';
+    if(document.getElementById('type-dropdown')) document.getElementById('type-dropdown').style.display = 'none';
+    
+    document.getElementById('edit-orig-title').innerText = "Project: " + (p.fullTitle || p.title);
+    
+    bootMiniCalendar(p.start, pId);
+    if (typeof startPresencePing === 'function') startPresencePing(pId);
+    if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
+}
+</script>

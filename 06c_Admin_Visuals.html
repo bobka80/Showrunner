@@ -1,0 +1,1130 @@
+<script>
+/**
+ * 06c_Admin_Visuals.html
+ * Domain: UI Configuration Engine, Modals & Theme Preferences.
+ */
+
+function syncVisualHTML() {
+    if(document.getElementById('vs-sidebar-width')) document.getElementById('vs-sidebar-width').value = CURRENT_SIDEBAR_WIDTH;
+    if(document.getElementById('vs-width-val')) document.getElementById('vs-width-val').innerText = CURRENT_SIDEBAR_WIDTH + 'px';
+    if(document.getElementById('vs-row-height')) document.getElementById('vs-row-height').value = CURRENT_ROW_HEIGHT;
+    if(document.getElementById('vs-height-val')) document.getElementById('vs-height-val').innerText = CURRENT_ROW_HEIGHT + 'px';
+
+    if(document.getElementById('se-height')) document.getElementById('se-height').value = SHIFT_HEIGHT;
+    if(document.getElementById('se-height-val')) document.getElementById('se-height-val').innerText = SHIFT_HEIGHT + 'px';
+    if(document.getElementById('se-font-size')) document.getElementById('se-font-size').value = SHIFT_FONT_SIZE;
+    if(document.getElementById('se-font-val')) document.getElementById('se-font-val').innerText = SHIFT_FONT_SIZE + 'px';
+    
+    if(document.getElementById('se-bold')) document.getElementById('se-bold').checked = (SHIFT_FONT_WEIGHT === 'bold' || SHIFT_FONT_WEIGHT === '900');
+    if(document.getElementById('se-italic')) document.getElementById('se-italic').checked = (SHIFT_FONT_STYLE === 'italic');
+    if(document.getElementById('se-underline')) document.getElementById('se-underline').checked = (SHIFT_TEXT_DECORATION === 'underline');
+
+    if(document.getElementById('se-time-x')) document.getElementById('se-time-x').value = SHIFT_TIME_X;
+    if(document.getElementById('se-time-x-val')) document.getElementById('se-time-x-val').innerText = SHIFT_TIME_X + 'px';
+    if(document.getElementById('se-time-y')) document.getElementById('se-time-y').value = SHIFT_TIME_Y;
+    if(document.getElementById('se-time-y-val')) document.getElementById('se-time-y-val').innerText = SHIFT_TIME_Y + 'px';
+    
+    if(document.getElementById('se-role-x')) document.getElementById('se-role-x').value = SHIFT_ROLE_X;
+    if(document.getElementById('se-role-x-val')) document.getElementById('se-role-x-val').innerText = SHIFT_ROLE_X + 'px';
+    if(document.getElementById('se-role-y')) document.getElementById('se-role-y').value = SHIFT_ROLE_Y;
+    if(document.getElementById('se-role-y-val')) document.getElementById('se-role-y-val').innerText = SHIFT_ROLE_Y + 'px';
+}
+
+if (typeof window.mountToDrawer !== 'function') {
+    window.mountToDrawer = function(modalId, title, color) {
+        let drawer = document.getElementById('settings-drawer-wrapper');
+        let drawerContent = document.getElementById('settings-drawer-content');
+        let emptyState = document.getElementById('settings-empty-state');
+        
+        if (!drawer || !drawerContent) return;
+        
+        Array.from(drawerContent.children).forEach(child => {
+            if (child.id === 'settings-empty-state') return;
+            if (child.dataset.originalModal) {
+                let origModal = document.getElementById(child.dataset.originalModal);
+                if (origModal) {
+                    let inner = origModal.querySelector('.modal');
+                    if (inner) inner.appendChild(child);
+                }
+            } else {
+                child.style.display = 'none';
+            }
+        });
+        
+        emptyState.style.display = 'none';
+        
+        let targetModal = document.getElementById(modalId);
+        if (targetModal) {
+            let inner = targetModal.querySelector('.modal');
+            if (inner) {
+                Array.from(inner.children).forEach(child => {
+                    if (child.tagName === 'H3') child.style.display = 'none';
+                    child.dataset.originalModal = modalId;
+                    drawerContent.appendChild(child);
+                });
+            }
+        }
+        
+        let titleEl = document.getElementById('settings-drawer-title');
+        if (titleEl) {
+            titleEl.innerText = title || '⚙️ VISUAL SETTINGS';
+            titleEl.style.color = color || '#10b981';
+        }
+        
+        drawer.style.display = 'flex';
+    };
+}
+
+if (typeof window.closeContextualSettings !== 'function') {
+    window.closeContextualSettings = function() {
+        document.body.classList.remove('editing-grid');
+        let drawer = document.getElementById('settings-drawer-wrapper');
+        let drawerContent = document.getElementById('settings-drawer-content');
+        
+        if (drawerContent) {
+            Array.from(drawerContent.children).forEach(child => {
+                if (child.id === 'settings-empty-state') return;
+                if (child.dataset.originalModal) {
+                    let origModal = document.getElementById(child.dataset.originalModal);
+                    if (origModal) {
+                        let inner = origModal.querySelector('.modal');
+                        if (inner) inner.appendChild(child);
+                    }
+                }
+            });
+        }
+        if (drawer) drawer.style.display = 'none';
+
+            let assetList = document.getElementById('asset-list-container');
+            if (assetList) assetList.classList.remove('editing-cols');
+            let vaultList = document.getElementById('pa-vault-list');
+            let assignedList = document.getElementById('pa-view-logistics');
+            let trackerList = document.getElementById('tracker-list-content');
+            if (vaultList) vaultList.classList.remove('editing-cols');
+            if (assignedList) assignedList.classList.remove('editing-cols');
+            if (trackerList) trackerList.classList.remove('editing-cols');
+    };
+}
+
+function openVisualSettings() {
+  syncVisualHTML();
+  if (typeof mountToDrawer === 'function') {
+      mountToDrawer('visual-settings-modal', '⚙️ TIMELINE SETTINGS', '#3b82f6');
+  } else {
+      document.getElementById('visual-settings-modal').style.display = 'flex';
+  }
+}
+
+function openStripEditor() {
+  syncVisualHTML();
+  if (typeof mountToDrawer === 'function') {
+      mountToDrawer('strip-editor-modal', '📏 STRIP FORMATTING', '#10b981');
+  } else {
+      document.getElementById('visual-settings-modal').style.display = 'none';
+      document.getElementById('strip-editor-modal').style.display = 'flex';
+  }
+}
+
+function closeStripEditor() {
+  openVisualSettings();
+}
+
+// @INDEX: VISUALS -> Apply Real-Time Theme
+function applyRealTimeVisuals() {
+  CURRENT_SIDEBAR_WIDTH = document.getElementById('vs-sidebar-width').value;
+  document.getElementById('vs-width-val').innerText = CURRENT_SIDEBAR_WIDTH + 'px';
+  CURRENT_ROW_HEIGHT = document.getElementById('vs-row-height').value;
+  document.getElementById('vs-height-val').innerText = CURRENT_ROW_HEIGHT + 'px';
+
+  SHIFT_HEIGHT = document.getElementById('se-height').value;
+  document.getElementById('se-height-val').innerText = SHIFT_HEIGHT + 'px';
+  SHIFT_FONT_SIZE = document.getElementById('se-font-size').value;
+  document.getElementById('se-font-val').innerText = SHIFT_FONT_SIZE + 'px';
+
+  SHIFT_FONT_WEIGHT = document.getElementById('se-bold').checked ? 'bold' : 'normal';
+  SHIFT_FONT_STYLE = document.getElementById('se-italic').checked ? 'italic' : 'normal';
+  SHIFT_TEXT_DECORATION = document.getElementById('se-underline').checked ? 'underline' : 'none';
+
+  SHIFT_TIME_X = document.getElementById('se-time-x').value;
+  document.getElementById('se-time-x-val').innerText = SHIFT_TIME_X + 'px';
+  SHIFT_TIME_Y = document.getElementById('se-time-y').value;
+  document.getElementById('se-time-y-val').innerText = SHIFT_TIME_Y + 'px';
+  
+  SHIFT_ROLE_X = document.getElementById('se-role-x').value;
+  document.getElementById('se-role-x-val').innerText = SHIFT_ROLE_X + 'px';
+  SHIFT_ROLE_Y = document.getElementById('se-role-y').value;
+  document.getElementById('se-role-y-val').innerText = SHIFT_ROLE_Y + 'px';
+
+  applyVisualWidth();
+
+  shifts.forEach(s => {
+     if(ROLE_COLORS[s.role]) {
+         s.color = ROLE_COLORS[s.role].bg;
+         s.textCol = ROLE_COLORS[s.role].text;
+     }
+  });
+  
+  if(document.getElementById('shift-layer').style.display === 'flex') {
+     drawShifts();
+     renderPhases();
+  }
+}
+
+function applyVisualWidth() {
+  let stylesheet = document.getElementById('dynamic-visual-styles');
+  if(!stylesheet) {
+     stylesheet = document.createElement('style');
+     stylesheet.id = 'dynamic-visual-styles';
+     document.head.appendChild(stylesheet);
+  }
+  
+  let shiftTop = (CURRENT_ROW_HEIGHT - SHIFT_HEIGHT) / 2;
+  if(shiftTop < 0) shiftTop = 0;
+  
+  stylesheet.innerHTML = `
+     .tt-sidebar { width: ${CURRENT_SIDEBAR_WIDTH}px !important; min-width: ${CURRENT_SIDEBAR_WIDTH}px !important; }
+     .tt-axis-y { width: ${CURRENT_SIDEBAR_WIDTH}px !important; min-width: ${CURRENT_SIDEBAR_WIDTH}px !important; }
+     .mr-corner { width: ${CURRENT_SIDEBAR_WIDTH}px !important; min-width: ${CURRENT_SIDEBAR_WIDTH}px !important; }
+     .mr-crew-row { width: ${CURRENT_SIDEBAR_WIDTH}px !important; min-width: ${CURRENT_SIDEBAR_WIDTH}px !important; }
+     
+     .tt-crew-row, .tt-grid-row { height: ${CURRENT_ROW_HEIGHT}px !important; min-height: ${CURRENT_ROW_HEIGHT}px !important; }
+     
+     .shift-block { 
+         top: ${shiftTop}px !important; 
+         height: ${SHIFT_HEIGHT}px !important; 
+     }
+     
+     .shift-label-container {
+         position: absolute !important;
+         top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important;
+         pointer-events: none !important; margin: 0 !important;
+     }
+     
+     .shift-time {
+         position: absolute !important;
+         left: ${SHIFT_TIME_X}px !important;
+         top: ${SHIFT_TIME_Y}px !important;
+         font-size: ${SHIFT_FONT_SIZE}px !important;
+         font-weight: ${SHIFT_FONT_WEIGHT} !important;
+         font-style: ${SHIFT_FONT_STYLE} !important;
+         text-decoration: ${SHIFT_TEXT_DECORATION} !important;
+         pointer-events: none !important;
+         z-index: 20 !important;
+         white-space: nowrap !important;
+         line-height: 1.1 !important;
+     }
+     
+     .shift-role {
+         position: absolute !important;
+         left: ${SHIFT_ROLE_X}px !important;
+         top: ${SHIFT_ROLE_Y}px !important;
+         font-size: ${SHIFT_FONT_SIZE}px !important;
+         font-weight: ${SHIFT_FONT_WEIGHT} !important;
+         font-style: ${SHIFT_FONT_STYLE} !important;
+         text-decoration: ${SHIFT_TEXT_DECORATION} !important;
+         pointer-events: none !important;
+         z-index: 20 !important;
+         white-space: nowrap !important;
+         line-height: 1.1 !important;
+     }
+     
+     .shift-note {
+         position: absolute !important;
+         left: 95px !important;
+         right: 34px !important;
+         top: 50% !important;
+         transform: translateY(-50%) !important;
+         font-size: ${SHIFT_FONT_SIZE}px !important;
+         font-weight: ${SHIFT_FONT_WEIGHT} !important;
+         font-style: ${SHIFT_FONT_STYLE} !important;
+         text-decoration: ${SHIFT_TEXT_DECORATION} !important;
+         text-align: right !important;
+         pointer-events: none !important;
+         z-index: 20 !important;
+         white-space: nowrap !important;
+         overflow: hidden !important;
+         text-overflow: ellipsis !important;
+     }
+     
+     .mr-shift-pill, .mr-shift-pill span {
+         font-size: ${SHIFT_FONT_SIZE}px !important;
+         font-weight: ${SHIFT_FONT_WEIGHT} !important;
+         font-style: ${SHIFT_FONT_STYLE} !important;
+         text-decoration: ${SHIFT_TEXT_DECORATION} !important;
+     }
+     
+     @media (max-width: 768px) {
+        .mr-corner, .mr-crew-row { width: 70px !important; min-width: 70px !important; }
+     }
+  `;
+}
+
+function loadVisualPreset(module, presetNum) {
+  let btnPrefix = module === 'timeline' ? 'vs' : module;
+  let btn = document.getElementById(btnPrefix + '-load-btn-' + presetNum);
+  if (btn) { btn.innerText = "LOADING..."; btn.disabled = true; }
+  
+  google.script.run.withSuccessHandler(settings => {
+      if (settings) {
+          if (module === 'timeline') {
+              if (settings.roles) ROLE_COLORS = settings.roles;
+              if (settings.phases) PHASE_PALETTE = settings.phases;
+              if (settings.sidebarWidth) CURRENT_SIDEBAR_WIDTH = settings.sidebarWidth;
+              if (settings.rowHeight) CURRENT_ROW_HEIGHT = settings.rowHeight;
+              if (settings.shiftHeight) SHIFT_HEIGHT = settings.shiftHeight;
+              if (settings.shiftFontSize) SHIFT_FONT_SIZE = settings.shiftFontSize;
+              if (settings.shiftFontWeight) SHIFT_FONT_WEIGHT = settings.shiftFontWeight;
+              if (settings.shiftFontStyle) SHIFT_FONT_STYLE = settings.shiftFontStyle;
+              if (settings.shiftTextDeco) SHIFT_TEXT_DECORATION = settings.shiftTextDeco;
+              if (settings.shiftTimeX !== undefined) SHIFT_TIME_X = settings.shiftTimeX;
+              if (settings.shiftTimeY !== undefined) SHIFT_TIME_Y = settings.shiftTimeY;
+              if (settings.shiftRoleX !== undefined) SHIFT_ROLE_X = settings.shiftRoleX;
+              if (settings.shiftRoleY !== undefined) SHIFT_ROLE_Y = settings.shiftRoleY;
+              syncVisualHTML();
+              applyRealTimeVisuals();
+          } else if (module === 'cal') {
+              if (settings.calEventHeight) CAL_EVENT_HEIGHT = settings.calEventHeight;
+              if (settings.calFontSize) CAL_FONT_SIZE = settings.calFontSize;
+              if (settings.calBgIntensity !== undefined) CAL_BG_INTENSITY = settings.calBgIntensity;
+              if (settings.calColors) CAL_COLORS = settings.calColors;
+              openCalendarVisualSettings();
+              applyCalVisuals();
+          } else if (module === 'mini') {
+              if (settings.paintColors) PAINT_COLORS = settings.paintColors;
+              if (settings.miniEventHeight) MINI_EVENT_HEIGHT = settings.miniEventHeight;
+              if (settings.miniFontSize) MINI_FONT_SIZE = settings.miniFontSize;
+              openMiniVisualSettings();
+              applyMiniVisuals();
+          } else if (module === 'mr') {
+              MR_VISUAL_SETTINGS = settings.mrSettings || settings || {};
+              openMrVisualSettings();
+              applyMrVisuals();
+          } else if (module === 'asset') {
+              if (settings.rowPadding !== undefined) ASSET_ROW_PADDING = settings.rowPadding;
+              if (settings.fontSize !== undefined) ASSET_FONT_SIZE = settings.fontSize;
+              if (settings.colWidths !== undefined) ASSET_COL_WIDTHS = settings.colWidths;
+              if (settings.colVisibility !== undefined) ASSET_COL_VISIBILITY = settings.colVisibility;
+              if (settings.colOrder !== undefined) ASSET_COL_ORDER = settings.colOrder;
+              openAssetVisualSettings();
+              applyAssetVisuals();
+          } else if (module === 'projectAsset') {
+              if (settings.rowPadding !== undefined) PA_ROW_PADDING = settings.rowPadding;
+              if (settings.fontSize !== undefined) PA_FONT_SIZE = settings.fontSize;
+              if (settings.colWidths !== undefined) PA_COL_WIDTHS = settings.colWidths;
+              if (settings.colVisibility !== undefined) PA_COL_VISIBILITY = settings.colVisibility;
+              if (settings.colOrder !== undefined) PA_COL_ORDER = settings.colOrder;
+              let paVaultAsst = settings.paVault || {};
+              if (paVaultAsst.colWidths !== undefined) PA_VAULT_COL_WIDTHS = paVaultAsst.colWidths;
+              if (paVaultAsst.colVisibility !== undefined) PA_VAULT_COL_VISIBILITY = paVaultAsst.colVisibility;
+              if (paVaultAsst.colOrder !== undefined) PA_VAULT_COL_ORDER = paVaultAsst.colOrder;
+
+              openProjectAssetVisualSettings();
+              applyProjectAssetVisuals();
+          } else if (module === 'tracker') {
+              if (settings.rowPadding !== undefined) TRACKER_ROW_PADDING = settings.rowPadding;
+              if (settings.fontSize !== undefined) TRACKER_FONT_SIZE = settings.fontSize;
+              if (settings.colWidths !== undefined) TRACKER_COL_WIDTHS = settings.colWidths;
+              if (settings.colVisibility !== undefined) TRACKER_COL_VISIBILITY = settings.colVisibility;
+              if (settings.colOrder !== undefined) TRACKER_COL_ORDER = settings.colOrder;
+              openTrackerVisualSettings();
+              applyTrackerVisuals();
+          }
+      }
+      if (btn) { btn.innerText = "LOAD PRESET " + presetNum; btn.disabled = false; }
+  }).getModuleVisualSettings(module, presetNum);
+}
+
+function saveVisualPreset(module, presetNum) {
+  let payload = {};
+  let btnPrefix = '';
+  let modalCloseFunc = null;
+  
+  if (module === 'timeline') {
+      payload = {
+          sidebarWidth: CURRENT_SIDEBAR_WIDTH, rowHeight: CURRENT_ROW_HEIGHT, shiftHeight: SHIFT_HEIGHT,
+          shiftFontSize: SHIFT_FONT_SIZE, shiftFontWeight: SHIFT_FONT_WEIGHT, shiftFontStyle: SHIFT_FONT_STYLE,
+          shiftTextDeco: SHIFT_TEXT_DECORATION, shiftTimeX: SHIFT_TIME_X, shiftTimeY: SHIFT_TIME_Y,
+          shiftRoleX: SHIFT_ROLE_X, shiftRoleY: SHIFT_ROLE_Y, phases: PHASE_PALETTE, roles: ROLE_COLORS
+      };
+      btnPrefix = 'vs';
+      modalCloseFunc = () => closeContextualSettings();
+  } else if (module === 'cal') {
+      payload = { calEventHeight: CAL_EVENT_HEIGHT, calFontSize: CAL_FONT_SIZE, calBgIntensity: CAL_BG_INTENSITY, calColors: CAL_COLORS };
+      btnPrefix = 'cal';
+      modalCloseFunc = closeCalVisualSettings;
+  } else if (module === 'mini') {
+      payload = { paintColors: PAINT_COLORS, miniEventHeight: MINI_EVENT_HEIGHT, miniFontSize: MINI_FONT_SIZE };
+      btnPrefix = 'mini';
+      modalCloseFunc = closeMiniVisualSettings;
+  } else if (module === 'mr') {
+      payload = MR_VISUAL_SETTINGS;
+      btnPrefix = 'mr';
+      modalCloseFunc = closeMrVisualSettings;
+  } else if (module === 'asset') {
+      payload = { rowPadding: ASSET_ROW_PADDING, fontSize: ASSET_FONT_SIZE, colWidths: ASSET_COL_WIDTHS, colVisibility: ASSET_COL_VISIBILITY, colOrder: ASSET_COL_ORDER };
+      btnPrefix = 'asset';
+      modalCloseFunc = closeAssetVisualSettings;
+  } else if (module === 'projectAsset') {
+              payload = { rowPadding: PA_ROW_PADDING, fontSize: PA_FONT_SIZE, colWidths: PA_COL_WIDTHS, colVisibility: PA_COL_VISIBILITY, colOrder: PA_COL_ORDER, paVault: { colWidths: PA_VAULT_COL_WIDTHS, colVisibility: PA_VAULT_COL_VISIBILITY, colOrder: PA_VAULT_COL_ORDER } };
+      btnPrefix = 'pa-vs';
+      modalCloseFunc = closeProjectAssetVisualSettings;
+  } else if (module === 'tracker') {
+      payload = { rowPadding: TRACKER_ROW_PADDING, fontSize: TRACKER_FONT_SIZE, colWidths: TRACKER_COL_WIDTHS, colVisibility: TRACKER_COL_VISIBILITY, colOrder: TRACKER_COL_ORDER };
+      btnPrefix = 'tracker';
+      modalCloseFunc = closeTrackerVisualSettings;
+  }
+
+  let btn = document.getElementById(presetNum === 'current' ? btnPrefix + '-vs-save-btn' : btnPrefix + '-save-btn-' + presetNum);
+  if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+
+  google.script.run.withSuccessHandler(() => {
+      if (btn) {
+          btn.innerText = presetNum === 'current' ? "SAVED" : "PRESET SAVED";
+          setTimeout(() => {
+              btn.innerText = presetNum === 'current' ? "DONE & SAVE" : "SAVE PRESET " + presetNum;
+              btn.disabled = false;
+              if (presetNum === 'current' && modalCloseFunc) modalCloseFunc();
+          }, 1000);
+      }
+  }).saveModuleVisualSettings(module, payload, presetNum);
+}
+
+function openCalendarVisualSettings() {
+   document.getElementById('cal-height-val').innerText = CAL_EVENT_HEIGHT + 'px';
+   document.getElementById('cal-height').value = CAL_EVENT_HEIGHT;
+   document.getElementById('cal-font-val').innerText = CAL_FONT_SIZE + 'px';
+   document.getElementById('cal-font').value = CAL_FONT_SIZE;
+   document.getElementById('cal-bg-intensity-val').innerText = Math.round(CAL_BG_INTENSITY * 100) + '%';
+   document.getElementById('cal-bg-intensity').value = Math.round(CAL_BG_INTENSITY * 100);
+   document.getElementById('cal-color-event').value = CAL_COLORS['event'];
+   document.getElementById('cal-color-meeting').value = CAL_COLORS['meeting'];
+   document.getElementById('cal-color-cross').value = CAL_COLORS['cross rent'];
+
+   if (typeof mountToDrawer === 'function') {
+       mountToDrawer('cal-visual-settings-modal', '📅 CALENDAR SETTINGS', '#10b981');
+   } else {
+       document.getElementById('cal-visual-settings-modal').style.display = 'flex';
+   }
+}
+
+function applyCalVisuals() {
+   CAL_EVENT_HEIGHT = document.getElementById('cal-height').value;
+   document.getElementById('cal-height-val').innerText = CAL_EVENT_HEIGHT + 'px';
+
+   CAL_FONT_SIZE = document.getElementById('cal-font').value;
+   document.getElementById('cal-font-val').innerText = CAL_FONT_SIZE + 'px';
+
+   CAL_BG_INTENSITY = document.getElementById('cal-bg-intensity').value / 100;
+   document.getElementById('cal-bg-intensity-val').innerText = Math.round(CAL_BG_INTENSITY * 100) + '%';
+
+   CAL_COLORS['event'] = document.getElementById('cal-color-event').value;
+   CAL_COLORS['meeting'] = document.getElementById('cal-color-meeting').value;
+   CAL_COLORS['cross rent'] = document.getElementById('cal-color-cross').value;
+
+   initCalVisualsCSS();
+   if (typeof calendar !== 'undefined' && calendar) {
+       setTimeout(() => { calendar.updateSize(); }, 50);
+   }
+}
+
+function closeCalVisualSettings() {
+   if (typeof closeContextualSettings === 'function') {
+       closeContextualSettings();
+   } else {
+       document.getElementById('cal-visual-settings-modal').style.display = 'none';
+   }
+}
+
+function openMrVisualSettings() {
+   document.getElementById('mr-event-height-val').innerText = (MR_VISUAL_SETTINGS.eventHeight || 24) + 'px';
+   document.getElementById('mr-event-height').value = MR_VISUAL_SETTINGS.eventHeight || 24;
+   document.getElementById('mr-shift-height-val').innerText = (MR_VISUAL_SETTINGS.shiftHeight || 22) + 'px';
+   document.getElementById('mr-shift-height').value = MR_VISUAL_SETTINGS.shiftHeight || 22;
+   document.getElementById('mr-row-height-val').innerText = (MR_VISUAL_SETTINGS.rowHeight || 80) + 'px';
+   document.getElementById('mr-row-height').value = MR_VISUAL_SETTINGS.rowHeight || 80;
+   
+   if (typeof mountToDrawer === 'function') {
+       mountToDrawer('mr-visual-settings-modal', '👥 MONTH ROSTER SETTINGS', '#f59e0b');
+   } else {
+       document.getElementById('mr-visual-settings-modal').style.display = 'flex';
+   }
+}
+
+function applyMrVisuals() {
+   let evH = document.getElementById('mr-event-height').value;
+   let shH = document.getElementById('mr-shift-height').value;
+   let rowH = document.getElementById('mr-row-height').value;
+   
+   document.getElementById('mr-event-height-val').innerText = evH + 'px';
+   document.getElementById('mr-shift-height-val').innerText = shH + 'px';
+   document.getElementById('mr-row-height-val').innerText = rowH + 'px';
+   
+   MR_VISUAL_SETTINGS.eventHeight = parseInt(evH, 10);
+   MR_VISUAL_SETTINGS.shiftHeight = parseInt(shH, 10);
+   MR_VISUAL_SETTINGS.rowHeight = parseInt(rowH, 10);
+   
+   initMrVisualsCSS();
+   if (typeof renderMonthGrid === 'function' && document.getElementById('month-roster-layer').style.display !== 'none') {
+       renderMonthGrid();
+   }
+}
+
+function closeMrVisualSettings() {
+   if (typeof closeContextualSettings === 'function') {
+       closeContextualSettings();
+   } else {
+       document.getElementById('mr-visual-settings-modal').style.display = 'none';
+   }
+}
+
+function openAssetVisualSettings() {
+    if (window.GridEngine && window.GridEngine.configs['vault']) {
+        window.GridEngine.openSettings('vault', '📦 ASSET REGISTRY SETTINGS');
+        let dynamicDiv = document.getElementById('ug-dynamic-settings');
+        if (dynamicDiv && !document.getElementById('asset-spacing-controls')) {
+            dynamicDiv.insertAdjacentHTML('afterbegin', `
+                <div id="asset-spacing-controls" style="padding:15px; border-bottom:1px solid #333;">
+                    <div class="input-label" style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span>Row Padding & Font Size</span>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-outline btn-sm" style="flex:1; margin:0;" onclick="updateAssetSpacing(-1)">- SMALLER</button>
+                        <button class="btn-outline btn-sm" style="flex:1; margin:0;" onclick="updateAssetSpacing(1)">+ LARGER</button>
+                    </div>
+                </div>
+            `);
+        }
+    }
+}
+
+window.updateAssetSpacing = function(dir) {
+    ASSET_ROW_PADDING = Math.max(2, Math.min(24, ASSET_ROW_PADDING + (dir * 2)));
+    ASSET_FONT_SIZE = Math.max(8, Math.min(18, ASSET_FONT_SIZE + dir));
+    if (typeof renderAssetRegistry === 'function') renderAssetRegistry();
+};
+
+window.saveGridEngineSettings = function(gridId, e) {
+    let btn = e ? e.currentTarget : null;
+    let orig = btn ? btn.innerText : 'SAVING...';
+    if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+
+    let conf = window.GridEngine.configs[gridId];
+    if (gridId === 'vault' && conf) {
+        ASSET_COL_ORDER = [...conf.order];
+        if (typeof ASSET_COL_GAPS === 'undefined') window.ASSET_COL_GAPS = {};
+        Object.keys(conf.cols).forEach(k => {
+            ASSET_COL_WIDTHS[k] = conf.cols[k].w + 'px';
+            ASSET_COL_GAPS[k] = conf.cols[k].mL + 'px';
+            ASSET_COL_VISIBILITY[k] = conf.cols[k].vis;
+        });
+        let payload = { rowPadding: ASSET_ROW_PADDING, fontSize: ASSET_FONT_SIZE, colWidths: ASSET_COL_WIDTHS, colGaps: ASSET_COL_GAPS, colVisibility: ASSET_COL_VISIBILITY, colOrder: ASSET_COL_ORDER };
+        
+        google.script.run.withSuccessHandler(() => {
+            if (btn) { btn.innerText = orig; btn.disabled = false; }
+            if (typeof closeContextualSettings === 'function') closeContextualSettings();
+        }).withFailureHandler(err => {
+            alert("Save failed: " + err.message);
+            if (btn) { btn.innerText = orig; btn.disabled = false; }
+        }).saveModuleVisualSettings('asset', payload, 'current');
+    } else if (gridId === 'tracker' && conf) {
+        TRACKER_COL_ORDER = [...conf.order];
+        if (typeof TRACKER_COL_GAPS === 'undefined') window.TRACKER_COL_GAPS = {};
+        Object.keys(conf.cols).forEach(k => {
+            TRACKER_COL_WIDTHS[k] = conf.cols[k].w + 'px';
+            TRACKER_COL_GAPS[k] = conf.cols[k].mL + 'px';
+            TRACKER_COL_VISIBILITY[k] = conf.cols[k].vis;
+        });
+        let payload = { rowPadding: TRACKER_ROW_PADDING, fontSize: TRACKER_FONT_SIZE, colWidths: TRACKER_COL_WIDTHS, colGaps: TRACKER_COL_GAPS, colVisibility: TRACKER_COL_VISIBILITY, colOrder: TRACKER_COL_ORDER };
+        
+        google.script.run.withSuccessHandler(() => {
+            if (btn) { btn.innerText = orig; btn.disabled = false; }
+            if (typeof closeContextualSettings === 'function') closeContextualSettings();
+        }).withFailureHandler(err => {
+            alert("Save failed: " + err.message);
+            if (btn) { btn.innerText = orig; btn.disabled = false; }
+        }).saveModuleVisualSettings('tracker', payload, 'current');
+    }
+}
+
+function applyAssetVisuals() {
+    ASSET_ROW_PADDING = parseInt(document.getElementById('asset-vs-padding').value, 10);
+    ASSET_FONT_SIZE = parseInt(document.getElementById('asset-vs-font').value, 10);
+    document.getElementById('asset-vs-padding-val').innerText = ASSET_ROW_PADDING + 'px';
+    document.getElementById('asset-vs-font-val').innerText = ASSET_FONT_SIZE + 'px';
+    
+    document.querySelectorAll('.asset-col-cb').forEach(cb => {
+        ASSET_COL_VISIBILITY[cb.dataset.col] = cb.checked;
+    });
+
+    if (document.getElementById('tab-content-assets').style.display !== 'none') renderAssetRegistry();
+}
+
+function closeAssetVisualSettings() { 
+    if (typeof closeContextualSettings === 'function') {
+        closeContextualSettings();
+    } else {
+        document.getElementById('asset-visual-settings-modal').style.display = 'none'; 
+    }
+    let container = document.getElementById('asset-list-container');
+    if (container) container.classList.remove('editing-cols');
+}
+
+// --- TRACKER VISUAL SETTINGS ---
+function openTrackerVisualSettings() {
+    if (window.GridEngine && window.GridEngine.configs['tracker']) {
+        window.GridEngine.openSettings('tracker', '🌍 EQUIPMENT TRACKER SETTINGS');
+        let dynamicDiv = document.getElementById('ug-dynamic-settings');
+        if (dynamicDiv && !document.getElementById('tracker-spacing-controls')) {
+            dynamicDiv.insertAdjacentHTML('afterbegin', `
+                <div id="tracker-spacing-controls" style="padding:15px; border-bottom:1px solid #333;">
+                    <div class="input-label" style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span>Row Padding & Font Size</span>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-outline btn-sm" style="flex:1; margin:0;" onclick="updateTrackerSpacing(-1)">- SMALLER</button>
+                        <button class="btn-outline btn-sm" style="flex:1; margin:0;" onclick="updateTrackerSpacing(1)">+ LARGER</button>
+                    </div>
+                </div>
+            `);
+        }
+    }
+}
+
+window.updateTrackerSpacing = function(dir) {
+    TRACKER_ROW_PADDING = Math.max(2, Math.min(24, TRACKER_ROW_PADDING + (dir * 2)));
+    TRACKER_FONT_SIZE = Math.max(8, Math.min(18, TRACKER_FONT_SIZE + dir));
+    if (typeof fetchTrackerData === 'function') fetchTrackerData();
+};
+
+function applyTrackerVisuals() {
+    if (typeof fetchTrackerData === 'function') fetchTrackerData();
+}
+
+function closeTrackerVisualSettings() {
+    closeContextualSettings();
+    let container = document.getElementById('tracker-list-content');
+    if (container) container.classList.remove('editing-cols');
+}
+
+function openProjectAssetVisualSettings() {
+    document.body.classList.add('editing-grid');
+    let confV = window.GridEngine.configs['project_vault'];
+    let confA = window.GridEngine.configs['project_assigned'];
+    let defs = window.GridEngine.defs['project_vault'];
+    if (!confV || !confA) return;
+
+    let html = `
+    <div style="padding:15px; border-bottom:1px solid #333;">
+        <div class="input-label" style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span>Row Padding & Font Size</span>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button class="btn-outline btn-sm" style="flex:1; margin:0;" onclick="updatePaSpacing(-1)">- SMALLER</button>
+            <button class="btn-outline btn-sm" style="flex:1; margin:0;" onclick="updatePaSpacing(1)">+ LARGER</button>
+        </div>
+    </div>
+    <div style="padding:15px; border-bottom:1px solid #333;">
+        <div class="input-label" style="display:flex; justify-content:space-between;">
+            <span>Panel Split Ratio (Left/Right)</span>
+            <span id="pa-split-val" style="color:#d8b4fe;">${PA_SPLIT_RATIO}% / ${100 - PA_SPLIT_RATIO}%</span>
+        </div>
+        <input type="range" min="20" max="80" value="${PA_SPLIT_RATIO}" oninput="document.getElementById('pa-split-val').innerText = this.value + '% / ' + (100 - this.value) + '%'; updatePaSplit(this.value);" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+    <div style="display:flex; gap:15px; padding:15px; max-height:400px; overflow-y:auto;">
+        <div style="flex:1; display:flex; flex-direction:column;">
+            <div class="input-label" style="margin-bottom:10px; color:#10b981;">LEFT PANEL (VAULT)</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">`;
+            
+    confV.order.forEach(key => {
+        let def = defs.find(d => d.key === key);
+        if (!def) return;
+        html += `
+        <div draggable="true" ondragstart="GridEngine.dragStartSettings(event, 'project_vault', '${key}')" ondragover="GridEngine.dragOverSettings(event)" ondrop="GridEngine.dropSettings(event, 'project_vault', '${key}')" ondragend="GridEngine.dragEndSettings(event)" style="display:flex; align-items:center; justify-content:space-between; background:#111; padding:6px 8px; border-radius:4px; border:1px solid #333; margin-bottom:4px; cursor:grab;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                <span style="color:#555; padding-right:4px;">⋮⋮</span>
+                <input type="checkbox" ${confV.cols[key].vis ? 'checked' : ''} onchange="togglePaSettingsCol('project_vault', '${key}', this.checked)" style="margin:0; width:14px; height:14px;">
+                <span style="color:#ccc; font-size:11px; font-weight:bold;">${def.label}</span>
+            </label>
+            <div style="display:flex; gap:4px;">
+                <button class="btn-outline btn-sm" style="padding:2px 6px!important; margin:0; border-color:#10b981; color:#10b981;" onclick="movePaSettingsCol('project_vault', '${key}', -1)">▲</button>
+                <button class="btn-outline btn-sm" style="padding:2px 6px!important; margin:0; border-color:#10b981; color:#10b981;" onclick="movePaSettingsCol('project_vault', '${key}', 1)">▼</button>
+            </div>
+        </div>`;
+    });
+
+    html += `</div></div><div style="flex:1; display:flex; flex-direction:column;">
+            <div class="input-label" style="margin-bottom:10px; color:#d8b4fe;">RIGHT PANEL (ASSIGNED)</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">`;
+
+    confA.order.forEach(key => {
+        let def = defs.find(d => d.key === key);
+        if (!def) return;
+        html += `
+        <div draggable="true" ondragstart="GridEngine.dragStartSettings(event, 'project_assigned', '${key}')" ondragover="GridEngine.dragOverSettings(event)" ondrop="GridEngine.dropSettings(event, 'project_assigned', '${key}')" ondragend="GridEngine.dragEndSettings(event)" style="display:flex; align-items:center; justify-content:space-between; background:#111; padding:6px 8px; border-radius:4px; border:1px solid #333; margin-bottom:4px; cursor:grab;">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                <span style="color:#555; padding-right:4px;">⋮⋮</span>
+                <input type="checkbox" ${confA.cols[key].vis ? 'checked' : ''} onchange="togglePaSettingsCol('project_assigned', '${key}', this.checked)" style="margin:0; width:14px; height:14px;">
+                <span style="color:#ccc; font-size:11px; font-weight:bold;">${def.label}</span>
+            </label>
+            <div style="display:flex; gap:4px;">
+                <button class="btn-outline btn-sm" style="padding:2px 6px!important; margin:0; border-color:#d8b4fe; color:#d8b4fe;" onclick="movePaSettingsCol('project_assigned', '${key}', -1)">▲</button>
+                <button class="btn-outline btn-sm" style="padding:2px 6px!important; margin:0; border-color:#d8b4fe; color:#d8b4fe;" onclick="movePaSettingsCol('project_assigned', '${key}', 1)">▼</button>
+            </div>
+        </div>`;
+    });
+    
+    html += `</div></div></div>
+    <div style="display:flex; gap:12px; padding:15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+        <button class="btn-close" style="width:auto; margin:0;" onclick="closeProjectAssetVisualSettings()">CANCEL</button>
+        <button class="btn-main" style="width:auto; margin:0;" onclick="saveProjectAssetVisualSettings(event)">DONE & SAVE</button>
+    </div>`;
+    
+    let drawerContent = document.getElementById('settings-drawer-content');
+    if (drawerContent) {
+        Array.from(drawerContent.children).forEach(child => child.style.display = 'none');
+        let dynamicDiv = document.getElementById('ug-dynamic-settings');
+        if (!dynamicDiv) { dynamicDiv = document.createElement('div'); dynamicDiv.id = 'ug-dynamic-settings'; drawerContent.appendChild(dynamicDiv); }
+        dynamicDiv.innerHTML = html;
+        dynamicDiv.style.display = 'block';
+        document.getElementById('settings-drawer-title').innerText = '⚙️ PROJECT EQUIPMENT';
+        document.getElementById('settings-drawer-title').style.color = '#f59e0b';
+        document.getElementById('settings-drawer-wrapper').style.display = 'flex';
+    }
+}
+
+window.togglePaSettingsCol = function(gridId, key, isVis) {
+    window.GridEngine.configs[gridId].cols[key].vis = isVis;
+    if (window.GridEngine.updateGlobals) window.GridEngine.updateGlobals(gridId);
+    window.GridEngine.fireRender(gridId);
+};
+
+window.movePaSettingsCol = function(gridId, key, dir) {
+    let conf = window.GridEngine.configs[gridId];
+    let idx = conf.order.indexOf(key);
+    if (idx === -1) return;
+    let newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= conf.order.length) return;
+    let temp = conf.order[idx]; conf.order[idx] = conf.order[newIdx]; conf.order[newIdx] = temp;
+    
+    if (window.GridEngine.updateGlobals) window.GridEngine.updateGlobals(gridId);
+    openProjectAssetVisualSettings();
+    window.GridEngine.fireRender(gridId);
+};
+
+window.updatePaSpacing = function(dir) {
+    PA_ROW_PADDING = Math.max(2, Math.min(24, PA_ROW_PADDING + (dir * 2)));
+    PA_FONT_SIZE = Math.max(8, Math.min(18, PA_FONT_SIZE + dir));
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+};
+
+window.updatePaSplit = function(val) {
+    PA_SPLIT_RATIO = parseInt(val, 10);
+    let pane = document.getElementById('pa-split-pane');
+    if (pane) {
+        pane.style.setProperty('--pa-split-left', PA_SPLIT_RATIO + '%');
+        pane.style.setProperty('--pa-split-right', (100 - PA_SPLIT_RATIO) + '%');
+    }
+};
+
+window.saveProjectAssetVisualSettings = function(e) {
+    let btn = e ? e.currentTarget : null;
+    let orig = btn ? btn.innerText : 'SAVING...';
+    if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+
+    let confV = window.GridEngine.configs['project_vault'];
+    let confA = window.GridEngine.configs['project_assigned'];
+    
+    if (confV && confA) {
+        PA_VAULT_COL_ORDER = [...confV.order];
+        if (typeof PA_VAULT_COL_GAPS === 'undefined') window.PA_VAULT_COL_GAPS = {};
+        Object.keys(confV.cols).forEach(k => {
+            PA_VAULT_COL_WIDTHS[k] = confV.cols[k].w + 'px';
+            PA_VAULT_COL_GAPS[k] = confV.cols[k].mL + 'px';
+            PA_VAULT_COL_VISIBILITY[k] = confV.cols[k].vis;
+        });
+        
+        PA_COL_ORDER = [...confA.order];
+        if (typeof PA_COL_GAPS === 'undefined') window.PA_COL_GAPS = {};
+        Object.keys(confA.cols).forEach(k => {
+            PA_COL_WIDTHS[k] = confA.cols[k].w + 'px';
+            PA_COL_GAPS[k] = confA.cols[k].mL + 'px';
+            PA_COL_VISIBILITY[k] = confA.cols[k].vis;
+        });
+        
+        let payload = { rowPadding: PA_ROW_PADDING, fontSize: PA_FONT_SIZE, paSplitRatio: PA_SPLIT_RATIO, colWidths: PA_COL_WIDTHS, colGaps: PA_COL_GAPS, colVisibility: PA_COL_VISIBILITY, colOrder: PA_COL_ORDER, paVault: { colWidths: PA_VAULT_COL_WIDTHS, colGaps: PA_VAULT_COL_GAPS, colVisibility: PA_VAULT_COL_VISIBILITY, colOrder: PA_VAULT_COL_ORDER } };
+        
+        google.script.run.withSuccessHandler(() => {
+            if (btn) { btn.innerText = orig; btn.disabled = false; }
+            closeProjectAssetVisualSettings();
+        }).withFailureHandler(err => {
+            alert("Save failed: " + err.message);
+            if (btn) { btn.innerText = orig; btn.disabled = false; }
+        }).saveModuleVisualSettings('projectAsset', payload, 'current');
+    }
+}
+
+function closeProjectAssetVisualSettings() { 
+    closeContextualSettings();
+}
+
+function openMiniVisualSettings() {
+   document.getElementById('mini-color-main').value = PAINT_COLORS['main'].color;
+   document.getElementById('mini-color-wh').value = PAINT_COLORS['wh'].color;
+   document.getElementById('mini-color-show').value = PAINT_COLORS['show'].color;
+   document.getElementById('mini-color-recovery').value = PAINT_COLORS['recovery'].color;
+   document.getElementById('mini-color-transit').value = PAINT_COLORS['transit'].color;
+   document.getElementById('mini-height-val').innerText = MINI_EVENT_HEIGHT + 'px';
+   document.getElementById('mini-height').value = MINI_EVENT_HEIGHT;
+   document.getElementById('mini-font-val').innerText = MINI_FONT_SIZE + 'px';
+   document.getElementById('mini-font').value = MINI_FONT_SIZE;
+   mountToDrawer('mini-visual-settings-modal', '⚙️ STRIP COLORS', '#d8b4fe');
+}
+
+function applyMiniVisuals() {
+   PAINT_COLORS['main'].color = document.getElementById('mini-color-main').value;
+   PAINT_COLORS['wh'].color = document.getElementById('mini-color-wh').value;
+   PAINT_COLORS['show'].color = document.getElementById('mini-color-show').value;
+   PAINT_COLORS['recovery'].color = document.getElementById('mini-color-recovery').value;
+   PAINT_COLORS['transit'].color = document.getElementById('mini-color-transit').value;
+   MINI_EVENT_HEIGHT = document.getElementById('mini-height').value;
+   document.getElementById('mini-height-val').innerText = MINI_EVENT_HEIGHT + 'px';
+   MINI_FONT_SIZE = document.getElementById('mini-font').value;
+   document.getElementById('mini-font-val').innerText = MINI_FONT_SIZE + 'px';
+   initMiniVisualsCSS();
+}
+
+function closeMiniVisualSettings() {
+   closeContextualSettings();
+}
+
+function openPhaseManager() {
+    let html = '';
+    for(let phase in PHASE_PALETTE) {
+        html += createPhaseRow(phase, PHASE_PALETTE[phase]);
+    }
+    document.getElementById('pm-list').innerHTML = html;
+    mountToDrawer('phase-manager-modal', '🎯 PHASE MANAGER', '#ef4444');
+}
+
+function createPhaseRow(name, color) {
+    return `
+    <div class="pm-row" style="display:flex; gap:10px; align-items:center; background:#222; padding:10px; border-radius:6px; margin-bottom:8px;">
+        <input type="hidden" class="pm-old" value="${String(name || '').replace(/"/g, '&quot;')}">
+        <input type="text" class="pm-name" value="${String(name || '').replace(/"/g, '&quot;')}" placeholder="Phase Name" style="flex:1; padding:8px; font-size:12px; background:#111;">
+        <input type="color" class="pm-color" value="${color}" style="width:35px; height:35px; padding:0; border:none; border-radius:4px; cursor:pointer; background:transparent;">
+        <button class="btn-delete" style="width:auto;" onclick="this.parentElement.remove()" title="Delete">DELETE</button>
+    </div>`;
+}
+
+function addPhaseRow() {
+    document.getElementById('pm-list').insertAdjacentHTML('beforeend', createPhaseRow('New Phase', '#ffffff'));
+}
+
+function savePhaseManager() {
+    let newPalette = {};
+    let renameMap = {};
+    
+    document.querySelectorAll('.pm-row').forEach(row => {
+        let oldName = row.querySelector('.pm-old').value;
+        let newName = row.querySelector('.pm-name').value.trim();
+        let color = row.querySelector('.pm-color').value;
+        
+        if(newName) {
+            newPalette[newName] = color;
+            if(oldName && oldName !== newName) {
+                renameMap[oldName] = newName; 
+            }
+        }
+    });
+    
+    PHASE_PALETTE = newPalette;
+    
+    activePhases.forEach(p => {
+        if(renameMap[p.type]) p.type = renameMap[p.type];
+    });
+    
+    applyRealTimeVisuals();
+    openVisualSettings();
+}
+
+function cancelPhaseManager() {
+    openVisualSettings();
+}
+
+function openDeptManager() {
+    document.getElementById('master-settings-overlay').style.display = 'none';
+    let html = '';
+    SYSTEM_DEPARTMENTS.forEach(dept => { html += createListRow(dept, 'dept'); });
+    document.getElementById('dept-list').innerHTML = html;
+    document.getElementById('dept-manager-modal').style.display = 'flex';
+}
+
+function openMealManager() {
+    document.getElementById('master-settings-overlay').style.display = 'none';
+    let html = '';
+    SYSTEM_MEALS.forEach(meal => { html += createListRow(meal, 'meal'); });
+    document.getElementById('meal-list').innerHTML = html;
+    document.getElementById('meal-manager-modal').style.display = 'flex';
+}
+
+function createListRow(val, type) {
+if (type === 'dept') {
+    let uid = typeof val === 'object' ? (val.uid || '') : '';
+    let name = typeof val === 'object' ? val.name : val;
+    let color = typeof val === 'object' ? val.color : '#3b82f6';
+    let isCore = ['Lighting', 'Audio', 'Video', 'Rigging', 'Trucks'].includes(name);
+    let inputAttr = isCore ? 'readonly style="flex:1; padding:8px; font-size:12px; background:#111; color:#888; border:1px solid #333;"' : 'style="flex:1; padding:8px; font-size:12px; background:#111; color:#fff; border:1px solid #444;"';
+          let btnHtml = isCore ? `<div style="width:60px;"></div>` : `<button class="btn-delete" style="width:auto;" onclick="this.parentElement.remove()" title="Delete">DELETE</button>`;
+    return `<div class="${type}-row" style="display:flex; gap:10px; align-items:center; background:#222; padding:10px; border-radius:6px; margin-bottom:8px;">
+              <input type="hidden" class="dept-uid" value="${uid}">
+              <input type="color" class="${type}-color" value="${color}" style="width:35px; height:35px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+              <input type="text" class="${type}-val" value="${String(name || '').replace(/"/g, '&quot;')}" ${inputAttr}>
+              ${btnHtml}
+            </div>`;
+} else {
+    let inputAttr = 'style="flex:1; padding:8px; font-size:12px; background:#111; color:#fff; border:1px solid #444;"';
+    return `<div class="${type}-row" style="display:flex; gap:10px; align-items:center; background:#222; padding:10px; border-radius:6px; margin-bottom:8px;">
+              <input type="text" class="${type}-val" value="${String(val || '').replace(/"/g, '&quot;')}" ${inputAttr}>
+                <button class="btn-delete" style="width:auto;" onclick="this.parentElement.remove()" title="Delete">DELETE</button>
+            </div>`;
+}
+}
+
+function addListRow(type) {
+  let defaultVal = type === 'dept' ? {uid: '', name: 'New Department', color: '#888888'} : 'New Meal';
+  document.getElementById(`${type}-list`).insertAdjacentHTML('beforeend', createListRow(defaultVal, type));
+}
+
+function saveListManager(type) {
+    let newList = [];
+    if (type === 'dept') {
+        document.querySelectorAll(`.${type}-row`).forEach(row => {
+            let u = row.querySelector('.dept-uid').value.trim();
+            if (!u) u = 'dept_' + Date.now() + Math.random().toString(36).substr(2, 5);
+            let n = row.querySelector(`.${type}-val`).value.trim();
+            let c = row.querySelector(`.${type}-color`).value;
+            if (n) newList.push({ uid: u, name: n, color: c });
+        });
+    } else {
+        document.querySelectorAll(`.${type}-row`).forEach(row => {
+            let val = row.querySelector(`.${type}-val`).value.trim();
+            if (val) newList.push(val);
+        });
+    }
+
+    const modal = document.getElementById(`${type}-manager-modal`);
+    const btn = modal.querySelector('.btn-main');
+    const origText = btn.innerText;
+    btn.innerText = 'SAVING...';
+    btn.disabled = true;
+
+    // These elements might not exist in the current view, so we must check for them safely.
+    let boss1El = document.getElementById('set-boss1-email');
+    let boss2El = document.getElementById('set-boss2-email');
+    let boss1 = boss1El ? boss1El.value : '';
+    let boss2 = boss2El ? boss2El.value : '';
+
+    let deptsToSave = (type === 'dept') ? newList : SYSTEM_DEPARTMENTS;
+    let mealsToSave = (type === 'meal') ? newList : SYSTEM_MEALS;
+
+    google.script.run
+        .withSuccessHandler(res => {
+            btn.innerText = 'SAVED!';
+            SYSTEM_DEPARTMENTS = deptsToSave; // Update global state after successful save
+            SYSTEM_MEALS = mealsToSave;
+            setTimeout(() => {
+                btn.innerText = origText; btn.disabled = false;
+                modal.style.display = 'none'; openMasterSettings();
+            }, 500);
+        })
+        .withFailureHandler(err => { alert("Save Failed: " + err.message); btn.innerText = origText; btn.disabled = false; })
+        .saveSystemSettings(boss1, boss2, deptsToSave, mealsToSave);
+}
+
+function cancelListManager(type) {
+  document.getElementById(`${type}-manager-modal`).style.display = 'none';
+  openMasterSettings(); // Brings you back to the giant screen
+}
+
+function toggleDept(safeDept, prefix) {
+    const rows = document.querySelectorAll(`.${prefix}-row-${safeDept}`);
+    const icon = document.getElementById(`icon-${prefix}-${safeDept}`);
+    const summaryContainer = document.getElementById(`summary-${prefix}-${safeDept}`);
+    if(!icon) return;
+    let isClosing = icon.innerText === '▼';
+    rows.forEach(r => {
+      r.style.setProperty('display', isClosing ? 'none' : '', 'important');
+    });
+    icon.innerText = isClosing ? '▶' : '▼';
+    if (summaryContainer) {
+      summaryContainer.style.display = isClosing ? 'block' : 'none';
+    }
+}
+
+function openAssignmentManager() {
+    document.getElementById('master-settings-overlay').style.display = 'none';
+    let html = '';
+    let index = 0;
+    
+    for (let [name, colors] of Object.entries(ROLE_COLORS)) {
+        html += createAssignmentRow(name, colors.bg, colors.text, index);
+        index++;
+    }
+    
+    document.getElementById('assignment-list').innerHTML = html;
+    document.getElementById('assignment-manager-modal').style.display = 'flex';
+}
+
+function createAssignmentRow(name, bg, text, index) {
+    return `
+    <div id="assign-row-${index}" class="assign-row" style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
+        <input type="hidden" class="assign-bg" value="${bg}">
+        <input type="hidden" class="assign-text" value="${text}">
+        <input type="text" class="assign-name" value="${name}" placeholder="e.g. Technician" style="flex:1; padding:8px; background:#18181b; border:1px solid #3f3f46; color:white; border-radius:4px; box-sizing:border-box;">
+        <button class="btn-delete" style="margin:0;" onclick="document.getElementById('assign-row-${index}').remove()">DELETE</button>
+    </div>`;
+}
+
+function addAssignmentRow() {
+    const list = document.getElementById('assignment-list');
+    const index = Date.now(); 
+    list.insertAdjacentHTML('beforeend', createAssignmentRow('', '#3b82f6', '#ffffff', index));
+}
+
+function saveAssignmentManager() {
+    const list = document.getElementById('assignment-list');
+    const rows = list.querySelectorAll('.assign-row');
+    let newColors = {};
+    
+    for (let i = 0; i < rows.length; i++) {
+        const name = rows[i].querySelector('.assign-name').value.trim();
+        const bg = rows[i].querySelector('.assign-bg').value;
+        const text = rows[i].querySelector('.assign-text').value;
+        if (name !== "") {
+            newColors[name] = { bg: bg, text: text };
+        }
+    }
+    
+    ROLE_COLORS = newColors;
+    
+    const payload = {
+        sidebarWidth: CURRENT_SIDEBAR_WIDTH, rowHeight: CURRENT_ROW_HEIGHT, shiftHeight: SHIFT_HEIGHT,
+        shiftFontSize: SHIFT_FONT_SIZE, shiftFontWeight: SHIFT_FONT_WEIGHT, shiftFontStyle: SHIFT_FONT_STYLE,
+        shiftTextDeco: SHIFT_TEXT_DECORATION, shiftTimeX: SHIFT_TIME_X, shiftTimeY: SHIFT_TIME_Y,
+        shiftRoleX: SHIFT_ROLE_X, shiftRoleY: SHIFT_ROLE_Y, phases: PHASE_PALETTE, roles: ROLE_COLORS
+    };
+    
+    google.script.run.withSuccessHandler(res => {
+        document.getElementById('assignment-manager-modal').style.display = 'none';
+        openMasterSettings(); 
+    }).saveModuleVisualSettings('timeline', payload, 'current');
+}
+
+function cancelAssignmentManager() {
+    document.getElementById('assignment-manager-modal').style.display = 'none';
+    openMasterSettings();
+}
+
+function openColorManager() {
+    let html = '';
+    let index = 0;
+    
+    for (let [name, colors] of Object.entries(ROLE_COLORS)) {
+        html += createColorRow(name, colors.bg, colors.text, index);
+        index++;
+    }
+    
+    document.getElementById('color-list').innerHTML = html;
+    mountToDrawer('color-manager-modal', '🎨 EDIT COLORS', '#f59e0b');
+}
+
+function createColorRow(name, bg, text, index) {
+    return `
+    <div id="color-row-${index}" class="color-row" style="display:flex; gap:10px; margin-bottom:10px; align-items:center;">
+        <input type="text" class="color-name" value="${name}" disabled style="flex:2; padding:8px; background:#18181b; border:1px solid #3f3f46; color:#a1a1aa; border-radius:4px; box-sizing:border-box; opacity: 0.8;">
+        <input type="color" class="color-bg" value="${bg}" style="flex:1; height:35px; padding:0; border:none; border-radius:4px; cursor:pointer;">
+        <input type="color" class="color-text" value="${text}" style="flex:1; height:35px; padding:0; border:none; border-radius:4px; cursor:pointer;">
+    </div>`;
+}
+
+function saveColorManager() {
+    const list = document.getElementById('color-list');
+    const rows = list.querySelectorAll('.color-row');
+    let newColors = {};
+    
+    for (let i = 0; i < rows.length; i++) {
+        const name = rows[i].querySelector('.color-name').value.trim();
+        const bg = rows[i].querySelector('.color-bg').value;
+        const text = rows[i].querySelector('.color-text').value;
+        if (name !== "") {
+            newColors[name] = { bg: bg, text: text };
+        }
+    }
+    
+    ROLE_COLORS = newColors;
+    
+    const payload = {
+        sidebarWidth: CURRENT_SIDEBAR_WIDTH, rowHeight: CURRENT_ROW_HEIGHT, shiftHeight: SHIFT_HEIGHT,
+        shiftFontSize: SHIFT_FONT_SIZE, shiftFontWeight: SHIFT_FONT_WEIGHT, shiftFontStyle: SHIFT_FONT_STYLE,
+        shiftTextDeco: SHIFT_TEXT_DECORATION, shiftTimeX: SHIFT_TIME_X, shiftTimeY: SHIFT_TIME_Y,
+        shiftRoleX: SHIFT_ROLE_X, shiftRoleY: SHIFT_ROLE_Y, phases: PHASE_PALETTE, roles: ROLE_COLORS
+    };
+    
+    google.script.run.withSuccessHandler(res => {
+        applyRealTimeVisuals();
+        openVisualSettings();
+    }).saveModuleVisualSettings('timeline', payload, 'current');
+}
+
+function cancelColorManager() {
+    openVisualSettings();
+}
+
+function toggleContextualSettings() {
+    let drawer = document.getElementById('settings-drawer-wrapper');
+    if (drawer && drawer.style.display === 'flex') {
+        if (typeof closeContextualSettings === 'function') {
+            closeContextualSettings();
+        } else {
+            drawer.style.display = 'none';
+        }
+        return;
+    }
+
+    let shiftLayer = document.getElementById('shift-layer');
+    let monthRoster = document.getElementById('month-roster-layer');
+    let projectAssetsModal = document.getElementById('project-assets-modal-overlay');
+    let masterSettings = document.getElementById('master-settings-overlay');
+    let editModal = document.getElementById('edit-modal-overlay');
+    let availabilityModal = document.getElementById('availability-modal-overlay');
+
+    if (availabilityModal && availabilityModal.style.display !== 'none' && availabilityModal.style.display !== '') {
+        openTrackerVisualSettings();
+    } else if (projectAssetsModal && projectAssetsModal.style.display !== 'none' && projectAssetsModal.style.display !== '') {
+        openProjectAssetVisualSettings();
+    } else if (shiftLayer && shiftLayer.style.display !== 'none' && shiftLayer.style.display !== '') {
+        openVisualSettings();
+    } else if (monthRoster && monthRoster.style.display !== 'none' && monthRoster.style.display !== '') {
+        openMrVisualSettings();
+    } else if (masterSettings && masterSettings.style.display !== 'none' && masterSettings.style.display !== '') {
+        let assetsTab = document.getElementById('tab-content-assets');
+        if (assetsTab && assetsTab.style.display !== 'none' && assetsTab.style.display !== '') {
+            openAssetVisualSettings();
+        } else {
+            if (drawer) {
+                document.getElementById('settings-empty-state').style.display = 'block';
+                document.getElementById('settings-drawer-title').innerText = '⚙️ VISUAL SETTINGS';
+                document.getElementById('settings-drawer-title').style.color = '#10b981';
+                Array.from(document.getElementById('settings-drawer-content').children).forEach(child => {
+                    if(child.id !== 'settings-empty-state') child.style.display = 'none';
+                });
+                drawer.style.display = 'flex';
+            }
+        }
+    } else if (editModal && editModal.style.display !== 'none' && editModal.style.display !== '') {
+        openMiniVisualSettings();
+    } else {
+        openCalendarVisualSettings();
+    }
+}
+</script>

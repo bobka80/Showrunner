@@ -1,0 +1,494 @@
+<!-- @INDEX: VISUALS -> Visual Settings (Timeline) -->
+<div id="visual-settings-modal" class="modal-overlay" style="z-index: 4000; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; overflow-x: hidden; width: 95%; max-width: 580px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">⚙️ Visual Settings</h3>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Sidebar Width</span>
+         <span id="vs-width-val" style="color:var(--accent);">180px</span>
+      </div>
+      <input type="range" id="vs-sidebar-width" min="100" max="300" value="180" oninput="applyRealTimeVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Timeline Row Height</span>
+         <span id="vs-height-val" style="color:var(--accent);">60px</span>
+      </div>
+      <input type="range" id="vs-row-height" min="40" max="120" value="60" oninput="applyRealTimeVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px; display: flex; flex-direction: column; gap: 12px;">
+      <div>
+        <div class="input-label">Event Phases</div>
+        <button class="btn-outline" style="width: 100%; margin-top: 5px;" onclick="openPhaseManager()">EDIT PHASES</button>
+      </div>
+      <div>
+        <div class="input-label">Shift Blocks</div>
+        <button class="btn-outline" style="width: 100%; margin-top: 5px;" onclick="openStripEditor()">STRIP FORMATTING</button>
+      </div>
+      <div>
+        <div class="input-label">Assignments</div>
+        <button class="btn-outline" style="width: 100%; margin-top: 5px;" onclick="openColorManager()">EDIT COLORS</button>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="vs-load-btn-1" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('timeline', 1)">LOAD PRESET 1</button>
+        <button id="vs-save-btn-1" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('timeline', 1)">SAVE PRESET 1</button>
+      </div>
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="vs-load-btn-2" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('timeline', 2)">LOAD PRESET 2</button>
+        <button id="vs-save-btn-2" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('timeline', 2)">SAVE PRESET 2</button>
+      </div>
+    </div>
+    <div style="display:flex; gap:12px; margin-top: 20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('visual-settings-modal').style.display='none'">CANCEL</button>
+      <button id="vs-vs-save-btn" class="btn-main" style="width:auto; margin:0;" onclick="saveVisualPreset('timeline', 'current')">DONE & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Visual Settings (Phase Manager) -->
+<div id="phase-manager-modal" class="modal-overlay" style="z-index: 4500; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 500px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">🎯 Manage Event Phases</h3>
+    <div id="pm-list" style="margin-top: 15px;"></div>
+    <button class="btn-add" style="margin-top: 10px; width: 100%;" onclick="addPhaseRow()">ADD NEW PHASE</button>
+    <div style="display:flex; gap:12px; margin-top:20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="cancelPhaseManager()">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="savePhaseManager()">APPLY & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Visual Settings (Strip Editor) -->
+<div id="strip-editor-modal" class="modal-overlay" style="z-index: 4500; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="width: 95%; max-width: 450px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">📏 Strip Formatting</h3>
+
+    <div style="margin-top:15px; background:#111; border:1px solid #333; border-radius:6px; padding:10px; overflow:hidden;">
+        <div class="input-label" style="margin-bottom:8px;">Live Preview (3 Hours)</div>
+        <div style="display:flex; border-bottom:1px solid #444; margin-bottom:5px; color:#888; font-size:10px; position:relative; padding-left:10px;">
+            <div style="flex:1;">12:00</div><div style="flex:1;">13:00</div><div style="flex:1;">14:00</div>
+        </div>
+        <div style="position:relative; height:60px;" id="se-preview-container">
+            <div class="shift-block" style="position:absolute; left:10px; width:180px; background:#86efac; border:1px solid rgba(255,255,255,0.2); cursor:default; z-index:5;">
+                <div class="shift-handle shift-handle-left"></div>
+                <div class="action-zone" style="position:absolute; top:0; left:12px; width:15px; height:100%; z-index:50; cursor:pointer;"></div>
+                <div class="shift-label-container" style="color:#064e3b; pointer-events: none;">
+                   <div class="shift-time">12:00 - 14:00</div>
+                   <div class="shift-role">TECHNICIAN</div>
+                   <div class="shift-note" style="font-size: 7px; font-style: italic; opacity: 0.85;">Example note text here...</div>
+                </div>
+            <div class="shift-arrow-btn" onclick="this.classList.toggle('active')" style="--arrow-color:#064e3b;" title="Toggle Indicator (Dbl-Click for Open Shift)">▶</div>
+                <div class="shift-handle shift-handle-right"></div>
+            </div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; margin-top: 15px;">
+      <div style="flex:1;">
+        <div class="input-label" style="display:flex; justify-content:space-between;"><span>Block Height</span><span id="se-height-val" style="color:var(--accent);">38px</span></div>
+        <input type="range" id="se-height" min="20" max="60" value="38" oninput="applyRealTimeVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+      </div>
+      <div style="flex:1;">
+        <div class="input-label" style="display:flex; justify-content:space-between;"><span>Font Size</span><span id="se-font-val" style="color:var(--accent);">9px</span></div>
+        <input type="range" id="se-font-size" min="6" max="18" value="9" oninput="applyRealTimeVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px; border-top:1px solid #333; padding-top:10px;">
+       <div>
+          <div class="input-label">Time Position X (<span id="se-time-x-val">4px</span>)</div>
+          <input type="range" id="se-time-x" min="-10" max="150" value="4" oninput="applyRealTimeVisuals()" style="width:100%;">
+       </div>
+       <div>
+          <div class="input-label">Time Position Y (<span id="se-time-y-val">2px</span>)</div>
+          <input type="range" id="se-time-y" min="-10" max="50" value="2" oninput="applyRealTimeVisuals()" style="width:100%;">
+       </div>
+       <div>
+          <div class="input-label">Role Position X (<span id="se-role-x-val">4px</span>)</div>
+          <input type="range" id="se-role-x" min="-10" max="150" value="4" oninput="applyRealTimeVisuals()" style="width:100%;">
+       </div>
+       <div>
+          <div class="input-label">Role Position Y (<span id="se-role-y-val">16px</span>)</div>
+          <input type="range" id="se-role-y" min="-10" max="50" value="16" oninput="applyRealTimeVisuals()" style="width:100%;">
+       </div>
+    </div>
+
+    <div class="input-label" style="margin-top: 15px;">Text Style</div>
+    <div style="display: flex; gap: 10px; margin-top: 5px;">
+        <label class="crew-cb-container" style="flex:1; justify-content:center; background:#222; border-radius:6px; border:1px solid #333; padding: 8px;">
+            <input type="checkbox" id="se-bold" class="crew-cb" onchange="applyRealTimeVisuals()" style="margin-right: 5px;">
+            <span style="color:#fff; font-weight:bold;">Bold</span>
+        </label>
+        <label class="crew-cb-container" style="flex:1; justify-content:center; background:#222; border-radius:6px; border:1px solid #333; padding: 8px;">
+            <input type="checkbox" id="se-italic" class="crew-cb" onchange="applyRealTimeVisuals()" style="margin-right: 5px;">
+            <span style="color:#fff; font-style:italic;">Italic</span>
+        </label>
+        <label class="crew-cb-container" style="flex:1; justify-content:center; background:#222; border-radius:6px; border:1px solid #333; padding: 8px;">
+            <input type="checkbox" id="se-underline" class="crew-cb" onchange="applyRealTimeVisuals()" style="margin-right: 5px;">
+            <span style="color:#fff; text-decoration:underline;">Line</span>
+        </label>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center;">
+      <button class="btn-main" style="width:auto; margin:0;" onclick="closeStripEditor()">DONE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Visual Settings (Calendar) -->
+<div id="cal-visual-settings-modal" class="modal-overlay" style="z-index: 4000; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 450px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">⚙️ Calendar Visual Settings</h3>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Event Frame Height</span>
+         <span id="cal-height-val" style="color:var(--accent);">42px</span>
+      </div>
+      <input type="range" id="cal-height" min="30" max="80" value="42" oninput="applyCalVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Title Font Size</span>
+         <span id="cal-font-val" style="color:var(--accent);">12px</span>
+      </div>
+      <input type="range" id="cal-font" min="8" max="24" value="12" oninput="applyCalVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Fill Opacity</span>
+         <span id="cal-bg-intensity-val" style="color:var(--accent);">30%</span>
+      </div>
+      <input type="range" id="cal-bg-intensity" min="10" max="100" value="30" oninput="applyCalVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+      <div class="input-label">Event Type Frame Colors</div>
+      <div style="display:flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Event</span>
+            <input type="color" id="cal-color-event" value="#888888" oninput="applyCalVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Meeting</span>
+            <input type="color" id="cal-color-meeting" value="#fecaca" oninput="applyCalVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Cross Rent</span>
+            <input type="color" id="cal-color-cross" value="#a7f3d0" oninput="applyCalVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="cal-load-btn-1" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('cal', 1)">LOAD PRESET 1</button>
+        <button id="cal-save-btn-1" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('cal', 1)">SAVE PRESET 1</button>
+      </div>
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="cal-load-btn-2" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('cal', 2)">LOAD PRESET 2</button>
+        <button id="cal-save-btn-2" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('cal', 2)">SAVE PRESET 2</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="closeCalVisualSettings()">CANCEL</button>
+      <button id="cal-vs-save-btn" class="btn-main" style="width:auto; margin:0;" onclick="saveVisualPreset('cal', 'current')">DONE & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Visual Settings (Mini Calendar) -->
+<div id="mini-visual-settings-modal" class="modal-overlay" style="z-index: 4000; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 450px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">⚙️ Strip Colors</h3>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Sub-Event Height</span>
+         <span id="mini-height-val" style="color:var(--accent);">24px</span>
+      </div>
+      <input type="range" id="mini-height" min="16" max="60" value="24" oninput="applyMiniVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Title Font Size</span>
+         <span id="mini-font-val" style="color:var(--accent);">12px</span>
+      </div>
+      <input type="range" id="mini-font" min="8" max="24" value="12" oninput="applyMiniVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label">Project Phase Colors</div>
+      <div style="display:flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Main Event</span>
+            <input type="color" id="mini-color-main" value="#3b82f6" oninput="applyMiniVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Warehouse</span>
+            <input type="color" id="mini-color-wh" value="#f97316" oninput="applyMiniVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Show Day</span>
+            <input type="color" id="mini-color-show" value="#10b981" oninput="applyMiniVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Recovery</span>
+            <input type="color" id="mini-color-recovery" value="#a855f7" oninput="applyMiniVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+         <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:8px; border-radius:6px;">
+            <span style="font-size:11px; font-weight:bold; color:#fff;">Transit</span>
+            <input type="color" id="mini-color-transit" value="#06b6d4" oninput="applyMiniVisuals()" style="width:25px; height:25px; padding:0; border:none; cursor:pointer; border-radius:4px; background:transparent;">
+         </div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="mini-load-btn-1" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('mini', 1)">LOAD PRESET 1</button>
+        <button id="mini-save-btn-1" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('mini', 1)">SAVE PRESET 1</button>
+      </div>
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="mini-load-btn-2" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('mini', 2)">LOAD PRESET 2</button>
+        <button id="mini-save-btn-2" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('mini', 2)">SAVE PRESET 2</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="closeMiniVisualSettings()">CANCEL</button>
+      <button id="mini-vs-save-btn" class="btn-main" style="width:auto; margin:0;" onclick="saveVisualPreset('mini', 'current')">DONE & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Visual Settings (Month Roster) -->
+<div id="mr-visual-settings-modal" class="modal-overlay" style="z-index: 4000; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 450px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">⚙️ V Settings (Month Roster)</h3>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Event Strip Height</span>
+         <span id="mr-event-height-val" style="color:var(--accent);">24px</span>
+      </div>
+      <input type="range" id="mr-event-height" min="16" max="60" value="24" oninput="applyMrVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Shift Strip Height</span>
+         <span id="mr-shift-height-val" style="color:var(--accent);">22px</span>
+      </div>
+      <input type="range" id="mr-shift-height" min="16" max="60" value="22" oninput="applyMrVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Person Row Height</span>
+         <span id="mr-row-height-val" style="color:var(--accent);">80px</span>
+      </div>
+      <input type="range" id="mr-row-height" min="40" max="150" value="80" oninput="applyMrVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="mr-load-btn-1" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('mr', 1)">LOAD PRESET 1</button>
+        <button id="mr-save-btn-1" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('mr', 1)">SAVE PRESET 1</button>
+      </div>
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="mr-load-btn-2" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('mr', 2)">LOAD PRESET 2</button>
+        <button id="mr-save-btn-2" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('mr', 2)">SAVE PRESET 2</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="closeMrVisualSettings()">CANCEL</button>
+      <button id="mr-vs-save-btn" class="btn-main" style="width:auto; margin:0;" onclick="saveVisualPreset('mr', 'current')">DONE & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Visual Settings (Project Assets) -->
+<div id="project-asset-visual-settings-modal" class="modal-overlay" style="z-index: 6000; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 450px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">⚙️ Project Equipment Settings</h3>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Row Padding (Height)</span>
+         <span id="pa-vs-padding-val" style="color:var(--accent);">6px</span>
+      </div>
+      <input type="range" id="pa-vs-padding" min="2" max="24" value="6" oninput="applyProjectAssetVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Font Size</span>
+         <span id="pa-vs-font-val" style="color:var(--accent);">11px</span>
+      </div>
+      <input type="range" id="pa-vs-font" min="8" max="18" value="11" oninput="applyProjectAssetVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px; display:flex; gap:15px; border-top:1px solid #333; padding-top:15px;">
+      <div style="flex:1;">
+         <div class="input-label" style="color:#10b981;">LEFT SIDE (VAULT)</div>
+         <div id="pa-vs-vault-cols" style="display:flex; flex-direction:column; gap:4px; margin-top:5px; max-height: 200px; overflow-y: auto; padding-right:5px;"></div>
+      </div>
+      <div style="flex:1;">
+         <div class="input-label" style="color:#3b82f6;">RIGHT SIDE (ASSIGNED)</div>
+         <div id="pa-vs-assigned-cols" style="display:flex; flex-direction:column; gap:4px; margin-top:5px; max-height: 200px; overflow-y: auto; padding-right:5px;"></div>
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="pa-vs-load-btn-1" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('projectAsset', 1)">LOAD PRESET 1</button>
+        <button id="pa-vs-save-btn-1" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('projectAsset', 1)">SAVE PRESET 1</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="closeProjectAssetVisualSettings()">CANCEL</button>
+      <button id="pa-vs-vs-save-btn" class="btn-main" style="width:auto; margin:0;" onclick="saveVisualPreset('projectAsset', 'current')">DONE & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Visual Settings (Asset Registry) -->
+<div id="asset-visual-settings-modal" class="modal-overlay" style="z-index: 6000; display: none; background: transparent; backdrop-filter: none; pointer-events: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 450px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">⚙️ Asset List Settings</h3>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Row Padding (Height)</span>
+         <span id="asset-vs-padding-val" style="color:var(--accent);">6px</span>
+      </div>
+      <input type="range" id="asset-vs-padding" min="2" max="24" value="6" oninput="applyAssetVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label" style="display:flex; justify-content:space-between;">
+         <span>Font Size</span>
+         <span id="asset-vs-font-val" style="color:var(--accent);">11px</span>
+      </div>
+      <input type="range" id="asset-vs-font" min="8" max="18" value="11" oninput="applyAssetVisuals()" style="width: 100%; cursor: pointer; padding: 0;">
+    </div>
+
+    <div style="margin-top: 15px;">
+      <div class="input-label">Visible Columns</div>
+      <div id="asset-vs-cols" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; margin-top:5px; background:#111; padding:10px; border:1px solid #333; border-radius:6px; max-height: 200px; overflow-y: auto;">
+         <!-- Inject checkboxes dynamically -->
+      </div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:12px; margin-top:20px;">
+      <div style="display:flex; gap:12px; justify-content: space-between;">
+        <button id="asset-load-btn-1" class="btn-outline" style="flex:1; margin:0;" onclick="loadVisualPreset('asset', 1)">LOAD PRESET 1</button>
+        <button id="asset-save-btn-1" class="btn-main" style="flex:1; margin:0;" onclick="saveVisualPreset('asset', 1)">SAVE PRESET 1</button>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="closeAssetVisualSettings()">CANCEL</button>
+      <button id="asset-vs-save-btn" class="btn-main" style="width:auto; margin:0;" onclick="saveVisualPreset('asset', 'current')">DONE & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Data Managers (Assignments) -->
+<div id="assignment-manager-modal" class="modal-overlay" style="z-index: 4500; display: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 500px; border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">🎯 Manage Assignments</h3>
+    
+    <div style="display:flex; gap:10px; padding:15px 0 5px 0; color:#a1a1aa; font-size:11px; font-weight:bold; text-transform:uppercase;">
+      <div style="flex:1;">Assignment Name</div>
+    </div>
+    
+    <div id="assignment-list" style="margin-top: 5px;"></div>
+    
+    <button class="btn-add" style="margin-top: 15px; width: 100%;" onclick="addAssignmentRow()">ADD ASSIGNMENT</button>
+    
+    <div style="display:flex; gap:12px; margin-top:20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="cancelAssignmentManager()">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="saveAssignmentManager()">APPLY & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Data Managers (Colors) -->
+<div id="color-manager-modal" class="modal-overlay" style="z-index: 4500; display: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 550px; border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">🎨 Edit Colors</h3>
+    
+    <div style="display:flex; gap:10px; padding:15px 0 5px 0; color:#a1a1aa; font-size:11px; font-weight:bold; text-transform:uppercase;">
+      <div style="flex:2;">Assignment Name</div>
+      <div style="flex:1; text-align:center;">Background</div>
+      <div style="flex:1; text-align:center;">Text Color</div>
+    </div>
+    
+    <div id="color-list" style="margin-top: 5px;"></div>
+    
+    <div style="display:flex; gap:12px; margin-top:20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="cancelColorManager()">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="saveColorManager()">APPLY & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Data Managers (Departments) -->
+<div id="dept-manager-modal" class="modal-overlay" style="z-index: 4500; display: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 500px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">🎯 Manage Departments</h3>
+    <div id="dept-list" style="margin-top: 15px;"></div>
+    <button class="btn-add" style="margin-top: 10px; width: 100%;" onclick="addListRow('dept')">ADD DEPARTMENT</button>
+    <div style="display:flex; gap:12px; margin-top:20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="cancelListManager('dept')">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="saveListManager('dept')">APPLY & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Data Managers (Meals) -->
+<div id="meal-manager-modal" class="modal-overlay" style="z-index: 4500; display: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: auto; width: 95%; max-width: 500px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px;">🍔 Manage Meals</h3>
+    <div id="meal-list" style="margin-top: 15px;"></div>
+    <button class="btn-add" style="margin-top: 10px; width: 100%;" onclick="addListRow('meal')">ADD MEAL</button>
+    <div style="display:flex; gap:12px; margin-top:20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="cancelListManager('meal')">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="saveListManager('meal')">APPLY & SAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: VISUALS -> Data Managers (Tags) -->
+<div id="tag-manager-modal" class="modal-overlay" style="z-index: 4500; display: none;">
+  <div class="modal" style="max-height: 90vh; overflow-y: hidden; display: flex; flex-direction: column; width: 95%; max-width: 800px; pointer-events: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.8); border: 1px solid #444;">
+    <h3 style="margin:0; color:#fff; border-bottom: 1px solid #333; padding-bottom: 10px; flex-shrink: 0;">🏷️ Lexicon: Tags & Syntax</h3>
+    
+    <div style="display: flex; flex-direction: column; margin-top: 15px; flex: 1; overflow: hidden; min-height: 400px;">
+        <div class="input-label" style="margin-bottom: 10px; color:#a855f7; display:flex; justify-content:space-between;">
+            <span>Tag Hierarchy & Shortcuts</span>
+            <span style="color:#10b981; font-weight:normal; text-transform:none;">Type a shortcut code (e.g. 'x3') next to any tag to map it.</span>
+        </div>
+        <div id="tag-tree-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px;"></div>
+        <button class="btn-add" style="width: 100%; border-color:#a855f7; color:#a855f7; background:rgba(168,85,247,0.1) !important;" onclick="addTagNode(null)">+ ADD ROOT CATEGORY</button>
+    </div>
+    
+    <div style="display:flex; gap:12px; margin-top:20px; border-top: 1px solid #333; padding-top: 15px; justify-content: flex-end; align-items: center; flex-shrink: 0;">
+      <button class="btn-close" style="width:auto; margin:0;" onclick="cancelTagManager()">CANCEL</button>
+      <button class="btn-main" style="width:auto; margin:0;" onclick="saveTagManager()">APPLY & SAVE</button>
+    </div>
+  </div>
+</div>

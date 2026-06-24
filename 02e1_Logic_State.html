@@ -1,0 +1,510 @@
+<script>
+/**
+ * 02e1_Logic_State.html
+ * Domain: View Controllers & UI State for Project Equipment.
+ */
+
+window.currentPaMode = 'design';
+window.activeContainerTarget = null;
+window.packingDeptFilters = [];
+
+window.explodeProjectAssets = function() {
+    let exploded = [];
+    currentProjectAssets.forEach(pa => {
+        let qty = parseInt(pa.qty, 10) || 1;
+        let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
+        let isBulk = asset && asset.type === 'Bulk';
+        let isGenericCase = pa.isGenericAuto;
+        
+        if (qty > 1 && !isBulk && !isGenericCase) {
+            let sQty = parseInt(pa.scannedQty, 10) || 0;
+            for (let i = 0; i < qty; i++) {
+                let clone = JSON.parse(JSON.stringify(pa));
+                clone.qty = 1;
+                if (sQty > 0) {
+                    clone.scannedQty = 1;
+                    sQty--;
+                } else {
+                    clone.scannedQty = 0;
+                }
+                if (i > 0) delete clone.uid;
+                exploded.push(clone);
+            }
+        } else {
+            exploded.push(pa);
+        }
+    });
+    currentProjectAssets = exploded;
+};
+
+window.collapseProjectAssets = function() {
+    let collapsed = [];
+    currentProjectAssets.forEach(pa => {
+        let existing = collapsed.find(m => 
+            m.assetId === pa.assetId && m.location === pa.location && m.formula === pa.formula && 
+            (m.containerUid || "") === (pa.containerUid || "") && m.isAuto === pa.isAuto && 
+            m.isGenericAuto === pa.isGenericAuto && m.isShortage === pa.isShortage && m.isExplicitlyUnpacked === pa.isExplicitlyUnpacked
+        );
+        if (existing) {
+            existing.qty = parseInt(existing.qty, 10) + parseInt(pa.qty, 10);
+            existing.scannedQty = (parseInt(existing.scannedQty, 10) || 0) + (parseInt(pa.scannedQty, 10) || 0);
+            if (pa.uid && !existing.uid) existing.uid = pa.uid;
+        } else {
+            collapsed.push(JSON.parse(JSON.stringify(pa)));
+        }
+    });
+    currentProjectAssets = collapsed;
+};
+
+// @INDEX: PA_LOGIC -> Mode & View Toggles
+window.toggleContainersView = function() {
+    let btn = document.getElementById('toggle-auto-containers-btn');
+    if (!btn) return;
+    let isActive = btn.dataset.active === 'true';
+    isActive = !isActive;
+    btn.dataset.active = isActive ? 'true' : 'false';
+    if (isActive) {
+        btn.style.setProperty('border-color', '#10b981', 'important');
+        btn.style.setProperty('color', '#000', 'important');
+        btn.style.setProperty('background', '#10b981', 'important');
+    } else {
+        btn.style.setProperty('border-color', '#333', 'important');
+        btn.style.setProperty('color', '#a1a1aa', 'important');
+        btn.style.setProperty('background', 'transparent', 'important');
+    }
+    if (window.currentPaMode === 'design') {
+        window.lastDesignContainerState = isActive;
+    }
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+};
+
+window.switchPaView = function(viewName) {
+    document.querySelectorAll('.pa-view').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.pa-view-btn').forEach(el => el.classList.remove('active'));
+
+    let viewEl = document.getElementById('pa-view-' + viewName);
+    if (viewEl) {
+        viewEl.style.display = 'flex';
+        if (viewName === 'logistics') viewEl.style.flexDirection = 'column';
+    }
+
+    let btnEl = document.getElementById('pa-view-' + viewName + '-btn');
+    if (btnEl) btnEl.classList.add('active');
+
+    let isOffer = (viewName === 'offer');
+
+    let hideElements = ['mode-toggle-btn', 'pa-new-sublist-btn', 'pa-add-container-btn', 'pa-clipboard-actions', 'toggle-auto-containers-btn', 'pa-count-badge', 'pa-packing-filters'];
+    
+    hideElements.forEach(id => {
+        let el = document.getElementById(id);
+        if (el) {
+            if (isOffer) {
+                if (!el.dataset.stashedDisplay) el.dataset.stashedDisplay = el.style.display || '';
+                el.style.setProperty('display', 'none', 'important');
+            } else {
+                if (el.dataset.stashedDisplay !== undefined) el.style.display = el.dataset.stashedDisplay;
+            }
+        }
+    });
+
+    if (viewName === 'logistics') {
+        if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+        if (typeof executeTogglePaMode === 'function') executeTogglePaMode(window.currentPaMode);
+    }
+    if (viewName === 'offer' && typeof renderOfferUI === 'function') renderOfferUI();
+};
+
+window.toggleAutoFillCases = function() {
+    let btn = document.getElementById('toggle-auto-fill-cases-btn');
+    if (!btn) return;
+    let isActive = btn.dataset.active === 'true';
+    isActive = !isActive;
+    btn.dataset.active = isActive ? 'true' : 'false';
+    if (isActive) {
+        btn.style.setProperty('border-color', '#10b981', 'important');
+        btn.style.setProperty('color', '#000', 'important');
+        btn.style.setProperty('background', '#10b981', 'important');
+    } else {
+        btn.style.setProperty('border-color', '#333', 'important');
+        btn.style.setProperty('color', '#a1a1aa', 'important');
+        btn.style.setProperty('background', 'transparent', 'important');
+    }
+};
+
+window.togglePaMode = function(forcedMode) {
+    let targetMode = forcedMode || ((window.currentPaMode === 'design') ? 'packing' : 'design');
+    
+    if (targetMode === 'packing' && typeof window.calculatePaDeltas === 'function' && window.calculatePaDeltas().length > 0) {
+        window.autoSaveAndExecute(() => {
+            executeTogglePaMode(targetMode);
+        }, true);
+        return;
+    }
+    executeTogglePaMode(targetMode);
+};
+
+function executeTogglePaMode(targetMode) {
+    let toggleContainersBtn = document.getElementById('toggle-auto-containers-btn');
+    let setContainersState = function(state) {
+        if (!toggleContainersBtn) return;
+        toggleContainersBtn.dataset.active = state ? 'true' : 'false';
+        if (state) {
+            toggleContainersBtn.style.setProperty('border-color', '#10b981', 'important');
+            toggleContainersBtn.style.setProperty('color', '#000', 'important');
+            toggleContainersBtn.style.setProperty('background', '#10b981', 'important');
+        } else {
+            toggleContainersBtn.style.setProperty('border-color', '#333', 'important');
+            toggleContainersBtn.style.setProperty('color', '#a1a1aa', 'important');
+            toggleContainersBtn.style.setProperty('background', 'transparent', 'important');
+        }
+    };
+
+    if (window.currentPaMode === 'design' && targetMode !== 'design' && toggleContainersBtn) {
+        window.lastDesignContainerState = toggleContainersBtn.dataset.active === 'true';
+    }
+
+    if (window.currentOperationType && window.currentPaMode !== targetMode) {
+        alert("⚠️ Please click '⏸ PAUSE' before switching to Design or Packing mode.");
+        return;
+    }
+
+    if ((targetMode === 'packing' || targetMode === 'operation') && window.currentPaMode === 'design') {
+        if (typeof explodeProjectAssets === 'function') explodeProjectAssets();
+    } else if (targetMode === 'design' && (window.currentPaMode === 'packing' || window.currentPaMode === 'operation')) {
+        if (typeof collapseProjectAssets === 'function') collapseProjectAssets();
+    }
+
+    window.currentPaMode = targetMode;
+    
+    window.selectedPaIndices.clear();
+    
+    let toggleBtn = document.getElementById('mode-toggle-btn');
+    let btnSub = document.getElementById('pa-new-sublist-btn');
+    let btnAdd = document.getElementById('pa-add-container-btn');
+    let clipActions = document.getElementById('pa-clipboard-actions');
+    let packFilters = document.getElementById('pa-packing-filters');
+    let arrangeBtn = document.getElementById('btn-arrange-truck');
+    let autoAddCasesBtn = document.getElementById('btn-auto-add-cases');
+    let loadinPlanBtn = document.getElementById('btn-loadin-plan');
+    let paModal = document.querySelector('#project-assets-modal-overlay .modal');
+    let btnMasterOp = document.getElementById('btn-master-operation');
+    
+    if (window.currentPaMode === 'design') {
+        if (toggleBtn) {
+            toggleBtn.style.display = 'inline-flex';
+                toggleBtn.innerHTML = 'DESIGN MODE';
+            toggleBtn.style.borderColor = '#d8b4fe';
+            toggleBtn.style.color = '#d8b4fe';
+            toggleBtn.style.opacity = '1';
+        }
+        if (btnSub) btnSub.style.setProperty('display', 'inline-flex', 'important');
+        if (btnAdd) btnAdd.style.setProperty('display', 'none', 'important');
+        if (clipActions) clipActions.style.setProperty('display', 'flex', 'important');
+        if (packFilters) packFilters.style.setProperty('display', 'none', 'important');
+        if (arrangeBtn) arrangeBtn.style.setProperty('display', 'none', 'important');
+        if (autoAddCasesBtn) autoAddCasesBtn.style.setProperty('display', 'none', 'important');
+        if (loadinPlanBtn) loadinPlanBtn.style.setProperty('display', 'none', 'important');
+            if (paModal) paModal.style.borderColor = 'transparent';
+        if (window.lastDesignContainerState !== undefined) {
+            setContainersState(window.lastDesignContainerState);
+        }
+        if (btnMasterOp) btnMasterOp.style.setProperty('display', 'none', 'important');
+        window.activeContainerTarget = null;
+    } else if (window.currentPaMode === 'packing') {
+        if (toggleBtn) {
+            toggleBtn.style.display = 'inline-flex';
+                toggleBtn.innerHTML = 'PACKING MODE';
+            toggleBtn.style.borderColor = '#f59e0b';
+            toggleBtn.style.color = '#f59e0b';
+            toggleBtn.style.opacity = '1';
+        }
+        if (btnSub) btnSub.style.setProperty('display', 'none', 'important');
+        if (btnAdd) btnAdd.style.setProperty('display', 'inline-flex', 'important');
+        if (clipActions) clipActions.style.setProperty('display', 'flex', 'important');
+        if (packFilters) packFilters.style.setProperty('display', 'flex', 'important');
+        if (arrangeBtn) arrangeBtn.style.setProperty('display', 'inline-flex', 'important');
+        if (autoAddCasesBtn) autoAddCasesBtn.style.setProperty('display', 'inline-flex', 'important');
+        if (loadinPlanBtn) loadinPlanBtn.style.setProperty('display', 'inline-flex', 'important');
+        if (paModal) {
+                paModal.style.borderColor = '#f59e0b';
+        }
+        setContainersState(true);
+        if (btnMasterOp) btnMasterOp.style.setProperty('display', 'inline-flex', 'important');
+        window.activePaTarget = null;
+    } else if (window.currentPaMode === 'operation') {
+        if (toggleBtn) {
+            toggleBtn.style.display = 'inline-flex';
+                toggleBtn.innerHTML = 'LOCKED IN OP';
+            toggleBtn.style.borderColor = '#ef4444';
+            toggleBtn.style.color = '#ef4444';
+            toggleBtn.style.opacity = '0.5';
+        }
+        if (btnSub) btnSub.style.setProperty('display', 'none', 'important');
+        if (btnAdd) btnAdd.style.setProperty('display', 'none', 'important');
+        if (clipActions) clipActions.style.setProperty('display', 'none', 'important');
+        if (packFilters) packFilters.style.setProperty('display', 'flex', 'important');
+        if (arrangeBtn) arrangeBtn.style.setProperty('display', 'none', 'important');
+        if (autoAddCasesBtn) autoAddCasesBtn.style.setProperty('display', 'none', 'important');
+        if (loadinPlanBtn) loadinPlanBtn.style.setProperty('display', 'none', 'important');
+        if (paModal) {
+                paModal.style.borderColor = '#ef4444';
+        }
+        setContainersState(true);
+        if (btnMasterOp) btnMasterOp.style.setProperty('display', 'inline-flex', 'important');
+        window.activePaTarget = null;
+    }
+    if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+}
+
+window.togglePackingDept = function(dept, noRender = false) {
+    let idx = window.packingDeptFilters.indexOf(dept);
+    if (idx > -1) window.packingDeptFilters.splice(idx, 1);
+    else window.packingDeptFilters.push(dept);
+    if (!noRender && typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+};
+
+// @INDEX: PA_LOGIC -> Group Targeting & UI Selection
+function setPaTarget(loc, form) {
+    window.backupFormulaGroup = currentProjectAssets.filter(pa => { 
+        let pLoc = pa.location || "General"; 
+        let pForm = pa.formula || "Standalone"; 
+        return (pLoc === loc && pForm === form); 
+    }).map(pa => ({...pa})); 
+    
+    window.activePaTarget = { location: loc, formula: form };
+    
+    let safeId = 'fg_' + (loc + form).replace(/[^a-zA-Z0-9]/g, '_');
+    expandedPaGroups.delete(safeId);
+    
+    renderProjectAssetsUI();
+}
+
+function clearPaTarget() {
+    window.activePaTarget = null;
+    window.backupFormulaGroup = [];
+    renderProjectAssetsUI();
+}
+
+window.selectFormulaGroup = function(id) {
+    let container = document.getElementById(id);
+    if (container) {
+        let children = container.querySelectorAll('.asset-row[data-paindex]');
+        let allSelected = true;
+        children.forEach(c => {
+            if (!window.selectedPaIndices.has(parseInt(c.dataset.paindex, 10))) allSelected = false;
+        });
+        if (allSelected) {
+            children.forEach(c => window.selectedPaIndices.delete(parseInt(c.dataset.paindex, 10)));
+        } else {
+            children.forEach(c => window.selectedPaIndices.add(parseInt(c.dataset.paindex, 10)));
+        }
+        if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
+        if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+    }
+};
+
+window.handlePaRowClick = function(e, mode, idOrIndex) {
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button') || e.target.tagName === 'INPUT') return;
+    let selectionChanged = false;
+    let isAssigned = (mode === 'assigned');
+    let isSummed = (mode === 'summed');
+    let targetSet = isAssigned ? window.selectedPaIndices : (isSummed ? window.selectedSummedIds : window.selectedVaultPaIds);
+    let lastId = isAssigned ? window.lastSelectedPaIndex : (isSummed ? window.lastSelectedSummedId : window.lastSelectedVaultPaId);
+    let currentId = isAssigned ? parseInt(idOrIndex, 10) : idOrIndex;
+    
+    if (e.shiftKey && lastId !== null) {
+        let selector = isAssigned ? '.asset-row[data-paindex]' : (isSummed ? '.asset-row[data-sumid]' : '.asset-row[data-vaultid]');
+        let allVisual = Array.from(document.querySelectorAll(selector)).map(el => isAssigned ? parseInt(el.dataset.paindex, 10) : (isSummed ? el.dataset.sumid : el.dataset.vaultid));
+        if (isAssigned) allVisual = allVisual.filter(idx => !isNaN(idx) && idx !== -1);
+        
+        let idx1 = allVisual.indexOf(lastId);
+        let idx2 = allVisual.indexOf(currentId);
+        if (idx1 !== -1 && idx2 !== -1) {
+            if (!e.ctrlKey && !e.metaKey) targetSet.clear();
+            let startIdx = Math.min(idx1, idx2);
+            let endIdx = Math.max(idx1, idx2);
+            for (let i = startIdx; i <= endIdx; i++) targetSet.add(allVisual[i]);
+            selectionChanged = true;
+        }
+    } else if (e.ctrlKey || e.metaKey) {
+        if (targetSet.has(currentId)) targetSet.delete(currentId);
+        else targetSet.add(currentId);
+        if (isAssigned) window.lastSelectedPaIndex = currentId; else if (isSummed) window.lastSelectedSummedId = currentId; else window.lastSelectedVaultPaId = currentId;
+        selectionChanged = true;
+    } else {
+        if (targetSet.has(currentId) && targetSet.size === 1) {
+            targetSet.clear();
+            selectionChanged = true;
+        } else {
+            targetSet.clear();
+            targetSet.add(currentId);
+            selectionChanged = true;
+        }
+        if (isAssigned) window.lastSelectedPaIndex = currentId; else if (isSummed) window.lastSelectedSummedId = currentId; else window.lastSelectedVaultPaId = currentId;
+    }
+    if (selectionChanged) window.updatePaSelectionUI();
+};
+
+window.updatePaSelectionUI = function() {
+    document.querySelectorAll('.asset-row[data-vaultid]').forEach(row => {
+        let id = row.dataset.vaultid;
+        if (window.selectedVaultPaIds.has(id)) row.classList.add('row-selected');
+        else row.classList.remove('row-selected');
+    });
+    
+    document.querySelectorAll('.asset-row[data-paindex]').forEach(row => {
+        let idx = parseInt(row.dataset.paindex, 10);
+        if (window.selectedPaIndices.has(idx)) row.classList.add('row-selected');
+        else row.classList.remove('row-selected');
+    });
+    
+    document.querySelectorAll('.asset-row[data-sumid]').forEach(row => {
+        let id = row.dataset.sumid;
+        if (window.selectedSummedIds.has(id)) row.classList.add('row-selected');
+        else row.classList.remove('row-selected');
+    });
+
+    let addSelBtn = document.getElementById('pa-add-sel-btn');
+    if (addSelBtn) {
+        addSelBtn.style.display = window.selectedVaultPaIds.size > 0 ? 'inline-flex' : 'none';
+        if (window.selectedVaultPaIds.size > 0) addSelBtn.innerText = `+ ADD (${window.selectedVaultPaIds.size})`;
+    }
+
+    let isDesign = window.currentPaMode !== 'operation';
+    let hasSelection = window.selectedPaIndices.size > 0 || window.selectedSummedIds.size > 0;
+
+    let cutBtn = document.getElementById('pa-cut-btn');
+    if (cutBtn) {
+        cutBtn.style.setProperty('opacity', hasSelection ? '1' : '0.3', 'important');
+        cutBtn.style.setProperty('pointer-events', hasSelection ? 'auto' : 'none', 'important');
+    }
+    let copyBtn = document.getElementById('pa-copy-btn');
+    if (copyBtn) {
+        copyBtn.style.setProperty('opacity', hasSelection ? '1' : '0.3', 'important');
+        copyBtn.style.setProperty('pointer-events', hasSelection ? 'auto' : 'none', 'important');
+    }
+    let delSelBtn = document.getElementById('pa-del-sel-btn');
+    if (delSelBtn) {
+        delSelBtn.style.setProperty('opacity', hasSelection ? '1' : '0.3', 'important');
+        delSelBtn.style.setProperty('pointer-events', hasSelection ? 'auto' : 'none', 'important');
+    }
+
+    let pasteBtn = document.getElementById('pa-paste-btn');
+    let cancelCutBtn = document.getElementById('pa-cancel-cut-btn');
+    let cutCount = currentProjectAssets.filter(pa => pa.isCut || pa.isCopied).length;
+    if (pasteBtn) {
+        pasteBtn.style.setProperty('opacity', cutCount > 0 ? '1' : '0.3', 'important');
+        pasteBtn.style.setProperty('pointer-events', cutCount > 0 ? 'auto' : 'none', 'important');
+    }
+    if (cancelCutBtn) {
+        cancelCutBtn.style.setProperty('opacity', cutCount > 0 ? '1' : '0.3', 'important');
+        cancelCutBtn.style.setProperty('pointer-events', cutCount > 0 ? 'auto' : 'none', 'important');
+    }
+};
+
+function toggleFormulaGroup(e, id) {
+    if (e && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+        e.stopPropagation(); e.preventDefault();
+        let container = document.getElementById(id);
+        if (container) {
+            let children = container.querySelectorAll('.asset-row[data-paindex]');
+            let addedAny = false;
+            children.forEach(child => {
+                let idx = parseInt(child.dataset.paindex, 10);
+                if (!window.selectedPaIndices.has(idx)) { window.selectedPaIndices.add(idx); addedAny = true; }
+            });
+            if (!addedAny) children.forEach(c => window.selectedPaIndices.delete(parseInt(c.dataset.paindex, 10)));
+            if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
+        }
+        return;
+    }
+    let el = document.getElementById(id);
+    let icon = document.getElementById('pa-icon-' + id);
+    if (el) {
+        let isClosed = el.style.display === 'none';
+        el.style.display = isClosed ? 'block' : 'none';
+        if (icon) icon.innerText = isClosed ? '▼' : '▶';
+        
+        if (isClosed) expandedPaGroups.delete(id);
+        else expandedPaGroups.add(id);
+    }
+}
+
+function togglePaDept(safeDept) {
+    const group = document.getElementById(`pa-group-${safeDept}`);
+    const icon = document.getElementById(`pa-icon-dept-${safeDept}`);
+    if (!group || !icon) return;
+    let isClosing = icon.innerText === '▼';
+    group.style.display = isClosing ? 'none' : 'block';
+    icon.innerText = isClosing ? '▶' : '▼';
+    
+    let id = `pa-group-${safeDept}`;
+    if (isClosing) expandedPaGroups.add(id);
+    else expandedPaGroups.delete(id);
+}
+
+function togglePaPackDept(safeDept) {
+    const group = document.getElementById(`pa-pack-dept-${safeDept}`);
+    const icon = document.getElementById(`pa-icon-pack-dept-${safeDept}`);
+    if (!group || !icon) return;
+    let isClosing = icon.innerText === '▼';
+    group.style.display = isClosing ? 'none' : 'block';
+    icon.innerText = isClosing ? '▶' : '▼';
+    
+    let id = `pa-group-${safeDept}`;
+    if (isClosing) expandedPaGroups.add(id);
+    else expandedPaGroups.delete(id);
+}
+
+function togglePaRollup(e, rollId) {
+    if (e && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+        e.stopPropagation(); e.preventDefault();
+        let container = document.getElementById('pa-child-group-' + rollId);
+        if (container) {
+            let children = container.querySelectorAll('.asset-row[data-paindex], .asset-row[data-vaultid]');
+            let addedAny = false;
+            children.forEach(child => {
+                if (child.dataset.paindex) {
+                    let idx = parseInt(child.dataset.paindex, 10);
+                    if (!window.selectedPaIndices.has(idx)) { window.selectedPaIndices.add(idx); addedAny = true; }
+                } else if (child.dataset.vaultid) {
+                    let id = child.dataset.vaultid;
+                    if (!window.selectedVaultPaIds.has(id)) { window.selectedVaultPaIds.add(id); addedAny = true; }
+                        } else if (child.dataset.sumid) {
+                            let id = child.dataset.sumid;
+                            if (!window.selectedSummedIds.has(id)) { window.selectedSummedIds.add(id); addedAny = true; }
+                }
+            });
+                    
+                    if (!addedAny) children.forEach(child => { 
+                        if (child.dataset.paindex) window.selectedPaIndices.delete(parseInt(child.dataset.paindex, 10)); 
+                        else if (child.dataset.vaultid) window.selectedVaultPaIds.delete(child.dataset.vaultid); 
+                        else if (child.dataset.sumid) window.selectedSummedIds.delete(child.dataset.sumid); 
+                    });
+                    
+            if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
+        }
+        return;
+    }
+    let grp = document.getElementById('pa-child-group-' + rollId);
+
+    let icon = document.getElementById('pa-icon-' + rollId);
+    if (!grp || !icon) return;
+    let isClosed = grp.style.display === 'none';
+    grp.style.display = isClosed ? 'block' : 'none';
+    icon.innerText = isClosed ? '▼' : '▶';
+    
+    let id = 'pa-child-group-' + rollId;
+    if (isClosed) expandedPaGroups.add(id);
+    else expandedPaGroups.delete(id);
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        let anyUncut = false;
+        currentProjectAssets.forEach(pa => { if (pa.isCut) { pa.isCut = false; anyUncut = true; } });
+        if (anyUncut && typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+    }
+});
+</script>

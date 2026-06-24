@@ -1,0 +1,505 @@
+<div id="smart-merge-overlay" class="modal-overlay" style="z-index:6000; display:none;">
+  <div class="modal" style="width: 95%; max-width: 1000px; display: flex; flex-direction: column;">
+     <h3 style="color:#f59e0b; margin:0 0 15px 0;">COMPARE & MERGE</h3>
+     <input type="hidden" id="sm-group-id">
+     <div style="display:flex; gap:15px; flex-wrap: wrap;">
+        <div style="flex:1; min-width:300px;">
+           <div class="input-label" style="color:#10b981;">OFFICIAL SURVIVOR NAME</div>
+           <input type="text" id="sm-official-name" style="font-size:16px; font-weight:bold; color:#10b981; border-color:#10b981; box-shadow: inset 0 0 10px rgba(16,185,129,0.1);">
+        </div>
+        <div style="flex:2; min-width:300px;">
+           <div class="input-label">Select Granular Data</div>
+           <p style="font-size:11px; color:#888; margin:0 0 10px 0;">Select the most accurate data for each attribute. The Base Record will survive and inherit these details. Quantities are automatically summed, and the losers are deleted.</p>
+        </div>
+     </div>
+     <div id="sm-candidate-list" style="display:flex; gap:15px; overflow-x:auto; margin-top:10px; padding-bottom:15px;"></div>
+     <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid #333;">
+        <button class="btn-close" onclick="document.getElementById('smart-merge-overlay').style.display='none'">CANCEL</button>
+        <button id="btn-confirm-merge" class="btn-main" style="background:#10b981; color:#000;" onclick="confirmSmartMerge()">MERGE & RESOLVE</button>
+     </div>
+  </div>
+</div>
+
+<div id="extraction-review-overlay" class="modal-overlay" style="z-index:6000; display:none;">
+  <div class="modal" style="width: 95%; max-width: 600px; display: flex; flex-direction: column;">
+     <h3 style="color:#eab308; margin:0 0 15px 0;">✨ REVIEW DATA EXTRACTION</h3>
+     <input type="hidden" id="ext-group-id">
+     <input type="hidden" id="ext-asset-id">
+     
+     <div style="background:#111; padding:15px; border-radius:6px; border:1px solid #333; margin-bottom:15px;">
+         <div class="input-label" style="margin-bottom:4px;">Original Name</div>
+         <div id="ext-original-name" style="color:#ef4444; text-decoration:line-through; font-size:14px; font-weight:bold;"></div>
+     </div>
+     
+     <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+        <div style="flex:2; min-width:200px;">
+            <div class="input-label">Cleaned Name</div>
+            <input type="text" id="ext-new-name" style="width:100%; padding:10px; background:#111; color:#10b981; border:1px solid #10b981; border-radius:4px; box-shadow: inset 0 0 5px rgba(16,185,129,0.15); box-sizing:border-box; font-weight:bold;">
+        </div>
+     </div>
+     
+     <div style="display:flex; gap:10px; margin-bottom:15px;">
+         <div style="flex:1;">
+             <div class="input-label">Extracted Length (m)</div>
+             <input type="text" id="ext-new-l" style="width:100%; padding:10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; box-sizing:border-box;">
+         </div>
+         <div style="flex:1;">
+             <div class="input-label">Extracted Weight (kg)</div>
+             <input type="text" id="ext-new-w" style="width:100%; padding:10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; box-sizing:border-box;">
+         </div>
+         <div style="flex:1;">
+             <div class="input-label">Extracted Dims</div>
+             <input type="text" id="ext-new-d" style="width:100%; padding:10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; box-sizing:border-box;">
+         </div>
+     </div>
+     
+     <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #333; padding-top:15px; margin-top:5px;">
+        <button class="btn-delete" onclick="ignoreExtraction(event)">IGNORE</button>
+        <div style="display:flex; gap:10px;">
+            <button class="btn-close" onclick="document.getElementById('extraction-review-overlay').style.display='none'">CANCEL</button>
+            <button id="btn-confirm-ext" class="btn-main" style="background:#eab308; color:#000; border-color:#eab308;" onclick="confirmExtraction()">CONFIRM & UPDATE</button>
+        </div>
+     </div>
+  </div>
+</div>
+
+<script>
+/**
+ * 06b3_Admin_Assets_Audit.html
+ * Domain: Audit Engine, Fuzzy Scanner, Data Extractor, and Smart Merge logic.
+ */
+
+// ==========================================
+// --- INLINE AUDIT & SMART MERGE ENGINE ---
+// ==========================================
+// @INDEX: AUDIT_ENGINE -> Inline Audit & Data Extraction
+function toggleInlineAuditMode() {
+    window.isInlineAuditMode = !window.isInlineAuditMode;
+    
+    if (window.isInlineAuditMode) {
+        window.hideAuditBlocks = false;
+        window.auditToggleFuzzy = false; // Off by default
+        window.auditToggleExtractor = false; // Off by default
+    }
+    
+    let btn = document.getElementById('btn-inline-audit');
+    if (btn) {
+        if (window.isInlineAuditMode) {
+            btn.style.setProperty('background', '#f59e0b', 'important');
+            btn.style.setProperty('color', '#000', 'important');
+        } else {
+            btn.style.setProperty('background', 'transparent', 'important');
+            btn.style.setProperty('color', '#f59e0b', 'important');
+        }
+    }
+    
+    if (window.isInlineAuditMode && window.auditFlags.length > 0) currentAssetFilter = 'ALL';
+    renderAssetRegistry();
+}
+
+window.toggleFuzzy = function() {
+    window.auditToggleFuzzy = !window.auditToggleFuzzy;
+    if (window.auditToggleFuzzy) runInlineScanner();
+    else renderAssetRegistry();
+};
+
+window.toggleExtractor = function() {
+    window.auditToggleExtractor = !window.auditToggleExtractor;
+    if (window.auditToggleExtractor) runDataExtractor();
+    else renderAssetRegistry();
+};
+
+function clearAuditDatabase() {
+    let confirmation = prompt('To confirm resetting all flags, type "RESET"');
+    if (confirmation !== "RESET") {
+        let prog = document.getElementById('reset-progress');
+        if (prog) prog.style.width = '0%';
+        return;
+    }
+    google.script.run.withSuccessHandler(() => { 
+        if (window.reviewedAssetIds) window.reviewedAssetIds.clear();
+        let prog = document.getElementById('reset-progress');
+        if (prog) prog.style.width = '0%';
+        loadAssetRegistry(); 
+    }).clearAllAuditFlags();
+}
+
+let resetHoldProgress = 0;
+let resetHoldInterval = null;
+
+window.startResetHold = function(e) {
+    let btn = document.getElementById('btn-reset-flags');
+    let prog = document.getElementById('reset-progress');
+    if (!btn || !prog) return;
+    btn.style.background = 'rgba(239,68,68,0.1)';
+    resetHoldProgress = 0;
+    if (resetHoldInterval) clearInterval(resetHoldInterval);
+    resetHoldInterval = setInterval(() => {
+        resetHoldProgress += (100 / 30); // 3 seconds = 30 intervals of 100ms
+        prog.style.width = Math.min(100, resetHoldProgress) + '%';
+        if (resetHoldProgress >= 100) {
+            clearInterval(resetHoldInterval);
+            window.cancelResetHold(true); 
+            clearAuditDatabase();
+        }
+    }, 100);
+};
+
+window.cancelResetHold = function(completed = false) {
+    if (resetHoldInterval) clearInterval(resetHoldInterval);
+    let btn = document.getElementById('btn-reset-flags');
+    let prog = document.getElementById('reset-progress');
+    if (btn) btn.style.background = 'transparent';
+    if (prog && !completed) prog.style.width = '0%';
+};
+
+function _localLevenshtein(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    let matrix = [];
+    for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+    for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+            else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+function runInlineScanner() {
+    let btn = document.getElementById('btn-run-scanner');
+    let statusEl = document.getElementById('audit-scanner-status');
+    if (btn) { btn.innerText = "SCANNING..."; btn.disabled = true; }
+    if (statusEl) statusEl.innerText = "Running Fuzzy Logic Engine. Please wait...";
+    
+    setTimeout(() => {
+        let groups = [];
+        let bulkMap = {};
+        globalAssets.forEach(a => {
+            if (a.type === 'Bulk') {
+                let key = (String(a.name || '') + '|||' + String(a.manufacturer || '')).toLowerCase();
+                if (!bulkMap[key]) bulkMap[key] = [];
+                bulkMap[key].push(a);
+            }
+        });
+        Object.values(bulkMap).forEach(arr => {
+            if (arr.length > 1) groups.push({ groupId: 'g_' + Date.now() + Math.random().toString(36).substr(2, 6), type: 'FRAGMENTED BULK ITEM', assetIds: arr.map(a => a.id) });
+        });
+
+        let nameGroups = [];
+        globalAssets.forEach(a => {
+            let bKey = (String(a.name || '') + '|||' + String(a.manufacturer || '')).toLowerCase();
+            if (a.type === 'Bulk' && bulkMap[bKey] && bulkMap[bKey].length > 1) return;
+            let clean = String(a.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            let placed = false;
+            for (let g of nameGroups) {
+                let dist = _localLevenshtein(clean, g.repClean);
+                if (dist > 0 && dist <= 2 && String(a.manufacturer || '').toLowerCase() === g.brand) {
+                    g.assets.push(a); g.uniqueNames.add(String(a.name || '')); placed = true; break;
+                }
+            }
+            if (!placed) nameGroups.push({ repClean: clean, brand: String(a.manufacturer || '').toLowerCase(), uniqueNames: new Set([String(a.name || '')]), assets: [a] });
+        });
+        
+        nameGroups.forEach(g => {
+            if (g.uniqueNames.size > 1) groups.push({ groupId: 'g_' + Date.now() + Math.random().toString(36).substr(2, 6), type: 'SPELLING VARIATIONS', assetIds: g.assets.map(a => a.id) });
+        });
+
+        if (groups.length === 0) {
+            alert("Database is clean! No conflicts found.");
+            if (btn) { btn.innerText = "FUZZY SCANNER"; btn.disabled = false; }
+            if (statusEl) statusEl.innerText = "Scanning auto-detects misspellings and fragmented Bulk items.";
+            window.auditToggleFuzzy = false;
+            renderAssetRegistry();
+            return;
+        }
+        
+        google.script.run.withSuccessHandler(() => {
+            if (document.getElementById('search-name')) document.getElementById('search-name').value = '';
+            if (document.getElementById('search-tag')) document.getElementById('search-tag').value = '';
+            loadAssetRegistry(); // Reloads all DB flags and sorts them to top
+        }).withFailureHandler(err => {
+            alert("Scan Error: " + err.message);
+            if (btn) { btn.innerText = "FUZZY SCANNER"; btn.disabled = false; }
+        }).saveAuditGroups(groups);
+    }, 100);
+}
+
+function runDataExtractor() {
+    let btn = document.getElementById('btn-run-extractor');
+    let statusEl = document.getElementById('audit-scanner-status');
+    if (btn) { btn.innerText = "EXTRACTING..."; btn.disabled = true; }
+    if (statusEl) statusEl.innerText = "Analyzing names for dimensions, weights, and lengths...";
+
+    setTimeout(() => {
+        let groups = [];
+        globalAssets.forEach(a => {
+            let originalName = String(a.name || '');
+            let newName = originalName;
+            let newL = String(a.length || '');
+            let newW = String(a.weight || '');
+            let newD = String(a.dims || '');
+            let changed = false;
+
+            // 1. Extract Weight (e.g., "Speaker 15kg", " 15.5 kg")
+            let wMatch = newName.match(/(?:^|[\s\-\|]+)(\d+(?:[.,]\d+)?)\s*[kK][gG](?=\s|$|\||\-)/);
+            if (wMatch && !newW) {
+                newW = wMatch[1].replace(',', '.');
+                newName = newName.replace(wMatch[0], ' ');
+                changed = true;
+            }
+
+            // 2. Extract Length (e.g., "Cable 10m", " 5.5 m")
+            let lMatch = newName.match(/(?:^|[\s\-\|]+)(\d+(?:[.,]\d+)?)\s*[mM](?=\s|$|\||\-)/);
+            if (lMatch && !newL) {
+                newL = lMatch[1].replace(',', '.');
+                newName = newName.replace(lMatch[0], ' ');
+                changed = true;
+            }
+
+            // 3. Extract Dims (e.g., "10x20", "10x20x30", "10cm x 20cm")
+            let dMatch = newName.match(/(?:^|[\s\-\|]+)(\d+(?:[.,]\d+)?)\s*(?:cm\.?)?\s*[xX*]\s*(\d+(?:[.,]\d+)?)\s*(?:cm\.?)?(?:\s*[xX*]\s*(\d+(?:[.,]\d+)?)\s*(?:cm\.?)?)?(?=\s|$|\||\-)/);
+            if (dMatch && !newD) {
+                newD = `${dMatch[1].replace(',', '.')}x${dMatch[2].replace(',', '.')}`;
+                if (dMatch[3]) newD += `x${dMatch[3].replace(',', '.')}`;
+                newName = newName.replace(dMatch[0], ' ');
+                changed = true;
+            }
+
+            // Clean up double spaces or trailing dashes
+            newName = newName.replace(/\s{2,}/g, ' ').replace(/^[\s\-\|]+|[\s\-\|]+$/g, '').trim();
+
+            if (changed && newName !== originalName && newName.length > 0) {
+                groups.push({ groupId: 'g_ext_' + Date.now() + Math.random().toString(36).substr(2, 6), type: 'DATA EXTRACTION', assetIds: [a.id] });
+            }
+        });
+
+        if (groups.length === 0) {
+            alert("No extractable data (length, weight, dims) found in asset names.");
+            if (btn) { btn.innerText = "DATA EXTRACTOR"; btn.disabled = false; }
+            if (statusEl) statusEl.innerText = "Scanning auto-detects misspellings and fragmented Bulk items.";
+            window.auditToggleExtractor = false;
+            renderAssetRegistry();
+            return;
+        }
+
+        google.script.run.withSuccessHandler(() => {
+            if (document.getElementById('search-name')) document.getElementById('search-name').value = '';
+            if (document.getElementById('search-tag')) document.getElementById('search-tag').value = '';
+            loadAssetRegistry();
+        }).withFailureHandler(err => {
+            alert("Scan Error: " + err.message);
+            if (btn) { btn.innerText = "DATA EXTRACTOR"; btn.disabled = false; }
+        }).saveAuditGroups(groups);
+    }, 100);
+}
+
+// @INDEX: SMART_MERGE -> Smart Merge Modal
+function openSmartMerge(groupId) {
+    let flagObj = window.auditFlags.find(f => f.groupId === groupId);
+    if (!flagObj) return;
+    
+    document.getElementById('sm-group-id').value = groupId;
+    let groupAssetIds = window.auditFlags.filter(f => f.groupId === groupId).map(f => f.assetId);
+    let groupAssets = globalAssets.filter(a => groupAssetIds.includes(a.id));
+    if (groupAssets.length === 0) return;
+    
+    document.getElementById('sm-official-name').value = groupAssets[0].name;
+    
+    const attrs = [
+        { prop: 'base', label: 'Base Record (History)', formatter: a => a.id.slice(-5) + (a.unitNumber ? ' #'+a.unitNumber : '') },
+        { prop: 'manufacturer', label: 'Brand', formatter: a => a.manufacturer || '-' },
+        { prop: 'department', label: 'Department', formatter: a => getDeptObj(a.department).name },
+        { prop: 'tags', label: 'Tags', formatter: a => {
+            let tagsArr = []; try { tagsArr = JSON.parse(a.tags || '[]'); } catch(e){}
+            return tagsArr.map(t => { let o = getTagObj(t); return o ? o.name : ''; }).filter(Boolean).join(', ') || '-';
+        }},
+        { prop: 'type', label: 'Type', formatter: a => a.type || 'Physical' },
+        { prop: 'length', label: 'Length', formatter: a => a.length ? a.length + 'm' : '-' },
+        { prop: 'weight', label: 'Weight', formatter: a => a.weight ? a.weight + 'kg' : '-' },
+        { prop: 'dims', label: 'Dimensions', formatter: a => a.dims || '-' },
+        { prop: 'capacity', label: 'Capacity', formatter: a => a.capacity !== undefined ? a.capacity : '-' },
+        { prop: 'power', label: 'Power', formatter: a => a.power ? a.power + 'W' : '-' },
+        { prop: 'price', label: 'Price', formatter: a => a.price ? '$'+parseFloat(a.price).toFixed(2) : '-' },
+        { prop: 'rental', label: 'Rental', formatter: a => a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-' }
+    ];
+
+    let html = '<table style="width: 100%; border-collapse: collapse; text-align: left; color: #fff; font-size: 13px;">';
+    html += '<thead><tr><th style="padding: 10px; border-bottom: 2px solid #333; color:#10b981;">Attribute</th>';
+    groupAssets.forEach((a, i) => {
+        html += `<th style="padding: 10px; border-bottom: 2px solid #333;">Item ${i+1}<br><span style="font-size:10px; color:#888; font-weight:normal;">Qty: ${a.type==='Bulk' ? (a.totalQuantity||1) : 1}</span></th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    attrs.forEach(attr => {
+        html += `<tr style="border-bottom: 1px solid #222;">`;
+        html += `<td style="padding: 12px 10px; color: #a1a1aa; font-weight: bold; text-transform: uppercase; font-size:11px;">${attr.label}</td>`;
+        groupAssets.forEach((a, i) => {
+            let isChecked = i === 0 ? 'checked' : '';
+            html += `<td style="padding: 12px 10px;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="radio" name="sm_attr_${attr.prop}" value="${a.id}" ${isChecked} style="margin:0; width:16px; height:16px; accent-color:#10b981; cursor:pointer;">
+                    <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px;" title="${String(attr.formatter(a)).replace(/"/g, '&quot;')}">${attr.formatter(a)}</span>
+                </label>
+            </td>`;
+        });
+        html += `</tr>`;
+    });
+    html += '</tbody></table>';
+    document.getElementById('sm-candidate-list').innerHTML = html;
+    document.getElementById('smart-merge-overlay').style.display = 'flex';
+}
+
+function confirmSmartMerge() {
+    let groupId = document.getElementById('sm-group-id').value;
+    let newName = document.getElementById('sm-official-name').value.trim();
+    if (!newName) return alert("Official name cannot be blank.");
+    let baseRadio = document.querySelector('input[name="sm_attr_base"]:checked');
+    if (!baseRadio) return alert("Please select a Base Record.");
+    
+    let groupAssetIds = window.auditFlags.filter(f => f.groupId === groupId).map(f => f.assetId);
+    let groupAssets = globalAssets.filter(a => groupAssetIds.includes(a.id));
+    let baseAsset = groupAssets.find(a => a.id === baseRadio.value);
+    if (!baseAsset) return;
+    
+    let slaveIdsToDelete = groupAssets.filter(a => a.id !== baseAsset.id).map(a => a.id);
+    let totalQty = 0;
+    groupAssets.forEach(a => { totalQty += (a.type === 'Bulk') ? (parseInt(a.totalQuantity, 10) || 1) : 1; });
+    
+    let payload = {
+        id: baseAsset.id, name: newName, unitNumber: baseAsset.unitNumber, rfidTag: baseAsset.rfidTag,
+        containerType: baseAsset.containerType, nestingLevel: baseAsset.nestingLevel,
+        whId: baseAsset.whId, zoneId: baseAsset.zoneId, areaId: baseAsset.areaId,
+        dateBought: baseAsset.dateBought, lifecycle: baseAsset.status,
+        lastService: baseAsset.lastService, serviceInterval: baseAsset.serviceInterval,
+        serialNumber: baseAsset.serialNumber, vendorUid: baseAsset.vendorUid
+    };
+
+    const props = ['manufacturer', 'department', 'tags', 'type', 'length', 'weight', 'dims', 'capacity', 'power', 'price', 'rental'];
+    props.forEach(prop => {
+        let selectedId = document.querySelector(`input[name="sm_attr_${prop}"]:checked`).value;
+        let selectedAsset = groupAssets.find(a => a.id === selectedId);
+        payload[prop] = selectedAsset[prop];
+    });
+    
+    let btn = document.getElementById('btn-confirm-merge');
+    let origText = btn.innerText;
+    btn.innerText = "MERGING..."; btn.disabled = true;
+    
+    google.script.run.withSuccessHandler(res => {
+        btn.innerText = origText; btn.disabled = false;
+        document.getElementById('smart-merge-overlay').style.display = 'none';
+        loadAssetRegistry(); 
+    }).withFailureHandler(err => {
+        alert("Merge Error: " + err.message);
+        btn.innerText = origText; btn.disabled = false;
+    }).resolveAuditGroup(groupId, payload, slaveIdsToDelete, totalQty, ACTIVE_USER_NAME);
+}
+
+function openExtractionReview(groupId) {
+    let flagObj = window.auditFlags.find(f => f.groupId === groupId);
+    if (!flagObj) return;
+    
+    let asset = globalAssets.find(a => a.id === flagObj.assetId);
+    if (!asset) return;
+
+    let originalName = String(asset.name || '');
+    let newName = originalName;
+    let newL = String(asset.length || '');
+    let newW = String(asset.weight || '');
+    let newD = String(asset.dims || '');
+
+    let wMatch = newName.match(/(?:^|[\s\-\|\/\(\[\{_])(\d+(?:[.,]\d+)?)\s*(?:kg|kilos?)(?=$|[\s\-\|\/\)\]\}_])/i);
+    if (wMatch && !newW) { newW = wMatch[1].replace(',', '.'); newName = newName.replace(wMatch[0], ' '); }
+
+    let lMatch = newName.match(/(?:^|[\s\-\|\/\(\[\{_])(\d+(?:[.,]\d+)?)\s*(?:m|meters?)(?=$|[\s\-\|\/\)\]\}_])/i);
+    if (lMatch && !newL) { newL = lMatch[1].replace(',', '.'); newName = newName.replace(lMatch[0], ' '); }
+
+    let dMatch = newName.match(/(?:^|[\s\-\|\/\(\[\{_])(\d+(?:[.,]\d+)?)\s*(?:cm\.?)?\s*[xX*]\s*(\d+(?:[.,]\d+)?)\s*(?:cm\.?)?(?:\s*[xX*]\s*(\d+(?:[.,]\d+)?)\s*(?:cm\.?)?)?(?=$|[\s\-\|\/\)\]\}_])/i);
+    if (dMatch && !newD) {
+        newD = `${dMatch[1].replace(',', '.')}x${dMatch[2].replace(',', '.')}`;
+        if (dMatch[3]) newD += `x${dMatch[3].replace(',', '.')}`;
+        newName = newName.replace(dMatch[0], ' ');
+    }
+    
+    newName = newName.replace(/\s{2,}/g, ' ').replace(/^[\s\-\|]+|[\s\-\|]+$/g, '').trim();
+
+    document.getElementById('ext-group-id').value = groupId;
+    document.getElementById('ext-asset-id').value = asset.id;
+    document.getElementById('ext-original-name').innerText = originalName;
+    document.getElementById('ext-new-name').value = newName;
+    document.getElementById('ext-new-l').value = newL;
+    document.getElementById('ext-new-w').value = newW;
+    document.getElementById('ext-new-d').value = newD;
+
+    document.getElementById('extraction-review-overlay').style.display = 'flex';
+}
+
+function confirmExtraction() {
+    let groupId = document.getElementById('ext-group-id').value;
+    let assetId = document.getElementById('ext-asset-id').value;
+    let asset = globalAssets.find(a => a.id === assetId);
+    if (!asset) return;
+
+    let payload = {
+        id: asset.id, name: document.getElementById('ext-new-name').value.trim(),
+        unitNumber: asset.unitNumber, rfidTag: asset.rfidTag, manufacturer: asset.manufacturer,
+        containerType: asset.containerType, nestingLevel: asset.nestingLevel, type: asset.type,
+        department: asset.department, whId: asset.whId, zoneId: asset.zoneId, areaId: asset.areaId,
+        weight: document.getElementById('ext-new-w').value.trim(), 
+        dims: document.getElementById('ext-new-d').value.trim(), 
+        capacity: asset.capacity, 
+        length: document.getElementById('ext-new-l').value.trim(),
+        power: asset.power, price: asset.price, rental: asset.rental, dateBought: asset.dateBought,
+        lifecycle: asset.status, lastService: asset.lastService, serviceInterval: asset.serviceInterval, 
+        tags: asset.tags, serialNumber: asset.serialNumber, vendorUid: asset.vendorUid
+    };
+
+    let totalQty = asset.type === 'Bulk' ? (parseInt(asset.totalQuantity, 10) || 1) : 1;
+
+    let btn = document.getElementById('btn-confirm-ext');
+    let orig = btn.innerText;
+    btn.innerText = "UPDATING..."; btn.disabled = true;
+
+    google.script.run.withSuccessHandler(res => {
+        btn.innerText = orig; btn.disabled = false;
+        document.getElementById('extraction-review-overlay').style.display = 'none';
+        loadAssetRegistry();
+    }).withFailureHandler(err => {
+        alert("Error: " + err.message);
+        btn.innerText = orig; btn.disabled = false;
+    }).resolveAuditGroup(groupId, payload, [], totalQty, ACTIVE_USER_NAME);
+}
+
+function ignoreExtraction(e) {
+    if(!confirm("Ignore this extraction suggestion?")) return;
+    let groupId = document.getElementById('ext-group-id').value;
+    let assetId = document.getElementById('ext-asset-id').value;
+    let asset = globalAssets.find(a => a.id === assetId);
+    if(!asset) return;
+
+    let payload = {
+        id: asset.id, name: asset.name, unitNumber: asset.unitNumber, rfidTag: asset.rfidTag, 
+        manufacturer: asset.manufacturer, containerType: asset.containerType, nestingLevel: asset.nestingLevel, 
+        type: asset.type, department: asset.department, whId: asset.whId, zoneId: asset.zoneId, areaId: asset.areaId,
+        weight: asset.weight, dims: asset.dims, capacity: asset.capacity, length: asset.length,
+        power: asset.power, price: asset.price, rental: asset.rental, dateBought: asset.dateBought,
+        lifecycle: asset.status, lastService: asset.lastService, serviceInterval: asset.serviceInterval, 
+        tags: asset.tags, serialNumber: asset.serialNumber, vendorUid: asset.vendorUid
+    };
+    
+    let totalQty = asset.type === 'Bulk' ? (parseInt(asset.totalQuantity, 10) || 1) : 1;
+    
+    let btn = e.currentTarget;
+    let orig = btn.innerText;
+    btn.innerText = "IGNORING..."; btn.disabled = true;
+
+    google.script.run.withSuccessHandler(() => {
+        btn.innerText = orig; btn.disabled = false;
+        document.getElementById('extraction-review-overlay').style.display = 'none';
+        loadAssetRegistry();
+    }).resolveAuditGroup(groupId, payload, [], totalQty, ACTIVE_USER_NAME);
+}
+</script>

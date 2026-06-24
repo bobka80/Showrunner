@@ -1,0 +1,355 @@
+<div id="audit-studio-overlay" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 5500; background: var(--bg-dark);">
+  <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
+
+    <!-- Header -->
+    <div style="height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0;">
+      <div style="color:#f59e0b; font-weight:900; font-size:16px; margin-right: 20px; letter-spacing: 1px;">🕵️ DATABASE AUDIT STUDIO</div>
+      
+      <button id="audit-tab-btn-dup" style="background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchAuditTab('dup')">DUPLICATE MERGE</button>
+      <button id="audit-tab-btn-item" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchAuditTab('item')">ITEM BY ITEM REVIEW</button>
+
+      <div style="flex:1;"></div>
+      <button class="btn-close" style="margin:0; width:auto;" onclick="closeAuditStudio()">CLOSE</button>
+    </div>
+
+    <!-- View: Duplicate Merge -->
+    <div id="audit-view-dup" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0a0a0c;">
+       <div style="padding: 15px 25px; background: #111; border-bottom: 1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+           <div id="audit-dup-status" style="color:#a1a1aa; font-size:13px;">Scanning database for spelling variations and overlapping bulk items...</div>
+           <button class="btn-outline btn-sm" style="margin:0; border-color:#3b82f6; color:#3b82f6;" onclick="runDuplicateScan()">RE-SCAN DATABASE</button>
+       </div>
+       <div id="audit-dup-list" style="flex: 1; overflow-y: auto; padding: 25px; display: flex; flex-direction: column; gap: 15px;">
+           <!-- Cards injected here -->
+       </div>
+    </div>
+
+    <!-- View: Item By Item -->
+    <div id="audit-view-item" style="display: none; flex-direction: column; flex: 1; overflow: hidden; background: #0a0a0c;">
+       <div style="padding: 15px 25px; background: #111; border-bottom: 1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+           <div id="audit-progress-text" style="color:#10b981; font-weight:bold; font-size:13px;">Progress: 0 / 0 Items Reviewed</div>
+           <button class="btn-delete btn-sm" style="margin:0; padding:4px 8px !important;" onclick="resetAuditProgress()">RESET PROGRESS</button>
+       </div>
+       <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 25px;">
+           <div id="audit-item-card" style="width: 100%; max-width: 600px; background: #1a1a1e; border: 1px solid #333; border-radius: 12px; padding: 30px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); text-align:center;">
+               <!-- Flashcard injected here -->
+           </div>
+       </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+window.auditedAssetIds = new Set();
+window.unauditedList = [];
+window.activeAuditAsset = null;
+window.isAuditModeActive = false;
+
+function openAuditStudio() {
+    document.getElementById('audit-studio-overlay').style.display = 'flex';
+    window.isAuditModeActive = true;
+    
+    // Load progress from backend
+    google.script.run.withSuccessHandler(res => {
+        window.auditedAssetIds = new Set(res || []);
+        switchAuditTab('dup'); // Default to duplicate scanner first
+    }).getVaultAsset('audited_assets_list', []);
+}
+
+function closeAuditStudio() {
+    document.getElementById('audit-studio-overlay').style.display = 'none';
+    window.isAuditModeActive = false;
+}
+
+function switchAuditTab(tab) {
+    document.getElementById('audit-view-dup').style.display = (tab === 'dup') ? 'flex' : 'none';
+    document.getElementById('audit-view-item').style.display = (tab === 'item') ? 'flex' : 'none';
+    
+    let btnDup = document.getElementById('audit-tab-btn-dup');
+    let btnItem = document.getElementById('audit-tab-btn-item');
+    
+    btnDup.style.cssText = (tab === 'dup') ? 'background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;' : 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    btnItem.style.cssText = (tab === 'item') ? 'background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;' : 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    
+    if (tab === 'dup') runDuplicateScan();
+    if (tab === 'item') loadNextUnaudited();
+}
+
+// ==========================================
+// 1. DUPLICATE SCANNER & MERGE ENGINE
+// ==========================================
+function _localLevenshtein(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    let matrix = [];
+    for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+    for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+            else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+function runDuplicateScan() {
+    let listEl = document.getElementById('audit-dup-list');
+    let statusEl = document.getElementById('audit-dup-status');
+    listEl.innerHTML = '<div style="color:#f59e0b; text-align:center; padding:40px; font-size:16px; font-weight:bold;">Running Fuzzy Logic Scanner...</div>';
+    
+    setTimeout(() => {
+        let groups = [];
+        
+        // Pass A: Find overlapping Bulk Items
+        let bulkMap = {};
+        globalAssets.forEach(a => {
+            if (a.type === 'Bulk') {
+                let key = (String(a.name || '') + '|||' + String(a.manufacturer || '')).toLowerCase();
+                if (!bulkMap[key]) bulkMap[key] = [];
+                bulkMap[key].push(a);
+            }
+        });
+        Object.values(bulkMap).forEach(arr => {
+            if (arr.length > 1) {
+                groups.push({ type: 'BULK', title: `Fragmented Bulk Item: ${arr[0].name}`, suggested: arr[0].name, assets: arr });
+            }
+        });
+
+        // Pass B: Fuzzy Name Typos (Spelling normalization)
+        let nameGroups = [];
+        globalAssets.forEach(a => {
+            // Skip if already in a Bulk conflict
+            let bKey = (String(a.name || '') + '|||' + String(a.manufacturer || '')).toLowerCase();
+            if (a.type === 'Bulk' && bulkMap[bKey] && bulkMap[bKey].length > 1) return;
+            
+            let clean = String(a.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            let placed = false;
+            for (let g of nameGroups) {
+                let dist = _localLevenshtein(clean, g.repClean);
+                // Group if extreme similarity (<= 2 typos) AND they share the same brand
+                if (dist > 0 && dist <= 2 && String(a.manufacturer || '').toLowerCase() === g.brand) {
+                    g.assets.push(a);
+                    g.uniqueNames.add(String(a.name || ''));
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                nameGroups.push({ repClean: clean, brand: String(a.manufacturer || '').toLowerCase(), uniqueNames: new Set([String(a.name || '')]), assets: [a] });
+            }
+        });
+        
+        nameGroups.forEach(g => {
+            if (g.uniqueNames.size > 1) {
+                groups.push({ type: 'SPELLING', title: `Spelling Variations: ${Array.from(g.uniqueNames).join(' vs ')}`, suggested: Array.from(g.uniqueNames)[0], assets: g.assets });
+            }
+        });
+
+        // Render Results
+        if (groups.length === 0) {
+            if (statusEl) statusEl.innerText = "✅ 0 conflicts remaining.";
+            listEl.innerHTML = '<div style="color:#10b981; text-align:center; padding:40px; font-size:16px; font-weight:bold;">✅ Database is clean! No duplicates or misspellings found.</div>';
+            return;
+        } else {
+            if (statusEl) statusEl.innerHTML = `<span style="color:#f59e0b; font-weight:bold;">⚠️ ${groups.length} Conflicts Found</span> (Spelling variations or overlapping bulk items)`;
+        }
+        
+        let html = '';
+        groups.forEach((g, idx) => {
+            let isBulk = g.type === 'BULK';
+            let icon = isBulk ? '📦' : '🔤';
+            let color = isBulk ? '#f59e0b' : '#3b82f6';
+            
+            let itemRows = g.assets.map(a => `<div style="display:flex; justify-content:space-between; background:#111; padding:6px 12px; border-bottom:1px solid #222; font-size:12px; color:#a1a1aa;"><span>${a.name} ${a.unitNumber ? '#'+a.unitNumber : ''}</span><span>UID: ...${a.id.slice(-5)}</span></div>`).join('');
+            
+            html += `
+            <div class="dup-card" style="background:#1a1a1e; border:1px solid ${color}; border-radius:8px; overflow:hidden;">
+                <div style="background:rgba(255,255,255,0.05); padding:12px 15px; border-bottom:1px solid ${color}; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="color:#fff; font-weight:bold; font-size:14px;">${icon} ${g.title}</div>
+                    <div style="color:${color}; font-size:11px; font-weight:bold; text-transform:uppercase;">${g.assets.length} Items</div>
+                </div>
+                <div style="padding:15px;">
+                    <div style="margin-bottom:15px; border:1px solid #333; border-radius:4px; overflow:hidden;">${itemRows}</div>
+                    <div style="display:flex; gap:10px; align-items:flex-end;">
+                        <div style="flex:1;">
+                            <div style="font-size:10px; color:#888; margin-bottom:4px; text-transform:uppercase; font-weight:bold;">Official Name to Apply</div>
+                            <input type="text" id="merge-name-${idx}" value="${g.suggested}" style="width:100%; padding:10px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; font-size:14px; box-sizing:border-box;">
+                        </div>
+                        <button class="btn-main" style="height:38px; margin:0;" onclick="executeMerge(${idx}, '${g.type}')">MERGE & NORMALIZE</button>
+                    </div>
+                </div>
+            </div>`;
+        });
+        window.currentDuplicateGroups = groups;
+        listEl.innerHTML = html;
+    }, 100);
+}
+
+function executeMerge(groupIdx, type) {
+    let group = window.currentDuplicateGroups[groupIdx];
+    let newName = document.getElementById(`merge-name-${groupIdx}`).value.trim();
+    if (!newName) return alert("Official Name cannot be blank.");
+    
+    let btn = event.currentTarget;
+    let origText = btn.innerText;
+    btn.innerText = "MERGING..."; btn.disabled = true;
+
+    if (type === 'BULK') {
+        // Merge Quantities into the first item, delete the rest
+        let primary = group.assets[0];
+        let totalQty = 0;
+        let idsToDelete = [];
+        group.assets.forEach((a, i) => {
+            totalQty += parseInt(a.totalQuantity, 10) || 1;
+            if (i > 0) idsToDelete.push(a.id);
+        });
+        
+        let payload = {
+            name: newName, unitNumber: primary.unitNumber, rfidTag: primary.rfidTag, manufacturer: primary.manufacturer,
+            containerType: primary.containerType, nestingLevel: primary.nestingLevel, type: primary.type,
+            department: primary.department, whId: primary.whId, zoneId: primary.zoneId, areaId: primary.areaId,
+            weight: primary.weight, dims: primary.dims, capacity: primary.capacity, length: primary.length,
+            power: primary.power, price: primary.price, rental: primary.rental, dateBought: primary.dateBought,
+            lifecycle: primary.status, lastService: primary.lastService, serviceInterval: primary.serviceInterval, tags: primary.tags
+        };
+
+        google.script.run.withSuccessHandler(() => {
+            google.script.run.withSuccessHandler(() => {
+                if (typeof loadAssetRegistry === 'function') loadAssetRegistry();
+                setTimeout(runDuplicateScan, 1000);
+            }).deleteVaultAsset(ACTIVE_USER_NAME, idsToDelete);
+        }).provisionNewAsset(ACTIVE_USER_NAME, payload, primary.id, totalQty);
+
+    } else {
+        // Spelling Normalization (Update Name for all items in group)
+        let allIds = group.assets.map(a => a.id);
+        let sample = group.assets[0];
+        let payload = {
+            name: newName, unitNumber: sample.unitNumber, rfidTag: sample.rfidTag, manufacturer: sample.manufacturer,
+            containerType: sample.containerType, nestingLevel: sample.nestingLevel, type: sample.type,
+            department: sample.department, whId: sample.whId, zoneId: sample.zoneId, areaId: sample.areaId,
+            weight: sample.weight, dims: sample.dims, capacity: sample.capacity, length: sample.length,
+            power: sample.power, price: sample.price, rental: sample.rental, dateBought: sample.dateBought,
+            lifecycle: sample.status, lastService: sample.lastService, serviceInterval: sample.serviceInterval, tags: sample.tags
+        };
+
+        google.script.run.withSuccessHandler(() => {
+            if (typeof loadAssetRegistry === 'function') loadAssetRegistry();
+            setTimeout(runDuplicateScan, 1000);
+        }).provisionNewAsset(ACTIVE_USER_NAME, payload, allIds, 1);
+    }
+}
+
+// ==========================================
+// 2. ITEM BY ITEM AUDIT ENGINE
+// ==========================================
+function loadNextUnaudited() {
+    window.unauditedList = globalAssets.filter(a => !window.auditedAssetIds.has(a.id));
+    
+    let total = globalAssets.length;
+    let done = window.auditedAssetIds.size;
+    document.getElementById('audit-progress-text').innerText = `Progress: ${done} / ${total} Items Audited`;
+
+    let cardEl = document.getElementById('audit-item-card');
+    
+    if (window.unauditedList.length === 0) {
+        cardEl.innerHTML = `
+            <div style="font-size: 60px; margin-bottom: 20px;">🎉</div>
+            <h2 style="color:#10b981; margin:0 0 10px 0;">DATABASE FULLY AUDITED</h2>
+            <p style="color:#a1a1aa;">You have successfully reviewed every single item in the database.</p>
+        `;
+        return;
+    }
+
+    window.activeAuditAsset = window.unauditedList[0];
+    let a = window.activeAuditAsset;
+    let dObj = getDeptObj(a.department);
+    
+    let tagsArr = [];
+    try { tagsArr = JSON.parse(a.tags || '[]'); } catch(e){}
+    let tagHtml = buildTagPathsHtml(tagsArr, 10);
+
+    cardEl.innerHTML = `
+        <div style="font-size:11px; color:${dObj.color}; font-weight:bold; text-transform:uppercase; margin-bottom:10px;">${dObj.name}</div>
+        <h2 style="color:#fff; margin:0 0 5px 0; font-size:28px;">${a.name} ${a.unitNumber ? '#'+a.unitNumber : ''}</h2>
+        <div style="color:#a1a1aa; font-size:14px; margin-bottom:25px;">${a.manufacturer || 'Unknown Brand'}</div>
+        
+        <div style="display:flex; justify-content:center; gap:20px; margin-bottom:25px;">
+            <div style="background:#111; padding:10px 20px; border-radius:6px; border:1px solid #333;">
+                <div style="font-size:10px; color:#888; text-transform:uppercase; margin-bottom:4px;">Type</div>
+                <div style="color:#fff; font-weight:bold;">${a.type}</div>
+            </div>
+            <div style="background:#111; padding:10px 20px; border-radius:6px; border:1px solid #333;">
+                <div style="font-size:10px; color:#888; text-transform:uppercase; margin-bottom:4px;">Total Qty</div>
+                <div style="color:#10b981; font-weight:bold;">${a.type === 'Bulk' ? a.totalQuantity : 1}</div>
+            </div>
+        </div>
+        
+        <div style="margin-bottom:30px; display:flex; justify-content:center;">${tagHtml}</div>
+        
+        <div style="display:flex; justify-content:center; gap:15px;">
+            <button class="btn-delete" style="padding:14px 24px!important; font-size:14px!important;" onclick="deleteAuditItem()">🗑️ DELETE</button>
+            <button class="btn-outline" style="border-color:#52525b; color:#a1a1aa; padding:14px 24px!important; font-size:14px!important;" onclick="skipAuditItem()">⏭️ SKIP FOR NOW</button>
+            <button class="btn-outline" style="border-color:#3b82f6; color:#3b82f6; padding:14px 24px!important; font-size:14px!important;" onclick="openAuditSetup()">✏️ EDIT IN SETUP</button>
+            <button class="btn-main" style="padding:14px 24px!important; font-size:14px!important;" onclick="markAuditDone()">✅ LOOKS GOOD</button>
+        </div>
+    `;
+}
+
+function skipAuditItem() {
+    let skipped = window.unauditedList.shift();
+    window.unauditedList.push(skipped); // Move to end of line
+    loadNextUnaudited();
+}
+
+function openAuditSetup() {
+    if (typeof openAssetModal === 'function' && window.activeAuditAsset) {
+        openAssetModal(window.activeAuditAsset.id);
+    }
+}
+
+function markAuditDone() {
+    if (window.activeAuditAsset) {
+        window.auditedAssetIds.add(window.activeAuditAsset.id);
+        google.script.run.saveVaultAsset('audited_assets_list', Array.from(window.auditedAssetIds));
+        loadNextUnaudited();
+    }
+}
+
+function deleteAuditItem() {
+    if (window.activeAuditAsset) {
+        if (!confirm(`PERMANENT WARNING: Delete ${window.activeAuditAsset.name} from the Vault completely?`)) return;
+        
+        let idToDel = window.activeAuditAsset.id;
+        window.auditedAssetIds.add(idToDel); // Mark as audited so it doesn't show up again
+        google.script.run.saveVaultAsset('audited_assets_list', Array.from(window.auditedAssetIds));
+        
+        google.script.run.withSuccessHandler(() => {
+            if (typeof loadAssetRegistry === 'function') loadAssetRegistry();
+            loadNextUnaudited();
+        }).deleteVaultAsset(ACTIVE_USER_NAME, [idToDel]);
+    }
+}
+
+function resetAuditProgress() {
+    if (!confirm("Are you sure you want to completely wipe your review progress? This will force you to review all items again.")) return;
+    window.auditedAssetIds.clear();
+    google.script.run.saveVaultAsset('audited_assets_list', []);
+    loadNextUnaudited();
+}
+
+// ==========================================
+// 3. THE LIVE INTERCEPTOR HOOK
+// ==========================================
+// This is called by 06b_Admin_Assets.html when the Asset Modal closes
+window.handleAuditModalClose = function(wasSaved) {
+    if (window.isAuditModeActive && window.activeAuditAsset) {
+        setTimeout(() => {
+            if (confirm("You just reviewed this item in Setup.\n\nDo you want to mark it as DONE and move to the next item?")) {
+                markAuditDone();
+            }
+        }, 200);
+    }
+};
+</script>

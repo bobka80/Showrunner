@@ -1,0 +1,564 @@
+<script>
+/**
+ * 03a_Timeline_Boot.html
+ * Domain: State variables, data fetching, grid rebuilding, and save operations.
+ */
+
+// ==========================================
+// --- TIMELINE_CORE -> State & Globals ---
+// ==========================================
+let shifts = [];
+let targetFolderId = null;
+let currentShiftMode = 'main'; 
+let cameFromRoster = false; 
+let currentIsReadOnly = false;
+let dragMode = null; 
+let startMouseX = 0;
+let selectedIds = new Set();
+let lastSelectedShiftId = null;
+let activeRoleTarget = null;
+const PX_PER_HR = 60;
+const SNAP_PX = 15; 
+
+let activePhases = [];
+let selectedPhaseIds = new Set();
+let lastSelectedPhaseId = null;
+let activePhaseTarget = null;
+let dragPhaseMode = null;
+window.isTimelineDirty = false;
+
+let lastPhaseClickTime = 0;
+let lastPhaseClickId = null;
+let lastShiftClickTime = 0;
+let lastShiftClickId = null;
+let indicatorClickTimer = null;
+
+let localDeptOverrides = {};
+let activeDeptOverrideUid = null;
+let backupGlobalAssignedArr = [];
+let backupLocalDeptOverrides = {};
+
+let activeSubEvents = [];
+let selectedSubEventIds = new Set();
+let dragSubEventMode = null;
+
+let lastEditedDurationMain = 8;
+let lastEditedDurationWH = 4;
+
+let isLassoing = false;
+let wasLassoing = false; 
+let lassoStartX = 0, lassoStartY = 0;
+let lassoBox = null;
+let baseSelectedIds = new Set();
+let baseSelectedPhaseIds = new Set();
+
+window.currentReadinessState = {};
+
+// ==========================================
+// --- UTILITY FUNCTIONS ---
+// ==========================================
+function formatShiftTime(rawHours) {
+  let h = Math.floor(rawHours) % 24;
+  let m = Math.round((rawHours % 1) * 60);
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+}
+
+function isTruck(uid) {
+  if (!uid) return false;
+  let uidStr = String(uid);
+  if (typeof globalVehicles !== 'undefined' && globalVehicles.length > 0) {
+      return globalVehicles.some(v => v.id === uidStr);
+  }
+  return false;
+}
+
+function getClientX(e) {
+  return e.touches ? e.touches[0].clientX : e.clientX;
+}
+
+// ==========================================
+// --- TIMELINE_CORE -> Engine Launcher ---
+// ==========================================
+function openShiftLayout(mode, isReadOnly = false) {
+  // Force hide the Month Roster so it physically cannot open on top
+  document.getElementById('month-roster-layer').style.display = 'none';
+
+  targetFolderId = document.getElementById('edit-folder-id').value;
+  if(!targetFolderId || targetFolderId === 'NEW') return alert("⚠️ Please Save & Sync the project first!");
+  
+  let bD = null, eD = null;
+  let paintedEvents = [];
+  let allPainted = [];
+  let allDbFragments = [];
+  
+  let phaseMap = { 'wh': 'wh', 'show': 'show', 'tidy': 'tidy', 'main': 'main' };
+  let targetCode = phaseMap[mode] || 'main';
+  
+  allDbFragments = [];
+  if (!cameFromRoster && typeof miniCalendar !== 'undefined' && miniCalendar) {
+      allPainted = miniCalendar.getEvents();
+      
+      allPainted.forEach(ev => {
+          let sD = ev.start;
+          let eD = ev.end || new Date(sD.getTime() + 86400000);
+          let currentD = new Date(sD.getTime());
+          while (currentD < eD) {
+              let isoDay = currentD.getFullYear() + "-" + String(currentD.getMonth() + 1).padStart(2, '0') + "-" + String(currentD.getDate()).padStart(2, '0');
+              let uiPhaseMap = { 'wh': 'WAREHOUSE', 'main': 'MAIN_EVENT', 'show': 'SHOW_DAY', 'recovery': 'RECOVERY', 'transit': 'TRANSIT' };
+              let backendType = uiPhaseMap[ev.extendedProps.phaseType] || ev.extendedProps.phaseType;
+              allDbFragments.push({
+                  type: backendType,
+                  date: isoDay,
+                  startTime: ev.extendedProps.startTime || "00:00",
+                  endTime: ev.extendedProps.endTime || "23:59",
+                  note: ev.extendedProps.note || ""
+              });
+              currentD.setDate(currentD.getDate() + 1);
+          }
+      });
+  } else if (typeof calendar !== 'undefined') {
+      let ev = calendar.getEventById(targetFolderId);
+      if (ev && ev.extendedProps.rawDbData) {
+          let raw = ev.extendedProps.rawDbData;
+          if (raw.fragments) allDbFragments = raw.fragments;
+          if (raw.readinessState) window.currentReadinessState = raw.readinessState;
+      }
+  }
+
+  // Calculate bD and eD directly from the pure fragments array
+  if (allDbFragments.length > 0) {
+      let dates = allDbFragments.map(f => new Date(Date.UTC(f.date.split('-')[0], f.date.split('-')[1]-1, f.date.split('-')[2])));
+      bD = new Date(Math.min(...dates.map(d => d.getTime())));
+      eD = new Date(Math.max(...dates.map(d => d.getTime())));
+  }
+
+  if (!bD) return alert("⚠️ You must paint this phase on the calendar before opening its Timeline.");
+  
+  let baseDateStr = bD.getFullYear() + '-' + String(bD.getMonth()+1).padStart(2,'0') + '-' + String(bD.getDate()).padStart(2,'0');
+  let endDateStr = eD.getFullYear() + '-' + String(eD.getMonth()+1).padStart(2,'0') + '-' + String(eD.getDate()).padStart(2,'0');
+  
+  // SURGICAL FIX: Restored hidden date injection so Double-Click math works!
+  if (document.getElementById('edit-proj-date')) document.getElementById('edit-proj-date').value = baseDateStr;
+  if (document.getElementById('edit-proj-wh-date')) document.getElementById('edit-proj-wh-date').value = baseDateStr;
+  if (document.getElementById('edit-proj-wh2-date')) document.getElementById('edit-proj-wh2-date').value = baseDateStr;
+  if (document.getElementById('edit-proj-tidy-date')) document.getElementById('edit-proj-tidy-date').value = baseDateStr;
+  if (document.getElementById('edit-proj-end-date')) document.getElementById('edit-proj-end-date').value = endDateStr;
+
+  currentShiftMode = mode;
+  currentIsReadOnly = isReadOnly;
+  window.activePresenceModule = 'timeline';
+  selectedIds.clear();
+  lastSelectedShiftId = null;
+  localDeptOverrides = {};
+  activeDeptOverrideUid = null;
+  
+  let modeTitle = "Project Timeline: ";
+  if (isReadOnly) modeTitle = "🔒 READ ONLY - " + modeTitle;
+  
+  // SURGICAL FIX: Pure Project Name only
+  document.getElementById('tt-title').innerText = document.getElementById('edit-proj-name').value;
+  
+  const saveBtn = document.getElementById('tt-save-btn');
+  const cancelBtn = document.getElementById('tt-cancel-btn');
+  
+  let finishedCb = document.getElementById('tt-crew-finished-cb');
+  if (finishedCb) {
+      finishedCb.checked = (window.currentReadinessState.crew === 'finished');
+      finishedCb.disabled = isReadOnly;
+  }
+
+  if (isReadOnly) { 
+      saveBtn.style.display = 'block'; 
+      saveBtn.innerText = "🔒 LOCKED (READ ONLY)";
+      saveBtn.disabled = true;
+      saveBtn.style.opacity = '0.5';
+      saveBtn.style.cursor = 'not-allowed';
+      cancelBtn.innerText = "CLOSE (ESC)"; 
+  } else { 
+      saveBtn.style.display = 'block'; 
+      saveBtn.disabled = false;
+      saveBtn.style.opacity = '1';
+      saveBtn.style.cursor = 'pointer';
+      cancelBtn.innerText = "CANCEL (ESC)"; 
+      saveBtn.innerText = "LOADING..."; 
+  }
+  
+  window.isTimelineDirty = false;
+  document.getElementById('shift-layer').style.display = 'flex';
+  document.getElementById('tt-x-days').innerHTML = '';
+  document.getElementById('tt-x-hours').innerHTML = '';
+  document.getElementById('tt-y-crew').innerHTML = '';
+  document.getElementById('tt-rows-container').innerHTML = '<div style="color:#888; padding: 20px; font-weight: 800; font-size: 14px;">CALCULATING TIMELINE DATA...</div>';
+  
+  google.script.run
+    .withFailureHandler(err => {
+       document.getElementById('tt-rows-container').innerHTML = `<div style="color:#ef4444; padding:20px; font-weight:bold;">Server Error: ${err.message}</div>`;
+       if (!isReadOnly) saveBtn.innerText = "ERROR";
+    })
+    .withSuccessHandler(data => {
+      try {
+          if (!data) throw new Error("No data returned from server.");
+          shifts = Array.isArray(data.shifts) ? data.shifts : [];
+          
+          // Apply visual colors to loaded shifts based on their saved roles
+          shifts.forEach(s => {
+              if (isTruck(s.user_uid || s.email)) {
+                  s.color = '#e5e7eb';
+                  s.textCol = '#18181b';
+              } else if (ROLE_COLORS && ROLE_COLORS[s.role]) {
+                  s.color = ROLE_COLORS[s.role].bg;
+                  s.textCol = ROLE_COLORS[s.role].text;
+              }
+          });
+          
+          activeRoster = Array.isArray(data.roster) ? data.roster : [];
+          
+          if (typeof globalVehicles !== 'undefined' && globalVehicles.length > 0) {
+              globalVehicles.forEach(v => {
+                  if (!activeRoster.some(c => c.uid === v.id)) {
+                      activeRoster.push({ uid: v.id, name: v.name, email: v.id, department: 'dept_trucks', isVehicle: true });
+                  }
+              });
+          }
+          activePhases = Array.isArray(data.phases) ? data.phases : [];
+          localDeptOverrides = data.overrides || {};
+          
+          globalAssignedArr = Array.isArray(data.assigned) ? data.assigned : [];
+          
+          let baseDate = new Date(); 
+          if(baseDateStr) {
+             let pts = baseDateStr.split('-');
+             baseDate = new Date(pts[0], pts[1]-1, pts[2]);
+          }
+          
+          let inputDays = 1;
+          if (baseDateStr && endDateStr) {
+             let ePts = endDateStr.split('-');
+             let eDate = new Date(ePts[0], ePts[1]-1, ePts[2]);
+             let diff = Math.round((eDate - baseDate) / (1000*60*60*24)) + 1;
+             if (diff > 1) inputDays = diff;
+          }
+          
+          let maxShiftHour = 0;
+          if (shifts.length > 0) maxShiftHour = Math.max(...shifts.map(s => s.start + s.duration));
+          let requiredDays = Math.ceil(maxShiftHour / 24);
+          let totalDaysToDraw = Math.max(inputDays, requiredDays) + 1;
+          if (totalDaysToDraw > 60) totalDaysToDraw = 60;
+          
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          let daysHtml = `<div id="tt-header-subevents-container" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1;"></div>`;
+          let daysLabelsHtml = `<div style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; pointer-events:none; z-index:15;">`;
+          let hoursHtml = '';
+
+          for(let d = 0; d < totalDaysToDraw; d++) {
+            let currD = new Date(baseDate);
+            currD.setDate(currD.getDate() + d);
+            let label = `${dayNames[currD.getDay()]}, ${monthNames[currD.getMonth()]} ${currD.getDate()}`;
+            
+            daysHtml += `<div class="tt-day-mark" style="background: transparent; position: relative; overflow: visible; border-right: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; z-index: 2; pointer-events: none;">
+                <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.2); pointer-events: none; z-index: -1;"></div>
+            </div>`;
+            
+            daysLabelsHtml += `<div style="width: 1440px; min-width: 1440px; display:flex; justify-content:center; align-items:center; box-sizing: border-box;">
+                <span style="color: #ffffff; text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 4px 10px rgba(0,0,0,0.8); font-size: 18px; font-weight: 900; pointer-events: none;">${label}</span>
+            </div>`;
+
+            for(let h=0; h<24; h++) hoursHtml += `<div class="tt-hour-mark">${h.toString().padStart(2,'0')}:00</div>`;
+          }
+          
+          daysLabelsHtml += `</div>`;
+          document.getElementById('tt-x-days').innerHTML = daysHtml + daysLabelsHtml;
+          document.getElementById('tt-x-hours').innerHTML = hoursHtml;
+          
+          let totalWidthPx = (totalDaysToDraw * 24 * PX_PER_HR) + 'px';
+          document.getElementById('tt-x-days').style.width = totalWidthPx;
+          document.getElementById('tt-x-hours').style.width = totalWidthPx;
+          document.getElementById('tt-rows-container').style.width = totalWidthPx;
+          
+          const phaseContainer = document.getElementById('tt-phases-container');
+          if (phaseContainer) phaseContainer.style.width = totalWidthPx; 
+          
+          // SURGICAL FIX: Restored HTML Div Structure for backend parsing
+          document.getElementById('shift-crew-list').innerHTML = activeRoster.map(c => {
+             let rawDept = c.department;
+             if (rawDept === "[object Object]") rawDept = "dept_lighting"; 
+             let defaultDept = (c.isVehicle || isTruck(c.uid)) ? 'dept_trucks' : (rawDept || (typeof SYSTEM_DEPARTMENTS !== 'undefined' && SYSTEM_DEPARTMENTS[0] ? SYSTEM_DEPARTMENTS[0].uid : 'Lighting'));
+             let dept = localDeptOverrides[c.uid] || defaultDept;
+             
+             return `
+             <label class="crew-cb-container" style="display: none;">
+               <input type="checkbox" class="crew-cb small-cb internal-cb" value="${c.uid}" data-name="${c.name}" data-dept="${dept}" 
+               ${globalAssignedArr.includes(c.uid)?'checked':''}>
+               <div>${c.name}</div>
+             </label>`;
+          }).join('');
+          
+          if (!isReadOnly) saveBtn.innerText = "SAVE SHIFTS";
+          
+          // MAP SUB-EVENTS
+          activeSubEvents = [];
+          if (allDbFragments && allDbFragments.length > 0) {
+              allDbFragments.forEach(f => {
+                  let fd = new Date(Date.UTC(f.date.split('-')[0], f.date.split('-')[1]-1, f.date.split('-')[2]));
+                  let baseT = new Date(Date.UTC(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate()));
+                  if (fd && baseT) {
+                      let dayOffset = Math.round((fd.getTime() - baseT.getTime()) / 86400000);
+                      let sTimeStr = f.startTime || "00:00";
+                      let eTimeStr = f.endTime || "23:59";
+                      
+                      let parseTimeStrToFloat = (tStr, defaultVal) => {
+                          if (!tStr) return defaultVal;
+                          let s = String(tStr);
+                          if (!s.includes(':')) { let num = parseFloat(s); return isNaN(num) ? defaultVal : num; }
+                          let pts = s.split(':');
+                          let h = parseInt(pts[0], 10);
+                          let m = parseInt(pts[1], 10) || 0;
+                          return isNaN(h) ? defaultVal : h + (m / 60);
+                      };
+                      
+                      let sHr = parseTimeStrToFloat(sTimeStr, 0);
+                      let eHr = parseTimeStrToFloat(eTimeStr, 24);
+                      if (sTimeStr === "00:00" && eTimeStr === "23:59") eHr = 24; 
+                      
+                      let startHr = (dayOffset * 24) + sHr;
+                      let dur = eHr - sHr;
+                      if (dur <= 0) dur += 24;
+                      
+                      activeSubEvents.push({ id: 'se_' + Math.random(), type: f.type, start: startHr, duration: dur, note: f.note });
+                  }
+              });
+          }
+          
+          rebuildTimelineGrid();
+          
+      } catch (err) {
+          document.getElementById('tt-rows-container').innerHTML = `<div style="color:#ef4444; padding:20px; font-weight:bold;">Client Error: ${err.message}</div>`;
+          if (!isReadOnly) saveBtn.innerText = "ERROR";
+      }
+    }).getTimelineData(targetFolderId, mode);
+}
+
+function cancelShifts() {
+  if (window.isTimelineDirty) {
+      if (!confirm("⚠️ You have unsaved timeline changes. Are you sure you want to discard them and leave?")) {
+          return;
+      }
+  }
+  window.isTimelineDirty = false;
+  document.getElementById('shift-layer').style.display = 'none';
+  
+  window.activePresenceModule = 'main'; // Unlock the door
+  if (typeof startPresencePing === 'function' && targetFolderId) startPresencePing(targetFolderId);
+  
+  if (cameFromRoster) {
+    document.getElementById('month-roster-layer').style.display = 'flex';
+    cameFromRoster = false;
+  } else {
+    document.getElementById('edit-modal-overlay').style.display = 'flex';
+  }
+}
+
+function launchMasterTimeline() {
+    // 1. Check if this is a brand new project that hasn't been saved yet
+    let folderId = document.getElementById('edit-folder-id').value;
+    
+    if (folderId === 'NEW' || !folderId) {
+        // Stop the user and warn them
+        alert("⚠️ DATABASE LOCK: You cannot open the Timeline for a brand new project yet.\n\nYou must click 'SAVE & SYNC CALENDAR' first to officially create the project. Once it is saved, click it again to open the Timeline!");
+        return; 
+    }
+
+    if (window.isProjectDirty) {
+        if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {
+            if (typeof runSchedule === 'function') runSchedule();
+        }
+        return;
+    }
+
+    // 2. If it is an official, saved project, hide the modal safely
+    document.getElementById('edit-modal-overlay').style.display = 'none';
+    
+    // 3. The Bouncer Logic
+    if (window.isTimelineOccupiedBy) {
+        // Someone is inside. Trigger the Loud-to-Quiet UX, and force Read-Only mode.
+        showLoudToQuietWarning(window.isTimelineOccupiedBy);
+        if(typeof openShiftLayout === 'function') openShiftLayout('main', true); // isReadOnly = true
+    } else {
+        // Room is empty. Lock the door behind us and enter.
+        window.activePresenceModule = 'timeline';
+        if (typeof startPresencePing === 'function') startPresencePing(folderId); // Force ping instantly
+        if(typeof openShiftLayout === 'function') openShiftLayout('main', false);
+    }
+}
+
+// ==========================================
+// --- TIMELINE_CORE -> Rebuild Grid Engine ---
+// ==========================================
+function rebuildTimelineGrid() {
+  let yHtml = '<div class="tt-crew-row" style="background: #27272f; border-bottom: 2px solid var(--accent); color: var(--accent); position: sticky; top: 0; z-index: 20;">🎯 EVENT PHASES</div>';
+  let gridHtml = '<div class="tt-grid-row" data-uid="PHASE_ROW" ondblclick="addPhaseFromClick(event)" style="background: #111114; border-bottom: 2px solid var(--accent); position: sticky; top: 0; z-index: 10;"></div>';
+  const checkedBoxes = Array.from(document.querySelectorAll('.internal-cb:checked'));
+  let grouped = {};
+  
+  checkedBoxes.forEach(cb => {
+    let deptVal = localDeptOverrides[cb.value] || cb.dataset.dept || (SYSTEM_DEPARTMENTS[0] ? SYSTEM_DEPARTMENTS[0].uid : 'Lighting');
+    let deptUid = typeof deptVal === 'object' ? (deptVal.uid || deptVal.name) : deptVal;
+    
+    // GHOST EXORCIST: Catch literal string "[object Object]"
+    if (deptUid === "[object Object]") deptUid = SYSTEM_DEPARTMENTS[0] ? SYSTEM_DEPARTMENTS[0].uid : 'Lighting';
+    
+    if(!grouped[deptUid]) grouped[deptUid] = [];
+    grouped[deptUid].push(cb);
+  });
+  
+  let sortedDeptUids = Object.keys(grouped).sort((a, b) => {
+      if (a === 'dept_trucks') return -1;
+      if (b === 'dept_trucks') return 1;
+      return getDeptObj(a).name.localeCompare(getDeptObj(b).name);
+  });
+  
+  sortedDeptUids.forEach(deptUid => {
+    let safeDept = deptUid.replace(/\s+/g, '-');
+    let deptObj = getDeptObj(deptUid);
+    let deptName = deptObj.name;
+    
+    yHtml += `<div class="tt-crew-row" onclick="toggleDept('${safeDept}', 'tt')" style="background: #1f1f23; color: #fff; cursor: pointer; border: 1px solid ${deptObj.color}; border-right: none; font-size: 11px; font-weight: 900; text-transform: uppercase;"><span id="icon-tt-${safeDept}">▼</span> &nbsp; ${deptName}</div>`;
+    gridHtml += `<div class="tt-grid-row" style="background: #131316; border: 1px solid ${deptObj.color}; border-left: none; position: relative;"><div id="summary-tt-${safeDept}" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div></div>`;
+    
+    grouped[deptUid].forEach(cb => {
+      let safeName = cb.dataset.name.replace(/'/g, "\\'");
+      yHtml += `<div class="tt-crew-row tt-row-${safeDept}" onclick="openDeptOverride('${cb.value}', '${safeName}')" style="cursor:pointer;" title="Change Department for this Event">${cb.dataset.name}</div>`;
+      gridHtml += `<div class="tt-grid-row tt-row-${safeDept}" data-uid="${cb.value}" ondblclick="addShift('${cb.value}', event)"></div>`;
+    });
+  });
+  
+  document.getElementById('tt-y-crew').innerHTML = yHtml;
+  document.getElementById('tt-rows-container').innerHTML = gridHtml;
+  drawShifts();
+  renderPhases();
+  renderSubEvents();
+}
+
+// ==========================================
+// --- TIMELINE_CORE -> Save Engine ---
+// ==========================================
+function saveAndCloseShifts() {
+  const crewUids = Array.from(document.querySelectorAll('.internal-cb:checked')).map(cb => cb.value);
+  let localShiftsToSave = shifts.filter(s => crewUids.includes(s.user_uid || s.email) || isTruck(s.user_uid || s.email));
+  
+  let projVersion = document.getElementById('edit-proj-version') ? document.getElementById('edit-proj-version').value : '';
+  
+  document.getElementById('shift-layer').style.display = 'none';
+  window.activePresenceModule = 'main'; // Unlock the door
+  if (typeof startPresencePing === 'function' && targetFolderId) startPresencePing(targetFolderId);
+  
+  let returnToRoster = cameFromRoster;
+  cameFromRoster = false;
+
+  window.isTimelineDirty = false;
+
+  // --- SAVING SUB-EVENTS TO PROJECT TIMELINES ---
+  let timelines = [];
+  let baseDateStr = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : null;
+  let baseDate = new Date();
+  if(baseDateStr) { let pts = baseDateStr.split('-'); baseDate = new Date(pts[0], pts[1]-1, pts[2]); }
+
+  activeSubEvents.forEach(se => {
+      let startDayOffset = Math.floor(se.start / 24);
+      let dStart = new Date(baseDate.getTime() + (startDayOffset * 86400000));
+      let isoDay = dStart.getFullYear() + "-" + String(dStart.getMonth() + 1).padStart(2, '0') + "-" + String(dStart.getDate()).padStart(2, '0');
+      
+      let sHr = se.start % 24;
+      let eHr = (se.start + se.duration) % 24;
+      if (eHr === 0 && se.duration > 0) eHr = 24; 
+      
+      let formatT = (hr) => {
+          let h = Math.floor(hr); let m = Math.round((hr - h)*60);
+          if (h >= 24) { h = 23; m = 59; }
+          return String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0');
+      };
+      
+      let uiPhaseMap = { 'wh': 'WAREHOUSE', 'main': 'MAIN_EVENT', 'show': 'SHOW_DAY', 'recovery': 'RECOVERY', 'transit': 'TRANSIT' };
+      let backendType = uiPhaseMap[se.type] || se.type;
+      
+      timelines.push({ Sub_Event_Type: backendType, Event_Date: isoDay, Start_Time: formatT(sHr), End_Time: formatT(eHr), Note: se.note || "" });
+  });
+
+  let finishedCb = document.getElementById('tt-crew-finished-cb');
+  window.currentReadinessState.crew = (finishedCb && finishedCb.checked) ? 'finished' : 'draft';
+
+  const projectData = {
+      Project_ID: targetFolderId, Project_Name: document.getElementById('edit-proj-name').value, Status: document.getElementById('display-event-status').innerText,
+      Type: document.getElementById('edit-proj-type').value, Client: document.getElementById('edit-proj-client') ? document.getElementById('edit-proj-client').value : '', Last_Updated: projVersion,
+      Readiness_State: JSON.stringify(window.currentReadinessState)
+  };
+
+  // --- OPTIMISTIC UI: UPDATE LOCAL ROSTER DATA IMMEDIATELY ---
+  if (typeof globalRosterData !== 'undefined' && globalRosterData && globalRosterData.shifts) {
+      // Remove old shifts for this project
+      globalRosterData.shifts = globalRosterData.shifts.filter(s => s.projectId !== targetFolderId || s.shiftMode !== currentShiftMode);
+      
+      let baseDateStr = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : null;
+      let pName = document.getElementById('edit-proj-name') ? document.getElementById('edit-proj-name').value : "";
+      
+      localShiftsToSave.forEach(ls => {
+          let y = null, m = null, d = null, absStart = null, absEnd = null;
+          if (baseDateStr) {
+              let pts = baseDateStr.split('-');
+              if (pts.length === 3) {
+                  let shiftEpoch = Date.UTC(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10)) + (Number(ls.start) * 3600000);
+                  let trueDate = new Date(shiftEpoch);
+                  y = trueDate.getUTCFullYear(); m = trueDate.getUTCMonth(); d = trueDate.getUTCDate();
+                  absStart = shiftEpoch / 3600000; absEnd = absStart + Number(ls.duration);
+              }
+          }
+          let color = '#86efac'; let textCol = '#064e3b';
+          if (typeof isTruck === 'function' && isTruck(ls.email)) { color = '#e5e7eb'; textCol = '#18181b'; } 
+          else if (typeof ROLE_COLORS !== 'undefined' && ROLE_COLORS[ls.role]) { color = ROLE_COLORS[ls.role].bg; textCol = ROLE_COLORS[ls.role].text; }
+
+          globalRosterData.shifts.push({
+              id: ls.id, projectId: targetFolderId, projectName: pName, isWh: currentShiftMode === 'wh', shiftMode: currentShiftMode,
+                      user_uid: ls.user_uid || ls.email, email: ls.user_uid || ls.email, role: ls.role, start: ls.start, duration: ls.duration, hasArrow: ls.hasArrow,
+              baseDate: baseDateStr, y: y, m: m, d: d, absStart: absStart, absEnd: absEnd, color: color, textCol: textCol
+          });
+      });
+      
+      if (returnToRoster && typeof renderMonthGrid === 'function') {
+          renderMonthGrid();
+      }
+  }
+
+  if (returnToRoster) {
+    document.getElementById('month-roster-layer').style.display = 'flex';
+  } else {
+    document.getElementById('edit-modal-overlay').style.display = 'flex';
+  }
+
+  let projBtn = document.getElementById('update-btn');
+  let origProjBtnText = projBtn ? projBtn.innerText : "SAVE & SYNC CALENDAR";
+  if (projBtn) { projBtn.innerText = "SYNCING SHIFTS..."; projBtn.disabled = true; }
+  
+  // Asynchronously push readiness status 
+  google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState));
+  
+  google.script.run
+      .withFailureHandler(err => {
+          if (err.message.includes("COLLISION_DETECTED")) alert("SAVE FAILED: Modified by another user. Please refresh.");
+          else alert("Save Failed: " + err.message);
+          if (projBtn) { projBtn.innerText = origProjBtnText; projBtn.disabled = false; }
+          if (typeof refreshData === 'function') refreshData();
+      })
+      .withSuccessHandler(res => {
+         if (projBtn) { projBtn.innerText = origProjBtnText; projBtn.disabled = false; }
+         
+         let finalRes = { status: res };
+         try { if (typeof res === 'string' && res.startsWith('{')) finalRes = JSON.parse(res); } catch(e){}
+         if (finalRes.timestamp && document.getElementById('edit-proj-version')) {
+             document.getElementById('edit-proj-version').value = finalRes.timestamp;
+         }
+         
+         if (typeof refreshData === 'function') refreshData(); 
+      }).saveTimelineData(targetFolderId, currentShiftMode, localShiftsToSave, crewUids, activePhases, localDeptOverrides, projVersion, ACTIVE_USER_NAME, timelines); 
+}
+</script>

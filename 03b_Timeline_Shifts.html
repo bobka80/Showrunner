@@ -1,0 +1,376 @@
+<script>
+/**
+ * 03b_Timeline_Shifts.html
+ * Domain: Rendering, CRUD, drag engine, and role picking for crew shifts.
+ */
+
+// ==========================================
+// --- TIMELINE_SHIFTS -> Shift CRUD & Render ---
+// ==========================================
+function addShift(uid, e) {
+  if (currentIsReadOnly || e.target.classList.contains('shift-block') || e.target.closest('.shift-block')) return;
+  const rect = e.currentTarget.getBoundingClientRect();
+  const clickX = e.clientX - rect.left;
+  const startHr = Math.round(clickX / SNAP_PX) * (SNAP_PX / PX_PER_HR);
+  if (isTruck(uid)) {
+    let tName = 'TRUCK';
+    if (typeof globalVehicles !== 'undefined') {
+        let v = globalVehicles.find(x => x.id === uid);
+        if (v) tName = v.name;
+    }
+    shifts.push({ id: 's_'+Date.now(), user_uid: uid, email: uid, start: startHr, duration: 2.5, role: tName, color: '#e5e7eb', textCol: '#18181b', hasArrow: false });
+  } else {
+    let dur = lastEditedDurationMain;
+    let person = activeRoster.find(c => c.uid === uid);
+    
+    let dRole = (person && person.defaultRole) ? person.defaultRole : 'Technician';
+    let bgHex = ROLE_COLORS[dRole] ? ROLE_COLORS[dRole].bg : '#86efac';
+    let txtCol = ROLE_COLORS[dRole] ? ROLE_COLORS[dRole].text : '#064e3b';
+    
+    shifts.push({ id: 's_'+Date.now(), user_uid: uid, email: uid, start: startHr, duration: dur, role: dRole, color: bgHex, textCol: txtCol, hasArrow: false });
+  }
+  drawShifts();
+  window.isTimelineDirty = true;
+}
+
+function removeShift(id, e) {
+  if (currentIsReadOnly) return;
+  e.stopPropagation();
+  if (selectedIds.has(id)) {
+    shifts = shifts.filter(s => !selectedIds.has(s.id));
+    selectedIds.clear();
+  } else {
+    shifts = shifts.filter(s => s.id !== id);
+  }
+  drawShifts();
+  window.isTimelineDirty = true;
+}
+
+function drawShifts() {
+  document.querySelectorAll('.shift-block:not([data-uid="PHASE_ROW"] > .shift-block)').forEach(el => {
+    if (!el.parentElement || el.parentElement.dataset.uid !== 'PHASE_ROW') el.remove();
+  });
+  document.querySelectorAll('.truck-transit-block').forEach(el => el.remove());
+
+  let deptShifts = {};
+  
+  let shiftsByUser = {};
+  shifts.forEach(s => {
+    let uid = s.user_uid || s.email;
+    if (!shiftsByUser[uid]) shiftsByUser[uid] = [];
+    shiftsByUser[uid].push(s);
+  });
+
+  Object.keys(shiftsByUser).forEach(uid => {
+      if (isTruck(uid)) {
+          let tShifts = shiftsByUser[uid].filter(x => x.role !== 'STAY').sort((a,b) => a.start - b.start);
+          const row = document.querySelector(`.tt-grid-row[data-uid="${uid}"]`);
+          if (row && tShifts.length > 1) {
+                  for (let i = 0; i < tShifts.length - 1; i += 2) {
+                  let s1 = tShifts[i];
+                  let s2 = tShifts[i+1];
+                  let end1 = s1.start + s1.duration;
+                  let start2 = s2.start;
+                  if (start2 > end1) {
+                      let transitBlock = document.createElement('div');
+                      transitBlock.className = 'truck-transit-block';
+                      transitBlock.style.position = 'absolute';
+                      transitBlock.style.left = (end1 * PX_PER_HR) + 'px';
+                      transitBlock.style.width = ((start2 - end1) * PX_PER_HR) + 'px';
+                      transitBlock.style.top = '15%';
+                      transitBlock.style.height = '70%';
+                      transitBlock.style.background = 'repeating-linear-gradient(45deg, rgba(0,0,0,0.3), rgba(0,0,0,0.3) 10px, rgba(0,0,0,0.5) 10px, rgba(0,0,0,0.5) 20px)';
+                      transitBlock.style.borderTop = '1px dashed #555';
+                      transitBlock.style.borderBottom = '1px dashed #555';
+                      transitBlock.style.pointerEvents = 'none';
+                      transitBlock.style.zIndex = '1';
+                      transitBlock.style.borderRadius = '2px';
+                      
+                      let transitLabel = document.createElement('div');
+                      transitLabel.style.position = 'absolute';
+                      transitLabel.style.width = '100%';
+                      transitLabel.style.top = '50%';
+                      transitLabel.style.transform = 'translateY(-50%)';
+                      transitLabel.style.textAlign = 'center';
+                      transitLabel.style.color = '#888';
+                      transitLabel.style.fontSize = '9px';
+                      transitLabel.style.fontWeight = 'bold';
+                      transitLabel.style.letterSpacing = '2px';
+                      transitLabel.innerText = 'IN TRANSIT';
+                      transitBlock.appendChild(transitLabel);
+                      
+                      row.appendChild(transitBlock);
+                  }
+              }
+          }
+      }
+  });
+
+  shifts.forEach(s => {
+    let targetUid = s.user_uid || s.email;
+    const row = document.querySelector(`.tt-grid-row[data-uid="${targetUid}"]`);
+    if (!row) return;
+    
+    let cb = document.querySelector(`.internal-cb[value="${targetUid}"]`);
+    let baseDept = cb ? cb.dataset.dept : (isTruck(targetUid) ? 'dept_trucks' : (SYSTEM_DEPARTMENTS[0] ? SYSTEM_DEPARTMENTS[0].uid : 'Lighting'));
+    let rawDept = localDeptOverrides[targetUid] || baseDept;
+    
+    let deptUid = typeof rawDept === 'object' ? (rawDept.uid || rawDept.name) : rawDept;
+    if (deptUid === "[object Object]") deptUid = SYSTEM_DEPARTMENTS[0] ? SYSTEM_DEPARTMENTS[0].uid : 'Lighting';
+    let safeDept = deptUid.replace(/\s+/g, '-');
+    
+    if(!deptShifts[safeDept]) deptShifts[safeDept] = [];
+    deptShifts[safeDept].push(s);
+    
+    const block = document.createElement('div');
+    block.className = 'shift-block';
+    if(selectedIds.has(s.id)) block.classList.add('selected');
+    block.style.left = (s.start * PX_PER_HR) + 'px';
+    block.style.width = (s.duration * PX_PER_HR) + 'px';
+    block.style.background = s.color || '#86efac';
+    block.dataset.id = s.id;
+    let txtCol = s.textCol || '#064e3b';
+    let timeLabel = `${formatShiftTime(s.start)} - ${formatShiftTime(s.start + s.duration)}`;
+    
+    if (isTruck(s.email)) {
+      if (s.role === 'STAY') {
+          block.innerHTML = `
+            ${currentIsReadOnly ? '' : '<div class="shift-handle shift-handle-left"></div><div class="action-zone" onclick="openRolePicker(\''+s.id+'\', event)" style="position:absolute; top:0; left:12px; width:15px; height:100%; z-index:50; cursor:pointer;" title="Change Role"></div>'}
+            <div class="shift-label-container" style="color: ${txtCol}; pointer-events: none;"><div class="shift-time">${timeLabel}</div><div class="shift-role">STAY</div></div>
+            ${currentIsReadOnly ? '' : '<div class="shift-handle shift-handle-right"></div>'}
+          `;
+      } else {
+          let sortedTruckShifts = shiftsByUser[targetUid].filter(x => x.role !== 'STAY').sort((a,b) => a.start - b.start);
+          let tIndex = sortedTruckShifts.findIndex(x => x.id === s.id);
+          let roleText = s.role;
+          if (roleText !== 'LOAD' && roleText !== 'UNLOAD') {
+              roleText = (tIndex % 2 === 0) ? 'LOAD' : 'UNLOAD';
+          }
+          let singleTimeLabel = formatShiftTime(s.start);
+          block.innerHTML = `
+            ${currentIsReadOnly ? '' : '<div class="shift-handle shift-handle-left"></div><div class="action-zone" onclick="openRolePicker(\''+s.id+'\', event)" style="position:absolute; top:0; left:12px; width:15px; height:100%; z-index:50; cursor:pointer;" title="Change Role"></div>'}
+            <div class="shift-label-container" style="color: ${txtCol}; pointer-events: none;"><div class="shift-time">🚛 ${singleTimeLabel}</div><div class="shift-role">${roleText}</div></div>
+            ${currentIsReadOnly ? '' : '<div class="shift-handle shift-handle-right"></div>'}
+          `;
+      }
+    } else {
+      let isArrow = (s.hasArrow === true || s.hasArrow === "true");
+      let isOpen = (s.hasArrow === 'open');
+      let indicatorChar = isOpen ? '?' : '▶';
+      let isActive = isArrow || isOpen;
+      let displayTime = isOpen ? "OPEN SHIFT" : timeLabel;
+
+      if (currentIsReadOnly) {
+        let arrowBtnHtmlRO = isActive ? `<div class="shift-arrow-btn active" style="--arrow-color:${txtCol}; pointer-events:none;">${indicatorChar}</div>` : '';
+        block.innerHTML = `<div class="shift-label-container" style="color: ${txtCol}; pointer-events: none;"><div class="shift-time">${displayTime}</div><div class="shift-role">${s.role || 'Technician'}</div>${s.note ? `<div class="shift-note">${s.note}</div>` : ''}</div>${arrowBtnHtmlRO}`;
+      } else {
+        let arrowBtnHtml = `<div class="shift-arrow-btn ${isActive ? 'active' : ''}" onclick="handleIndicatorClick('${s.id}', event)" style="--arrow-color:${txtCol};" title="Toggle Indicator (Dbl-Click for Open Shift)">${indicatorChar}</div>`;
+        block.innerHTML = `
+          <div class="shift-handle shift-handle-left"></div>
+          <div class="action-zone" onclick="openRolePicker('${s.id}', event)" style="position:absolute; top:0; left:12px; width:15px; height:100%; z-index:50; cursor:pointer;" title="Change Role"></div>
+          <div class="shift-label-container" style="color: ${txtCol}; pointer-events: none;"><div class="shift-time">${displayTime}</div><div class="shift-role">${s.role || 'Technician'}</div>${s.note ? `<div class="shift-note">${s.note}</div>` : ''}</div>
+          ${arrowBtnHtml}
+          <div class="shift-handle shift-handle-right"></div>
+        `;
+      }
+    }
+    
+    if (!currentIsReadOnly) {
+      block.addEventListener('mousedown', e => initDrag(e, s.id));
+      block.addEventListener('touchstart', e => initDrag(e, s.id), {passive: false});
+    }
+    row.appendChild(block);
+  });
+  
+  for (let safeDept in deptShifts) {
+    const summaryContainer = document.getElementById(`summary-tt-${safeDept}`);
+    if (!summaryContainer) continue;
+    summaryContainer.innerHTML = '';
+    deptShifts[safeDept].sort((a,b) => a.start - b.start).forEach((s, index) => {
+      let bar = document.createElement('div');
+      bar.style.position = 'absolute'; bar.style.height = '3px';
+      let stackY = 12 + (index % 6) * 6;
+      bar.style.top = stackY + 'px'; bar.style.left = (s.start * PX_PER_HR) + 'px';
+      bar.style.width = (s.duration * PX_PER_HR) + 'px';
+      bar.style.background = s.color || '#3b82f6';
+      bar.style.borderRadius = '2px'; bar.style.opacity = '0.8';
+      summaryContainer.appendChild(bar);
+    });
+  }
+}
+
+// ==========================================
+// --- TIMELINE_SHIFTS -> Shift Drag Engine ---
+// ==========================================
+function initDrag(e, id) {
+  if (currentIsReadOnly || e.target.classList.contains('action-zone') || e.target.classList.contains('shift-arrow-btn')) return;
+  document.getElementById('role-picker').style.display = 'none';
+  
+  if (e.type === 'mousedown') e.preventDefault(); 
+  
+  let now = Date.now();
+  if (lastShiftClickId === id && now - lastShiftClickTime < 300) {
+      if (e) e.preventDefault();
+      openNoteModal(id, 'shift', e);
+      return; 
+  }
+  lastShiftClickTime = now;
+  lastShiftClickId = id;
+
+  let selectionChanged = false;
+  if (e.shiftKey && lastSelectedShiftId) {
+     let allVisualShifts = [];
+     const rowUids = Array.from(document.querySelectorAll('.internal-cb:checked')).map(cb => cb.value);
+     rowUids.forEach(uid => {
+         let rowShifts = shifts.filter(s => (s.user_uid || s.email) === uid).sort((a, b) => a.start - b.start);
+         allVisualShifts.push(...rowShifts);
+     });
+     let idx1 = allVisualShifts.findIndex(s => s.id === lastSelectedShiftId);
+     let idx2 = allVisualShifts.findIndex(s => s.id === id);
+     if (idx1 !== -1 && idx2 !== -1) {
+         if (!e.ctrlKey && !e.metaKey) selectedIds.clear();
+         let startIdx = Math.min(idx1, idx2);
+         let endIdx = Math.max(idx1, idx2);
+         for (let i = startIdx; i <= endIdx; i++) {
+             selectedIds.add(allVisualShifts[i].id);
+         }
+         selectionChanged = true;
+     }
+  } else if (e.ctrlKey || e.metaKey) {
+     if (selectedIds.has(id)) selectedIds.delete(id);
+     else selectedIds.add(id);
+     lastSelectedShiftId = id;
+     selectionChanged = true;
+  } else {
+         if (!selectedIds.has(id)) {
+         selectedIds.clear();
+         selectedIds.add(id);
+         selectionChanged = true;
+     }
+     lastSelectedShiftId = id;
+  }
+
+  if (selectionChanged) drawShifts(); 
+  
+  dragMode = e.target.classList.contains('shift-handle-left') ? 'resize-left' :
+             (e.target.classList.contains('shift-handle-right') || e.target.classList.contains('shift-handle')) ? 'resize-right' : 'move';
+             
+  startMouseX = getClientX(e);
+  shifts.forEach(s => { if(selectedIds.has(s.id)) { s._start = s.start; s._dur = s.duration; } });
+  if (e.touches) {
+    document.addEventListener('touchmove', onDrag, {passive: false});
+    document.addEventListener('touchend', endDrag);
+  } else {
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+  }
+}
+
+function onDrag(e) {
+  if (e.touches) e.preventDefault(); 
+  const dx = getClientX(e) - startMouseX;
+  const hrDelta = Math.round(dx / SNAP_PX) * (SNAP_PX / PX_PER_HR);
+  shifts.forEach(s => {
+    if(selectedIds.has(s.id)) {
+      if (dragMode === 'move') {
+        let newStart = s._start + hrDelta;
+        if(newStart < 0) newStart = 0;
+        s.start = newStart;
+      } else if (dragMode === 'resize-left') {
+        let newStart = s._start + hrDelta;
+        let newDur = s._dur - hrDelta;
+        if (newStart < 0) { newDur = s._dur + s._start; newStart = 0; }
+        if (newDur < 0.25) { newDur = 0.25; newStart = s._start + s._dur - 0.25; }
+        s.start = newStart;
+        s.duration = newDur;
+      } else {
+        let newDur = s._dur + hrDelta;
+        if(newDur < 0.25) newDur = 0.25; 
+        s.duration = newDur;
+      }
+
+          let block = document.querySelector(`.shift-block[data-id="${s.id}"]`);
+          if (block) {
+              block.style.left = (s.start * PX_PER_HR) + 'px';
+              block.style.width = (s.duration * PX_PER_HR) + 'px';
+                  let timeLabel = `${formatShiftTime(s.start)} - ${formatShiftTime(s.start + s.duration)}`;
+              let timeEl = block.querySelector('.shift-time');
+              if (timeEl && s.hasArrow !== 'open') {
+                  if (isTruck(s.email)) {
+                      if (s.role === 'STAY') {
+                          timeEl.innerText = timeLabel;
+                      } else {
+                          timeEl.innerText = '🚛 ' + formatShiftTime(s.start);
+                      }
+                  } else {
+                      timeEl.innerText = timeLabel;
+                  }
+              }
+          }
+    }
+  });
+}
+
+function endDrag() { 
+  if ((dragMode === 'resize-left' || dragMode === 'resize-right') && selectedIds.size > 0) {
+      let sampleId = Array.from(selectedIds)[0];
+      let s = shifts.find(x => x.id === sampleId);
+      if (s) lastEditedDurationMain = s.duration;
+  }
+  setTimeout(() => { dragMode = null; }, 50);
+  document.removeEventListener('mousemove', onDrag); 
+  document.removeEventListener('mouseup', endDrag); 
+  document.removeEventListener('touchmove', onDrag); 
+  document.removeEventListener('touchend', endDrag);
+  drawShifts();
+  window.isTimelineDirty = true;
+}
+
+// ==========================================
+// --- TIMELINE_SHIFTS -> Role Picker ---
+// ==========================================
+function openRolePicker(id, e) {
+  if (currentIsReadOnly) return;
+  activeRoleTarget = id;
+  const p = document.getElementById('role-picker');
+  let targetShift = shifts.find(s => s.id === id);
+  
+  let html = '';
+  if (targetShift && isTruck(targetShift.email)) {
+      html += `<div class="role-opt" onclick="setRole('LOAD', '#e5e7eb', '#18181b')"><div class="role-dot" style="background:#10b981;"></div> LOAD</div>`;
+      html += `<div class="role-opt" onclick="setRole('UNLOAD', '#e5e7eb', '#18181b')"><div class="role-dot" style="background:#ef4444;"></div> UNLOAD</div>`;
+      html += `<div class="role-opt" onclick="setRole('STAY', '#06b6d4', '#ffffff')"><div class="role-dot" style="background:#06b6d4;"></div> STAY</div>`;
+  } else {
+      html += `
+          <div class="role-opt" onclick="setRole('Technician', '#86efac', '#064e3b')"><div class="role-dot" style="background:#86efac;"></div> Technician</div>
+          <div class="role-opt" onclick="setRole('On Duty', '#166534', '#ffffff')"><div class="role-dot" style="background:#166534;"></div> On Duty</div>
+          <div class="role-opt" onclick="setRole('Supervisor', '#a855f7', '#ffffff')"><div class="role-dot" style="background:#a855f7;"></div> Supervisor</div>
+          <div class="role-opt" onclick="setRole('Operator', '#3b82f6', '#ffffff')"><div class="role-dot" style="background:#3b82f6;"></div> Operator</div>
+          <div class="role-opt" onclick="setRole('Follow Spot', '#facc15', '#854d0e')"><div class="role-dot" style="background:#facc15;"></div> Follow Spot</div>
+          <div class="role-opt" onclick="setRole('World Tech', '#f97316', '#ffffff')"><div class="role-dot" style="background:#f97316;"></div> World Tech</div>
+          <div class="role-opt" onclick="setRole('Bus Boy', '#93c5fd', '#1e3a8a')"><div class="role-dot" style="background:#93c5fd;"></div> Bus Boy</div>
+      `;
+  }
+  
+  p.innerHTML = html;
+  p.style.display = 'block'; p.style.left = getClientX(e) + 'px';
+  p.style.top = (e.touches ? e.touches[0].clientY : e.clientY) + 'px';
+  e.stopPropagation();
+}
+
+function setRole(roleName, bgHex, textHex) {
+  const targetShift = shifts.find(s => s.id === activeRoleTarget);
+  let isTargetTruck = targetShift ? isTruck(targetShift.email) : false;
+
+  if (selectedIds.has(activeRoleTarget) && selectedIds.size > 1) {
+    shifts.forEach(s => {
+      if (selectedIds.has(s.id) && isTruck(s.email) === isTargetTruck) { s.role = roleName; s.color = bgHex; s.textCol = textHex; }
+    });
+  } else {
+    if(targetShift) { targetShift.role = roleName; targetShift.color = bgHex; targetShift.textCol = textHex; }
+  }
+  document.getElementById('role-picker').style.display = 'none';
+  drawShifts();
+  window.isTimelineDirty = true;
+}
+</script>

@@ -1,0 +1,375 @@
+<style>
+  /* @INDEX: GRID_ENGINE -> Dynamic Styles */
+  .ug-header-container {
+     display: flex; align-items: center; position: sticky; top: 0; z-index: 10;
+     background: #1a1a1e; border-bottom: 1px solid #3f3f46;
+     color: #a1a1aa; font-size: 10px; font-weight: bold; text-transform: uppercase;
+     user-select: none; width: 100%; box-sizing: border-box;
+  }
+  .ug-col-header {
+     position: relative; display: flex; align-items: center; 
+     transition: background 0.2s; border-radius: 4px;
+     height: 100%; box-sizing: border-box; padding: 10px 0;
+  }
+  .ug-col-resizer {
+     position: absolute; width: 10px; z-index: 20; display: none; height: 100%; top: 0;
+  }
+  .editing-grid .ug-col-resizer { display: block; opacity: 0.4; transition: opacity 0.2s; }
+  .editing-grid .ug-col-header:hover .ug-col-resizer { opacity: 1; z-index: 30; }
+  .ug-col-resizer.right { right: 0; cursor: col-resize; border-right: 2px dashed #a855f7; }
+  .ug-col-resizer.left { left: 0; cursor: ew-resize; border-left: 2px dashed #10b981; }
+  .ug-col-resizer.right:hover, .ug-col-resizer.right.active {
+     background: rgba(168, 85, 247, 0.3); border-right: 2px solid #a855f7; opacity: 1;
+  }
+  .ug-col-resizer.left:hover, .ug-col-resizer.left.active {
+     background: rgba(16, 185, 129, 0.3); border-left: 2px solid #10b981; opacity: 1;
+  }
+  .ug-row {
+      display: flex; align-items: center; border-bottom: 1px solid #27272a;
+      width: 100%; box-sizing: border-box; transition: background 0.1s;
+  }
+  .ug-row:hover { background: #151518; }
+</style>
+
+<script>
+/**
+ * 07b_Grid_Engine.html
+ * Domain: Universal Data Grid Engine (UI Renderer, Constraints, Dynamic Settings).
+ */
+
+// @INDEX: GRID_ENGINE -> State & Globals
+window.GridEngine = {
+    configs: {}, // Dictionary of grid settings (widths, visibility, order, gap)
+    defs: {},    // Dictionary of column definitions {key, label, sortable}
+    
+    registerGrid: function(gridId, colDefs) {
+        this.defs[gridId] = colDefs;
+        if (!this.configs[gridId]) {
+            let conf = { cols: {}, order: [] };
+            colDefs.forEach((c, i) => {
+                conf.cols[c.key] = { w: c.defaultW || 100, vis: c.defaultVis !== false, mL: 0 };
+                conf.order.push(c.key);
+            });
+            this.configs[gridId] = conf;
+        }
+    },
+
+updateGlobals: function(gridId) {
+    let conf = this.configs[gridId];
+    if (!conf) return;
+        
+        if (gridId === 'tracker' && typeof TRACKER_COL_ORDER !== 'undefined') {
+            TRACKER_COL_ORDER = [...conf.order];
+            Object.keys(conf.cols).forEach(k => { TRACKER_COL_VISIBILITY[k] = conf.cols[k].vis; TRACKER_COL_WIDTHS[k] = conf.cols[k].w + 'px'; TRACKER_COL_GAPS[k] = conf.cols[k].mL + 'px'; });
+        } else if (gridId === 'vault' && typeof ASSET_COL_ORDER !== 'undefined') {
+            ASSET_COL_ORDER = [...conf.order];
+            Object.keys(conf.cols).forEach(k => { ASSET_COL_VISIBILITY[k] = conf.cols[k].vis; ASSET_COL_WIDTHS[k] = conf.cols[k].w + 'px'; ASSET_COL_GAPS[k] = conf.cols[k].mL + 'px'; });
+        } else if (gridId === 'project_vault' && typeof PA_VAULT_COL_ORDER !== 'undefined') {
+            PA_VAULT_COL_ORDER = [...conf.order];
+            Object.keys(conf.cols).forEach(k => { PA_VAULT_COL_VISIBILITY[k] = conf.cols[k].vis; PA_VAULT_COL_WIDTHS[k] = conf.cols[k].w + 'px'; PA_VAULT_COL_GAPS[k] = conf.cols[k].mL + 'px'; });
+        } else if (gridId === 'project_assigned' && typeof PA_COL_ORDER !== 'undefined') {
+            PA_COL_ORDER = [...conf.order];
+            Object.keys(conf.cols).forEach(k => { PA_COL_VISIBILITY[k] = conf.cols[k].vis; PA_COL_WIDTHS[k] = conf.cols[k].w + 'px'; PA_COL_GAPS[k] = conf.cols[k].mL + 'px'; });
+    }
+},
+
+    buildCSS: function(gridId) {
+        let conf = this.configs[gridId];
+        if (!conf) return '';
+        let css = '';
+        conf.order.forEach(k => {
+            if (conf.cols[k]) {
+                css += `--${gridId}-w-${k}: ${conf.cols[k].w}px; `;
+                css += `--${gridId}-ml-${k}: ${conf.cols[k].mL || 0}px; `;
+            }
+        });
+        
+        let styleId = `style-grid-${gridId}`;
+        let existingStyle = document.getElementById(styleId);
+        let styleStr = `:root { ${css} }`;
+        if (existingStyle) {
+            existingStyle.innerHTML = styleStr;
+            return '';
+        } else {
+            return `<style id="${styleId}">${styleStr}</style>`;
+        }
+    },
+
+    // @INDEX: GRID_ENGINE -> Render Core
+    buildHeader: function(gridId, sortConfig) {
+        let conf = this.configs[gridId];
+        let defs = this.defs[gridId];
+        if (!conf || !defs) return '';
+        
+        let h = `<div class="ug-header-container ${gridId}-container" style="padding: 0 15px;">`;
+        
+        let visibleCols = conf.order.filter(k => conf.cols[k].vis);
+        
+        visibleCols.forEach((key, idx) => {
+            let def = defs.find(d => d.key === key);
+            if (!def) return;
+            
+            let isLastDataCol = (idx === visibleCols.length - 2 && visibleCols[visibleCols.length - 1] === 'action');
+            let isActionCol = (key === 'action');
+            
+            let widthStyle = isActionCol ? `width: var(--${gridId}-w-${key}); margin-left: var(--${gridId}-ml-${key}); flex-shrink: 0; text-align:center; justify-content:center;` : `width: var(--${gridId}-w-${key}); margin-left: var(--${gridId}-ml-${key}); flex-shrink: 1; min-width: 0px;`;
+
+            let sortHtml = '';
+            let sortIcon = '';
+            if (def.sortable) {
+                sortHtml = ` onclick="GridEngine.triggerSort('${gridId}', '${key}')" style="cursor:pointer; flex:1; display:flex; align-items:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;${isActionCol ? ' justify-content:center;' : ''}"`;
+                if (sortConfig && sortConfig.col === key) {
+                    sortIcon = sortConfig.asc ? ' ▲' : ' ▼';
+                }
+            } else {
+                sortHtml = ` style="flex:1; display:flex; align-items:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;${isActionCol ? ' justify-content:center;' : ''}"`;
+            }
+
+            let prefix = (key === 'name' && gridId !== 'tracker') ? `<div style="width:16px; flex-shrink:0; margin-right:4px;"></div>` : '';
+
+            h += `<div class="ug-col-header" draggable="true" ondragstart="GridEngine.dragStart(event, '${gridId}', '${key}')" ondragover="GridEngine.dragOver(event)" ondrop="GridEngine.drop(event, '${gridId}', '${key}')" ondragend="GridEngine.dragEnd(event)" style="${widthStyle}">
+                    ${idx > 0 || isActionCol ? `<div class="ug-col-resizer left" onmousedown="GridEngine.initResize(event, '${gridId}', '${key}', 'left')"></div>` : ''}
+                    <div${sortHtml} title="${def.label}">
+                        ${prefix}<span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${def.label}</span>
+                        <span style="color:#fff; pointer-events:none; margin-left:4px;">${sortIcon}</span>
+                    </div>
+                    ${!isActionCol ? `<div class="ug-col-resizer right" onmousedown="GridEngine.initResize(event, '${gridId}', '${key}', 'right')"></div>` : ''}
+                  </div>`;
+            
+            // THE SMART FLEX SPACER (Absorbs dead space to pin Action buttons right)
+            if (isLastDataCol) {
+                h += `<div class="ug-flex-spacer" style="flex: 1; min-width: 0px;"></div>`;
+            }
+        });
+        h += `</div>`;
+        return h;
+    },
+
+    // @INDEX: GRID_ENGINE -> Dynamic Settings Modal
+    openSettings: function(gridId, gridTitle) {
+        document.body.classList.add('editing-grid');
+        let conf = this.configs[gridId];
+        let defs = this.defs[gridId];
+        if (!conf || !defs) return;
+
+        let html = `
+        <div style="padding:15px;">
+            <div class="input-label" style="margin-bottom:10px;">Visible Columns & Order</div>
+            <div id="ug-settings-cols" style="display:flex; flex-direction:column; gap:6px; max-height:400px; overflow-y:auto; padding-right:5px;">`;
+
+        conf.order.forEach(key => {
+            let def = defs.find(d => d.key === key);
+            if (!def) return;
+            html += `
+            <div draggable="true" ondragstart="GridEngine.dragStartSettings(event, '${gridId}', '${key}')" ondragover="GridEngine.dragOverSettings(event)" ondrop="GridEngine.dropSettings(event, '${gridId}', '${key}')" ondragend="GridEngine.dragEndSettings(event)" style="display:flex; align-items:center; justify-content:space-between; background:#111; padding:8px 12px; border-radius:4px; border:1px solid #333; margin-bottom:4px; cursor:grab;">
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+                    <span style="color:#555; padding-right:4px;">⋮⋮</span>
+                    <input type="checkbox" ${conf.cols[key].vis ? 'checked' : ''} onchange="GridEngine.toggleCol('${gridId}', '${key}', this.checked)" style="margin:0; width:16px; height:16px;">
+                    <span style="color:#fff; font-size:12px; font-weight:bold;">${def.label}</span>
+                </label>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-outline btn-sm" style="padding:2px 8px!important; margin:0;" onclick="GridEngine.moveCol('${gridId}', '${key}', -1)">▲</button>
+                    <button class="btn-outline btn-sm" style="padding:2px 8px!important; margin:0;" onclick="GridEngine.moveCol('${gridId}', '${key}', 1)">▼</button>
+                </div>
+            </div>`;
+        });
+
+        html += `</div>
+        <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
+            <button class="btn-close" style="width:auto; margin:0;" onclick="document.body.classList.remove('editing-grid'); if(typeof closeContextualSettings==='function') closeContextualSettings()">CANCEL</button>
+            <button class="btn-main" style="width:auto; margin:0;" onclick="document.body.classList.remove('editing-grid'); if(typeof saveGridEngineSettings==='function') saveGridEngineSettings('${gridId}', event)">DONE & SAVE</button>
+        </div></div>`;
+        
+        let drawerContent = document.getElementById('settings-drawer-content');
+        if (drawerContent) {
+            Array.from(drawerContent.children).forEach(child => child.style.display = 'none');
+            
+            let dynamicDiv = document.getElementById('ug-dynamic-settings');
+            if (!dynamicDiv) {
+                dynamicDiv = document.createElement('div');
+                dynamicDiv.id = 'ug-dynamic-settings';
+                drawerContent.appendChild(dynamicDiv);
+            }
+            dynamicDiv.innerHTML = html;
+            dynamicDiv.style.display = 'block';
+
+            document.getElementById('settings-drawer-title').innerText = '⚙️ ' + gridTitle;
+            document.getElementById('settings-drawer-title').style.color = '#f59e0b';
+            document.getElementById('settings-drawer-wrapper').style.display = 'flex';
+        }
+    },
+
+    toggleCol: function(gridId, key, isVis) {
+        this.configs[gridId].cols[key].vis = isVis;
+        if (this.updateGlobals) this.updateGlobals(gridId);
+        this.fireRender(gridId);
+    },
+    moveCol: function(gridId, key, dir) {
+        let order = this.configs[gridId].order;
+        let idx = order.indexOf(key);
+        if (idx === -1) return;
+        let nIdx = idx + dir;
+        if (nIdx < 0 || nIdx >= order.length) return;
+        let temp = order[idx]; order[idx] = order[nIdx]; order[nIdx] = temp;
+        
+        if (this.updateGlobals) this.updateGlobals(gridId);
+        let title = document.getElementById('settings-drawer-title').innerText.replace('⚙️ ', '');
+        this.openSettings(gridId, title);
+        this.fireRender(gridId);
+    },
+
+    fireRender: function(gridId) {
+        if (gridId === 'vault' || gridId === 'project_vault') {
+            if (typeof loadAssetRegistry === 'function') renderAssetRegistry();
+            if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+        }
+        if (gridId === 'project_assigned') {
+            if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+        }
+        if (gridId === 'tracker') {
+            if (typeof renderTrackerGrid === 'function') renderTrackerGrid();
+            else if (typeof renderTrackerList === 'function') renderTrackerList();
+        }
+    },
+
+    // @INDEX: GRID_ENGINE -> Drag & Drop
+    draggedKey: null,
+    dragStart: function(e, gridId, key) {
+        let settingsDrawer = document.getElementById('settings-drawer-wrapper');
+        if (!settingsDrawer || settingsDrawer.style.display === 'none') {
+            e.preventDefault();
+            return false;
+        }
+        window.GridEngine.draggedKey = key;
+        e.dataTransfer.effectAllowed = 'move';
+        e.currentTarget.style.opacity = '0.4';
+    },
+    dragOver: function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; },
+    drop: function(e, gridId, targetKey) {
+        e.preventDefault(); e.stopPropagation();
+        if (window.GridEngine.draggedKey && window.GridEngine.draggedKey !== targetKey) {
+            let order = this.configs[gridId].order;
+            let from = order.indexOf(window.GridEngine.draggedKey);
+            let to = order.indexOf(targetKey);
+            if (from > -1 && to > -1) {
+                order.splice(from, 1);
+                order.splice(to, 0, window.GridEngine.draggedKey);
+                if (window.GridEngine.updateGlobals) window.GridEngine.updateGlobals(gridId);
+                window.GridEngine.fireRender(gridId);
+                
+                let settingsDrawer = document.getElementById('settings-drawer-wrapper');
+                if (!settingsDrawer || settingsDrawer.style.display === 'none') {
+                    // Auto-save logic
+                    if (gridId === 'project_vault' || gridId === 'project_assigned') {
+                        if (typeof saveProjectAssetVisualSettings === 'function') saveProjectAssetVisualSettings(null);
+                    } else if (typeof saveGridEngineSettings === 'function') {
+                        saveGridEngineSettings(gridId, null);
+                    }
+                } else {
+                    let titleEl = document.getElementById('settings-drawer-title');
+                    let title = titleEl ? titleEl.innerText.replace('⚙️ ', '') : '';
+                    window.GridEngine.openSettings(gridId, title);
+                }
+            }
+        }
+        window.GridEngine.draggedKey = null;
+    },
+    dragEnd: function(e) {
+        e.currentTarget.style.opacity = '1';
+        window.GridEngine.draggedKey = null;
+    },
+    
+    // @INDEX: GRID_ENGINE -> Drag & Drop Settings List
+    draggedKeySettings: null,
+    dragStartSettings: function(e, gridId, key) {
+        window.GridEngine.draggedKeySettings = key;
+        e.dataTransfer.effectAllowed = 'move';
+        e.currentTarget.style.opacity = '0.4';
+    },
+    dragOverSettings: function(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; },
+    dropSettings: function(e, gridId, targetKey) {
+        e.preventDefault(); e.stopPropagation();
+        if (window.GridEngine.draggedKeySettings && window.GridEngine.draggedKeySettings !== targetKey) {
+            let order = this.configs[gridId].order;
+            let from = order.indexOf(window.GridEngine.draggedKeySettings);
+            let to = order.indexOf(targetKey);
+            if (from > -1 && to > -1) {
+                order.splice(from, 1);
+                order.splice(to, 0, window.GridEngine.draggedKeySettings);
+                if (window.GridEngine.updateGlobals) window.GridEngine.updateGlobals(gridId);
+                let titleEl = document.getElementById('settings-drawer-title');
+                let title = titleEl ? titleEl.innerText.replace('⚙️ ', '') : '';
+                window.GridEngine.openSettings(gridId, title);
+                window.GridEngine.fireRender(gridId);
+            }
+        }
+        window.GridEngine.draggedKeySettings = null;
+    },
+    dragEndSettings: function(e) {
+        e.currentTarget.style.opacity = '1';
+        window.GridEngine.draggedKeySettings = null;
+    },
+
+    // @INDEX: GRID_ENGINE -> Column Resizing
+    resizeState: null,
+    initResize: function(e, gridId, key, edge) {
+        let settingsDrawer = document.getElementById('settings-drawer-wrapper');
+        if (!settingsDrawer || settingsDrawer.style.display === 'none') {
+            e.preventDefault(); e.stopPropagation();
+            return;
+        }
+        e.preventDefault(); e.stopPropagation();
+        let th = e.target.closest('.ug-col-header');
+        if (!th) return;
+        window.GridEngine.resizeState = { 
+            gridId, key, edge, 
+            startX: e.clientX, 
+            startW: window.GridEngine.configs[gridId].cols[key].w || th.getBoundingClientRect().width,
+            startML: window.GridEngine.configs[gridId].cols[key].mL || 0
+        };
+        e.target.classList.add('active');
+        document.addEventListener('mousemove', window.GridEngine.onResize);
+        document.addEventListener('mouseup', window.GridEngine.endResize);
+    },
+    onResize: function(e) {
+        let state = window.GridEngine.resizeState;
+        if (!state) return;
+        let dx = e.clientX - state.startX;
+        if (state.edge === 'right') { 
+            let newW = Math.max(10, state.startW + dx); 
+            window.GridEngine.configs[state.gridId].cols[state.key].w = newW; 
+            document.documentElement.style.setProperty(`--${state.gridId}-w-${state.key}`, `${newW}px`); 
+        } else if (state.edge === 'left') { 
+            if (state.key === 'action') {
+                let newW = Math.max(10, state.startW - dx);
+                window.GridEngine.configs[state.gridId].cols[state.key].w = newW; 
+                document.documentElement.style.setProperty(`--${state.gridId}-w-${state.key}`, `${newW}px`); 
+            } else {
+                let newML = Math.max(0, state.startML + dx); 
+                window.GridEngine.configs[state.gridId].cols[state.key].mL = newML; 
+                document.documentElement.style.setProperty(`--${state.gridId}-ml-${state.key}`, `${newML}px`); 
+            }
+        }
+    },
+    endResize: function(e) {
+        try {
+            document.querySelectorAll('.ug-col-resizer.active').forEach(el => el.classList.remove('active'));
+            let state = window.GridEngine.resizeState;
+            if (state) {
+                if (window.GridEngine.updateGlobals) window.GridEngine.updateGlobals(state.gridId);
+                window.GridEngine.fireRender(state.gridId);
+            }
+        } finally {
+            window.GridEngine.resizeState = null;
+            document.removeEventListener('mousemove', window.GridEngine.onResize);
+            document.removeEventListener('mouseup', window.GridEngine.endResize);
+        }
+    },
+
+    triggerSort: function(gridId, key) {
+        if (gridId === 'vault') { if(typeof toggleAssetSort==='function') toggleAssetSort(null, key); }
+        if (gridId === 'project_vault') { if(typeof togglePaSort==='function') togglePaSort(null, 'vault', key); }
+        if (gridId === 'project_assigned') { if(typeof togglePaSort==='function') togglePaSort(null, 'assigned', key); }
+    }
+};
+</script>

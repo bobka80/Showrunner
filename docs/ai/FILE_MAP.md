@@ -1,0 +1,318 @@
+# Master File Map & Component Registry
+
+This file serves as the definitive index of all 40+ components and their routing engines within the architecture. It **replaces the deprecated `Project_Index.md`** (never created / removed).
+
+> Entry point for AI agents: [AI_DOCTRINE.md](../../AI_DOCTRINE.md)
+
+---
+
+## Wiring Status (`Index.html` includes)
+
+Only modules listed in root **`Index.html`** via `<?!= include('...'); ?>` are compiled by `build.js` and deployed. Files on disk without an include are **orphans** (invisible to the live app).
+
+| Status | Modules |
+|--------|---------|
+| **Wired (production)** | All entries in sections 1–9 below |
+| **Re-wired 2026-06-24** | `02g_Project_Reports` (Print Studio), `06f_Admin_Audit` (Audit Studio) |
+| **Dev / not in Index** | `temp_script_0.js`, `test.js`, `test_db.js`, `run_test.js`, `watch.js`, `Logistics_Debug.js` |
+
+When adding a new `.html` module: update this file **and** add the include to `Index.html` before `node build.js`.
+
+---
+
+## 1. System Core & Globals
+- **`Index.html`**: The main application shell and entry point. Injects all other HTML templates. Contains the mobile dashboard and global left navigation.
+- **`Main.js`**: GAS backend entry point. Handles HTTP GET/POST routing and the high-speed boot payload.
+- **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits.
+- **`Security.js`**: Manages user authentication and extracts security profiles.
+- **`Styles.html`**: The global CSS engine. Defines core theme variables, custom color engines, and universal UI states.
+- **`07_Core_Globals.html`**: Centralized utility functions, live tag parsers, and the CSS theme engine initialization.
+- **`07b_Grid_Engine.html`**: The interactive Drag & Drop data grid core.
+- **`07c_Generalization_Engine.html`**: The Blueprint template engine.
+- **`08_Conflict_Manager.html`**: Renders the active triage drawer for resolving timeline and equipment conflicts.
+- **`Conflicts.js`**: Backend resolver for conflicts identified in the frontend.
+
+## 2. Shared UI Components
+- **`00a_UI_Layers.html`**: Z-index layer stack and overlay foundations for modals/drawers.
+- **`00b_UI_Hubs.html`**: Hub shells and navigation containers for major UI regions.
+- **`00c_UI_Forms.html`**: Universal form renderers (Provisioning, Warehouse Roots, Clients, Vehicles).
+- **`00d_UI_Visuals.html`**: Settings drawers and data manager modals (Colors, Depts, Meals, Tags).
+- **`00e_UI_Modals.html`**: Universal popups (Global Tasks, Pickers, Checklists, Backup).
+
+## 3. Operations & Integrations
+- **`Operations.js`**: Core backend execution (RFID processing, ledger commits, starting sessions).
+- **`Integrations.js`**: External APIs. Handles Google Drive folder generation, dumb vault deployment, and cron triggers (e.g., weather automations).
+
+## 4. The 01 Series: Calendar & Dashboard
+- **`01a_Calendar_Core.html`**: Main dashboard boot sequence and FullCalendar configurations.
+- **`01b_Calendar_Tasks.html`**: Task rendering and notification engines.
+- **`01c_Calendar_Mini.html`**: The scoped Mini Calendar editor boot sequence.
+- **`01d_Calendar_Mobile.html`**: Mobile-specific calendar views and dashboards.
+
+## 5. The 02 Series: Project Editor & Logistics Hub
+- **`02_Project_Editor_Core.html`**: The presence engine heartbeat and core project schedule sync operations.
+- **`02_Project_Editor_Logistics.html`**: **The Logistics Wizard.** Houses the autonomous engine and the *Auto-Packing* system. *Quirk: Operates on Bulk items independently from the explosion engine.*
+- **`02_Project_Editor_Map.html`**: Leaflet geocoding map engine and weather display.
+- **`02a_Project_Equipment.html`**: The main Project Assets (PA) modal wrapper.
+- **`02b_Project_Syntax.html`**: The Text CLI parser. *Quirk: Parses commands like '12x Fixtures' and handles mathematical rounding.*
+- **`02c_Project_Operations.html`**: RFID scanners and manual ledger queues within a project context.
+- **`02d_Equipment_Render.html`**: The main rendering loop for equipment rows.
+- **`02e1_Logic_State.html`**: Logic toggles for UI view state and group targeting.
+- **`02e2_Logic_CRUD.html`**: Core mutations for adding/editing project assets.
+- **`02e3_Logic_Clipboard.html`**: The cut/copy/paste equipment engine.
+- **`02e4_Logic_Containers.html`**: Autonomous packing detection. *Quirk: This is the fluid 'Auto-Containerization' engine, distinct from bulk Auto-Packing.*
+- **`02e5_Logic_Sync.html`**: Optimistic syncing and delta calculations. *Quirk: Houses 'processFormulas()'.*
+- **`02g_Project_Reports.html`**: The Print Studio modal and logistics tree filtering. **Wired** in `Index.html` (required for `openPrintModal()` from Project Assets PRINT button).
+- **`Logistics_Assets.js`**: The master logistics aggregator for project assets on the backend.
+- **`Logistics_Projects.js`**: CRUD operations for project lifecycles.
+- **`Logistics_Roster.js`**: Month Matrix and un-paid scanner data operations.
+- **`Logistics_Schema.js`**: Relational engine schemas.
+- **`Logistics_Tasks.js`**: Task routing logic.
+- **`Logistics_Timeline.js`**: Project timeline backend CRUD.
+
+## 6. The 03 & 04 Series: Timelines & Crew
+- **`03a_Timeline_Boot.html`** to **`03e_Timeline_UX.html`**: The shift and phase drag-and-drop timeline builder.
+- **`04_Month_Roster.html`**: The Master Month Roster matrix render loop.
+- **`04b_Equipment_Tracker.html`**: Global equipment timeline tracking and state fetching.
+
+## 7. The 05 Series: Warehouse & Trucks
+- **`05_Warehouse_Engine.html`**: 2D CAD spatial renderer and polygon dragging for warehouse management.
+- **`05a_Truck_Arrangement.html`**: Predictive 2D truck packing CAD UI.
+- **`05b_Loadin_Plan.html`**: Specialized load-in timing plans.
+
+## 8. The 06 Series: System Admin & Data
+- **`06_System_Admin.html`**: Core admin resource hub router.
+- **`06a_Admin_IAM.html`**: User access and role configuration.
+- **`06b1_Admin_Assets_Core.html`** to **`06b4_Admin_Assets_QR.html`**: The Equipment Vault. Covers bulk review, asset provisioning, smart merges, and the QR print generator.
+- **`06c_Admin_Visuals.html`**: Real-time theme application engine.
+- **`06d_Admin_Fleet.html`**: Vehicle database CRUD.
+- **`06e_Admin_Automation.html`**: Database archivers and manager rules.
+- **`06f_Admin_Audit.html`**: Database Audit Studio (duplicate merge + item-by-item review). **Wired** in `Index.html`. Entry: `openAuditStudio()` when linked from admin UI.
+- **`Resources_Core.js`**, **`Resources_Audit.js`**, **`Resources_Migrations.js`**, **`Resources_System.js`**, **`Resources_Vault.js`**, **`Resources_Warehouse.js`**: The backend CRUD and schema engines for global resources.
+
+## 9. The 09 Series: Financials
+- **`09_Financials_Hub.html`**: The main hub for payroll, labor costs, and interactive ledgers.
+
+---
+
+## Global Command Index (@INDEX)
+
+Below is the definitive list of all `@INDEX:` markers mapped inside the codebase files to segment large engines. You can use these markers to quickly jump to specific code logic blocks using search tools.
+
+### 00c_UI_Forms.html
+- `FORMS -> Crew & IAM Provisioning`
+- `FORMS -> Asset Provisioning & QR`
+- `FORMS -> Warehouse Roots`
+- `FORMS -> Clients`
+- `FORMS -> Vehicles`
+### 00d_UI_Visuals.html
+- `VISUALS -> Visual Settings (Timeline)`
+- `VISUALS -> Visual Settings (Phase Manager)`
+- `VISUALS -> Visual Settings (Strip Editor)`
+- `VISUALS -> Visual Settings (Calendar)`
+- `VISUALS -> Visual Settings (Mini Calendar)`
+- `VISUALS -> Visual Settings (Month Roster)`
+- `VISUALS -> Visual Settings (Project Assets)`
+- `VISUALS -> Visual Settings (Asset Registry)`
+- `VISUALS -> Data Managers (Assignments)`
+- `VISUALS -> Data Managers (Colors)`
+- `VISUALS -> Data Managers (Departments)`
+- `VISUALS -> Data Managers (Meals)`
+- `VISUALS -> Data Managers (Tags)`
+### 00e_UI_Modals.html
+- `MODALS -> Global Tasks`
+- `MODALS -> Pickers & Context Menus`
+- `MODALS -> Project Checklists`
+- `MODALS -> Crew Leave / Managers`
+- `MODALS -> Logistics Hub Engine`
+- `MODALS -> Database Backup`
+### 01a_Calendar_Core.html
+- `BOOT -> System Boot Sequence`
+- `CALENDAR -> Main Dashboard Calendar Config`
+- `DATA -> Contour Engine Interceptor`
+### 01b_Calendar_Tasks.html
+- `TASKS -> Render & Notifs`
+### 01c_Calendar_Mini.html
+- `MINI_CALENDAR -> Mini Calendar Editor Boot`
+### 01d_Calendar_Mobile.html
+- `MOBILE -> Dashboard & Views`
+### 02a_Project_Equipment.html
+- `PA_MODAL -> Project Assets Modal Management`
+### 02b_Project_Syntax.html
+- `SYNTAX_CLI -> Syntax Help Modal`
+- `SYNTAX_CLI -> Unified Search Input Handler`
+- `SYNTAX_CLI -> Live Syntax Execution`
+- `SYNTAX_CLI -> Syntax Parser Engine`
+- `SYNTAX_CLI -> Fuzzy Matching Engine`
+### 02c_Project_Operations.html
+- `OPERATIONS -> Start Operation UI`
+- `OPERATIONS -> RFID Scan Handler`
+- `OPERATIONS -> Trigger Manual Scan`
+- `OPERATIONS -> Batch Ops Ledger Queue`
+### 02d_Equipment_Render.html
+- `PA_RENDER -> Main Equipment Rendering Loop`
+### 02e1_Logic_State.html
+- `PA_LOGIC -> Mode & View Toggles`
+- `PA_LOGIC -> Group Targeting & UI Selection`
+### 02e2_Logic_CRUD.html
+- `PA_LOGIC -> Asset Provisioning & Mutations`
+### 02e3_Logic_Clipboard.html
+- `PA_LOGIC -> Cut/Copy/Paste Engine`
+### 02e4_Logic_Containers.html
+- `PA_LOGIC -> Item Packing & Unpacking`
+- `PA_LOGIC -> Autonomous Packing Detection Engine`
+### 02e5_Logic_Sync.html
+- `PA_LOGIC -> Shortage Queue Processing`
+- `PA_DELTA -> Calculate Equipment Deltas`
+### 02g_Project_Reports.html
+- `PRINT_STUDIO -> Modal UI & Mode Switching`
+- `PRINT_STUDIO -> Filter Engine (Logistics Tree)`
+- `PRINT_STUDIO -> Live Document Rendering & Output`
+### 02_Project_Editor_Core.html
+- `PRESENCE -> Presence Engine & Heartbeat`
+- `PROJECT_CRUD -> Schedule Save & Sync`
+### 02_Project_Editor_Logistics.html
+- `LOGISTICS_WIZARD -> Logistics Hub & Autonomous Engine`
+### 02_Project_Editor_Map.html
+- `MAP_ENGINE -> Leaflet Geocoding & Weather`
+### 04b_Equipment_Tracker.html
+- `TRACKER -> State & Globals`
+- `TRACKER -> Network & Fetching`
+- `TRACKER -> Render Top Timeline & Playhead`
+- `TRACKER -> Render Dynamic Grid List (Bottom Half)`
+### 04_Month_Roster.html
+- `ROSTER -> Open Month Roster UI`
+- `ROSTER -> Render Matrix Grid`
+- `ROSTER -> Leave Drag Engine`
+### 05a_Truck_Arrangement.html
+- `TRUCK_CAD -> Predictive Truck Packing`
+### 05_Warehouse_Engine.html
+- `WAREHOUSE -> Level 0 Root Drawer`
+- `WAREHOUSE -> 2D CAD Render Engine`
+- `WAREHOUSE -> Vector Polygon Drag`
+### 06a_Admin_IAM.html
+- `IAM -> Save Role Configuration`
+- `IAM -> Render Directory`
+### 06b1_Admin_Assets_Core.html
+- `AUDIT_REGISTRY -> Bulk Review Toggles`
+- `ASSET_REGISTRY -> Render Equipment Vault`
+### 06b2_Admin_Assets_Form.html
+- `ASSET_PROVISIONING -> Logic & Save`
+- `KIT_BUILDER -> Logic & Render`
+- `TAG_PICKER -> Asset Modal`
+### 06b3_Admin_Assets_Audit.html
+- `AUDIT_ENGINE -> Inline Audit & Data Extraction`
+- `SMART_MERGE -> Smart Merge Modal`
+### 06b4_Admin_Assets_QR.html
+- `QR_STUDIO -> QR Print Generator`
+- `QR_STUDIO -> Live Preview Engine`
+- `QR_STUDIO -> Smart Document Title Generator`
+### 06c_Admin_Visuals.html
+- `VISUALS -> Apply Real-Time Theme`
+### 06d_Admin_Fleet.html
+- `FLEET -> Render Vehicle Database`
+### 06e_Admin_Automation.html
+- `AUTOMATION -> Save Manager Rules`
+- `AUTOMATION -> Database Archivers`
+### 06_System_Admin.html
+- `ADMIN -> Resource Hub Tab Router`
+### 07b_Grid_Engine.html
+- `GRID_ENGINE -> Dynamic Styles`
+- `GRID_ENGINE -> State & Globals`
+- `GRID_ENGINE -> Render Core`
+- `GRID_ENGINE -> Dynamic Settings Modal`
+- `GRID_ENGINE -> Drag & Drop`
+- `GRID_ENGINE -> Drag & Drop Settings List`
+- `GRID_ENGINE -> Column Resizing`
+### 07c_Generalization_Engine.html
+- `GENERALIZATION -> Blueprint Engine`
+### 07_Core_Globals.html
+- `GLOBALS -> CSS Theme Engine`
+- `GLOBALS -> Asset Utilities`
+- `GLOBALS -> Live Tag Lexicon Parser`
+- `GLOBALS -> Database Backup Engine`
+### 08_Conflict_Manager.html
+- `CONFLICTS -> Render Triage Drawer`
+### 09_Financials_Hub.html
+- `FINANCIALS -> Hub Boot & View Router`
+- `FINANCIALS -> Payroll & Labor Engine`
+- `FINANCIALS -> Interactive Ledger & Payments`
+- `FINANCIALS -> Global Unpaid Viewer`
+- `FINANCIALS -> Settings & Overheads`
+### build.js
+- `PAYLOAD -> Dynamic Frontend Logic Injection`
+### Conflicts.js
+- `CONFLICTS -> Active Conflict Resolver`
+### Index.html
+- `SHELL -> Mobile Dashboard`
+- `SHELL -> Global Left Nav`
+### Integrations.js
+- `DRIVE_API -> Dumb Vault Deployment`
+- `DRIVE_API -> Generate Project Folders`
+- `DRIVE_API -> Retroactive Drive Sync`
+- `SYSTEM_CRON -> Weather Automations`
+- `SYSTEM_CRON -> Setup Weather Trigger`
+### Login.html
+- `LOGIN -> Authenticate Form Submit`
+### Logistics_Assets.js
+- `PA_ENGINE -> Project Assets Logistics`
+- `TRACKER_ENGINE -> Unified Equipment Matrix Data`
+- `PA_ENGINE -> Master Logistics Aggregator`
+### Logistics_Projects.js
+- `CRUD_PROJECTS -> Project & Checklists Save`
+- `CRUD_PROJECTS -> Status & Lifecycle`
+### Logistics_Roster.js
+- `DATA_ENGINE -> Global Month Matrix`
+- `FINANCIALS_ENGINE -> Payroll Data Scanner`
+- `FINANCIALS -> Global Unpaid Scanner`
+### Logistics_Schema.js
+- `SCHEMA_ENGINE -> Relational Engine Schema`
+### Logistics_Tasks.js
+- `TASKS_ENGINE -> Tasks & Notifications`
+### Logistics_Timeline.js
+- `CRUD_ENGINE -> Project Timeline Data`
+### Main.js
+- `ROUTING -> Web App Get/Post`
+- `PAYLOAD -> High Speed Boot Payload`
+### Operations.js
+- `OPS_BACKEND -> Start Session`
+- `OPS_BACKEND -> RFID Processor`
+- `OPS_BACKEND -> Ledger Committer`
+### Resources_Audit.js
+- `AUDIT_LOG -> Enterprise Audit Logger`
+- `AUDIT_DB -> External Audit & Merge Engine`
+- `AUDIT_REVIEW -> Bulk Review Status Engine`
+### Resources_Core.js
+- `SCHEMA_VAULT -> Relational Schema Engine`
+- `CACHE -> Sheet Data Caching`
+### Resources_Migrations.js
+- `MIGRATIONS -> Schema Upgrades`
+### Resources_System.js
+- `SYSTEM_CONFIG -> Global Settings & Tags`
+### Resources_Vault.js
+- `VAULT_CRUD -> Provision Assets & Entities`
+- `IAM -> Provision New Asset`
+### Resources_Warehouse.js
+- `WAREHOUSE_DB -> Spatial Storage CRUD`
+### Security.js
+- `SECURITY -> User Authentication`
+- `SECURITY -> User Security Profile Extractor`
+### Styles.html
+- `STYLES -> Core Theme Variables`
+- `STYLES -> CSS Color Engine`
+
+---
+
+## CSS Cheat Sheet (Design System)
+
+To ensure uniform UI scaling and prevent layout breaks, strictly use these predefined Vanilla CSS classes rather than inventing inline CSS:
+
+- **`btn-main` / `btn-blue`**: Primary submission or call-to-action buttons.
+- **`btn-outline`**: Secondary actions or toggles.
+- **`btn-delete` / `btn-close`**: Destructive actions, cancels, or modal closers.
+- **`btn-add`**: Buttons that spawn new items or entities.
+- **`btn-sm`**: Add this modifier class to any of the buttons above to uniformly shrink them for compact UI areas.
+- **`btn-mobile-nav`**: Specific large touch buttons for mobile menus.
+
+> [!WARNING]
+> **NEVER USE `style="padding: ... !important"` ON BUTTONS.** Hardcoded padding overrides destroy the uniform heights of `btn-sm` and other classes when placed next to each other. Rely exclusively on the standard CSS class sizing.

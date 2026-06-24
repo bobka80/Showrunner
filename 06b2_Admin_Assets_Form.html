@@ -1,0 +1,1087 @@
+<script>
+/**
+ * 06b2_Admin_Assets_Form.html
+ * Domain: Asset Provisioning, Autocomplete, Nesting, and Multi-Tag Picker logic.
+ */
+
+window.kitBuilderComponents = [];
+
+// ==========================================
+// --- ASSET NAME AUTOCOMPLETE ENGINE ---
+// ==========================================
+function handleAssetNameInput() {
+    let input = document.getElementById('asset-name');
+    let ghost = document.getElementById('asset-name-ghost');
+    let val = input.value;
+    if (!val || typeof globalAssets === 'undefined' || globalAssets.length === 0) { ghost.value = ''; return; }
+    let match = globalAssets.find(a => String(a.name || '').toLowerCase().startsWith(String(val || '').toLowerCase()));
+    if (match) {
+        let rest = match.name.substring(val.length);
+        ghost.value = val + rest;
+        
+        if (val.toLowerCase() === match.name.toLowerCase()) {
+            autoFillAssetFields(match.name);
+        }
+    } else ghost.value = '';
+}
+function handleAssetNameKeydown(e) {
+    let input = document.getElementById('asset-name');
+    let ghost = document.getElementById('asset-name-ghost');
+    if (e.key === 'ArrowRight' || e.key === 'Tab') {
+        if (ghost.value && ghost.value.toLowerCase() !== input.value.toLowerCase()) {
+            e.preventDefault();
+            input.value = ghost.value;
+            ghost.value = '';
+            autoFillAssetFields(input.value);
+        }
+    }
+}
+function autoFillAssetFields(name) {
+    let matches = globalAssets.filter(a => String(a.name || '').toLowerCase() === String(name || '').toLowerCase());
+    if (matches.length === 0) return;
+    let ref = matches[0];
+    if (ref.manufacturer) document.getElementById('asset-manufacturer').value = ref.manufacturer;
+    if (ref.nestingLevel !== undefined) document.getElementById('asset-level').value = ref.nestingLevel;
+    if (ref.type) document.getElementById('asset-type').value = ref.type;
+    if (ref.isConsumable !== undefined && document.getElementById('asset-is-consumable')) document.getElementById('asset-is-consumable').checked = (ref.isConsumable === true || ref.isConsumable === 'true');
+    if (ref.department) document.getElementById('asset-department').value = ref.department;
+    if (ref.weight) document.getElementById('asset-weight').value = ref.weight;
+    if (ref.dims) document.getElementById('asset-dims').value = ref.dims;
+    if (ref.length) document.getElementById('asset-length').value = ref.length;
+    if (ref.capacity !== undefined) document.getElementById('asset-capacity').value = ref.capacity;
+    if (ref.power) document.getElementById('asset-power').value = ref.power;
+    if (ref.price) document.getElementById('asset-price').value = ref.price;
+    if (ref.rental) document.getElementById('asset-rental').value = ref.rental;
+    if (ref.serialNumber !== undefined) document.getElementById('asset-serial').value = ref.serialNumber;
+    if (ref.vendorUid !== undefined) document.getElementById('asset-vendor').value = ref.vendorUid;
+    
+    if (ref.whId) {
+        document.getElementById('asset-wh').value = ref.whId;
+        updateAssetZones();
+        if (ref.zoneId) {
+            document.getElementById('asset-zone').value = ref.zoneId;
+            updateAssetAreas();
+            if (ref.areaId) {
+                document.getElementById('asset-area').value = ref.areaId;
+            }
+        }
+    }
+    if (ref.dateBought) document.getElementById('asset-date-bought').value = ref.dateBought;
+    if (ref.status) document.getElementById('asset-lifecycle').value = ref.status;
+    if (ref.lastService) document.getElementById('asset-last-service').value = ref.lastService;
+    if (ref.serviceInterval) document.getElementById('asset-service-interval').value = ref.serviceInterval;
+    if (ref.tags) {
+        document.getElementById('asset-tags-hidden').value = ref.tags;
+        renderAssetTags();
+    }
+
+    let existingUnits = [];
+    let padding = 2;
+    let populateId = Array.isArray(currentEditAssetId) ? currentEditAssetId[0] : currentEditAssetId;
+    matches.forEach(m => {
+        if (m.id === populateId) return;
+        if (m.unitNumber) {
+            let strVal = String(m.unitNumber).trim();
+            let num = parseInt(strVal, 10);
+            if (!isNaN(num)) existingUnits.push(num);
+            if (strVal.startsWith('0') && strVal.length > padding) padding = strVal.length;
+        }
+    });
+    
+    let nextUnit = 1;
+    existingUnits.sort((a, b) => a - b);
+    for (let i = 0; i < existingUnits.length; i++) {
+        if (existingUnits[i] === nextUnit) nextUnit++;
+        else if (existingUnits[i] > nextUnit) break;
+    }
+    document.getElementById('asset-unit-number').value = String(nextUnit).padStart(padding, '0');
+
+    if (typeof handleAssetTypeChange === 'function') handleAssetTypeChange();
+}
+
+// ==========================================
+// --- ASSET MANAGER (NESTING LOGIC) ---
+// ==========================================
+// @INDEX: ASSET_PROVISIONING -> Logic & Save
+
+window.dirtyAssetFields = new Set();
+function markAssetFieldDirty(e) {
+    if (e && e.target && e.target.id) {
+        window.dirtyAssetFields.add(e.target.id);
+    }
+}
+
+function openAssetModal(editId = null) {
+    currentEditAssetId = editId;
+    if (typeof resetAuditChecklist === 'function') resetAuditChecklist();
+
+    if (typeof window.untrackedMemory === 'undefined') {
+        window.untrackedMemory = [];
+        google.script.run.withSuccessHandler(res => { window.untrackedMemory = res || []; }).getVaultAsset('untracked_memory', []);
+    }
+
+    // Clear previous inputs
+    document.querySelectorAll('#asset-modal-overlay input').forEach(inp => {
+        if (inp.type !== 'hidden') inp.value = '';
+    });
+    
+    window.dirtyAssetFields.clear();
+    document.querySelectorAll('#asset-modal-overlay input, #asset-modal-overlay select, #asset-modal-overlay textarea').forEach(inp => {
+        inp.removeEventListener('input', markAssetFieldDirty);
+        inp.removeEventListener('change', markAssetFieldDirty);
+        inp.addEventListener('input', markAssetFieldDirty);
+        inp.addEventListener('change', markAssetFieldDirty);
+    });
+    if (document.getElementById('asset-tags-hidden')) {
+        document.getElementById('asset-tags-hidden').value = '[]';
+        renderAssetTags();
+    }
+    
+    if (document.getElementById('asset-quantity')) {
+        document.getElementById('asset-quantity').value = '1';
+        document.getElementById('asset-quantity').disabled = false;
+        if(document.getElementById('asset-unit-number')) document.getElementById('asset-unit-number').disabled = false;
+        if(document.getElementById('asset-rfid')) document.getElementById('asset-rfid').disabled = false;
+        if(document.getElementById('asset-serial')) document.getElementById('asset-serial').disabled = false;
+    }
+    if (document.getElementById('asset-is-consumable')) document.getElementById('asset-is-consumable').checked = false;
+    if (document.getElementById('asset-name-ghost')) document.getElementById('asset-name-ghost').value = '';
+    if (document.getElementById('asset-unit-number')) document.getElementById('asset-unit-number').value = '01';
+    if (document.getElementById('asset-capacity')) document.getElementById('asset-capacity').value = '';
+    if (document.getElementById('asset-length')) document.getElementById('asset-length').value = '';
+    if (document.getElementById('asset-serial')) document.getElementById('asset-serial').value = '';
+    if (document.getElementById('asset-vendor')) document.getElementById('asset-vendor').value = '';
+    
+    // Reset Select Dropdowns
+    document.getElementById('asset-level').value = '6';
+    if (document.getElementById('kit-builder-mode')) document.getElementById('kit-builder-mode').value = 'fluid';
+    document.getElementById('asset-type').value = 'Physical';
+    document.getElementById('asset-lifecycle').value = 'Active';
+    if (document.getElementById('asset-service-interval')) document.getElementById('asset-service-interval').value = '12';
+    
+    // Populate Departments
+    const deptSelect = document.getElementById('asset-department');
+    if (deptSelect) {
+        deptSelect.innerHTML = '<option value="">None</option>';
+        if (typeof SYSTEM_DEPARTMENTS !== 'undefined') {
+            SYSTEM_DEPARTMENTS.forEach(d => {
+                deptSelect.innerHTML += `<option value="${d.uid || d.name}">${d.name}</option>`;
+            });
+        }
+    }
+
+    // Reset Kit Builder
+    window.kitBuilderComponents = [];
+    window.kitBuilderWarning = null;
+    if (document.getElementById('kit-builder-panel')) document.getElementById('kit-builder-panel').style.display = 'none';
+    
+    // Ensure warehouse spatial data is loaded before opening the modal
+    if (typeof globalWhRoots === 'undefined' || !globalWhRoots || globalWhRoots.length === 0) {
+        google.script.run
+            .withFailureHandler(err => { alert("Warning: Could not fetch warehouse zones. " + err.message); finishOpeningAssetModal(); })
+            .withSuccessHandler(res => {
+                globalWhRoots = res.roots || [];
+                globalWhZones = res.zones || [];
+                globalWhAreas = res.areas || [];
+                finishOpeningAssetModal();
+            }).getWarehouseData();
+    } else {
+        finishOpeningAssetModal();
+    }
+}
+
+function finishOpeningAssetModal() {
+    try {
+        const whSelect = document.getElementById('asset-wh');
+        whSelect.innerHTML = '<option value="">Select...</option>';
+        if (typeof globalWhRoots !== 'undefined') {
+            globalWhRoots.forEach(r => { whSelect.innerHTML += `<option value="${r.id}">${r.name}</option>`; });
+        }
+        
+        document.getElementById('asset-zone').innerHTML = '<option value="">Select...</option>';
+        document.getElementById('asset-zone').disabled = true;
+        document.getElementById('asset-area').innerHTML = '<option value="">Select...</option>';
+        document.getElementById('asset-area').disabled = true;
+    
+        let populateId = Array.isArray(currentEditAssetId) ? currentEditAssetId[0] : currentEditAssetId;
+
+        let isBulk = Array.isArray(currentEditAssetId) && currentEditAssetId.length > 1;
+        let selectedAssets = isBulk ? globalAssets.filter(a => currentEditAssetId.includes(a.id)) : [];
+
+        if (populateId) {
+            if (isBulk) {
+                const getSharedValue = (prop, isSelect = false) => {
+                    let sharedVal = null;
+                    for (let i = 0; i < selectedAssets.length; i++) {
+                        let val = selectedAssets[i][prop];
+                        if (val !== undefined && val !== null && String(val).trim() !== '') {
+                            if (sharedVal === null) {
+                                sharedVal = val;
+                            } else if (String(sharedVal) !== String(val)) {
+                                return isSelect ? '' : '[Multiple Values]';
+                            }
+                        }
+                    }
+                    return sharedVal !== null ? sharedVal : (isSelect ? '' : '');
+                };
+
+                document.getElementById('asset-name').value = getSharedValue('name') || '';
+                if(document.getElementById('asset-unit-number')) { document.getElementById('asset-unit-number').value = 'MULTIPLE'; document.getElementById('asset-unit-number').disabled = true; }
+                if(document.getElementById('asset-rfid')) { document.getElementById('asset-rfid').value = 'MULTIPLE'; document.getElementById('asset-rfid').disabled = true; }
+                if(document.getElementById('asset-serial')) { document.getElementById('asset-serial').value = 'MULTIPLE'; document.getElementById('asset-serial').disabled = true; }
+                if(document.getElementById('asset-quantity')) { document.getElementById('asset-quantity').value = selectedAssets.length; document.getElementById('asset-quantity').disabled = false; document.getElementById('asset-quantity').dataset.origQty = selectedAssets.length; }
+                
+                document.getElementById('asset-manufacturer').value = getSharedValue('manufacturer') || '';
+
+                let sLevel = getSharedValue('nestingLevel', true);
+                document.getElementById('asset-level').value = sLevel === '' ? '' : (sLevel !== null ? sLevel : '6');
+                
+                let sType = getSharedValue('type', true);
+                document.getElementById('asset-type').value = sType === '' ? '' : (sType || 'Physical');
+                
+                let sConsumable = getSharedValue('isConsumable', true);
+                if (document.getElementById('asset-is-consumable')) document.getElementById('asset-is-consumable').checked = sConsumable === '' ? false : (sConsumable === true || sConsumable === 'true');
+                
+                let sDept = getSharedValue('department', true);
+                document.getElementById('asset-department').value = sDept === '' ? '' : (sDept || '');
+                
+                let sWh = getSharedValue('whId', true);
+                document.getElementById('asset-wh').value = sWh === '' ? '' : (sWh || '');
+                updateAssetZones();
+                
+                let sZone = getSharedValue('zoneId', true);
+                document.getElementById('asset-zone').value = sZone === '' ? '' : (sZone || '');
+                updateAssetAreas();
+                
+                let sArea = getSharedValue('areaId', true);
+                document.getElementById('asset-area').value = sArea === '' ? '' : (sArea || '');
+
+                document.getElementById('asset-weight').value = getSharedValue('weight') || '';
+                document.getElementById('asset-dims').value = getSharedValue('dims') || '';
+                document.getElementById('asset-capacity').value = getSharedValue('capacity') !== '[Multiple Values]' && getSharedValue('capacity') !== null ? getSharedValue('capacity') : '';
+                document.getElementById('asset-length').value = getSharedValue('length') || '';
+                if(document.getElementById('asset-vendor')) document.getElementById('asset-vendor').value = getSharedValue('vendorUid') || '';
+                document.getElementById('asset-power').value = getSharedValue('power') || '';
+                document.getElementById('asset-price').value = getSharedValue('price') || '';
+                document.getElementById('asset-rental').value = getSharedValue('rental') || '';
+                document.getElementById('asset-date-bought').value = getSharedValue('dateBought') || '';
+                
+                let sLife = getSharedValue('lifecycle', true);
+                document.getElementById('asset-lifecycle').value = sLife === '' ? '' : (sLife || 'Active');
+                
+                document.getElementById('asset-last-service').value = getSharedValue('lastService') || '';
+                
+                let sInt = getSharedValue('serviceInterval', true);
+                document.getElementById('asset-service-interval').value = sInt === '' ? '' : (sInt || '12');
+                
+                let sTags = getSharedValue('tags');
+                if (sTags === '[Multiple Values]') {
+                    document.getElementById('asset-tags-hidden').value = '[]';
+                    document.getElementById('asset-tags-list').innerHTML = '<div style="color:#f59e0b; font-size:10px; font-weight:bold;">[Multiple Tags Detected - Edit to Override]</div>';
+                } else {
+                    document.getElementById('asset-tags-hidden').value = sTags || '[]';
+                    renderAssetTags();
+                }
+
+                if (sLevel == 3 || sLevel == 4 || sLevel == 5) {
+                    let sComps = getSharedValue('components');
+                    let isFixed = getSharedValue('isFixedRack');
+                    let compsToUse = null;
+                    window.kitBuilderWarning = null;
+                    
+                    if (document.getElementById('kit-builder-mode')) {
+                        document.getElementById('kit-builder-mode').value = (isFixed === true || isFixed === 'true') ? 'fixed' : 'fluid';
+                    }
+                    
+                    if (sComps === '[Multiple Values]') {
+                        let bestAsset = selectedAssets.reduce((prev, current) => { return (String(prev.components || '').length > String(current.components || '').length) ? prev : current; });
+                        compsToUse = bestAsset.components;
+                        window.kitBuilderWarning = "⚠️ INCONSISTENT TEMPLATES DETECTED: Some of the selected cases have different contents. Saving this will sync all of them to match this blueprint.";
+                    } else {
+                        compsToUse = sComps;
+                    }
+                    
+                    let untrackedComps = compsToUse ? compsToUse.split(',').map(c => {
+                        let text = c.trim();
+                        let match = text.match(/^(\d+)x\s+(.*)$/i);
+                        if (match) return { qty: parseInt(match[1], 10), name: match[2] };
+                        return { qty: 1, name: text };
+                    }).filter(c => c.name) : [];
+                    
+                    let selectedCaseIds = selectedAssets.map(a => a.id);
+                    let trackedComps = window.GeneralizationEngine.generateBlueprint(selectedCaseIds, globalAssets);
+                    
+                    window.kitBuilderComponents = [...trackedComps];
+                    let trackedNames = new Set(trackedComps.map(c => String(c.name).toLowerCase().trim()));
+                    let isFixedMode = getSharedValue('isFixedRack') === true || getSharedValue('isFixedRack') === 'true';
+                    untrackedComps.forEach(uc => {
+                        let nLow = String(uc.name).toLowerCase().trim();
+                        if (!trackedNames.has(nLow)) {
+                            window.kitBuilderComponents.push(uc);
+                        } else if (!isFixedMode) {
+                            let existing = window.kitBuilderComponents.find(c => String(c.name).toLowerCase().trim() === nLow);
+                            if (existing && uc.qty > existing.qty) existing.qty = uc.qty;
+                        }
+                    });
+                    
+                    if (typeof renderKitBuilder === 'function') renderKitBuilder();
+                    if (document.getElementById('kit-builder-panel')) document.getElementById('kit-builder-panel').style.display = 'flex';
+                }
+            } else {
+                const a = globalAssets.find(x => x.id === populateId);
+                if (a) {
+                    document.getElementById('asset-name').value = a.name || '';
+                    if(document.getElementById('asset-unit-number')) { document.getElementById('asset-unit-number').value = a.unitNumber || ''; document.getElementById('asset-unit-number').disabled = false; }
+                    if(document.getElementById('asset-rfid')) { document.getElementById('asset-rfid').value = a.rfidTag || ''; document.getElementById('asset-rfid').disabled = false; }
+                    document.getElementById('asset-manufacturer').value = a.manufacturer || '';
+                    document.getElementById('asset-level').value = a.nestingLevel !== undefined ? a.nestingLevel : '6';
+                    document.getElementById('asset-type').value = a.type || 'Physical';
+                    if (document.getElementById('asset-is-consumable')) document.getElementById('asset-is-consumable').checked = (a.isConsumable === true || a.isConsumable === 'true');
+                    if (document.getElementById('asset-quantity')) {
+                        document.getElementById('asset-quantity').value = a.type === 'Bulk' ? (a.totalQuantity || 1) : 1;
+                        document.getElementById('asset-quantity').disabled = false;
+                    }
+                    if (typeof handleAssetTypeChange === 'function') handleAssetTypeChange();
+                    document.getElementById('asset-department').value = a.department || '';
+                    document.getElementById('asset-wh').value = a.whId || '';
+                    updateAssetZones();
+                    document.getElementById('asset-zone').value = a.zoneId || '';
+                    updateAssetAreas();
+                    document.getElementById('asset-area').value = a.areaId || '';
+                    document.getElementById('asset-weight').value = a.weight || '';
+                    document.getElementById('asset-dims').value = a.dims || '';
+                    document.getElementById('asset-capacity').value = a.capacity !== undefined ? a.capacity : '';
+                    document.getElementById('asset-length').value = a.length || '';
+                    if(document.getElementById('asset-serial')) { document.getElementById('asset-serial').value = a.serialNumber || ''; document.getElementById('asset-serial').disabled = false; }
+                    if(document.getElementById('asset-vendor')) document.getElementById('asset-vendor').value = a.vendorUid || '';
+                    document.getElementById('asset-power').value = a.power || '';
+                    document.getElementById('asset-price').value = a.price || '';
+                    document.getElementById('asset-rental').value = a.rental || '';
+                    document.getElementById('asset-date-bought').value = a.dateBought || '';
+                    document.getElementById('asset-lifecycle').value = a.lifecycle || 'Active';
+                    document.getElementById('asset-last-service').value = a.lastService || '';
+                    document.getElementById('asset-service-interval').value = a.serviceInterval || '12';
+                    document.getElementById('asset-tags-hidden').value = a.tags || '[]';
+                    renderAssetTags();
+
+                    if (document.getElementById('kit-builder-mode')) {
+                        document.getElementById('kit-builder-mode').value = (a.isFixedRack === true || a.isFixedRack === 'true') ? 'fixed' : 'fluid';
+                    }
+
+                    if (a.nestingLevel == 3 || a.nestingLevel == 4 || a.nestingLevel == 5) {
+                        let untrackedComps = a.components ? a.components.split(',').map(c => {
+                            let text = c.trim();
+                            let match = text.match(/^(\d+)x\s+(.*)$/i);
+                            if (match) return { qty: parseInt(match[1], 10), name: match[2] };
+                            return { qty: 1, name: text };
+                        }).filter(c => c.name) : [];
+                        
+                        let childItems = globalAssets.filter(child => child.containerType === a.id);
+                        let childGroups = {};
+                        childItems.forEach(child => {
+                            let n = child.name;
+                            let nLow = n.toLowerCase();
+                            let uniqueKey = nLow;
+                            if (!childGroups[uniqueKey]) childGroups[uniqueKey] = { qty: 0, name: n, uids: [], unitNumbers: [] };
+                            childGroups[uniqueKey].qty += (child.type === 'Bulk' ? (parseInt(child.totalQuantity, 10) || 1) : 1);
+                            childGroups[uniqueKey].uids.push(child.id);
+                            if (child.unitNumber) childGroups[uniqueKey].unitNumbers.push(child.unitNumber);
+                        });
+                        let trackedComps = Object.values(childGroups);
+                        
+                        window.kitBuilderComponents = [...trackedComps];
+                        let trackedNames = new Set(trackedComps.map(c => String(c.name).toLowerCase().trim()));
+                        untrackedComps.forEach(uc => {
+                            let isTrackedGlobal = globalAssets.some(ga => String(ga.name||'').toLowerCase().trim() === String(uc.name).toLowerCase().trim());
+                            if (!trackedNames.has(String(uc.name).toLowerCase().trim()) && !isTrackedGlobal) window.kitBuilderComponents.push(uc);
+                        });
+                        
+                        if (typeof renderKitBuilder === 'function') renderKitBuilder();
+                        if (document.getElementById('kit-builder-panel')) document.getElementById('kit-builder-panel').style.display = 'flex';
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Asset Modal Population Error:", e);
+        alert("Notice: Could not load some asset data properties: " + e.message);
+    }
+    
+    document.getElementById('asset-modal-overlay').style.display = 'flex';
+}
+
+window.closeAssetModal = function(wasSaved) {
+    document.getElementById('asset-modal-overlay').style.display = 'none';
+    if (typeof handleAuditModalClose === 'function') {
+        handleAuditModalClose(wasSaved);
+    }
+};
+
+function updateAssetZones() {
+    const whId = document.getElementById('asset-wh').value;
+    const zoneSelect = document.getElementById('asset-zone');
+    const areaSelect = document.getElementById('asset-area');
+    
+    zoneSelect.innerHTML = '<option value="">Select...</option>';
+    areaSelect.innerHTML = '<option value="">Select...</option>';
+    areaSelect.disabled = true;
+
+    if (!whId) {
+        zoneSelect.disabled = true;
+        return;
+    }
+    
+    zoneSelect.disabled = false;
+    if (typeof globalWhZones !== 'undefined') {
+        let zones = globalWhZones.filter(z => z.parentId === whId);
+        zones.forEach(z => { zoneSelect.innerHTML += `<option value="${z.id}">${z.name}</option>`; });
+    }
+}
+
+function updateAssetAreas() {
+    const zoneId = document.getElementById('asset-zone').value;
+    const areaSelect = document.getElementById('asset-area');
+    
+    areaSelect.innerHTML = '<option value="">Select...</option>';
+
+    if (!zoneId) {
+        areaSelect.disabled = true;
+        return;
+    }
+
+    areaSelect.disabled = false;
+    if (typeof globalWhAreas !== 'undefined') {
+        let areas = globalWhAreas.filter(a => a.zoneId === zoneId);
+        areas.forEach(a => { areaSelect.innerHTML += `<option value="${a.id}">${a.name}</option>`; });
+    }
+}
+
+function saveAsset() {
+    let isBulk = Array.isArray(currentEditAssetId) && currentEditAssetId.length > 1;
+    
+    if (!isBulk) {
+        const name = document.getElementById('asset-name').value;
+        const level = document.getElementById('asset-level').value;
+        const type = document.getElementById('asset-type').value;
+        const unitNumber = document.getElementById('asset-unit-number') ? document.getElementById('asset-unit-number').value.trim() : '';
+        if (!name || !level || !type) return alert("System Critical Data Missing: Name, Nesting Level, and Asset Type are required.");
+        if (type !== 'Bulk' && !unitNumber) return alert("Unit Number is mandatory for serialized/unique items. Please enter a number (e.g., '01').");
+    }
+    
+    const quantity = document.getElementById('asset-quantity') ? (parseInt(document.getElementById('asset-quantity').value, 10) || 1) : 1;
+
+    if (isBulk && document.getElementById('asset-quantity')) {
+        let origQty = parseInt(document.getElementById('asset-quantity').dataset.origQty, 10) || 1;
+        if (quantity < origQty) {
+            if (!confirm(`WARNING: You entered a quantity (${quantity}) smaller than the existing group size (${origQty}).\n\nThis WILL PERMANENTLY DELETE ${origQty - quantity} item(s) from this group. Are you sure you want to proceed?`)) {
+                return;
+            }
+        }
+    }
+    
+    let markAsReviewed = false;
+    if (window.isInlineAuditMode) {
+        markAsReviewed = true; // Auto-mark as reviewed without prompting
+    }
+
+    const modal = document.getElementById('asset-modal-overlay');
+    const btn = modal.querySelector('.btn-main');
+    const origText = btn.innerText;
+    btn.innerText = "SAVING TO VAULT...";
+    btn.disabled = true;
+
+    const payload = {};
+    if (!isBulk || window.dirtyAssetFields.has('asset-name')) payload.name = document.getElementById('asset-name').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-unit-number')) payload.unitNumber = document.getElementById('asset-unit-number') ? document.getElementById('asset-unit-number').value.trim() : '';
+    if (!isBulk || window.dirtyAssetFields.has('asset-rfid')) payload.rfidTag = document.getElementById('asset-rfid') ? document.getElementById('asset-rfid').value.trim() : '';
+    if (!isBulk || window.dirtyAssetFields.has('asset-manufacturer')) payload.manufacturer = document.getElementById('asset-manufacturer').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-level')) payload.nestingLevel = document.getElementById('asset-level').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-type')) payload.type = document.getElementById('asset-type').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-is-consumable')) payload.isConsumable = document.getElementById('asset-is-consumable') ? document.getElementById('asset-is-consumable').checked : false;
+    if (!isBulk || window.dirtyAssetFields.has('asset-department')) payload.department = document.getElementById('asset-department').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-wh')) payload.whId = document.getElementById('asset-wh').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-zone')) payload.zoneId = document.getElementById('asset-zone').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-area')) payload.areaId = document.getElementById('asset-area').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-weight')) payload.weight = document.getElementById('asset-weight').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-dims')) payload.dims = document.getElementById('asset-dims').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-capacity')) payload.capacity = document.getElementById('asset-capacity').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-length')) payload.length = document.getElementById('asset-length').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-serial')) payload.serialNumber = document.getElementById('asset-serial') ? document.getElementById('asset-serial').value : '';
+    if (!isBulk || window.dirtyAssetFields.has('asset-vendor')) payload.vendorUid = document.getElementById('asset-vendor') ? document.getElementById('asset-vendor').value : '';
+    if (!isBulk || window.dirtyAssetFields.has('asset-power')) payload.power = document.getElementById('asset-power').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-price')) payload.price = document.getElementById('asset-price').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-rental')) payload.rental = document.getElementById('asset-rental').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-date-bought')) payload.dateBought = document.getElementById('asset-date-bought').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-lifecycle')) payload.lifecycle = document.getElementById('asset-lifecycle').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-last-service')) payload.lastService = document.getElementById('asset-last-service').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-service-interval')) payload.serviceInterval = document.getElementById('asset-service-interval').value;
+    if (!isBulk || window.dirtyAssetFields.has('asset-tags-hidden')) payload.tags = document.getElementById('asset-tags-hidden').value;
+
+    let currentLvl = document.getElementById('asset-level').value;
+    // Kit Builder Payload
+    if (currentLvl == 3 || currentLvl == 4 || currentLvl == 5) {
+        let kMode = document.getElementById('kit-builder-mode') ? document.getElementById('kit-builder-mode').value : 'fluid';
+        payload.kitMode = kMode;
+        payload.isFixedRack = (kMode === 'fixed');
+        
+        if (payload.kitMode === 'fixed') {
+            payload.fixedChildren = [];
+            window.kitBuilderComponents.forEach(c => {
+                if (c.uids && Array.isArray(c.uids)) {
+                    payload.fixedChildren.push(...c.uids);
+                } else if (c.uid) {
+                    payload.fixedChildren.push(c.uid);
+                }
+            });
+        }
+        
+        payload.components = window.kitBuilderComponents.map(c => `${c.qty}x ${c.name}`).join(', ');
+        
+        let totalTracked = 0;
+        window.kitBuilderComponents.forEach(c => {
+            let isTracked = (typeof globalAssets !== 'undefined') && globalAssets.some(ga => String(ga.name || '').toLowerCase() === String(c.name || '').toLowerCase());
+            if (isTracked) totalTracked += (parseInt(c.qty, 10) || 1);
+        });
+        payload.capacity = totalTracked > 0 ? totalTracked : '';
+    } else {
+        payload.capacity = '';
+    }
+
+    let safetyTimer = setTimeout(() => {
+        btn.innerText = "STILL SAVING...";
+    }, 30000);
+
+    let hardFailTimer = setTimeout(() => {
+        btn.innerText = origText;
+        btn.disabled = false;
+        alert("Network Timeout: The server is taking an unusually long time. Please close this window and refresh the page to check if your assets were saved before trying again.");
+    }, 90000);
+
+    google.script.run
+        .withFailureHandler(err => {
+            clearTimeout(safetyTimer);
+            clearTimeout(hardFailTimer);
+            alert("Server Error: " + err.message);
+            btn.innerText = origText;
+            btn.disabled = false;
+        })
+        .withSuccessHandler(res => {
+            clearTimeout(safetyTimer);
+            clearTimeout(hardFailTimer);
+            btn.innerText = origText;
+            btn.disabled = false;
+            if (res.success) {
+                if (typeof closeAssetModal === 'function') closeAssetModal(true); else modal.style.display = 'none';
+                if (currentEditAssetId) {
+                    let idsToUpdate = Array.isArray(currentEditAssetId) ? currentEditAssetId : [currentEditAssetId];
+                    idsToUpdate.forEach(id => {
+                        let a = globalAssets.find(x => x.id === id);
+                        if (a) {
+                            if (payload.hasOwnProperty('name')) a.name = payload.name;
+                            if (idsToUpdate.length === 1) {
+                                if (payload.hasOwnProperty('unitNumber')) a.unitNumber = payload.unitNumber;
+                                if (payload.hasOwnProperty('rfidTag')) a.rfidTag = payload.rfidTag;
+                            }
+                            if (payload.hasOwnProperty('manufacturer')) a.manufacturer = payload.manufacturer;
+                            if (payload.hasOwnProperty('nestingLevel')) a.nestingLevel = parseInt(payload.nestingLevel, 10);
+                            if (payload.hasOwnProperty('type')) a.type = payload.type;
+                            if (payload.hasOwnProperty('isConsumable')) a.isConsumable = payload.isConsumable;
+                            if (payload.hasOwnProperty('department')) a.department = payload.department;
+                            if (payload.hasOwnProperty('whId')) a.whId = payload.whId;
+                            if (payload.hasOwnProperty('zoneId')) a.zoneId = payload.zoneId;
+                            if (payload.hasOwnProperty('areaId')) a.areaId = payload.areaId;
+                            if (payload.hasOwnProperty('weight')) a.weight = payload.weight;
+                            if (payload.hasOwnProperty('dims')) a.dims = payload.dims;
+                            if (payload.hasOwnProperty('capacity')) a.capacity = payload.capacity;
+                            if (payload.hasOwnProperty('length')) a.length = payload.length;
+                            if (payload.hasOwnProperty('serialNumber')) a.serialNumber = payload.serialNumber;
+                            if (payload.hasOwnProperty('vendorUid')) a.vendorUid = payload.vendorUid;
+                            if (payload.hasOwnProperty('power')) a.power = payload.power;
+                            if (payload.hasOwnProperty('price')) a.price = payload.price;
+                            if (payload.hasOwnProperty('rental')) a.rental = payload.rental;
+                            if (payload.hasOwnProperty('dateBought')) a.dateBought = payload.dateBought;
+                            if (payload.hasOwnProperty('lifecycle')) a.status = payload.lifecycle;
+                            if (payload.hasOwnProperty('lastService')) a.lastService = payload.lastService;
+                            if (payload.hasOwnProperty('serviceInterval')) a.serviceInterval = payload.serviceInterval;
+                            if (payload.hasOwnProperty('tags')) a.tags = payload.tags;
+                            if (payload.hasOwnProperty('components')) a.components = payload.components;
+                            if (payload.hasOwnProperty('isFixedRack')) a.isFixedRack = payload.isFixedRack;
+                            if (payload.hasOwnProperty('type') && payload.type === 'Bulk') a.totalQuantity = quantity;
+                        }
+                    });
+                    
+                    // FRONTEND MEMORY RE-PACK: Optimistically "Start Anew" in local RAM
+                    let isContainerObj = (payload.nestingLevel == 3 || payload.nestingLevel == 4 || payload.nestingLevel == 5 || payload.type === 'Container');
+                    if (isContainerObj && payload.hasOwnProperty('components')) {
+                        globalAssets.forEach(child => {
+                            if (idsToUpdate.includes(child.containerType)) child.containerType = ""; 
+                            delete child.usedOpt;
+                        });
+                        
+                        window.kitBuilderComponents.forEach(comp => {
+                            let availableItems = globalAssets.filter(a => String(a.name||'').toLowerCase().trim() === String(comp.name||'').toLowerCase().trim() && !a.containerType);
+                            idsToUpdate.forEach(caseId => {
+                                let needed = comp.qty;
+                                for (let i = 0; i < availableItems.length && needed > 0; i++) {
+                                    let av = availableItems[i];
+                                    if (av.type === 'Bulk' && parseInt(av.totalQuantity||1, 10) > needed) continue;
+                                    av.containerType = caseId;
+                                    needed -= (av.type === 'Bulk' ? parseInt(av.totalQuantity||1, 10) : 1);
+                                    av.usedOpt = true;
+                                }
+                                availableItems = availableItems.filter(a => !a.usedOpt);
+                            });
+                        });
+                    }
+                    
+                    if (markAsReviewed) {
+                        if (!window.reviewedAssetIds) window.reviewedAssetIds = new Set();
+                        idsToUpdate.forEach(id => window.reviewedAssetIds.add(id));
+                        google.script.run.setAssetReviewedStatus(idsToUpdate, true, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+                    }
+
+                    // INSTANT CACHE LOCK: Protect optimistic changes from being overwritten by immediate local reads
+                    try { localStorage.setItem('sm_vault_cache', JSON.stringify({ assets: globalAssets, auditFlags: window.auditFlags || [], reviewedAssetIds: Array.from(window.reviewedAssetIds || []) })); } catch(e) {}
+
+                        if (res.isExpansion || isContainerObj) {
+                            if(typeof loadAssetRegistry === 'function') loadAssetRegistry();
+                        } else {
+                            if(typeof renderAssetRegistry === 'function') renderAssetRegistry();
+                        }
+                        
+                        if (res.warning) setTimeout(() => alert("Notice:\n" + res.warning), 500);
+                } else {
+                    alert(res.message);
+                    if(typeof loadAssetRegistry === 'function') loadAssetRegistry();
+                }
+            } else {
+                alert(res.error);
+            }
+        })
+    .provisionNewAsset(ACTIVE_USER_NAME, payload, currentEditAssetId, quantity);
+}
+
+function handleAssetTypeChange() {
+    const type = document.getElementById('asset-type').value;
+    const isConsumable = document.getElementById('asset-is-consumable') ? document.getElementById('asset-is-consumable').checked : false;
+    const qty = document.getElementById('asset-quantity');
+    const unit = document.getElementById('asset-unit-number');
+    
+    if (isConsumable) {
+        if(qty) { qty.value = 1; qty.disabled = true; }
+        if(unit) { unit.value = ''; unit.disabled = true; }
+    } else if (type === 'Bulk') {
+        if(qty) qty.disabled = false;
+        if(unit) { 
+            if (unit.value) unit.dataset.lastValue = unit.value;
+            unit.disabled = true; 
+            unit.value = ''; 
+        }
+    } else {
+        if(qty) {
+            qty.disabled = false;
+                if (currentEditAssetId) {
+                    let count = Array.isArray(currentEditAssetId) ? currentEditAssetId.length : 1;
+                    qty.min = count;
+                    if (parseInt(qty.value, 10) < count) qty.value = count;
+                } else {
+                    qty.min = 1;
+                }
+        }
+        if(unit) {
+            unit.disabled = false;
+            if (!unit.value && unit.dataset.lastValue) {
+                unit.value = unit.dataset.lastValue;
+            } else if (!unit.value) {
+                let name = document.getElementById('asset-name').value;
+                if (name && typeof globalAssets !== 'undefined') {
+                    let matches = globalAssets.filter(a => String(a.name || '').toLowerCase() === String(name || '').toLowerCase());
+                    if (matches.length > 0) {
+                        let padding = 2; let existingUnits = [];
+                        matches.forEach(m => {
+                            if (m.unitNumber) {
+                                let strVal = String(m.unitNumber).trim();
+                                let num = parseInt(strVal, 10);
+                                if (!isNaN(num)) existingUnits.push(num);
+                                if (strVal.startsWith('0') && strVal.length > padding) padding = strVal.length;
+                            }
+                        });
+                        let nextUnit = 1;
+                        existingUnits.sort((a, b) => a - b);
+                        for (let i = 0; i < existingUnits.length; i++) {
+                            if (existingUnits[i] === nextUnit) nextUnit++;
+                            else if (existingUnits[i] > nextUnit) break;
+                        }
+                        unit.value = String(nextUnit).padStart(padding, '0');
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// --- KIT BUILDER UI LOGIC ---
+// ==========================================
+// @INDEX: KIT_BUILDER -> Logic & Render
+function handleNestingLevelChange() {
+    let level = document.getElementById('asset-level').value;
+    let panel = document.getElementById('kit-builder-panel');
+    if (panel) {
+        panel.style.display = (level == 3 || level == 4 || level == 5) ? 'flex' : 'none';
+    }
+}
+
+function renderKitBuilder() {
+    let componentsList = document.getElementById('kit-builder-components-list');
+    if (!componentsList) return;
+
+    // Auto-sort: Tracked Items (Database) on top, Untracked (Text) below. Alphabetical within each.
+    window.kitBuilderComponents.sort((a, b) => {
+        let aIsTracked = (typeof globalAssets !== 'undefined') && globalAssets.some(ga => String(ga.name || '').toLowerCase() === String(a.name || '').toLowerCase());
+        let bIsTracked = (typeof globalAssets !== 'undefined') && globalAssets.some(ga => String(ga.name || '').toLowerCase() === String(b.name || '').toLowerCase());
+        
+        if (aIsTracked && !bIsTracked) return -1;
+        if (!aIsTracked && bIsTracked) return 1;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+
+    let isBulkEdit = Array.isArray(currentEditAssetId) && currentEditAssetId.length > 1;
+    let kMode = document.getElementById('kit-builder-mode') ? document.getElementById('kit-builder-mode').value : 'fluid';
+
+    let searchInput = document.getElementById('kit-builder-child-search');
+    if (searchInput) searchInput.style.display = 'block';
+
+    let compHtml = window.kitBuilderComponents.map((c, i) => {
+        let unitStr = '';
+        if (kMode === 'fixed') {
+            if (c.unitNumbers && c.unitNumbers.length > 0) {
+                unitStr = ` <span style="color:#a855f7; font-weight:bold;">(#${c.unitNumbers.join(', #')})</span>`;
+            } else if (c.unitNumber) {
+                unitStr = ` <span style="color:#a855f7; font-weight:bold;">#${c.unitNumber}</span>`;
+            }
+        }
+        let safeComp = (typeof escapeHTML === 'function' ? escapeHTML(c.name) : c.name) + unitStr;
+        let isTracked = (typeof globalAssets !== 'undefined') && globalAssets.some(ga => String(ga.name || '').toLowerCase() === String(c.name || '').toLowerCase());
+        let textColor = isTracked ? '#10b981' : '#fff';
+        let lockIcon = (kMode === 'fixed' && (c.uid || (c.uids && c.uids.length > 0))) ? '<span style="margin-right:4px;" title="Hard-Allocated Fixed Unit">🔒</span>' : '';
+        return `<div style="display:flex; align-items:center; gap:8px; background:#1a1a1e; padding:6px 10px; border-radius:4px; border:1px solid #333;">
+                  <input type="number" min="1" value="${c.qty}" ${kMode === 'fixed' ? 'disabled' : ''} onfocus="this.select()" onclick="this.select()" onchange="if(typeof updateUntrackedComponentQty === 'function') updateUntrackedComponentQty(${i}, this.value)" style="width:40px; padding:4px; font-size:11px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; text-align:center;">
+                  <span style="flex:1; color:${textColor}; font-size:11px; font-weight:${isTracked ? 'bold' : 'normal'};">${lockIcon}${safeComp}</span>
+                  <button class="btn-delete btn-sm" style="padding:4px 8px; margin:0;" onclick="removeUntrackedComponentFromKit(${i})">X</button>
+               </div>`;
+    }).join('');
+    
+    if (window.kitBuilderWarning) {
+        compHtml = `<div style="background:rgba(245,158,11,0.1); color:#f59e0b; border:1px solid #f59e0b; padding:8px; font-size:10px; font-weight:bold; border-radius:4px; margin-bottom:10px;">${window.kitBuilderWarning}</div>` + compHtml;
+    }
+    
+    componentsList.innerHTML = compHtml || '<div style="color:#555; font-size:10px; font-style:italic;">Template is empty.</div>';
+    
+    if (typeof window.updateCapacityFromKit === 'function') window.updateCapacityFromKit();
+}
+
+window.updateCapacityFromKit = function() {
+    let level = document.getElementById('asset-level').value;
+    if (level != 3 && level != 4 && level != 5) return;
+    
+    let totalTracked = 0;
+    window.kitBuilderComponents.forEach(c => {
+        let isTracked = (typeof globalAssets !== 'undefined') && globalAssets.some(ga => String(ga.name || '').toLowerCase() === String(c.name || '').toLowerCase());
+        if (isTracked) {
+            totalTracked += (parseInt(c.qty, 10) || 1);
+        }
+    });
+    let capInput = document.getElementById('asset-capacity');
+    if (capInput) {
+        capInput.value = totalTracked > 0 ? totalTracked : '';
+        if (window.dirtyAssetFields) window.dirtyAssetFields.add('asset-capacity');
+    }
+};
+
+window.updateUntrackedComponentQty = function(index, qty) {
+    if (window.kitBuilderComponents[index]) {
+        window.kitBuilderComponents[index].qty = parseInt(qty, 10) || 1;
+        if (typeof window.updateCapacityFromKit === 'function') window.updateCapacityFromKit();
+    }
+};
+
+function addUntrackedComponentToKit() {
+    let input = document.getElementById('kit-builder-new-component');
+    let val = input.value.trim();
+    if (val) {
+        window.kitBuilderComponents.push({ qty: 1, name: val });
+        input.value = '';
+        renderKitBuilder();
+        if(typeof handleUntrackedInput === 'function') handleUntrackedInput();
+    }
+}
+
+function removeUntrackedComponentFromKit(index) {
+    window.kitBuilderComponents.splice(index, 1);
+    renderKitBuilder();
+}
+
+function filterKitBuilderChildSearch() {
+    let dropdown = document.getElementById('kit-builder-child-dropdown');
+    let searchInput = document.getElementById('kit-builder-child-search');
+    if (!dropdown || !searchInput) return;
+
+    let query = searchInput.value.toLowerCase().trim();
+    dropdown.style.display = 'block';
+
+    let filtered = (typeof globalAssets !== 'undefined' ? globalAssets : []).filter(a => {
+        let editId = Array.isArray(currentEditAssetId) ? currentEditAssetId[0] : currentEditAssetId;
+        if (a.id === editId) return false; // Can't add itself
+        
+        // STRICT MATRYOSHKA FILTER: Only show packable items (Levels 4, 5, and 6)
+        let lvl = a.nestingLevel !== undefined ? a.nestingLevel : 6;
+        if (lvl < 4) return false; // Hide Master Cases, Presets, Sub-Warehouses, and Roots
+        
+        if (!query) return true; // Show all if empty
+        
+        let nameMatch = String(a.name || '').toLowerCase().includes(query);
+        let unitMatch = a.unitNumber && String(a.unitNumber).toLowerCase().includes(query);
+        let brandMatch = String(a.manufacturer || '').toLowerCase().includes(query);
+        return nameMatch || unitMatch || brandMatch;
+    }).slice(0, 50); // Limit results
+
+    let html = filtered.map(a => {
+        let safeName = typeof escapeHTML === 'function' ? escapeHTML(a.name) : a.name;
+        let unit = a.unitNumber ? ` <span style="color:#a855f7; font-weight:bold;">#${a.unitNumber}</span>` : '';
+        let brand = a.manufacturer ? ` <span style="color:#888; font-size:9px;">${a.manufacturer}</span>` : '';
+        return `<div style="padding:8px 12px; cursor:pointer; color:#fff; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='transparent'" onclick="selectKitBuilderChild('${a.id}')">
+            <span>${safeName}${unit}</span>
+            ${brand}
+        </div>`;
+    }).join('');
+
+    dropdown.innerHTML = html || '<div style="padding:8px 12px; color:#888;">No assets match your search.</div>';
+}
+
+function selectKitBuilderChild(assetId) {
+    let asset = globalAssets.find(a => a.id === assetId);
+    if (asset) {
+        let existing = window.kitBuilderComponents.find(c => c.name.toLowerCase() === asset.name.toLowerCase());
+        if (existing) {
+            existing.qty += 1;
+            if (!existing.uids) existing.uids = existing.uid ? [existing.uid] : [];
+            existing.uids.push(asset.id);
+            if (!existing.unitNumbers) existing.unitNumbers = existing.unitNumber ? [existing.unitNumber] : [];
+            if (asset.unitNumber) existing.unitNumbers.push(asset.unitNumber);
+        } else {
+            window.kitBuilderComponents.push({ qty: 1, name: asset.name, uids: [asset.id], unitNumbers: asset.unitNumber ? [asset.unitNumber] : [] });
+        }
+        renderKitBuilder();
+    }
+    document.getElementById('kit-builder-child-search').value = '';
+    document.getElementById('kit-builder-child-dropdown').style.display = 'none';
+}
+
+window.handleUntrackedInput = function() {
+    let input = document.getElementById('kit-builder-new-component');
+    let memBtn = document.getElementById('kit-builder-memorize-btn');
+    let dropdown = document.getElementById('untracked-memory-dropdown');
+    if (!input || !dropdown) return;
+    
+    let val = input.value.trim().toLowerCase();
+    
+    if (val && window.untrackedMemory && !window.untrackedMemory.some(m => m.toLowerCase() === val)) {
+        memBtn.style.display = 'block';
+        memBtn.innerText = 'MEMORIZE';
+        memBtn.disabled = false;
+    } else {
+        memBtn.style.display = 'none';
+    }
+
+    let filtered = window.untrackedMemory || [];
+    if (val) {
+        filtered = filtered.filter(m => m.toLowerCase().includes(val));
+    }
+
+    if (filtered.length > 0) {
+        dropdown.innerHTML = filtered.map((m) => `
+            <div style="padding:8px 12px; color:#fff; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='transparent'">
+                <span style="cursor:pointer; flex:1;" onclick="selectUntrackedMemory('${m.replace(/'/g, "\\'")}')">${m}</span>
+                <button class="btn-delete btn-sm" style="padding:2px 8px; margin:0;" onclick="deleteUntrackedMemory('${m.replace(/'/g, "\\'")}', event)" title="Delete from memory">X</button>
+            </div>
+        `).join('');
+        dropdown.style.display = 'block';
+    } else {
+        dropdown.style.display = 'none';
+    }
+};
+
+window.memorizeUntrackedComponent = function() {
+    let input = document.getElementById('kit-builder-new-component');
+    let val = input.value.trim();
+    if (!val) return;
+    
+    let memBtn = document.getElementById('kit-builder-memorize-btn');
+    memBtn.innerText = 'SAVING...';
+    memBtn.disabled = true;
+
+    if (!window.untrackedMemory) window.untrackedMemory = [];
+    if (!window.untrackedMemory.includes(val)) {
+        window.untrackedMemory.push(val);
+        window.untrackedMemory.sort();
+        google.script.run.withSuccessHandler(() => {
+            memBtn.innerText = 'MEMORIZED ✓';
+            setTimeout(() => { memBtn.style.display = 'none'; memBtn.disabled = false; }, 1500);
+            handleUntrackedInput();
+        }).saveVaultAsset('untracked_memory', window.untrackedMemory);
+    }
+};
+
+window.deleteUntrackedMemory = function(val, e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    if (!confirm(`Delete "${val}" from the saved dictionary?`)) return;
+    
+    window.untrackedMemory = window.untrackedMemory.filter(m => m !== val);
+    google.script.run.saveVaultAsset('untracked_memory', window.untrackedMemory);
+    handleUntrackedInput();
+};
+
+window.selectUntrackedMemory = function(val) {
+    let input = document.getElementById('kit-builder-new-component');
+    input.value = val;
+    document.getElementById('untracked-memory-dropdown').style.display = 'none';
+    addUntrackedComponentToKit();
+};
+
+document.addEventListener('click', function(e) {
+    let dd = document.getElementById('kit-builder-child-dropdown');
+    if (dd && dd.style.display === 'block' && !e.target.closest('#kit-builder-child-search') && !e.target.closest('#kit-builder-child-dropdown')) {
+        dd.style.display = 'none';
+    }
+    let dd2 = document.getElementById('untracked-memory-dropdown');
+    if (dd2 && dd2.style.display === 'block' && !e.target.closest('#kit-builder-new-component') && !e.target.closest('#untracked-memory-dropdown') && !e.target.closest('#kit-builder-memorize-btn')) {
+        dd2.style.display = 'none';
+    }
+});
+
+// ==========================================
+// --- MULTI-TAG PICKER (ASSET MODAL) ---
+// ==========================================
+// @INDEX: TAG_PICKER -> Asset Modal
+function renderAssetTags() {
+    let tags = [];
+    try {
+        tags = JSON.parse(document.getElementById('asset-tags-hidden').value || '[]');
+    } catch(e) {
+        tags = [];
+    }
+    
+    let tagObjs = [];
+    tags.forEach(tId => {
+        let tObj = getTagObj(tId);
+        if (tObj) tagObjs.push(tObj);
+    });
+    
+    tagObjs.sort((a, b) => {
+        let depthA = getTagDepthById(a.id);
+        let depthB = getTagDepthById(b.id);
+        return depthA - depthB;
+    });
+
+    let html = tagObjs.map(t => {
+        let color = t.color || '#a855f7';
+        return `<div style="background:rgba(0,0,0,0.4); border:1px solid ${color}; color:${color}; padding:4px 8px; border-radius:12px; font-size:10px; font-weight:bold; display:flex; align-items:center; gap:6px;">${t.name} <span style="cursor:pointer; color:#ef4444;" onclick="removeAssetTag('${t.id}')">✖</span></div>`;
+    }).join('');
+    if(html === '') html = '<div style="color:#555; font-size:10px; font-style:italic;">No tags selected.</div>';
+    document.getElementById('asset-tags-list').innerHTML = html;
+}
+
+function removeAssetTag(id) {
+    let tags = JSON.parse(document.getElementById('asset-tags-hidden').value || '[]');
+    tags = tags.filter(t => t !== id);
+    document.getElementById('asset-tags-hidden').value = JSON.stringify(tags);
+    if(window.dirtyAssetFields) window.dirtyAssetFields.add('asset-tags-hidden');
+    if(window.markAuditField) window.markAuditField('tags');
+    renderAssetTags();
+}
+
+function openTagSelector(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const menu = document.getElementById('tag-selector-menu');
+    menu.style.display = 'block';
+    menu.style.left = e.clientX + 'px';
+    menu.style.top = (e.clientY + 15) + 'px';
+    
+    let html = `
+        <input type="text" id="tag-search-input" placeholder="Search tags..." style="width:100%; padding:6px; margin-bottom:10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; font-size:11px; box-sizing:border-box;" oninput="filterTagSelector(this.value)" onclick="event.stopPropagation()">
+        <div id="tag-selector-tree-inner">
+            ${buildTagSelectorHTML(SYSTEM_TAGS, 0)}
+        </div>
+    `;
+    document.getElementById('tag-selector-tree').innerHTML = html;
+    setTimeout(() => { let inp = document.getElementById('tag-search-input'); if(inp) inp.focus(); }, 50);
+}
+
+function filterTagSelector(query) {
+    document.getElementById('tag-selector-tree-inner').innerHTML = buildTagSelectorHTML(SYSTEM_TAGS, 0, query);
+}
+
+function hasMatchingChild(children, query) {
+    if(!children) return false;
+    for(let c of children) {
+        if(c.name.toLowerCase().includes(query.toLowerCase())) return true;
+        if(hasMatchingChild(c.children, query)) return true;
+    }
+    return false;
+}
+
+function buildTagSelectorHTML(nodes, depth, query = '') {
+    if (!nodes || nodes.length === 0) return '';
+    let html = '';
+    nodes.forEach(node => {
+        let match = true;
+        if (query && !node.name.toLowerCase().includes(query.toLowerCase())) {
+            if (!hasMatchingChild(node.children, query)) match = false;
+        }
+        if (!match) return;
+
+        let padding = depth * 15;
+        let hasChildren = node.children && node.children.length > 0;
+        let color = node.color || '#a855f7';
+        html += `<div style="padding-left:${padding}px; margin-bottom:4px;">`;
+        
+        html += `<div onclick="selectAssetTag('${node.id}')" style="cursor:pointer; font-size:11px; color:#fff; background:#222; padding:4px 8px; border-radius:4px; border-left:3px solid ${color}; display:inline-block; transition:0.2s;" onmouseover="this.style.background='#333'" onmouseout="this.style.background='#222'">${node.name}</div>`;
+        
+        if (hasChildren) {
+            html += `<div style="margin-top:4px;">${buildTagSelectorHTML(node.children, depth + 1, query)}</div>`;
+        }
+        html += `</div>`;
+    });
+    return html;
+}
+
+function selectAssetTag(id) {
+    let tags = JSON.parse(document.getElementById('asset-tags-hidden').value || '[]');
+    
+    let path = getTagPathById(id);
+    if (path) {
+        path.forEach(pId => {
+            if (!tags.includes(pId)) tags.push(pId);
+        });
+    } else {
+        if (!tags.includes(id)) tags.push(id);
+    }
+    
+    tags.sort((a, b) => getTagDepthById(a) - getTagDepthById(b));
+
+    document.getElementById('asset-tags-hidden').value = JSON.stringify(tags);
+    if(window.dirtyAssetFields) window.dirtyAssetFields.add('asset-tags-hidden');
+    if(window.markAuditField) window.markAuditField('tags');
+    renderAssetTags();
+    document.getElementById('tag-selector-menu').style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#tag-selector-menu') && !e.target.closest('button[onclick*="openTagSelector"]')) {
+        const menu = document.getElementById('tag-selector-menu');
+        if (menu) menu.style.display = 'none';
+    }
+});
+</script>

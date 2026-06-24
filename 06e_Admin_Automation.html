@@ -1,0 +1,961 @@
+<script>
+/**
+ * 06e_Admin_Automation.html
+ * Domain: Drive Automation, Archivers, Universal History, and Tag Dictionary.
+ */
+
+// ==========================================
+// --- CHECKLIST AUTOMATION LOGIC ---
+// ==========================================
+function openSyncPickerModal() {
+    document.getElementById('sync-picker-modal').style.display = 'flex';
+    let listContainer = document.getElementById('sp-folder-list');
+    listContainer.innerHTML = '<div style="color:#555; text-align:center; padding:20px;">Loading Template Contents...</div>';
+    
+    let checkAllCb = document.getElementById('sync-check-all');
+    if (checkAllCb) checkAllCb.checked = false;
+    
+    let activeSelection = [];
+    try { 
+        let rawVal = null;
+        if (typeof globalManagerConfig !== 'undefined' && globalManagerConfig.syncSelection) {
+            rawVal = globalManagerConfig.syncSelection;
+        } else {
+            let el = document.getElementById('mgr-sync-selection');
+            if (el) rawVal = el.value;
+        }
+        
+        if (typeof rawVal === 'string') {
+            try { activeSelection = JSON.parse(rawVal || "[]"); } catch(e) { activeSelection = []; }
+        } else if (Array.isArray(rawVal)) {
+            activeSelection = rawVal;
+        }
+        
+        let el = document.getElementById('mgr-sync-selection');
+        if (el) el.value = JSON.stringify(activeSelection);
+    } catch(e) { activeSelection = []; }
+    
+    google.script.run.withSuccessHandler(res => {
+        let html = '';
+        if (!res || res.length === 0) {
+            html = '<div style="color:#ef4444; text-align:center; padding:20px;">No template folder configured or it is empty.</div>';
+        } else {
+            res.forEach(item => {
+                let safeName = item.name.replace(/"/g, '&quot;');
+                let isCheckedAttr = '';
+                if (Array.isArray(activeSelection)) {
+                    let matched = activeSelection.some(s => s === item.name || s === safeName || (typeof s === 'string' && s.replace(/&quot;/g, '"') === item.name));
+                    if (matched) isCheckedAttr = 'checked';
+                }
+                let icon = item.type === 'folder' ? '📁' : '📄';
+                html += `<label style="display:flex; align-items:center; gap:10px; cursor:pointer; padding:8px 12px; background:#1a1a1e; border:1px solid #333; border-radius:4px; transition:0.2s;" onmouseover="this.style.background='#222'" onmouseout="this.style.background='#1a1a1e'"><input type="checkbox" class="sync-item-cb" value="${safeName}" ${isCheckedAttr} style="width:16px; height:16px; margin:0;" onchange="document.getElementById('sync-check-all').checked = false;"><span style="color:#fff; font-size:13px; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${icon} ${item.name}</span></label>`;
+            });
+        }
+        listContainer.innerHTML = html;
+        
+        if (checkAllCb) {
+            let total = document.querySelectorAll('.sync-item-cb').length;
+            let checked = document.querySelectorAll('.sync-item-cb:checked').length;
+            checkAllCb.checked = (total > 0 && total === checked);
+        }
+    }).getTemplateContent(ACTIVE_USER_NAME);
+}
+
+function toggleAllSyncItems(isChecked) {
+    let checkboxes = document.querySelectorAll('.sync-item-cb');
+    checkboxes.forEach(cb => cb.checked = isChecked);
+}
+
+function saveSyncSelection() {
+    let checkboxes = document.querySelectorAll('.sync-item-cb:checked');
+    let newSelection = Array.from(checkboxes).map(cb => cb.value);
+    document.getElementById('mgr-sync-selection').value = JSON.stringify(newSelection);
+    
+    if (typeof globalManagerConfig !== 'undefined') {
+        globalManagerConfig.syncSelection = newSelection;
+    }
+    
+    let btn = document.querySelector('#sync-picker-modal .btn-main');
+    let originalText = btn ? btn.innerText : "APPLY & SAVE";
+    if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+    
+    google.script.run.withSuccessHandler(() => {
+        if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        document.getElementById('sync-picker-modal').style.display = 'none';
+        
+        // Cascade to the rest of the settings module if it's currently open
+        if (typeof submitManagerConfig === 'function') submitManagerConfig(); 
+    }).withFailureHandler(err => {
+        if (btn) { btn.innerText = originalText; btn.disabled = false; }
+        alert("Failed to save Sync Selection: " + err.message);
+    }).saveManagerConfig(ACTIVE_USER_NAME, globalManagerConfig);
+}
+
+function triggerRetroactiveSync(btn) {
+    if (!confirm("This will scan all existing projects and drop any missing shortcuts into your Google Drive.\n\nThis process may take 1-2 minutes depending on the number of projects. Proceed?")) return;
+
+    let originalText = btn.innerText;
+    btn.innerText = "SCANNING DRIVE...";
+    btn.disabled = true;
+
+    google.script.run.withSuccessHandler(res => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+        alert(res);
+    }).withFailureHandler(err => {
+        btn.innerText = originalText;
+        btn.disabled = false;
+        alert("Sync Failed: " + err.message);
+    }).runRetroactiveDriveSync(ACTIVE_USER_NAME);
+}
+
+// ==========================================
+// --- MANAGER HUB LOGIC ---
+// ==========================================
+let currentPickerTarget = null;
+let currentPickerFolder = null;
+let currentPickerParent = null;
+let currentRuleRow = null;
+let pickerIncludesFiles = false;
+
+function toggleMgrAccordion(id) {
+  const el = document.getElementById(id);
+  const icon = document.getElementById(id + '-icon');
+  if (el.style.display === 'none' || el.style.display === '') {
+      el.style.display = 'flex';
+      icon.innerText = '▲';
+  } else {
+      el.style.display = 'none';
+      icon.innerText = '▼';
+  }
+}
+
+function openManagerSettings() {
+  if (typeof closeModals === 'function') {
+      if (!closeModals()) return;
+  }
+  document.getElementById('manager-settings-overlay').style.display = 'flex';
+  if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-manager');
+  
+  let templateEl = document.getElementById('mgr-template-name');
+  if (templateEl) templateEl.value = "Loading...";
+
+  const addBtn = document.getElementById('add-rule-btn');
+  const addRenameBtn = document.getElementById('add-rename-rule-btn');
+  if (addBtn) {
+      addBtn.disabled = true;
+      addBtn.style.opacity = 0.5;
+      addBtn.style.cursor = 'wait';
+      if (addRenameBtn) { addRenameBtn.disabled = true; addRenameBtn.style.opacity = 0.5; addRenameBtn.style.cursor = 'wait'; }
+  }
+  
+  google.script.run.withSuccessHandler(config => {
+      globalManagerConfig = config || { rules: [], renameRules: [], syncSelection: [] };
+      renderRuleRows(globalManagerConfig.rules || []);
+      renderRenameRuleRows(globalManagerConfig.renameRules || []);
+      let syncInput = document.getElementById('mgr-sync-selection');
+      if (syncInput) syncInput.value = JSON.stringify(globalManagerConfig.syncSelection || []);
+
+      if (addBtn) {
+          addBtn.disabled = false;
+          addBtn.style.opacity = 1;
+          addBtn.style.cursor = 'pointer';
+          if (addRenameBtn) { addRenameBtn.disabled = false; addRenameBtn.style.opacity = 1; addRenameBtn.style.cursor = 'pointer'; }
+      }
+  }).getManagerConfig(ACTIVE_USER_NAME);
+}
+
+function renderRuleRows(rulesArray) {
+ let html = '';
+ if (!rulesArray) rulesArray = [];
+ rulesArray.forEach(r => { html += createRuleRow(r); });
+ document.getElementById('rule-list').innerHTML = html;
+}
+
+function createRuleRow(r) {
+ return `
+ <div class="rule-row" style="display:flex; flex-direction:column; gap:10px; background:#222; padding:12px; border-radius:6px; border: 1px solid #333;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:11px; font-weight:800; color:#f97316;">AUTOMATION TASK</div>
+        <button class="btn-delete" style="width:auto; margin:0; padding:4px 8px; height:auto; font-size:10px;" onclick="this.closest('.rule-row').remove()" title="Delete Rule">X</button>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center;">
+        <div style="flex:1;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Task Name</div>
+            <input type="text" class="rule-task" placeholder="e.g. Rider" value="${String(r.taskName || r.word || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+        </div>
+        <div style="flex:1;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Source (Template)</div>
+            <div style="display:flex; gap:5px;">
+               <input type="text" class="rule-src-name" disabled placeholder="Event Root" value="${String(r.srcFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+               <button class="btn-outline" style="width:auto; margin:0; padding:6px 10px; height: 30px;" onclick="openSharedDrivePicker('rule-src', this)" title="Browse">📁</button>
+            </div>
+        </div>
+        <div style="flex:1.5;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Search Contains</div>
+            <input type="text" class="rule-search" placeholder="Tech Rider" value="${String(r.searchString || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+        </div>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center;">
+        <div style="flex:1;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Append Suffix</div>
+            <input type="text" class="rule-suffix" placeholder="_FINAL" value="${String(r.suffix || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+        </div>
+        <div style="flex:2;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Destination (Template)</div>
+            <div style="display:flex; gap:5px;">
+               <input type="text" class="rule-dest-name" disabled placeholder="Event Root" value="${String(r.destFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+               <button class="btn-blue" style="width:auto; margin:0; padding:6px 10px; height: 30px;" onclick="openSharedDrivePicker('rule-dest', this)" title="Browse">📁</button>
+            </div>
+        </div>
+    </div>
+ </div>`;
+}
+
+function addRuleRow() {
+ document.getElementById('rule-list').insertAdjacentHTML('beforeend', createRuleRow({}));
+}
+
+function renderRenameRuleRows(rulesArray) {
+ let html = '';
+ if (!rulesArray) rulesArray = [];
+ rulesArray.forEach(r => { html += createRenameRuleRow(r); });
+ document.getElementById('rename-rule-list').innerHTML = html;
+}
+
+function createRenameRuleRow(r) {
+ return `
+ <div class="rename-row" style="display:flex; flex-direction:column; gap:10px; background:#222; padding:12px; border-radius:6px; border: 1px solid #333;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:11px; font-weight:800; color:#10b981;">RENAME RULE</div>
+        <button class="btn-delete" style="width:auto; margin:0; padding:4px 8px; height:auto; font-size:10px;" onclick="this.closest('.rename-row').remove()" title="Delete Rule">X</button>
+    </div>
+    <div style="display:flex; flex-wrap:nowrap; gap:10px; align-items:flex-end;">
+        <div style="flex:2; min-width:120px;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">File to Rename</div>
+            <input type="hidden" class="rename-file-id" value="${String(r.fileId || '').replace(/"/g, '&quot;')}">
+            <div style="display:flex; gap:5px;">
+               <input type="text" class="rename-file-name" disabled placeholder="Select File" value="${String(r.originalName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+               <button class="btn-outline" style="border-color:#10b981; color:#10b981; width:auto; margin:0; padding:6px 10px; height: 30px;" onclick="openSharedDrivePicker('rename-file', this)" title="Browse">📄</button>
+            </div>
+        </div>
+
+        <div style="flex:1; min-width:80px;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Prefix</div>
+            <input type="text" class="rename-prefix" placeholder="BUDGET" value="${String(r.prefix || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height:30px; box-sizing:border-box; font-size:11px;">
+        </div>
+
+        <div style="flex:1; min-width:80px;">
+            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Suffix</div>
+            <input type="text" class="rename-suffix" placeholder="V1" value="${String(r.suffix || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height:30px; box-sizing:border-box; font-size:11px;">
+        </div>
+    </div>
+ </div>`;
+}
+
+function addRenameRuleRow() {
+ document.getElementById('rename-rule-list').insertAdjacentHTML('beforeend', createRenameRuleRow({}));
+}
+
+// @INDEX: AUTOMATION -> Save Manager Rules
+function submitManagerConfig() {
+  const btn = document.getElementById('btn-save-mgr');
+  btn.innerText = "SAVING..."; btn.disabled = true;
+  
+  let rules = [];
+  let taskNames = new Set();
+  let searchCombos = new Set();
+  let hasError = false;
+  
+  document.querySelectorAll('.rule-row').forEach(row => {
+     let taskName = row.querySelector('.rule-task').value.trim();
+     if (taskName) {
+         if (taskNames.has(taskName.toLowerCase())) {
+             alert("Validation Error: Multiple Automation Tasks have the exact same name ('" + taskName + "'). Task names must be unique.");
+             hasError = true;
+         }
+         taskNames.add(taskName.toLowerCase());
+         
+         let searchStr = row.querySelector('.rule-search').value.trim();
+         let srcFolder = row.querySelector('.rule-src-name').value.trim();
+         let comboKey = (srcFolder + "|||" + searchStr).toLowerCase();
+         if (searchCombos.has(comboKey)) {
+             alert("Validation Error: Multiple rules are searching for the exact same keyword ('" + searchStr + "') in the exact same source folder. This overlap will cause conflicting file duplications.");
+             hasError = true;
+         }
+         searchCombos.add(comboKey);
+         
+         rules.push({
+             taskName: taskName,
+             srcFolderName: srcFolder,
+             searchString: searchStr,
+             suffix: row.querySelector('.rule-suffix').value.trim(),
+             destFolderName: row.querySelector('.rule-dest-name').value.trim()
+         });
+     }
+  });
+  
+  if (hasError) {
+      btn.innerText = "SAVE CONFIGURATION"; btn.disabled = false;
+      return;
+  }
+
+  let renameRules = [];
+  let originalNames = new Set();
+  
+  document.querySelectorAll('.rename-row').forEach(row => {
+     let originalName = row.querySelector('.rename-file-name').value.trim();
+     let fileId = row.querySelector('.rename-file-id').value.trim();
+     if (originalName) {
+         if (originalNames.has(originalName.toLowerCase())) {
+             alert("Validation Error: Multiple Rename Rules are targeting the exact same file ('" + originalName + "'). Each file can only have one active rename rule.");
+             hasError = true;
+         }
+         originalNames.add(originalName.toLowerCase());
+         renameRules.push({
+             fileId: fileId,
+             originalName: originalName,
+             prefix: row.querySelector('.rename-prefix').value.trim(),
+             suffix: row.querySelector('.rename-suffix').value.trim()
+         });
+     }
+  });
+  
+  if (hasError) {
+      btn.innerText = "SAVE CONFIGURATION"; btn.disabled = false;
+      return;
+  }
+
+  let parsedSyncSelection = [];
+  try {
+      parsedSyncSelection = JSON.parse(document.getElementById('mgr-sync-selection').value || "[]");
+  } catch (e) {
+      alert("Configuration Error: Failed to read sync selection rules. Settings may be corrupted.");
+      btn.innerText = "SAVE CONFIGURATION"; btn.disabled = false;
+      return;
+  }
+
+  // FIX: Safely mutate existing config so we do not erase other properties like templateFolder
+  if (typeof globalManagerConfig === 'undefined' || !globalManagerConfig) {
+      globalManagerConfig = {};
+  }
+  globalManagerConfig.rules = rules;
+  globalManagerConfig.renameRules = renameRules;
+  globalManagerConfig.syncSelection = parsedSyncSelection;
+  
+  google.script.run
+      .withFailureHandler(err => {
+          if (err.message.includes("COLLISION_DETECTED")) {
+              alert("🛑 " + err.message);
+          } else {
+              alert("Save Failed: " + err.message);
+          }
+          btn.innerText = "SAVE CONFIGURATION"; btn.disabled = false;
+      })
+      .withSuccessHandler(res => {
+          btn.innerText = "SAVE CONFIGURATION"; btn.disabled = false; 
+          alert(res);
+          openManagerSettings(); // Re-fetch to update local timestamp secretly
+      })
+      .saveManagerConfig(ACTIVE_USER_NAME, globalManagerConfig);
+}
+
+function openSharedDrivePicker(target, btnEl) {
+  currentPickerTarget = target;
+  if (target.startsWith('rule')) currentRuleRow = btnEl.closest('.rule-row');
+  if (target === 'rename-file') currentRuleRow = btnEl.closest('.rename-row');
+  
+  pickerIncludesFiles = (target === 'rename-file');
+
+  document.getElementById('drive-picker-modal').style.display = 'flex';
+  document.getElementById('dp-folder-list').innerHTML = '<div style="color:#888; text-align:center; padding:20px; font-size:12px;">Connecting to System...</div>';
+  document.getElementById('dp-current-path').innerText = 'Loading...';
+  document.getElementById('dp-select-btn').disabled = true;
+  document.getElementById('dp-back-btn').disabled = true;
+  
+  // Default strictly to the child template folder ID when searching for rules/rename files
+  let startFolderId = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
+  
+  loadSharedDriveFolder(startFolderId);
+}
+
+function loadSharedDriveFolder(folderId) {
+  document.getElementById('dp-folder-list').innerHTML = '<div style="color:#888; text-align:center; padding:20px; font-size:12px;">Fetching Folders...</div>';
+  document.getElementById('dp-select-btn').disabled = true;
+  google.script.run.withSuccessHandler(renderSharedDrivePicker).withFailureHandler(err => {
+      if (folderId !== 'root') loadSharedDriveFolder('root');
+      else document.getElementById('dp-folder-list').innerHTML = `<div style="color:#ef4444; text-align:center; padding:20px; font-size:12px;">Error: ${err.message}</div>`;
+  }).getHostDriveDirectory(ACTIVE_USER_NAME, folderId, pickerIncludesFiles);
+}
+
+function renderSharedDrivePicker(data) {
+  currentPickerFolder = data.current;
+  currentPickerParent = data.parent;
+  
+  document.getElementById('dp-current-path').innerText = data.current.name;
+  document.getElementById('dp-back-btn').disabled = (data.parent === null);
+  
+  if (currentPickerTarget === 'rename-file') {
+      document.getElementById('dp-select-btn').disabled = true;
+      document.getElementById('dp-select-btn').innerText = 'CLICK A FILE TO SELECT';
+  } else {
+      document.getElementById('dp-select-btn').disabled = (data.current.id === 'root');
+      let templateFolderId = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
+      let isTemplateRoot = ((currentPickerTarget === 'rule-src' || currentPickerTarget === 'rule-dest') && data.current.id === templateFolderId);
+      document.getElementById('dp-select-btn').innerText = data.current.id === 'root' ? 'BROWSE A FOLDER' : (isTemplateRoot ? 'SELECT EVENT ROOT' : `SELECT "${data.current.name.toUpperCase()}"`);
+  }
+  
+  if (data.subfolders.length === 0) {
+      document.getElementById('dp-folder-list').innerHTML = '<div style="color:#555; text-align:center; padding:20px; font-size:12px;">This folder is empty.</div>';
+  } else {
+      document.getElementById('dp-folder-list').innerHTML = data.subfolders.map(f => `
+          <div class="dp-folder-item" onclick="${f.isFile ? `selectFileFromPicker('${f.id}', '${f.name.replace(/'/g, "\\'")}')` : `loadSharedDriveFolder('${f.id}')`}"><span class="dp-folder-icon">${f.isFile ? '📄' : '📁'}</span><span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${f.name}</span></div>
+      `).join('');
+  }
+}
+
+function navigateSharedDriveUp() {
+  if (currentPickerParent) loadSharedDriveFolder(currentPickerParent.id);
+}
+
+function selectFileFromPicker(id, name) {
+  if (currentPickerTarget === 'rename-file' && currentRuleRow) {
+      currentRuleRow.querySelector('.rename-file-id').value = id;
+      currentRuleRow.querySelector('.rename-file-name').value = name;
+      document.getElementById('drive-picker-modal').style.display = 'none';
+  }
+}
+
+function confirmSharedDriveSelection() {
+  if (!currentPickerFolder) return;
+  
+  let templateFolderId = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
+
+  if (currentPickerTarget === 'rule-src' && currentRuleRow) {
+      if (currentPickerFolder.id === templateFolderId || currentPickerFolder.id === 'root') {
+          currentRuleRow.querySelector('.rule-src-name').value = ''; 
+      } else {
+          currentRuleRow.querySelector('.rule-src-name').value = currentPickerFolder.name;
+      }
+  } else if (currentPickerTarget === 'rule-dest' && currentRuleRow) {
+      if (currentPickerFolder.id === templateFolderId || currentPickerFolder.id === 'root') {
+          currentRuleRow.querySelector('.rule-dest-name').value = ''; 
+      } else {
+          currentRuleRow.querySelector('.rule-dest-name').value = currentPickerFolder.name;
+      }
+  }
+  
+  document.getElementById('drive-picker-modal').style.display = 'none';
+}
+
+// ==========================================
+// --- INFINITE TAG DICTIONARY BUILDER ---
+// ==========================================
+
+function openTagManager() {
+    document.getElementById('master-settings-overlay').style.display = 'none';
+    mapAliasesToTags(SYSTEM_TAGS);
+    renderTagTree();
+    document.getElementById('tag-manager-modal').style.display = 'flex';
+}
+
+function getShortcutForTag(tagName) {
+    if (!tagName) return '';
+    let lowerTag = tagName.trim().toLowerCase();
+    for (let [code, trans] of Object.entries(SYSTEM_ALIASES)) {
+        if (trans.trim().toLowerCase() === lowerTag) return code;
+    }
+    return '';
+}
+
+function mapAliasesToTags(nodes) {
+    if (!nodes) return;
+    nodes.forEach(n => {
+        n.shortcut = getShortcutForTag(n.name);
+        if (n.children) mapAliasesToTags(n.children);
+    });
+}
+
+function renderTagTree() {
+    let html = `<div id="tag-root-dropzone" ondragover="handleTagDragOver(event)" ondragenter="handleTagDragEnter(event)" ondragleave="handleTagDragLeave(event)" ondrop="handleTagDrop(event, 'root')" style="padding:15px; border:2px dashed #333; text-align:center; color:#888; border-radius:6px; margin-bottom:10px; transition:0.2s;">Drop here to move to Root Level</div>`;
+    html += buildTagTreeHTML(SYSTEM_TAGS, 0);
+    document.getElementById('tag-tree-container').innerHTML = html;
+}
+
+function buildTagTreeHTML(nodes, depth) {
+    if (!nodes || nodes.length === 0) return '';
+    let html = '';
+    nodes.forEach(node => {
+        let padding = depth * 20;
+        let hasChildren = node.children && node.children.length > 0;
+        let toggleIcon = hasChildren ? (node.expanded ? '▼' : '▶') : '<span style="opacity:0.2;">●</span>';
+        
+        html += `
+        <div style="display:flex; flex-direction:column; margin-bottom: 4px;">
+            <div id="tag-node-${node.id}" draggable="true" ondragstart="handleTagDragStart(event, '${node.id}')" ondragover="handleTagDragOver(event)" ondragenter="handleTagDragEnter(event)" ondragleave="handleTagDragLeave(event)" ondrop="handleTagDrop(event, '${node.id}')" ondragend="handleTagDragEnd(event)" style="display:flex; align-items:center; gap:6px; padding: 4px 6px 4px ${padding + 6}px; border-radius: 4px; border: 1px solid transparent; transition: 0.2s;">
+                <span style="color:#a855f7; font-size:10px; cursor:pointer; width:16px; text-align:center;" onclick="toggleTagNode('${node.id}')">${toggleIcon}</span>
+                <span style="cursor:grab; color:#555; padding:0 4px;" title="Drag to move">⋮⋮</span>
+                <input type="color" value="${node.color || '#a855f7'}" oninput="updateTagColor('${node.id}', this.value)" style="width:25px; height:25px; padding:0; border:1px solid #333; border-radius:4px; background:transparent; cursor:pointer; flex-shrink:0;">
+                <input type="text" value="${(node.name || '').replace(/"/g, '&quot;')}" oninput="updateTagName('${node.id}', this.value)" placeholder="Tag Name..." style="flex:1; padding:6px 10px; font-size:12px; background:#18181b; color:#fff; border:1px solid #333; border-radius:4px;">
+                <input type="text" value="${(node.shortcut || '').replace(/"/g, '&quot;')}" oninput="updateTagShortcut('${node.id}', this.value)" placeholder="Shortcut (e.g. s)" style="width:120px; padding:6px 10px; font-size:12px; background:#111; color:#10b981; border:1px solid #10b981; border-radius:4px; text-align:center;">
+                <label style="display:flex; align-items:center; gap:4px; margin: 0 4px; padding: 4px 8px; background: #111; border: 1px solid #333; border-radius: 4px; cursor:pointer;" title="Include assets with this tag in mathematical formula strings"><input type="checkbox" ${node.inFormula ? 'checked' : ''} onchange="updateTagFormula('${node.id}', this.checked)" style="margin:0; width:12px; height:12px; accent-color:#3b82f6;"><span style="font-size:10px; color:#a1a1aa; font-weight:bold;">∑ MATH</span></label>
+                <button class="btn-outline btn-sm" style="padding:6px 10px !important; margin:0; border-color:#10b981; color:#10b981;" onclick="addTagNode('${node.id}')" title="Add Sub-Tag">+ SUB</button>
+                <button class="btn-delete btn-sm" style="padding:6px 10px !important; margin:0;" onclick="deleteTagNode('${node.id}')" title="Delete">X</button>
+            </div>
+            <div style="display:${node.expanded ? 'block' : 'none'}; margin-top:4px;">
+                ${buildTagTreeHTML(node.children, depth + 1)}
+            </div>
+        </div>`;
+    });
+    return html;
+}
+
+function findTagNode(nodes, id) {
+    for (let i=0; i<nodes.length; i++) {
+        if (nodes[i].id === id) return nodes[i];
+        if (nodes[i].children) { let f = findTagNode(nodes[i].children, id); if (f) return f; }
+    }
+    return null;
+}
+
+function removeTagNode(nodes, id) {
+    for (let i=0; i<nodes.length; i++) {
+        if (nodes[i].id === id) { nodes.splice(i, 1); return true; }
+        if (nodes[i].children && removeTagNode(nodes[i].children, id)) return true;
+    }
+    return false;
+}
+
+function toggleTagNode(id) { let n = findTagNode(SYSTEM_TAGS, id); if (n) { n.expanded = !n.expanded; renderTagTree(); } }
+function updateTagName(id, val) { let n = findTagNode(SYSTEM_TAGS, id); if (n) n.name = val; }
+function updateTagColor(id, val) { let n = findTagNode(SYSTEM_TAGS, id); if (n) n.color = val; }
+function updateTagShortcut(id, val) { let n = findTagNode(SYSTEM_TAGS, id); if (n) n.shortcut = val; }
+function updateTagFormula(id, val) { let n = findTagNode(SYSTEM_TAGS, id); if (n) n.inFormula = val; }
+
+function addTagNode(parentId) {
+    let newNode = { id: 'tag_' + Date.now() + Math.floor(Math.random()*1000), name: '', color: '#a855f7', shortcut: '', children: [], expanded: true, inFormula: false };
+    if (parentId) {
+        let parent = findTagNode(SYSTEM_TAGS, parentId);
+        if (parent) {
+            if (!parent.children) parent.children = [];
+            parent.children.push(newNode);
+            parent.expanded = true;
+        }
+    } else { SYSTEM_TAGS.push(newNode); }
+    renderTagTree();
+}
+
+function deleteTagNode(id) { if (confirm("Delete this tag and all its nested sub-tags?")) { removeTagNode(SYSTEM_TAGS, id); renderTagTree(); } }
+
+function saveTagManager() {
+    let newAliases = {};
+    let duplicates = new Set();
+    let warnings = [];
+
+    const extractAliases = (nodes) => {
+        nodes.forEach(n => {
+            let code = (n.shortcut || '').trim().toLowerCase();
+            let trans = (n.name || '').trim().toLowerCase();
+            if (code && trans) {
+                if (newAliases[code] && newAliases[code] !== trans) {
+                    duplicates.add(code);
+                } else {
+                    newAliases[code] = trans;
+                }
+            }
+            if (n.children) extractAliases(n.children);
+        });
+    };
+    
+    extractAliases(SYSTEM_TAGS);
+
+    if (duplicates.size > 0) {
+        duplicates.forEach(dupCode => {
+            delete newAliases[dupCode];
+            warnings.push(dupCode);
+        });
+        alert("⚠️ Duplicate Shortcuts Detected:\nThe code(s) [" + warnings.join(', ') + "] were assigned to multiple different tags. They have been skipped.\n\nAll other tags and unique shortcuts were saved successfully.");
+    }
+
+    SYSTEM_ALIASES = newAliases;
+
+    document.getElementById('tag-manager-modal').style.display = 'none';
+    openMasterSettings('assets');
+    
+    google.script.run.saveSystemTags(SYSTEM_TAGS);
+    google.script.run.saveVaultAsset('syntax_aliases', SYSTEM_ALIASES);
+}
+
+function cancelTagManager() { document.getElementById('tag-manager-modal').style.display = 'none'; openMasterSettings('assets'); }
+
+// ==========================================
+// --- DRAG AND DROP TAG DICTIONARY ENGINE ---
+// ==========================================
+let draggedTagId = null;
+
+function handleTagDragStart(e, id) {
+    draggedTagId = id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    setTimeout(() => { e.target.style.opacity = '0.4'; }, 0);
+    e.stopPropagation();
+}
+
+function handleTagDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleTagDragEnter(e) {
+    e.preventDefault();
+    let target = e.currentTarget;
+    if (target.id === 'tag-root-dropzone') {
+        target.style.borderColor = '#a855f7';
+        target.style.background = 'rgba(168, 85, 247, 0.1)';
+    } else {
+        target.style.background = 'rgba(255,255,255,0.1)';
+    }
+    e.stopPropagation();
+}
+
+function handleTagDragLeave(e) {
+    let target = e.currentTarget;
+    if (target.id === 'tag-root-dropzone') {
+        target.style.borderColor = '#333';
+        target.style.background = 'transparent';
+    } else {
+        target.style.background = 'transparent';
+    }
+    e.stopPropagation();
+}
+
+function handleTagDrop(e, targetId) {
+    e.stopPropagation();
+    e.preventDefault();
+    let target = e.currentTarget;
+    
+    if (target.id === 'tag-root-dropzone') {
+        target.style.borderColor = '#333';
+        target.style.background = 'transparent';
+    } else {
+        target.style.background = 'transparent';
+    }
+
+    if (!draggedTagId || draggedTagId === targetId) { draggedTagId = null; return false; }
+
+    if (isTagDescendant(SYSTEM_TAGS, draggedTagId, targetId)) {
+        alert("Cannot move a parent tag into its own child category.");
+        draggedTagId = null;
+        return false;
+    }
+
+    let nodeToMove = null;
+    const extractNode = (nodes) => {
+        for (let i = 0; i < nodes.length; i++) {
+            if (nodes[i].id === draggedTagId) { nodeToMove = nodes.splice(i, 1)[0]; return true; }
+            if (nodes[i].children && extractNode(nodes[i].children)) return true;
+        }
+        return false;
+    };
+    extractNode(SYSTEM_TAGS);
+
+    if (nodeToMove) {
+        if (targetId === 'root') { SYSTEM_TAGS.push(nodeToMove); } 
+        else {
+            let targetNode = findTagNode(SYSTEM_TAGS, targetId);
+            if (targetNode) {
+                if (!targetNode.children) targetNode.children = [];
+                targetNode.children.push(nodeToMove);
+                targetNode.expanded = true;
+            } else { SYSTEM_TAGS.push(nodeToMove); }
+        }
+    }
+
+    draggedTagId = null;
+    renderTagTree();
+    return false;
+}
+
+function handleTagDragEnd(e) {
+    e.target.style.opacity = '1';
+    document.querySelectorAll('[id^="tag-node-"]').forEach(el => el.style.background = 'transparent');
+    let rootDrop = document.getElementById('tag-root-dropzone');
+    if (rootDrop) { rootDrop.style.borderColor = '#333'; rootDrop.style.background = 'transparent'; }
+    draggedTagId = null;
+    e.stopPropagation();
+}
+
+function isTagDescendant(nodes, parentId, targetId) {
+    let parentNode = findTagNode(nodes, parentId);
+    if (!parentNode || !parentNode.children) return false;
+    return findTagNode(parentNode.children, targetId) !== null;
+}
+
+// ==========================================
+// --- CHECKLIST AUTOMATION LOGIC ---
+// ==========================================
+function openChecklistModal(projectId, e) {
+  if (e) e.stopPropagation();
+  if (!globalManagerConfig.rules || globalManagerConfig.rules.length === 0) {
+      alert("No automation rules configured. Go to the Manager Hub to set up Task Rules.");
+      return;
+  }
+  
+  let ev = calendar.getEventById(projectId);
+  if (!ev) return;
+  
+  document.getElementById('checklist-project-id').value = projectId;
+  document.getElementById('checklist-title').innerText = "Checklist: " + ev.title;
+  
+  let state = ev.extendedProps.rawDbData.checklistState || {};
+  if (typeof state === 'string') {
+      try { state = JSON.parse(state); } catch(e) { state = {}; }
+  }
+  
+  let html = '';
+  globalManagerConfig.rules.forEach((r, idx) => {
+      let isChecked = state[r.taskName] && state[r.taskName].checked;
+      let loadingId = `chk-load-${idx}`;
+      html += `
+      <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:12px; border-radius:6px;">
+         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; flex:1;">
+            <input type="checkbox" id="chk-${idx}" class="crew-cb" ${isChecked ? 'checked' : ''} onchange="toggleChecklistItem('${projectId}', ${idx}, this.checked)">
+            <span style="color:#fff; font-weight:bold; font-size:13px;">${r.taskName}</span>
+         </label>
+         <span id="${loadingId}" style="font-size:11px; color:#a855f7; display:none; font-weight:800;">PROCESSING...</span>
+      </div>`;
+  });
+  document.getElementById('checklist-items').innerHTML = html;
+  document.getElementById('checklist-modal-overlay').style.display = 'flex';
+}
+
+function toggleChecklistItem(projectId, ruleIdx, isChecked) {
+  let rule = globalManagerConfig.rules[ruleIdx];
+  let loader = document.getElementById(`chk-load-${ruleIdx}`);
+  let chk = document.getElementById(`chk-${ruleIdx}`);
+  
+  loader.style.display = 'block';
+  chk.disabled = true;
+  
+  google.script.run
+  .withFailureHandler(err => {
+      alert("Automation Error: " + err.message);
+      loader.style.display = 'none';
+      chk.disabled = false;
+      chk.checked = !isChecked; 
+  })
+  .withSuccessHandler(newStateStr => {
+      loader.style.display = 'none';
+      chk.disabled = false;
+      
+      let ev = calendar.getEventById(projectId);
+      if (ev) {
+          let raw = ev.extendedProps.rawDbData;
+          raw.checklistState = JSON.parse(newStateStr);
+          ev.setExtendedProp('rawDbData', raw); 
+      }
+  })
+  .processChecklistAction(projectId, rule.taskName, rule.srcFolderName, rule.searchString, rule.suffix, rule.destFolderName, isChecked, ACTIVE_USER_NAME);
+}
+
+// ==========================================
+// --- DATABASE ARCHIVER ENGINE (UI) ---
+// ==========================================
+// @INDEX: AUTOMATION -> Database Archivers
+function triggerMonthlyLogArchive() {
+  const overlay = document.getElementById('backup-modal-overlay');
+  const subText = document.getElementById('backup-modal-sub');
+  const mainText = document.getElementById('backup-modal-text');
+  
+  if (overlay) {
+      overlay.style.display = 'flex';
+      overlay.style.pointerEvents = 'auto';
+      overlay.style.background = 'rgba(0,0,0,0.8)';
+      overlay.style.backdropFilter = 'blur(8px)';
+      mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #a855f7;">ARCHIVING LOGS...</span>`;
+      subText.innerText = "Scanning Audit Logs for old entries. Do not close this window.";
+  } else {
+      console.log("Monthly Archiver starting...");
+  }
+  
+  google.script.run
+    .withSuccessHandler(res => {
+       if (mainText) {
+           mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #10b981;">ARCHIVE COMPLETE</span>`;
+           subText.innerText = res;
+           setTimeout(() => { overlay.style.display = 'none'; }, 4000);
+       } else alert("Archive Complete:\n" + res);
+    })
+    .withFailureHandler(err => {
+       if (mainText) {
+           mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #ef4444;">ARCHIVE FAILED</span>`;
+           subText.innerText = err.message;
+           setTimeout(() => { overlay.style.display = 'none'; }, 5000);
+       } else alert("Archive Failed:\n" + err.message);
+    })
+    .runMonthlyLogArchive(ACTIVE_USER_NAME);
+}
+
+function triggerYearlyEngineArchive() {
+  const overlay = document.getElementById('backup-modal-overlay');
+  const subText = document.getElementById('backup-modal-sub');
+  const mainText = document.getElementById('backup-modal-text');
+  
+  overlay.style.display = 'flex';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.background = 'transparent';
+  overlay.style.backdropFilter = 'none';
+  
+  let count = 10; // 10s Warning Phase
+  let phase = 1;
+  
+  mainText.innerHTML = `Engine will start archiving in <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #a855f7;">${count}</span><br> seconds.`;
+  subText.innerText = "Please save your work. The interface will lock soon.";
+
+  const timer = setInterval(() => {
+    count--;
+    const newCountdownEl = document.getElementById('backup-countdown');
+    if (newCountdownEl) newCountdownEl.innerText = count;
+    
+    if (count <= 0) {
+      if (phase === 1) {
+        phase = 2;
+        count = 15; // 15s Extended Hard Lock for Data Destruction
+        overlay.style.pointerEvents = 'auto';
+        overlay.style.background = 'rgba(0,0,0,0.8)';
+        overlay.style.backdropFilter = 'blur(8px)';
+        mainText.innerHTML = `Interface locked. Safety buffer: <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #f59e0b;">${count}</span><br> seconds.`;
+        subText.innerText = "Waiting for pending background saves to complete...";
+      } else if (phase === 2) {
+        clearInterval(timer);
+        mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #a855f7;">ARCHIVING ENGINE...</span>`;
+        subText.innerText = "Checking 18-month threshold for Project Engine. Please wait.";
+        
+        google.script.run
+          .withSuccessHandler(res => {
+             mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #10b981;">ARCHIVE COMPLETE</span>`;
+             subText.innerText = res;
+             setTimeout(() => { overlay.style.display = 'none'; }, 4000);
+          })
+          .withFailureHandler(err => {
+             mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #ef4444;">ARCHIVE FAILED</span>`;
+             subText.innerText = err.message;
+             setTimeout(() => { overlay.style.display = 'none'; }, 5000);
+          })
+          .runYearlyEngineArchive(ACTIVE_USER_NAME);
+      }
+    }
+  }, 1000);
+}
+
+// ==========================================
+// --- UNIVERSAL ENTITY AUDIT TRAIL UI ---
+// ==========================================
+window.currentUhHistory = [];
+window.currentUhFilter = 'ALL';
+
+function fetchEntitySummary(uid, btnId) {
+    let btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (!uid || uid === 'NEW') { btn.style.display = 'none'; return; }
+    if (typeof USER_ACCESS !== 'undefined' && !['ROOT', 'Admin', 'EDITOR'].includes(USER_ACCESS)) return;
+
+    btn.style.display = 'inline-flex';
+    btn.innerHTML = `<span style="opacity:0.5;">LOADING...</span>`;
+
+    google.script.run.withSuccessHandler(history => {
+        if (!history || history.length === 0) {
+            btn.innerHTML = `NO HISTORY`;
+            return;
+        }
+        let createdLog = history[history.length - 1]; // Oldest log
+
+        // Clean up the name (e.g., "John Doe (uid-123)" -> "John Doe")
+        let createdName = createdLog.actor.split('(')[0].trim().toUpperCase();
+
+        btn.innerHTML = `🕒 CREATOR: ${createdName}`;
+    }).getEntityAuditHistory(uid);
+}
+
+function openUniversalHistory(uid) {
+    document.getElementById('universal-history-modal').style.display = 'flex';
+    document.getElementById('uh-timeline').innerHTML = '';
+    document.getElementById('uh-loading').style.display = 'block';
+
+    filterUhTimeline('ALL', true); // Reset visual styling
+
+    google.script.run.withSuccessHandler(history => {
+        document.getElementById('uh-loading').style.display = 'none';
+        window.currentUhHistory = history || [];
+        renderUhTimeline();
+    }).getEntityAuditHistory(uid);
+}
+
+function filterUhTimeline(moduleName, noRender = false) {
+    window.currentUhFilter = moduleName;
+    document.querySelectorAll('.uh-filter-btn').forEach(btn => {
+        if (btn.dataset.filter === moduleName) {
+            btn.style.borderColor = '#a855f7';
+            btn.style.color = '#a855f7';
+        } else {
+            btn.style.borderColor = '';
+            btn.style.color = '';
+        }
+    });
+    if (!noRender) renderUhTimeline();
+}
+
+function renderUhTimeline() {
+    let html = '';
+    let filtered = window.currentUhHistory;
+    
+    if (window.currentUhFilter !== 'ALL') {
+        filtered = window.currentUhHistory.filter(log => {
+            if (window.currentUhFilter === 'TIMELINE') return log.module === 'TIMELINE' || log.module === 'SHIFTS';
+            return log.module === window.currentUhFilter;
+        });
+    }
+
+    if (!filtered || filtered.length === 0) {
+        html = '<div style="color:#888; text-align:center; padding: 20px;">No audit logs found for this filter.</div>';
+    } else {
+        filtered.forEach(log => {
+            let d = new Date(log.timestamp);
+            let dateStr = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            let actionColor = log.action === 'CREATE' ? '#10b981' : (log.action === 'DELETE' ? '#ef4444' : (log.action === 'RESTORE' ? '#f59e0b' : '#3b82f6'));
+            let cleanActor = log.actor.split('(')[0].trim();
+
+            // Module-based color points for easy scanning
+            let moduleColor = '#888888'; 
+            if (log.module === 'PROJECTS') moduleColor = '#3b82f6'; // Blue
+            else if (log.module === 'TIMELINE' || log.module === 'SHIFTS') moduleColor = '#a855f7'; // Purple
+            else if (log.module === 'PROJECT_ASSETS' || log.module === 'ASSETS') moduleColor = '#10b981'; // Green
+            else if (log.module === 'CHECKLIST' || log.module === 'TASKS') moduleColor = '#f59e0b'; // Orange
+            else if (log.module === 'IAM' || log.module === 'IAM_ROLES') moduleColor = '#ef4444'; // Red
+            else if (log.module === 'ROSTER_LEAVE') moduleColor = '#f43f5e'; // Rose
+
+            html += `<div style="display:flex; gap:15px;">
+                        <div style="display:flex; flex-direction:column; align-items:center; width:20px;">
+                            <div style="width:12px; height:12px; border-radius:50%; background:${moduleColor}; box-shadow: 0 0 6px ${moduleColor}; z-index:2;"></div>
+                            <div style="flex:1; width:2px; background:#333; margin-top:5px; margin-bottom:-10px; z-index:1;"></div>
+                        </div>
+                        <div style="flex:1; background:#1a1a1e; border:1px solid #333; padding:12px; border-radius:6px; margin-bottom:12px;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                                <div style="color:#fff; font-size:14px; font-weight:bold;">${cleanActor}</div>
+                                <div style="color:#a1a1aa; font-size:12px;">${dateStr}</div>
+                            </div>
+                            <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                <span style="background:rgba(255,255,255,0.1); color:${actionColor}; padding:3px 8px; border-radius:4px; font-size:11px; font-weight:900;">${log.action}</span>
+                                <span style="color:${moduleColor}; font-size:11px; font-weight:bold; text-transform:uppercase;">${log.module}</span>
+                            </div>
+                            <div style="color:#e4e4e7; font-size:14px; line-height:1.4;">${log.delta}</div>
+                        </div>
+                    </div>`;
+        });
+    }
+    document.getElementById('uh-timeline').innerHTML = html;
+}
+</script>

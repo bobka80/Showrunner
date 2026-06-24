@@ -1,0 +1,1486 @@
+<script>
+/**
+ * 05_Warehouse_Engine.html
+ * Domain: The spatial drawing canvas and warehouse map logic.
+ */
+
+// ==========================================
+// --- WAREHOUSE DRAWER (LEVEL 0 & 1) ---
+// ==========================================
+
+// ==========================================
+// --- KEYBOARD LISTENERS (UNDO/DELETE) ---
+// ==========================================
+document.addEventListener('keydown', e => {
+  if (document.getElementById('zone-inner-map-wrapper') && document.getElementById('zone-inner-map-wrapper').style.display === 'flex') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+          if (e.shiftKey) redoMap(); else undoMap();
+          e.preventDefault(); return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+          redoMap(); e.preventDefault(); return;
+      }
+  }
+  if ((e.key === 'Delete' || e.key === 'Backspace')) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (activeEditingZoneId) {
+          if (typeof polyTool !== 'undefined' && polyTool === 'select' && selectedPoly && selectedVertices.length > 0) {
+              let obj = selectedPoly.type === 'zone' ? globalWhZones.find(z => z.id === selectedPoly.id) : globalWhAreas.find(a => a.id === selectedPoly.id);
+              if (obj && obj.points && obj.points.length - selectedVertices.length >= 3) {
+                  pushMapHistory();
+                  selectedVertices.sort((a,b) => b-a).forEach(idx => obj.points.splice(idx, 1));
+                  selectedVertices = [];
+                  renderZoneInnerMap();
+              } else if (obj && obj.points && obj.points.length - selectedVertices.length < 3) {
+                  alert("A polygon must have at least 3 points. Delete the whole shape instead.");
+              }
+              return;
+          }
+      }
+  }
+});
+
+// Backend API stubs to prevent crashes before relational hookup
+const WH_API = {
+    saveRoot: (r) => google.script.run.saveWarehouseRoot(r),
+    deleteEntity: (type, id) => google.script.run.deleteWarehouseEntity(type, id),
+    saveZone: (z) => google.script.run.saveWarehouseZone(z),
+    saveArea: (a) => google.script.run.saveWarehouseArea(a)
+};
+
+let activeWhRootId = null;
+let globalWhRoots = [];
+let globalWhZones = [];
+let globalWhAreas = [];
+let deletedAreaIds = [];
+
+// @INDEX: WAREHOUSE -> Level 0 Root Drawer
+function initWarehouseDrawer() {
+    let html = '';
+    globalWhRoots.forEach(r => {
+        let icon = r.type === 'Truck' ? '🚛' : '🏭';
+        let isActiveRoot = (r.id === activeWhRootId);
+        
+        html += `<div class="wh-root-ticket" style="margin-bottom: ${isActiveRoot ? '5px' : '10px'}; border-radius: 8px; border: 1px solid ${isActiveRoot ? 'var(--accent)' : '#333'}; background: ${isActiveRoot ? '#18181b' : '#111'}; cursor:pointer; overflow:hidden;" onclick="selectWhRoot('${r.id}')">
+                   <div style="display:flex; align-items:center; gap:10px; padding:12px 15px;">
+                       <span style="font-size:20px;">${icon}</span> 
+                       <div style="flex:1;">
+                           <div style="font-weight:bold; font-size:14px; color:${isActiveRoot ? '#fff' : '#a1a1aa'};">${r.name}</div>
+                           <div style="font-size:10px; color:#888; font-weight:800; text-transform:uppercase;">${r.type}</div>
+                       </div>
+                       ${isActiveRoot ? `
+                       <div style="display:flex; gap: 5px;">
+                           <button class="btn-outline btn-sm" style="margin:0; padding:4px 8px !important; border-color:var(--accent); color:var(--accent);" onclick="createNewZone('${r.id}'); event.stopPropagation();" title="Add Zone">➕</button>
+                           <button class="btn-outline btn-sm" style="margin:0; padding:4px 8px !important; border-color:transparent; background:transparent; color:#888;" onclick="openEditRootModal('${r.id}'); event.stopPropagation();" title="Edit Root">✏️</button>
+                           <button class="btn-delete btn-sm" style="margin:0; padding:4px 8px !important; border-color:transparent; background:transparent; color:#ef4444;" onclick="deleteRoot('${r.id}'); event.stopPropagation();" title="Delete Root">🗑️</button>
+                       </div>
+                       ` : ''}
+                   </div>
+                </div>`;
+        
+        if (isActiveRoot) {
+            let rootZones = globalWhZones.filter(z => z.parentId === r.id);
+            if (rootZones.length > 0) {
+                html += `<div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 15px; padding-left: 15px;">`;
+                rootZones.forEach(z => {
+                    let isActiveZone = (z.id === activeEditingZoneId);
+                    html += `<div style="padding: 10px 15px; border-radius:8px; border: 1px solid ${isActiveZone ? '#3b82f6' : '#333'}; background: ${isActiveZone ? 'rgba(59,130,246,0.1)' : '#1a1a1e'}; color: ${isActiveZone ? '#fff' : '#a1a1aa'}; cursor:pointer; font-size:13px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; transition:0.2s;" onclick="openEditZone('${z.id}'); event.stopPropagation();">
+                                <span>🚪 ${z.name}</span>
+                                <button class="btn-delete btn-sm" style="padding: 4px 8px !important; display:${isActiveZone ? 'block' : 'none'};" onclick="deleteZone('${z.id}'); event.stopPropagation();">DELETE</button>
+                             </div>`;
+                });
+                html += `</div>`;
+            }
+        }
+    });
+    
+    if (globalWhRoots.length === 0) {
+        html = '<div style="padding: 30px 15px; text-align: center; color: #52525b; font-size: 11px; font-weight: 800; text-transform: uppercase; line-height: 1.6;">No Root Locations Found<br><span style="font-weight: normal; font-size: 9px;">Click "+ NEW ROOT" to create your first Warehouse.</span></div>';
+    }
+    document.querySelectorAll('.wh-root-list').forEach(el => el.innerHTML = html);
+}
+
+function selectWhRoot(id) {
+    if (activeWhRootId === id) activeWhRootId = null;
+    else activeWhRootId = id;
+    initWarehouseDrawer();
+}
+
+function openRootModal() {
+    document.querySelectorAll('#root-modal-overlay input').forEach(i => i.value='');
+    document.getElementById('root-type').value = 'Warehouse';
+    document.getElementById('root-modal-title').innerText = '🏭 Provision Root (Level 0)';
+    document.getElementById('btn-del-root').style.display = 'none';
+    document.getElementById('root-modal-overlay').style.display = 'flex';
+}
+
+function openEditRootModal(id) {
+    let r = globalWhRoots.find(x => x.id === id);
+    if(!r) return;
+    document.querySelectorAll('#root-modal-overlay input').forEach(i => i.value='');
+    document.getElementById('root-id').value = r.id;
+    document.getElementById('root-name').value = r.name;
+    document.getElementById('root-type').value = r.type;
+    document.getElementById('root-kg').value = r.kg || '';
+    document.getElementById('root-m3').value = r.m3 || '';
+    document.getElementById('root-address').value = r.address || '';
+    document.getElementById('root-map-url').value = r.mapUrl || '';
+    
+    document.getElementById('root-modal-title').innerText = '🏭 Edit Root (Level 0)';
+    document.getElementById('btn-del-root').style.display = 'block';
+    document.getElementById('root-modal-overlay').style.display = 'flex';
+}
+
+function saveRoot() {
+    let id = document.getElementById('root-id').value;
+    let name = document.getElementById('root-name').value;
+    let type = document.getElementById('root-type').value;
+    let kg = document.getElementById('root-kg').value;
+    let m3 = document.getElementById('root-m3').value;
+    let address = document.getElementById('root-address').value;
+    let mapUrl = document.getElementById('root-map-url').value;
+    
+    if (!name) return alert("Root Name is required.");
+    let rootObj = { id: id || 'wh_' + Date.now(), name: name, type: type, kg: kg, m3: m3, address: address, mapUrl: mapUrl };
+    if (id) {
+        let r = globalWhRoots.find(x => x.id === id);
+        if (r) {
+            rootObj.anchorX = r.anchorX;
+            rootObj.anchorY = r.anchorY;
+            Object.assign(r, rootObj);
+        }
+    } else {
+        rootObj.anchorX = 0; rootObj.anchorY = 0;
+        globalWhRoots.push(rootObj);
+    }
+    document.getElementById('root-modal-overlay').style.display = 'none';
+    initWarehouseDrawer();
+    WH_API.saveRoot(rootObj);
+}
+
+function deleteRoot(overrideId) {
+    let id = overrideId || document.getElementById('root-id').value;
+    if (!id) return;
+    if (!confirm("Are you sure you want to delete this Root Location and all its internal zones?")) return;
+    
+    globalWhRoots = globalWhRoots.filter(r => r.id !== id);
+    globalWhZones = globalWhZones.filter(z => z.parentId !== id);
+    if (activeWhRootId === id) activeWhRootId = null;
+    
+    document.getElementById('root-modal-overlay').style.display = 'none';
+    initWarehouseDrawer();
+    WH_API.deleteEntity('root', id);
+}
+
+let activeEditingZoneId = null;
+
+function initZoneEditorLayout() {
+    // The HTML layout is fully static now, simply ensure the wrapper is visible
+    let wrapper = document.getElementById('zone-inner-map-wrapper');
+    if (wrapper) wrapper.style.display = 'flex';
+}
+
+function openEditZone(id) {
+    let z = globalWhZones.find(x => x.id === id);
+    if (!z) return;
+    activeEditingZoneId = id;
+    let activeRoot = globalWhRoots.find(r => r.id === z.parentId);
+    activeWhRootId = z.parentId;
+    
+    initZoneEditorLayout();
+    
+    document.getElementById('wh-empty-state').style.display = 'none';
+    document.getElementById('zone-editor-container').style.display = 'flex';
+    
+    document.getElementById('zone-id').value = z.id;
+    document.getElementById('zone-parent-id').value = z.parentId;
+    document.getElementById('zone-name').value = z.name;
+    document.getElementById('zone-floor').value = z.floor || '';
+        document.getElementById('zone-elevation').value = z.elevation || '';
+    document.getElementById('zone-room').value = z.room || '';
+    document.getElementById('zone-notes').value = z.notes || '';
+    
+    document.getElementById('zone-editor-title').innerText = '🚪 Edit Zone: ' + z.name;
+    
+    mapHistory = [];
+    mapRedo = [];
+    deletedAreaIds = [];
+    document.getElementById('zone-inner-map').style.transform = `translate(${innerMapTr.panX}px, ${innerMapTr.panY}px) scale(${innerMapTr.zoom})`;
+    
+    if (typeof hideAreaProps === 'function') hideAreaProps();
+    if (typeof setPolyTool === 'function') setPolyTool('select');
+
+    renderZoneInnerMap();
+    initWarehouseDrawer(); 
+}
+
+function createNewZone(rootId) {
+    let activeRoot = globalWhRoots.find(r => r.id === rootId);
+    if (!activeRoot) return;
+    
+    let name = prompt("Enter new Zone Name (e.g. Ground Floor):");
+    if (!name) return;
+    
+    let zObj = { id: 'z_' + Date.now(), parentId: rootId, name: name, floor: '', elevation: '', room: '', notes: '', x: 20, y: 20, w: 160, h: 100, points: [] };
+    globalWhZones.push(zObj);
+    WH_API.saveZone(zObj);
+    
+    initWarehouseDrawer();
+    openEditZone(zObj.id);
+}
+
+function saveZone() {
+    if (!activeEditingZoneId) return;
+    let id = document.getElementById('zone-id').value;
+    let name = document.getElementById('zone-name').value;
+    let floor = document.getElementById('zone-floor').value;
+    let elevation = document.getElementById('zone-elevation').value;
+    let room = document.getElementById('zone-room').value;
+    let notes = document.getElementById('zone-notes').value;
+    
+    if (!name) return alert("Zone Name is required.");
+    
+    const btn = document.getElementById('btn-save-warehouse');
+    const origText = btn.innerText;
+    btn.innerText = "SAVING...";
+    btn.disabled = true;
+
+        let safetyTimer = setTimeout(() => {
+            btn.innerText = origText; btn.disabled = false;
+            alert("Network Timeout: Save failed. Please check your connection.");
+        }, 30000);
+
+    if (id) {
+        let z = globalWhZones.find(x => x.id === id);
+        if (z) {
+            z.name = name;
+            z.floor = floor;
+            z.elevation = elevation;
+            z.room = room;
+            z.notes = notes;
+            document.getElementById('zone-editor-title').innerText = '🚪 Edit Zone: ' + z.name;
+        }
+        let areasToSave = globalWhAreas.filter(a => a.zoneId === id);
+        google.script.run
+            .withSuccessHandler(res => {
+                    clearTimeout(safetyTimer);
+                btn.innerText = "SAVED";
+                setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
+                deletedAreaIds = [];
+                
+                google.script.run.withSuccessHandler(whRes => {
+                    globalWhRoots = whRes.roots || [];
+                    globalWhZones = whRes.zones || [];
+                    globalWhAreas = whRes.areas || [];
+                }).getWarehouseData();
+                initWarehouseDrawer();
+            })
+            .withFailureHandler(err => {
+                    clearTimeout(safetyTimer);
+                alert("Save Failed: " + err.message);
+                btn.innerText = origText; btn.disabled = false;
+            })
+            .saveWarehouseDraft(z, areasToSave, deletedAreaIds);
+    }
+}
+
+function addSpotToZone() {
+    if (!activeEditingZoneId) return;
+    pushMapHistory();
+    let zAreas = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+    let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+    
+    let container = document.getElementById('zone-inner-map-container');
+    let cx = 1000, cy = 1000;
+    if (z && z.points && z.points.length >= 3) {
+        let centroid = getCentroid(z.points);
+        cx = Math.round(centroid.x / 10) * 10;
+        cy = Math.round(centroid.y / 10) * 10;
+    }
+    cx = Math.max(40, Math.min(1960, cx)); 
+    cy = Math.max(20, Math.min(1980, cy));
+    
+    let boxW = 80, boxH = 40;
+    let placed = false;
+    let pts = [];
+    
+    for (let ring = 0; ring < 20 && !placed; ring++) {
+        for (let dx = -ring; dx <= ring; dx++) {
+            for (let dy = -ring; dy <= ring; dy++) {
+                if (Math.abs(dx) !== ring && Math.abs(dy) !== ring) continue;
+                
+                let testX = cx + dx * 20;
+                let testY = cy + dy * 20;
+                
+                pts = [
+                    {x: testX - boxW/2, y: testY - boxH/2}, 
+                    {x: testX + boxW/2, y: testY - boxH/2},
+                    {x: testX + boxW/2, y: testY + boxH/2}, 
+                    {x: testX - boxW/2, y: testY + boxH/2}
+                ];
+                
+                let collision = false;
+                if (z && z.points && z.points.length >= 3) {
+                    for (let pt of pts) { if (!isPointInPoly(pt, z.points)) collision = true; }
+                }
+                if (!collision) {
+                    for (let a of zAreas) {
+                        if (doPolygonsIntersect(pts, a.points)) {
+                            collision = true; break;
+                        }
+                    }
+                }
+                if (!collision) { placed = true; break; }
+            }
+            if (placed) break;
+        }
+    }
+    
+    if (!placed) {
+        pts = [
+            {x: cx - boxW/2, y: cy - boxH/2}, {x: cx + boxW/2, y: cy - boxH/2},
+            {x: cx + boxW/2, y: cy + boxH/2}, {x: cx - boxW/2, y: cy + boxH/2}
+        ];
+    }
+    
+    let newArea = {
+        id: 'a_' + Date.now(),
+        zoneId: activeEditingZoneId,
+        name: 'Area ' + String.fromCharCode(65 + zAreas.length),
+        points: pts
+    };
+    globalWhAreas.push(newArea);
+    setPolyTool('select');
+    selectPoly('area', newArea.id);
+}
+
+function deleteZone(id) {
+    if (!id) return;
+    if (!confirm("Are you sure you want to delete this zone?")) return;
+    
+    globalWhZones = globalWhZones.filter(z => z.id !== id);
+    globalWhAreas = globalWhAreas.filter(a => a.zoneId !== id);
+    WH_API.deleteEntity('zone', id);
+    
+    if (activeEditingZoneId === id) {
+        activeEditingZoneId = null;
+        document.getElementById('zone-editor-container').style.display = 'none';
+        document.getElementById('wh-empty-state').style.display = 'flex';
+    }
+    initWarehouseDrawer();
+}
+
+// ==========================================
+// --- COLLISION DETECTION ENGINE ---
+// ==========================================
+function doLineSegmentsIntersect(p1, p2, p3, p4) {
+    let s1_x = p2.x - p1.x, s1_y = p2.y - p1.y;
+    let s2_x = p4.x - p3.x, s2_y = p4.y - p3.y;
+    let denom = (-s2_x * s1_y + s1_x * s2_y);
+    if (denom === 0) return false;
+    let s = (-s1_y * (p1.x - p3.x) + s1_x * (p1.y - p3.y)) / denom;
+    let t = ( s2_x * (p1.y - p3.y) - s2_y * (p1.x - p3.x)) / denom;
+    return (s > 0 && s < 1 && t > 0 && t < 1);
+}
+
+function doPolygonsIntersect(polyA, polyB) {
+    if(!polyA || !polyB || polyA.length < 3 || polyB.length < 3) return false;
+    let minXA = Math.min(...polyA.map(p=>p.x)), maxXA = Math.max(...polyA.map(p=>p.x));
+    let minYA = Math.min(...polyA.map(p=>p.y)), maxYA = Math.max(...polyA.map(p=>p.y));
+    let minXB = Math.min(...polyB.map(p=>p.x)), maxXB = Math.max(...polyB.map(p=>p.x));
+    let minYB = Math.min(...polyB.map(p=>p.y)), maxYB = Math.max(...polyB.map(p=>p.y));
+    if (maxXA <= minXB || minXA >= maxXB || maxYA <= minYB || minYA >= maxYB) return false;
+    for (let i=0; i<polyA.length; i++) {
+        let p1 = polyA[i], p2 = polyA[(i+1)%polyA.length];
+        for (let j=0; j<polyB.length; j++) {
+            let p3 = polyB[j], p4 = polyB[(j+1)%polyB.length];
+            if (doLineSegmentsIntersect(p1, p2, p3, p4)) return true;
+        }
+    }
+    if (isPointInPoly(polyA[0], polyB)) return true;
+    if (isPointInPoly(polyB[0], polyA)) return true;
+    return false;
+}
+
+function getClosestPointOnPoly(pt, poly) {
+    let minDist = Infinity;
+    let closestPt = {x: pt.x, y: pt.y};
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        let p1 = poly[i], p2 = poly[j];
+        let l2 = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2);
+        if (l2 === 0) continue;
+        let t = Math.max(0, Math.min(1, ((pt.x - p1.x) * (p2.x - p1.x) + (pt.y - p1.y) * (p2.y - p1.y)) / l2));
+        let projX = p1.x + t * (p2.x - p1.x);
+        let projY = p1.y + t * (p2.y - p1.y);
+        let dist = Math.hypot(pt.x - projX, pt.y - projY);
+        if (dist < minDist) { minDist = dist; closestPt = {x: projX, y: projY}; }
+    }
+    return closestPt;
+}
+
+// ==========================================
+// --- VECTOR POLYGON DRAWING ENGINE ---
+// ==========================================
+let polyTool = 'select'; // 'select', 'draw-zone', 'draw-area'
+let drawPoints = [];
+let selectedPoly = null; // { type: 'zone'|'area', id: '...' }
+let selectedVertices = []; // Array of vertex indices
+let vertexLasso = null; 
+let snapGuides = { x: null, y: null };
+let mapHistory = [];
+let mapRedo = [];
+
+function pushMapHistory() {
+    if (!activeEditingZoneId) return;
+    let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+    let aList = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+    mapHistory.push(JSON.stringify({ zone: z, areas: aList }));
+    mapRedo = [];
+    if (mapHistory.length > 20) mapHistory.shift();
+}
+
+function undoMap() {
+    if (mapHistory.length === 0 || !activeEditingZoneId) return;
+    let zCurrent = globalWhZones.find(x => x.id === activeEditingZoneId);
+    let aCurrent = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+    mapRedo.push(JSON.stringify({ zone: zCurrent, areas: aCurrent }));
+    let state = JSON.parse(mapHistory.pop());
+    restoreMapState(state);
+}
+
+function redoMap() {
+    if (mapRedo.length === 0 || !activeEditingZoneId) return;
+    let zCurrent = globalWhZones.find(x => x.id === activeEditingZoneId);
+    let aCurrent = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+    mapHistory.push(JSON.stringify({ zone: zCurrent, areas: aCurrent }));
+    let state = JSON.parse(mapRedo.pop());
+    restoreMapState(state);
+}
+
+function restoreMapState(state) {
+    let prevSelPoly = selectedPoly ? JSON.parse(JSON.stringify(selectedPoly)) : null;
+    let prevSelVerts = [...selectedVertices];
+    
+    let zIdx = globalWhZones.findIndex(x => x.id === state.zone.id);
+    if (zIdx > -1) { globalWhZones[zIdx] = state.zone; }
+    let currentAreaIds = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId).map(a => a.id);
+    let stateAreaIds = state.areas.map(a => a.id);
+    currentAreaIds.forEach(id => { if (!stateAreaIds.includes(id)) { globalWhAreas = globalWhAreas.filter(a => a.id !== id); if (!deletedAreaIds.includes(id)) deletedAreaIds.push(id); } });
+    state.areas.forEach(a => { let aIdx = globalWhAreas.findIndex(x => x.id === a.id); if (aIdx > -1) globalWhAreas[aIdx] = a; else globalWhAreas.push(a); deletedAreaIds = deletedAreaIds.filter(did => did !== a.id); });
+    
+    if (prevSelPoly) {
+        let objExists = prevSelPoly.type === 'zone' ? globalWhZones.find(x => x.id === prevSelPoly.id) : globalWhAreas.find(x => x.id === prevSelPoly.id);
+        if (objExists) {
+            selectedPoly = prevSelPoly;
+            selectedVertices = prevSelVerts;
+            selectPoly(prevSelPoly.type, objExists.id);
+        } else {
+            selectedPoly = null;
+            selectedVertices = [];
+            hideAreaProps();
+        }
+    }
+    renderZoneInnerMap();
+}
+
+function ensurePoints(obj) {
+    if (!obj.points || obj.points.length === 0) {
+        if (obj.w && obj.h) {
+            obj.points = [
+                {x: obj.x, y: obj.y},
+                {x: obj.x + obj.w, y: obj.y},
+                {x: obj.x + obj.w, y: obj.y + obj.h},
+                {x: obj.x, y: obj.y + obj.h}
+            ];
+        } else { obj.points = []; }
+    }
+}
+
+function getCentroid(pts) {
+    if(!pts || pts.length === 0) return {x:0, y:0};
+    let minX = Math.min(...pts.map(p=>p.x)), maxX = Math.max(...pts.map(p=>p.x));
+    let minY = Math.min(...pts.map(p=>p.y)), maxY = Math.max(...pts.map(p=>p.y));
+    return { x: minX + (maxX - minX)/2, y: minY + (maxY - minY)/2 };
+}
+
+function setPolyTool(tool) {
+    polyTool = tool;
+    drawPoints = [];
+    snapGuides = { x: null, y: null };
+    document.querySelectorAll('.poly-tool-btn').forEach(btn => {
+        btn.style.borderColor = '#52525b';
+        if (btn.id === 'tool-poly-area') btn.style.borderColor = '#10b981';
+    });
+    let activeBtn = document.getElementById('tool-poly-' + tool.replace('draw-', ''));
+    if (activeBtn) activeBtn.style.borderColor = '#fff';
+    renderZoneInnerMap();
+}
+
+function getSvgCoords(svgId, e) {
+    let svg = document.getElementById(svgId);
+    let pt = svg.createSVGPoint();
+    pt.x = e.touches ? e.touches[0].clientX : e.clientX;
+    pt.y = e.touches ? e.touches[0].clientY : e.clientY;
+    let cursorPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return {
+        x: cursorPt.x,
+        y: cursorPt.y
+    };
+}
+
+function getSnappedCoords(rawX, rawY, ignoreType, ignoreId, ignoreIndex) {
+    let snapStep = 10; // 1m default
+    if (innerMapTr.zoom >= 1.5) snapStep = 5; // 0.5m
+    if (innerMapTr.zoom >= 4) snapStep = 1;   // 0.1m
+    
+    let snapThreshold = 5 / innerMapTr.zoom;
+    let bestX = Math.round(rawX / snapStep) * snapStep;
+    let bestY = Math.round(rawY / snapStep) * snapStep;
+    bestX = Math.max(0, Math.min(2000, bestX));
+    bestY = Math.max(0, Math.min(2000, bestY));
+    
+    let guideX = null, guideY = null;
+    let minDistX = snapThreshold, minDistY = snapThreshold;
+
+    let allPoints = [];
+    let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+    if (z && z.points) z.points.forEach((p, i) => { if (!(ignoreType==='zone' && ignoreId===z.id && ignoreIndex===i)) allPoints.push(p); });
+        
+        // Allow magnetic snapping to ALL sibling floors and their boundaries
+        let rootZones = globalWhZones.filter(z => z.parentId === activeWhRootId);
+        rootZones.forEach(z => {
+            if (z.points) {
+                z.points.forEach((p, i) => { if (!(ignoreType==='zone' && ignoreId===z.id && ignoreIndex===i)) allPoints.push(p); });
+            }
+        });
+        
+    let zAreas = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+    zAreas.forEach(a => {
+        if (a.points) a.points.forEach((p, i) => { if (!(ignoreType==='area' && ignoreId===a.id && ignoreIndex===i)) allPoints.push(p); });
+    });
+    drawPoints.forEach((p, i) => { if (!(ignoreType==='draw' && ignoreIndex===i)) allPoints.push(p); });
+
+    allPoints.forEach(p => {
+        let rawDx = Math.abs(rawX - p.x);
+        let rawDy = Math.abs(rawY - p.y);
+        if (rawDx < minDistX) { minDistX = rawDx; bestX = p.x; guideX = p.x; }
+        if (rawDy < minDistY) { minDistY = rawDy; bestY = p.y; guideY = p.y; }
+    });
+
+    bestX = Math.max(0, Math.min(2000, bestX));
+    bestY = Math.max(0, Math.min(2000, bestY));
+
+    if (ignoreType === 'draw' && polyTool === 'draw-area' && activeEditingZoneId) {
+        let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+        if (z && z.points && z.points.length >= 3) {
+            if (!isPointInPoly({x: bestX, y: bestY}, z.points)) {
+                let clamped = getClosestPointOnPoly({x: bestX, y: bestY}, z.points);
+                bestX = clamped.x; bestY = clamped.y;
+            }
+        }
+    }
+
+    snapGuides = { x: guideX, y: guideY };
+    return { x: bestX, y: bestY };
+}
+
+let wasLassoingPoly = false;
+
+function onSvgMapClick(e) {
+    if (innerMapTr.isPanning || e.altKey) return;
+    
+    if (polyTool === 'set-anchor') {
+        let coords = getSvgCoords('zone-inner-svg', e);
+        let root = globalWhRoots.find(r => r.id === activeWhRootId);
+        if (root) {
+            root.anchorX = coords.x;
+            root.anchorY = coords.y;
+            WH_API.saveRoot(root);
+            setPolyTool('select');
+            renderZoneInnerMap();
+        }
+        return;
+    }
+    
+    if (polyTool === 'select') {
+        if (wasLassoingPoly) { wasLassoingPoly = false; return; }
+        let tgt = e.target;
+        let isSvgBg = (tgt.tagName.toLowerCase() === 'svg' || tgt.id === 'zone-inner-svg' || tgt.id === 'zone-inner-map');
+        if (isSvgBg) {
+            if (!e.shiftKey) {
+                selectedPoly = null;
+                selectedVertices = [];
+                hideAreaProps();
+                renderZoneInnerMap();
+            }
+        }
+        return;
+    }
+    
+    let coords = getSvgCoords('zone-inner-svg', e);
+    
+    if (drawPoints.length > 0) {
+        let startPt = drawPoints[0];
+        let dist = Math.hypot(coords.x - startPt.x, coords.y - startPt.y);
+        if (dist <= 20) { finishPolygon(); return; }
+    }
+    
+    let snapped = getSnappedCoords(coords.x, coords.y, 'draw', null, drawPoints.length);
+    
+    if (polyTool === 'draw-area') {
+        let inOther = globalWhAreas.some(a => a.zoneId === activeEditingZoneId && isPointInPoly(snapped, a.points));
+        if (inOther) return; 
+    }
+    
+    drawPoints.push(snapped);
+    snapGuides = { x: null, y: null };
+    renderZoneInnerMap();
+}
+
+let currentMousePos = null;
+
+function startSvgLasso(e) {
+    let tgt = e.target;
+    let isSvgBg = (tgt.tagName.toLowerCase() === 'svg' || tgt.id === 'zone-inner-svg' || tgt.id === 'zone-inner-map');
+    if (!isSvgBg || polyTool !== 'select' || e.button === 1 || e.altKey) return;
+    let coords = getSvgCoords('zone-inner-svg', e);
+    vertexLasso = { startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y };
+    wasLassoingPoly = false;
+}
+
+function endSvgLasso(e) {
+    if (vertexLasso) {
+        if (selectedPoly) {
+            let polyObj = selectedPoly.type === 'zone' ? globalWhZones.find(x => x.id === selectedPoly.id) : globalWhAreas.find(x => x.id === selectedPoly.id);
+            if (polyObj && polyObj.points) {
+                let minX = Math.min(vertexLasso.startX, vertexLasso.currentX);
+                let maxX = Math.max(vertexLasso.startX, vertexLasso.currentX);
+                let minY = Math.min(vertexLasso.startY, vertexLasso.currentY);
+                let maxY = Math.max(vertexLasso.startY, vertexLasso.currentY);
+                
+                if (Math.abs(maxX - minX) > 5 || Math.abs(maxY - minY) > 5) {
+                    wasLassoingPoly = true;
+                    if (!e.shiftKey) selectedVertices = [];
+                    polyObj.points.forEach((p, i) => {
+                        if (p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY) {
+                            if (!selectedVertices.includes(i)) selectedVertices.push(i);
+                        }
+                    });
+                }
+            }
+        }
+        vertexLasso = null;
+        renderZoneInnerMap();
+    }
+}
+
+function onSvgMapMove(e) {
+    if (polyTool === 'select' || drawPoints.length === 0) return;
+    currentMousePos = getSvgCoords('zone-inner-svg', e);
+    
+    if (vertexLasso) {
+        vertexLasso.currentX = currentMousePos.x;
+        vertexLasso.currentY = currentMousePos.y;
+        renderZoneInnerMap();
+    } else if (drawPoints.length > 0) {
+        getSnappedCoords(currentMousePos.x, currentMousePos.y, 'draw', null, drawPoints.length);
+        renderZoneInnerMap();
+    }
+}
+
+function finishPolygon() {
+    if (drawPoints.length < 3) {
+        drawPoints = [];
+        renderZoneInnerMap();
+        return;
+    }
+    let newPts = [...drawPoints];
+    drawPoints = [];
+    pushMapHistory();
+    snapGuides = { x: null, y: null };
+
+    if (polyTool === 'draw-zone') {
+        let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+        if (z) {
+            z.points = newPts;
+        }
+    } else if (polyTool === 'draw-area') {
+        let zAreas = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+        let newArea = {
+            id: 'a_' + Date.now(),
+            zoneId: activeEditingZoneId,
+            name: 'Area ' + String.fromCharCode(65 + zAreas.length),
+            points: newPts
+        };
+        globalWhAreas.push(newArea);
+    }
+    setPolyTool('select');
+}
+
+let activePolyDrag = null;
+
+function startPolyDrag(e, type, id) {
+    if (polyTool !== 'select') return;
+    e.stopPropagation(); e.preventDefault();
+    
+    selectPoly(type, id, e);
+    
+    if (type === 'zone') {
+        return; // Prevent dragging the actual floor bounds
+    }
+    
+    let obj = type === 'zone' ? globalWhZones.find(x => x.id === id) : globalWhAreas.find(x => x.id === id);
+    if (!obj || !obj.points || obj.points.length === 0) return;
+    
+    pushMapHistory();
+    let origPoints = obj.points.map(p => ({x: p.x, y: p.y}));
+    let mouseCoords = getSvgCoords('zone-inner-svg', e);
+    
+    activePolyDrag = { type, id, origPoints, mouseStartX: mouseCoords.x, mouseStartY: mouseCoords.y };
+    document.addEventListener('mousemove', onPolyDrag);
+    document.addEventListener('mouseup', endPolyDrag);
+}
+
+function onPolyDrag(e) {
+    if (!activePolyDrag) return;
+    let mouseCoords = getSvgCoords('zone-inner-svg', e);
+    let dx = mouseCoords.x - activePolyDrag.mouseStartX;
+    let dy = mouseCoords.y - activePolyDrag.mouseStartY;
+    
+    let snapStep = 10; // 1m
+    if (innerMapTr.zoom >= 1.5) snapStep = 5; // 0.5m
+    if (innerMapTr.zoom >= 4) snapStep = 1;   // 0.1m
+    
+    let snapDx = Math.round(dx / snapStep) * snapStep;
+    let snapDy = Math.round(dy / snapStep) * snapStep;
+    
+    let obj = activePolyDrag.type === 'zone' ? globalWhZones.find(x => x.id === activePolyDrag.id) : globalWhAreas.find(x => x.id === activePolyDrag.id);
+    if (!obj || !obj.points) return;
+    
+    let boundsValid = true;
+    let newPts = [];
+    for (let i = 0; i < activePolyDrag.origPoints.length; i++) {
+        let nx = activePolyDrag.origPoints[i].x + snapDx;
+        let ny = activePolyDrag.origPoints[i].y + snapDy;
+        if (nx < 0 || nx > 2000 || ny < 0 || ny > 2000) boundsValid = false;
+        newPts.push({x: nx, y: ny});
+    }
+    
+    if (activePolyDrag.type === 'area') {
+        let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+        if (z && z.points && z.points.length >= 3) {
+            let wasOut = false;
+            for (let pt of activePolyDrag.origPoints) { if (!isPointInPoly(pt, z.points)) wasOut = true; }
+            for (let pt of newPts) {
+                if (!isPointInPoly(pt, z.points) && !wasOut) boundsValid = false;
+            }
+        }
+    }
+    
+    if (activePolyDrag.type === 'area' && boundsValid) {
+        let otherAreas = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId && a.id !== activePolyDrag.id);
+        for (let other of otherAreas) { 
+            let wasColliding = doPolygonsIntersect(activePolyDrag.origPoints, other.points);
+            let isColliding = doPolygonsIntersect(newPts, other.points);
+            if (isColliding && !wasColliding) boundsValid = false; 
+        }
+    }
+    
+    if (boundsValid) {
+        obj.points = newPts;
+        renderZoneInnerMap();
+    }
+}
+
+function endPolyDrag(e) {
+    activePolyDrag = null;
+    document.removeEventListener('mousemove', onPolyDrag);
+    document.removeEventListener('mouseup', endPolyDrag);
+}
+
+function handleEdgeMouseDown(e, type, id, idx) {
+    e.stopPropagation(); e.preventDefault();
+    if (polyTool !== 'select') return;
+    if (e.ctrlKey || e.metaKey) {
+        splitPolyEdge(e, type, id, idx);
+    } else {
+        startEdgeDrag(e, type, id, idx);
+    }
+}
+
+function startEdgeDrag(e, type, id, idx) {
+    pushMapHistory();
+    let obj = type === 'zone' ? globalWhZones.find(z => z.id === id) : globalWhAreas.find(a => a.id === id);
+    if (!obj) return;
+    let nextIdx = (idx + 1) % obj.points.length;
+    
+    selectedVertices = [idx, nextIdx];
+    let origCoords = {};
+    selectedVertices.forEach(i => origCoords[i] = { x: obj.points[i].x, y: obj.points[i].y });
+
+    let mouseCoords = getSvgCoords('zone-inner-svg', e);
+    activeVertexDrag = { type, id, index: idx, origCoords, mouseStartX: mouseCoords.x, mouseStartY: mouseCoords.y };
+    document.addEventListener('mousemove', onVertexDrag);
+    document.addEventListener('mouseup', endVertexDrag);
+    renderZoneInnerMap();
+}
+
+function zoomToFloor() {
+    let zAreas = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+    let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+    if (!z) return;
+    ensurePoints(z);
+    zAreas.forEach(a => ensurePoints(a));
+    
+    if (!z.points || z.points.length === 0) return;
+
+    let minX = Math.min(...z.points.map(p=>p.x));
+    let maxX = Math.max(...z.points.map(p=>p.x));
+    let minY = Math.min(...z.points.map(p=>p.y));
+    let maxY = Math.max(...z.points.map(p=>p.y));
+    
+    zAreas.forEach(a => {
+        if (a.points && a.points.length > 0) {
+            minX = Math.min(minX, ...a.points.map(p=>p.x));
+            maxX = Math.max(maxX, ...a.points.map(p=>p.x));
+            minY = Math.min(minY, ...a.points.map(p=>p.y));
+            maxY = Math.max(maxY, ...a.points.map(p=>p.y));
+        }
+    });
+    
+    let pW = maxX - minX;
+    let pH = maxY - minY;
+    
+    let container = document.getElementById('zone-inner-map-container');
+    let cW = container.clientWidth;
+    let cH = container.clientHeight;
+    
+    if (cW === 0 || cH === 0) return;
+    
+    let pad = 80; // Safety area padding (pixels)
+    let scale = Math.min((cW - pad) / pW, (cH - pad) / pH);
+    scale = Math.min(Math.max(0.05, scale), 20);
+    
+    innerMapTr.zoom = scale;
+    innerMapTr.panX = (cW / 2) - ((minX + maxX) / 2) * scale;
+    innerMapTr.panY = (cH / 2) - ((minY + maxY) / 2) * scale;
+    
+    document.getElementById('zone-inner-map').style.transform = `translate(${innerMapTr.panX}px, ${innerMapTr.panY}px) scale(${innerMapTr.zoom})`;
+    renderZoneInnerMap();
+}
+
+function splitPolyEdge(e, type, id, idx) {
+    pushMapHistory();
+    let obj = type === 'zone' ? globalWhZones.find(x => x.id === id) : globalWhAreas.find(x => x.id === id);
+    let coords = getSvgCoords('zone-inner-svg', e);
+    let snapped = getSnappedCoords(coords.x, coords.y, null, null, null);
+    obj.points.splice(idx + 1, 0, snapped);
+    selectedVertices = [idx + 1]; 
+    renderZoneInnerMap();
+}
+
+function editEdgeLength(e, type, id, idx) {
+    e.stopPropagation();
+    if (polyTool !== 'select') return;
+    let obj = type === 'zone' ? globalWhZones.find(x => x.id === id) : globalWhAreas.find(x => x.id === id);
+    if (!obj || !obj.points) return;
+    let p1 = obj.points[idx];
+    let nextIdx = (idx + 1) % obj.points.length;
+    let p2 = obj.points[nextIdx];
+    let dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    let input = prompt("Enter new length in meters (Max Limit ~200m):", (dist / 10).toFixed(2));
+    if (!input || isNaN(input)) return;
+    let newDist = parseFloat(input) * 10;
+    if (newDist <= 0 || newDist === dist) return;
+    
+    let ratio = newDist / dist;
+    let newP2x = Math.round(p1.x + (p2.x - p1.x) * ratio);
+    let newP2y = Math.round(p1.y + (p2.y - p1.y) * ratio);
+
+    let testPoints = JSON.parse(JSON.stringify(obj.points));
+    testPoints[nextIdx].x = newP2x;
+    testPoints[nextIdx].y = newP2y;
+    
+    let minX = Math.min(...testPoints.map(p=>p.x));
+    let maxX = Math.max(...testPoints.map(p=>p.x));
+    let minY = Math.min(...testPoints.map(p=>p.y));
+    let maxY = Math.max(...testPoints.map(p=>p.y));
+    
+    if (maxX - minX > 2000 || maxY - minY > 2000) {
+        alert("Error: Shape length modifications exceed the maximum 200x200m Field boundary.");
+        return;
+    }
+    
+    let shiftX = 0, shiftY = 0;
+    let SAFE_ZONE = 20; // 2m padding so it doesn't touch the exact edge
+    if (minX < SAFE_ZONE) shiftX = SAFE_ZONE - minX;
+    if (maxX > 2000 - SAFE_ZONE) shiftX = (2000 - SAFE_ZONE) - maxX;
+    if (minY < SAFE_ZONE) shiftY = SAFE_ZONE - minY;
+    if (maxY > 2000 - SAFE_ZONE) shiftY = (2000 - SAFE_ZONE) - maxY;
+    
+    pushMapHistory();
+    obj.points = testPoints.map(p => ({ x: p.x + shiftX, y: p.y + shiftY }));
+
+    renderZoneInnerMap();
+}
+
+// @INDEX: WAREHOUSE -> 2D CAD Render Engine
+function renderZoneInnerMap() {
+    let innerMap = document.getElementById('zone-inner-map');
+    if (!innerMap) return;
+    let svg = document.getElementById('zone-inner-svg');
+    if (!svg) {
+        innerMap.innerHTML = '<svg id="zone-inner-svg" width="2000" height="2000" style="position:absolute; top:0; left:0; overflow:visible;" onclick="onSvgMapClick(event)" onmousedown="startSvgLasso(event)" onmousemove="onSvgMapMove(event)" onmouseup="endSvgLasso(event)"></svg>';
+        svg = document.getElementById('zone-inner-svg');
+    }
+
+    let zAreas = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId);
+    let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+    if (!z) return;
+    ensurePoints(z);
+    
+    let zScale = innerMapTr.zoom || 1;
+    let edgeWidth = 4 / zScale;
+    let hitEdgeWidth = 20 / zScale;
+    let vertexR = 4 / zScale;
+    let vertexSelR = 6 / zScale;
+    let vertexHitR = 16 / zScale;
+    let dimFontSize = 14 / zScale;
+    let dimOffset = 8 / zScale;
+
+    let html = `
+    <defs>
+        <pattern id="dotGrid" width="5" height="5" patternUnits="userSpaceOnUse">
+            <circle cx="2.5" cy="2.5" r="0.5" fill="#3f3f46" />
+        </pattern>
+    </defs>
+    <rect width="2000" height="2000" fill="url(#dotGrid)" pointer-events="none" />
+    `;
+    
+    if (snapGuides.x !== null) html += `<line x1="${snapGuides.x}" y1="0" x2="${snapGuides.x}" y2="2000" class="snap-guide" />`;
+    if (snapGuides.y !== null) html += `<line x1="0" y1="${snapGuides.y}" x2="2000" y2="${snapGuides.y}" class="snap-guide" />`;
+
+    if (vertexLasso) {
+        let lX = Math.min(vertexLasso.startX, vertexLasso.currentX), lY = Math.min(vertexLasso.startY, vertexLasso.currentY);
+        let lW = Math.abs(vertexLasso.currentX - vertexLasso.startX), lH = Math.abs(vertexLasso.currentY - vertexLasso.startY);
+        html += `<rect x="${lX}" y="${lY}" width="${lW}" height="${lH}" class="lasso-rect" />`;
+    }
+
+    // Render background sibling zones
+    let rootZones = globalWhZones.filter(z => z.parentId === activeWhRootId);
+    rootZones.forEach(otherZ => {
+        if (otherZ.id !== activeEditingZoneId) {
+            ensurePoints(otherZ);
+            if (otherZ.points && otherZ.points.length > 0) {
+                let ptsStr = otherZ.points.map(p => `${p.x},${p.y}`).join(' ');
+                html += `<polygon points="${ptsStr}" style="fill:rgba(255,255,255,0.03); stroke:#52525b; stroke-width:1; stroke-dasharray:4,4; pointer-events:none;" />`;
+                let center = getCentroid(otherZ.points);
+                html += `<text x="${center.x}" y="${center.y}" style="fill:#52525b; font-size:10px; font-weight:bold; pointer-events:none; text-anchor:middle; dominant-baseline:middle;">${otherZ.name}</text>`;
+            }
+        }
+    });
+
+    // Render 0,0 Coordinate Anchor
+    let activeRoot = globalWhRoots.find(r => r.id === activeWhRootId);
+    if (polyTool === 'set-anchor' && activeRoot && activeRoot.anchorX !== undefined && activeRoot.anchorY !== undefined) {
+        let ax = activeRoot.anchorX;
+        let ay = activeRoot.anchorY;
+        html += `<g transform="translate(${ax}, ${ay})" style="cursor: grab; pointer-events: all; opacity: 0.8;" onmousedown="startAnchorDrag(event)">
+                        <rect x="-8" y="-8" width="16" height="16" fill="none" stroke="#eab308" stroke-width="2" pointer-events="all" />
+                        <circle cx="0" cy="0" r="2" fill="#eab308" pointer-events="none" />
+                        <text x="12" y="-5" fill="#eab308" font-size:10px; font-weight:bold; pointer-events:none;">0,0 Anchor</text>
+                 </g>`;
+    }
+
+    // Render Zone Boundary
+    if (z.points.length > 0) {
+        let ptsStr = z.points.map(p => `${p.x},${p.y}`).join(' ');
+        let isActive = (selectedPoly && selectedPoly.id === z.id) ? 'poly-active' : '';
+        html += `<polygon points="${ptsStr}" class="poly-zone ${isActive}" style="stroke-width:${3/zScale}px;" onmousedown="startPolyDrag(event, 'zone', '${z.id}')" />`;
+    }
+
+    // Render Storage Areas
+    zAreas.forEach(a => {
+        ensurePoints(a);
+        if (a.points.length > 0) {
+            let ptsStr = a.points.map(p => `${p.x},${p.y}`).join(' ');
+            let isActive = (selectedPoly && selectedPoly.id === a.id) ? 'poly-active' : '';
+            
+            let strokeColor = '#10b981';
+            let fillColor = 'rgba(16, 185, 129, 0.15)';
+            if (a.department && typeof SYSTEM_DEPARTMENTS !== 'undefined') {
+                let dObj = getDeptObj(a.department);
+                if (dObj && dObj.uid) {
+                    strokeColor = dObj.color;
+                    let r = parseInt(strokeColor.slice(1, 3), 16) || 16;
+                    let g = parseInt(strokeColor.slice(3, 5), 16) || 185;
+                    let b = parseInt(strokeColor.slice(5, 7), 16) || 129;
+                    fillColor = `rgba(${r}, ${g}, ${b}, 0.25)`;
+                }
+            }
+            
+            html += `<polygon points="${ptsStr}" class="poly-area ${isActive}" style="--poly-stroke:${strokeColor}; --poly-fill:${fillColor}; stroke-width:${3/zScale}px;" onmousedown="startPolyDrag(event, 'area', '${a.id}')" />`;
+            let center = getCentroid(a.points);
+            
+            let longestEdge = { len: 0, angle: 0 };
+            let polyArea = 0;
+            if (a.points.length >= 3) {
+                for (let i = 0; i < a.points.length; i++) {
+                    let p1 = a.points[i], p2 = a.points[(i + 1) % a.points.length];
+                    let dx = p2.x - p1.x, dy = p2.y - p1.y;
+                    let len = Math.hypot(dx, dy);
+                    if (len > longestEdge.len) { longestEdge.len = len; longestEdge.angle = Math.atan2(dy, dx) * 180 / Math.PI; }
+                    
+                    polyArea += (p1.x * p2.y - p2.x * p1.y);
+                }
+                polyArea = Math.abs(polyArea / 2);
+            }
+            let angle = longestEdge.angle || 0;
+            if (angle > 90) angle -= 180; else if (angle < -90) angle += 180;
+            
+            let perpHeight = longestEdge.len > 0 ? (polyArea / longestEdge.len) : 10;
+            let maxTextSizeByLength = longestEdge.len / Math.max(1, a.name.length * 0.55);
+            let optimalFontSize = Math.min(maxTextSizeByLength * 0.8, 24, perpHeight * 0.8);
+            optimalFontSize = Math.max(optimalFontSize, 2);
+            
+            html += `<text x="${center.x}" y="${center.y}" class="poly-label" transform="rotate(${angle}, ${center.x}, ${center.y})" style="font-size: ${optimalFontSize}px; pointer-events: none;">${a.name}</text>`;
+        }
+    });
+
+    // Render Active Drawing Strings
+    if (drawPoints.length > 0) {
+        let ptsStr = drawPoints.map(p => `${p.x},${p.y}`).join(' ');
+        if (currentMousePos) ptsStr += ` ${currentMousePos.x},${currentMousePos.y}`;
+        html += `<polyline points="${ptsStr}" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,6" />`;
+        
+        drawPoints.forEach((p, idx) => {
+            let color = idx === 0 ? '#ef4444' : '#f59e0b';
+            let rad = idx === 0 ? 8 : 5;
+            html += `<circle cx="${p.x}" cy="${p.y}" r="${rad}" fill="${color}" style="cursor:crosshair;" />`;
+        });
+    }
+
+    // Render Draggable Vertices for Selected Shape
+    if (polyTool === 'select' && selectedPoly) {
+        let polyObj = selectedPoly.type === 'zone' ? z : zAreas.find(x => x.id === selectedPoly.id);
+        if (polyObj && polyObj.points) {
+            polyObj.points.forEach((p, idx) => {
+                let nextIdx = (idx + 1) % polyObj.points.length;
+                let nextP = polyObj.points[nextIdx];
+                
+                html += `<line x1="${p.x}" y1="${p.y}" x2="${nextP.x}" y2="${nextP.y}" class="poly-edge" style="stroke-width:${edgeWidth}px; pointer-events:none;" />`;
+                html += `<line x1="${p.x}" y1="${p.y}" x2="${nextP.x}" y2="${nextP.y}" style="stroke:transparent; stroke-width:${hitEdgeWidth}px; cursor:crosshair;" onmousedown="handleEdgeMouseDown(event, '${selectedPoly.type}', '${selectedPoly.id}', ${idx})" />`;
+                
+                let dist = Math.hypot(nextP.x - p.x, nextP.y - p.y);
+                let angle = Math.atan2(nextP.y - p.y, nextP.x - p.x);
+                let offX = ((p.x + nextP.x) / 2) + Math.cos(angle - Math.PI/2) * dimOffset;
+                let offY = ((p.y + nextP.y) / 2) + Math.sin(angle - Math.PI/2) * dimOffset;
+                
+                let deg = angle * 180 / Math.PI;
+                if (deg > 90 || deg < -90) deg += 180;
+                
+                html += `<text x="${offX}" y="${offY}" class="dim-text" transform="rotate(${deg}, ${offX}, ${offY})" style="font-size:${dimFontSize}px; pointer-events:all;" onclick="editEdgeLength(event, '${selectedPoly.type}', '${selectedPoly.id}', ${idx})">${(dist/10).toFixed(1)}m</text>`;
+                
+                let isSel = selectedVertices.includes(idx) ? 'vertex-selected' : '';
+                let currentR = selectedVertices.includes(idx) ? (6/zScale) : vertexR;
+                html += `<circle cx="${p.x}" cy="${p.y}" r="${currentR}" class="poly-vertex ${isSel}" style="stroke-width:${1/zScale}px; pointer-events:none;" />`;
+                html += `<circle cx="${p.x}" cy="${p.y}" r="${vertexHitR}" style="fill:transparent; cursor:grab;" onmousedown="startVertexDrag(event, '${selectedPoly.type}', '${selectedPoly.id}', ${idx})" />`;
+            });
+        }
+    }
+
+    svg.innerHTML = html;
+}
+
+function updateSpatialPropsDisplay(obj, type) {
+    let spatialPanel = document.getElementById('prop-spatial-data');
+    if (!spatialPanel) return;
+    if (type === 'area' && obj && obj.points && obj.points.length > 0) {
+        let root = globalWhRoots.find(r => r.id === activeWhRootId);
+        let ax = (root && root.anchorX !== undefined) ? root.anchorX : 0;
+        let ay = (root && root.anchorY !== undefined) ? root.anchorY : 0;
+        
+        let center = getCentroid(obj.points);
+        
+        let relX = (center.x - ax) / 10;
+        let relY = (center.y - ay) / 10;
+        
+        let areaSqPx = 0;
+        let pts = obj.points;
+        for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+            areaSqPx += (pts[j].x + pts[i].x) * (pts[j].y - pts[i].y);
+        }
+        let sqm = Math.abs(areaSqPx / 2) / 100;
+        
+        document.getElementById('prop-rel-x').innerText = Math.abs(relX).toFixed(2) + 'm ' + (relX >= 0 ? '(E)' : '(W)');
+        document.getElementById('prop-rel-y').innerText = Math.abs(relY).toFixed(2) + 'm ' + (relY <= 0 ? '(N)' : '(S)');
+        document.getElementById('prop-area-sqm').innerText = sqm.toFixed(2) + ' m²';
+        
+        spatialPanel.style.display = 'flex';
+    } else {
+        spatialPanel.style.display = 'none';
+    }
+}
+
+function updateAreaProp() {
+    let id = document.getElementById('prop-area-id').value;
+    if(!id) return;
+    
+    if (selectedPoly && selectedPoly.type === 'zone') {
+        let z = globalWhZones.find(x => x.id === id);
+        if(z) { z.name = document.getElementById('prop-name').value; }
+    } else {
+        let a = globalWhAreas.find(x => x.id === id);
+        if(a) { a.name = document.getElementById('prop-name').value; a.department = document.getElementById('prop-dept').value; }
+    }
+    
+    renderZoneInnerMap();
+}
+
+function selectPoly(type, id, e) {
+    if (polyTool !== 'select') return;
+    if (e) e.stopPropagation();
+    
+    if (selectedPoly && selectedPoly.id !== id) selectedVertices = [];
+    selectedPoly = { type, id };
+    
+    let obj = type === 'zone' ? globalWhZones.find(x => x.id === id) : globalWhAreas.find(x => x.id === id);
+    if (obj) {
+        document.getElementById('area-props-panel').style.display = 'flex';
+        let placeholder = document.getElementById('area-props-placeholder');
+        if (placeholder) placeholder.style.display = 'none';
+        
+        document.getElementById('prop-area-id').value = obj.id;
+        document.getElementById('prop-name').value = obj.name;
+        
+        let selectEl = document.getElementById('prop-dept');
+        if (type === 'area' && selectEl) {
+            let deptHtml = '<option value="">None</option>';
+            if(typeof SYSTEM_DEPARTMENTS !== 'undefined') SYSTEM_DEPARTMENTS.forEach(d => deptHtml += `<option value="${d.uid || d.name}">${d.name}</option>`);
+            selectEl.innerHTML = deptHtml;
+            selectEl.value = obj.department || '';
+            selectEl.parentElement.style.display = 'flex';
+        } else if (selectEl) {
+            selectEl.parentElement.style.display = 'none';
+        }
+    }
+    
+    if (selectedPoly && selectedPoly.type === 'area') {
+        let a = globalWhAreas.find(x => x.id === selectedPoly.id);
+        if (a) updateSpatialPropsDisplay(a, 'area');
+    }
+    
+    renderZoneInnerMap();
+}
+
+function hideAreaProps() {
+    const panel = document.getElementById('area-props-panel');
+    if (panel) panel.style.display = 'none';
+    const placeholder = document.getElementById('area-props-placeholder');
+    if (placeholder) placeholder.style.display = 'flex';
+    const idField = document.getElementById('prop-area-id');
+    if (idField) idField.value = '';
+}
+
+function deleteSelectedPoly() {
+    if (!selectedPoly) return;
+    if (selectedPoly.type === 'zone') {
+        alert("Floor Boundaries cannot be deleted from here. Go back and click DELETE on the main zone panel.");
+        return;
+    }
+    if (!confirm("Are you sure you want to delete this Storage Area polygon?")) return;
+    
+    pushMapHistory();
+    globalWhAreas = globalWhAreas.filter(a => a.id !== selectedPoly.id);
+    if (!deletedAreaIds.includes(selectedPoly.id)) deletedAreaIds.push(selectedPoly.id);
+    selectedPoly = null;
+    hideAreaProps();
+    renderZoneInnerMap();
+}
+
+function isPointInPoly(pt, poly) {
+    let x = pt.x, y = pt.y;
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        let xi = poly[i].x, yi = poly[i].y;
+        let xj = poly[j].x, yj = poly[j].y;
+        
+        let l2 = Math.pow(xi - xj, 2) + Math.pow(yi - yj, 2);
+        if (l2 !== 0) {
+            let t = Math.max(0, Math.min(1, ((x - xi) * (xj - xi) + (y - yi) * (yj - yi)) / l2));
+            let projX = xi + t * (xj - xi);
+            let projY = yi + t * (yj - yi);
+            if (Math.hypot(x - projX, y - projY) <= 1.0) return true; // 1px tolerance
+        } else if (Math.hypot(x - xi, y - yi) <= 1.0) {
+            return true;
+        }
+        
+        let intersect = ((yi > y) != (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+// @INDEX: WAREHOUSE -> Vector Polygon Drag
+let activeVertexDrag = null;
+function startVertexDrag(e, type, id, index) {
+    e.stopPropagation(); e.preventDefault();
+    if (polyTool !== 'select') return;
+    
+    pushMapHistory();
+    
+    if (!e.shiftKey && !selectedVertices.includes(index)) {
+        selectedVertices = [index];
+    } else if (e.shiftKey && !selectedVertices.includes(index)) {
+        selectedVertices.push(index);
+    }
+    
+    let obj = type === 'zone' ? globalWhZones.find(z => z.id === id) : globalWhAreas.find(a => a.id === id);
+    let origCoords = {};
+    if (obj) selectedVertices.forEach(i => origCoords[i] = { x: obj.points[i].x, y: obj.points[i].y });
+
+    let mouseCoords = getSvgCoords('zone-inner-svg', e);
+    activeVertexDrag = { type, id, index, origCoords, mouseStartX: mouseCoords.x, mouseStartY: mouseCoords.y };
+    document.addEventListener('mousemove', onVertexDrag);
+    document.addEventListener('mouseup', endVertexDrag);
+    renderZoneInnerMap();
+}
+
+function onVertexDrag(e) {
+    if (!activeVertexDrag) return;
+    let mouseCoords = getSvgCoords('zone-inner-svg', e);
+    
+    let rawDx = mouseCoords.x - activeVertexDrag.mouseStartX;
+    let rawDy = mouseCoords.y - activeVertexDrag.mouseStartY;
+    
+    let obj = activeVertexDrag.type === 'zone' ? globalWhZones.find(z => z.id === activeVertexDrag.id) : globalWhAreas.find(a => a.id === activeVertexDrag.id);
+    if (!obj || !obj.points) return;
+    
+    let primaryIndex = activeVertexDrag.index;
+    let origPrimary = activeVertexDrag.origCoords[primaryIndex];
+    
+    let targetX = origPrimary.x + rawDx;
+    let targetY = origPrimary.y + rawDy;
+    
+    let snapped = getSnappedCoords(targetX, targetY, activeVertexDrag.type, activeVertexDrag.id, primaryIndex);
+    
+    let finalDx = snapped.x - origPrimary.x;
+    let finalDy = snapped.y - origPrimary.y;
+    
+    let boundsValid = true;
+    
+    let testPts = obj.points.map((p, i) => {
+        if (selectedVertices.includes(i)) {
+            let orig = activeVertexDrag.origCoords[i];
+            if(orig) {
+                let nx = orig.x + finalDx;
+                let ny = orig.y + finalDy;
+                if (activeVertexDrag.type === 'area') {
+                    let z = globalWhZones.find(x => x.id === activeEditingZoneId);
+                    if (z && z.points && z.points.length >= 3) {
+                        if (!isPointInPoly({x: nx, y: ny}, z.points)) {
+                            let clamped = getClosestPointOnPoly({x: nx, y: ny}, z.points);
+                            nx = clamped.x; ny = clamped.y;
+                        }
+                    }
+                }
+                return { x: nx, y: ny };
+            }
+        }
+        return p;
+    });
+    
+    testPts.forEach(pt => { if (pt.x < 0 || pt.x > 2000 || pt.y < 0 || pt.y > 2000) boundsValid = false; });
+    
+    let origPoly = obj.points.map((p, i) => activeVertexDrag.origCoords[i] ? activeVertexDrag.origCoords[i] : p);
+    
+    if (activeVertexDrag.type === 'area' && boundsValid) {
+        let otherAreas = globalWhAreas.filter(a => a.zoneId === activeEditingZoneId && a.id !== activeVertexDrag.id);
+        for (let other of otherAreas) { 
+            let wasColliding = doPolygonsIntersect(origPoly, other.points);
+            let isColliding = doPolygonsIntersect(testPts, other.points);
+            if (isColliding && !wasColliding) boundsValid = false;
+        }
+    }
+    
+    if (boundsValid) {
+        obj.points = testPts;
+        renderZoneInnerMap();
+    }
+}
+
+function endVertexDrag() {
+    activeVertexDrag = null;
+    snapGuides = { x: null, y: null };
+    document.removeEventListener('mousemove', onVertexDrag);
+    document.removeEventListener('mouseup', endVertexDrag);
+}
+
+// ==========================================
+// --- ANCHOR DRAG ENGINE ---
+// ==========================================
+let activeAnchorDrag = null;
+
+function startAnchorDrag(e) {
+    e.stopPropagation(); e.preventDefault();
+    if (polyTool !== 'set-anchor') return;
+    let root = globalWhRoots.find(r => r.id === activeWhRootId);
+    if (!root) return;
+    
+    let mouseCoords = getSvgCoords('zone-inner-svg', e);
+    activeAnchorDrag = { rootId: root.id, startX: root.anchorX || 0, startY: root.anchorY || 0, mouseStartX: mouseCoords.x, mouseStartY: mouseCoords.y };
+    document.addEventListener('mousemove', onAnchorDrag);
+    document.addEventListener('mouseup', endAnchorDrag);
+}
+
+function onAnchorDrag(e) {
+    if (!activeAnchorDrag) return;
+    let mouseCoords = getSvgCoords('zone-inner-svg', e);
+    let targetX = activeAnchorDrag.startX + (mouseCoords.x - activeAnchorDrag.mouseStartX);
+    let targetY = activeAnchorDrag.startY + (mouseCoords.y - activeAnchorDrag.mouseStartY);
+    
+    let snapped = getSnappedCoords(targetX, targetY, 'anchor', null, null);
+    let root = globalWhRoots.find(r => r.id === activeWhRootId);
+    if (root) {
+        root.anchorX = snapped.x; root.anchorY = snapped.y;
+        renderZoneInnerMap();
+    }
+}
+
+function endAnchorDrag(e) {
+    if (!activeAnchorDrag) return;
+    let root = globalWhRoots.find(r => r.id === activeWhRootId);
+    if (root) WH_API.saveRoot(root);
+    activeAnchorDrag = null;
+    snapGuides = { x: null, y: null };
+    document.removeEventListener('mousemove', onAnchorDrag);
+    document.removeEventListener('mouseup', endAnchorDrag);
+    setPolyTool('select');
+}
+
+// ==========================================
+// --- GLOBAL MAP ZOOM / PAN ENGINE ---
+// ==========================================
+let innerMapTr = { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0 };
+
+function attachZoomPan(containerSelector, mapSelector, zoomVarObj) {
+    const containers = document.querySelectorAll(containerSelector);
+    containers.forEach(container => {
+        const map = container.querySelector(mapSelector);
+        if(!map) return;
+
+        container.style.cursor = zoomVarObj.cursorStyle || ((containerSelector === '#qr-preview-container') ? 'grab' : 'crosshair');
+
+        container.addEventListener('wheel', (e) => {
+            if (containerSelector === '#zone-inner-map-container' && !activeEditingZoneId) return;
+            e.preventDefault();
+              
+              const rect = container.getBoundingClientRect();
+              const mouseX = e.clientX - rect.left;
+              const mouseY = e.clientY - rect.top;
+              
+              if (containerSelector === '#zone-inner-map-container' && typeof polyTool !== 'undefined' && polyTool !== 'select') {
+                  e.preventDefault();
+                  return;
+              }
+              
+              if (zoomVarObj.disableZoom) {
+                  zoomVarObj.panY -= e.deltaY;
+                  if (zoomVarObj.panY > 0) zoomVarObj.panY = 0; // Prevent scrolling above the canvas
+                  map.style.transform = `translate(${zoomVarObj.panX}px, ${zoomVarObj.panY}px) scale(${zoomVarObj.zoom})`;
+                  return;
+              }
+
+              const mapX = (mouseX - zoomVarObj.panX) / zoomVarObj.zoom;
+              const mapY = (mouseY - zoomVarObj.panY) / zoomVarObj.zoom;
+              
+                const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
+                zoomVarObj.zoom *= zoomAmount;
+                if (zoomVarObj.minZoom !== undefined) zoomVarObj.zoom = Math.max(zoomVarObj.minZoom, zoomVarObj.zoom);
+                if (zoomVarObj.maxZoom !== undefined) zoomVarObj.zoom = Math.min(zoomVarObj.maxZoom, zoomVarObj.zoom);
+                zoomVarObj.zoom = Math.min(Math.max(0.05, zoomVarObj.zoom), 20);
+                
+                zoomVarObj.panX = mouseX - mapX * zoomVarObj.zoom;
+                zoomVarObj.panY = mouseY - mapY * zoomVarObj.zoom;
+                
+                if (zoomVarObj.limitX !== undefined && zoomVarObj.panX > zoomVarObj.limitX) zoomVarObj.panX = zoomVarObj.limitX;
+                if (zoomVarObj.limitY !== undefined && zoomVarObj.panY > zoomVarObj.limitY) zoomVarObj.panY = zoomVarObj.limitY;
+
+                map.style.transform = `translate(${zoomVarObj.panX}px, ${zoomVarObj.panY}px) scale(${zoomVarObj.zoom})`;
+                
+                if (containerSelector === '#zone-inner-map-container' && typeof renderZoneInnerMap === 'function') {
+                    renderZoneInnerMap();
+                }
+            });
+
+            container.addEventListener('mousedown', (e) => {
+                let isQr = (containerSelector === '#qr-preview-container');
+                if(e.button === 1 || e.altKey || isQr) {
+                    if (isQr && e.button !== 0 && e.button !== 1) return; // Allow left/middle click for QR
+
+                    e.preventDefault();
+                    zoomVarObj.isPanning = true;
+                zoomVarObj.startX = e.clientX - zoomVarObj.panX;
+                zoomVarObj.startY = e.clientY - zoomVarObj.panY;
+                container.style.cursor = 'grabbing';
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (zoomVarObj.isPanning) {
+                if (!zoomVarObj.disablePanX) zoomVarObj.panX = e.clientX - zoomVarObj.startX;
+                zoomVarObj.panY = e.clientY - zoomVarObj.startY;
+                
+                if (zoomVarObj.limitX !== undefined && zoomVarObj.panX > zoomVarObj.limitX) {
+                    zoomVarObj.panX = zoomVarObj.limitX;
+                    zoomVarObj.startX = e.clientX - zoomVarObj.panX; // reset start to prevent drift
+                }
+                if (zoomVarObj.limitY !== undefined && zoomVarObj.panY > zoomVarObj.limitY) {
+                    zoomVarObj.panY = zoomVarObj.limitY;
+                    zoomVarObj.startY = e.clientY - zoomVarObj.panY; // reset start to prevent drift
+                }
+
+                map.style.transform = `translate(${zoomVarObj.panX}px, ${zoomVarObj.panY}px) scale(${zoomVarObj.zoom})`;
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (zoomVarObj.isPanning) {
+                zoomVarObj.isPanning = false;
+                container.style.cursor = zoomVarObj.cursorStyle || ((containerSelector === '#qr-preview-container') ? 'grab' : 'crosshair');
+            }
+        });
+        
+        if (containerSelector === '#qr-preview-container') {
+             container.style.cursor = 'grab';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.getElementById('svg-cad-styles')) {
+        let s = document.createElement('style');
+        s.id = 'svg-cad-styles';
+        s.innerHTML = `
+            .poly-zone { fill: rgba(59, 130, 246, 0.1); stroke: #3b82f6; stroke-width: 2; transition: 0.2s; }
+            .poly-zone:hover { fill: rgba(59, 130, 246, 0.2); }
+            .poly-zone.poly-active { stroke: #fff; fill: rgba(255, 255, 255, 0.15); stroke-dasharray: 5,5; }
+            .poly-area { fill: var(--poly-fill, rgba(16,185,129,0.15)); stroke: var(--poly-stroke, #10b981); stroke-width: 2; cursor: pointer; transition: 0.2s; }
+            .poly-area:hover { filter: brightness(1.3); }
+            .poly-area.poly-active { stroke: #fff; stroke-dasharray: 4,4; }
+            .poly-edge { stroke: transparent; stroke-width: 6; cursor: crosshair; }
+            .poly-edge:hover { stroke: rgba(255,255,255,0.5); }
+            .poly-vertex { fill: #fff; stroke: #000; stroke-width: 1; cursor: grab; }
+            .poly-vertex:active { cursor: grabbing; }
+            .poly-vertex.vertex-selected { fill: #f59e0b; stroke: #fff; stroke-width: 2; }
+            .poly-label { fill: #fff; font-size: 12px; font-weight: bold; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+            .dim-text { fill: #fff; font-size: 10px; background: #000; cursor: pointer; text-anchor: middle; dominant-baseline: middle; }
+            .dim-text:hover { fill: #f59e0b; }
+            .snap-guide { stroke: #10b981; stroke-width: 1; stroke-dasharray: 4,4; pointer-events: none; }
+            .lasso-rect { fill: rgba(168, 85, 247, 0.2); stroke: #a855f7; stroke-width: 1; pointer-events: none; }
+        `;
+        document.head.appendChild(s);
+    }
+    attachZoomPan('#zone-inner-map-container', '#zone-inner-map', innerMapTr);
+});
+</script>

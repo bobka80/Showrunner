@@ -1,0 +1,1412 @@
+<div id="truck-modal-overlay" class="modal-overlay" style="z-index: 5600; display: none;">
+  <div class="modal" style="width: 100% !important; max-width: 100% !important; height: 100% !important; max-height: 100% !important; border-radius: 0; border: none; box-sizing: border-box; display: flex; flex-direction: column; padding: 0; background: var(--bg-dark);">
+    <div style="height: 70px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0;">
+        <div style="display:flex; align-items:center; gap: 15px;">
+            <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing: 1px;">🚛 PREDICTIVE TRUCK ARRANGEMENT</div>
+                <select id="active-leg-selector" onchange="switchActiveArrangementLeg(this.value)" style="padding: 6px 10px; background: #18181b; color: #a855f7; border: 1px solid #a855f7; border-radius: 4px; font-size: 12px; font-weight:bold;">
+                    <option value="outbound">OUTBOUND (WH ➝ SITE)</option>
+                    <option value="inbound">INBOUND (SITE ➝ WH)</option>
+                </select>
+            <select id="active-truck-selector" onchange="switchActiveArrangementTruck(this.value)" style="padding: 6px 10px; background: #111; color: #fff; border: 1px solid #555; border-radius: 4px; font-size: 12px; width: 180px;"></select>
+            <button class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="openVehicleModal()">+ ADD TRUCK</button>
+        </div>
+        <div style="display:flex; align-items:center; gap: 12px;">
+            <button class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="tightenCargo('truck')">TIGHTEN CARGO</button>
+            <button class="btn-outline btn-sm" style="margin:0; border-color:#3b82f6; color:#3b82f6;" onclick="zoomTruckToFit()">ZOOM TO FIT</button>
+            <div id="truck-stats" style="color:#a1a1aa; font-size:12px; font-weight:bold; margin-right: 15px;"></div>
+            <button class="btn-close" style="width:auto; margin:0;" onclick="cancelTruckArrangement()">CLOSE</button>
+            <button class="btn-main" style="width:auto; margin:0;" onclick="saveTruckArrangement()">SAVE ARRANGEMENT</button>
+        </div>
+    </div>
+    
+    <div style="flex:1; display:flex; overflow:hidden;">
+        <div id="truck-svg-container" style="flex:1; background:#0a0a0c; border-right:1px solid #333; position:relative; overflow:hidden;">
+           <!-- Infinite Panning Canvas -->
+           <svg id="truck-svg" style="width:5000px; height:5000px; transform-origin: 0 0; touch-action: none; position:absolute; top:0; left:0;"></svg>
+        </div>
+        <div style="width:33vw; min-width:400px; max-width:600px; background:#111; display:flex; flex-direction:column; border-left:1px solid #333;">
+            <div style="padding:15px; border-bottom:1px solid #333; font-weight:900; color:#10b981; font-size:12px; letter-spacing:1px; background:#18181b; display:flex; justify-content:space-between; align-items:center;">
+                <span>📦 STAGING AREA</span>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; padding: 4px 8px!important;" onclick="tightenCargo('staging')">TIGHTEN STAGING</button>
+                </div>
+            </div>
+            <div id="truck-staging-svg-container" style="flex:1; background:#0a0a0c; position:relative; overflow:hidden;">
+                <!-- Infinite Panning Staging Canvas -->
+                <svg id="truck-staging-svg" style="width:5000px; height:5000px; transform-origin: 0 0; touch-action: none; position:absolute; top:0; left:0;"></svg>
+            </div>
+            <div style="padding:15px; border-top:1px solid #333; background:#1a1a1e;">
+                <div class="input-label" style="margin-bottom:8px; color:#a855f7;">Auto-Stack Settings</div>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="number" id="truck-max-stack" value="2" min="1" max="5" style="width:60px; padding:10px; margin:0; text-align:center; font-weight:bold; font-size:14px;" title="Max Stack Height">
+                    <div id="auto-arrange-container" style="flex:1; position:relative; display:flex;">
+                        <button class="btn-main" style="width:100%; margin:0; background:rgba(168,85,247,0.2) !important; border-color:#a855f7 !important; color:#d8b4fe !important;" onclick="toggleAutoArrangeMenu(event)">AUTO ARRANGE ▼</button>
+                        <div id="auto-arrange-menu" style="display:none; position:absolute; bottom:100%; left:0; width:100%; background:#1a1a1e; border:1px solid #a855f7; border-radius:6px; padding:8px; flex-direction:column; gap:8px; z-index:100; margin-bottom:8px; box-shadow:0 -5px 15px rgba(0,0,0,0.5);">
+                            <button class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="autoArrangeTruck('heavy-first')">Heaviest First</button>
+                            <button class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="autoArrangeTruck('largest-first')">Largest Footprint First</button>
+                            <button class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="autoArrangeTruck('smart')">Smart Arrangement</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * 05a_Truck_Arrangement.html
+ * Domain: Spatial Bin-Packing Editor, Auto-Stacking, and Weight Distribution.
+ */
+
+window.isTruckDirty = false;
+window.truckZoomAttached = false;
+
+let allTruckCases = [];
+let allTruckStacks = [];
+let truckZoomObj = { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0, cursorStyle: 'crosshair' };
+let stagingZoomObj = { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0, disableZoom: true, disablePanX: true, cursorStyle: 'default' };
+let activeTruckDrag = null;
+window.stagingZoomAttached = false;
+
+let truckHistory = [];
+let truckRedo = [];
+let selectedTruckIds = new Set();
+let isTruckLassoing = false;
+let truckLassoStartX = 0, truckLassoStartY = 0;
+let truckLassoBox = null;
+let baseSelectedTruckIds = new Set();
+
+window.addEventListener('click', function(e) {
+    let m = document.getElementById('auto-arrange-menu');
+    if (m && !e.target.closest('#auto-arrange-container')) {
+        m.style.display = 'none';
+    }
+});
+
+function toggleAutoArrangeMenu(e) {
+    e.stopPropagation();
+    let m = document.getElementById('auto-arrange-menu');
+    if (m) m.style.display = m.style.display === 'none' ? 'flex' : 'none';
+}
+
+function getSvgCoords(svgId, e) {
+    let svg = document.getElementById(svgId);
+    if (!svg) return { x: 0, y: 0 };
+    let pt = svg.createSVGPoint();
+    pt.x = e.clientX || (e.touches && e.touches[0].clientX);
+    pt.y = e.clientY || (e.touches && e.touches[0].clientY);
+    let cursorPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+    return {
+        x: cursorPt.x,
+        y: cursorPt.y
+    };
+}
+
+function pushTruckHistory() {
+    truckHistory.push(JSON.stringify({ cases: allTruckCases, stacks: allTruckStacks }));
+    truckRedo = [];
+    if (truckHistory.length > 30) truckHistory.shift();
+}
+
+function undoTruckArrangement() {
+    if (truckHistory.length === 0) return;
+    truckRedo.push(JSON.stringify({ cases: allTruckCases, stacks: allTruckStacks }));
+    let state = JSON.parse(truckHistory.pop());
+    allTruckCases = state.cases;
+    allTruckStacks = state.stacks;
+    selectedTruckIds.clear();
+    renderTruckWorkspace();
+    window.isTruckDirty = true;
+}
+
+function redoTruckArrangement() {
+    if (truckRedo.length === 0) return;
+    truckHistory.push(JSON.stringify({ cases: allTruckCases, stacks: allTruckStacks }));
+    let state = JSON.parse(truckRedo.pop());
+    allTruckCases = state.cases;
+    allTruckStacks = state.stacks;
+    selectedTruckIds.clear();
+    renderTruckWorkspace();
+    window.isTruckDirty = true;
+}
+
+// Global Listeners for Editor Tools
+document.addEventListener('keydown', e => {
+    let m = document.getElementById('truck-modal-overlay');
+    if (m && m.style.display === 'flex') {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            if (e.shiftKey) redoTruckArrangement(); else undoTruckArrangement();
+            e.preventDefault();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+            redoTruckArrangement(); e.preventDefault();
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+           if (selectedTruckIds.size > 0) {
+               pushTruckHistory();
+               
+               let stagedStacks = allTruckStacks.filter(st => st.isStaged && !selectedTruckIds.has(st.id));
+               let maxY = 20;
+               stagedStacks.forEach(st => {
+                   if (st.y + st.w > maxY) maxY = st.y + st.w;
+               });
+               
+               selectedTruckIds.forEach(id => {
+                   let s = allTruckStacks.find(x => x.id === id);
+                   if(s && !s.isStaged) {
+                       s.isStaged = true;
+                       s.truckUid = "";
+                       s.x = 5;
+                       s.y = maxY + 10;
+                       applyPushAside(s, stagedStacks, true);
+                       stagedStacks.push(s); // Add to local array so next item pushes further down
+                       maxY = Math.max(maxY, s.y + s.w);
+                   }
+               });
+               selectedTruckIds.clear();
+               renderTruckWorkspace();
+               window.isTruckDirty = true;
+           }
+        }
+    }
+});
+
+document.addEventListener('mousedown', function(e) {
+    let tm = document.getElementById('truck-modal-overlay');
+    if (!tm || tm.style.display !== 'flex') return;
+    let tgtId = e.target.id || (e.target.tagName ? e.target.tagName.toLowerCase() : '');
+    let isBg = (tgtId === 'truck-svg' || tgtId === 'truck-svg-container' || tgtId === 'truck-staging-svg' || tgtId === 'truck-staging-svg-container' || tgtId === 'svg');
+    if (!isBg || e.button !== 0 || e.altKey || e.target.closest('button') || e.target.closest('input')) return;
+
+    isTruckLassoing = true;
+    truckLassoStartX = e.clientX; truckLassoStartY = e.clientY;
+    truckLassoBox = document.createElement('div');
+    truckLassoBox.style.cssText = 'position:fixed; background:rgba(59, 130, 246, 0.2); border:1px solid #3b82f6; z-index:99999; pointer-events:none;';
+    document.body.appendChild(truckLassoBox);
+
+    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) { selectedTruckIds.clear(); updateTruckSelectionUI(); }
+    baseSelectedTruckIds = new Set(selectedTruckIds);
+});
+
+document.addEventListener('mousemove', function(e) {
+    if (isTruckLassoing && truckLassoBox) {
+        let minX = Math.min(truckLassoStartX, e.clientX); let minY = Math.min(truckLassoStartY, e.clientY);
+        let maxX = Math.max(truckLassoStartX, e.clientX); let maxY = Math.max(truckLassoStartY, e.clientY);
+        truckLassoBox.style.left = minX + 'px'; truckLassoBox.style.top = minY + 'px';
+        truckLassoBox.style.width = (maxX - minX) + 'px'; truckLassoBox.style.height = (maxY - minY) + 'px';
+        let rect = truckLassoBox.getBoundingClientRect();
+        selectedTruckIds.clear(); baseSelectedTruckIds.forEach(id => selectedTruckIds.add(id));
+        document.querySelectorAll('.truck-case-item, .truck-stack-item, .truck-svg-item').forEach(block => {
+            let bRect = block.getBoundingClientRect();
+            let overlap = !(rect.right < bRect.left || rect.left > bRect.right || rect.bottom < bRect.top || rect.top > bRect.bottom);
+            if (overlap && block.dataset.id) selectedTruckIds.add(block.dataset.id);
+        });
+        updateTruckSelectionUI();
+    }
+});
+
+document.addEventListener('mouseup', function(e) {
+    if (isTruckLassoing) {
+        isTruckLassoing = false;
+        if (truckLassoBox) truckLassoBox.remove();
+        truckLassoBox = null;
+        updateTruckSelectionUI();
+    }
+});
+
+// Dynamic Virtual Coordinates for Truck Bed
+let TRUCK_X = 1000;
+let TRUCK_Y = 1000;
+let TRUCK_L = 700; 
+let TRUCK_W = 240; 
+let activeArrangementTruckId = null;
+
+function switchActiveArrangementLeg(leg) {
+    window.activeArrangementLeg = leg;
+    executeTruckArrangementBoot();
+}
+
+function populateTruckSelector() {
+    let sel = document.getElementById('active-truck-selector');
+    if (!sel) return;
+    sel.innerHTML = '';
+    
+    let timelineTruckIds = new Set();
+    if (typeof globalAssignedArr !== 'undefined') {
+        globalAssignedArr.forEach(uid => { if (isTruck(uid)) timelineTruckIds.add(uid); });
+    }
+    
+    if (typeof globalVehicles !== 'undefined' && globalVehicles.length > 0) {
+        globalVehicles.forEach(v => {
+            let prefix = timelineTruckIds.has(v.id) ? '📅 ' : '';
+            sel.innerHTML += `<option value="${v.id}">${prefix}${v.name}</option>`;
+        });
+        
+        if (!activeArrangementTruckId || !globalVehicles.find(v => v.id === activeArrangementTruckId)) {
+            activeArrangementTruckId = (timelineTruckIds.size > 0) ? Array.from(timelineTruckIds)[0] : globalVehicles[0].id;
+        }
+        sel.value = activeArrangementTruckId;
+        applyTruckDimensions(activeArrangementTruckId);
+    } else {
+        sel.innerHTML = '<option value="">No Trucks Found</option>';
+    }
+}
+
+function switchActiveArrangementTruck(truckId) {
+    activeArrangementTruckId = truckId;
+    applyTruckDimensions(truckId);
+}
+
+function applyTruckDimensions(truckId) {
+    if (typeof globalVehicles !== 'undefined') {
+        let v = globalVehicles.find(x => x.id === truckId);
+        if (v && parseFloat(v.l) > 0 && parseFloat(v.w) > 0) {
+            TRUCK_L = parseFloat(v.l) * 100;
+            TRUCK_W = parseFloat(v.w) * 100;
+        } else {
+            TRUCK_L = 700; TRUCK_W = 240;
+        }
+    }
+    renderTruckWorkspace();
+    zoomTruckToFit();
+}
+
+// @INDEX: TRUCK_CAD -> Predictive Truck Packing
+function openTruckArrangementDashboard() {
+    if (typeof currentProjectAssets === 'undefined' || currentProjectAssets.length === 0) {
+        return alert("No equipment assigned to this project yet.");
+    }
+    
+    let hasContainers = currentProjectAssets.some(pa => {
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        return asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
+    });
+    
+    if (!hasContainers) {
+        alert("⚠️ No cases/containers found in this project. You must pack equipment into cases before arranging trucks.");
+        return;
+    }
+    
+    if (typeof explodeProjectAssets === 'function') explodeProjectAssets();
+    
+    let bootLogic = () => {
+        if (window.currentPaMode === 'design' && typeof collapseProjectAssets === 'function') collapseProjectAssets();
+        executeTruckArrangementBoot();
+    };
+    
+    if (typeof window.calculatePaDeltas === 'function' && window.calculatePaDeltas().length > 0) {
+        window.autoSaveAndExecute(bootLogic, false, null, true);
+        return;
+    }
+    window.autoSaveAndExecute(bootLogic, false, null, true);
+}
+
+function executeTruckArrangementBoot() {
+    
+    if (!window.activeArrangementLeg) window.activeArrangementLeg = 'outbound';
+    let leg = window.activeArrangementLeg;
+    window.activePresenceModule = 'truck';
+    
+    truckHistory = [];
+    truckRedo = [];
+    selectedTruckIds.clear();
+    
+    populateTruckSelector();
+
+    document.getElementById('truck-modal-overlay').style.display = 'flex';
+    
+    allTruckCases = [];
+    allTruckStacks = [];
+    let cId = 0;
+    
+    let startStageX = 5;
+    let startStageY = 5;
+    let maxStageRowW = 0;
+
+    currentProjectAssets.forEach(pa => {
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        if (asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.type === 'Container')) {
+            let qty = parseInt(pa.qty, 10) || 1;
+            let emptyWeight = parseFloat(asset.weight) || 0; 
+            
+            // Calculate exact weight of all nested equipment packed inside this specific case group
+            let nestedWeight = 0;
+            let nestedTags = new Set();
+            let cid = (pa.formula && pa.formula !== 'Standalone') ? (pa.assetId + "|||" + pa.formula) : pa.assetId;
+            
+            let totalContainerQty = 0;
+            currentProjectAssets.forEach(p => {
+                let pCid = (p.formula && p.formula !== 'Standalone') ? (p.assetId + "|||" + p.formula) : p.assetId;
+                if (pCid === cid) totalContainerQty += (parseInt(p.qty, 10) || 0);
+            });
+            if (totalContainerQty === 0) totalContainerQty = 1;
+
+            currentProjectAssets.forEach(childPa => {
+                let childAsset = globalAssets.find(ca => ca.id === childPa.assetId);
+                if (childAsset) {
+                    let isExplicit = (childPa.containerUid === cid);
+                    let isImplicit = false;
+                    
+                    // Catch fixtures that are auto-packed but don't have hard container UIDs yet
+                    if (pa.isAuto && !childPa.containerUid && childAsset.containerType === pa.assetId) {
+                        let cLoc = childPa.location || 'General'; let cForm = childPa.formula || 'Standalone';
+                        let pLoc = pa.location || 'General'; let pForm = pa.formula || 'Standalone';
+                        if (cLoc === pLoc && cForm === pForm) isImplicit = true;
+                    }
+                    
+                    if (isExplicit || isImplicit) {
+                        nestedWeight += (parseFloat(childAsset.weight) || 0) * (parseInt(childPa.qty, 10) || 0);
+                        
+                        try {
+                            let tArr = JSON.parse(childAsset.tags || '[]');
+                            tArr.forEach(tId => {
+                                let tObj = getTagObj(tId);
+                                if (tObj) {
+                                    let tName = tObj.shortcut ? tObj.shortcut.toUpperCase() : tObj.name.toUpperCase();
+                                    nestedTags.add(tName);
+                                }
+                            });
+                        } catch(e) {}
+                    }
+                }
+            });
+            
+            // Distribute nested payload weight evenly across the total grouped physical boxes
+            let trueWeight = emptyWeight + (nestedWeight / totalContainerQty);
+            let w = 60, l = 120; // default 120x60 cm footprint
+            if (asset.dims) {
+                let pts = asset.dims.split('*');
+                if (pts.length >= 2) {
+                    l = parseFloat(pts[0]);
+                    w = parseFloat(pts[1]);
+                    // Auto-convert meters to cm if values are tiny
+                    if (l > 0 && l < 15 && w > 0 && w < 15) {
+                        l *= 100;
+                        w *= 100;
+                    }
+                }
+            }
+            
+            let getCreatorDeptLoc = (creatorName, fallback) => {
+                if (!creatorName || creatorName === 'System') return fallback;
+                let roster = (typeof globalRosterData !== 'undefined' && globalRosterData && globalRosterData.roster) ? globalRosterData.roster : ((typeof activeRoster !== 'undefined') ? activeRoster : null);
+                if (roster) {
+                    let person = roster.find(c => c.name === creatorName || c.email === creatorName);
+                    if (person && person.department) {
+                        let d = typeof person.department === 'object' ? (person.department.uid || person.department.name) : person.department;
+                        if (d && d !== "[object Object]") return d;
+                    }
+                }
+                return fallback;
+            };
+            
+            let fallbackDept = asset.department ? asset.department : 'Unassigned';
+            let deptUid = pa.overrideDept;
+            
+            if (!deptUid && pa.isAuto && pa.formula) {
+                let match = pa.formula.match(/-\s*(.*?)$/);
+                if (match) {
+                    let dName = match[1].replace('[AUTO]', '').trim().toUpperCase();
+                    let found = (typeof SYSTEM_DEPARTMENTS !== 'undefined') ? SYSTEM_DEPARTMENTS.find(d => d.name.toUpperCase() === dName) : null;
+                    if (found) deptUid = found.uid;
+                }
+            }
+            
+            if (!deptUid) deptUid = getCreatorDeptLoc(pa.creator, fallbackDept);
+            let dObj = typeof getDeptObj === 'function' ? getDeptObj(deptUid) : null;
+            let color = dObj && dObj.color ? dObj.color : '#a855f7';
+
+            let displayName = asset.name;
+            if (pa.formula && pa.formula !== 'Standalone') {
+                displayName = pa.formula.replace(' [AUTO]', '').trim();
+            }
+
+            for (let i = 0; i < qty; i++) {
+                let c = { id: 'tc_' + (cId++), name: displayName, weight: parseFloat(trueWeight.toFixed(2)), l: Math.max(l, w), w: Math.min(l, w), color: color, stackId: null, nestedTags: Array.from(nestedTags), paUid: pa.uid, paRef: pa };
+                
+                // Rehydrate from Database if saved
+                if (pa[`${leg}X`] !== null && pa[`${leg}X`] !== undefined) {
+                    if (pa[`${leg}Rotated`]) { let temp = c.l; c.l = c.w; c.w = temp; }
+                    c.truckUid = pa[`${leg}TruckUid`];
+                    c.truckX = pa[`${leg}X`];
+                    c.truckY = pa[`${leg}Y`];
+                    c.truckZ = pa[`${leg}Z`];
+                    c.isStaged = pa[`${leg}Staged`];
+                }
+                allTruckCases.push(c);
+            }
+        }
+    });
+    
+    // Group cases into their restored stacks
+    let savedCases = allTruckCases.filter(c => c.truckX !== null && c.truckX !== undefined);
+    let looseCases = allTruckCases.filter(c => c.truckX === null || c.truckX === undefined);
+    
+    let stacksMap = {}; 
+    savedCases.forEach(c => {
+        let k = `${c.truckUid}_${c.truckX}_${c.truckY}_${c.isStaged}`;
+        if (!stacksMap[k]) {
+            stacksMap[k] = { id: 'ts_' + Date.now() + Math.random(), x: c.truckX, y: c.truckY, l: c.l, w: c.w, caseIds: [], casesToSort: [], weight: 0, isStaged: c.isStaged, truckUid: c.truckUid };
+            allTruckStacks.push(stacksMap[k]);
+        }
+        stacksMap[k].casesToSort.push(c);
+        stacksMap[k].weight += c.weight;
+    });
+    
+    allTruckStacks.forEach(s => {
+        if (s.casesToSort) {
+            s.casesToSort.sort((a,b) => a.truckZ - b.truckZ);
+            s.caseIds = s.casesToSort.map(c => c.id);
+            s.casesToSort.forEach(c => c.stackId = s.id);
+            delete s.casesToSort;
+        }
+    });
+
+    // Dump unassigned cases to staging board
+    looseCases.forEach(c => {
+        let newStack = { id: 'ts_' + Date.now() + Math.random(), x: startStageX, y: startStageY, l: c.l, w: c.w, caseIds: [c.id], weight: c.weight, isStaged: true };
+        allTruckStacks.push(newStack);
+        c.stackId = newStack.id;
+        
+        startStageX += c.l + 5;
+        if (c.w > maxStageRowW) maxStageRowW = c.w;
+        if (startStageX > 295) { startStageX = 5; startStageY += maxStageRowW + 5; maxStageRowW = 0; }
+    });
+    
+    // Center the truck map on load
+    truckZoomObj.zoom = 1;
+    truckZoomObj.panX = -700; 
+    truckZoomObj.panY = -800;
+    let svg = document.getElementById('truck-svg');
+    if (svg) svg.style.transform = `translate(${truckZoomObj.panX}px, ${truckZoomObj.panY}px) scale(1)`;
+    
+    if (!window.truckZoomAttached && typeof attachZoomPan === 'function') {
+        attachZoomPan('#truck-svg-container', '#truck-svg', truckZoomObj);
+        window.truckZoomAttached = true;
+    }
+    
+    stagingZoomObj.zoom = 1;
+    document.getElementById('truck-staging-svg').style.transform = `translate(0px, 0px) scale(1)`;
+    if (!window.stagingZoomAttached && typeof attachZoomPan === 'function') {
+        attachZoomPan('#truck-staging-svg-container', '#truck-staging-svg', stagingZoomObj);
+        window.stagingZoomAttached = true;
+    }
+
+    renderTruckWorkspace();
+    setTimeout(zoomTruckToFit, 100);
+    setTimeout(zoomStagingToFit, 100);
+}
+
+function zoomTruckToFit() {
+    let svgContainer = document.getElementById('truck-svg-container');
+    if (!svgContainer || svgContainer.clientWidth === 0) return;
+    let minX = TRUCK_X - 100; let maxX = TRUCK_X + TRUCK_L + 100;
+    let minY = TRUCK_Y - 100; let maxY = TRUCK_Y + TRUCK_W + 100;
+
+    allTruckStacks.forEach(s => {
+        if (!s.isStaged && s.truckUid === activeArrangementTruckId) {
+            if (s.x < minX) minX = s.x - 50; if (s.x + s.l > maxX) maxX = s.x + s.l + 50;
+            if (s.y < minY) minY = s.y - 50; if (s.y + s.w > maxY) maxY = s.y + s.w + 50;
+        }
+    });
+    
+    let pW = maxX - minX; let pH = maxY - minY;
+    let scale = Math.min((svgContainer.clientWidth - 40) / pW, (svgContainer.clientHeight - 40) / pH);
+    scale = Math.min(Math.max(0.1, scale), 3);
+    truckZoomObj.zoom = scale;
+    truckZoomObj.panX = (svgContainer.clientWidth / 2) - ((minX + maxX) / 2) * scale;
+    truckZoomObj.panY = (svgContainer.clientHeight / 2) - ((minY + maxY) / 2) * scale;
+    document.getElementById('truck-svg').style.transform = `translate(${truckZoomObj.panX}px, ${truckZoomObj.panY}px) scale(${truckZoomObj.zoom})`;
+}
+
+function zoomStagingToFit() {
+    let svgContainer = document.getElementById('truck-staging-svg-container');
+    if (!svgContainer || svgContainer.clientWidth === 0) return;
+    
+    // 5 meters = 500 units. We fit exactly 500 units horizontally.
+    let scale = svgContainer.clientWidth / 500;
+    
+    stagingZoomObj.zoom = scale;
+    stagingZoomObj.panX = 0;
+    document.getElementById('truck-staging-svg').style.transform = `translate(${stagingZoomObj.panX}px, ${stagingZoomObj.panY}px) scale(${stagingZoomObj.zoom})`;
+}
+
+function autoArrangeTruck(strategy = 'heavy-first') {
+    let m = document.getElementById('auto-arrange-menu');
+    if (m) m.style.display = 'none';
+
+    if (selectedTruckIds.size === 0) {
+        allTruckStacks.forEach(s => selectedTruckIds.add(s.id));
+        if (selectedTruckIds.size === 0) return alert("No items available to arrange.");
+    }
+    
+    pushTruckHistory();
+    let maxLevels = parseInt(document.getElementById('truck-max-stack').value, 10) || 2;
+    
+    let stacksToArrange = allTruckStacks.filter(s => selectedTruckIds.has(s.id));
+    let casesToArrange = [];
+    
+    stacksToArrange.forEach(s => {
+        s.caseIds.forEach(cId => {
+            let c = allTruckCases.find(x => x.id === cId);
+            if (c) casesToArrange.push(c);
+        });
+    });
+    
+    // Remove the old stacks being rearranged
+    allTruckStacks = allTruckStacks.filter(s => !selectedTruckIds.has(s.id));
+    
+    let sId = Date.now();
+    let tempStacks = [];
+    
+    if (strategy === 'smart') {
+        let unassigned = [...casesToArrange];
+        // Sort by Department desc, then Area desc, then Weight desc to guarantee stable massive bases grouped cleanly
+        unassigned.sort((a, b) => {
+            let dObjA = typeof getDeptObj === 'function' ? getDeptObj(a.paRef ? a.paRef.overrideDept : null) : {name: 'Z'};
+            let dObjB = typeof getDeptObj === 'function' ? getDeptObj(b.paRef ? b.paRef.overrideDept : null) : {name: 'Z'};
+            return dObjA.name.localeCompare(dObjB.name) || (b.l * b.w) - (a.l * a.w) || b.weight - a.weight;
+        });
+        
+        while (unassigned.length > 0) {
+            let base = unassigned.shift();
+            let chunk = [base];
+            
+            // 1. Build Base Tower: Find exactly identical footprints
+            for (let i = 0; i < unassigned.length && chunk.length < maxLevels; i++) {
+                let cand = unassigned[i];
+                let exactMatch = (cand.l === base.l && cand.w === base.w) || (cand.l === base.w && cand.w === base.l);
+                if (exactMatch) {
+                    cand.l = base.l; cand.w = base.w; // Normalize alignment
+                    chunk.push(cand);
+                    unassigned.splice(i, 1);
+                    i--; 
+                }
+            }
+            
+            // 2. Tapered Pyramid Top: Find up to 1 smaller case (Must not exceed base weight)
+            if (chunk.length < maxLevels) {
+                for (let i = 0; i < unassigned.length; i++) {
+                    let cand = unassigned[i];
+                    let fitsStandard = (cand.l <= base.l && cand.w <= base.w);
+                    let fitsRotated = (cand.w <= base.l && cand.l <= base.w);
+                    
+                    if ((fitsStandard || fitsRotated) && cand.weight <= base.weight) {
+                        if (fitsRotated && !fitsStandard) {
+                            let t = cand.l; cand.l = cand.w; cand.w = t;
+                        }
+                        chunk.push(cand);
+                        unassigned.splice(i, 1);
+                        break; // Strict 1-to-1 top rule prevents "Tetris top" complexity
+                    }
+                }
+            }
+            
+            // Heaviest perfectly at the bottom
+            chunk.sort((a, b) => b.weight - a.weight);
+            
+            let stack = {
+                id: 'ts_' + (sId++) + Math.random(),
+                x: 0, y: 0,
+                l: base.l, w: base.w,
+                caseIds: chunk.map(c => c.id),
+                weight: chunk.reduce((s, c) => s + c.weight, 0),
+                isStaged: false
+            };
+            chunk.forEach(c => c.stackId = stack.id);
+            tempStacks.push(stack);
+        }
+    } else {
+        let pools = {};
+        casesToArrange.forEach(c => {
+            let k = c.name + '_' + c.l + '_' + c.w;
+            if(!pools[k]) pools[k] = [];
+            pools[k].push(c);
+        });
+        
+        for(let k in pools) {
+            let pool = pools[k];
+            while(pool.length > 0) {
+                let chunk = pool.splice(0, maxLevels);
+                let baseCase = chunk[0];
+                let stack = {
+                    id: 'ts_' + (sId++) + Math.random(),
+                    x: 0, y: 0,
+                    l: baseCase.l, w: baseCase.w,
+                    caseIds: chunk.map(c => c.id),
+                    weight: chunk.reduce((s, c) => s + c.weight, 0),
+                    isStaged: false
+                };
+                chunk.forEach(c => c.stackId = stack.id);
+                tempStacks.push(stack);
+            }
+        }
+    }
+    
+    // Dynamic Sorter
+    if (strategy === 'heavy-first' || strategy === 'smart') {
+        tempStacks.sort((a,b) => {
+            let aDept = typeof getDeptObj === 'function' && allTruckCases.find(x => x.id === a.caseIds[0]) ? getDeptObj(allTruckCases.find(x => x.id === a.caseIds[0]).paRef?.overrideDept).name : 'Z';
+            let bDept = typeof getDeptObj === 'function' && allTruckCases.find(x => x.id === b.caseIds[0]) ? getDeptObj(allTruckCases.find(x => x.id === b.caseIds[0]).paRef?.overrideDept).name : 'Z';
+            return aDept.localeCompare(bDept) || b.weight - a.weight || (b.l * b.w) - (a.l * a.w);
+        });
+    } else if (strategy === 'largest-first') {
+        tempStacks.sort((a,b) => (b.l * b.w) - (a.l * a.w));
+    }
+    
+    // Find the rightmost edge of existing cargo to start packing
+    let currentX = TRUCK_X;
+    let currentY = TRUCK_Y;
+    let truckCargo = allTruckStacks.filter(s => !s.isStaged && s.truckUid === activeArrangementTruckId);
+    if (truckCargo.length > 0) {
+        currentX = Math.max(...truckCargo.map(s => s.x + s.l));
+    }
+    
+    let maxLevelW = 0;
+    
+    // Staging area cursors for when truck overflows
+    let stagingCursorX = 5;
+    let stagingCursorY = 5;
+    let stagingMaxRowW = 0;
+    let alreadyStaged = allTruckStacks.filter(s => s.isStaged);
+    if (alreadyStaged.length > 0) {
+        stagingCursorY = Math.max(5, ...alreadyStaged.map(s => s.y + s.w)) + 5;
+    }
+    
+    // Width-First Smart Packing (Clean Shelf Algorithm)
+    let maxRowL = 0;
+    let prevStackHeight = 0;
+
+    tempStacks.forEach(s => {
+        let sHeight = s.caseIds.length;
+        let remY = (TRUCK_Y + TRUCK_W) - currentY;
+        
+        let fitsStandard = (s.w <= remY); // Long side on X, Short side on Y
+        let fitsRotated = (s.l <= remY); // Short side on X, Long side on Y
+        
+        // If neither fits, row is full. Wrap to the next row before deciding rotation.
+        if (!fitsStandard && !fitsRotated) {
+            currentX += maxRowL;
+            currentY = TRUCK_Y;
+            maxRowL = 0;
+            prevStackHeight = 0;
+            remY = TRUCK_W;
+            fitsStandard = (s.w <= remY);
+            fitsRotated = (s.l <= remY);
+        }
+        
+        let shouldRotate = false;
+        
+        if (currentY > TRUCK_Y) {
+            // IN A ROW: Priority 1 is maintaining the X-depth (flush face)
+            if (fitsStandard && s.l === maxRowL && (!fitsRotated || s.w !== maxRowL)) shouldRotate = false;
+            else if (fitsRotated && s.w === maxRowL && (!fitsStandard || s.l !== maxRowL)) shouldRotate = true;
+            else {
+                // Priority 2: Perfect fit remaining space
+                if (fitsRotated && remY % s.l === 0 && remY % s.w !== 0) shouldRotate = true;
+                else if (fitsStandard && remY % s.w === 0 && remY % s.l !== 0) shouldRotate = false;
+                else if (fitsRotated && !fitsStandard) shouldRotate = true;
+                else shouldRotate = false; // Default: Long side on X
+            }
+        } else {
+            // NEW ROW: Priority 1 is perfect divisibility of the total truck width
+            let divStandard = (TRUCK_W % s.w === 0);
+            let divRotated = (TRUCK_W % s.l === 0);
+            
+            if (divRotated && !divStandard) shouldRotate = true;
+            else if (divStandard && !divRotated) shouldRotate = false;
+            else shouldRotate = false; // Default: Long side on X
+        }
+        
+        if (shouldRotate) {
+            let temp = s.l; s.l = s.w; s.w = temp;
+        }
+        
+        if (currentY + s.w > TRUCK_Y + TRUCK_W) {
+            currentX += maxRowL;
+            currentY = TRUCK_Y;
+            maxRowL = 0;
+            prevStackHeight = 0;
+            
+            // Re-evaluate rotation for new row
+            if (s.l < s.w && s.w <= TRUCK_W) {
+                let temp = s.l; s.l = s.w; s.w = temp;
+            }
+        }
+        
+        // Final bounds check for staging overflow
+        if (currentX + s.l > TRUCK_X + TRUCK_L) {
+            s.isStaged = true;
+            if (stagingCursorX > 5 && stagingCursorX + s.l > 295) {
+                stagingCursorX = 5;
+                stagingCursorY += stagingMaxRowW + 5;
+                stagingMaxRowW = 0;
+            }
+            s.x = stagingCursorX;
+            s.y = stagingCursorY;
+            stagingCursorX += s.l + 5;
+            if (s.w > stagingMaxRowW) stagingMaxRowW = s.w;
+            allTruckStacks.push(s);
+            return; 
+        }
+        
+        s.x = currentX;
+        s.y = currentY;
+        s.isStaged = false;
+        s.truckUid = activeArrangementTruckId;
+        allTruckStacks.push(s);
+        
+        currentY += s.w;
+        if (s.l > maxRowL) maxRowL = s.l;
+        prevStackHeight = sHeight;
+    });
+    
+    selectedTruckIds.clear();
+    updateTruckSelectionUI();
+    window.isTruckDirty = true;
+    renderTruckWorkspace();
+    zoomTruckToFit();
+    
+    // Auto-tighten algorithms
+    if (allTruckStacks.some(s => s.isStaged)) {
+        setTimeout(() => tightenCargo('staging'), 200);
+    } else if (strategy === 'smart') {
+        setTimeout(() => tightenCargo('truck'), 200);
+    }
+}
+
+function tightenCargo(area) {
+    pushTruckHistory();
+    let isStaged = (area === 'staging');
+    let stacks = allTruckStacks.filter(s => s.isStaged === isStaged && (isStaged || s.truckUid === activeArrangementTruckId));
+    
+    if (isStaged) {
+        // Grid Reflow: Pack tight into the 3M (300 unit) boundary
+        stacks.sort((a,b) => a.y - b.y || a.x - b.x);
+        let currentX = 5;
+        let currentY = 5;
+        let maxRowW = 0;
+        
+        stacks.forEach(s => {
+            if (currentX > 5 && currentX + s.l > 295) {
+                currentX = 5;
+                currentY += maxRowW + 5;
+                maxRowW = 0;
+            }
+            s.x = currentX;
+            s.y = currentY;
+            currentX += s.l + 5;
+            if (s.w > maxRowW) maxRowW = s.w;
+        });
+        
+        renderTruckWorkspace();
+        zoomStagingToFit();
+        window.isTruckDirty = true;
+        return;
+    }
+
+    // Sort by X then Y for Truck (push to Cabin at X=TRUCK_X)
+    stacks.sort((a,b) => a.x - b.x || a.y - b.y);
+    
+    let minX = isStaged ? 5 : TRUCK_X;
+    let minY = isStaged ? 5 : TRUCK_Y;
+    
+    stacks.forEach(s => {
+        // Binary Gapless Gravity
+        let stepX = 16;
+        while (stepX >= 1) {
+            while (s.x > minX) {
+                s.x -= stepX;
+                if (checkAnyOverlap(s, stacks) || s.x < minX) { s.x += stepX; break; }
+            }
+            stepX = Math.floor(stepX / 2);
+        }
+        let stepY = 16;
+        while (stepY >= 1) {
+            while (s.y > minY) {
+                s.y -= stepY;
+                if (checkAnyOverlap(s, stacks) || s.y < minY) { s.y += stepY; break; }
+            }
+            stepY = Math.floor(stepY / 2);
+        }
+        stepX = 16;
+        while (stepX >= 1) {
+            while (s.x > minX) {
+                s.x -= stepX;
+                if (checkAnyOverlap(s, stacks) || s.x < minX) { s.x += stepX; break; }
+            }
+            stepX = Math.floor(stepX / 2);
+        }
+    });
+    
+    renderTruckWorkspace();
+    if (isStaged) zoomStagingToFit(); else zoomTruckToFit();
+    window.isTruckDirty = true;
+}
+
+function applyPushAside(droppedStack, stacks, isStagingContext) {
+    let iterations = 0;
+    while (iterations < 50) { // Safety break for infinite loops
+        let collisionFound = false;
+        let bestMTV = { overlap: Infinity, x: 0, y: 0 };
+
+        for (const other of stacks) {
+            if (droppedStack.id === other.id) continue;
+
+            const overlapX = Math.max(0, Math.min(droppedStack.x + droppedStack.l, other.x + other.l) - Math.max(droppedStack.x, other.x));
+            const overlapY = Math.max(0, Math.min(droppedStack.y + droppedStack.w, other.y + other.w) - Math.max(droppedStack.y, other.y));
+
+            if (overlapX > 0 && overlapY > 0) {
+                collisionFound = true;
+                // Minimum Translation Vector
+                let mtvX = (droppedStack.x + droppedStack.l / 2 < other.x + other.l / 2) ? -overlapX : overlapX;
+                let mtvY = (droppedStack.y + droppedStack.w / 2 < other.y + other.w / 2) ? -overlapY : overlapY;
+
+                // Find smallest push to resolve this specific collision
+                if (overlapX < overlapY) {
+                    if (overlapX < bestMTV.overlap) {
+                        bestMTV = { overlap: overlapX, x: mtvX, y: 0 };
+                    }
+                } else {
+                    if (overlapY < bestMTV.overlap) {
+                        bestMTV = { overlap: overlapY, x: 0, y: mtvY };
+                    }
+                }
+            }
+        }
+
+        if (!collisionFound) break;
+
+        // Apply the smallest push to resolve the most significant overlap in this pass
+        droppedStack.x += bestMTV.x;
+        droppedStack.y += bestMTV.y;
+        iterations++;
+    }
+}
+
+function applyRigidPushAside(draggedGroup, otherStacks, isStagingContext) {
+    let iterations = 0;
+    while (iterations < 50) {
+        let collisionFound = false;
+        let bestMTV = { overlap: Infinity, x: 0, y: 0 };
+
+        for (const item of draggedGroup) {
+            for (const other of otherStacks) {
+                const overlapX = Math.max(0, Math.min(item.x + item.l, other.x + other.l) - Math.max(item.x, other.x));
+                const overlapY = Math.max(0, Math.min(item.y + item.w, other.y + other.w) - Math.max(item.y, other.y));
+
+                if (overlapX > 0 && overlapY > 0) {
+                    collisionFound = true;
+                    let mtvX = (item.x + item.l / 2 < other.x + other.l / 2) ? -overlapX : overlapX;
+                    let mtvY = (item.y + item.w / 2 < other.y + other.w / 2) ? -overlapY : overlapY;
+
+                    if (overlapX < overlapY) {
+                        if (overlapX < bestMTV.overlap) bestMTV = { overlap: overlapX, x: mtvX, y: 0 };
+                    } else {
+                        if (overlapY < bestMTV.overlap) bestMTV = { overlap: overlapY, x: 0, y: mtvY };
+                    }
+                }
+            }
+        }
+
+        if (!collisionFound) break;
+
+        draggedGroup.forEach(item => { item.x += bestMTV.x; item.y += bestMTV.y; });
+        iterations++;
+    }
+}
+
+function checkAnyOverlap(s, stacks) {
+    for (let other of stacks) {
+        if (s.id === other.id) continue;
+        if (s.x < other.x + other.l && s.x + s.l > other.x && s.y < other.y + other.w && s.y + s.w > other.y) return true;
+    }
+    return false;
+}
+
+function rotateTruckItem(id) {
+    pushTruckHistory();
+
+    let idsToProcess = new Set();
+    if (selectedTruckIds.has(id)) {
+        idsToProcess = new Set(selectedTruckIds);
+    } else {
+        idsToProcess.add(id);
+    }
+
+    if (idsToProcess.size > 1) {
+        // Rigid Body Group Rotation
+        let groupStacks = allTruckStacks.filter(s => idsToProcess.has(s.id));
+        let minX = Math.min(...groupStacks.map(s => s.x)); let maxX = Math.max(...groupStacks.map(s => s.x + s.l));
+        let minY = Math.min(...groupStacks.map(s => s.y)); let maxY = Math.max(...groupStacks.map(s => s.y + s.w));
+        let cx = (minX + maxX) / 2; let cy = (minY + maxY) / 2;
+
+        groupStacks.forEach(s => {
+            let sx = s.x + s.l / 2; let sy = s.y + s.w / 2;
+            let nsx = cx - (sy - cy); let nsy = cy + (sx - cx);
+            let t = s.l; s.l = s.w; s.w = t;
+            s.x = nsx - s.l / 2; s.y = nsy - s.w / 2;
+        });
+
+        let isStaged = groupStacks[0].isStaged;
+        let otherStacks = allTruckStacks.filter(st => st.isStaged === isStaged && st.truckUid === groupStacks[0].truckUid && !idsToProcess.has(st.id));
+        let anyOverlap = groupStacks.some(item => checkAnyOverlap(item, otherStacks));
+        if (anyOverlap) applyRigidPushAside(groupStacks, otherStacks, isStaged);
+    } else {
+        // Single Item Rotation
+        idsToProcess.forEach(stackId => {
+            let s = allTruckStacks.find(x => x.id === stackId);
+            if (s) { 
+                let t = s.l; s.l = s.w; s.w = t; 
+                let areaStacks = allTruckStacks.filter(st => st.isStaged === s.isStaged && st.truckUid === s.truckUid);
+                if (checkAnyOverlap(s, areaStacks.filter(st => st.id !== s.id))) applyPushAside(s, areaStacks);
+            }
+        });
+    }
+
+    renderTruckWorkspace();
+    window.isTruckDirty = true;
+}
+
+function startTruckDrag(e, type, id) {
+    if(e.target.closest('.action-btn')) return;
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (e.ctrlKey || e.metaKey || e.shiftKey) {
+        if (selectedTruckIds.has(id)) selectedTruckIds.delete(id); else selectedTruckIds.add(id);
+        updateTruckSelectionUI(); return; 
+    } else {
+        if (!selectedTruckIds.has(id)) { selectedTruckIds.clear(); selectedTruckIds.add(id); updateTruckSelectionUI(); }
+    }
+    
+    pushTruckHistory();
+
+    let isStagingSVG = e.target.closest('#truck-staging-svg-container') !== null;
+    let svgId = isStagingSVG ? 'truck-staging-svg' : 'truck-svg';
+    let mouseCoords = getSvgCoords(svgId, e);
+
+    let dragOffsets = [];
+    let groupBBox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+    let ghostScale = isStagingSVG ? stagingZoomObj.zoom : truckZoomObj.zoom;
+    let svgInner = '';
+
+    selectedTruckIds.forEach(selId => {
+        let stack = allTruckStacks.find(x => x.id === selId);
+        if (stack) {
+            dragOffsets.push({ id: selId, dx: stack.x - mouseCoords.x, dy: stack.y - mouseCoords.y });
+            if (stack.x < groupBBox.minX) groupBBox.minX = stack.x;
+            if (stack.y < groupBBox.minY) groupBBox.minY = stack.y;
+            if (stack.x + stack.l > groupBBox.maxX) groupBBox.maxX = stack.x + stack.l;
+            if (stack.y + stack.w > groupBBox.maxY) groupBBox.maxY = stack.y + stack.w;
+            
+            let baseCase = allTruckCases.find(x => x.id === stack.caseIds[0]);
+            let color = baseCase ? baseCase.color : '#3b82f6';
+            let sw = stack.l * ghostScale; let sh = stack.w * ghostScale;
+            let offX = (stack.x - mouseCoords.x) * ghostScale;
+            let offY = (stack.y - mouseCoords.y) * ghostScale;
+            svgInner += `<rect x="${offX}" y="${offY}" width="${sw}" height="${sh}" fill="${color}aa" stroke="${color}" stroke-width="2" rx="4" />`;
+        }
+    });
+
+    let ghost = document.createElement('div');
+    let scaledW = (groupBBox.maxX - groupBBox.minX) * ghostScale;
+    let scaledH = (groupBBox.maxY - groupBBox.minY) * ghostScale;
+    
+    // Shift the internal SVG viewport to accommodate the relative negative drag coordinates seamlessly
+    let vX = (groupBBox.minX - mouseCoords.x) * ghostScale;
+    let vY = (groupBBox.minY - mouseCoords.y) * ghostScale;
+
+    ghost.style.cssText = `position:fixed; width:${scaledW}px; height:${scaledH}px; pointer-events:none; z-index:999999;`;
+    ghost.innerHTML = `<div style="background:#3b82f6; color:#fff; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; position:absolute; top:-20px; left:0; display:${selectedTruckIds.size > 1 ? 'block' : 'none'};">${selectedTruckIds.size} items</div><svg viewBox="${vX} ${vY} ${scaledW} ${scaledH}" style="width:100%; height:100%; overflow:visible; filter: drop-shadow(0 10px 30px rgba(0,0,0,0.8));">${svgInner}</svg>`;
+
+    document.body.appendChild(ghost);
+
+    let mouseOffsetX = (mouseCoords.x - groupBBox.minX) * ghostScale;
+    let mouseOffsetY = (mouseCoords.y - groupBBox.minY) * ghostScale;
+    activeTruckDrag = { ghost, dragOffsets, mouseOffsetX, mouseOffsetY };
+
+    updateTruckGhost(e);
+    
+    document.addEventListener('mousemove', updateTruckGhost);
+    document.addEventListener('mouseup', endTruckDrag);
+}
+
+function updateTruckGhost(e) {
+    if(!activeTruckDrag) return;
+    let cx = e.clientX || (e.touches && e.touches[0].clientX);
+    let cy = e.clientY || (e.touches && e.touches[0].clientY);
+    activeTruckDrag.ghost.style.left = (cx - activeTruckDrag.mouseOffsetX) + 'px';
+    activeTruckDrag.ghost.style.top = (cy - activeTruckDrag.mouseOffsetY) + 'px';
+}
+
+function endTruckDrag(e) {
+    document.removeEventListener('mousemove', updateTruckGhost);
+    document.removeEventListener('mouseup', endTruckDrag);
+    if(!activeTruckDrag) return;
+    
+    activeTruckDrag.ghost.remove();
+    
+    let cx = e.clientX || (e.changedTouches && e.changedTouches[0].clientX);
+    let cy = e.clientY || (e.changedTouches && e.changedTouches[0].clientY);
+    let svgContainer = document.getElementById('truck-svg-container');
+    let rect = svgContainer.getBoundingClientRect();
+    
+    let targetIsStaging = false;
+    let targetSvgId = 'truck-svg';
+    let stagingRect = document.getElementById('truck-staging-svg-container').getBoundingClientRect();
+    
+    if (cx >= stagingRect.left && cx <= stagingRect.right && cy >= stagingRect.top && cy <= stagingRect.bottom) {
+        targetIsStaging = true;
+        targetSvgId = 'truck-staging-svg';
+    } else if (cx >= rect.left && cx <= rect.right && cy >= rect.top && cy <= rect.bottom) {
+        targetIsStaging = false;
+    } else {
+        renderTruckWorkspace();
+        return;
+    }
+
+    let areaStacks = allTruckStacks.filter(s => s.isStaged === targetIsStaging && (targetIsStaging || s.truckUid === activeArrangementTruckId));
+    let svg = document.getElementById(targetSvgId);
+    let pt = svg.createSVGPoint(); pt.x = cx; pt.y = cy;
+    let mouseCoords = pt.matrixTransform(svg.getScreenCTM().inverse());
+    
+    let draggedItems = [];
+
+    activeTruckDrag.dragOffsets.forEach(offset => {
+        let stack = allTruckStacks.find(x => x.id === offset.id);
+        if (!stack) return;
+        stack.isStaged = targetIsStaging;
+        if (!targetIsStaging) stack.truckUid = activeArrangementTruckId;
+        else stack.truckUid = "";
+        stack.x = mouseCoords.x + offset.dx;
+        stack.y = mouseCoords.y + offset.dy;
+        draggedItems.push(stack);
+    });
+
+    // --- Unified Magnetic Snapping ---
+    let snapThreshold = 15;
+    let minSnapDx = snapThreshold, minSnapDy = snapThreshold;
+    let bestSnapDx = 0, bestSnapDy = 0;
+
+    for (let stack of draggedItems) {
+        for (let s of areaStacks) {
+            if (selectedTruckIds.has(s.id)) continue;
+            let xCands = [s.x - stack.x, s.x + s.l - stack.x, s.x - (stack.x + stack.l), s.x + s.l - (stack.x + stack.l)];
+            for (let dx of xCands) { if (Math.abs(dx) < minSnapDx) { minSnapDx = Math.abs(dx); bestSnapDx = dx; } }
+            let yCands = [s.y - stack.y, s.y + s.w - stack.y, s.y - (stack.y + stack.w), s.y + s.w - (stack.y + stack.w)];
+            for (let dy of yCands) { if (Math.abs(dy) < minSnapDy) { minSnapDy = Math.abs(dy); bestSnapDy = dy; } }
+        }
+    }
+    draggedItems.forEach(stack => { stack.x += bestSnapDx; stack.y += bestSnapDy; });
+
+    // --- Unified Truck Boundary Check ---
+    if (!targetIsStaging) {
+        let minX = Math.min(...draggedItems.map(s => s.x));
+        let minY = Math.min(...draggedItems.map(s => s.y));
+        let maxX = Math.max(...draggedItems.map(s => s.x + s.l));
+        let maxY = Math.max(...draggedItems.map(s => s.y + s.w));
+        
+        let shiftX = 0, shiftY = 0;
+        if (minX < TRUCK_X) shiftX = TRUCK_X - minX;
+        else if (maxX > TRUCK_X + TRUCK_L) shiftX = (TRUCK_X + TRUCK_L) - maxX;
+        
+        if (minY < TRUCK_Y) shiftY = TRUCK_Y - minY;
+        else if (maxY > TRUCK_Y + TRUCK_W) shiftY = (TRUCK_Y + TRUCK_W) - maxY;
+
+        draggedItems.forEach(stack => { stack.x += shiftX; stack.y += shiftY; });
+    }
+
+    // --- Unified Stacking & Collision Logic ---
+    if (draggedItems.length === 1) {
+        let stack = draggedItems[0];
+        let targetStack = null; let bestOverlapArea = 0;
+        let otherStacks = areaStacks.filter(s => !selectedTruckIds.has(s.id));
+
+        for (let other of otherStacks) {
+            let ix = Math.max(0, Math.min(stack.x + stack.l, other.x + other.l) - Math.max(stack.x, other.x));
+            let iy = Math.max(0, Math.min(stack.y + stack.w, other.y + other.w) - Math.max(stack.y, other.y));
+            let area = ix * iy;
+            if (area > bestOverlapArea) {
+                bestOverlapArea = area;
+                targetStack = other;
+            }
+        }
+
+        let dragArea = stack.l * stack.w;
+        let willStack = (bestOverlapArea >= dragArea * 0.66);
+
+        if (willStack && targetStack) {
+            targetStack.caseIds.push(...stack.caseIds);
+            targetStack.weight += stack.weight;
+            stack.caseIds.forEach(cId => { let caseObj = allTruckCases.find(x => x.id === cId); if (caseObj) caseObj.stackId = targetStack.id; });
+            allTruckStacks = allTruckStacks.filter(x => x.id !== stack.id);
+        } else {
+            applyPushAside(stack, otherStacks, targetIsStaging);
+        }
+    } else {
+        let otherStacks = areaStacks.filter(s => !selectedTruckIds.has(s.id));
+        applyRigidPushAside(draggedItems, otherStacks, targetIsStaging);
+    }
+    
+    window.isTruckDirty = true;
+    activeTruckDrag = null;
+    renderTruckWorkspace();
+}
+
+function unstackTruckStack(sId) {
+    pushTruckHistory();
+
+    let idsToProcess = new Set();
+    if (selectedTruckIds.has(sId)) {
+        idsToProcess = new Set(selectedTruckIds);
+    } else {
+        idsToProcess.add(sId);
+    }
+
+    idsToProcess.forEach(stackId => {
+        let s = allTruckStacks.find(x => x.id === stackId);
+        if(!s || s.caseIds.length <= 1) return;
+        
+        let offsetX = s.x;
+        s.caseIds.forEach((cId, idx) => { 
+            let caseObj = allTruckCases.find(x => x.id===cId); 
+            if(caseObj) {
+                if (idx === 0) {
+                    s.caseIds = [cId];
+                    s.weight = caseObj.weight;
+                    caseObj.stackId = s.id;
+                } else {
+                    offsetX += 5;
+                    let newStack = { id: 'ts_' + Date.now() + Math.random(), x: offsetX, y: s.y + 10, l: s.l, w: s.w, caseIds: [cId], weight: caseObj.weight, isStaged: s.isStaged, truckUid: s.truckUid };
+                    applyPushAside(newStack, allTruckStacks.filter(st => st.isStaged === s.isStaged && st.truckUid === s.truckUid));
+                    allTruckStacks.push(newStack);
+                    caseObj.stackId = newStack.id;
+                }
+            } 
+        });
+    });
+    window.isTruckDirty = true;
+    renderTruckWorkspace();
+}
+
+function returnToStaging(sId) {
+    pushTruckHistory();
+
+    let idsToProcess = new Set();
+    if (selectedTruckIds.has(sId)) {
+        idsToProcess = new Set(selectedTruckIds);
+    } else {
+        idsToProcess.add(sId);
+    }
+
+    let stagedStacks = allTruckStacks.filter(st => st.isStaged && !idsToProcess.has(st.id));
+    let maxY = 20;
+    stagedStacks.forEach(st => {
+        if (st.y + st.w > maxY) maxY = st.y + st.w;
+    });
+
+    idsToProcess.forEach(stackId => {
+        let s = allTruckStacks.find(x => x.id === stackId);
+        if (s && !s.isStaged) {
+            s.isStaged = true;
+            s.truckUid = "";
+            s.x = 5;
+            s.y = maxY + 10;
+            applyPushAside(s, stagedStacks, true);
+            stagedStacks.push(s); // Add to local array so next item pushes further down
+            maxY = Math.max(maxY, s.y + s.w);
+        }
+    });
+    window.isTruckDirty = true;
+    renderTruckWorkspace();
+}
+
+function renderTruckWorkspace() {
+    let svgHtml = `
+    <defs>
+        <pattern id="truckDotGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1" fill="#3f3f46" />
+        </pattern>
+    </defs>
+    <rect x="-5000" y="-5000" width="10000" height="10000" fill="url(#truckDotGrid)" pointer-events="none" />
+    
+    <!-- Main Truck Bounds -->
+    <rect x="${TRUCK_X}" y="${TRUCK_Y}" width="${TRUCK_L}" height="${TRUCK_W}" fill="#151518" stroke="#52525b" stroke-width="4" rx="4" style="pointer-events:none;"/>
+    <text x="${TRUCK_X - 30}" y="${TRUCK_Y + TRUCK_W/2}" fill="#52525b" font-size="24" font-weight="bold" text-anchor="middle" dominant-baseline="middle" transform="rotate(-90, ${TRUCK_X - 30}, ${TRUCK_Y + TRUCK_W/2})" style="pointer-events:none;">CABIN</text>
+    `;
+    
+    let stagingHtml = `
+    <defs>
+        <pattern id="stageDotGrid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="2" cy="2" r="1" fill="#3f3f46" />
+        </pattern>
+    </defs>
+    <rect x="0" y="0" width="500" height="10000" fill="url(#stageDotGrid)" pointer-events="none" />
+    <line x1="300" y1="0" x2="300" y2="10000" stroke="#f59e0b" stroke-width="4" stroke-dasharray="15,15" opacity="0.6" pointer-events="none" />
+    `;
+
+    let totalWeight = 0;
+    let visibleStacks = allTruckStacks.filter(s => s.isStaged || (!s.isStaged && s.truckUid === activeArrangementTruckId));
+    
+    visibleStacks.forEach(s => {
+        let baseCase = allTruckCases.find(x => x.id === s.caseIds[0]);
+        let color = baseCase ? baseCase.color : '#a855f7';
+        if (!s.isStaged) totalWeight += s.weight;
+        
+        let blockHtml = `
+        <g class="truck-svg-item" data-id="${s.id}" onmousedown="startTruckDrag(event, 'stack', '${s.id}')" style="cursor:grab;" onmouseup="if(activeTruckDrag) endTruckDrag(event);">
+            <rect data-origstroke="${color}" x="${s.x}" y="${s.y}" width="${s.l}" height="${s.w}" fill="${color}33" stroke="${color}" stroke-width="2" rx="4" />
+        `;
+        
+        let tYOffset = s.y + s.w - 8;
+        let cNames = s.caseIds.map(cId => {
+            let caseObj = allTruckCases.find(x => x.id === cId);
+            if (!caseObj) return 'Case';
+            let name = typeof escapeHTML === 'function' ? escapeHTML(caseObj.name) : caseObj.name;
+            return name;
+        });
+        
+        cNames.forEach((n, idx) => {
+            let txtW = s.l - 8; 
+            blockHtml += `
+            <text x="${s.x + 4}" y="${tYOffset}" fill="#fff" font-size="8" font-weight="bold" style="pointer-events:none;">
+                <tspan textLength="${Math.max(10, txtW)}" lengthAdjust="spacingAndGlyphs">${n}</tspan>
+            </text>`;
+            tYOffset -= 10;
+        });
+        
+        let btnX = s.x + s.l - 18;
+        blockHtml += `
+            <g class="action-btn" onclick="event.stopPropagation(); unstackTruckStack('${s.id}')" style="cursor:pointer;" onmouseover="this.querySelector('rect').setAttribute('fill','#333')" onmouseout="this.querySelector('rect').setAttribute('fill','rgba(0,0,0,0.8)')">
+                <rect x="${btnX}" y="${s.y + 2}" width="14" height="14" fill="rgba(0,0,0,0.8)" rx="2" ry="2" />
+                <svg x="${btnX + 2}" y="${s.y + 4}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" style="pointer-events:none;"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </g>
+        `;
+        btnX -= 16;
+        blockHtml += `
+            <g class="action-btn" onclick="event.stopPropagation(); rotateTruckItem('${s.id}')" style="cursor:pointer;" onmouseover="this.querySelector('rect').setAttribute('fill','#333')" onmouseout="this.querySelector('rect').setAttribute('fill','rgba(0,0,0,0.8)')">
+                <rect x="${btnX}" y="${s.y + 2}" width="14" height="14" fill="rgba(0,0,0,0.8)" rx="2" ry="2" />
+                <svg x="${btnX + 2}" y="${s.y + 4}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="pointer-events:none;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </g>
+        `;
+        if (!s.isStaged) {
+            btnX -= 16;
+            blockHtml += `
+            <g class="action-btn" onclick="event.stopPropagation(); returnToStaging('${s.id}')" style="cursor:pointer;" onmouseover="this.querySelector('rect').setAttribute('fill','#333')" onmouseout="this.querySelector('rect').setAttribute('fill','rgba(0,0,0,0.8)')">
+                <rect x="${btnX}" y="${s.y + 2}" width="14" height="14" fill="rgba(0,0,0,0.8)" rx="2" ry="2" />
+                <svg x="${btnX + 2}" y="${s.y + 4}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" style="pointer-events:none;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </g>
+            `;
+        }
+        blockHtml += `</g>`;
+        
+        if (s.isStaged) stagingHtml += blockHtml;
+        else svgHtml += blockHtml;
+    });
+    
+    let truckSvg = document.getElementById('truck-svg');
+    if (truckSvg) truckSvg.innerHTML = svgHtml;
+    
+    let stagingSvg = document.getElementById('truck-staging-svg');
+    if (stagingSvg) stagingSvg.innerHTML = stagingHtml;
+    
+    let stagedCasesCount = allTruckStacks.filter(s => s.isStaged).reduce((sum, s) => sum + s.caseIds.length, 0);
+    
+    let statsEl = document.getElementById('truck-stats');
+    if (statsEl) {
+        if(stagedCasesCount === 0) {
+            statsEl.innerText = `✅ 100% PACKED (${totalWeight} kg on this truck)`;
+            statsEl.style.color = '#10b981';
+        } else {
+            statsEl.innerText = `⚠️ ${stagedCasesCount} STAGED CASES (${totalWeight} kg on this truck)`;
+            statsEl.style.color = '#f59e0b';
+        }
+    }
+}
+
+function updateTruckSelectionUI() {
+    document.querySelectorAll('.truck-case-item, .truck-stack-item').forEach(el => {
+        if (selectedTruckIds.has(el.dataset.id)) {
+            el.style.boxShadow = '0 0 0 2px #3b82f6';
+            el.style.filter = 'brightness(1.3)';
+        } else {
+            el.style.boxShadow = 'none';
+            el.style.filter = 'none';
+        }
+    });
+    document.querySelectorAll('.truck-svg-item').forEach(el => {
+        let rect = el.querySelector('rect');
+        if (!rect) return;
+        if (selectedTruckIds.has(el.dataset.id)) {
+            rect.setAttribute('stroke', '#fff'); rect.setAttribute('stroke-width', '4'); rect.setAttribute('stroke-dasharray', '5,5');
+        } else {
+            rect.setAttribute('stroke', rect.dataset.origstroke); rect.setAttribute('stroke-width', '2'); rect.setAttribute('stroke-dasharray', 'none');
+        }
+    });
+}
+
+function cancelTruckArrangement() {
+    if (window.isTruckDirty) {
+        if (!confirm("⚠️ You have unsaved truck arrangement changes. Are you sure you want to discard them and leave?")) {
+            return;
+        }
+    }
+    window.isTruckDirty = false;
+    window.activePresenceModule = 'assets';
+    document.getElementById('truck-modal-overlay').style.display = 'none';
+}
+
+function saveTruckArrangement() {
+    if (window.isBackgroundSyncing) {
+        let btn = document.querySelector('#truck-modal-overlay .btn-main');
+        let origText = btn.innerText;
+        btn.innerText = "AWAITING SYNC..."; btn.disabled = true;
+        setTimeout(saveTruckArrangement, 500);
+        return;
+    }
+    const projectId = document.getElementById('edit-folder-id').value;
+    let payload = [];
+    
+    let btn = document.querySelector('#truck-modal-overlay .btn-main');
+    let origText = btn.innerText;
+    btn.innerText = "SAVING..."; btn.disabled = true;
+    
+    let leg = window.activeArrangementLeg || 'outbound';
+    allTruckStacks.forEach(s => {
+        s.caseIds.forEach((cId, zIndex) => {
+            let c = allTruckCases.find(x => x.id === cId);
+            let targetPaUid = c.paUid || (c.paRef ? c.paRef.uid : null);
+            if (c && targetPaUid) {
+                payload.push({
+                    paUid: targetPaUid,
+                    truckUid: s.isStaged ? "" : (s.truckUid || ""),
+                    truckX: s.x,
+                    truckY: s.y,
+                    truckZ: zIndex,
+                    isRotated: (s.l < s.w), // Check the live stack footprint. If l < w, it is rotated.
+                    isStaged: s.isStaged
+                });
+            }
+        });
+    });
+    
+    google.script.run
+    .withSuccessHandler(res => {
+        btn.innerText = "SAVED ✓";
+        setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
+        window.isTruckDirty = false;
+        // Force a reload of the equipment window to fetch the new split rows with their new UIDs
+        setTimeout(() => {
+            document.getElementById('truck-modal-overlay').style.display = 'none';
+            openProjectAssetsModal();
+        }, 1000);
+    })
+    .withFailureHandler(err => {
+        btn.innerText = origText; btn.disabled = false;
+        alert("Failed to save truck layout: " + err.message);
+    }).saveTruckArrangementAPI(projectId, payload, leg, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+}
+</script>

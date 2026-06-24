@@ -1,0 +1,575 @@
+<div id="edit-modal-overlay" class="modal-overlay">
+  <div class="modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
+        <div style="display:flex; align-items:center; gap: 12px; flex: 1;">
+            <h3 id="edit-orig-title" style="margin:0; color:#fff;">Configure Project</h3>
+            <div style="position: relative;">
+               <button class="btn-delete btn-sm" style="margin:0;" onclick="toggleTrashMenu()">TRASH</button>
+               <div id="trash-dropdown" style="display:none; position:absolute; top: 100%; right:0; width:140px; background:#1a1a1e; border:1px solid #ef4444; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
+                  <button id="trash-project-btn" class="btn-delete btn-sm" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Trashed')">TRASH</button>
+                  <button id="delete-project-btn" class="btn-delete btn-sm" style="width:100%; margin-bottom:8px;" onclick="runFullDelete()">DELETE</button>
+                  <button id="restore-project-btn" class="btn-outline btn-sm" style="width:100%; margin:0; display:none;" onclick="runRestoreProject()">RESTORE</button>
+               </div>
+            </div>
+            <button id="project-history-btn" class="btn-outline btn-sm" style="display:none; border-color:#3f3f46; color:#a1a1aa; margin:0;" onclick="openUniversalHistory(document.getElementById('edit-folder-id').value)">
+                <span style="opacity:0.5;">LOADING...</span>
+            </button>
+        </div>
+        
+        <div style="display:flex; gap: 5px; align-items: center; justify-content: flex-end; flex: 1;">
+           <button id="logistics-hub-btn-layers" class="btn-outline" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openLogisticsHubModal()">LOGISTICS HUB</button>
+           <button class="btn-outline" style="margin:0;" onclick="openDriveFolder()">FOLDER</button>
+           <button id="print-eq-btn" class="btn-outline" style="margin:0;" onclick="triggerPrint()">PDF</button>
+        </div>
+    </div>
+    <input type="hidden" id="edit-folder-id">
+    <input type="hidden" id="edit-proj-version">
+    <input type="hidden" id="edit-old-date">
+    <input type="hidden" id="edit-proj-date">
+    <input type="hidden" id="edit-proj-end-date">
+    <input type="hidden" id="edit-proj-actual-date">
+    <input type="hidden" id="edit-proj-wh-date">
+    <input type="hidden" id="edit-proj-wh2-date">
+    <input type="hidden" id="edit-proj-recovery-date">
+    <input type="hidden" id="edit-proj-transit-date">
+    <input type="hidden" id="edit-proj-type" value="Event">
+    
+    <div style="display:flex; gap:10px; margin-top:16px; position:relative; align-items:center; flex-wrap: wrap;">
+      <input type="text" id="edit-proj-name" placeholder="Title" oninput="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; box-sizing: border-box;">
+      
+      <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
+          <input list="edit-proj-client-list" id="edit-proj-client" placeholder="Select Client..." oninput="window.isProjectDirty=true" onchange="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:6px; box-sizing: border-box;">
+          <datalist id="edit-proj-client-list"></datalist>
+          <button class="btn-outline" style="width:auto; margin:0; padding: 0 10px; height: 42px; box-sizing: border-box; flex-shrink: 0;" onclick="openClientModal()" title="New Client">+ NEW CLIENT</button>
+      </div>
+      
+      <div style="display:flex; gap:0; align-items:center;">
+          <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="window.isProjectDirty=true" style="width: 180px; margin:0; padding:12px; background:#1a1a1e; color:#fff; border:1px solid #333; border-radius:6px 0 0 6px; box-sizing: border-box; border-right:none;">
+          <button class="btn-outline" style="margin:0; padding: 0 12px; height: 42px; box-sizing: border-box; flex-shrink: 0; border-radius: 0 6px 6px 0;" onclick="window.openLocationMap()" title="Set Location Map">📍</button>
+      </div>
+      
+      <input type="hidden" id="edit-proj-lat">
+      <input type="hidden" id="edit-proj-lng">
+      <div style="position: relative; width: 110px; height: 42px; display: block; flex-shrink: 0;">
+          <style>
+              #weather-widget-container::-webkit-scrollbar { height: 6px; }
+              #weather-widget-container::-webkit-scrollbar-track { background: #111; border-radius: 4px; }
+              #weather-widget-container::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+              #weather-widget-container::-webkit-scrollbar-thumb:hover { background: #10b981; }
+          </style>
+          <div id="weather-widget-container" style="display:none; position: absolute; bottom: 46px; left: 50%; transform: translateX(-50%); width: 450px; max-width: 80vw; height: 84px; background: #111; border: 1px solid #333; border-radius: 6px; box-sizing: border-box; flex-direction: row; overflow-x: auto; overflow-y: hidden; z-index: 50; padding: 6px; gap: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.8);"></div>
+          <label class="crew-cb-container" style="padding: 0; border: none; margin: 0; display: flex; align-items: center; justify-content: center; background: #27272a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333; cursor: pointer; height: 42px; width: 100%; box-sizing: border-box;">
+             <input type="checkbox" id="edit-proj-outdoor" class="crew-cb" onchange="window.isProjectDirty=true; if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();" style="margin-right: 8px;">
+             <span style="color:#fff; font-size:11px; font-weight:bold; white-space:nowrap; margin-top: 1px;">OUTDOOR</span>
+          </label>
+      </div>
+      
+      <div style="position: relative; width: 70px; height: 42px; flex-shrink: 0;">
+          <div class="input-label" style="position:absolute; top:-16px; left:0; width:100%; text-align:center; margin:0; font-size:9px; white-space:nowrap; color:#f59e0b;">DIFF. MULT</div>
+          <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="window.isProjectDirty=true" style="width: 100%; height: 42px; padding: 10px; margin: 0; text-align: center; background:#18181b; color:#f59e0b; font-weight:bold; border:1px solid #f59e0b; border-radius:6px; box-sizing: border-box;">
+      </div>
+      
+      <label class="crew-cb-container" style="padding: 0; border: none; margin: 0; display: flex; align-items: center; justify-content: center; background: #27272a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333; cursor: pointer; height: 42px; box-sizing: border-box;">
+         <input type="checkbox" id="edit-proj-in-sofia" class="crew-cb" onchange="window.isProjectDirty=true; if(typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();" style="margin-right: 8px;" checked>
+         <span style="color:#fff; font-size:11px; font-weight:bold; white-space:nowrap; margin-top: 1px;">IN SOFIA</span>
+      </label>
+      <div id="edit-proj-distance-container" style="position: relative; width: 70px; height: 42px; flex-shrink: 0; opacity:0.3; pointer-events:none;">
+          <div class="input-label" style="position:absolute; top:-16px; left:0; width:100%; text-align:center; margin:0; font-size:9px; white-space:nowrap;">DIST (KM)</div>
+          <input type="number" id="edit-proj-distance" placeholder="0" oninput="window.isProjectDirty=true" style="width: 100%; height: 42px; padding: 10px; margin: 0; text-align: center; background:#18181b; color:#fff; border:1px solid #333; border-radius:6px; box-sizing: border-box;">
+      </div>
+      
+      <div style="position: relative; width: 130px; margin-left: auto;">
+        <button class="btn-outline" style="width:100%; margin:0;" onclick="toggleTypeMenu()"><span id="display-event-type">EVENT</span></button>
+        <div id="type-dropdown" style="display:none; position:absolute; top: 100%; left:0; width:100%; background:#1a1a1e; border:1px solid #333; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
+           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="setEventType('Event')">Event</button>
+           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="setEventType('Cross Rent')">Cross Rent</button>
+           <button class="btn-outline" style="width:100%; margin:0;" onclick="setEventType('Meeting')">Meeting</button>
+        </div>
+      </div>
+
+      <div style="position: relative; width: 140px;">
+        <button class="btn-outline" style="width:100%; margin:0;" onclick="toggleStatusMenu()"><span id="display-event-status">DRAFT</span></button>
+        <div id="status-dropdown" style="display:none; position:absolute; top: 100%; left:0; width:100%; background:#1a1a1e; border:1px solid #333; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
+           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Approved')">Approved</button>
+           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Not Approved')">Not Approved</button>
+           <button id="cancel-project-btn" class="btn-delete" style="width:100%; margin:0;" onclick="runSetStatus('Cancelled')">Cancelled</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="event-context-menu" style="display: none; position: fixed; background: #1a1a1e; border: 1px solid #444; border-radius: 6px; padding: 5px; z-index: 99999; box-shadow: 0 8px 16px rgba(0,0,0,0.8); width: 140px;">
+            <div style="color: #a1a1aa; font-size: 9px; font-weight: bold; padding: 4px 8px; border-bottom: 1px solid #333; margin-bottom: 4px;">CHANGE TYPE</div>
+            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #3b82f6; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('main')">MAIN EVENT</button>
+            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #10b981; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('show')">SHOW DAY</button>
+            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #f97316; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('wh')">WAREHOUSE</button>
+            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #a855f7; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('recovery')">RECOVERY</button>
+            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 4px 0; color: #06b6d4; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('transit')">TRANSIT</button>
+            <div style="border-top: 1px solid #333; padding-top: 4px;">
+                <button class="btn-delete" style="width: 100%; text-align: left; padding: 6px 8px; margin: 0; font-size: 11px;" onclick="updateEventPhase('delete')">DELETE STRIP</button>
+            </div>
+        </div>
+
+        <div id="mini-project-calendar" style="flex: 1; background: #0a0a0c; padding: 10px;"></div>
+
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
+      <div style="display:flex; gap:12px; align-items:center;">
+         <button id="master-timeline-btn" class="btn-purple" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
+         <button class="btn-outline" style="margin:0; border-color:#f97316; color:#f97316;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
+      </div>
+      <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
+         <button id="manual-crew-email-btn" class="btn-outline" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
+         
+         <button class="btn-close" style="margin: 0; width:auto;" onclick="cancelProjectEditor()">CANCEL</button>
+         <button id="update-btn" class="btn-main" style="margin: 0; width:auto;" onclick="runSchedule()">SAVE & SYNC CALENDAR</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * 02_Project_Editor_Core.html
+ * Domain: Project Editor, Settings, and Mini-Calendar Editor.
+ */
+
+window.isProjectDirty = false;
+
+// ==========================================
+// --- PRESENCE ENGINE (UI HEARTBEAT) ---
+// ==========================================
+// @INDEX: PRESENCE -> Presence Engine & Heartbeat
+let presenceTimer = null;
+let activePresenceProject = null;
+window.activePresenceModule = 'main'; // Tracks if user is in 'main', 'timeline', etc.
+window.isTimelineOccupiedBy = null;   // Tracks who currently holds the lock
+
+function showLoudToQuietWarning(userName) {
+    let safeName = userName ? String(userName).replace(/</g, "&lt;").replace(/>/g, "&gt;") : "UNKNOWN USER";
+    let overlay = document.createElement('div');
+    overlay.id = 'loud-warning-overlay';
+    overlay.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:999999; display:flex; justify-content:center; align-items:center; transition: all 1s ease-in-out;';
+    overlay.innerHTML = `<div style="text-align:center; padding: 40px; border: 2px solid #ef4444; background: #1a1a1e; border-radius: 12px; box-shadow: 0 20px 50px rgba(239,68,68,0.3); transform: scale(1); transition: transform 1s ease-in-out;" id="loud-warning-box">
+        <div style="font-size: 40px; margin-bottom: 10px;">⚠️</div>
+        <h1 style="color: #ef4444; margin: 0 0 10px 0; font-size: 24px; text-transform: uppercase;">${safeName} IS EDITING</h1>
+        <p style="color: #fff; font-size: 14px; font-weight: bold;">You have been placed in Read-Only mode.</p>
+    </div>`;
+    document.body.appendChild(overlay);
+
+    setTimeout(() => {
+        let box = document.getElementById('loud-warning-box');
+        if (box) box.style.transform = 'scale(0.8)';
+        overlay.style.opacity = '0';
+        setTimeout(() => { if (document.body.contains(overlay)) document.body.removeChild(overlay); }, 1000);
+    }, 3000);
+}
+
+function startPresencePing(projectId) {
+    stopPresencePing();
+    if (!projectId || projectId === 'NEW') return;
+    activePresenceProject = projectId;
+    
+    let tlBtn = document.getElementById('master-timeline-btn');
+    if (tlBtn) {
+        tlBtn.innerText = `⏳ CHECKING LOCK...`;
+        tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#a1a1aa"; tlBtn.style.color = "#a1a1aa";
+        tlBtn.disabled = true;
+    }
+
+    const ping = () => {
+        if (!activePresenceProject) return;
+        let userAlias = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown';
+        google.script.run
+        .withFailureHandler(err => {
+            let tlBtn = document.getElementById('master-timeline-btn');
+            if (tlBtn) {
+                tlBtn.disabled = false;
+                tlBtn.innerText = `OPEN TIMELINE`;
+                tlBtn.className = "btn-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
+            }
+        })
+        .withSuccessHandler(othersObj => {
+            window.isTimelineOccupiedBy = null;
+            let othersNames = Object.keys(othersObj);
+            
+            if (othersNames.length > 0) {
+                for (let name in othersObj) {
+                    if (othersObj[name].module === 'timeline') window.isTimelineOccupiedBy = name;
+                }
+            }
+            
+            if (tlBtn) {
+                tlBtn.disabled = false;
+                if (window.isTimelineOccupiedBy) {
+                    tlBtn.innerText = `🔒 ${window.isTimelineOccupiedBy.toUpperCase()} EDITING`;
+                    tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#ef4444"; tlBtn.style.color = "#ef4444";
+                } else {
+                    tlBtn.innerText = `OPEN TIMELINE`;
+                    tlBtn.className = "btn-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
+                }
+            }
+        }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule);
+    };
+    
+    ping(); 
+    presenceTimer = setInterval(ping, 5000); 
+}
+
+function stopPresencePing() {
+    if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
+    if (activePresenceProject) { google.script.run.reportProjectPresence(activePresenceProject, ACTIVE_USER_NAME, 'leave'); activePresenceProject = null; }
+}
+
+function triggerPrint() {
+  const id = document.getElementById('edit-folder-id').value;
+  if(!id) return;
+  const btn = document.getElementById('print-eq-btn');
+  const origText = btn.innerText;
+  btn.innerText = "GENERATING...";
+  btn.disabled = true;
+  
+  google.script.run.withSuccessHandler(res => {
+    btn.innerText = origText;
+    btn.disabled = false;
+    if(res.startsWith("Error")) alert(res);
+    else { window.open(res, '_blank'); refreshData(); }
+  }).printEquipmentList(id);
+}
+
+window.toggleDistanceInput = function() {
+    let inSofia = document.getElementById('edit-proj-in-sofia').checked;
+    let distCont = document.getElementById('edit-proj-distance-container');
+    if (distCont) {
+        distCont.style.opacity = inSofia ? '0.3' : '1';
+        distCont.style.pointerEvents = inSofia ? 'none' : 'auto';
+    }
+};
+
+// @INDEX: PROJECT_CRUD -> Schedule Save & Sync
+function runSchedule() {
+    const btn = document.getElementById('update-btn'); 
+    const id = document.getElementById('edit-folder-id').value; 
+    const newT = document.getElementById('edit-proj-name').value; 
+    
+    if (!newT) return alert("⚠️ A Project Title is required!");
+    if (!miniCalendar) return alert("⚠️ The Calendar Engine is offline.");
+    
+    const paintedEvents = miniCalendar.getEvents();
+    if (paintedEvents.length === 0) {
+        return alert("⚠️ You must paint at least one phase on the calendar before saving!");
+    }
+
+    btn.disabled = true; 
+    btn.innerText = "SAVING...";
+    
+    let safetyTimer = setTimeout(() => {
+        btn.disabled = false; 
+        btn.innerText = "SAVE & SYNC CALENDAR"; 
+        alert("Network Timeout: The server took too long to respond. Please check your connection.");
+    }, 20000);
+    
+    let activeState = window.currentReadinessState || {};
+    activeState.isOutdoor = document.getElementById('edit-proj-outdoor').checked;
+    activeState.inSofia = document.getElementById('edit-proj-in-sofia').checked;
+    activeState.distanceKm = parseFloat(document.getElementById('edit-proj-distance').value) || 0;
+    let lat = document.getElementById('edit-proj-lat').value; let lng = document.getElementById('edit-proj-lng').value;
+    if (lat && lng) activeState.coords = { lat: lat, lng: lng };
+
+    const projectData = {
+        Project_ID: (id === 'NEW') ? '' : id,
+        Project_Name: newT,
+        Status: document.getElementById('display-event-status').innerText,
+        Type: document.getElementById('edit-proj-type').value,
+        Client: document.getElementById('edit-proj-client') ? document.getElementById('edit-proj-client').value : '',
+        Location_URL: document.getElementById('edit-proj-location') ? document.getElementById('edit-proj-location').value : '',
+        Last_Updated: document.getElementById('edit-proj-version').value,
+        Difficulty_Multiplier: document.getElementById('edit-proj-multiplier') ? parseFloat(document.getElementById('edit-proj-multiplier').value) : 1.0,
+        Readiness_State: JSON.stringify(activeState)
+    };
+
+    const timelines = [];
+    const phaseMap = { 'wh': 'WAREHOUSE', 'main': 'MAIN_EVENT', 'show': 'SHOW_DAY', 'recovery': 'RECOVERY', 'transit': 'TRANSIT' };
+
+    paintedEvents.forEach(ev => {
+        let phaseCode = ev.extendedProps.phaseType;
+        let note = ev.extendedProps.note || '';
+        let sTime = ev.extendedProps.startTime || '';
+        let eTime = ev.extendedProps.endTime || '';
+        let backendType = phaseMap[phaseCode] || phaseCode;
+        if (!backendType) return; 
+        
+        let startD = ev.start;
+        let endD = ev.end ? ev.end : new Date(startD.getTime() + 86400000); 
+        if (endD <= startD) endD = new Date(startD.getTime() + 86400000);
+        
+        let currentD = new Date(startD);
+        while (currentD < endD) {
+            let isoDay = currentD.getFullYear() + "-" + 
+                         String(currentD.getMonth() + 1).padStart(2, '0') + "-" + 
+                         String(currentD.getDate()).padStart(2, '0');
+            timelines.push({ Sub_Event_Type: backendType, Event_Date: isoDay, Start_Time: sTime, End_Time: eTime, Note: note });
+            currentD.setDate(currentD.getDate() + 1);
+        }
+    });
+    
+    google.script.run
+        .withFailureHandler(err => { 
+            clearTimeout(safetyTimer);
+            if (err.message.includes("COLLISION_DETECTED")) {
+                alert("SAVE FAILED: This project was modified by someone else while you were editing. Please close this window, refresh the main dashboard, and re-apply your changes.");
+            } else {
+                alert("Database Error: " + err.message); 
+            }
+            btn.disabled = false; 
+            btn.innerText = "SAVE & SYNC CALENDAR"; 
+        })
+        .withSuccessHandler(res => { 
+            clearTimeout(safetyTimer);
+            btn.disabled = false; 
+            
+            btn.innerText = "SAVED";
+            window.isProjectDirty = false;
+            setTimeout(() => { btn.innerText = "SAVE & SYNC CALENDAR"; }, 2000);
+            
+            if (res && res.toString().startsWith("Error")) { alert(res); return; }
+            
+            let resObj = { id: res };
+            try { if (typeof res === 'string' && res.startsWith('{')) resObj = JSON.parse(res); } catch(e){}
+            
+            let finalId = resObj.id || res;
+
+            if (id === 'NEW' && finalId && finalId !== "Success") {
+                document.getElementById('edit-folder-id').value = finalId;
+                
+                google.script.run
+                    .withFailureHandler(err => console.error("Folder generation failed:", err))
+                    .generateProjectFolders(ACTIVE_USER_NAME, finalId, newT);
+                
+                if (typeof startPresencePing === 'function') startPresencePing(finalId);
+            }
+            
+            if (resObj.timestamp) {
+                document.getElementById('edit-proj-version').value = resObj.timestamp;
+            }
+
+            refreshData(); 
+            
+        }).saveEventFromUI(projectData, timelines, ACTIVE_USER_NAME); 
+}
+
+function openDriveFolder() {
+  const id = document.getElementById('edit-folder-id').value;
+  if(id) window.open('https://drive.google.com/drive/folders/' + id, '_blank');
+}
+
+function toggleTrashMenu() {
+  const menu = document.getElementById('trash-dropdown');
+  if (menu) menu.style.display = (menu.style.display === 'none' || menu.style.display === '') ? 'block' : 'none';
+}
+
+function toggleTypeMenu() {
+  const m = document.getElementById('type-dropdown');
+  m.style.display = (m.style.display === 'none' || m.style.display === '') ? 'block' : 'none';
+  document.getElementById('status-dropdown').style.display = 'none';
+}
+
+function toggleStatusMenu() {
+  const m = document.getElementById('status-dropdown');
+  m.style.display = (m.style.display === 'none' || m.style.display === '') ? 'block' : 'none';
+  document.getElementById('type-dropdown').style.display = 'none';
+}
+
+function setEventType(type) {
+  window.isProjectDirty = true;
+  document.getElementById('edit-proj-type').value = type;
+  document.getElementById('display-event-type').innerText = type.toUpperCase();
+  document.getElementById('type-dropdown').style.display = 'none';
+}
+
+function runSetStatus(status) {
+  const id = document.getElementById('edit-folder-id').value;
+  
+  if(document.getElementById('trash-dropdown')) document.getElementById('trash-dropdown').style.display = 'none';
+  if(document.getElementById('status-dropdown')) document.getElementById('status-dropdown').style.display = 'none';
+  
+  if (!id || id === 'NEW') {
+     document.getElementById('display-event-status').innerText = status.toUpperCase();
+     return;
+  }
+  
+  if (status === 'Trashed' || status === 'Cancelled') {
+      if (!confirm(`Are you sure you want to mark this project as ${status}?`)) return;
+  }
+  
+  document.getElementById('display-event-status').innerText = status.toUpperCase();
+  window.isProjectDirty = true;
+  
+  google.script.run
+      .withFailureHandler(err => alert("Failed to update status: " + err.message))
+      .withSuccessHandler(() => {
+         if (status === 'Trashed') { 
+             window.activeProjectContext = null;
+             closeModals(); 
+             let isList = document.getElementById('desktop-event-list') && document.getElementById('desktop-event-list').style.display === 'flex';
+             if (typeof setDashboardIcon === 'function') setDashboardIcon(isList ? 'list' : 'calendar');
+             refreshData(); 
+         } else { 
+             refreshData(); 
+         }
+      }).setProjectStatus(id, status, ACTIVE_USER_NAME);
+}
+
+function runRestoreProject() {
+  const id = document.getElementById('edit-folder-id').value;
+  if (!id || id === 'NEW') return;
+  if (!confirm(`Restore this project? Overlapping shifts with active projects will be removed.`)) return;
+  
+  document.getElementById('trash-dropdown').style.display = 'none';
+  google.script.run
+      .withFailureHandler(err => alert("Failed to restore project: " + err.message))
+      .withSuccessHandler((res) => {
+         alert(res);
+         closeModals(); refreshData();
+      }).restoreProjectWithConflictCheck(id, ACTIVE_USER_NAME);
+}
+
+function runFullDelete() {
+  const id = document.getElementById('edit-folder-id').value;
+  const title = document.getElementById('edit-orig-title').innerText.replace("Project: ", "");
+  const oldDate = document.getElementById('edit-old-date').value;
+  if (confirm("PERMANENT WARNING: Wipe this project entirely from the database?")) {
+      document.getElementById('trash-dropdown').style.display = 'none';
+      google.script.run
+          .withFailureHandler(err => alert("Failed to delete project: " + err.message))
+          .withSuccessHandler(() => { 
+              window.activeProjectContext = null;
+              closeModals(); 
+              let isList = document.getElementById('desktop-event-list') && document.getElementById('desktop-event-list').style.display === 'flex';
+              if (typeof setDashboardIcon === 'function') setDashboardIcon(isList ? 'list' : 'calendar');
+              refreshData(); 
+          }).deleteProjectFull(id, title, oldDate, ACTIVE_USER_NAME); 
+  }
+}
+
+function openUnscheduledModal(pId, title, fullTitle) {
+    window.isProjectDirty = false;
+    window.activeProjectContext = pId;
+    if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
+    document.getElementById('edit-modal-overlay').style.display = 'flex';
+    document.getElementById('edit-folder-id').value = pId; 
+    document.getElementById('edit-proj-version').value = ''; 
+    document.getElementById('edit-proj-name').value = title; 
+    document.getElementById('edit-orig-title').innerText = "Project: " + fullTitle;
+    if(document.getElementById('trash-dropdown')) document.getElementById('trash-dropdown').style.display = 'none';
+    if(document.getElementById('status-dropdown')) document.getElementById('status-dropdown').style.display = 'none';
+    if(document.getElementById('type-dropdown')) document.getElementById('type-dropdown').style.display = 'none';
+    
+    let isOutdoor = false;
+    if (typeof calendar !== 'undefined' && calendar) {
+        let ev = calendar.getEventById(pId);
+        if (ev && ev.extendedProps && ev.extendedProps.rawDbData && ev.extendedProps.rawDbData.readinessState) {
+            window.currentReadinessState = ev.extendedProps.rawDbData.readinessState;
+            let cState = window.currentReadinessState;
+            if (cState.isOutdoor) isOutdoor = true;
+            if (cState.coords) { document.getElementById('edit-proj-lat').value = cState.coords.lat; document.getElementById('edit-proj-lng').value = cState.coords.lng; }
+        }
+    }
+    document.getElementById('edit-proj-outdoor').checked = isOutdoor;
+    if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
+    
+    let cState = window.currentReadinessState || {};
+    document.getElementById('edit-proj-in-sofia').checked = cState.inSofia !== false;
+    document.getElementById('edit-proj-distance').value = cState.distanceKm || "";
+    if(typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();
+    
+    document.getElementById('display-event-status').innerText = 'DRAFT';
+    document.getElementById('edit-proj-type').value = 'Event';
+    document.getElementById('display-event-type').innerText = 'EVENT';
+    if(document.getElementById('edit-proj-client')) document.getElementById('edit-proj-client').value = '';
+    if(document.getElementById('edit-proj-location')) document.getElementById('edit-proj-location').value = '';
+    
+    document.getElementById('restore-project-btn').style.display = 'block';
+    
+    let todayStr = new Date().toISOString().split('T')[0];
+    bootMiniCalendar(todayStr, pId);
+    if (typeof startPresencePing === 'function') startPresencePing(pId);
+    if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
+}
+
+window.cancelProjectEditor = function() {
+    if (window.isProjectDirty) {
+        if (!confirm("⚠️ You have unsaved event changes. Are you sure you want to discard them and leave?")) {
+            return false;
+        }
+    }
+    window.isProjectDirty = false;
+    window.activeProjectContext = null;
+    
+    document.getElementById('edit-folder-id').value = '';
+    document.getElementById('edit-proj-version').value = '';
+    if (typeof stopPresencePing === 'function') stopPresencePing();
+    window.activePresenceModule = 'main';
+    
+    document.getElementById('edit-modal-overlay').style.display = 'none';
+    
+    if (typeof setDashboardIcon === 'function') {
+        let isList = document.getElementById('desktop-event-list') && document.getElementById('desktop-event-list').style.display === 'flex';
+        setDashboardIcon(isList ? 'list' : 'calendar');
+    }
+    return true;
+};
+
+function closeModals() { 
+    if (window.currentOperationType) {
+        alert("⚠️ Please PAUSE the active operation before navigating away.");
+        return false;
+    }
+
+    document.querySelectorAll('.modal-overlay').forEach(m => { 
+        if (m.id !== 'backup-modal-overlay' && m.id !== 'task-modal-overlay' && m.id !== 'task-crew-modal-overlay') {
+            m.style.display='none'; 
+        }
+    }); 
+    
+    ['shift-layer', 'master-settings-overlay', 'manager-settings-overlay', 'month-roster-layer', 'availability-modal-overlay', 'audit-studio-overlay', 'crew-manager-modal', 'financials-hub-overlay'].forEach(id => {
+        let el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+    
+    if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-dashboard');
+    
+    return true;
+}
+
+function sendManualCrewEmailUI() {
+  const folderId = document.getElementById('edit-folder-id').value;
+  const title = document.getElementById('edit-orig-title').innerText.replace("Project: ", "");
+  const startDate = document.getElementById('edit-proj-date').value;
+  const endDate = document.getElementById('edit-proj-end-date').value;
+  const whDate = document.getElementById('edit-proj-wh-date').value;
+  const wh2Date = document.getElementById('edit-proj-wh2-date').value;
+  const tidyDate = document.getElementById('edit-proj-recovery-date').value;
+
+  if(!folderId) return alert("Please save the project first.");
+  
+  const btn = document.getElementById('manual-crew-email-btn');
+  const origText = btn.innerText;
+  btn.innerText = "SENDING...";
+  btn.disabled = true;
+
+  google.script.run
+      .withFailureHandler(err => {
+          btn.innerText = "ERROR";
+          alert(err.message);
+          setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
+      })
+      .withSuccessHandler(res => {
+          if(res === "Success") {
+              btn.innerText = "SENT";
+          } else {
+              btn.innerText = "ERROR";
+              alert(res);
+          }
+          setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
+      }).triggerManualCrewEmail(folderId, title, startDate, endDate, whDate, wh2Date, tidyDate, ACTIVE_USER_NAME);
+}
+</script>

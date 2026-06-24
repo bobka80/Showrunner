@@ -1,0 +1,431 @@
+<script>
+/**
+ * 06b4_Admin_Assets_QR.html
+ * Domain: QR Print Studio.
+ */
+
+let qrZoomObj = { zoom: 1, panX: 0, panY: 0, isPanning: false, startX: 0, startY: 0 };
+let qrZoomAttached = false;
+
+// @INDEX: QR_STUDIO -> QR Print Generator
+window.openQRStudio = function() {
+    if (selectedAssetIds.size === 0) return alert("Select assets to print first.");
+
+    // 1. Evaluate selection and autonomously expand Logical Parents
+    let baseAssets = globalAssets.filter(a => selectedAssetIds.has(a.id));
+    window.qrMasterCases = baseAssets.filter(a => a.nestingLevel == 3 || a.nestingLevel == 4 || a.nestingLevel == 5 || a.type === 'Container');
+    
+    // Do not print small QR stickers for Master Cases/Kits that are getting an A6 Case Card
+    let labelSet = new Set(baseAssets.filter(function(a) { return !(a.nestingLevel == 3 || a.nestingLevel == 4 || a.nestingLevel == 5 || a.type === 'Container'); }));
+    window.qrMasterCases.forEach(c => {
+        // Matryoshka Expansion: Find all children inside this case and add them to the label queue
+        if (c.isFixedRack === true || c.isFixedRack === 'true') {
+            globalAssets.filter(a => a.containerType === c.id).forEach(child => labelSet.add(child));
+        }
+    });
+    
+    window.qrLabelAssets = Array.from(labelSet).sort((a,b) => a.name.localeCompare(b.name));
+
+    let grouped = {};
+
+    window.qrLabelAssets.forEach(a => {
+        if (!grouped[a.name]) grouped[a.name] = 0;
+        grouped[a.name]++;
+    });
+
+    let aliasHtml = '';
+    Object.keys(grouped).sort().forEach(name => {
+        let count = grouped[name];
+        let safeName = name.replace(/"/g, '&quot;');
+            aliasHtml += '<div style="display:flex; flex-direction:column; gap:6px; background:#1a1a1e; padding:12px; border-radius:6px; border:1px solid #333;">' +
+                '<div style="display:flex; justify-content:space-between; align-items:center;">' +
+                    '<span style="color:#a1a1aa; font-size:12px; font-weight:bold;">' + name + '</span>' +
+                    '<span style="color:#10b981; font-size:10px; font-weight:bold; background:rgba(16,185,129,0.1); padding:2px 8px; border-radius:10px;">' + count + ' Units</span>' +
+                '</div>' +
+                '<input type="text" class="qr-alias-input" data-originalname="' + safeName + '" value="' + safeName + '" oninput="updateQRPreview()" placeholder="Short printed name..." style="width:100%; padding:10px; background:#111; color:#fff; border:1px solid #444; border-radius:4px; font-size:13px; box-sizing:border-box;">' +
+            '</div>';
+    });
+
+    document.getElementById('qr-alias-list').innerHTML = aliasHtml;
+    document.getElementById('qr-studio-modal').style.display = 'flex';
+    
+    if (!qrZoomAttached) {
+        if (typeof attachZoomPan === 'function') {
+            attachZoomPan('#qr-preview-container', '#qr-preview-wrapper', qrZoomObj);
+        }
+        qrZoomAttached = true;
+    }
+    
+    setTimeout(updateQRPreview, 50);
+    setTimeout(scaleQRPreview, 100);
+    window.addEventListener('resize', scaleQRPreview);
+}
+
+window.closeQRStudio = function() {
+    document.getElementById('qr-studio-modal').style.display = 'none';
+    window.removeEventListener('resize', scaleQRPreview);
+}
+
+// @INDEX: QR_STUDIO -> Live Preview Engine
+window.updateQRPreview = function() {
+    let pageSize = document.getElementById('qr-page-size').value;
+    let orient = document.getElementById('qr-page-orient').value;
+    let cols = parseInt(document.getElementById('qr-cols').value, 10) || 5;
+    let rows = parseInt(document.getElementById('qr-rows').value, 10) || 8;
+    let qrSize = parseInt(document.getElementById('qr-size-mm').value, 10) || 25;
+    let fontSize = parseInt(document.getElementById('qr-font-px').value, 10) || 10;
+    let labelW = parseInt(document.getElementById('qr-label-w').value, 10) || 35;
+    let labelH = parseInt(document.getElementById('qr-label-h').value, 10) || 35;
+    let textPos = document.getElementById('qr-text-pos').value;
+    let manifestFormat = document.getElementById('qr-manifest-format') ? document.getElementById('qr-manifest-format').value : 'A7';
+
+    let wStr = '210mm', hStr = '297mm';
+    if (pageSize === 'A3') { wStr = '297mm'; hStr = '420mm'; }
+    if (orient === 'landscape') { let temp = wStr; wStr = hStr; hStr = temp; }
+
+    let aliases = {};
+    document.querySelectorAll('.qr-alias-input').forEach(inp => {
+        aliases[inp.dataset.originalname] = inp.value.trim();
+    });
+
+    let wrapper = document.getElementById('qr-preview-wrapper');
+    let html = '';
+    let itemsPerPage = cols * rows;
+    let pagesCount = Math.ceil(window.qrLabelAssets.length / itemsPerPage);
+    
+    let caseMsg = window.qrMasterCases.length > 0 
+        ? '<br><br><span style="color:#10b981; font-size:14px; font-weight:900;">✅ ' + window.qrMasterCases.length + ' Case Manifest(s) (' + manifestFormat + ' Format) generated!</span>' 
+        : '';
+    document.getElementById('qr-preview-info').innerHTML = '<span style="color:#a1a1aa;">Previewing First Pages... (' + window.qrLabelAssets.length + ' total stickers)</span>' + caseMsg;
+
+    if (window.qrMasterCases.length > 0) {
+        let isA7 = manifestFormat === 'A7';
+        let mCols = 2;
+        let mRows = isA7 ? 4 : 2;
+        let cardsPerPage = mCols * mRows;
+        
+        html += '<div style="width:' + wStr + '; height:' + hStr + '; background:#fff; margin-bottom: 20px; box-shadow:0 10px 30px rgba(0,0,0,0.8); display:grid; grid-template-columns: repeat(' + mCols + ', 1fr); grid-template-rows: repeat(' + mRows + ', 1fr); gap: 5mm; padding: 5mm; box-sizing: border-box;">';
+        
+        for (let i = 0; i < cardsPerPage; i++) {
+            if (i < window.qrMasterCases.length) {
+                let caseObj = window.qrMasterCases[i];
+                    let printName = (aliases[caseObj.name] || caseObj.name) + (caseObj.unitNumber ? ' #' + caseObj.unitNumber : '');
+                let titleSize = isA7 ? '12px' : '14px';
+                let qrImgSize = isA7 ? '18mm' : '22mm';
+                let cardPad = isA7 ? '4mm' : '6mm';
+                let fSize = isA7 ? '10px' : '12px';
+                let pSize = isA7 ? '2px 0' : '4px 0';
+                
+                let children = globalAssets.filter(a => a.containerType === caseObj.id);
+                let isFixed = (caseObj.isFixedRack === true || caseObj.isFixedRack === 'true');
+                
+                let componentsList = [];
+                if (caseObj.components && caseObj.components.trim() !== '') {
+                    componentsList = caseObj.components.split(',').map(c => {
+                        let text = c.trim();
+                        if (!text) return null;
+                        let match = text.match(/^(\d+)x\s+(.*)$/i);
+                        if (match) return { qty: parseInt(match[1], 10), name: match[2].trim() };
+                        return { qty: 1, name: text };
+                    }).filter(c => c);
+                }
+
+                let childGroups = {};
+                children.forEach(child => {
+                    let n = child.name.trim();
+                    let nLow = n.toLowerCase();
+                    if (!childGroups[nLow]) childGroups[nLow] = { qty: 0, name: n, units: [], isTracked: true };
+                    childGroups[nLow].qty += (child.type === 'Bulk' ? (parseInt(child.totalQuantity, 10) || 1) : 1);
+                    if (child.unitNumber && isFixed) childGroups[nLow].units.push(child.unitNumber);
+                });
+
+                let allComps = Object.values(childGroups);
+                let trackedNames = new Set(Object.keys(childGroups));
+
+                componentsList.forEach(c => {
+                    let nLow = c.name.toLowerCase();
+                    if (!trackedNames.has(nLow)) {
+                        let isTrackedGlobal = globalAssets.some(ga => String(ga.name||'').toLowerCase().trim() === nLow);
+                        allComps.push({ name: c.name, qty: c.qty, units: [], isTracked: isTrackedGlobal });
+                    }
+                });
+
+                let listHtml = '';
+                if (allComps.length === 0) {
+                    listHtml = '<div style="padding: ' + pSize + '; border-bottom: 1px solid #eee; font-size: ' + fSize + '; font-family: monospace; color:#000;"><i>Empty Case.</i></div>';
+                } else {
+                    allComps.sort((a, b) => {
+                        if (a.isTracked && !b.isTracked) return -1;
+                        if (!a.isTracked && b.isTracked) return 1;
+                        return String(a.name || '').localeCompare(String(b.name || ''));
+                    });
+                    listHtml = allComps.map(c => {
+                        let safeName = typeof escapeHTML === 'function' ? escapeHTML(c.name) : c.name;
+                        let unitStr = (c.units && c.units.length > 0) ? ' <span style="color:#666; font-size:10px;">(#' + c.units.join(', #') + ')</span>' : '';
+                        return '<div style="padding: ' + pSize + '; border-bottom: 1px solid #eee; font-size: ' + fSize + '; font-family: monospace; color:#000;">▢ ' + c.qty + 'x ' + safeName + unitStr + '</div>';
+                    }).join('');
+                }
+                let deptCol = typeof getDeptObj === 'function' ? (getDeptObj(caseObj.department).color || '#aaa') : '#aaa';
+                html += '<div style="border: 1px dashed #aaa; padding: ' + cardPad + '; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; width: 100%; height: 100%; border-radius: 4px;">' +
+                    '<div style="display:flex; justify-content:space-between; align-items:stretch; border-bottom:2px solid #000; padding-bottom:3mm; margin-bottom:3mm;">' +
+                        '<div style="flex:1; padding-right:2mm; overflow:hidden; display:flex; flex-direction:column;">' +
+                            '<div style="font-size:' + titleSize + '; font-weight:bold; font-family:sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#000; margin-bottom:4px;">' + printName + '</div>' +
+                            '<div style="width: 100%; flex:1; background-color: ' + deptCol + '; border: 1px solid #000; box-sizing:border-box;"></div>' +
+                        '</div>' +
+                        '<div style="width:' + qrImgSize + '; height:' + qrImgSize + '; background:#000; flex-shrink:0;"></div>' +
+                    '</div>' +
+                    '<div style="font-size:10px; font-family:sans-serif; flex:1; overflow-y:hidden;">' +
+                        '<div style="font-weight:bold; margin-bottom:2mm; font-size:9px; text-transform:uppercase; color:#888;">Contents Manifest</div>' +
+                        listHtml +
+                    '</div>' +
+                '</div>';
+            } else {
+                html += '<div></div>';
+            }
+        }
+        html += '</div>';
+    }
+
+    if (window.qrLabelAssets.length > 0) {
+        html += '<div style="width:' + wStr + '; height:' + hStr + '; background:#fff; margin-bottom: 20px; box-shadow:0 10px 30px rgba(0,0,0,0.8); display:grid; grid-template-columns: repeat(' + cols + ', 1fr); grid-template-rows: repeat(' + rows + ', 1fr); justify-items: center; align-items: center; padding: 5mm; box-sizing: border-box;">';
+        for (let i = 0; i < itemsPerPage; i++) {
+            if (i < window.qrLabelAssets.length) {
+                let a = window.qrLabelAssets[i];
+                let printName = aliases[a.name] || a.name;
+                let text = printName + (a.unitNumber ? ' #' + a.unitNumber : '');
+                let dir = textPos === 'top' ? 'column-reverse' : 'column';
+                let mt = textPos === 'bottom' ? '3mm' : '0';
+                let mb = textPos === 'top' ? '3mm' : '0';
+                let txtDisplay = textPos === 'none' ? 'none' : 'block';
+                let deptCol = typeof getDeptObj === 'function' ? (getDeptObj(a.department).color || '#ccc') : '#ccc';
+                html += '<div style="width:' + labelW + 'mm; height:' + labelH + 'mm; display:flex; flex-direction:' + dir + '; align-items:center; justify-content:center; border:1px dashed #ccc; border-top: 4px solid ' + deptCol + '; padding:2mm; box-sizing:border-box; overflow:hidden;"><div style="width:' + qrSize + 'mm; height:' + qrSize + 'mm; background:#000; flex-shrink:0;"></div><div style="font-size:' + fontSize + 'px; font-family:sans-serif; font-weight:bold; color:#000; text-align:center; margin-top:' + mt + '; margin-bottom:' + mb + '; display:' + txtDisplay + '; width:100%; word-break:break-word; line-height:1.1;">' + text + '</div></div>';
+            } else {
+                html += '<div style="border:1px dashed transparent;"></div>';
+            }
+        }
+        html += '</div>';
+    }
+    wrapper.innerHTML = html;
+}
+
+window.scaleQRPreview = function() {
+    let wrapper = document.getElementById('qr-preview-wrapper');
+    let container = document.getElementById('qr-preview-container');
+    if (!wrapper || !container || wrapper.children.length === 0) return;
+    
+    let page = wrapper.children[0];
+    
+    let pW = page.offsetWidth; let pH = page.offsetHeight;
+    let cW = container.clientWidth; let cH = container.clientHeight;
+    
+    if (pW > 0 && pH > 0 && cW > 0 && cH > 0) {
+        let scale = Math.min((cW - 40) / pW, (cH - 40) / pH);
+        scale = Math.min(Math.max(0.05, scale), 5); 
+        
+        qrZoomObj.zoom = scale;
+        qrZoomObj.panX = (cW / 2) - ((pW * scale) / 2);
+        qrZoomObj.panY = 20;
+        
+        wrapper.style.transform = `translate(${qrZoomObj.panX}px, ${qrZoomObj.panY}px) scale(${qrZoomObj.zoom})`;
+    }
+}
+
+window.executeQRPrint = function() {
+    let pageSize = document.getElementById('qr-page-size').value;
+    let orient = document.getElementById('qr-page-orient').value;
+    let cols = parseInt(document.getElementById('qr-cols').value, 10) || 5;
+    let rows = parseInt(document.getElementById('qr-rows').value, 10) || 8;
+    let qrSize = parseInt(document.getElementById('qr-size-mm').value, 10) || 25;
+    let fontSize = parseInt(document.getElementById('qr-font-px').value, 10) || 10;
+    let labelW = parseInt(document.getElementById('qr-label-w').value, 10) || 35;
+    let labelH = parseInt(document.getElementById('qr-label-h').value, 10) || 35;
+    let textPos = document.getElementById('qr-text-pos').value;
+    let manifestFormat = document.getElementById('qr-manifest-format') ? document.getElementById('qr-manifest-format').value : 'A7';
+
+    let aliases = {};
+    document.querySelectorAll('.qr-alias-input').forEach(inp => {
+        aliases[inp.dataset.originalname] = inp.value.trim();
+    });
+    
+    let isA7 = manifestFormat === 'A7';
+    let mCols = 2;
+    let mRows = isA7 ? 4 : 2;
+    let cardsPerPage = mCols * mRows;
+
+    // @INDEX: QR_STUDIO -> Smart Document Title Generator
+    // --- SMART DOCUMENT TITLE GENERATOR ---
+    let nameGroups = {};
+    let allPrintItems = [...(window.qrMasterCases || []), ...(window.qrLabelAssets || [])];
+    allPrintItems.forEach(a => {
+        let name = aliases[a.name] || a.name;
+        if (!nameGroups[name]) nameGroups[name] = [];
+        if (a.unitNumber) {
+            let num = parseInt(a.unitNumber, 10);
+            if (!isNaN(num)) nameGroups[name].push(num);
+        }
+    });
+
+    let titleParts = [];
+    Object.keys(nameGroups).forEach(name => {
+        let units = nameGroups[name];
+        if (units.length > 1) {
+            let min = Math.min(...units);
+            let max = Math.max(...units);
+            titleParts.push(`${name} ${min} to ${max}`);
+        } else if (units.length === 1) {
+            titleParts.push(`${name} ${units[0]}`);
+        } else {
+            titleParts.push(name);
+        }
+    });
+
+    let docTitle = "QR Labels";
+    if (titleParts.length === 1) {
+        docTitle = titleParts[0];
+    } else if (titleParts.length > 1) {
+        let joined = titleParts.join(' and ');
+        if (joined.length > 60) {
+            docTitle = `${titleParts[0]} and ${titleParts.length - 1} more`;
+        } else {
+            docTitle = joined;
+        }
+    }
+    docTitle = "QR_" + docTitle.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
+
+    let html = '<html><head><title>' + docTitle + '</title><style>' +
+        '@page { size: ' + pageSize + ' ' + orient + '; margin: 5mm; }' +
+        'body { margin: 0; padding: 0; font-family: sans-serif; box-sizing: border-box; background: #fff; }' +
+        '.page { display: grid; grid-template-columns: repeat(' + cols + ', 1fr); grid-template-rows: repeat(' + rows + ', 1fr); justify-items: center; align-items: center; width: 100vw; height: 100vh; page-break-after: always; box-sizing: border-box; padding: 5mm; }' +
+        '.label { width: ' + labelW + 'mm; height: ' + labelH + 'mm; display: flex; flex-direction: ' + (textPos === 'top' ? 'column-reverse' : 'column') + '; align-items: center; justify-content: center; box-sizing: border-box; padding: 2mm; border: 1px dashed #ccc; overflow: hidden; }' +
+        '.qr-img { width: ' + qrSize + 'mm; height: ' + qrSize + 'mm; object-fit: contain; flex-shrink:0; }' +
+        '.label-text { font-size: ' + fontSize + 'px; font-weight: bold; text-align: center; margin-top: ' + (textPos === 'bottom' ? '3mm' : '0') + '; margin-bottom: ' + (textPos === 'top' ? '3mm' : '0') + '; display: ' + (textPos === 'none' ? 'none' : 'block') + '; width: 100%; word-break: break-word; line-height: 1.1; color: #000; }' +
+        '.a4-page-manifest { width: 210mm; height: 297mm; display: grid; grid-template-columns: repeat(' + mCols + ', 1fr); grid-template-rows: repeat(' + mRows + ', 1fr); page-break-after: always; box-sizing: border-box; padding: 5mm; gap: 5mm; background: #fff; }' +
+        '.manifest-card { border: 1px dashed #aaa; padding: ' + (isA7 ? '4mm' : '6mm') + '; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; width: 100%; height: 100%; border-radius: 4px; }' +
+    '</style></head><body>';
+
+    // --- 1. PROCESS CASE MANIFESTS ---
+    if (window.qrMasterCases.length > 0) {
+        let manifestPages = Math.ceil(window.qrMasterCases.length / cardsPerPage);
+        for (let p = 0; p < manifestPages; p++) {
+            html += '<div class="a4-page-manifest">';
+            for (let i = 0; i < cardsPerPage; i++) {
+                let cIdx = (p * cardsPerPage) + i;
+                if (cIdx < window.qrMasterCases.length) {
+                    let caseObj = window.qrMasterCases[cIdx];
+                    let printName = (aliases[caseObj.name] || caseObj.name) + (caseObj.unitNumber ? ' #' + caseObj.unitNumber : '');
+                    let qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(caseObj.id);
+                    
+                    let contentsHtml = '';
+                    let children = globalAssets.filter(a => a.containerType === caseObj.id);
+                    
+                    let isFixed = (caseObj.isFixedRack === true || caseObj.isFixedRack === 'true');
+                    
+                    let componentsList = [];
+                    if (caseObj.components && caseObj.components.trim() !== '') {
+                        componentsList = caseObj.components.split(',').map(c => {
+                            let text = c.trim();
+                            if (!text) return null;
+                            let match = text.match(/^(\d+)x\s+(.*)$/i);
+                            if (match) return { qty: parseInt(match[1], 10), name: match[2].trim() };
+                            return { qty: 1, name: text };
+                        }).filter(c => c);
+                    }
+
+                    let childGroups = {};
+                    children.forEach(child => {
+                        let n = child.name.trim();
+                        let nLow = n.toLowerCase();
+                        if (!childGroups[nLow]) childGroups[nLow] = { qty: 0, name: n, units: [], isTracked: true };
+                        childGroups[nLow].qty += (child.type === 'Bulk' ? (parseInt(child.totalQuantity, 10) || 1) : 1);
+                        if (child.unitNumber && isFixed) childGroups[nLow].units.push(child.unitNumber);
+                    });
+
+                    let allComps = Object.values(childGroups);
+                    let trackedNames = new Set(Object.keys(childGroups));
+
+                    componentsList.forEach(c => {
+                        let nLow = c.name.toLowerCase();
+                        if (!trackedNames.has(nLow)) {
+                            let isTrackedGlobal = globalAssets.some(ga => String(ga.name||'').toLowerCase().trim() === nLow);
+                            allComps.push({ name: c.name, qty: c.qty, units: [], isTracked: isTrackedGlobal });
+                        }
+                    });
+
+                    contentsHtml = '';
+                    if (allComps.length === 0) {
+                        contentsHtml = '<i>Empty Case.</i>';
+                    } else {
+                        allComps.sort((a, b) => {
+                            if (a.isTracked && !b.isTracked) return -1;
+                            if (!a.isTracked && b.isTracked) return 1;
+                            return String(a.name || '').localeCompare(String(b.name || ''));
+                        });
+                        contentsHtml = allComps.map(c => {
+                            let safeName = typeof escapeHTML === 'function' ? escapeHTML(c.name) : c.name;
+                            let unitStr = (c.units && c.units.length > 0) ? ' <span style="color:#666; font-size:10px;">(#' + c.units.join(', #') + ')</span>' : '';
+                            let fSize = isA7 ? '10px' : '12px';
+                            let pSize = isA7 ? '2px 0' : '4px 0';
+                            return '<div style="padding: ' + pSize + '; border-bottom: 1px solid #eee; font-size: ' + fSize + '; font-family: monospace;">▢ ' + c.qty + 'x ' + safeName + unitStr + '</div>';
+                        }).join('');
+                    }
+
+                    let titleSize = isA7 ? '12px' : '14px';
+                    let qrImgSize = isA7 ? '18mm' : '22mm';
+                    let deptCol = typeof getDeptObj === 'function' ? (getDeptObj(caseObj.department).color || '#aaa') : '#aaa';
+                    html += '<div class="manifest-card">' +
+                        '<div style="display:flex; justify-content:space-between; align-items:stretch; border-bottom:2px solid #000; padding-bottom:3mm; margin-bottom:3mm;">' +
+                            '<div style="flex:1; padding-right:2mm; overflow:hidden; display:flex; flex-direction:column;">' +
+                                '<div style="font-size:' + titleSize + '; font-weight:bold; font-family:sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#000; margin-bottom:4px;">' + printName + '</div>' +
+                                '<div style="width: 100%; flex:1; background-color: ' + deptCol + '; border: 1px solid #000; box-sizing:border-box;"></div>' +
+                            '</div>' +
+                            '<img src="' + qrUrl + '" style="width:' + qrImgSize + '; height:' + qrImgSize + '; flex-shrink:0;" onload="window.printCheck()" onerror="window.printCheck()">' +
+                        '</div>' +
+                        '<div style="font-size:10px; font-family:sans-serif; flex:1; overflow-y:hidden;">' +
+                            '<div style="font-weight:bold; margin-bottom:2mm; font-size:9px; text-transform:uppercase; color:#888;">Contents Manifest</div>' +
+                            contentsHtml +
+                        '</div>' +
+                    '</div>';
+                } else {
+                    html += '<div></div>';
+                }
+            }
+            html += '</div>';
+        }
+    }
+
+    // --- 2. PROCESS QR LABELS (STICKERS) ---
+    let itemsPerPage = cols * rows;
+    let pagesCount = Math.ceil(window.qrLabelAssets.length / itemsPerPage);
+
+    for (let p = 0; p < pagesCount; p++) {
+        html += '<div class="page">';
+        for (let i = 0; i < itemsPerPage; i++) {
+            let assetIndex = (p * itemsPerPage) + i;
+            if (assetIndex < window.qrLabelAssets.length) {
+                let a = window.qrLabelAssets[assetIndex];
+                let printName = aliases[a.name] || a.name;
+                let text = printName + (a.unitNumber ? ' #' + a.unitNumber : '');
+                let qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&margin=0&data=' + encodeURIComponent(a.id);
+                let deptCol = typeof getDeptObj === 'function' ? (getDeptObj(a.department).color || '#ccc') : '#ccc';
+                html += '<div class="label" style="border-top: 4px solid ' + deptCol + '"><img class="qr-img" src="' + qrUrl + '" onload="window.printCheck()" onerror="window.printCheck()"><div class="label-text">' + text + '</div></div>';
+            } else {
+                html += '<div class="label" style="border-color: transparent;"></div>';
+            }
+        }
+        html += '</div>';
+    }
+
+    html += '</body></html>';
+    
+    let printWin = window.open('', '_blank');
+    printWin.document.open();
+    printWin.document.write(html);
+    
+    let totalItemsToLoad = window.qrLabelAssets.length + window.qrMasterCases.length;
+    let scriptEl = printWin.document.createElement('script');
+    scriptEl.innerHTML = "let loadedCount = 0; let total = " + totalItemsToLoad + "; window.printCheck = function() { loadedCount++; if (loadedCount >= total) { setTimeout(() => { window.print(); }, 500); } };";
+    printWin.document.body.appendChild(scriptEl);
+    
+    printWin.document.close();
+}
+</script>

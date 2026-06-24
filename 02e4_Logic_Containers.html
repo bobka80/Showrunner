@@ -1,0 +1,384 @@
+<script>
+/**
+ * 02e4_Logic_Containers.html
+ * Domain: The Matryoshka Packing Engine and Auto-Containerization.
+ */
+
+// ==========================================
+// 🏗️ ARCHITECTURAL WARNING: SOFT ALLOCATION & MATRYOSHKA PROTOCOL
+// ==========================================
+// 1. SOFT ALLOCATION: Phantom auto-containers and packed items in this UI 
+//    must remain generic. Physical Case UIDs are NOT locked in until RFID checkout.
+// 2. TOP-DOWN vs BOTTOM-UP: The UI packs "Top-Down". The Relational Database ALWAYS links "Bottom-Up".
+
+window.addPackingContainer = function() {
+    let cases = globalAssets.filter(a => a.nestingLevel == 3 || a.nestingLevel == 4 || a.type === 'Container');
+    if (cases.length === 0) return alert("No cases found in Vault. Provision a Case first.");
+    let cName = prompt("Simulate Scanner: Enter the name or ID of the Case/Trunk to add:");
+    if (!cName) return;
+    let match = typeof fuzzyMatchAsset === 'function' ? fuzzyMatchAsset([], cName) : null;
+    if (!match) return alert("Case not found.");
+    window.activeContainerTarget = match.id;
+    addPa(match.id, 1);
+};
+
+window.backupContainerState = null;
+
+window.setVaultContainerTarget = function(assetId) {
+    let asset = globalAssets.find(a => a.id === assetId);
+    if (!asset) return;
+    
+    window.backupContainerState = JSON.parse(JSON.stringify(currentProjectAssets));
+    
+    let match = currentProjectAssets.find(pa => pa.assetId === assetId && pa.formula === "Standalone" && !pa.containerUid);
+    if (!match) {
+        currentProjectAssets.push({
+            assetId: assetId, qty: 1, formula: "Standalone", location: "General", containerUid: "",
+            creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+        });
+    }
+    window.activeContainerTarget = assetId;
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+};
+
+window.setContainerTarget = function(cid) {
+    window.backupContainerState = JSON.parse(JSON.stringify(currentProjectAssets));
+    window.activeContainerTarget = cid;
+    renderProjectAssetsUI();
+};
+
+window.renameContainerTarget = function(cid, newName) {
+    newName = newName.trim();
+    if (!newName) return;
+    
+    let baseAssetId = cid.includes('|||') ? cid.split('|||')[0] : cid;
+    let oldForm = cid.includes('|||') ? cid.split('|||')[1] : "Standalone";
+    
+    let containerPa = currentProjectAssets.find(pa => pa.assetId === baseAssetId && (pa.formula || "Standalone") === oldForm);
+    
+    if (containerPa) {
+        let finalName = newName;
+        if (containerPa.isAuto && !finalName.includes('[AUTO]')) {
+            finalName += ' [AUTO]';
+        }
+        
+        if (containerPa.formula !== finalName) {
+            containerPa.formula = finalName;
+            
+            let newCid = (containerPa.formula && containerPa.formula !== 'Standalone') ? (baseAssetId + "|||" + finalName) : baseAssetId;
+            if (newCid !== cid) {
+                currentProjectAssets.forEach(pa => {
+                    if (pa.containerUid === cid) pa.containerUid = newCid;
+                });
+                if (window.activeContainerTarget === cid) window.activeContainerTarget = newCid;
+            }
+        }
+    }
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+};
+
+window.clearContainerTarget = function() {
+    window.activeContainerTarget = null;
+    window.backupContainerState = null;
+    renderProjectAssetsUI();
+};
+
+window.cancelContainerPacking = function() {
+    if (window.backupContainerState) {
+        currentProjectAssets = JSON.parse(JSON.stringify(window.backupContainerState));
+    }
+    window.activeContainerTarget = null;
+    window.backupContainerState = null;
+    renderProjectAssetsUI();
+};
+
+// @INDEX: PA_LOGIC -> Item Packing & Unpacking
+window.packItem = function(paIndex, containerUid, requestedQty) {
+    let pa = currentProjectAssets[paIndex];
+    if (!pa) return;
+    if (pa.assetId === containerUid) return alert("Cannot pack a container inside itself!");
+    
+    let qtyToPack = parseInt(requestedQty, 10) || pa.qty;
+    if (qtyToPack <= 0 || qtyToPack > pa.qty) return alert("Invalid quantity");
+    
+    if (qtyToPack == pa.qty) {
+        pa.containerUid = containerUid;
+        pa.isExplicitlyUnpacked = false;
+    } else { 
+        pa.qty = pa.qty - qtyToPack; let clone = JSON.parse(JSON.stringify(pa)); clone.qty = qtyToPack; clone.containerUid = containerUid; clone.isExplicitlyUnpacked = false; clone.scannedQty = 0; currentProjectAssets.push(clone); 
+    }
+    mergeLooseItems(); 
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+};
+
+window.unpackItem = function(paIndex, requestedQty) {
+    let pa = currentProjectAssets[paIndex];
+    if (!pa) return;
+    let qtyToUnpack = parseInt(requestedQty, 10) || pa.qty;
+    if (qtyToUnpack <= 0 || qtyToUnpack > pa.qty) return alert("Invalid quantity");
+    if (qtyToUnpack == pa.qty) {
+        pa.containerUid = "";
+        pa.isExplicitlyUnpacked = true;
+    } else { 
+        pa.qty = pa.qty - qtyToUnpack; let clone = JSON.parse(JSON.stringify(pa)); clone.qty = qtyToUnpack; clone.containerUid = ""; clone.isExplicitlyUnpacked = true; clone.scannedQty = 0; currentProjectAssets.push(clone); 
+    }
+    mergeLooseItems(); 
+    if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    renderProjectAssetsUI();
+};
+
+function mergeLooseItems() {
+    let merged = [];
+    currentProjectAssets.forEach(pa => {
+        let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
+        let isBulk = asset && asset.type === 'Bulk';
+        
+        if ((window.currentPaMode === 'packing' || window.currentPaMode === 'operation') && !isBulk) {
+            merged.push(pa);
+        } else {
+            let existing = merged.find(m => m.assetId === pa.assetId && m.location === pa.location && m.formula === pa.formula && (m.containerUid||"") === (pa.containerUid||"") && m.isAuto === pa.isAuto && m.isShortage === pa.isShortage && m.isExplicitlyUnpacked === pa.isExplicitlyUnpacked);
+            if (existing) existing.qty = parseInt(existing.qty, 10) + parseInt(pa.qty, 10);
+            else merged.push(pa);
+        }
+    });
+    currentProjectAssets = merged;
+}
+
+window.toggleAutoPack = function() {
+    let hasGenericAutoPack = false;
+    currentProjectAssets.forEach(pa => {
+        if (pa.isGenericAuto) hasGenericAutoPack = true;
+    });
+
+    if (hasGenericAutoPack) {
+        if (typeof revertAutoPack === 'function') revertAutoPack(true);
+    } else {
+        if (typeof autoProvisionCableCases === 'function') autoProvisionCableCases();
+    }
+    updateAutoPackButtonState();
+};
+
+window.updateAutoPackButtonState = function() {
+    let hasGenericAutoPack = false;
+    if (typeof currentProjectAssets !== 'undefined') currentProjectAssets.forEach(pa => { if (pa.isGenericAuto) hasGenericAutoPack = true; });
+    
+    const svgIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; transform:translateY(1px);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>`;
+    
+    let btn = document.getElementById('btn-auto-add-cases');
+    if (btn) {
+        if (hasGenericAutoPack) {
+            btn.style.setProperty('background', 'rgba(168, 85, 247, 0.2)', 'important');
+            btn.innerHTML = `${svgIcon}UNPACK ALL`;
+        } else {
+            btn.style.setProperty('background', 'transparent', 'important');
+            btn.innerHTML = `${svgIcon}AUTO PACK`;
+        }
+    }
+    let logisticsBtn = document.getElementById('logistics-out-autopack-btn');
+    if (logisticsBtn) {
+        if (hasGenericAutoPack) {
+            logisticsBtn.style.setProperty('background', 'rgba(168, 85, 247, 0.2)', 'important');
+            logisticsBtn.innerHTML = `${svgIcon}UNPACK ALL`;
+        } else {
+            logisticsBtn.style.setProperty('background', 'transparent', 'important');
+            logisticsBtn.innerHTML = `${svgIcon}AUTO PACK`;
+        }
+    }
+};
+
+window.autoProvisionCableCases = function() {
+    if (typeof globalAssets === 'undefined' || !currentProjectAssets) return;
+
+    // --- GHOST LINK PURGE ---
+    // Detect and destroy any broken container links caused by database string parsing
+    let activeCids = new Set();
+    currentProjectAssets.forEach(pa => {
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        let isContainer = pa.isAuto || (asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container'));
+        if (isContainer) {
+            let cid = (pa.formula && pa.formula !== 'Standalone') ? (pa.assetId + "|||" + pa.formula) : pa.assetId;
+            activeCids.add(cid);
+        }
+    });
+    currentProjectAssets.forEach(pa => {
+        if (pa.containerUid && !activeCids.has(pa.containerUid)) pa.containerUid = "";
+    });
+
+    let myName = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+    let deptCables = new Map();
+
+    let getCreatorDeptLoc = (creatorName, fallback) => {
+        if (!creatorName || creatorName === 'System') return fallback;
+        let roster = (typeof globalRosterData !== 'undefined' && globalRosterData && globalRosterData.roster) ? globalRosterData.roster : ((typeof activeRoster !== 'undefined') ? activeRoster : null);
+        if (roster) {
+            let person = roster.find(c => c.name === creatorName || c.email === creatorName);
+            if (person && person.department) {
+                let d = typeof person.department === 'object' ? (person.department.uid || person.department.name) : person.department;
+                if (d && d !== "[object Object]") return d;
+            }
+        }
+        return fallback;
+    };
+
+    // 1. Group loose bulk items purely by Department and Tag Name
+    currentProjectAssets.forEach(pa => {
+        if (pa.isAuto || pa.containerUid) return; 
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        if (!asset || asset.type !== 'Bulk') return; 
+        
+        let deptUid = pa.overrideDept || getCreatorDeptLoc(pa.creator, asset.department) || 'Unassigned'; 
+        if (window.packingDeptFilters && window.packingDeptFilters.length > 0 && !window.packingDeptFilters.includes(deptUid)) return;
+        
+        let cName = 'BULK';
+        try {
+            let tags = JSON.parse(asset.tags || '[]');
+            if (tags.length > 0) {
+                let cblTagFound = false;
+                for (let tId of tags) {
+                    let path = typeof getTagPathById === 'function' ? getTagPathById(tId) : null;
+                    if (path) {
+                        let cblIndex = path.findIndex(p => {
+                            let to = getTagObj(p);
+                            return to && (to.name.toUpperCase() === 'CBL' || to.name.toUpperCase().includes('CABLE'));
+                        });
+                        if (cblIndex !== -1 && path.length > cblIndex + 1) {
+                            let childTag = getTagObj(path[cblIndex + 1]);
+                            if (childTag) { cName = childTag.name; cblTagFound = true; break; }
+                        }
+                    }
+                }
+                if (!cblTagFound) {
+                    let tagObj = typeof getTagObj === 'function' ? getTagObj(tags[tags.length - 1]) : null;
+                    if (tagObj) cName = tagObj.name;
+                }
+            }
+        } catch(e) {}
+        
+        // Strip sublist (formula) and location to consolidate across the entire project by Department
+        let compKey = cName + "|||" + deptUid;
+        if(!deptCables.has(compKey)) deptCables.set(compKey, { cName: cName, deptUid: deptUid, formula: 'Standalone', location: 'General', cables: [] }); 
+        deptCables.get(compKey).cables.push(pa); 
+    });
+
+    // Setup base case asset
+    let caseAsset = globalAssets.find(a => (a.nestingLevel == 3 || a.nestingLevel == 4 || a.type === 'Container') && (a.name.toUpperCase().includes('CBL') || a.name.toUpperCase().includes('CABLE')));
+    if (!caseAsset) caseAsset = globalAssets.find(a => (a.nestingLevel == 3 || a.nestingLevel == 4 || a.type === 'Container') && (a.name.toUpperCase().includes('CASE') || a.name.toUpperCase().includes('TRUNK')));
+    if (!caseAsset) caseAsset = globalAssets.find(a => a.nestingLevel == 3 || a.type === 'Container');
+    
+    if (!caseAsset) return alert("No generic case found in Vault.");
+
+    let actionsTaken = false;
+    let cap = parseInt(caseAsset.capacity, 10) || 50;
+    if (isNaN(cap) || cap <= 0) cap = 50;
+
+    // 2. Cleanup all old generic auto cases
+    for (let i = currentProjectAssets.length - 1; i >= 0; i--) {
+        let pa = currentProjectAssets[i];
+        if (pa.isGenericAuto) {
+            currentProjectAssets.splice(i, 1);
+        }
+    }
+
+    // 3. Pack items by Segregated Tag Group
+    if (deptCables.size > 0) { 
+        deptCables.forEach((info, compKey) => {
+            let cables = info.cables;
+            let dObj = typeof getDeptObj === 'function' ? getDeptObj(info.deptUid) : { name: 'Unassigned' };
+            let trunkForm = "[BULK] " + info.cName.toUpperCase() + " CASE - " + dObj.name.toUpperCase();
+            
+            let currentCid = caseAsset.id + "|||" + trunkForm;
+            let totalCablesQty = 0;
+
+            cables.forEach(cPa => {
+                totalCablesQty += parseInt(cPa.qty, 10) || 1;
+                cPa.containerUid = currentCid;
+                cPa.isExplicitlyUnpacked = false;
+                actionsTaken = true;
+            }); 
+            
+            let neededTrunks = Math.ceil(totalCablesQty / cap);
+            if (neededTrunks === 0) neededTrunks = 1;
+            
+            for (let i = 0; i < neededTrunks; i++) {
+                currentProjectAssets.push({ 
+                    assetId: caseAsset.id, 
+                    qty: 1, 
+                    formula: trunkForm, 
+                    location: info.location, 
+                    creator: myName, 
+                    overrideDept: info.deptUid,
+                    isAuto: true,
+                    isGenericAuto: true
+                });
+            }
+        }); 
+    }
+
+    if (actionsTaken) { 
+        if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI(); 
+    } else {
+        alert("No matching loose bulk items found, or they are already perfectly packed.");
+    }
+};
+
+// ==========================================
+// --- AUTONOMOUS PACKING DETECTION ENGINE ---
+// ==========================================
+// @INDEX: PA_LOGIC -> Autonomous Packing Detection Engine
+window.evaluatePackingReadiness = function(saveToDb = false) {
+    if (!window.currentReadinessState) window.currentReadinessState = {};
+    
+    let needsPacking = false;
+    let hasAutoContainers = false;
+    let packableItemFound = false;
+    let calculatedConsumablesExpense = 0;
+    
+    if (typeof currentProjectAssets === 'undefined' || currentProjectAssets.length === 0) return;
+    
+    currentProjectAssets.forEach(pa => {
+        if (pa.isShortage) return;
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        if (!asset) return;
+        
+        let isContainer = (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
+        let parent = typeof getParentCaseForAsset === 'function' ? getParentCaseForAsset(asset.name) : null;
+        let hasInherentContainer = !!parent;
+        
+        if (asset.isConsumable) {
+            let usageFrac = parseFloat(pa.qty) || 0;
+            let price = parseFloat(asset.price) || 0;
+            calculatedConsumablesExpense += (usageFrac * price);
+        }
+        
+        // The Matryoshka Rule: Only loose items without inherent cases need manual packing
+        if (!isContainer && !hasInherentContainer) {
+            packableItemFound = true;
+            if (!pa.containerUid) {
+                needsPacking = true; // Found a loose item waiting for a miracle!
+            }
+        }
+        
+        if (pa.isAuto) hasAutoContainers = true;
+    });
+    
+    let allVisibleDepts = Array.from(document.querySelectorAll('.eq-dept-finished-cb')).map(cb => cb.dataset.dept);
+    let allChecked = allVisibleDepts.length > 0 && allVisibleDepts.every(d => window.currentReadinessState.eq_depts && window.currentReadinessState.eq_depts.includes(d));
+    
+    let baseState = allChecked ? 'finished' : 'draft';
+    
+    // Only upgrade to Packed if there were actually loose items, and ALL of them have been securely put into cases
+    if (packableItemFound && !needsPacking) {
+        baseState = hasAutoContainers ? 'packed_auto' : 'packed_human';
+    }
+    
+    if (window.currentReadinessState.eq !== baseState || window.currentReadinessState.consumablesExpense !== calculatedConsumablesExpense) {
+        window.currentReadinessState.eq = baseState;
+        window.currentReadinessState.consumablesExpense = calculatedConsumablesExpense;
+        
+        if (saveToDb && typeof updateEqReadinessToDatabase === 'function') {
+            updateEqReadinessToDatabase();
+        }
+    }
+};
+</script>

@@ -1,0 +1,83 @@
+<!-- GLOBAL AVAILABILITY & FLEET MODAL -->
+<div id="availability-modal-overlay" style="display: none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 4000; background: var(--bg-dark);">
+  <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
+     <!-- Header -->
+     <div style="height: 70px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0;">
+        <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing: 1px;">EQUIPMENT TRACKER</div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="position: relative;" onmouseenter="document.getElementById('tracker-watchlist-dropdown').style.display='flex'" onmouseleave="document.getElementById('tracker-watchlist-dropdown').style.display='none'">
+                <input type="text" id="tracker-search-input" placeholder="Add to Watchlist..." style="width:180px; height:32px; padding:6px 12px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; font-size:12px; margin:0;" onkeydown="if(typeof handleTrackerWatchlistInput === 'function') handleTrackerWatchlistInput(event)">
+                <div id="tracker-watchlist-dropdown" style="display:none; position:absolute; top:100%; right:0; background:#1a1a1e; border:1px solid #333; border-radius:6px; padding:10px; z-index:100; flex-direction:column; gap:8px; margin-top:4px; box-shadow: 0 10px 25px rgba(0,0,0,0.8); min-width: 220px;">
+                    <div style="font-size:10px; color:#888; font-weight:bold; text-transform:uppercase; border-bottom:1px solid #333; padding-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>Active Watchlist</span>
+                        <button id="tracker-clear-btn" style="background:transparent; border:none; color:#ef4444; cursor:pointer; font-size:10px; font-weight:bold; padding:0; display:none; margin:0;" onclick="if(typeof clearWatchlist === 'function') clearWatchlist()">CLEAR ALL</button>
+                    </div>
+                    <div id="tracker-watchlist-pills" style="display:flex; flex-direction:column; gap:4px; max-height: 250px; overflow-y:auto;">
+                        <div style="color:#555; font-size:11px; font-style:italic;">Watchlist is empty.</div>
+                    </div>
+                </div>
+            </div>
+            <div style="width:1px; height:20px; background:#333; margin:0 5px;"></div>
+            <button class="btn-outline btn-sm" style="margin:0;" onclick="if(typeof changeTrackerDate === 'function') changeTrackerDate(-1)">PREV</button>
+            <input type="date" id="tracker-start-date" style="height:32px; padding:4px 8px; font-size:12px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; margin:0;" onchange="if(typeof applyTrackerCustomDates === 'function') applyTrackerCustomDates()">
+            <span style="color:#888; font-size:12px;">to</span>
+            <input type="date" id="tracker-end-date" style="height:32px; padding:4px 8px; font-size:12px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; margin:0;" onchange="if(typeof applyTrackerCustomDates === 'function') applyTrackerCustomDates()">
+            <button class="btn-outline btn-sm" style="margin:0;" onclick="if(typeof changeTrackerDate === 'function') changeTrackerDate(1)">NEXT</button>
+            <button class="btn-outline btn-sm" style="margin:0; margin-left:8px; border-color:#f59e0b; color:#f59e0b;" onclick="if(typeof forceTrackerSync === 'function') forceTrackerSync()">↻ REFRESH</button>
+        </div>
+     </div>
+     <!-- Unified Matrix Body -->
+     <div id="tracker-canvas-inner" style="flex: 1; overflow: auto; position: relative; background: #111; display: flex; flex-direction: column;">
+         <div style="padding: 40px; text-align: center; color: #888; font-style: italic;">Unified Equipment Matrix loading...</div>
+     </div>
+  </div>
+</div>
+
+<div id="shift-layer" style="display: none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; background: var(--bg-dark); z-index: 2000; flex-direction: column;">
+  <div class="tt-workspace" style="flex: 1; display: flex; overflow: hidden;">
+    <div class="tt-sidebar" style="display: none;">
+      <div id="dept-override-panel"></div>
+      <div class="tt-sidebar-list" id="shift-crew-list"></div>
+    </div>
+    <div class="tt-canvas" style="flex: 1; display: flex; overflow: hidden; position: relative;">
+      <div class="tt-axis-y" style="display: flex; flex-direction: column; background: var(--bg-sidebar); border-right: 1px solid #333; z-index: 50;">
+        <div class="tt-header-corner" style="display: flex; flex-direction: column; justify-content: center; padding: 6px; border-bottom: 1px solid #333; background: #1a1a1e; gap: 8px; box-sizing: border-box; flex-shrink: 0;">
+            <div id="timeline-local-project-name" style="display: none;"></div> 
+            <div id="tt-title" style="color: #fff; font-size: 13px; font-weight: 900; line-height: 1.1; text-shadow: 0px 2px 4px rgba(0,0,0,0.5); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">LOADING...</div>
+        </div>
+        <div id="tt-y-crew" style="flex: 1; overflow: hidden;"></div> 
+      </div>
+      <div class="tt-grid-wrapper" id="tt-grid-wrap" onscroll="document.getElementById('tt-y-crew').scrollTop = this.scrollTop;">
+        <div class="tt-header-x-container">
+          <div class="tt-header-days" id="tt-x-days"></div>
+          <div class="tt-header-hours" id="tt-x-hours"></div>
+        </div>
+        <div id="tt-rows-container"></div>
+      </div>
+    </div>
+  </div> 
+  <div class="tt-bottom-actions">
+      <button onclick="openCrewManager()" class="btn-blue" style="margin: 0; width: auto;">EDIT CREW</button>
+      <div style="flex: 1;"></div>
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
+          <input type="checkbox" id="tt-crew-finished-cb" style="width:16px; height:16px; margin:0; accent-color:#10b981;" onchange="window.isTimelineDirty = true;"> CREW FINISHED
+      </label>
+      <button id="tt-cancel-btn" class="btn-close" style="margin: 0; width: auto;" onclick="cancelShifts()">CANCEL (ESC)</button>
+      <button id="tt-save-btn" class="btn-main" style="margin: 0; width: auto;" onclick="saveAndCloseShifts()">SAVE SHIFTS</button>
+  </div>
+</div>
+
+<div id="month-roster-layer" style="display: none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
+  <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
+    <div style="height: 70px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 25px;">
+      <div style="color:#fff; font-weight:800; font-size:16px;">Master Month Roster</div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <button class="btn-outline" style="margin:0; width:auto;" onclick="changeRosterMonth(-1)">PREV</button>
+        <div id="mr-month-label" style="color:#fff; font-weight:800; min-width:160px; text-align:center; text-transform:uppercase;">Month</div>
+        <button class="btn-outline" style="margin:0; width:auto;" onclick="changeRosterMonth(1)">NEXT</button>
+      </div>
+          <div style="width: 16px;"></div> 
+    </div>
+    <div id="mr-canvas-inner" style="flex: 1; overflow: auto; position: relative; background: #111;"></div>
+  </div>
+</div>

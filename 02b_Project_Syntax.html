@@ -1,0 +1,944 @@
+<script>
+/**
+ * 02b_Project_Syntax.html
+ * Domain: Custom Command Line Interface (CLI) & Syntax Parser for rapid asset provisioning.
+ */
+
+window.cliTempAssets = [];
+window.cliShortages = [];
+
+// @INDEX: SYNTAX_CLI -> Syntax Help Modal
+function openSyntaxHelpModal() {
+    let modal = document.getElementById('syntax-help-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'syntax-help-modal';
+        modal.className = 'modal-overlay';
+        modal.style.cssText = 'display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:99999; justify-content:center; align-items:center; backdrop-filter:blur(4px);';
+        
+        let content = document.createElement('div');
+        content.style.cssText = 'background:#151518; padding:25px; border-radius:8px; width:90%; max-width:700px; max-height:85vh; overflow-y:auto; color:#fff; border:1px solid #333; box-shadow:0 10px 40px rgba(0,0,0,0.8);';
+        content.id = 'syntax-help-content';
+        
+        modal.appendChild(content);
+        modal.onclick = (e) => { if(e.target === modal) modal.style.display = 'none'; };
+        document.body.appendChild(modal);
+    }
+    
+    // AUTONOMOUSLY FETCHES LIVE ALIASES
+    let aliasHtml = '';
+    if (typeof SYSTEM_ALIASES !== 'undefined') {
+        let sortedKeys = Object.keys(SYSTEM_ALIASES).sort();
+        aliasHtml = sortedKeys.map(k => `<span style="background:#27272a; padding:4px 8px; border-radius:4px; font-family:monospace; margin:4px; display:inline-block; border:1px solid #3f3f46;"><b>${k}</b> <span style="color:#a1a1aa; margin:0 4px;">➝</span> <span style="color:#10b981;">${SYSTEM_ALIASES[k]}</span></span>`).join('');
+    }
+    
+    // AUTONOMOUSLY SAMPLES REAL VAULT ASSETS FOR EXAMPLES
+    let exAsset = "Robin 1000";
+    if (typeof globalAssets !== 'undefined' && globalAssets.length > 0) {
+        let physical = globalAssets.filter(a => a.type !== 'Bulk' && a.name.length > 4);
+        if (physical.length > 0) exAsset = physical[Math.floor(Math.random() * physical.length)].name;
+    }
+    let shortAsset = exAsset.substring(0, 3).toLowerCase();
+    
+    let helpHtml = `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding-bottom:15px; margin-bottom:20px;">
+            <h2 style="margin:0; color:#d8b4fe; font-size:18px; display:flex; align-items:center; gap:10px;"><span>🧠</span> Dynamic Syntax Engine Guide</h2>
+            <button class="btn-delete" style="width:auto; margin:0; padding:6px 12px; font-size:11px;" onclick="document.getElementById('syntax-help-modal').style.display='none'">CLOSE</button>
+        </div>
+        
+        <p style="font-size:13px; color:#a1a1aa; line-height:1.6; margin-top:0;">
+            The search bar is a <b>Hybrid Engine</b>. If you don't type an equals sign (<code>=</code>), it searches manually. If you type an equals sign, it transforms into the powerful <b>Command Line Formula Engine</b>.
+        </p>
+        
+        <h3 style="color:#10b981; margin-top:25px; margin-bottom:8px; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Mode A: Fast Manual Search</h3>
+        <p style="font-size:12px; color:#a1a1aa; margin-top:0; margin-bottom:10px;">Type a quantity followed by any part of the asset name. It safely ignores context math rules.</p>
+        <div style="background:#0a0a0c; padding:12px; border-radius:6px; border-left:4px solid #10b981; font-family:monospace; font-size:13px; margin-bottom:20px;">
+            <span style="color:#888; font-size:11px;">EXAMPLE:</span><br>
+            <span style="color:#fff;">10x ${shortAsset}</span> <br><br>
+            <span style="color:#10b981; font-size:11px;">RESULT: Adds 10 units of "${exAsset}"</span>
+        </div>
+
+        <h3 style="color:#3b82f6; margin-top:25px; margin-bottom:8px; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Mode B: Formula Engine</h3>
+        <p style="font-size:12px; color:#a1a1aa; margin-top:0; margin-bottom:10px;">Use this mode to map specific locations, apply grouped tags (contexts), and chain entire kits into a single line of text.</p>
+        
+        <div style="background:#111; padding:12px; border-radius:6px; margin-bottom:15px;">
+            <table style="width:100%; font-size:12px; color:#e4e4e7; border-collapse:collapse;">
+                <tr style="border-bottom:1px solid #333;"><td style="padding:6px; width:60px; font-weight:bold; color:#d8b4fe;">Left of =</td><td style="padding:6px; color:#a1a1aa;">The assigned <b>Location</b> (e.g., <code>lx1</code>, <code>Truss A</code>).</td></tr>
+                <tr style="border-bottom:1px solid #333;"><td style="padding:6px; font-weight:bold; color:#d8b4fe;">Right of =</td><td style="padding:6px; color:#a1a1aa;">Your active <b>Payload</b>. Starts in <b>Tag Mode</b>.</td></tr>
+                <tr style="border-bottom:1px solid #333;"><td style="padding:6px; font-weight:bold; color:#d8b4fe; font-size:16px; text-align:center;">/</td><td style="padding:6px; color:#a1a1aa;">Acts as a <b>Toggle Wrapper</b> for tags. Open it, type tags, and close it.</td></tr>
+                <tr style="border-bottom:1px solid #333;"><td style="padding:6px; font-weight:bold; color:#d8b4fe; font-size:16px; text-align:center;">+</td><td style="padding:6px; color:#a1a1aa;"><b>Chains</b> multiple different items together.</td></tr>
+                <tr><td style="padding:6px; font-weight:bold; color:#d8b4fe; font-size:14px; text-align:center;">x <span style="font-size:11px; font-weight:normal; color:#888;">or</span> *</td><td style="padding:6px; color:#a1a1aa;">Sets the <b>Quantity</b>.</td></tr>
+            </table>
+        </div>
+
+        <div style="background:#0a0a0c; padding:12px; border-radius:6px; border-left:4px solid #3b82f6; font-family:monospace; font-size:13px; margin-bottom:20px;">
+            <span style="color:#888; font-size:11px;">COMPLEX EXAMPLE:</span><br>
+            <span style="color:#fff;">lx1 = s / 2*20 + 2*10 / 3x / 2*10 + 2*2</span> <br><br>
+            <span style="color:#3b82f6; font-size:11px;">HOW THE ENGINE READS IT:</span><br>
+            <span style="color:#d8b4fe;">lx1 =</span> <span style="color:#a1a1aa;">Assigns to location "lx1"</span><br>
+            <span style="color:#d8b4fe;">s /</span> <span style="color:#a1a1aa;">Opens "socapex" context (via your active aliases)</span><br>
+            <span style="color:#d8b4fe;">2*20</span> <span style="color:#a1a1aa;">Finds 2 "20m" cables within active context</span><br>
+            <span style="color:#d8b4fe;">+ 2*10</span> <span style="color:#a1a1aa;">Finds 2 "10m" cables within active context</span><br>
+            <span style="color:#d8b4fe;">/ 3x /</span> <span style="color:#a1a1aa;">Replaces the context wrapper with "3-pin"</span><br>
+            <span style="color:#d8b4fe;">2*10</span> <span style="color:#a1a1aa;">Finds 2 "10m" cables within new context</span><br>
+            <span style="color:#d8b4fe;">+ 2*2</span> <span style="color:#a1a1aa;">Finds 2 "2m" cables within new context</span><br>
+        </div>
+
+        <h3 style="color:#f59e0b; margin-top:25px; margin-bottom:8px; font-size:14px; text-transform:uppercase; letter-spacing:1px;">⚠️ Core Engine Rules</h3>
+        <div style="background:#27272a; padding:15px; border-radius:6px; border-left:4px solid #f59e0b;">
+            <div style="color:#fff; font-size:13px; font-weight:bold; margin-bottom:4px;">1. No Naked Quantities</div>
+            <div style="color:#a1a1aa; font-size:12px; margin-bottom:10px;">The engine needs a target word after a multiplier. If you just want a generic item, provide a valid search term. (e.g. <span style="color:#ef4444; text-decoration:line-through;">5x</span> fails, <span style="color:#10b981;">5x xlr</span> works).</div>
+            
+            <div style="color:#fff; font-size:13px; font-weight:bold; margin-bottom:4px;">2. Context Baggage & Toggle Rules</div>
+            <div style="color:#a1a1aa; font-size:12px;">The payload starts in Tag Mode. Opening a new pair of slashes entirely overwrites the previous tags. If you want to type an item WITHOUT any tags first, start with a slash: <code>lx1 = / 10x rob</code>. Or just skip slashes entirely: <code>lx1 = 10x rob</code>.</div>
+        </div>
+
+        <div style="background:#151518; border:1px solid #333; padding:15px; border-radius:6px; margin-top:20px;">
+            <div style="font-size:12px; font-weight:bold; color:#fff; margin-bottom:10px; display:flex; align-items:center; gap:8px;">
+                <span style="display:inline-block; width:8px; height:8px; background:#10b981; border-radius:50%;"></span> 
+                LIVE ALIAS DICTIONARY (AUTO-UPDATES)
+            </div>
+            <div style="line-height:2.0; font-size:12px;">${aliasHtml || '<span style="color:#555;">No aliases found in System Settings.</span>'}</div>
+        </div>
+    `;
+    
+    document.getElementById('syntax-help-content').innerHTML = helpHtml;
+    modal.style.display = 'flex';
+}
+
+// @INDEX: SYNTAX_CLI -> Unified Search Input Handler
+function handleUnifiedInput() {
+    const inputEl = document.getElementById('pa-search-cli');
+    if(!inputEl) return;
+    const input = inputEl.value;
+    
+    updateGhostText(input);
+    executeSyntaxLive(input); // Always parse, allowing fluid transitions between Search & CLI
+}
+
+function updateGhostText(rawStr) {
+    let humanListEl = document.getElementById('pa-human-list');
+    if (!humanListEl) return;
+    
+    // Auto-resize the textarea to fit its content
+    let inputEl = document.getElementById('pa-search-cli');
+    if (inputEl && inputEl.tagName === 'TEXTAREA') {
+        inputEl.style.height = '38px'; // Reset to base height to calculate true scrollHeight
+        let newHeight = Math.max(38, inputEl.scrollHeight);
+        inputEl.style.height = newHeight + 'px';
+    }
+
+    if (!rawStr) { 
+        return; 
+    }
+    
+    let searchMod = rawStr;
+    if (rawStr.includes('=')) {
+        // MODE B: Formula Engine (Isolate the last active chunk being typed)
+        let payload = rawStr.split('=').pop();
+        let chunks = payload.split(/[\+\/]/);
+        
+        let slashChunks = payload.split('/');
+        let isTagBlock = (slashChunks.length > 1 && slashChunks.length % 2 !== 0);
+        
+        if (isTagBlock) {
+            return;
+        } else {
+            let lastChunk = chunks.pop().trimStart();
+            let prefixMatch = lastChunk.match(/^(\d+)(?:\s*(?:x|\*)\s*|\s+)(.*)$/i);
+            let suffixMatch = lastChunk.match(/^(.*?)\s+(?:x\*|\*x|x|\*)\s*(\d+)$/i) || lastChunk.match(/^(.*?)\s+(\d+)x$/i);
+            
+            if (prefixMatch) searchMod = prefixMatch[2];
+            else if (suffixMatch) searchMod = suffixMatch[1];
+            else searchMod = lastChunk;
+        }
+    } else {
+        // MODE A: Manual Search (Only strip the leading quantity so names like "A/V+" survive)
+        let match = rawStr.match(/^\s*(\d+)(?:\s*(?:x|\*)\s*|\s+)(.*)$/i);
+        if (match) searchMod = match[2];
+        else searchMod = rawStr.trimStart();
+    }
+    
+    let termLower = searchMod.toLowerCase();
+    let trimmedTerm = searchMod.trim();
+    
+    if (trimmedTerm.length < 2) { return; }
+    
+    let bestMatch = fuzzyMatchAsset([], trimmedTerm);
+    if (bestMatch) {
+        let matchName = bestMatch.name.toLowerCase();
+        if (matchName.startsWith(termLower)) {
+            let rest = bestMatch.name.substring(searchMod.length);
+            let reconstructed = rawStr + rest;
+            
+            // Store the suggestion so the Tab/Right arrow keydown handler can access it
+            window.activeAutocompleteSuggestion = reconstructed;
+            
+            // Render the suggestion in the bottom rail
+            let humanHtml = humanListEl.innerHTML;
+            let suggestionHtml = `<div id="autocomplete-rail" style="width:100%; border-top: 1px solid #333; margin-top: 8px; padding-top: 8px; color: #555; font-style: italic;">Suggestion (Hit Tab): <span style="color:#d8b4fe;">${reconstructed}</span></div>`;
+            
+            // Inject it safely
+            if (humanHtml.includes('autocomplete-rail')) {
+                humanListEl.innerHTML = humanHtml.replace(/<div id="autocomplete-rail".*?<\/div>/, suggestionHtml);
+            } else {
+                humanListEl.innerHTML += suggestionHtml;
+            }
+            return;
+        }
+    }
+    window.activeAutocompleteSuggestion = null;
+    let currentHtml = humanListEl.innerHTML;
+    if (currentHtml.includes('autocomplete-rail')) {
+         humanListEl.innerHTML = currentHtml.replace(/<div id="autocomplete-rail".*?<\/div>/, '');
+    }
+}
+
+function handleUnifiedKeydown(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        commitSyntaxCommand();
+    } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+        let ghost = document.getElementById('pa-search-ghost');
+        let input = document.getElementById('pa-search-cli');
+        if (ghost && ghost.value && ghost.value.toLowerCase() !== input.value.toLowerCase()) {
+            e.preventDefault();
+            input.value = ghost.value;
+            ghost.value = '';
+            handleUnifiedInput();
+        }
+    }
+}
+
+function getDeptColorForCli(deptName) {
+    if (!deptName || typeof SYSTEM_DEPARTMENTS === 'undefined') return '#888';
+    let dObj = getDeptObj(deptName);
+    return dObj && dObj.uid ? dObj.color : '#888';
+}
+
+// @INDEX: SYNTAX_CLI -> Live Syntax Execution
+function executeSyntaxLive(rawStr) {
+    rawStr = rawStr.trim();
+    window.cliTempAssets = [];
+    window.cliShortages = [];
+    
+    const humanListEl = document.getElementById('pa-human-list');
+    
+    if (!rawStr) {
+        if(humanListEl) {
+            humanListEl.style.display = 'none';
+            humanListEl.innerHTML = '';
+        }
+        renderProjectAssetsUI();
+        return;
+    }
+
+    const parsed = parseAssetSyntax(rawStr);
+    if (!parsed || parsed.items.length === 0) {
+        if(humanListEl) {
+            humanListEl.style.display = 'none';
+            humanListEl.innerHTML = '';
+        }
+        renderProjectAssetsUI();
+        return;
+    }
+    
+    // Triangle of Truth: Inject active target context if appending shorthand without '='
+    if (!rawStr.includes('=') && window.activePaTarget) {
+        parsed.location = window.activePaTarget.location;
+        parsed.rawFormula = window.activePaTarget.formula;
+        parsed.items.forEach(item => {
+            item.location = window.activePaTarget.location;
+            item.rawFormula = window.activePaTarget.formula;
+        });
+    }
+    
+    if(humanListEl) humanListEl.style.display = 'flex';
+
+    let humanHtml = parsed.rawFormula !== "Manual" ? `<span style="color:#a855f7; font-weight:bold; border-right:1px solid #333; padding-right:6px; margin-right:6px;">${parsed.location}</span>` : '';
+    let itemSpans = [];
+
+    parsed.items.forEach(item => {
+        let matchedAsset = typeof fuzzyMatchAsset === 'function' ? fuzzyMatchAsset(item.contexts, item.mod) : null;
+        let isPureDimension = /^\d+(\.\d+)?([mM])?$/.test(item.mod.trim());
+        if (!matchedAsset && !isPureDimension) matchedAsset = typeof fuzzyMatchAsset === 'function' ? fuzzyMatchAsset([], item.mod) : null;
+        if (!matchedAsset && typeof globalAssets !== 'undefined') {
+            let nameLower = item.mod.toLowerCase().replace(/[^a-z0-9]/g, '');
+            matchedAsset = globalAssets.find(a => {
+                 let cw = String(a.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                 return cw === nameLower;
+            });
+        }
+        if (matchedAsset) {
+            let requestedQ = parseInt(item.qty, 10) || 1;
+            
+            // --- AUTO-FILL CASES LOGIC ---
+            let autoFillBtn = document.getElementById('toggle-auto-fill-cases-btn');
+            let autoFillChecked = autoFillBtn ? autoFillBtn.dataset.active === 'true' : true;
+            if (autoFillChecked) {
+                let parent = matchedAsset.containerType ? globalAssets.find(a => a.id === matchedAsset.containerType) : (typeof getParentCaseForAsset === 'function' ? getParentCaseForAsset(matchedAsset.name) : null);
+                
+                let caseSize = 1;
+                if (parent) {
+                    if (parent.capacity) caseSize = parseInt(parent.capacity, 10);
+                    if ((!caseSize || caseSize <= 1) && parent.components) {
+                        let comps = parent.components.split(',').map(c => {
+                            let m = c.trim().match(/^(\d+)x\s+(.*)$/i);
+                            if (m) return { qty: parseInt(m[1], 10), name: m[2].trim().toLowerCase() };
+                            return { qty: 1, name: c.trim().toLowerCase() };
+                        });
+                        let myComp = comps.find(c => c.name === String(matchedAsset.name || '').toLowerCase());
+                        if (myComp && myComp.qty > 1) caseSize = myComp.qty;
+                    }
+                }
+                
+                if (caseSize > 1) {
+                    requestedQ = Math.ceil(requestedQ / caseSize) * caseSize;
+                }
+            }
+            // -----------------------------
+
+            // --- SOFT-ALLOCATION QUANTITY ENGINE ---
+            let actualQ = 0;
+            let isTargetShortage = false;
+            if (window.activePaTarget && !rawStr.includes('=')) {
+                isTargetShortage = currentProjectAssets.some(pa => pa.location === window.activePaTarget.location && pa.formula === window.activePaTarget.formula && pa.isShortage);
+            } else if (parsed.rawFormula !== "Manual" && parsed.rawFormula !== "Standalone") {
+                let targetLoc = parsed.location;
+                let existingItems = currentProjectAssets.filter(pa => pa.location && pa.location.toLowerCase() === targetLoc.toLowerCase() && pa.formula && pa.formula !== "Standalone");
+                if (existingItems.length > 0) {
+                    isTargetShortage = existingItems[0].isShortage;
+                }
+            }
+            
+            if (matchedAsset.type === 'Bulk') {
+                let maxQty = parseInt(matchedAsset.totalQuantity, 10) || 1;
+                let paMatches = currentProjectAssets.filter(pa => pa.assetId === matchedAsset.id && !pa.isShortage);
+                let alreadyAssigned = paMatches.reduce((sum, pa) => sum + parseInt(pa.qty, 10), 0);
+                let tempMatches = window.cliTempAssets.filter(pa => pa.assetId === matchedAsset.id);
+                let alreadyInTemp = tempMatches.reduce((sum, pa) => sum + parseInt(pa.qty, 10), 0);
+                let overlappingAssigned = window.overlappingAllocations ? (window.overlappingAllocations[matchedAsset.id] || 0) : 0;
+                let avail = isTargetShortage ? 999999 : Math.max(0, maxQty - alreadyAssigned - alreadyInTemp - overlappingAssigned);
+                actualQ = Math.min(requestedQ, avail);
+            } else {
+                // Treat serialized items like bulk items during planning
+                let siblings = globalAssets.filter(a => a.name === matchedAsset.name && a.manufacturer === matchedAsset.manufacturer && a.status === matchedAsset.status);
+                let maxQty = siblings.length;
+                let allModelIds = new Set(siblings.map(s => s.id));
+
+                let alreadyAssigned = currentProjectAssets
+                    .filter(pa => allModelIds.has(pa.assetId) && !pa.isShortage)
+                    .reduce((sum, pa) => sum + parseInt(pa.qty, 10), 0);
+
+                // Use a representative ID for temp assets to correctly sum them up
+                let representativeId = siblings.length > 0 ? siblings[0].id : matchedAsset.id;
+                let alreadyInTemp = window.cliTempAssets
+                    .filter(pa => pa.assetId === representativeId)
+                    .reduce((sum, pa) => sum + parseInt(pa.qty, 10), 0);
+
+                let overlappingAssigned = 0;
+                if (window.overlappingAllocations) {
+                    allModelIds.forEach(id => overlappingAssigned += (window.overlappingAllocations[id] || 0));
+                }
+
+                let avail = isTargetShortage ? 999999 : Math.max(0, maxQty - alreadyAssigned - alreadyInTemp - overlappingAssigned);
+                actualQ = Math.min(requestedQ, avail);
+                matchedAsset = globalAssets.find(a => a.id === representativeId) || matchedAsset; // Ensure we use the rep asset
+            }
+
+            if (actualQ > 0) {
+                let matchPa = window.cliTempAssets.find(pa => pa.assetId === matchedAsset.id && pa.formula === parsed.rawFormula);
+                if (matchPa) {
+                    matchPa.qty = parseInt(matchPa.qty, 10) + actualQ;
+                } else {
+                    window.cliTempAssets.push({
+                        assetId: matchedAsset.id,
+                        qty: actualQ,
+                        formula: parsed.rawFormula,
+                        location: parsed.location,
+                        creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+                    });
+                }
+            }
+            
+            if (actualQ < requestedQ) {
+                let matchShort = window.cliShortages.find(sh => sh.asset.id === matchedAsset.id && sh.formula === parsed.rawFormula);
+                if (matchShort) {
+                    matchShort.shortQty += (requestedQ - actualQ);
+                } else {
+                    window.cliShortages.push({
+                        asset: matchedAsset,
+                        shortQty: requestedQ - actualQ,
+                        formula: parsed.rawFormula
+                    });
+                }
+            }
+            
+            let tagColor = '#a855f7';
+            try {
+                let tArr = JSON.parse(matchedAsset.tags || '[]');
+                if (tArr.length > 0) {
+                    let tObj = getTagObj(tArr[tArr.length - 1]);
+                    if (tObj) tagColor = tObj.color || '#a855f7';
+                }
+            } catch(e) {}
+            
+            let isMeter = /^\d+(\.\d+)?([m|M])?$/i.test(item.mod);
+            let nameDisp = matchedAsset.name.toUpperCase();
+            if (isMeter) { let meterVal = item.mod.toUpperCase(); if (!meterVal.endsWith('M')) meterVal += 'M'; nameDisp = `<span style="color:#fef08a;">${meterVal}</span> <span style="color:${tagColor};">${nameDisp}</span>`; } else { nameDisp = `<span style="color:${tagColor};">${nameDisp}</span>`; }
+            
+            let qtyDisp = requestedQ > actualQ 
+                ? `<span style="color:#ef4444; text-decoration:line-through; opacity:0.6;" title="Requested ${requestedQ}, but only ${actualQ} available">${requestedQ}</span><span style="color:#22d3ee;font-weight:bold;">x</span> <span style="color:#86efac; font-weight:bold;">${actualQ}</span><span style="color:#22d3ee;font-weight:bold;">x</span>` 
+                : `<span style="color:#86efac;">${actualQ}</span><span style="color:#22d3ee;font-weight:bold;">x</span>`;
+                
+            itemSpans.push(`${qtyDisp} <span style="font-weight:bold; background:rgba(255,255,255,0.05); padding:2px 4px; border-radius:4px;">${nameDisp}</span>`);
+        } else {
+            itemSpans.push(`<span style="color:#ef4444;" title="Unmatched: ${item.mod}">?x ${item.mod}</span>`);
+        }
+    });
+
+            if (humanListEl) {
+                if (parsed.rawFormula !== "Standalone" || (window.activePaTarget && !rawStr.includes('='))) {
+                    humanListEl.style.display = 'block';
+                    humanListEl.style.padding = '8px 12px';
+                    humanListEl.style.background = '#151518';
+                    humanListEl.style.border = '1px solid #333';
+                    humanListEl.style.borderRadius = '4px';
+                    humanListEl.style.fontFamily = 'monospace';
+                    humanListEl.style.fontSize = '14px';
+                    humanListEl.style.marginTop = '4px';
+                    
+                    // Auto-Correct Shorthand: Derive from matched temp assets
+                    let derivedRaw = typeof generateFormulaFromItems === 'function' && window.cliTempAssets && window.cliTempAssets.length > 0 
+                        ? generateFormulaFromItems(parsed.location, window.cliTempAssets) 
+                        : parsed.rawFormula;
+                        
+                    let colorized = typeof colorizeFormula === 'function' ? colorizeFormula(derivedRaw) : derivedRaw;
+                    if (colorized && colorized !== "Standalone") {
+                        humanListEl.innerHTML = colorized;
+                    } else {
+                        humanListEl.style.display = 'none';
+                    }
+                } else {
+                    humanListEl.style.display = 'none';
+                }
+            }
+            
+    renderProjectAssetsUI();
+}
+
+function commitSyntaxCommand() {
+    const input = document.getElementById('pa-search-cli');
+    const rawStr = input.value.trim();
+    
+    if (!rawStr) return;
+
+    let hasTemp = window.cliTempAssets && window.cliTempAssets.length > 0;
+    let hasShortages = window.cliShortages && window.cliShortages.length > 0;
+
+    if (hasTemp || hasShortages) {
+        let isFormula = rawStr.includes('=');
+        let mergedFormula = rawStr;
+        let targetLoc = "General";
+        
+        if (isFormula) {
+            let loc = rawStr.split('=')[0].trim();
+            targetLoc = loc;
+            
+            let newParsed = parseAssetSyntax(rawStr);
+            let mergedItems = [];
+            
+            // Case-insensitive check to find if this location already exists
+            let existingItems = currentProjectAssets.filter(pa => pa.location && pa.location.toLowerCase() === loc.toLowerCase() && pa.formula && pa.formula !== "Standalone");
+            
+            if (existingItems.length > 0) {
+                let oldFormula = existingItems[0].formula;
+                targetLoc = existingItems[0].location; // Preserve original casing
+                let oldParsed = parseAssetSyntax(oldFormula);
+                if (oldParsed && oldParsed.items) mergedItems = mergedItems.concat(oldParsed.items);
+            }
+            
+            if (newParsed && newParsed.items) {
+                newParsed.items.forEach(newItem => {
+                    newItem.location = targetLoc;
+                    let newCtxStr = newItem.contexts.join('|');
+                    let insertIndex = mergedItems.length;
+                    for (let i = mergedItems.length - 1; i >= 0; i--) {
+                        if (mergedItems[i].contexts.join('|') === newCtxStr) { insertIndex = i + 1; break; }
+                    }
+                    mergedItems.splice(insertIndex, 0, newItem);
+                });
+            }
+            
+            // Triangle of Truth: The formula column now only stores the formula name/identifier.
+            mergedFormula = isFormula ? targetLoc + " Formula" : rawStr;
+            
+            if (existingItems.length > 0) {
+                // If a formula sublist already exists here, adopt its name to merge cleanly
+                mergedFormula = existingItems[0].formula;
+            } else if (window.activePaTarget && window.activePaTarget.location.toLowerCase() === targetLoc.toLowerCase()) {
+                mergedFormula = window.activePaTarget.formula; // Preserve exact formula ID!
+            }
+            
+            let existingShortage = currentProjectAssets.find(pa => pa.location && pa.location.toLowerCase() === targetLoc.toLowerCase() && (pa.formula === mergedFormula || pa.formula === oldFormula) && pa.isShortage);
+            if (existingShortage) window.cliTempAssets.forEach(t => t.isShortage = true);
+        } else if (window.activePaTarget) {
+            // Triangle of Truth: Append directly to the active sublist
+            targetLoc = window.activePaTarget.location;
+            mergedFormula = window.activePaTarget.formula;
+            
+            let existingShortage = currentProjectAssets.find(pa => pa.location && pa.location.toLowerCase() === targetLoc.toLowerCase() && pa.formula === mergedFormula && pa.isShortage);
+            if (existingShortage) window.cliTempAssets.forEach(t => t.isShortage = true);
+        }
+        
+        if (hasTemp) {
+            window.cliTempAssets.forEach(temp => {
+                if (isFormula || window.activePaTarget) {
+                    temp.formula = mergedFormula;
+                    temp.location = targetLoc;
+                }
+                
+                let matchPa = currentProjectAssets.find(pa => pa.assetId === temp.assetId && pa.formula === temp.formula && pa.location === temp.location);
+                if (matchPa && temp.formula !== "Standalone") {
+                    matchPa.qty = parseInt(matchPa.qty, 10) + parseInt(temp.qty, 10);
+                } else {
+                    let manMatch = currentProjectAssets.find(pa => pa.assetId === temp.assetId && pa.formula === "Standalone" && pa.location === temp.location);
+                    if (manMatch) manMatch.qty = parseInt(manMatch.qty, 10) + parseInt(temp.qty, 10);
+                    else window.insertIntoProjectAssets({...temp, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'});
+                }
+            });
+            
+            if ((isFormula || window.activePaTarget) && typeof window.syncFormulaToItems === 'function') {
+                window.syncFormulaToItems(targetLoc, mergedFormula);
+            }
+        }
+        window.cliTempAssets = [];
+        input.value = '';
+        let ghost = document.getElementById('pa-search-ghost');
+        if(ghost) ghost.value = '';
+        let humanListEl = document.getElementById('pa-human-list');
+        if(humanListEl) {
+            humanListEl.style.display = 'none';
+            humanListEl.innerHTML = '';
+        }
+        
+        if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+        renderProjectAssetsUI();
+        
+        if (hasShortages) {
+            window.pendingShortages = [...window.cliShortages];
+            window.cliShortages = [];
+            if (typeof processShortageQueue === 'function') {
+                processShortageQueue(targetLoc);
+            }
+        }
+    } else {
+        alert("Could not find Vault items for these modifiers. Check spelling/tags.");
+    }
+}
+
+function standardizeFormulaString(parsed, colorize = false) {
+    let loc = parsed.location;
+    if (!parsed.items || parsed.items.length === 0) {
+        if (colorize) return `<span style="color:#22d3ee;font-weight:bold;margin-right:6px;">=</span>`;
+        return loc + " = ";
+    }
+    
+    let processedItems = parsed.items.map(item => {
+        let primaryCtx = item.contexts.length > 0 ? item.contexts[item.contexts.length - 1] : 'cable';
+        let lowerT = primaryCtx.toLowerCase();
+        let mapped = (typeof SYSTEM_ALIASES !== 'undefined' && SYSTEM_ALIASES[lowerT]) ? SYSTEM_ALIASES[lowerT] : primaryCtx;
+        
+        let lineage = [];
+        if (typeof SYSTEM_TAGS !== 'undefined') {
+            const findLineage = (nodes, target, path) => {
+                for (let n of nodes) {
+                    let curr = [...path, {name: n.name, color: n.color}];
+                    if (n.name.toLowerCase() === target.toLowerCase()) return curr;
+                    if (n.shortcut && n.shortcut.toLowerCase() === target.toLowerCase()) return curr;
+                    if (n.children) { let res = findLineage(n.children, target, curr); if (res) return res; }
+                }
+                return null;
+            };
+            lineage = findLineage(SYSTEM_TAGS, mapped, []) || [];
+            if (lineage.length === 0) lineage = findLineage(SYSTEM_TAGS, lowerT, []) || [];
+        }
+        
+        if (lineage.length === 0) {
+            let c = typeof getLiveTagColor === 'function' ? getLiveTagColor(mapped) : '#a855f7';
+            lineage = [{name: mapped, color: c}];
+        }
+        
+        let deepestNode = lineage[lineage.length - 1];
+        let bestCodeSub = deepestNode.name;
+        
+        if (typeof SYSTEM_ALIASES !== 'undefined') {
+            for (let [code, trans] of Object.entries(SYSTEM_ALIASES)) {
+                if (trans.toLowerCase() === deepestNode.name.toLowerCase() && code.length < bestCodeSub.length) bestCodeSub = code;
+            }
+        }
+        
+        let plainCtxStr = item.contexts.join(' ') || bestCodeSub.toLowerCase();
+
+        let displayName = String(item.mod).trim();
+        if (/^\d+(\.\d+)?$/.test(displayName)) {
+            displayName += 'm';
+        }
+        
+        let itemStr = '';
+        if (colorize) {
+            let lengthMatch = displayName.match(/^(\d+(?:\.\d+)?)([m|M])$/i);
+            if (lengthMatch) {
+                itemStr = `<span style="color:#ffffff;">${item.qty}</span><span style="color:#22d3ee;font-weight:bold;">x</span> <span style="color:#ffffff;">${lengthMatch[1]}</span><span style="color:#fef08a;">M</span>`;
+            } else {
+                itemStr = `<span style="color:#ffffff;">${item.qty}</span><span style="color:#22d3ee;font-weight:bold;">x</span> <span style="color:#ffffff;">${displayName.toUpperCase()}</span>`;
+            }
+        } else {
+            itemStr = `${item.qty}x ${displayName}`;
+        }
+        
+        return { lineage, plainCtxStr, itemStr };
+    });
+    
+    if (colorize) {
+        let root = { name: "ROOT", items: [], children: {}, order: [] };
+        
+        processedItems.forEach(pi => {
+            let current = root;
+            pi.lineage.forEach(node => {
+                let key = node.name.toUpperCase();
+                if (!current.children[key]) {
+                    current.children[key] = { name: node.name, color: node.color, items: [], children: {}, order: [] };
+                    current.order.push(key);
+                }
+                current = current.children[key];
+            });
+            current.items.push(pi.itemStr);
+        });
+        
+        let s_plus  = ` <span style="color:#22d3ee;font-weight:bold;">+</span> `;
+        let s_eq    = `<span style="color:#22d3ee;font-weight:bold;margin-right:6px;">=</span>`;
+        
+        const bracketMap = [
+            { open: '(', close: ')' },
+            { open: '[', close: ']' },
+            { open: '{', close: '}' },
+            { open: '(', close: ')' }
+        ];
+        
+        function renderTree(node, depth) {
+            let parts = [];
+            
+            if (node.items && node.items.length > 0) {
+                parts.push(node.items.join(s_plus));
+            }
+            
+            node.order.forEach(childKey => {
+                let childNode = node.children[childKey];
+                let childContent = renderTree(childNode, depth + 1);
+                
+                if (childContent) {
+                    let brackets = bracketMap[Math.min(depth, bracketMap.length - 1)];
+                    let cColor = childNode.color || '#d8b4fe';
+                    let bOpen = `<span style="color:${cColor}; font-weight:bold;"> ${brackets.open} </span>`;
+                    let bClose = `<span style="color:${cColor}; font-weight:bold;"> ${brackets.close}</span>`;
+                    let title = `<span style="color:${cColor}; font-weight:bold;">${childNode.name.toUpperCase()}</span>`;
+                    
+                    parts.push(`${title}${bOpen}${childContent}${bClose}`);
+                }
+            });
+            
+            return parts.join(s_plus);
+        }
+        
+        let res = renderTree(root, 0).trim();
+        return `${s_eq} ${res}`;
+    } else {
+        let parts = [];
+        let lastCtxStr = null;
+        let hasAnyContext = parsed.items.some(item => item.contexts && item.contexts.length > 0);
+        
+        processedItems.forEach((pi, index) => {
+            if (pi.plainCtxStr !== lastCtxStr) {
+                let disp = pi.plainCtxStr;
+                let isImplicit = (disp === 'cable' || disp === 'cbl' || disp === 'c');
+                
+                if (isImplicit) {
+                    if (index !== 0) { parts.push('/'); parts.push('/'); }
+                } else {
+                    if (index === 0) {
+                        if (disp) { parts.push(disp); parts.push('/'); } 
+                        else if (hasAnyContext) { parts.push('/'); }
+                    } else {
+                        if (disp) { parts.push('/'); parts.push(disp); parts.push('/'); } 
+                        else { parts.push('/'); parts.push('/'); }
+                    }
+                }
+                parts.push(pi.itemStr);
+                lastCtxStr = pi.plainCtxStr;
+            } else {
+                parts.push('+');
+                parts.push(pi.itemStr);
+            }
+        });
+        
+        let res = parts.join(' ').replace(/\s+/g, ' ').trim();
+        if (res.startsWith('/ +')) res = '/' + res.substring(3).trim();
+        return `${loc} = ${res}`;
+    }
+}
+
+function colorizeFormula(rawStr) {
+    if (!rawStr || !rawStr.includes('=')) return typeof escapeHTML === 'function' ? escapeHTML(rawStr) : rawStr;
+    let parsed = null;
+    try { parsed = parseAssetSyntax(rawStr); } catch(e) {}
+    if (!parsed) return typeof escapeHTML === 'function' ? escapeHTML(rawStr) : rawStr;
+    
+    if (typeof standardizeFormulaString === 'function') {
+        let colorized = standardizeFormulaString(parsed, true);
+        if (colorized && !colorized.includes("= Standalone")) return colorized;
+    }
+    return typeof escapeHTML === 'function' ? escapeHTML(rawStr) : rawStr;
+}
+
+// @INDEX: SYNTAX_CLI -> Syntax Parser Engine
+function parseAssetSyntax(str) {
+    let location = "General";
+    let rawFormula = "Standalone";
+    let payload = str;
+    let results = [];
+    
+    if (str.includes('=')) {
+        let parts = str.split('=');
+        location = parts[0].trim();
+        payload = parts[1].trim();
+        rawFormula = str;
+
+        let chunks = payload.split('/');
+        
+        // Triangle of Truth: Cable is the implicit default parent
+        let activeContexts = ['cable'];
+
+        for (let i = 0; i < chunks.length; i++) {
+            let chunk = chunks[i].trim();
+            
+            let isTagBlock = (chunks.length > 1) ? (i % 2 === 0) : false;
+            
+            if (isTagBlock) {
+                // Context Toggle Block
+                if (chunk) activeContexts = chunk.split(/\s+/);
+                else activeContexts = []; // Empty slashes remove the default context
+            } else {
+                // Item Block
+                if (!chunk) continue;
+
+                let items = chunk.split('+');
+                items.forEach(item => {
+                    let qty = 1;
+                    let mod = item.trim();
+                    if (!mod) return;
+                    
+                    let prefixMatch = mod.match(/^(\d+)(?:\s*(?:x|\*)\s*|\s+)(.*)$/i);
+                    let suffixMatch = mod.match(/^(.*?)\s+(?:x\*|\*x|x|\*)\s*(\d+)$/i) || mod.match(/^(.*?)\s+(\d+)x$/i);
+                    
+                    if (prefixMatch) {
+                        qty = parseInt(prefixMatch[1], 10) || 1;
+                        mod = prefixMatch[2].trim();
+                    } else if (suffixMatch) {
+                        qty = parseInt(suffixMatch[2], 10) || 1;
+                        mod = suffixMatch[1].trim();
+                    }
+                    
+                    let appliedContexts = [...activeContexts];
+                    
+                    if (mod) results.push({ location, contexts: appliedContexts, qty: qty, mod: mod, rawFormula: rawFormula });
+                });
+            }
+        }
+    } else {
+        // MODE A: Manual Search
+        // Disable math splitters and implicit cable trap to safely search for '+' or '/' in names
+        let qty = 1;
+        let mod = payload.trim();
+        if (!mod) return { location, rawFormula, items: [] };
+        
+        let prefixMatch = mod.match(/^(\d+)(?:\s*(?:x|\*)\s*|\s+)(.*)$/i);
+        if (prefixMatch) {
+            qty = parseInt(prefixMatch[1], 10) || 1;
+            mod = prefixMatch[2].trim();
+        }
+        
+        if (mod) results.push({ location, contexts: [], qty: qty, mod: mod, rawFormula: rawFormula });
+    }
+
+    return { location, rawFormula: rawFormula, items: results };
+}
+
+// @INDEX: SYNTAX_CLI -> Fuzzy Matching Engine
+function fuzzyMatchAsset(contexts, mod) {
+    // 1. Pool Contexts and Modifiers into an Order-Agnostic Token Array
+    let searchTokens = [...contexts];
+    if (mod) searchTokens.push(...mod.split(/\s+/));
+    searchTokens = searchTokens.filter(Boolean).map(t => t.toLowerCase());
+    
+    // Resolve Aliases (e.g. 'c' -> 'cable')
+    searchTokens = searchTokens.map(t => (typeof SYSTEM_ALIASES !== 'undefined' && SYSTEM_ALIASES[t]) ? SYSTEM_ALIASES[t] : t);
+    
+    let onlyLengths = true;
+    searchTokens.forEach(t => {
+        if (isNaN(t) && !/^\d+(\.\d+)?m$/i.test(t)) onlyLengths = false;
+    });
+    if (onlyLengths && searchTokens.length > 0) return null;
+    
+    let bestMatch = null;
+    let bestScore = -1;
+
+    globalAssets.forEach(a => {
+        let score = 0;
+        let tags = [];
+        try { 
+            JSON.parse(a.tags || '[]').forEach(tId => {
+                let tObj = getTagObj(tId);
+                if(tObj) {
+                    tags.push(tObj.name.toLowerCase());
+                    tags.push(...tObj.name.toLowerCase().split(/\s+/));
+                }
+            });
+        } catch(e){}
+        
+        // Combine Name, Manufacturer, Dept, and Tags into a universal search target
+        let nameWords = String(a.name || '').toLowerCase().split(/\s+/);
+        if (a.manufacturer) nameWords.push(String(a.manufacturer || '').toLowerCase());
+        if (a.department) {
+            let dObj = getDeptObj(a.department);
+            if (dObj && dObj.name && dObj.name !== 'Unassigned') nameWords.push(...dObj.name.toLowerCase().split(/\s+/));
+        }
+        
+        let allTargetWords = [...tags, ...nameWords];
+        let matchedTokens = 0;
+        
+        let hasIdentityTokens = false;
+        let identityTokensMatched = 0;
+        let failedNumericToken = false; // STRICT DIMENSION GUARD
+
+        searchTokens.forEach(token => {
+            let tokenMatched = false;
+            let bestTokenScore = 0;
+
+            // Specific length dimension matching
+            let isLenMatch = (!isNaN(token) || /^\d+(\.\d+)?m$/i.test(token));
+            if (!isLenMatch) hasIdentityTokens = true;
+            
+            if (isLenMatch && parseFloat(a.length) === parseFloat(token)) {
+                bestTokenScore = Math.max(bestTokenScore, 50);
+                tokenMatched = true;
+            }
+            
+            let cleanToken = token.toLowerCase().replace(/[^a-z0-9]/g, '');
+            let numToken = parseFloat(token);
+
+            allTargetWords.forEach(target => {
+                let cleanTarget = target.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (!cleanTarget) return;
+                
+                let numTarget = parseFloat(target);
+                
+                if (cleanTarget === cleanToken) {
+                    bestTokenScore = Math.max(bestTokenScore, 40); // Exact Match
+                    tokenMatched = true;
+                } else if (!isNaN(numToken) && !isNaN(numTarget) && numToken === numTarget) {
+                    bestTokenScore = Math.max(bestTokenScore, 40); // Numeric Equivalent Match (e.g. "2" == "2m")
+                    tokenMatched = true;
+                } else if (cleanTarget.includes(cleanToken) || cleanToken.includes(cleanTarget)) {
+                    if (cleanToken.length >= 3 && cleanTarget.length >= 3) {
+                        bestTokenScore = Math.max(bestTokenScore, 20); // Substring Match
+                        tokenMatched = true;
+                    }
+                } else if (cleanToken.length === 2 && cleanTarget.startsWith(cleanToken.split('').reverse().join(''))) {
+                    bestTokenScore = Math.max(bestTokenScore, 20); // Transposed shortcode match (x3 -> 3x)
+                    tokenMatched = true;
+                } else if (cleanToken.length >= 3 && cleanTarget.length >= 3 && cleanTarget.substring(0, 3) === cleanToken.substring(0, 3)) {
+                    bestTokenScore = Math.max(bestTokenScore, 15); // Root match (handles soca vs socopex vs sockapex)
+                    tokenMatched = true;
+                } else if (cleanToken.length >= 3 && cleanTarget.length >= 3) {
+                    let dist = levenshteinDistance(cleanToken, cleanTarget);
+                    if (dist <= 1) { 
+                        bestTokenScore = Math.max(bestTokenScore, 25); // 1 Typo Match
+                        tokenMatched = true;
+                    } else if (dist <= 2 && token.length >= 5) {
+                        bestTokenScore = Math.max(bestTokenScore, 15); // 2 Typo Match (Long words)
+                        tokenMatched = true;
+                    }
+                }
+            });
+
+            score += bestTokenScore;
+            if (tokenMatched) {
+                matchedTokens++;
+                if (!isLenMatch) identityTokensMatched++;
+            } else {
+                if (isLenMatch) failedNumericToken = true;
+            }
+        });
+
+        // Accuracy constraint: Penalize score if words are typed that do not match the asset
+        if (searchTokens.length > 0) {
+            let matchRatio = matchedTokens / searchTokens.length;
+            score = score * Math.pow(matchRatio, 2); 
+        }
+        
+        // STRICT IDENTITY GUARD: Prevent "Length Only" matches from hijacking unrelated contexts
+        if (hasIdentityTokens && identityTokensMatched === 0) {
+            score = 0;
+        }
+        
+        // STRICT DIMENSION GUARD: Prevent unmatched numbers/lengths from adopting wrong assets
+        if (failedNumericToken) {
+            score = 0;
+        }
+
+        // Volume/Availability Tie-breaker Boost
+        let inventoryBoost = Math.min(parseInt(a.totalQuantity, 10) || 1, 20); 
+        score += (inventoryBoost * 0.1);
+
+        // Must hit a minimum confidence threshold to be suggested
+        if (matchedTokens > 0 && score > bestScore && score > 5) {
+            bestScore = score;
+            bestMatch = a;
+        }
+    });
+    return bestMatch;
+}
+
+// ==========================================
+// --- LEVENSHTEIN DISTANCE ENGINE ---
+// ==========================================
+function levenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    let matrix = [];
+    for (let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+    for (let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) matrix[i][j] = matrix[i - 1][j - 1];
+            else matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+        }
+    }
+    return matrix[b.length][a.length];
+}
+
+function updateLivePreviewQty(assetId, delta) {
+    let input = document.getElementById('pa-search-cli');
+    if (!input) return;
+    let rawStr = input.value.trim();
+    let asset = globalAssets.find(a => a.id === assetId);
+    if (!asset || !rawStr.includes('=')) return;
+    
+    let newForm = modifyFormulaText(rawStr, asset, delta, false);
+    if (newForm === "Manual") newForm = rawStr.split('=')[0].trim() + " = ";
+    
+    input.value = newForm;
+    if (typeof handleUnifiedInput === 'function') handleUnifiedInput();
+}
+</script>

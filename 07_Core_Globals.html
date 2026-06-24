@@ -1,0 +1,562 @@
+<script>
+/**
+ * 07_Core_Globals.html
+ * Domain: System-wide state management, shared utilities, and boot sequence.
+ */
+let calendar = null, miniCalendar = null, templates = [], activeRoster = [];
+let globalTasks = [], globalNotifs = [];
+let SYSTEM_TAGS = [];
+let globalRosterData = null;
+let globalAssets = [];
+let SYSTEM_ALIASES = { 's':'SOCA', 'd':'DISTRO', 'e':'EXTENDER', 'b':'BREAKOUT', 'c':'CABLE', '3x':'3XLR', '5x':'5XLR', 'x3':'3XLR', 'x5':'5XLR' };
+
+window.returnToHome = function() {
+    if (window.activeProjectContext) {
+        if (typeof cancelProjectEditor === 'function') {
+            if (cancelProjectEditor() === false) return; 
+        }
+    }
+    if (typeof closeModals === 'function') closeModals();
+};
+
+// ==========================================
+// --- SECURITY UTILITIES ---
+// ==========================================
+function escapeHTML(str) {
+    if (typeof str !== 'string') return str;
+    return str.replace(/[&<>'"]/g, function(tag) {
+        const charsToReplace = { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' };
+        return charsToReplace[tag] || tag;
+    });
+}
+
+// ==========================================
+// --- THEME ENGINE (LOCAL PREFERENCES) ---
+// ==========================================
+// @INDEX: GLOBALS -> CSS Theme Engine
+function changeUserTheme(theme) {
+    localStorage.setItem('sm_user_theme', theme);
+    applyTheme(theme);
+}
+
+function applyTheme(theme) {
+    if (theme === 'light') {
+        document.documentElement.classList.add('theme-light');
+        document.body.classList.add('theme-light');
+    } else {
+        document.documentElement.classList.remove('theme-light');
+        document.body.classList.remove('theme-light');
+    }
+    
+    let select = document.getElementById('user-theme-select');
+    if (select) select.value = theme;
+}
+
+// ==========================================
+// --- PAINTBRUSH STATE ENGINE ---
+// ==========================================
+let currentPaintTool = 'main'; // System strictly defaults to MAIN EVENT
+
+let PAINT_COLORS = {
+    'wh': { title: 'Warehouse', color: '#f97316' },
+    'main': { title: 'Main Event', color: '#3b82f6' },
+    'show': { title: 'Show Day', color: '#10b981' },
+    'recovery': { title: 'Recovery', color: '#a855f7' },
+    'transit': { title: 'Transit', color: '#06b6d4' },
+    'erase': { title: 'Erase', color: '#ef4444' }
+};
+
+function setPaintTool(tool) {
+    currentPaintTool = tool;
+    
+    // 1. Clear all borders
+    document.querySelectorAll('.paint-tool').forEach(btn => {
+        if(btn.id !== 'tool-erase') btn.style.borderColor = 'transparent';
+    });
+    
+    // 2. Apply border to the newly selected tool
+    let activeBtn = document.getElementById('tool-' + tool);
+    if (activeBtn && tool !== 'erase') {
+        activeBtn.style.borderColor = '#fff';
+    }
+}
+
+// --- VISUAL SETTINGS ENGINE ---
+const DEFAULT_ROLE_COLORS = {
+  'Technician': {bg: '#86efac', text: '#064e3b'},
+  'Bus Boy': {bg: '#93c5fd', text: '#1e3a8a'},
+  'On Duty': {bg: '#166534', text: '#ffffff'},
+  'Supervisor': {bg: '#a855f7', text: '#ffffff'},
+  'Operator': {bg: '#3b82f6', text: '#ffffff'},
+  'Follow Spot': {bg: '#facc15', text: '#854d0e'},
+  'World Tech': {bg: '#f97316', text: '#ffffff'}
+};
+const DEFAULT_PHASE_PALETTE = {
+  "Build-Up": "#78350f",
+  "Rehearsal": "#1e3a8a",
+  "Break": "#334155",
+  "Doors Open": "#312e81",
+  "Showtime": "#7f1d1d",
+  "Breakdown": "#4c1d95"
+};
+
+// Active State Variables
+let ROLE_COLORS = JSON.parse(JSON.stringify(DEFAULT_ROLE_COLORS));
+let PHASE_PALETTE = JSON.parse(JSON.stringify(DEFAULT_PHASE_PALETTE));
+let CURRENT_SIDEBAR_WIDTH = 180;
+let CURRENT_ROW_HEIGHT = 60;
+let SHIFT_HEIGHT = 38;
+let SHIFT_FONT_SIZE = 9;
+let SHIFT_FONT_WEIGHT = '900';
+let SHIFT_FONT_STYLE = 'normal';
+let SHIFT_TEXT_DECORATION = 'none';
+
+// Text Coordinate Engines
+let SHIFT_TIME_X = 22; 
+let SHIFT_TIME_Y = 2;
+let SHIFT_ROLE_X = 22;
+let SHIFT_ROLE_Y = 16;
+
+let ASSET_ROW_PADDING = 6;
+let ASSET_FONT_SIZE = 11;
+let ASSET_COL_WIDTHS = { name: '220px', qty: '60px', unit: '50px', rfid: '120px', brand: '110px', length: '80px', location: '140px', container: '140px', tags: '120px', type: '90px', level: '110px', status: '80px', action: '110px', weight: '80px', dims: '100px', capacity: '80px', power: '80px', price: '80px', rental: '80px', dateBought: '100px', lastService: '100px', interval: '80px', dept: '110px' };
+let ASSET_COL_GAPS = {};
+let ASSET_COL_VISIBILITY = { name: true, qty: true, unit: true, rfid: true, brand: true, length: false, location: true, container: true, tags: true, type: true, status: true, action: true, weight: false, dims: false, capacity: false, power: false, price: false, rental: false, dateBought: false, lastService: false, interval: false, dept: false };
+let ASSET_COL_ORDER = ['name', 'qty', 'unit', 'rfid', 'brand', 'length', 'location', 'container', 'tags', 'type', 'weight', 'dims', 'capacity', 'power', 'price', 'rental', 'dateBought', 'lastService', 'interval', 'dept', 'status', 'action'];
+
+let PA_ROW_PADDING = 6;
+let PA_FONT_SIZE = 11;
+let PA_SPLIT_RATIO = 40;
+let PA_COL_WIDTHS = { name: '220px', qty: '60px', unit: '50px', rfid: '120px', brand: '110px', length: '80px', location: '140px', container: '140px', tags: '120px', type: '90px', level: '110px', status: '80px', action: '130px', weight: '80px', dims: '100px', capacity: '80px', power: '80px', price: '80px', rental: '80px', dateBought: '100px', lastService: '100px', interval: '80px', dept: '110px' };
+let PA_COL_GAPS = {};
+let PA_COL_VISIBILITY = { name: true, qty: true, unit: true, rfid: true, brand: true, length: false, location: true, container: true, tags: true, type: true, status: true, action: true, weight: false, dims: false, capacity: false, power: false, price: false, rental: false, dateBought: false, lastService: false, interval: false, dept: false };
+let PA_COL_ORDER = ['name', 'qty', 'unit', 'rfid', 'brand', 'length', 'location', 'container', 'tags', 'type', 'weight', 'dims', 'capacity', 'power', 'price', 'rental', 'dateBought', 'lastService', 'interval', 'dept', 'status', 'action'];
+
+let PA_VAULT_COL_WIDTHS = JSON.parse(JSON.stringify(PA_COL_WIDTHS));
+let PA_VAULT_COL_GAPS = {};
+let PA_VAULT_COL_VISIBILITY = JSON.parse(JSON.stringify(PA_COL_VISIBILITY));
+let PA_VAULT_COL_ORDER = [...PA_COL_ORDER];
+
+let TRACKER_ROW_PADDING = 6;
+let TRACKER_FONT_SIZE = 11;
+let TRACKER_COL_WIDTHS = JSON.parse(JSON.stringify(ASSET_COL_WIDTHS));
+let TRACKER_COL_GAPS = {};
+let TRACKER_COL_VISIBILITY = JSON.parse(JSON.stringify(ASSET_COL_VISIBILITY));
+let TRACKER_COL_ORDER = [...ASSET_COL_ORDER];
+
+let MINI_EVENT_HEIGHT = 24;
+let MINI_FONT_SIZE = 12;
+
+let CAL_EVENT_HEIGHT = 42;
+let CAL_FONT_SIZE = 12;
+let CAL_BG_INTENSITY = 0.3;
+let CAL_COLORS = { 'event': '#888888', 'meeting': '#fecaca', 'cross rent': '#a7f3d0' };
+let MR_VISUAL_SETTINGS = {};
+let globalManagerConfig = { rules: [] };
+
+let SYSTEM_DEPARTMENTS = [
+  {uid: "dept_lighting", name: "Lighting", color: "#f59e0b"},
+  {uid: "dept_audio", name: "Audio", color: "#3b82f6"},
+  {uid: "dept_video", name: "Video", color: "#10b981"},
+  {uid: "dept_rigging", name: "Rigging", color: "#ef4444"},
+  {uid: "dept_trucks", name: "Trucks", color: "#6b7280"}
+];
+let SYSTEM_MEALS = ["None", "Vegan", "Vegetarian", "Gluten-Free", "Low Carb", "Not Junk"];
+
+function getDeptObj(val) {
+    if (!val) return { uid: '', name: 'Unassigned', color: '#888888' };
+    if (typeof val === 'object') return val;
+    let cleanVal = String(val).trim();
+    let d = SYSTEM_DEPARTMENTS.find(x => x.uid === cleanVal || x.name === cleanVal);
+    return d || { uid: cleanVal, name: cleanVal, color: '#888888' };
+}
+
+function getTagObj(id, nodes = SYSTEM_TAGS) {
+    if (!id || !nodes) return null;
+    if (typeof id === 'object') return id; // LEGACY FALLBACK
+    for (let n of nodes) {
+        if (n.id === id) return n;
+        if (n.children) {
+            let found = getTagObj(id, n.children);
+            if (found) return found;
+        }
+    }
+    return null;
+}
+
+function getTagPathById(id, nodes = SYSTEM_TAGS, currentPath = []) {
+    if (!id || !nodes) return null;
+    if (typeof id === 'object') return [id]; // LEGACY FALLBACK
+    for (let n of nodes) {
+        let newPath = [...currentPath, n.id];
+        if (n.id === id) return newPath;
+        if (n.children) {
+            let res = getTagPathById(id, n.children, newPath);
+            if (res) return res;
+        }
+    }
+    return null;
+}
+
+function getTagDepthById(id, nodes = SYSTEM_TAGS, depth = 0) {
+    if (!id || !nodes) return -1;
+    if (typeof id === 'object') return 0; // LEGACY FALLBACK
+    for (let n of nodes) {
+        if (n.id === id) return depth;
+        if (n.children) {
+            let d = getTagDepthById(id, n.children, depth + 1);
+            if (d > -1) return d;
+        }
+    }
+    return -1;
+}
+
+// @INDEX: GLOBALS -> Asset Utilities
+function getParentCaseForAsset(assetName) {
+    if (!assetName || typeof globalAssets === 'undefined') return null;
+    let target = String(assetName).trim().toLowerCase();
+    return globalAssets.find(p => {
+        if ((p.nestingLevel == 3 || p.nestingLevel == 4 || p.nestingLevel == 5 || p.type === 'Container') && p.components) {
+            let comps = p.components.split(',');
+            return comps.some(c => {
+                let match = c.trim().match(/^(\d+)x\s+(.*)$/i);
+                let cName = match ? match[2].trim().toLowerCase() : c.trim().toLowerCase();
+                return cName === target;
+            });
+        }
+        return false;
+    });
+}
+
+function getAssetGroupingKey(asset) {
+    if (!asset) return 'unknown';
+    let key = (asset.name || 'Unnamed') + '|' + (asset.manufacturer || '') + '|' + (asset.length || '');
+    if (asset.type && asset.type.toLowerCase() === 'bulk') key += '|' + (asset.id || asset.uid);
+    return key;
+}
+
+function getAssetModelKey(asset) {
+    if (!asset) return 'unknown';
+    if (asset.modelKey) return asset.modelKey;
+    if (asset.type && asset.type.toLowerCase() === 'bulk' && (asset.id || asset.uid)) return 'bulk_' + (asset.id || asset.uid);
+    let len = asset.length ? "|||" + asset.length : "";
+    return (String(asset.name || '') + "|||" + String(asset.manufacturer || '') + len).toLowerCase();
+}
+
+// @INDEX: GLOBALS -> Live Tag Lexicon Parser
+function getLiveTagColor(tagName, fallbackColor) {
+    if (typeof SYSTEM_TAGS === 'undefined') return fallbackColor !== undefined ? fallbackColor : '#a855f7';
+    let target = String(tagName).toLowerCase().trim();
+    let cleanTarget = target.replace(/[^a-z0-9]/g, '');
+    if (!cleanTarget) return fallbackColor !== undefined ? fallbackColor : '#a855f7';
+    
+    let targetWords = target.split(/[\s\-\/_]+/).filter(w => w.length > 0);
+    let bestMatch = null;
+    let bestScore = -1;
+
+    const findT = (nodes) => {
+        for (let n of nodes) {
+            let nName = String(n.name).toLowerCase().trim();
+            let nClean = nName.replace(/[^a-z0-9]/g, '');
+            let nWords = nName.split(/[\s\-\/_]+/).filter(w => w.length > 0);
+            let score = -1;
+            
+            if (nName === target) score = 100;
+            else if (typeof SYSTEM_ALIASES !== 'undefined' && SYSTEM_ALIASES[nName] && SYSTEM_ALIASES[nName].toLowerCase() === target) score = 100;
+            else if (typeof SYSTEM_ALIASES !== 'undefined' && SYSTEM_ALIASES[target] && SYSTEM_ALIASES[target].toLowerCase() === nName) score = 100;
+            else if (nClean === cleanTarget) score = 90;
+            else {
+                let wordMatches = 0;
+                targetWords.forEach(tw => {
+                    nWords.forEach(nw => {
+                        if (tw === nw) wordMatches += 2;
+                        else if (tw.length >= 3 && nw.length >= 3 && (tw.includes(nw) || nw.includes(tw))) wordMatches += 1;
+                    });
+                });
+                
+                if (wordMatches > 0) score = 60 + wordMatches;
+                else if (cleanTarget.length >= 3 && nClean.length >= 3 && (nClean.includes(cleanTarget) || cleanTarget.includes(nClean))) score = 50;
+                else if (cleanTarget.length >= 3 && nClean.length >= 3 && (nClean.startsWith(cleanTarget) || cleanTarget.startsWith(nClean))) score = 40;
+            }
+
+            if (score > bestScore && score > 0) { bestScore = score; bestMatch = n; }
+            if (n.children) findT(n.children);
+        }
+    };
+    findT(SYSTEM_TAGS);
+    return (bestMatch && bestMatch.color) ? bestMatch.color : (fallbackColor !== undefined ? fallbackColor : '#a855f7');
+}
+
+function buildTagPathsHtml(tagIds, badgeFs = 8) {
+    if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) return '-';
+
+    const idSet = new Set(tagIds);
+    if (idSet.size === 0) return '-';
+
+    // 1. Find all "leaf" nodes within the provided tagIds.
+    // A leaf is a tag that is not a parent to any other tag in the list.
+    const leafIds = tagIds.filter(id => {
+        const node = getTagObj(id);
+        if (!node || !node.children || node.children.length === 0) return true;
+        return !node.children.some(child => idSet.has(child.id));
+    });
+
+    // Fallback for corrupted data where a parent is present without its child, or if no leaves are found for some reason.
+    if (leafIds.length === 0 && tagIds.length > 0) {
+        return tagIds.map(tId => {
+            const tObj = getTagObj(tId);
+            if (!tObj) return '';
+            let dispName = tObj.name;
+            if (dispName.toLowerCase() === 'cable') dispName = 'CBL';
+            const c = tObj.color || '#a855f7';
+            return `<span style="border:1px solid ${c}; color:${c}; padding:2px 4px; border-radius:4px; font-size:${badgeFs}px; margin-right:4px; text-transform:uppercase;">${dispName}</span>`;
+        }).join('');
+    }
+
+    // 2. For each leaf, get its full path and render it as a breadcrumb.
+    const pathHtmls = leafIds.map(leafId => {
+        const pathIds = getTagPathById(leafId);
+        if (!pathIds) return '';
+        const pathPills = pathIds.map(pId => {
+            const tObj = getTagObj(pId);
+            if (!tObj) return '';
+            let dispName = tObj.name;
+            if (dispName.toLowerCase() === 'cable') dispName = 'CBL';
+            const c = tObj.color || '#a855f7';
+            return `<span style="border:1px solid ${c}; color:${c}; padding:2px 4px; border-radius:4px; font-size:${badgeFs}px; text-transform:uppercase;">${dispName}</span>`;
+        }).join('');
+        
+        return `<div style="display:flex; align-items:center; gap: 1px; margin-bottom:2px; white-space:nowrap;">${pathPills}</div>`;
+    });
+
+    return pathHtmls.join('');
+}
+
+function initCalVisualsCSS() {
+   document.documentElement.style.setProperty('--cal-event-height', CAL_EVENT_HEIGHT + 'px');
+   document.documentElement.style.setProperty('--cal-font-size', CAL_FONT_SIZE + 'px');
+   document.documentElement.style.setProperty('--cal-bg-intensity', CAL_BG_INTENSITY);
+   document.documentElement.style.setProperty('--cal-color-event', CAL_COLORS['event']);
+   document.documentElement.style.setProperty('--cal-color-meeting', CAL_COLORS['meeting']);
+   document.documentElement.style.setProperty('--cal-color-cross-rent', CAL_COLORS['cross rent']);
+}
+
+function initMiniVisualsCSS() {
+   document.documentElement.style.setProperty('--color-paint-main', PAINT_COLORS['main'].color);
+   document.documentElement.style.setProperty('--color-paint-wh', PAINT_COLORS['wh'].color);
+   document.documentElement.style.setProperty('--color-paint-show', PAINT_COLORS['show'].color);
+   document.documentElement.style.setProperty('--color-paint-recovery', PAINT_COLORS['recovery'].color);
+   document.documentElement.style.setProperty('--color-paint-transit', PAINT_COLORS['transit'].color);
+   document.documentElement.style.setProperty('--mini-event-height', MINI_EVENT_HEIGHT + 'px');
+   document.documentElement.style.setProperty('--mini-font-size', MINI_FONT_SIZE + 'px');
+}
+
+function initMrVisualsCSS() {
+   let evH = MR_VISUAL_SETTINGS.eventHeight || 24;
+   let shH = MR_VISUAL_SETTINGS.shiftHeight || 22;
+   let rowH = MR_VISUAL_SETTINGS.rowHeight || 80;
+   document.documentElement.style.setProperty('--mr-event-height', evH + 'px');
+   document.documentElement.style.setProperty('--mr-shift-height', shH + 'px');
+   document.documentElement.style.setProperty('--mr-row-height', rowH + 'px');
+}
+
+// ==========================================
+// --- SYSTEM BOOT SEQUENCE (BACKGROUND LOAD) ---
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+
+  // Apply user theme preference immediately on boot
+  let savedTheme = localStorage.getItem('sm_user_theme') || 'dark';
+  applyTheme(savedTheme);
+
+  // Global Dirty Memory Heartbeat for Nav Dashboard Lock
+  setInterval(() => {
+      let btn = document.getElementById('nav-btn-dashboard');
+      let projIcon = document.getElementById('nav-icon-project');
+      if (btn && projIcon && projIcon.style.display !== 'none') {
+          let isDirty = false;
+          if (window.isProjectDirty) isDirty = true;
+          if (window.isTimelineDirty) isDirty = true;
+          if (window.isTruckDirty) isDirty = true;
+          if (typeof calculatePaDeltas === 'function' && calculatePaDeltas().length > 0) isDirty = true;
+          
+          if (isDirty) {
+              btn.style.setProperty('color', '#ef4444', 'important');
+              projIcon.style.stroke = '#ef4444';
+              btn.classList.add('dirty-glow');
+          } else {
+              btn.style.removeProperty('color');
+              projIcon.style.stroke = 'currentColor';
+              btn.classList.remove('dirty-glow');
+          }
+      }
+  }, 1000);
+
+  // ==========================================
+  // 1. ROSTER AUTO-LOAD & STRICT TRAP ENGINE
+  // ==========================================
+  google.script.url.getLocation(function(location) {
+      if (location.parameter && location.parameter.roster === 'true') {
+          const checkInterval = setInterval(() => {
+              if (typeof openMonthRoster === 'function') {
+                  clearInterval(checkInterval);
+                  openMonthRoster(); 
+                  
+                  let lockStyle = document.createElement('style');
+                  lockStyle.innerHTML = `
+                      #calendar-container, .sidebar, .fc-header-toolbar { display: none !important; }
+                      .mr-canvas, .mr-row, .mr-cell, .shift-block { pointer-events: none !important; }
+                      button[onclick*="close"], button[onclick*="Calendar"], .btn-main { display: none !important; }
+                      #month-roster-container { display: flex !important; pointer-events: auto !important; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 9999; background: var(--bg-dark); }
+                  `;
+                  document.head.appendChild(lockStyle);
+              }
+          }, 100);
+      }
+  });
+
+  const isMobile = window.innerWidth <= 768;
+
+  // ==========================================
+  // --- MAIN DASHBOARD CALENDAR ---
+  // ==========================================
+  // Note: FullCalendar initialization is isolated inside 01_Main_Calendar.html's boot sequence.
+});
+
+// GLOBAL KEYBOARD SHORTCUTS & MODAL EXIT
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('role-picker') && document.getElementById('role-picker').style.display === 'block') {
+      document.getElementById('role-picker').style.display = 'none';
+    } else if (document.getElementById('phase-picker') && document.getElementById('phase-picker').style.display === 'block') {
+      document.getElementById('phase-picker').style.display = 'none';
+    } else if (document.getElementById('event-context-menu') && document.getElementById('event-context-menu').style.display === 'block') {
+      if (typeof closeEventMenu === 'function') closeEventMenu();
+    } else if (document.getElementById('syntax-help-modal') && document.getElementById('syntax-help-modal').style.display === 'flex') {
+      document.getElementById('syntax-help-modal').style.display = 'none';
+    } else if (document.getElementById('client-modal-overlay') && document.getElementById('client-modal-overlay').style.display === 'flex') {
+      document.getElementById('client-modal-overlay').style.display = 'none';
+    } else if (document.getElementById('universal-history-modal') && document.getElementById('universal-history-modal').style.display === 'flex') {
+      document.getElementById('universal-history-modal').style.display = 'none';
+    } else if (document.getElementById('crew-manager-modal') && document.getElementById('crew-manager-modal').style.display === 'flex') {
+      if(typeof cancelCrewManager === 'function') cancelCrewManager();
+    } else if (document.getElementById('truck-modal-overlay') && document.getElementById('truck-modal-overlay').style.display === 'flex') {
+      if(typeof cancelTruckArrangement === 'function') cancelTruckArrangement(); else document.getElementById('truck-modal-overlay').style.display = 'none';
+    } else if (document.getElementById('project-assets-modal-overlay') && document.getElementById('project-assets-modal-overlay').style.display === 'flex') {
+      if(typeof cancelProjectAssetsModal === 'function') cancelProjectAssetsModal(); else document.getElementById('project-assets-modal-overlay').style.display = 'none';
+    } else if (document.getElementById('checklist-modal-overlay') && document.getElementById('checklist-modal-overlay').style.display === 'flex') {
+      document.getElementById('checklist-modal-overlay').style.display = 'none';
+    } else if (document.getElementById('shift-layer') && document.getElementById('shift-layer').style.display === 'flex') {
+      if(typeof cancelShifts === 'function') cancelShifts();
+    } else if (document.getElementById('edit-modal-overlay') && document.getElementById('edit-modal-overlay').style.display === 'flex') {
+      if(typeof cancelProjectEditor === 'function') cancelProjectEditor();
+    } else if (document.getElementById('master-edit-modal') && document.getElementById('master-edit-modal').style.display === 'flex') {
+      document.getElementById('master-edit-modal').style.display = 'none';
+    } else if (document.getElementById('leave-modal') && document.getElementById('leave-modal').style.display === 'flex') {
+      document.getElementById('leave-modal').style.display = 'none';
+    } else {
+      if (typeof endDrag === 'function') endDrag(); 
+      if (typeof endPhaseDrag === 'function') endPhaseDrag();
+      if (typeof closeContextualSettings === 'function') closeContextualSettings();
+      
+      const subModals = ['visual-settings-modal', 'phase-manager-modal', 'strip-editor-modal', 'cal-visual-settings-modal', 'mini-visual-settings-modal', 'mr-visual-settings-modal', 'asset-visual-settings-modal', 'project-asset-visual-settings-modal', 'sync-picker-modal', 'drive-picker-modal', 'root-modal-overlay', 'add-member-modal-overlay', 'edit-member-modal-overlay', 'iam-modal-overlay', 'assignment-manager-modal', 'color-manager-modal', 'dept-manager-modal', 'meal-manager-modal', 'tag-manager-modal', 'vehicle-modal-overlay', 'logistics-hub-modal-overlay'];
+      
+      for (let id of subModals) {
+          let m = document.getElementById(id);
+          if (m && (m.style.display === 'flex' || m.style.display === 'block')) {
+              m.style.display = 'none';
+              break; 
+          }
+      }
+    }
+  }
+  
+  if ((e.key === 'Delete' || e.key === 'Backspace')) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+      if (typeof selectedLeaveId !== 'undefined' && selectedLeaveId) {
+          let l = globalRosterData.leaves.find(x => x.id === selectedLeaveId);
+          if (l && l.unconfirmed) {
+              globalRosterData.leaves = globalRosterData.leaves.filter(x => x.id !== selectedLeaveId);
+              selectedLeaveId = null;
+              if(typeof renderMonthGrid === 'function') renderMonthGrid();
+          } else if (confirm("Are you sure you want to delete this leave?")) {
+                      google.script.run.deleteLeave(selectedLeaveId, ACTIVE_USER_NAME);
+              if (globalRosterData && globalRosterData.leaves) {
+                  globalRosterData.leaves = globalRosterData.leaves.filter(x => x.id !== selectedLeaveId);
+              }
+              selectedLeaveId = null;
+              if(typeof renderMonthGrid === 'function') renderMonthGrid();
+          }
+      }
+  }
+});
+
+// ==========================================
+// --- NAVIGATION ACTIVE STATE ENGINE ---
+// ==========================================
+function updateActiveNav(activeId) {
+    ['nav-btn-dashboard', 'nav-btn-availability', 'nav-btn-roster', 'nav-btn-manager', 'nav-btn-master', 'nav-btn-financials'].forEach(id => {
+        let btn = document.getElementById(id);
+        if (btn) {
+            if (id === activeId) btn.classList.add('nav-active');
+            else btn.classList.remove('nav-active');
+        }
+    });
+}
+
+// ==========================================
+// --- DATABASE BACKUP ENGINE (CLIENT-SIDE) ---
+// ==========================================
+// @INDEX: GLOBALS -> Database Backup Engine
+function triggerDatabaseBackup() {
+  const overlay = document.getElementById('backup-modal-overlay');
+  const subText = document.getElementById('backup-modal-sub');
+  const mainText = document.getElementById('backup-modal-text');
+  
+  overlay.style.display = 'flex';
+  overlay.style.pointerEvents = 'none';
+  overlay.style.background = 'transparent';
+  overlay.style.backdropFilter = 'none';
+  
+  let count = 20;
+  let phase = 1;
+  
+  mainText.innerHTML = `The database will start backing up in <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #ef4444;">${count}</span><br> seconds.`;
+  subText.innerText = "Please save your work. The interface will lock soon.";
+
+  const timer = setInterval(() => {
+    count--;
+    const newCountdownEl = document.getElementById('backup-countdown');
+    if (newCountdownEl) newCountdownEl.innerText = count;
+    
+    if (count <= 0) {
+      if (phase === 1) {
+        phase = 2;
+        count = 10;
+        overlay.style.pointerEvents = 'auto';
+        overlay.style.background = 'rgba(0,0,0,0.8)';
+        overlay.style.backdropFilter = 'blur(8px)';
+        mainText.innerHTML = `Interface locked. Safety buffer: <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #f59e0b;">${count}</span><br> seconds.`;
+        subText.innerText = "Waiting for pending background saves to complete...";
+      } else if (phase === 2) {
+        clearInterval(timer);
+        mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #10b981;">BACKING UP NOW...</span>`;
+        subText.innerText = "Processing files in Google Drive. Please wait.";
+        
+        google.script.run
+          .withSuccessHandler(res => {
+             mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #10b981;">SUCCESS</span>`;
+             subText.innerText = res;
+             setTimeout(() => { overlay.style.display = 'none'; }, 3000);
+          })
+          .withFailureHandler(err => {
+             mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #ef4444;">ERROR</span>`;
+             subText.innerText = err.message;
+             setTimeout(() => { overlay.style.display = 'none'; }, 5000);
+          })
+          .runNightlyBackup(true, ACTIVE_USER_NAME);
+      }
+    }
+  }, 1000);
+}
+</script>

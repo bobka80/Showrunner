@@ -1,0 +1,506 @@
+<div id="print-studio-overlay" class="modal-overlay" style="z-index: 6000; display:none;">
+  <div class="modal" style="max-width: 1400px; width: 95vw; height: 95vh; display:flex; flex-direction:column; padding:0; background:var(--bg-dark);">
+      
+      <!-- Header -->
+      <div style="height: 70px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0;">
+          <div style="color:#3b82f6; font-weight:900; font-size:16px; letter-spacing: 1px;">🖨️ PRINT STUDIO</div>
+          <div style="display:flex; gap:10px; background:#18181b; padding:5px; border-radius:6px; border:1px solid #333;">
+              <button id="ps-mode-offer" class="btn-main" style="margin:0; padding:6px 15px !important;" onclick="switchPrintMode('offer')">📄 OFFER QUOTE</button>
+              <button id="ps-mode-logistics" class="btn-outline" style="margin:0; padding:6px 15px !important;" onclick="switchPrintMode('logistics')">📋 LOGISTICS LIST</button>
+          </div>
+          <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('print-studio-overlay').style.display='none'">CLOSE</button>
+      </div>
+
+      <!-- Body Split Pane -->
+      <div style="flex:1; display:flex; overflow:hidden;">
+          
+          <!-- Left Side: Config & Filters -->
+          <div style="width: 350px; min-width: 350px; background: #111; border-right: 1px solid #333; display:flex; flex-direction:column;">
+              
+              <!-- Offer Config -->
+              <div id="ps-config-offer" style="padding:20px; display:flex; flex-direction:column; gap:15px; overflow-y:auto; flex:1;">
+                  <div>
+                      <div class="input-label" style="color:#d8b4fe;">Document Details</div>
+                      <input type="text" id="ps-quote-no" placeholder="Offer / Invoice #" oninput="updatePrintPreview()" style="margin-bottom:10px;">
+                      <input type="text" id="ps-company-name" placeholder="Your Company Name" oninput="saveCompanyName(this.value); updatePrintPreview();" style="margin-bottom:10px;">
+                      <input type="text" id="ps-client-name" placeholder="Client Name" oninput="updatePrintPreview()">
+                  </div>
+                  <div style="border-top:1px solid #333; padding-top:15px;">
+                      <div class="input-label" style="color:#d8b4fe;">Language / Език</div>
+                      <select id="ps-offer-lang" onchange="window.offerLanguage = this.value; localStorage.setItem('sm_offer_lang', this.value); updatePrintPreview();" style="margin-bottom:10px; background:#1a1a1e; color:#fff; border:1px solid #333; padding:8px; border-radius:4px; width:100%; outline:none;"><option value="bg">Bulgarian (Български)</option><option value="en">English</option></select>
+                  </div>
+                  <div style="border-top:1px solid #333; padding-top:15px;">
+                      <div class="input-label" style="color:#d8b4fe;">Display Options</div>
+                      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff; font-size:12px; margin-bottom:10px;">
+                          <input type="checkbox" id="ps-hide-prices" onchange="updatePrintPreview()" style="margin:0; width:16px; height:16px;"> Hide Line-Item Prices
+                      </label>
+                      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff; font-size:12px;">
+                          <input type="checkbox" id="ps-hide-zeros" checked onchange="updatePrintPreview()" style="margin:0; width:16px; height:16px;"> Hide $0 / Consumable Items
+                      </label>
+                  </div>
+              </div>
+
+              <!-- Logistics Config -->
+              <div id="ps-config-logistics" style="padding:20px; display:none; flex-direction:column; gap:15px; overflow-y:auto; flex:1;">
+                  <div>
+                      <div class="input-label" style="color:#3b82f6;">Subrent / Cross-Hire Filter</div>
+                      <select id="ps-subrent-filter" onchange="updatePrintPreview()">
+                          <option value="all">Show All Equipment</option>
+                          <option value="exclude">Exclude Subrents</option>
+                          <option value="only">Print ONLY Subrents</option>
+                      </select>
+                  </div>
+                  <div style="border-top:1px solid #333; padding-top:15px; margin-top:15px;">
+                      <div class="input-label" style="color:#3b82f6;">Document Format</div>
+                      <select id="ps-log-format" onchange="updatePrintPreview()" style="margin-bottom:10px; width:100%; padding:8px; background:#1a1a1e; color:#fff; border:1px solid #333; border-radius:4px; outline:none;">
+                          <option value="tally">Interactive Tally Sheet (Checkboxes)</option>
+                          <option value="standard">Standard Manifest (Trucks / Handover)</option>
+                      </select>
+                      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff; font-size:12px;">
+                          <input type="checkbox" id="ps-log-hide-containers" onchange="updatePrintPreview()" style="margin:0; width:16px; height:16px;"> Hide Cases / Containers
+                      </label>
+                  </div>
+                  <div style="border-top:1px solid #333; padding-top:15px;">
+                      <div class="input-label" style="color:#3b82f6; display:flex; justify-content:space-between;">
+                          <span>Department Filter Tree</span>
+                          <span style="color:#888; cursor:pointer; font-size:9px;" onclick="toggleAllFilters(true)">ALL</span>
+                      </div>
+                      <div id="ps-dept-filters" style="display:flex; flex-direction:column; gap:4px; margin-top:10px;">
+                          <!-- Filter Checkboxes Auto-Generated Here -->
+                      </div>
+                  </div>
+              </div>
+
+              <!-- Bottom Output Button -->
+              <div style="padding:20px; background:#18181b; border-top:1px solid #333; flex-shrink:0;">
+                  <button class="btn-main" style="width:100%; font-size:16px !important; padding:15px !important;" onclick="executePDFPrint()">🖨️ GENERATE PDF</button>
+              </div>
+          </div>
+
+          <!-- Right Side: Live Document Preview -->
+          <div style="flex:1; background:#52525b; padding:30px; overflow-y:auto; display:flex; justify-content:center;">
+              <!-- The Virtual A4 Paper -->
+              <div id="ps-paper-preview" style="width:210mm; min-height:297mm; background:#fff; color:#000; padding:20mm; box-shadow:0 10px 40px rgba(0,0,0,0.6); box-sizing:border-box;">
+                  <div style="text-align:center; color:#888; margin-top:100px;">Loading Preview...</div>
+              </div>
+          </div>
+
+      </div>
+  </div>
+</div>
+
+<script>
+// Hardcoded Company Logo: Stage Masters Black
+const STAGE_MASTERS_LOGO_SVG = `<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 513.6 42.4" style="height: 24px; width: auto;"><defs><style>.cls-1 { fill: #eb1c24; }</style></defs><path d="M513.6,31.13c-3.06,10.13-12.85,11.85-22.29,11.01-7.67-.68-14.2-5.48-14.64-13.64-.05-.99-.01-.62.71-.72,1.55-.21,11.33-.87,11.75-.45s-.11,4.28,3.43,5.91c6.18,2.85,11.7-3.31,6.84-6.35-6.26-3.92-20.29-2.14-21.24-13.78-1.24-15.2,26.77-16.88,32.49-6.56.77,1.4,2.72,5.94.32,6.39-2.89.54-7.32-.33-10.5.51-.46-.13-.51-1.87-.88-2.56-3.38-6.26-14.36-.64-7.22,2.42s18.41,2.07,21.24,12.07v5.75Z"/><path d="M227.55.96l6.71,22.99,6.24-22.99h16.54v39.98c0,.05-.67.72-.72.72h-9.59c-.05,0-.72-.67-.72-.72V14.37l-7.26,27.23-9.21.08-7.99-29.23v29.21h-10.55V.96h16.54Z"/><path d="M461.09.96c11.86,1.4,14.22,16.26,4.03,21.74-.94.51-2.48.41-2.83,1.24l2.38.74c4.84,4.59,7.08,11.17,10.09,16.98h-14.15c-2.74-3.02-6.76-14.95-10.28-16.07-.95-.3-1.93-.24-2.9-.21v16.28h-12.23c-.05,0-.72-.67-.72-.72V1.68c0-.13.56-.48.72-.72,8.18.7,17.91-.95,25.9,0ZM447.42,17.24c3.83,0,12.83.94,10.93-5.41-.19-.63-2.11-2.25-2.54-2.25h-8.39v7.66Z"/><path d="M164.01,35.91c-13.58,9.21-37.16,10.51-41.11-9.47-1.75-8.87,1.02-19.8,9.76-23.99,7.45-3.57,22.59-3.72,27.99,3.53.62.83,3.24,5.29,2.12,6.04-.49.33-10.93,2.29-11.5,2.19s-1.66-4.16-5.71-4.65c-8.23-.98-10.58,5.72-10.32,12.69.33,8.59,5.27,12.73,13.79,9.96,3.41-1.11,3.84-1.58,3.46-5.4h-8.15v-8.62h19.66v17.72Z"/><path d="M205.25.96v8.38c0,.05-.67.72-.72.72h-19.9v5.75h19.18v8.62h-19.18v7.66h21.1v9.58h-33.81c-.05,0-.72-.67-.72-.72V1.68c0-.05.67-.72.72-.72h33.33Z"/><path d="M406.18,10.06v5.75h19.18v8.62h-19.18v7.66h21.58v8.86c0,.05-.67.72-.72.72h-33.81V.96h33.33c.05,0,.72.67.72.72v7.66c0,.05-.67.72-.72.72h-20.38Z"/><path d="M308.83,27.77c2.2.37,10.53-1.32,11.93-.42.28.18.57,2.45.92,3.15,3.1,6.24,13.88,3.05,11.07-1.95-2.57-4.57-16.17-3.16-20.96-10.68-4.1-6.44-.17-13.91,6.5-16.34,9.2-3.35,25.77-1.67,25.83,10.93-.64.87-9.54.29-11.48.88-.97-.34-.74-2.41-1.73-3.55-2.43-2.84-10.12-2.33-8.57,2.33.46,1.37,13.43,3.95,16.22,5.35,11.68,5.86,8.13,20.96-3.82,23.94-11,2.74-25.8.22-25.9-13.65Z"/><path d="M262.32,41.66l15.09-40.24c1.17-1.19,11.14-.05,13.46-.5l15.57,40.74h-12.71c-1.25-1.89-1.94-4.46-2.18-6.68l-14.07-.05-2.45,6.73h-12.71ZM280.06,25.86h8.63c-1.13-1.5-3.43-12.74-4.08-12.93-.97-.29-.66.51-.84,1.05-1.31,3.93-2.08,8.06-3.71,11.88Z"/><path d="M387.48.96v9.82c0,.05-.67.72-.72.72h-11.75v29.45c0,.05-.67.72-.72.72h-12.23V11.49h-12.23c-.05,0-.72-.67-.72-.72V.96h38.36Z"/><path class="cls-1" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/><path d="M23.56,13.34c-.62-2.85-1.94-4.88-5.09-5.21-5-.52-7.58,3.67-2.54,5.41,6.66,2.3,16.86,2.33,20.05,10.15,3.85,9.43-4.13,17.44-13.26,18.39-10.99,1.14-22.24-1.33-22.72-14.31,2.2.37,10.53-1.32,11.93-.42.21.14.69,3.13,1.96,4.51,4.25,4.59,12.85.94,9.83-3.59S6.26,25.66,2.31,16.61C-1.24,8.45,5.09,2.07,12.83.6,18.95-.56,28.71,0,32.81,5.31c1.13,1.46,4.14,7.13,1.48,7.62-2.9.53-7.52-.21-10.72.41Z"/><path d="M78.65.96v9.82c0,.05-.67.72-.72.72h-11.75v29.45c0,.05-.67.72-.72.72h-12.23V11.49h-12.23c-.05,0-.72-.67-.72-.72V.96h38.36Z"/></svg>`;
+
+// @INDEX: PRINT_STUDIO -> Modal UI & Mode Switching
+let activePrintMode = 'offer'; // 'offer' or 'logistics'
+
+window.openPrintModal = function() {
+    document.getElementById('print-studio-overlay').style.display = 'flex';
+    
+    // Auto-fill Client Name from Project Editor
+    let pClient = document.getElementById('edit-proj-client') ? document.getElementById('edit-proj-client').value : '';
+    document.getElementById('ps-client-name').value = pClient;
+    
+    // Load saved company name
+    let savedCo = localStorage.getItem('sm_company_name');
+    if (savedCo) document.getElementById('ps-company-name').value = savedCo;
+    document.getElementById('ps-offer-lang').value = window.offerLanguage || localStorage.getItem('sm_offer_lang') || 'bg';
+    
+    // Build Logistics Filter Tree based on CURRENT project assets
+    buildLogisticsFilterTree();
+    
+    switchPrintMode(activePrintMode);
+};
+
+window.switchPrintMode = function(mode) {
+    activePrintMode = mode;
+    
+    let btnOffer = document.getElementById('ps-mode-offer');
+    let btnLogistics = document.getElementById('ps-mode-logistics');
+    let configOffer = document.getElementById('ps-config-offer');
+    let configLogistics = document.getElementById('ps-config-logistics');
+
+    if (mode === 'offer') {
+        btnOffer.className = 'btn-main';
+        btnLogistics.className = 'btn-outline';
+        configOffer.style.display = 'flex';
+        configLogistics.style.display = 'none';
+    } else {
+        btnOffer.className = 'btn-outline';
+        btnLogistics.className = 'btn-main';
+        configOffer.style.display = 'none';
+        configLogistics.style.display = 'flex';
+    }
+    
+    updatePrintPreview();
+};
+
+window.saveCompanyName = function(val) {
+    localStorage.setItem('sm_company_name', val);
+};
+
+// @INDEX: PRINT_STUDIO -> Filter Engine (Logistics Tree)
+function buildLogisticsFilterTree() {
+    let depts = new Set();
+    currentProjectAssets.forEach(pa => {
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        if (asset) {
+            depts.add(pa.overrideDept || asset.department || 'Unassigned');
+        }
+    });
+    
+    let html = '';
+    Array.from(depts).sort().forEach(deptUid => {
+        let dObj = typeof getDeptObj === 'function' ? getDeptObj(deptUid) : { name: deptUid };
+        html += `
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:#fff; font-size:12px; background:#1a1a1e; padding:8px 10px; border-radius:4px; border:1px solid #333;">
+            <input type="checkbox" class="ps-filter-cb" value="${deptUid}" checked onchange="updatePrintPreview()" style="margin:0; width:14px; height:14px;">
+            <span style="font-weight:bold;">${dObj.name}</span>
+        </label>`;
+    });
+    
+    document.getElementById('ps-dept-filters').innerHTML = html;
+}
+
+window.toggleAllFilters = function(state) {
+    document.querySelectorAll('.ps-filter-cb').forEach(cb => cb.checked = state);
+    updatePrintPreview();
+};
+
+// @INDEX: PRINT_STUDIO -> Live Document Rendering & Output
+window.updatePrintPreview = function() {
+    let paper = document.getElementById('ps-paper-preview');
+    let pName = document.getElementById('edit-proj-name') ? document.getElementById('edit-proj-name').value : 'Unknown Project';
+    let pDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+    
+    if (activePrintMode === 'offer') {
+        let quoteNo = document.getElementById('ps-quote-no').value || 'DRAFT';
+        let coName = document.getElementById('ps-company-name').value || 'YOUR COMPANY';
+        let clientName = document.getElementById('ps-client-name').value || 'CLIENT NAME';
+        let hidePrices = document.getElementById('ps-hide-prices').checked;
+        let hideZeros = document.getElementById('ps-hide-zeros').checked;
+        
+        let fin = window.currentReadinessState && window.currentReadinessState.financials ? window.currentReadinessState.financials : { daysCharged: 1, discountPct: 0, taxPct: 0 };
+        
+        window.offerLanguage = window.offerLanguage || localStorage.getItem('sm_offer_lang') || 'bg';
+        const LANG = window.offerLanguage;
+        
+        const t = {
+            docSubtitle: LANG === 'bg' ? 'Официална Оферта' : 'Formal Quote / Offer',
+            quoteNum: LANG === 'bg' ? 'Оферта №' : 'Quote #',
+            date: LANG === 'bg' ? 'Дата:' : 'Date:',
+            client: LANG === 'bg' ? 'Клиент:' : 'Client:',
+            project: LANG === 'bg' ? 'Проект:' : 'Project:',
+            qty: LANG === 'bg' ? 'К-во' : 'Qty',
+            desc: LANG === 'bg' ? 'Описание' : 'Description',
+            uPrice: LANG === 'bg' ? 'Ед. Цена' : 'Unit Price',
+            total: LANG === 'bg' ? 'Общо' : 'Total',
+            subtotal: LANG === 'bg' ? 'Междинна сума:' : 'Subtotal:',
+            days: LANG === 'bg' ? 'Коефициент (Дни):' : 'Days Charged:',
+            discount: LANG === 'bg' ? `Отстъпка (${fin.discountPct}%):` : `Discount (${fin.discountPct}%):`,
+            tax: LANG === 'bg' ? `ДДС (${fin.taxPct}%):` : `Tax / VAT (${fin.taxPct}%):`,
+            grand: LANG === 'bg' ? 'КРАЙНА СУМА:' : 'GRAND TOTAL:',
+            legalTitle: LANG === 'bg' ? 'Общи условия / Бележки' : 'Terms & Conditions / Legal Notes'
+        };
+        
+        const AVAILABLE_LEGAL_NOTES = [
+            { id: 'thanks', text: LANG === 'bg' ? 'Благодарим Ви за доверието! Очакваме с нетърпение да работим заедно по този проект.' : 'Thank you for your business! We look forward to working with you on this project.' },
+            { id: 'validity', text: LANG === 'bg' ? 'Валидност: Тази оферта е валидна 14 дни от датата на издаване.' : 'Validity: This offer is valid for 14 days from the date of issue.' },
+            { id: 'payment', text: LANG === 'bg' ? 'Начин на плащане: Изисква се 50% авансово плащане за потвърждаване на резервацията. Окончателно плащане до 30 дни.' : 'Payment Terms: 50% deposit required to confirm booking. Balance due Net 30.' },
+            { id: 'liability', text: LANG === 'bg' ? 'Отговорност: Наемателят поема пълна отговорност за повреди, кражба или загуба на оборудването по време на наемния период.' : 'Liability: The lessee assumes all responsibility for equipment damage, theft, or loss during the rental period.' },
+            { id: 'cancel', text: LANG === 'bg' ? 'Анулиране: При отмяна в рамките на 48 часа преди събитието се дължи неустойка в размер на 50%.' : 'Cancellations: Cancellations within 48 hours of the event load-in will incur a 50% cancellation fee.' }
+        ];
+
+        let html = `
+            <div style="display:flex; justify-content:space-between; border-bottom:3px solid #000; padding-bottom:15px; margin-bottom:20px;">
+                <div>
+                    <div style="margin-bottom: 8px;">${STAGE_MASTERS_LOGO_SVG}</div>
+                    <div style="font-weight:bold; font-size:12px; text-transform:uppercase;">${coName}</div>
+                    <div style="font-size:11px; color:#555; margin-top:2px;">${t.docSubtitle}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:bold; font-size:16px;">${t.quoteNum}${quoteNo}</div>
+                    <div style="font-size:12px; color:#555;">${t.date} ${new Date().toLocaleDateString()}</div>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:30px; font-size:13px;">
+                <div><b>${t.client}</b><br>${clientName}</div>
+                <div style="text-align:right;"><b>${t.project}</b><br>${pName}<br>${pDate}</div>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                    <tr style="border-bottom:2px solid #000;">
+                        <th style="padding:8px 0; text-align:left; width:50px;">${t.qty}</th>
+                        <th style="padding:8px 0; text-align:left;">${t.desc}</th>
+                        ${hidePrices ? '' : `<th style="padding:8px 0; text-align:right; width:80px;">${t.uPrice}</th>`}
+                        ${hidePrices ? '' : `<th style="padding:8px 0; text-align:right; width:100px;">${t.total}</th>`}
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        let subtotal = 0;
+        // Group Physical Items
+        let deptGroups = {};
+        currentProjectAssets.forEach(pa => {
+            let asset = globalAssets.find(a => a.id === pa.assetId);
+            if (!asset) return;
+            let basePrice = parseFloat(asset.rental) || 0;
+            let isOverride = pa.overridePrice !== undefined && pa.overridePrice !== null && pa.overridePrice !== "";
+            let finalPrice = isOverride ? parseFloat(pa.overridePrice) : basePrice;
+            if (hideZeros && asset.type === 'Consumable' || (basePrice === 0 && !isOverride)) return;
+
+            let d = pa.overrideDept || asset.department || 'Unassigned';
+            if (!deptGroups[d]) deptGroups[d] = [];
+            let key = asset.id + "_" + finalPrice;
+            let existing = deptGroups[d].find(i => i.key === key);
+            let qty = parseInt(pa.qty, 10) || 1;
+            if (existing) { existing.qty += qty; existing.lineTotal = existing.qty * finalPrice; } 
+            else { deptGroups[d].push({ key: key, asset: asset, qty: qty, unitPrice: finalPrice, lineTotal: qty * finalPrice }); }
+        });
+
+        Object.keys(deptGroups).sort().forEach(deptUid => {
+            let dName = typeof getDeptObj === 'function' ? getDeptObj(deptUid).name : deptUid;
+            html += `<tr><td colspan="${hidePrices ? '2' : '4'}" style="padding:15px 0 5px 0; font-weight:bold; font-size:13px; border-bottom:1px solid #ccc;">${dName.toUpperCase()}</td></tr>`;
+            
+            deptGroups[deptUid].sort((a,b) => a.asset.name.localeCompare(b.asset.name)).forEach(item => {
+                subtotal += item.lineTotal;
+                html += `<tr>
+                    <td style="padding:6px 0; border-bottom:1px solid #eee;">${item.qty}</td>
+                    <td style="padding:6px 0; border-bottom:1px solid #eee;">${item.asset.name}</td>
+                    ${hidePrices ? '' : `<td style="padding:6px 0; text-align:right; border-bottom:1px solid #eee;">€${item.unitPrice.toFixed(2)}</td>`}
+                    ${hidePrices ? '' : `<td style="padding:6px 0; text-align:right; border-bottom:1px solid #eee;">€${item.lineTotal.toFixed(2)}</td>`}
+                </tr>`;
+            });
+        });
+
+        let afterDays = subtotal * fin.daysCharged;
+        let discountAmt = afterDays * (fin.discountPct / 100);
+        let afterDiscount = afterDays - discountAmt;
+        let taxAmt = afterDiscount * (fin.taxPct / 100);
+        let grandTotal = afterDiscount + taxAmt;
+
+        html += `</tbody></table>
+            <div style="margin-top:30px; border-top:2px solid #000; padding-top:15px; width:300px; margin-left:auto; display:flex; flex-direction:column; gap:6px; font-size:13px;">
+                <div style="display:flex; justify-content:space-between;"><span>${t.subtotal}</span><span>€${subtotal.toFixed(2)}</span></div>
+                <div style="display:flex; justify-content:space-between;"><span>${t.days}</span><span>x ${fin.daysCharged}</span></div>
+                ${fin.discountPct > 0 ? `<div style="display:flex; justify-content:space-between; color:#ef4444;"><span>${t.discount}</span><span>-€${discountAmt.toFixed(2)}</span></div>` : ''}
+                <div style="display:flex; justify-content:space-between;"><span>${t.tax}</span><span>€${taxAmt.toFixed(2)}</span></div>
+                <div style="border-top:1px solid #000; margin:4px 0;"></div>
+                <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:16px;"><span>${t.grand}</span><span>€${grandTotal.toFixed(2)}</span></div>
+            </div>`;
+            
+        let activeNotes = AVAILABLE_LEGAL_NOTES.filter(n => fin.legalNotes && fin.legalNotes.includes(n.id));
+        if (activeNotes.length > 0) {
+            html += `<div style="margin-top: 30px; font-size: 11px; color: #555;">
+                <div style="font-weight: bold; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px solid #ccc; padding-bottom: 2px;">${t.legalTitle}</div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    ${activeNotes.map(n => `<div>${n.text}</div>`).join('')}
+                </div>
+            </div>`;
+        }
+        
+        paper.innerHTML = html;
+        
+    } else if (activePrintMode === 'logistics') {
+        let subrentFilter = document.getElementById('ps-subrent-filter').value;
+        let activeDepts = Array.from(document.querySelectorAll('.ps-filter-cb:checked')).map(cb => cb.value);
+        let listFormat = document.getElementById('ps-log-format') ? document.getElementById('ps-log-format').value : 'tally';
+        let hideContainers = document.getElementById('ps-log-hide-containers') ? document.getElementById('ps-log-hide-containers').checked : false;
+        
+        window.offerLanguage = window.offerLanguage || localStorage.getItem('sm_offer_lang') || 'bg';
+        const LANG = window.offerLanguage;
+        
+        const tLog = {
+            title: LANG === 'bg' ? 'ЛОГИСТИЧЕН СПИСЪК' : 'LOGISTICS PREP LIST',
+            project: LANG === 'bg' ? 'Проект:' : 'Project:',
+            date: LANG === 'bg' ? 'Дата:' : 'Date:',
+            printed: LANG === 'bg' ? 'Разпечатано:' : 'Printed:',
+            qty: LANG === 'bg' ? 'К-во' : 'Qty',
+            desc: LANG === 'bg' ? 'Описание' : 'Item / Description',
+            container: LANG === 'bg' ? 'Кейс / Инфо' : 'Container / Info',
+            notes: LANG === 'bg' ? 'Бележки / Серийни №' : 'Notes / Serial #',
+            prep: LANG === 'bg' ? 'Подг.' : 'Prep',
+            load: LANG === 'bg' ? 'Натов.' : 'Load',
+            empty: LANG === 'bg' ? 'Няма артикули, отговарящи на филтрите.' : 'No items match the current filters.',
+            subrent: LANG === 'bg' ? '[ПОДНАЕМ]' : '[SUBRENT]',
+            autoCase: LANG === 'bg' ? 'Авто Кейс' : 'Auto Case'
+        };
+
+        let html = `
+            <div style="display:flex; justify-content:space-between; border-bottom:3px solid #000; padding-bottom:15px; margin-bottom:20px;">
+                <div>
+                    <div style="margin-bottom: 8px;">${STAGE_MASTERS_LOGO_SVG}</div>
+                    <div style="font-weight:bold; font-size:14px; text-transform:uppercase;">${tLog.title}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-weight:bold; font-size:16px;">${tLog.project} ${pName}</div>
+                    <div style="font-size:12px; color:#555;">${tLog.date} ${pDate}</div>
+                    <div style="font-size:12px; color:#555;">${tLog.printed} ${new Date().toLocaleDateString()}</div>
+                </div>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                <thead>
+                    <tr style="border-bottom:2px solid #000;">
+        `;
+        
+        if (listFormat === 'tally') {
+            html += `<th style="padding:4px 0; text-align:left; width:40px;">${tLog.qty}</th>
+                     <th style="padding:4px 0; text-align:left;">${tLog.desc}</th>
+                     <th style="padding:4px 0; text-align:left; width:150px;">${tLog.notes}</th>
+                     <th style="padding:4px 0; text-align:center; width:40px;">${tLog.prep}</th>
+                     <th style="padding:4px 0; text-align:center; width:40px;">${tLog.load}</th>`;
+        } else {
+            html += `<th style="padding:4px 0; text-align:left; width:40px;">${tLog.qty}</th>
+                     <th style="padding:4px 0; text-align:left;">${tLog.desc}</th>
+                     <th style="padding:4px 0; text-align:left; width:180px;">${tLog.container}</th>`;
+        }
+        
+        html += `
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        let filteredAssets = [];
+        currentProjectAssets.forEach(pa => {
+            let asset = globalAssets.find(a => a.id === pa.assetId);
+            if (!asset && !pa.isEmptyGroup) return;
+            
+            if (subrentFilter === 'exclude' && pa.isShortage) return;
+            if (subrentFilter === 'only' && !pa.isShortage) return;
+            
+            if (hideContainers && asset) {
+                if (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container') return;
+            }
+            
+            let deptUid = pa.overrideDept || (asset ? asset.department : 'Unassigned');
+            if (!activeDepts.includes(deptUid)) return;
+
+            filteredAssets.push({ pa: pa, asset: asset });
+        });
+
+        let deptGroups = {};
+        filteredAssets.forEach(item => {
+            let deptUid = item.pa.overrideDept || (item.asset ? item.asset.department : 'Unassigned');
+            let loc = item.pa.location || 'General';
+            let form = item.pa.formula || 'Standalone';
+            if (item.pa.isShortage) form = `${tLog.subrent} ` + form;
+
+            if (!deptGroups[deptUid]) deptGroups[deptUid] = {};
+            let groupKey = loc + "|||" + form;
+            if (!deptGroups[deptUid][groupKey]) deptGroups[deptUid][groupKey] = [];
+            
+            let existing = deptGroups[deptUid][groupKey].find(i => i.asset && item.asset && i.asset.id === item.asset.id && i.pa.containerUid === item.pa.containerUid && i.pa.isAuto === item.pa.isAuto);
+            if (existing) {
+                existing.qty += parseInt(item.pa.qty, 10) || 1;
+            } else {
+                deptGroups[deptUid][groupKey].push({ asset: item.asset, pa: item.pa, qty: parseInt(item.pa.qty, 10) || 1 });
+            }
+        });
+
+        let sortedDepts = Object.keys(deptGroups).sort((a,b) => {
+            let dA = typeof getDeptObj === 'function' ? getDeptObj(a).name : a;
+            let dB = typeof getDeptObj === 'function' ? getDeptObj(b).name : b;
+            return dA.localeCompare(dB);
+        });
+
+        let getCaseName = (cUid) => {
+            if (!cUid) return "";
+            let cPts = cUid.split("|||");
+            let cAsset = globalAssets.find(a => a.id === cPts[0]);
+            let cForm = cPts[1];
+            if (cAsset) {
+                if (cForm && cForm !== 'Standalone') return `📦 ${cAsset.name} [${cForm}]`;
+                return `📦 ${cAsset.name}`;
+            }
+            return "📦 Packed";
+        };
+
+        if (sortedDepts.length === 0) {
+            html += `<tr><td colspan="5" style="padding:20px; text-align:center; color:#888; font-style:italic;">${tLog.empty}</td></tr>`;
+        } else {
+            sortedDepts.forEach(deptUid => {
+                let dName = typeof getDeptObj === 'function' ? getDeptObj(deptUid).name : deptUid;
+                html += `<tr><td colspan="5" style="padding:20px 0 5px 0; font-weight:900; font-size:14px; border-bottom:2px solid #444;">${dName.toUpperCase()}</td></tr>`;
+                
+                let groups = deptGroups[deptUid];
+                Object.keys(groups).sort().forEach(gKey => {
+                    let pts = gKey.split("|||");
+                    let locName = pts[0];
+                    let formName = pts[1];
+                    
+                    html += `<tr><td colspan="${listFormat === 'tally' ? '5' : '3'}" style="padding:12px 0 4px 0; font-weight:bold; font-size:12px; color:#444; border-bottom:1px solid #ccc;">
+                        <span style="color:#000;">${locName.toUpperCase()}</span> 
+                        ${formName !== 'Standalone' ? `<span style="font-family:monospace; margin-left:10px; padding:2px 6px; background:#f4f4f5; border-radius:4px; font-size:11px;">${formName}</span>` : ''}
+                    </td></tr>`;
+                    
+                    let items = groups[gKey];
+                    items.sort((a,b) => (a.asset ? a.asset.name : '').localeCompare(b.asset ? b.asset.name : '')).forEach(item => {
+                        let cName = "";
+                        if (item.pa.isAuto) cName = `<span style="color:#a855f7; font-style:italic;">⚡ ${tLog.autoCase}</span>`;
+                        else if (item.pa.containerUid) cName = `<span style="color:#555;">${getCaseName(item.pa.containerUid)}</span>`;
+                        else if (item.asset && item.asset.type === 'Bulk') cName = `<span style="color:#888; font-size:10px;">BULK / LOOSE</span>`;
+
+                        if (listFormat === 'tally') {
+                            html += `<tr style="page-break-inside: avoid;">
+                                <td style="padding:4px 0; border-bottom:1px solid #eee; font-weight:bold; font-size:13px;">${item.qty}</td>
+                                <td style="padding:4px 6px 4px 0; border-bottom:1px solid #eee;">
+                                    <div style="font-weight:bold; font-size:12px;">${item.asset ? item.asset.name : 'Unknown Item'}</div>
+                                    ${cName ? `<div style="font-size:10px; color:#555; margin-top:1px;">${cName}</div>` : ''}
+                                </td>
+                                <td style="padding:4px 6px 4px 0; border-bottom:1px solid #eee;"><div style="border:1px solid #ddd; height:16px; width:100%; border-radius:2px; background:#fafafa;"></div></td>
+                                <td style="padding:4px 0; text-align:center; border-bottom:1px solid #eee;"><div style="width:14px; height:14px; border:2px solid #555; margin:0 auto; border-radius:3px;"></div></td>
+                                <td style="padding:4px 0; text-align:center; border-bottom:1px solid #eee;"><div style="width:14px; height:14px; border:2px solid #555; margin:0 auto; border-radius:3px;"></div></td>
+                            </tr>`;
+                        } else {
+                            html += `<tr style="page-break-inside: avoid;">
+                                <td style="padding:4px 0; border-bottom:1px solid #eee; font-weight:bold; font-size:13px;">${item.qty}</td>
+                                <td style="padding:4px 6px 4px 0; border-bottom:1px solid #eee; font-weight:bold; font-size:12px;">${item.asset ? item.asset.name : 'Unknown Item'}</td>
+                                <td style="padding:4px 0; border-bottom:1px solid #eee; font-size:11px;">${cName}</td>
+                            </tr>`;
+                        }
+                    });
+                });
+            });
+        }
+
+        html += `</tbody></table>`;
+        paper.innerHTML = html;
+    }
+};
+
+window.executePDFPrint = function() {
+    let content = document.getElementById('ps-paper-preview').innerHTML;
+    let pName = document.getElementById('edit-proj-name') ? document.getElementById('edit-proj-name').value : 'Document';
+    let safeTitle = pName.replace(/[^a-zA-Z0-9_\-\s]/g, '').replace(/\s+/g, '_');
+    
+    let printWin = window.open('', '_blank');
+    printWin.document.write(`
+        <html>
+        <head>
+            <title>${safeTitle}_${activePrintMode.toUpperCase()}</title>
+            <style>
+                @page { size: A4 portrait; margin: 15mm; }
+                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size:12px; color:#000; background:#fff; margin:0; padding:0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                table { page-break-inside: auto; }
+                tr { page-break-inside: avoid; page-break-after: auto; }
+                thead { display: table-header-group; }
+                tfoot { display: table-footer-group; }
+                /* Hide any interactive UI elements that accidentally get caught in the DOM copy */
+                input, button, select { display: none !important; }
+            </style>
+        </head>
+        <body>
+            ${content}
+        </body>
+        </html>
+    `);
+    printWin.document.close();
+    
+    // Wait for external fonts/styles to parse before firing print dialog
+    setTimeout(() => { printWin.print(); }, 500);
+};
+</script>

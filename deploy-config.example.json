@@ -1,0 +1,4 @@
+{
+  "productionDeploymentId": "PASTE_FROM_clasp_list-deployments",
+  "notes": "Copy this file to deploy-config.json and paste your Production Web App deployment ID. Run: clasp list-deployments"
+}

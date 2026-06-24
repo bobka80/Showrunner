@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "html-minifier-terser": "^7.2.0"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "dev-push": "node dev-push.js",
+    "works-save": "node works-save.js",
+    "milestone": "node milestone.js",
+    "rollback-works": "node rollback-works.js",
+    "rollback-milestone": "node rollback-milestone.js"
+  }
+}

@@ -1,0 +1,365 @@
+<script>
+/**
+ * 03c_Timeline_Phases.html
+ * Domain: Phase blocks and top-bar Sub-Events Gantt rendering and drag logic.
+ */
+
+// ==========================================
+// --- TIMELINE_PHASES -> Phase Render & CRUD ---
+// ==========================================
+function addPhaseFromClick(e) {
+   if (currentIsReadOnly || e.target.classList.contains('shift-block') || e.target.closest('.shift-block')) return;
+   const rect = e.currentTarget.getBoundingClientRect();
+   const clickX = e.clientX - rect.left;
+   const startHr = Math.round(clickX / SNAP_PX) * (SNAP_PX / PX_PER_HR);
+   
+   activePhases.push({ id: 'p_'+Date.now(), type: 'Build-Up', start: startHr, duration: 4 });
+   renderPhases();
+   window.isTimelineDirty = true;
+}
+
+function renderPhases() {
+  const row = document.querySelector('.tt-grid-row[data-uid="PHASE_ROW"]');
+  if (!row) return;
+  row.innerHTML = '';
+  
+  // Clear old vertical guide lines spanning the grid
+  document.querySelectorAll('.phase-vline').forEach(el => el.remove());
+
+  if (activePhases.length === 0 && !currentIsReadOnly) {
+      row.innerHTML = '<div style="position: sticky; left: 20px; width: max-content; color: #52525b; font-size: 11px; line-height: 60px; pointer-events: none; font-weight: 800; letter-spacing: 1px;">+ DOUBLE CLICK ROW TO ADD PHASE +</div>';
+  }
+
+  activePhases.forEach((p) => {
+    if(!p.id) p.id = 'p_'+Math.random(); 
+    
+    let block = document.createElement('div');
+    block.className = 'shift-block';
+    if(selectedPhaseIds.has(p.id)) block.classList.add('selected');
+    
+    let phaseColor = PHASE_PALETTE[p.type] || '#333';
+
+    block.style.left = (p.start * PX_PER_HR) + 'px';
+    block.style.width = (p.duration * PX_PER_HR) + 'px';
+    block.style.setProperty('background', 'transparent', 'important');
+    block.style.setProperty('border', `2px solid ${phaseColor}`, 'important');
+    block.dataset.id = p.id;
+    
+    let timeLabel = `${formatShiftTime(p.start)} - ${formatShiftTime(p.start + p.duration)}`;
+    
+    if (currentIsReadOnly) {
+       block.innerHTML = `
+         <div class="shift-label-container" style="color: #fff;">
+            <div class="shift-time">${timeLabel}</div>
+            <div class="shift-role">${escapeHTML(p.type)}</div>
+            ${p.note ? `<div class="shift-note">${escapeHTML(p.note)}</div>` : ''}
+         </div>
+       `;
+    } else {
+       block.innerHTML = `
+         <div class="shift-handle shift-handle-left phase-handle-left"></div>
+         <div class="action-zone" onclick="openPhasePicker('${p.id}', event)" style="position:absolute; top:0; left:12px; width:10px; height:100%; z-index:50; cursor:pointer;" title="Change Phase"></div>
+         <div class="shift-label-container" style="color: #fff; pointer-events: none;">
+            <div class="shift-time">${timeLabel}</div>
+            <div class="shift-role">${escapeHTML(p.type)}</div>
+            ${p.note ? `<div class="shift-note">${escapeHTML(p.note)}</div>` : ''}
+         </div>
+         <div class="shift-handle shift-handle-right phase-handle-right"></div>
+       `;
+       
+       block.addEventListener('mousedown', e => initPhaseDrag(e, p.id));
+       block.addEventListener('touchstart', e => initPhaseDrag(e, p.id), {passive: false});
+    }
+    row.appendChild(block);
+    
+    // Generate vertical boundary lines through the entire timeline editor
+    let rowsContainer = document.getElementById('tt-rows-container');
+    if (rowsContainer) {
+        let sLine = document.createElement('div');
+        sLine.className = 'phase-vline';
+        sLine.style.cssText = `position: absolute; left: ${p.start * PX_PER_HR}px; top: 0; bottom: 0; width: 2px; background: ${phaseColor}; z-index: 4; pointer-events: none; opacity: 0.5;`;
+        rowsContainer.appendChild(sLine);
+        
+        let eLine = document.createElement('div');
+        eLine.className = 'phase-vline';
+        eLine.style.cssText = `position: absolute; left: ${(p.start + p.duration) * PX_PER_HR}px; top: 0; bottom: 0; width: 2px; background: ${phaseColor}; z-index: 4; pointer-events: none; opacity: 0.5;`;
+        rowsContainer.appendChild(eLine);
+    }
+  });
+}
+
+// ==========================================
+// --- TIMELINE_PHASES -> Phase Drag Engine ---
+// ==========================================
+function initPhaseDrag(e, id) {
+  if (currentIsReadOnly || e.target.classList.contains('action-zone')) return;
+  document.getElementById('role-picker').style.display = 'none';
+  
+  if (e.type === 'mousedown') e.preventDefault(); 
+  
+  let now = Date.now();
+  if (lastPhaseClickId === id && now - lastPhaseClickTime < 300) {
+      if (e) e.preventDefault();
+      openNoteModal(id, 'phase', e);
+      return; 
+  }
+  lastPhaseClickTime = now;
+  lastPhaseClickId = id;
+
+  let selectionChanged = false;
+  if (e.shiftKey && lastSelectedPhaseId) {
+     let allVisualPhases = [...activePhases].sort((a, b) => a.start - b.start);
+     let idx1 = allVisualPhases.findIndex(p => p.id === lastSelectedPhaseId);
+     let idx2 = allVisualPhases.findIndex(p => p.id === id);
+     if (idx1 !== -1 && idx2 !== -1) {
+         if (!e.ctrlKey && !e.metaKey) selectedPhaseIds.clear();
+         let startIdx = Math.min(idx1, idx2);
+         let endIdx = Math.max(idx1, idx2);
+         for (let i = startIdx; i <= endIdx; i++) {
+             selectedPhaseIds.add(allVisualPhases[i].id);
+         }
+         selectionChanged = true;
+     }
+  } else if (e.ctrlKey || e.metaKey) {
+     if (selectedPhaseIds.has(id)) selectedPhaseIds.delete(id); 
+     else selectedPhaseIds.add(id);
+     lastSelectedPhaseId = id;
+     selectionChanged = true;
+  } else {
+         if (!selectedPhaseIds.has(id)) { 
+         selectedPhaseIds.clear(); 
+         selectedPhaseIds.add(id); 
+         selectionChanged = true;
+     }
+     lastSelectedPhaseId = id;
+  }
+  
+  if (selectionChanged) renderPhases(); 
+  
+  dragPhaseMode = (e.target.classList.contains('phase-handle-left') || e.target.classList.contains('shift-handle-left')) ? 'resize-left' :
+                  (e.target.classList.contains('phase-handle-right') || e.target.classList.contains('shift-handle-right') || e.target.classList.contains('phase-handle')) ? 'resize-right' : 'move';
+                  
+  startMouseX = getClientX(e);
+  activePhases.forEach(p => { if(selectedPhaseIds.has(p.id)) { p._start = p.start; p._dur = p.duration; } });
+  
+  if (e.touches) {
+    document.addEventListener('touchmove', onPhaseDrag, {passive: false});
+    document.addEventListener('touchend', endPhaseDrag);
+  } else {
+    document.addEventListener('mousemove', onPhaseDrag);
+    document.addEventListener('mouseup', endPhaseDrag);
+  }
+}
+
+function onPhaseDrag(e) {
+  if (e.touches) e.preventDefault(); 
+  const dx = getClientX(e) - startMouseX;
+  const hrDelta = Math.round(dx / SNAP_PX) * (SNAP_PX / PX_PER_HR);
+  activePhases.forEach(p => {
+    if(selectedPhaseIds.has(p.id)) {
+      if (dragPhaseMode === 'move') {
+         let newStart = p._start + hrDelta;
+         if(newStart < 0) newStart = 0;
+         p.start = newStart;
+      } else if (dragPhaseMode === 'resize-left') {
+         let newStart = p._start + hrDelta;
+         let newDur = p._dur - hrDelta;
+         if (newStart < 0) { newDur = p._dur + p._start; newStart = 0; }
+         if (newDur < 0.25) { newDur = 0.25; newStart = p._start + p._dur - 0.25; }
+         p.start = newStart;
+         p.duration = newDur;
+      } else {
+         let newDur = p._dur + hrDelta;
+         if(newDur < 0.25) newDur = 0.25; 
+         p.duration = newDur;
+      }
+          
+          let block = document.querySelector(`.shift-block[data-id="${p.id}"]`);
+          if (block) {
+              block.style.left = (p.start * PX_PER_HR) + 'px';
+              block.style.width = (p.duration * PX_PER_HR) + 'px';
+              let timeEl = block.querySelector('.shift-time');
+              if (timeEl) timeEl.innerText = `${formatShiftTime(p.start)} - ${formatShiftTime(p.start + p.duration)}`;
+          }
+    }
+  });
+}
+
+function endPhaseDrag() { 
+  setTimeout(() => { dragPhaseMode = null; }, 50); 
+  document.removeEventListener('mousemove', onPhaseDrag); 
+  document.removeEventListener('mouseup', endPhaseDrag); 
+  document.removeEventListener('touchmove', onPhaseDrag); 
+  document.removeEventListener('touchend', endPhaseDrag);
+  renderPhases();
+  window.isTimelineDirty = true;
+}
+
+// ==========================================
+// --- TIMELINE_PHASES -> Phase Picker ---
+// ==========================================
+function openPhasePicker(id, e) {
+  if (currentIsReadOnly) return;
+  activePhaseTarget = id;
+  const p = document.getElementById('phase-picker'); 
+  let html = '';
+  for (const [name, color] of Object.entries(PHASE_PALETTE)) {
+     html += `<div class="phase-opt" onclick="setPhaseType('${name}')"><div class="phase-dot" style="background:${color};"></div> ${name}</div>`;
+  }
+  p.innerHTML = html;
+  p.style.display = 'block'; p.style.left = getClientX(e) + 'px';
+  p.style.top = (e.touches ? e.touches[0].clientY : e.clientY) + 'px';
+  e.stopPropagation();
+}
+
+function setPhaseType(typeName) {
+  if (selectedPhaseIds.has(activePhaseTarget) && selectedPhaseIds.size > 1) {
+     activePhases.forEach(p => { if (selectedPhaseIds.has(p.id)) p.type = typeName; });
+  } else {
+     const phase = activePhases.find(p => p.id === activePhaseTarget);
+     if(phase) phase.type = typeName;
+  }
+  document.getElementById('phase-picker').style.display = 'none';
+  renderPhases();
+  window.isTimelineDirty = true;
+}
+
+// ==========================================
+// --- TIMELINE_PHASES -> Top Bar Gantt (Sub-Events) ---
+// ==========================================
+function renderSubEvents() {
+  renderSubEventVisuals();
+}
+
+function renderSubEventVisuals() {
+    let container = document.getElementById('tt-header-subevents-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    let timePoints = new Set();
+    activeSubEvents.forEach(p => { timePoints.add(p.start); timePoints.add(p.start + p.duration); });
+    let sortedPoints = Array.from(timePoints).sort((a,b) => a-b);
+    let typeMap = { 'WAREHOUSE': 'wh', 'MAIN_EVENT': 'main', 'SHOW_DAY': 'show', 'RECOVERY': 'recovery', 'TRANSIT': 'transit' };
+    
+    activeSubEvents.forEach((p) => {
+      if(!p.id) p.id = 'se_'+Math.random(); 
+      let uiType = typeMap[p.type] || 'main';
+      let phaseData = PAINT_COLORS[uiType] || { color: '#888' };
+      let isSelected = selectedSubEventIds.has(p.id);
+      let highlight = isSelected ? 'filter: brightness(1.3); z-index: 20;' : 'z-index: 10;';
+
+      let wrapper = document.createElement('div');
+      wrapper.className = 'se-wrapper';
+      wrapper.dataset.id = p.id;
+      wrapper.style.cssText = `position: absolute; left: ${p.start * PX_PER_HR}px; width: ${p.duration * PX_PER_HR}px; top: 0; height: 100%; pointer-events: none; ${highlight}`;
+
+      let html = '';
+      let pSegments = [];
+
+      for (let i = 0; i < sortedPoints.length - 1; i++) {
+          let s = sortedPoints[i];
+          let e = sortedPoints[i+1];
+          if (e - s < 0.01) continue; 
+          if (s >= p.start - 0.01 && e <= p.start + p.duration + 0.01) {
+              pSegments.push({ s, e });
+          }
+      }
+
+      pSegments.forEach((seg, sIdx) => {
+          let activeInSeg = activeSubEvents.filter(x => x.start <= seg.s + 0.01 && (x.start + x.duration) >= seg.e - 0.01);
+          activeInSeg.sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+          
+          let idx = activeInSeg.findIndex(x => x.id === p.id);
+          let heightPct = 100 / activeInSeg.length;
+          let topPct = idx * heightPct;
+
+          let leftPct = ((seg.s - p.start) / p.duration) * 100;
+          let widthPct = ((seg.e - seg.s) / p.duration) * 100;
+
+          let isFirst = (sIdx === 0);
+          let isLast = (sIdx === pSegments.length - 1);
+
+          let br = '';
+          if (isFirst) br += 'border-top-left-radius: 6px; border-bottom-left-radius: 6px; ';
+          if (isLast) br += 'border-top-right-radius: 6px; border-bottom-right-radius: 6px; ';
+          
+          let widthCalc = isLast ? `${widthPct}%` : `calc(${widthPct}% + 1px)`;
+
+          let innerHtml = '';
+
+          if (isFirst) {
+              if (!currentIsReadOnly) {
+                  innerHtml += `<div class="phase-handle phase-handle-left" onmousedown="initSubEventDrag(event, '${p.id}', 'left')" ontouchstart="initSubEventDrag(event, '${p.id}', 'left')" style="pointer-events:auto; z-index:20; cursor:ew-resize;"></div>`;
+              }
+              innerHtml += `<div class="se-time-badge" style="position:absolute; left:6px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.75); color:#fff; font-size:10px; font-weight:bold; padding:3px 6px; border-radius:4px; pointer-events:none; line-height:1; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 4px rgba(0,0,0,0.8);">${formatShiftTime(p.start)}</div>`;
+          }
+          
+          if (isLast) {
+              if (!currentIsReadOnly) {
+                  innerHtml += `<div class="phase-handle phase-handle-right" onmousedown="initSubEventDrag(event, '${p.id}', 'right')" ontouchstart="initSubEventDrag(event, '${p.id}', 'right')" style="pointer-events:auto; z-index:20; cursor:ew-resize; right:0;"></div>`;
+              }
+              innerHtml += `<div class="se-time-badge" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); background:rgba(0,0,0,0.75); color:#fff; font-size:10px; font-weight:bold; padding:3px 6px; border-radius:4px; pointer-events:none; line-height:1; border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 2px 4px rgba(0,0,0,0.8);">${formatShiftTime(p.start + p.duration)}</div>`;
+          }
+
+          html += `<div onmousedown="initSubEventDrag(event, '${p.id}', 'move')" ontouchstart="initSubEventDrag(event, '${p.id}', 'move')" style="position:absolute; left:${leftPct}%; width:${widthCalc}; top:${topPct}%; height:${heightPct}%; background:${phaseData.color}; ${br} box-sizing:border-box; pointer-events:auto; cursor:grab;">
+              ${innerHtml}
+          </div>`;
+      });
+
+      wrapper.innerHTML = html;
+      container.appendChild(wrapper);
+    });
+}
+
+function initSubEventDrag(e, id, overrideMode) {
+  if (currentIsReadOnly) return;
+  if (e.type === 'mousedown') e.preventDefault();
+  e.stopPropagation();
+  
+  dragSubEventMode = (overrideMode === 'left') ? 'resize-left' :
+                     (overrideMode === 'right') ? 'resize-right' : 'move';
+                     
+  startMouseX = getClientX(e);
+  if (!selectedSubEventIds.has(id)) {
+      if (!e.shiftKey && !e.ctrlKey && !e.metaKey) selectedSubEventIds.clear();
+      selectedSubEventIds.add(id);
+  }
+  
+  activeSubEvents.forEach(p => { if(selectedSubEventIds.has(p.id)) { p._start = p.start; p._dur = p.duration; } });
+  
+  renderSubEvents();
+  
+  document.addEventListener('mousemove', onSubEventDrag);
+  document.addEventListener('mouseup', endSubEventDrag);
+}
+
+function onSubEventDrag(e) {
+  const dx = getClientX(e) - startMouseX;
+  const hrDelta = Math.round(dx / SNAP_PX) * (SNAP_PX / PX_PER_HR);
+  
+  activeSubEvents.forEach(p => {
+    if(selectedSubEventIds.has(p.id)) {
+      if (dragSubEventMode === 'move') { let newStart = p._start + hrDelta; if(newStart < 0) newStart = 0; p.start = newStart; } 
+      else if (dragSubEventMode === 'resize-left') { let newStart = p._start + hrDelta; let newDur = p._dur - hrDelta; if (newStart < 0) { newDur = p._dur + p._start; newStart = 0; } if (newDur < 0.25) { newDur = 0.25; newStart = p._start + p._dur - 0.25; } p.start = newStart; p.duration = newDur; } 
+      else { let newDur = p._dur + hrDelta; if(newDur < 0.25) newDur = 0.25; p.duration = newDur; }
+      
+      let wrapper = document.querySelector(`.se-wrapper[data-id="${p.id}"]`);
+      if (wrapper) { 
+          wrapper.style.left = (p.start * PX_PER_HR) + 'px'; 
+          wrapper.style.width = (p.duration * PX_PER_HR) + 'px'; 
+          let timeEls = wrapper.querySelectorAll('.se-time-badge');
+          if (timeEls.length >= 1) timeEls[0].innerText = formatShiftTime(p.start);
+          if (timeEls.length >= 2) timeEls[1].innerText = formatShiftTime(p.start + p.duration);
+      }
+    }
+  });
+}
+
+function endSubEventDrag() {
+  setTimeout(() => { dragSubEventMode = null; }, 50);
+  document.removeEventListener('mousemove', onSubEventDrag);
+  document.removeEventListener('mouseup', endSubEventDrag);
+  renderSubEvents();
+  window.isTimelineDirty = true;
+}
+</script>

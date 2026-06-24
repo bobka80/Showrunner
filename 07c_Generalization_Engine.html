@@ -1,0 +1,35 @@
+<script>
+/**
+ * 07c_Generalization_Engine.html
+ * Domain: Universal Generalization Engine (Averaging & Blueprints).
+ */
+
+// @INDEX: GENERALIZATION -> Blueprint Engine
+window.GeneralizationEngine = {
+    /**
+     * Takes an array of parent container IDs and generates an averaged blueprint
+     * of their internal contents.
+     * 
+     * @param {Array<string>} parentIds - UIDs of the parent containers
+     * @param {Array<object>} sourceAssets - Global assets array to scan for children
+     * @returns {Array<object>} - Array of averaged components { name: string, qty: number }
+     */
+    generateBlueprint: function(parentIds, sourceAssets) {
+        if (!parentIds || parentIds.length === 0 || !sourceAssets) return [];
+        
+        let childItems = sourceAssets.filter(child => parentIds.includes(child.containerType));
+        let childGroups = {};
+        
+        childItems.forEach(child => {
+            let nLow = String(child.name || '').toLowerCase().trim();
+            if (!childGroups[nLow]) childGroups[nLow] = { qty: 0, name: child.name };
+            childGroups[nLow].qty += (child.type === 'Bulk' ? (parseInt(child.totalQuantity, 10) || 1) : 1);
+        });
+        
+        let containerCount = parentIds.length;
+        return Object.values(childGroups)
+            .map(group => ({ name: group.name, qty: Math.round(group.qty / containerCount) }))
+            .filter(comp => comp.qty > 0);
+    }
+};
+</script>

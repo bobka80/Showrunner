@@ -1,0 +1,1406 @@
+<!-- @INDEX: FINANCIALS -> Hub Boot & View Router -->
+<div id="financials-hub-overlay" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
+  <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
+
+    <!-- TOP NAVIGATION TABS -->
+    <div style="height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink:0;">
+      <div style="color:#10b981; font-weight:900; font-size:16px; margin-right: 20px; letter-spacing: 1px; display:flex; align-items:center; gap:8px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          FINANCIALS HUB
+      </div>
+      
+      <button id="fin-tab-btn-payroll" style="background: #27272a; border: 1px solid #3f3f46; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchFinancialTab('payroll')">PAYROLL & LABOR</button>
+      <button id="fin-tab-btn-pnl" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchFinancialTab('pnl')">P&L PREDICTIONS</button>
+      <button id="fin-tab-btn-settings" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchFinancialTab('settings')">FINANCIAL SETTINGS</button>
+
+      <div style="flex:1;"></div>
+      <button class="btn-close" style="width:auto; margin:0;" onclick="closeFinancialsHub()">CLOSE</button>
+    </div>
+
+    <!-- TAB 1: PAYROLL & LABOR -->
+    <div id="fin-content-payroll" style="display:flex; flex-direction:column; flex:1; overflow:hidden; background: #0a0a0c;">
+        <!-- Sub-Header / Toggles -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar);">
+            <div style="display:flex; gap:10px; background:#18181b; padding:4px; border-radius:6px; border:1px solid #333;">
+                <button id="fin-view-btn-person" class="btn-main" style="margin:0; padding:6px 15px !important;" onclick="switchPayrollView('person')">VIEW BY PERSON</button>
+                <button id="fin-view-btn-event" class="btn-outline" style="margin:0; padding:6px 15px !important; border-color:transparent; color:#888;" onclick="switchPayrollView('event')">VIEW BY EVENT</button>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <span style="color:#888; font-size:11px; font-weight:bold;">START:</span>
+                <input type="date" id="fin-payroll-start" style="padding:6px 10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; font-size:12px; height: 32px; box-sizing: border-box;">
+                <span style="color:#888; font-size:11px; font-weight:bold;">END:</span>
+                <input type="date" id="fin-payroll-end" style="padding:6px 10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; font-size:12px; height: 32px; box-sizing: border-box;">
+                <button class="btn-outline btn-sm" id="btn-calc-payroll" style="border-color:#10b981; color:#10b981; margin:0;" onclick="calculatePayrollEngine()">CALCULATE PAYROLL</button>
+            </div>
+        </div>
+        
+        <!-- View: By Person -->
+        <div id="fin-payroll-view-person" style="flex:1; overflow-y:auto; padding: 25px; display:flex; flex-direction:column; gap:15px;">
+            <div style="text-align:center; padding: 40px; color: #888;">Select a month and click "Calculate Payroll" to load data.</div>
+        </div>
+
+        <!-- View: By Event -->
+        <div id="fin-payroll-view-event" style="display:none; flex:1; overflow-y:auto; padding: 25px; flex-direction:column; gap:15px;">
+            <div style="text-align:center; padding: 40px; color: #888;">Select a month and click "Calculate Payroll" to load data.</div>
+        </div>
+
+    </div>
+
+    <!-- TAB 2: P&L DASHBOARD -->
+    <div id="fin-content-pnl" style="display:none; flex-direction:column; flex:1; overflow:hidden; background: #0a0a0c;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar);">
+            <div style="color:#fff; font-weight:800; font-size:14px; letter-spacing:1px;">PROFIT & LOSS PREDICTIONS</div>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding: 25px;">
+            <div style="text-align:center; padding: 40px; color: #888;">ROI calculation engine pending...</div>
+        </div>
+    </div>
+
+    <!-- TAB 3: SETTINGS -->
+    <div id="fin-content-settings" style="display:none; flex-direction:column; flex:1; overflow:hidden; background: #0a0a0c;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar);">
+            <div style="color:#fff; font-weight:800; font-size:14px; letter-spacing:1px;">FINANCIAL SETTINGS & OVERHEADS</div>
+        </div>
+        <div style="flex:1; overflow-y:auto; padding: 25px;">
+            <div style="max-width: 800px; margin: 0 auto; display:flex; flex-direction:column; gap:25px;">
+                
+                <!-- Setting Tabs Navigation -->
+                <div style="display:flex; gap:10px;">
+                    <button id="fin-subtab-btn-labor" class="btn-main" onclick="switchFinSubTab('labor')">LABOR & FLEET RATES</button>
+                    <button id="fin-subtab-btn-overheads" class="btn-outline" onclick="switchFinSubTab('overheads')">COMPANY OVERHEADS</button>
+                </div>
+
+                <!-- Subtab: Labor & Fleet -->
+                <div id="fin-subtab-labor" style="display:grid; grid-template-columns: 3fr 2fr; gap:20px;">
+                    
+                    <!-- Left Side: Standard Rates, OT, Trucks -->
+                    <div style="display:flex; flex-direction:column; gap:20px;">
+                        <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
+                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Standard Phase Rates</h3>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                                <div>
+                                    <div class="input-label">Preparation (Warehouse)</div>
+                                    <div style="display:flex; gap:6px;">
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Base (€)</div><input type="number" id="fin-set-prep-rate" style="width:100%; box-sizing:border-box;"></div>
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Hours</div><input type="number" id="fin-set-prep-hours" style="width:100%; box-sizing:border-box;"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="input-label">Recovery (Warehouse)</div>
+                                    <div style="display:flex; gap:6px;">
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Base (€)</div><input type="number" id="fin-set-recovery-rate" style="width:100%; box-sizing:border-box;"></div>
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Hours</div><input type="number" id="fin-set-recovery-hours" style="width:100%; box-sizing:border-box;"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="input-label">Standard Build-Up</div>
+                                    <div style="display:flex; gap:6px;">
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Base (€)</div><input type="number" id="fin-set-build-rate" style="width:100%; box-sizing:border-box;"></div>
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Hours</div><input type="number" id="fin-set-build-hours" style="width:100%; box-sizing:border-box;"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="input-label">Standard Duty / Show</div>
+                                    <div style="display:flex; gap:6px;">
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Base (€)</div><input type="number" id="fin-set-duty-rate" style="width:100%; box-sizing:border-box;"></div>
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Hours</div><input type="number" id="fin-set-duty-hours" style="width:100%; box-sizing:border-box;"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="input-label">Standard Breakdown</div>
+                                    <div style="display:flex; gap:6px;">
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Base (€)</div><input type="number" id="fin-set-break-rate" style="width:100%; box-sizing:border-box;"></div>
+                                        <div style="flex:1;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">Hours</div><input type="number" id="fin-set-break-hours" style="width:100%; box-sizing:border-box;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
+                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Global Overtime & Bonuses</h3>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                                <div><div class="input-label">Overtime Threshold (Hrs)</div><input type="number" id="fin-set-default-shift-period" placeholder="e.g., 12"></div>
+                                <div><div class="input-label">Overtime Multiplier</div><input type="number" step="0.1" id="fin-set-overtime-multiplier" placeholder="e.g., 1.5x"></div>
+                                <div><div class="input-label">Follow Spot Bonus (€)</div><input type="number" id="fin-set-followspot-bonus" placeholder="Per shift"></div>
+                                <div><div class="input-label">Console Op Bonus (€)</div><input type="number" id="fin-set-console-bonus" placeholder="Per shift"></div>
+                            </div>
+                        </div>
+                        
+                        <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
+                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Extra Hourly Rates</h3>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                                <div><div class="input-label">Standard Events (€/hr)</div><input type="number" id="fin-set-extra-rate-standard" placeholder="e.g., 15"></div>
+                                <div><div class="input-label">Prep & Recovery (€/hr)</div><input type="number" id="fin-set-extra-rate-prep" placeholder="e.g., 15"></div>
+                            </div>
+                        </div>
+                        
+                        <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
+                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Default Trucking Fleet Rates</h3>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                                <div>
+                                    <div class="input-label">Tier 1 (Cargo Van)</div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ In Sofia (Course)</div><input type="number" id="fin-set-truck-t1-in" style="width:100%; box-sizing:border-box;"></div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Out Sofia (Per km)</div><input type="number" id="fin-set-truck-t1-out" style="width:100%; box-sizing:border-box;"></div>
+                                    <div><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Stay (Per day)</div><input type="number" id="fin-set-truck-t1-stay" style="width:100%; box-sizing:border-box;"></div>
+                                </div>
+                                <div>
+                                    <div class="input-label">Tier 2 (Box Van)</div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ In Sofia</div><input type="number" id="fin-set-truck-t2-in" style="width:100%; box-sizing:border-box;"></div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Out Sofia</div><input type="number" id="fin-set-truck-t2-out" style="width:100%; box-sizing:border-box;"></div>
+                                    <div><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Stay</div><input type="number" id="fin-set-truck-t2-stay" style="width:100%; box-sizing:border-box;"></div>
+                                </div>
+                                <div>
+                                    <div class="input-label">Tier 3 (Rigid Truck)</div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ In Sofia</div><input type="number" id="fin-set-truck-t3-in" style="width:100%; box-sizing:border-box;"></div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Out Sofia</div><input type="number" id="fin-set-truck-t3-out" style="width:100%; box-sizing:border-box;"></div>
+                                    <div><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Stay</div><input type="number" id="fin-set-truck-t3-stay" style="width:100%; box-sizing:border-box;"></div>
+                                </div>
+                                <div>
+                                    <div class="input-label">Tier 4 (Artic Trailer)</div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ In Sofia</div><input type="number" id="fin-set-truck-t4-in" style="width:100%; box-sizing:border-box;"></div>
+                                    <div style="margin-bottom:6px;"><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Out Sofia</div><input type="number" id="fin-set-truck-t4-out" style="width:100%; box-sizing:border-box;"></div>
+                                    <div><div class="input-label" style="font-size:9px; margin-bottom:4px; color:#888;">€ Stay</div><input type="number" id="fin-set-truck-t4-stay" style="width:100%; box-sizing:border-box;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Side: Roles -->
+                    <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
+                        <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Role Specifics & Colors</h3>
+                        <p style="color:#a1a1aa; font-size:11px; margin-top:0; margin-bottom:15px; line-height:1.4;">Adjust the multiplier for each role. This applies on top of the Standard Phase Rates calculated dynamically from the timeline.</p>
+                        <div id="fin-roles-container" style="display:flex; flex-direction:column; gap:8px; max-height:600px; overflow-y:auto; padding-right:5px;">
+                            <div style="color:#888; font-size:12px; font-style:italic;">Loading Dictionary...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subtab: Overheads -->
+                <div id="fin-subtab-overheads" style="display:none; flex-direction:column; gap:20px;">
+                    <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
+                        <h3 style="margin:0 0 20px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>Company Overheads & Indirect Expenses</span>
+                            <button class="btn-outline btn-sm" style="margin:0; border-color:#f97316; color:#f97316;" onclick="addFinOverheadRow()">+ ADD EXPENSE</button>
+                        </h3>
+                        <div id="fin-overheads-container" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto; padding-right:5px;"></div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:flex-end; border-top:1px solid #333; padding-top:20px;">
+                    <button class="btn-main" style="width:200px;" onclick="handleSaveFinancialSettings()">SAVE SETTINGS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+  </div>
+</div>
+<script>
+let activePayrollData = null;
+let activeEnrichedShifts = [];
+let currentPayrollView = 'person';
+
+// @INDEX: FINANCIALS -> Hub Boot & View Router
+function openFinancialsHub() {
+    if (typeof closeModals === 'function') {
+        if (!closeModals()) return;
+    }
+    let now = new Date();
+    let y = now.getFullYear();
+    let m = String(now.getMonth() + 1).padStart(2, '0');
+    let dLast = new Date(y, now.getMonth() + 1, 0).getDate();
+    document.getElementById('fin-payroll-start').value = `${y}-${m}-01`;
+    document.getElementById('fin-payroll-end').value = `${y}-${m}-${dLast}`;
+
+    document.getElementById('financials-hub-overlay').style.display = 'flex';
+    if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-financials');
+}
+
+function closeFinancialsHub() {
+    document.getElementById('financials-hub-overlay').style.display = 'none';
+    if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-dashboard');
+}
+
+function switchFinancialTab(tabId) {
+    document.getElementById('fin-content-payroll').style.display = 'none';
+    document.getElementById('fin-content-pnl').style.display = 'none';
+    document.getElementById('fin-content-settings').style.display = 'none';
+    
+    document.getElementById('fin-tab-btn-payroll').style.cssText = 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    document.getElementById('fin-tab-btn-pnl').style.cssText = 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    document.getElementById('fin-tab-btn-settings').style.cssText = 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    
+    document.getElementById('fin-content-' + tabId).style.display = 'flex';
+    
+    let activeBtn = document.getElementById('fin-tab-btn-' + tabId);
+    if (activeBtn) {
+        activeBtn.style.cssText = 'background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    }
+    if (tabId === 'settings') {
+        loadFinSettingsUI();
+    }
+}
+
+function switchPayrollView(view) {
+    document.getElementById('fin-payroll-view-person').style.display = 'none';
+    document.getElementById('fin-payroll-view-event').style.display = 'none';
+    
+    let btnPerson = document.getElementById('fin-view-btn-person');
+    let btnEvent = document.getElementById('fin-view-btn-event');
+    
+    if (view === 'person') {
+        document.getElementById('fin-payroll-view-person').style.display = 'flex';
+        btnPerson.className = 'btn-main';
+        btnPerson.style.borderColor = '#10b981';
+        btnPerson.style.color = '#000';
+        
+        btnEvent.className = 'btn-outline';
+        btnEvent.style.borderColor = 'transparent';
+        btnEvent.style.color = '#888';
+        btnEvent.style.background = 'transparent';
+        currentPayrollView = 'person';
+        if (activePayrollData) renderPayrollByPerson();
+    } else {
+        document.getElementById('fin-payroll-view-event').style.display = 'flex';
+        btnEvent.className = 'btn-main';
+        btnEvent.style.borderColor = '#10b981';
+        btnEvent.style.color = '#000';
+        
+        btnPerson.className = 'btn-outline';
+        btnPerson.style.borderColor = 'transparent';
+        btnPerson.style.color = '#888';
+        btnPerson.style.background = 'transparent';
+        currentPayrollView = 'event';
+        if (activePayrollData) renderPayrollByEvent();
+    }
+}
+
+// @INDEX: FINANCIALS -> Payroll & Labor Engine
+function calculatePayrollEngine() {
+    let startStr = document.getElementById('fin-payroll-start').value;
+    let endStr = document.getElementById('fin-payroll-end').value;
+    if (!startStr || !endStr) return alert("Select a start and end date.");
+    
+    let btn = document.getElementById('btn-calc-payroll');
+    let orig = btn.innerText;
+    btn.innerText = "CALCULATING..."; btn.disabled = true;
+    
+    document.getElementById('fin-payroll-view-person').innerHTML = '<div style="text-align:center; padding: 40px; color: #10b981; font-weight:bold;">Fetching and calculating real-time shifts...</div>';
+    document.getElementById('fin-payroll-view-event').innerHTML = '<div style="text-align:center; padding: 40px; color: #10b981; font-weight:bold;">Fetching and calculating real-time shifts...</div>';
+    
+    google.script.run.withSuccessHandler(res => {
+        btn.innerText = orig; btn.disabled = false;
+        activePayrollData = res;
+        enrichShiftsWithMath(startStr, endStr);
+        if (currentPayrollView === 'person') renderPayrollByPerson();
+        else renderPayrollByEvent();
+    }).withFailureHandler(err => {
+        btn.innerText = orig; btn.disabled = false;
+        alert("Engine Error: " + err.message);
+    }).getFinancialsData(startStr); // Sends startStr just to satisfy backend signature
+}
+
+let finToggleState = {};
+
+function toggleFinEl(id) {
+    let el = document.getElementById(id);
+    let icon = document.getElementById('icon-' + id);
+    if (!el || !icon) return;
+    let isClosed = el.style.display === 'none';
+    let newState = isClosed ? 'block' : 'none';
+    el.style.display = newState;
+    icon.innerText = isClosed ? '▼' : '▶';
+    finToggleState[id] = newState;
+}
+
+function restoreFinToggles() {
+    Object.keys(finToggleState).forEach(id => {
+        let el = document.getElementById(id);
+        let icon = document.getElementById('icon-' + id);
+        if (el && icon) {
+            el.style.display = finToggleState[id];
+            icon.innerText = finToggleState[id] === 'none' ? '▶' : '▼';
+        }
+    });
+}
+
+let globalUnpaidUids = new Set();
+
+function enrichShiftsWithMath(startStr, endStr) {
+    if (!activePayrollData) return;
+    let { crew, fleet, projects, shifts, timelines, settings, blocks } = activePayrollData;
+    let globals = settings.globals || {};
+    activeEnrichedShifts = [];
+
+    let projBaseDates = {};
+    timelines.forEach(t => {
+        if (!projBaseDates[t.Project_ID] || t.Event_Date < projBaseDates[t.Project_ID]) {
+            projBaseDates[t.Project_ID] = t.Event_Date;
+        }
+    });
+
+    shifts.forEach(s => {
+        let pDateStr = projBaseDates[s.projectId];
+        if (!pDateStr) return;
+        
+        let pDate = new Date(pDateStr + "T00:00:00Z"); 
+        let dayOffset = Math.floor(Number(s.start) / 24);
+        let shiftDate = new Date(pDate.getTime() + (dayOffset * 86400000));
+        
+        let shiftIso = `${shiftDate.getUTCFullYear()}-${String(shiftDate.getUTCMonth()+1).padStart(2,'0')}-${String(shiftDate.getUTCDate()).padStart(2,'0')}`;
+        
+        let isGlobalUnpaid = globalUnpaidUids.has(s.email) && (s.status !== 'Paid' || (s.status === 'Paid' && parseFloat(s.amount) === 0));
+        if ((shiftIso >= startStr && shiftIso <= endStr) || isGlobalUnpaid) {
+            s.exactDateStr = shiftIso;
+            s.exactDateObj = shiftDate;
+
+            let vehicle = (fleet || []).find(f => f.uid === s.email);
+            if (vehicle) {
+                let proj = projects.find(p => p.id === s.projectId) || { id: s.projectId, name: 'Unknown Event', diffMult: 1.0, readinessState: '{}' };
+                let rState = {};
+                try { rState = JSON.parse(proj.readinessState); } catch(e){}
+                let inSofia = rState.inSofia !== false;
+                let dist = parseFloat(rState.distanceKm) || 0;
+                
+                let tMatch = vehicle.tier ? vehicle.tier.match(/Tier (\d)/i) : null;
+                let tKey = tMatch ? 'truck_t' + tMatch[1] : 'truck_t1';
+                let trucksConfig = settings.trucks || {};
+                
+                let isStay = (s.role && s.role.toUpperCase() === 'STAY') || (s.note && s.note.toUpperCase().includes('STAY'));
+                let finalVal = 0;
+                let bd = `<div style="font-size:11px; color:#a1a1aa; line-height:1.4;">`;
+                
+                let dur = parseFloat(s.duration) || 0;
+                if (isStay) {
+                    let stayDays = Math.ceil(dur / 24);
+                    if (stayDays < 1) stayDays = 1;
+                    let rate = parseFloat(trucksConfig[tKey + '_stay']) || 0;
+                    finalVal = stayDays * rate;
+                    bd += `<div style="display:flex; justify-content:space-between; color:#06b6d4;"><span>Stay Duration:</span><span>${stayDays} Day(s)</span></div>`;
+                    bd += `<div style="display:flex; justify-content:space-between;"><span>Rate (${vehicle.tier}):</span><span style="color:#e4e4e7;">€${rate.toFixed(2)} / day</span></div>`;
+                } else {
+                    let projTruckShifts = shifts.filter(ts => ts.projectId === s.projectId && ts.email === s.email && ts.role !== 'STAY' && (!ts.note || !ts.note.toUpperCase().includes('STAY')));
+                    projTruckShifts.sort((a,b) => Number(a.start) - Number(b.start));
+                    let sIndex = projTruckShifts.findIndex(ts => ts.id === s.id);
+                    
+                    let roleText = s.role;
+                    if (roleText !== 'LOAD' && roleText !== 'UNLOAD') {
+                        roleText = (sIndex % 2 === 0) ? 'LOAD' : 'UNLOAD';
+                    }
+                    
+                    if (roleText === 'UNLOAD') {
+                        return; // User explicitly requested not to see UNLOAD zero-value shifts
+                    } else {
+                        bd += `<div style="display:flex; justify-content:space-between; color:#888;"><span>Leg Phase:</span><span>LOAD</span></div>`;
+                        if (inSofia) {
+                            let rate = parseFloat(trucksConfig[tKey + '_in']) || 0;
+                            finalVal = rate;
+                            bd += `<div style="display:flex; justify-content:space-between; color:#10b981;"><span>Location:</span><span>In Sofia</span></div>`;
+                            bd += `<div style="display:flex; justify-content:space-between;"><span>Course Rate (${vehicle.tier}):</span><span style="color:#e4e4e7;">€${rate.toFixed(2)}</span></div>`;
+                        } else {
+                            let rate = parseFloat(trucksConfig[tKey + '_out']) || 0;
+                            finalVal = rate * dist;
+                            bd += `<div style="display:flex; justify-content:space-between; color:#f59e0b;"><span>Distance:</span><span>${dist} km</span></div>`;
+                            bd += `<div style="display:flex; justify-content:space-between;"><span>Rate (${vehicle.tier}):</span><span style="color:#e4e4e7;">€${rate.toFixed(2)} / km</span></div>`;
+                        }
+                    }
+                }
+                
+                let rawTotal = finalVal;
+                let isPaid = s.status === 'Paid';
+                
+                if (isPaid && parseFloat(s.amount) > 0) {
+                    finalVal = parseFloat(s.amount);
+                    rawTotal = finalVal;
+                } else {
+                    finalVal = rawTotal;
+                }
+                
+                bd = `<div style="font-size:14px; color:#e4e4e7; line-height:1.5; font-family: monospace; white-space: pre;">`;
+                bd += `  Base Value: €${rawTotal.toFixed(2)}\n`;
+                bd += `</div>`;
+                
+                let formatT = (hr) => { let h = Math.floor(hr); let m = Math.round((hr - h)*60); if (h >= 24) h -= 24; return String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0'); };
+                let sStartHr = Number(s.start) % 24;
+                
+                s.math = { shiftType: isStay ? 'stay' : 'drive', shiftTypeDisplay: isStay ? 'STAY (IDLE)' : 'DRIVE (COURSE)', timeStr: `${formatT(sStartHr)} - ${formatT(sStartHr + dur)} (${dur.toFixed(1)}h)`, finalVal: finalVal, breakdownHtml: bd, isPaid: isPaid, isFleet: true };
+                s.person = { uid: vehicle.uid, name: vehicle.name, mult: 1.0, department: 'dept_trucks', role: vehicle.tier, isFleet: true };
+                s.proj = proj;
+                s.deptUid = 'dept_trucks';
+                activeEnrichedShifts.push(s);
+                return;
+            }
+
+            let shiftType = 'build';
+            let frag = timelines.find(t => t.Project_ID === s.projectId && t.Event_Date === shiftIso);
+            if (frag) {
+                if (frag.Sub_Event_Type === 'WAREHOUSE') {
+                    shiftType = 'prep';
+                } else if (frag.Sub_Event_Type === 'RECOVERY') {
+                    shiftType = 'recovery';
+                } else if (frag.Sub_Event_Type === 'MAIN_EVENT' || frag.Sub_Event_Type === 'SHOW_DAY') {
+                    let sStart = Number(s.start);
+                    let sEnd = sStart + Number(s.duration);
+                    let projBlocks = (blocks || []).filter(b => b.projectId === s.projectId);
+                    let intersectingBlock = null;
+                    let maxOverlap = 0;
+                    projBlocks.forEach(b => {
+                        let bStart = Number(b.start);
+                        let bEnd = bStart + Number(b.duration);
+                        let overlapStart = Math.max(sStart, bStart);
+                        let overlapEnd = Math.min(sEnd, bEnd);
+                        if (overlapStart < overlapEnd) {
+                            let overlap = overlapEnd - overlapStart;
+                            if (overlap > maxOverlap) { maxOverlap = overlap; intersectingBlock = b; }
+                        }
+                    });
+                    if (intersectingBlock) {
+                        let bName = intersectingBlock.phaseName ? intersectingBlock.phaseName.toLowerCase() : '';
+                        if (bName.includes('show') || bName.includes('rehearsal')) shiftType = 'duty';
+                        else if (bName.includes('break') || bName.includes('strike') || bName.includes('load out')) shiftType = 'break';
+                        else shiftType = 'build';
+                    }
+                }
+            } else { shiftType = 'prep'; }
+            
+            let baseRate = 0, baseHrs = 8, shiftMult = 1.0;
+            if (shiftType === 'prep') { baseRate = parseFloat(globals.prep_rate)||80; baseHrs = parseFloat(globals.prep_hours)||8; }
+            else if (shiftType === 'recovery') { baseRate = parseFloat(globals.recovery_rate)||80; baseHrs = parseFloat(globals.recovery_hours)||8; }
+            else if (shiftType === 'build') { baseRate = parseFloat(globals.build_rate)||100; baseHrs = parseFloat(globals.build_hours)||6; }
+            else if (shiftType === 'duty') { baseRate = parseFloat(globals.duty_rate)||120; baseHrs = parseFloat(globals.duty_hours)||8; }
+            else if (shiftType === 'break') { baseRate = parseFloat(globals.break_rate)||80; baseHrs = parseFloat(globals.break_hours)||4; }
+            
+            let roleRates = settings.roles ? settings.roles[s.role] : null;
+            if (roleRates && roleRates.mult !== undefined) shiftMult *= parseFloat(roleRates.mult);
+            
+            let otMult = parseFloat(globals.overtime_multiplier) || 1.5;
+            let otThreshold = parseFloat(globals.default_shift_period) || 12;
+            
+            let hourlyRate = 0;
+            if (shiftType === 'prep' || shiftType === 'recovery') {
+                let conf = parseFloat(globals.extra_rate_prep);
+                hourlyRate = !isNaN(conf) ? conf : (baseHrs > 0 ? (baseRate / baseHrs) : 0);
+            } else {
+                let conf = parseFloat(globals.extra_rate_standard);
+                hourlyRate = !isNaN(conf) ? conf : (baseHrs > 0 ? (baseRate / baseHrs) : 0);
+            }
+            
+            let dur = parseFloat(s.duration) || 0;
+            let stdExtraHrs = 0;
+            let otHrs = 0;
+            
+            if (dur > otThreshold) {
+                otHrs = dur - otThreshold;
+                stdExtraHrs = Math.max(0, otThreshold - baseHrs);
+            } else {
+                stdExtraHrs = Math.max(0, dur - baseHrs);
+            }
+            
+            let mathBase = baseRate;
+            let mathStd = stdExtraHrs * hourlyRate;
+            let mathOt = otHrs * hourlyRate * otMult;
+            
+            let roleBonus = 0;
+            if (s.role === 'Follow Spot') roleBonus = parseFloat(globals.followspot_bonus) || 0;
+            if (s.role === 'Operator') roleBonus = parseFloat(globals.console_bonus) || 0;
+            
+            let person = crew.find(c => c.uid === s.email);
+            let proj = projects.find(p => p.id === s.projectId);
+            
+            let personMult = person ? (person.mult || 1.0) : 1.0;
+            let projMult = proj ? (proj.diffMult || 1.0) : 1.0;
+            
+            let rawTotal = ((mathBase + mathStd + mathOt) * shiftMult) + roleBonus;
+            let finalVal = rawTotal * personMult * projMult;
+            
+            let isPaid = s.status === 'Paid';
+            if (isPaid && parseFloat(s.amount) > 0) finalVal = parseFloat(s.amount);
+            
+            let formatT = (hr) => {
+                let h = Math.floor(hr); let m = Math.round((hr - h)*60);
+                if (h >= 24) h -= 24;
+                return String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0');
+            };
+            let sStartHr = Number(s.start) % 24;
+            
+            let hasOuterParens = (personMult !== 1.0 || projMult !== 1.0);
+
+            let bd = `<div style="display:flex; align-items:center; flex-wrap:nowrap;">`;
+
+            // Optional OUTER OPENING parenthesis
+            if (hasOuterParens) {
+                bd += `<div style="font-size:42px; font-weight:300; color:#888; line-height:0.8; margin-right:4px;">(</div>`;
+            }
+
+            // Inner Big Parentheses Block
+            bd += `<div style="display:flex; align-items:center;">`;
+            bd += `<div style="font-size:42px; font-weight:300; color:#555; line-height:0.8; margin-right:4px;">(</div>`;
+            bd += `<div style="display:grid; grid-template-columns: auto auto auto auto auto; gap: 0 6px; text-align:left; font-family:monospace; font-size:16px; line-height:1.15; color:#e4e4e7; white-space:nowrap; align-items:center;">`;
+            bd += `<div></div><div>Base</div><div>:</div><div style="text-align:right;">€${mathBase.toFixed(2)}</div><div style="color:#888;">(${baseHrs}h)</div>`;
+            if (stdExtraHrs > 0) bd += `<div>+</div><div>Extra</div><div>:</div><div style="text-align:right;">€${mathStd.toFixed(2)}</div><div style="color:#888;">(${stdExtraHrs.toFixed(1)}h)</div>`;
+            if (otHrs > 0) bd += `<div style="color:#ef4444">+</div><div style="color:#ef4444">OT</div><div style="color:#ef4444">:</div><div style="color:#ef4444; text-align:right;">€${mathOt.toFixed(2)}</div><div style="color:#888;">(${otHrs.toFixed(1)}h)</div>`;
+            bd += `</div>`;
+            bd += `<div style="font-size:42px; font-weight:300; color:#555; line-height:0.8; margin-left:4px;">)</div>`;
+            bd += `</div>`;
+
+            // Horizontal multipliers
+            bd += `<div style="display:flex; align-items:center; font-family:monospace; font-size:16px; margin-left:8px; gap:8px; white-space:nowrap;">`;
+            if (shiftMult !== 1.0) bd += `<span style="color:#3b82f6;">&times; Role(${shiftMult.toFixed(2)})</span>`;
+            if (roleBonus > 0) bd += `<span style="color:#f59e0b;">+ Bonus(€${roleBonus.toFixed(2)})</span>`;
+            
+            // Optional OUTER CLOSING parenthesis
+            if (hasOuterParens) {
+                bd += `<div style="font-size:42px; font-weight:300; color:#888; line-height:0.8; margin-left:2px; margin-right:4px;">)</div>`;
+            }
+
+            if (personMult !== 1.0) bd += `<span style="color:#10b981;">&times; Person(${personMult.toFixed(2)})</span>`;
+            if (projMult !== 1.0) bd += `<span style="color:#a855f7;">&times; Event(${projMult.toFixed(2)})</span>`;
+            bd += `</div>`;
+            bd += `</div>`;
+            
+            s.math = {
+                shiftType: shiftType,
+                shiftTypeDisplay: shiftType.toUpperCase(),
+                timeStr: `${formatT(sStartHr)} - ${formatT(sStartHr + dur)} (${dur.toFixed(1)}h)`,
+                finalVal: finalVal,
+                breakdownHtml: bd,
+                isPaid: isPaid
+            };
+            s.person = person || { uid: s.email, name: s.email, mult: 1.0, department: 'Unassigned', role: 'Unknown' };
+            s.proj = proj || { id: s.projectId, name: 'Unknown Event', diffMult: 1.0 };
+            s.deptUid = s.person.department || 'Unassigned';
+            
+            activeEnrichedShifts.push(s);
+        }
+    });
+}
+
+function renderPayrollByPerson() {
+    if (!activeEnrichedShifts) return;
+    let container = document.getElementById('fin-payroll-view-person');
+    let tree = {};
+    let anyData = false;
+    
+    activeEnrichedShifts.forEach(s => {
+        if (!tree[s.deptUid]) tree[s.deptUid] = { obj: typeof getDeptObj === 'function' ? getDeptObj(s.deptUid) : { name: s.deptUid, color: '#888' }, persons: {} };
+        if (!tree[s.deptUid].persons[s.person.uid]) tree[s.deptUid].persons[s.person.uid] = { obj: s.person, events: {} };
+        if (!tree[s.deptUid].persons[s.person.uid].events[s.proj.id]) tree[s.deptUid].persons[s.person.uid].events[s.proj.id] = { obj: s.proj, shifts: [] };
+        
+        tree[s.deptUid].persons[s.person.uid].events[s.proj.id].shifts.push(s);
+    });
+    
+    let html = '';
+    let sortedDepts = Object.keys(tree).sort((a,b) => tree[a].obj.name.localeCompare(tree[b].obj.name));
+    
+    sortedDepts.forEach(deptUid => {
+        anyData = true;
+        let dept = tree[deptUid];
+        let safeDept = deptUid.replace(/[^a-zA-Z0-9]/g, '-');
+        
+        let deptTotal = 0;
+        let personsHtml = '';
+        let sortedPersons = Object.keys(dept.persons).sort((a,b) => dept.persons[a].obj.name.localeCompare(dept.persons[b].obj.name));
+        
+        sortedPersons.forEach(pUid => {
+            let person = dept.persons[pUid];
+            let safePerson = pUid.replace(/[^a-zA-Z0-9]/g, '-');
+            let personTotal = 0;
+            let eventsHtml = '';
+            let sortedEvents = Object.keys(person.events).sort((a,b) => person.events[a].obj.name.localeCompare(person.events[b].obj.name));
+            
+            let personAllPaid = true;
+            sortedEvents.forEach(evId => {
+                person.events[evId].shifts.forEach(s => {
+                    if(!s.math.isPaid) personAllPaid = false;
+                });
+            });
+            
+            sortedEvents.forEach(evId => {
+                let ev = person.events[evId];
+                let safeEv = evId.replace(/[^a-zA-Z0-9]/g, '-');
+                let evTotal = 0;
+                let evAllPaid = ev.shifts.every(s => s.math.isPaid);
+                
+                let shiftsHtml = `
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left;">
+                        <thead>
+                            <tr style="background:#111; color:#888; border-bottom:1px solid #333; text-transform:uppercase; font-size:10px; letter-spacing:0.5px;">
+                                <th style="padding:10px 15px;">Date & Time</th>
+                                <th style="padding:10px;">Role & Phase</th>
+                                <th style="padding:10px; width:200px;">Mathematical Breakdown</th>
+                                <th style="padding:10px 15px; text-align:right;">Final Shift Payout</th>
+                                <th style="padding:10px 15px; text-align:center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                
+                ev.shifts.sort((a,b) => new Date(a.exactDateStr).getTime() - new Date(b.exactDateStr).getTime() || a.start - b.start).forEach(s => {
+                    evTotal += s.math.finalVal;
+                    
+                    let dObj = new Date(s.exactDateStr + "T00:00:00Z");
+                    let formattedDate = `${String(dObj.getUTCDate()).padStart(2, '0')}.${String(dObj.getUTCMonth() + 1).padStart(2, '0')}.${dObj.getUTCFullYear()}`;
+
+                    shiftsHtml += `
+                    <tr style="border-bottom:1px solid #222; background:#18181b;" onmouseover="this.style.background='#27272a'" onmouseout="this.style.background='#18181b'">
+                        <td style="padding:12px 15px;">
+                            <div style="color:#e4e4e7; font-weight:bold;">${formattedDate}</div>
+                            <div style="color:#a1a1aa; font-size:11px; margin-top:4px;">${s.math.timeStr}</div>
+                        </td>
+                        <td style="padding:12px 10px;">
+                            <div style="color:#fff; font-weight:bold;">${s.role}</div>
+                            <div style="color:#888; font-size:10px; margin-top:4px; text-transform:uppercase;">${s.math.shiftTypeDisplay}</div>
+                        </td>
+                        <td style="padding:12px 10px;">
+                            ${s.math.breakdownHtml}
+                        </td>
+                        <td style="padding:12px 15px; text-align:right;">
+                            <div style="display:flex; align-items:center; justify-content:flex-end;">€ <input type="number" step="0.01" id="pay-total-${s.id}" class="pay-total-${safePerson} pay-total-ev-${safeEv}" value="${s.math.finalVal.toFixed(2)}" oninput="markShiftManual('${s.person.uid}', '${s.proj.id}')" style="width:80px; background:#111; border:1px solid #10b981; color:#10b981; padding:6px; border-radius:4px; margin-left:4px; font-weight:900; text-align:right; font-size:14px; outline:none;" ${s.math.isPaid ? 'disabled' : ''}></div>
+                        </td>
+                        <td style="padding:12px 15px; text-align:center;">
+                            ${s.math.isPaid 
+                              ? getPaidButtonHtml(s.id) 
+                              : `<button class="btn-main btn-sm" id="pay-btn-${s.id}" onclick="approveAndPayShift('${s.id}')" style="margin:0; padding:4px 8px !important;">PAY SHIFT</button>`
+                            }
+                        </td>
+                    </tr>`;
+                });
+                shiftsHtml += `</tbody></table></div>`;
+                personTotal += evTotal;
+                
+                eventsHtml += `
+                <div style="background:#1a1a1e; border:1px solid #333; border-radius:6px; overflow:hidden; margin-bottom:15px;">
+                    <div style="padding:10px 15px; background:rgba(255,255,255,0.03); border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="color:#e4e4e7; font-weight:bold; font-size:13px;">${ev.obj.name}</div>
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <div style="color:#f59e0b; font-size:11px; font-weight:bold;">EVENT MULT: <input type="number" step="0.1" value="${ev.obj.diffMult.toFixed(1)}" onchange="updateGlobalEventMult('${ev.obj.id}', this.value)" style="width:40px; background:transparent; border:1px dashed #f59e0b; color:#f59e0b; padding:2px; border-radius:4px; font-weight:bold; text-align:center; outline:none;">x</div>
+                            ${getBulkPayButtonHtml(pUid, evId, 'event', evAllPaid, 'PAY FULL EVENT')}
+                        </div>
+                    </div>
+                    ${shiftsHtml}
+                </div>`;
+            });
+            deptTotal += personTotal;
+            
+            personsHtml += `
+            <div style="margin-bottom:10px; border:1px solid #333; border-radius:8px; overflow:hidden;">
+                <div onclick="toggleFinEl('person-${safePerson}')" style="background:#18181b; padding:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:background 0.2s;" onmouseover="this.style.background='#222'" onmouseout="this.style.background='#18181b'">
+                    <div style="display:flex; align-items:center; gap:15px;">
+                        <span id="icon-person-${safePerson}" style="color:#a1a1aa; font-size:12px; width:12px; text-align:center;">▶</span>
+                            <span style="font-size:24px;">${person.obj.isFleet ? '🚚' : '👤'}</span>
+                        <div>
+                            <div style="color:#fff; font-weight:900; font-size:16px;">${person.obj.name}</div>
+                                <div style="color:#a855f7; font-size:11px; font-weight:bold; text-transform:uppercase;">${person.obj.role} ${person.obj.isFleet ? '' : `<span style="color:#888; font-weight:normal;">| Personal Mult: <span style="color:#fff;">${person.obj.mult.toFixed(1)}x</span></span>`}</div>
+                        </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:15px; text-align:right;">
+                        ${getBulkPayButtonHtml(pUid, 'ALL', 'person_all', personAllPaid, 'PAY ALL PERSON')}
+                        <button class="btn-outline" onclick="showGlobalUnpaid('${person.obj.uid}', '${person.obj.name.replace(/'/g, "\\'")}'); event.stopPropagation();" style="margin:0; border-color:#ef4444; color:#ef4444;">SHOW ALL UNPAID</button>
+                        <div>
+                            <div style="color:#888; font-size:10px; text-transform:uppercase; font-weight:bold;">Total Payout</div>
+                            <div id="grand-total-${pUid}" style="color:#10b981; font-weight:900; font-size:20px;">€ ${personTotal.toFixed(2)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div id="person-${safePerson}" style="display:none; padding:15px; background:#0a0a0c;">
+                    ${eventsHtml}
+                </div>
+            </div>`;
+        });
+        
+        html += `
+        <div style="margin-bottom:20px;">
+            <div onclick="toggleFinEl('dept-${safeDept}')" style="background:#1f1f23; color:#fff; cursor:pointer; border:1px solid ${dept.obj.color}; border-left:4px solid ${dept.obj.color}; padding:10px 15px; font-size:12px; font-weight:900; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; border-radius:4px;">
+                <div><span id="icon-dept-${safeDept}" style="margin-right:10px; display:inline-block; width:12px;">▼</span> ${dept.obj.name}</div>
+                <div style="color:${dept.obj.color}; font-weight:900;">€ ${deptTotal.toFixed(2)}</div>
+            </div>
+            <div id="dept-${safeDept}" style="padding-top:10px;">
+                ${personsHtml}
+            </div>
+        </div>`;
+    });
+    
+    if (!anyData) html = '<div style="text-align:center; padding: 40px; color: #888;">No shifts found for this date range.</div>';
+    container.innerHTML = html;
+    restoreFinToggles();
+}
+
+function renderPayrollByEvent() {
+    if (!activeEnrichedShifts) return;
+    let container = document.getElementById('fin-payroll-view-event');
+    let tree = {};
+    let anyData = false;
+    
+    activeEnrichedShifts.forEach(s => {
+        if (!tree[s.proj.id]) tree[s.proj.id] = { obj: s.proj, depts: {} };
+        if (!tree[s.proj.id].depts[s.deptUid]) tree[s.proj.id].depts[s.deptUid] = { obj: typeof getDeptObj === 'function' ? getDeptObj(s.deptUid) : { name: s.deptUid, color: '#888' }, persons: {} };
+        if (!tree[s.proj.id].depts[s.deptUid].persons[s.person.uid]) tree[s.proj.id].depts[s.deptUid].persons[s.person.uid] = { obj: s.person, shifts: [] };
+        
+        tree[s.proj.id].depts[s.deptUid].persons[s.person.uid].shifts.push(s);
+    });
+    
+    let html = '';
+    let sortedEvents = Object.keys(tree).sort((a,b) => tree[a].obj.name.localeCompare(tree[b].obj.name));
+    
+    sortedEvents.forEach(evId => {
+        anyData = true;
+        let ev = tree[evId];
+        let safeEv = evId.replace(/[^a-zA-Z0-9]/g, '-');
+        
+        let evTotal = 0;
+        let deptsHtml = '';
+        let sortedDepts = Object.keys(ev.depts).sort((a,b) => ev.depts[a].obj.name.localeCompare(ev.depts[b].obj.name));
+        
+        sortedDepts.forEach(deptUid => {
+            let dept = ev.depts[deptUid];
+            let deptTotal = 0;
+            let personsHtml = '';
+            let sortedPersons = Object.keys(dept.persons).sort((a,b) => dept.persons[a].obj.name.localeCompare(dept.persons[b].obj.name));
+            
+            sortedPersons.forEach(pUid => {
+                let person = dept.persons[pUid];
+                let safePerson = pUid.replace(/[^a-zA-Z0-9]/g, '-');
+                let personTotal = 0;
+                let personEvAllPaid = person.shifts.every(s => s.math.isPaid);
+                
+                let shiftsHtml = `
+                <div style="overflow-x:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:14px; text-align:left;">
+                        <thead>
+                            <tr style="background:#111; color:#888; border-bottom:1px solid #333; text-transform:uppercase; font-size:11px; letter-spacing:0.5px;">
+                                <th style="padding:10px 15px;">Date & Time</th>
+                                <th style="padding:10px;">Role & Phase</th>
+                                <th style="padding:10px;">Mathematical Breakdown</th>
+                                <th style="padding:10px 15px; text-align:right;">Final Shift Payout</th>
+                                <th style="padding:10px 15px; text-align:center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+                
+                person.shifts.sort((a,b) => new Date(a.exactDateStr).getTime() - new Date(b.exactDateStr).getTime() || a.start - b.start).forEach(s => {
+                    personTotal += s.math.finalVal;
+                    
+                    let dObj = new Date(s.exactDateStr + "T00:00:00Z");
+                    let formattedDate = `${String(dObj.getUTCDate()).padStart(2, '0')}.${String(dObj.getUTCMonth() + 1).padStart(2, '0')}.${dObj.getUTCFullYear()}`;
+
+                    shiftsHtml += `
+                    <tr style="border-bottom:1px solid #222; background:#18181b;" onmouseover="this.style.background='#27272a'" onmouseout="this.style.background='#18181b'">
+                        <td style="padding:12px 15px;">
+                            <div style="color:#e4e4e7; font-weight:bold; font-size:15px;">${formattedDate}</div>
+                            <div style="color:#a1a1aa; font-size:13px; margin-top:4px;">${s.math.timeStr}</div>
+                        </td>
+                        <td style="padding:12px 10px;">
+                            <div style="color:#fff; font-weight:bold; font-size:15px;">${s.role}</div>
+                            <div style="color:#888; font-size:12px; margin-top:4px; text-transform:uppercase;">${s.math.shiftTypeDisplay}</div>
+                        </td>
+                        <td style="padding:12px 10px;">
+                            ${s.math.breakdownHtml}
+                        </td>
+                        <td style="padding:12px 15px; text-align:right;">
+                            <div style="display:flex; align-items:center; justify-content:flex-end;">€ <input type="number" step="0.01" id="pay-total-${s.id}" class="pay-total-${safePerson} pay-total-ev-${safeEv}" value="${s.math.finalVal.toFixed(2)}" oninput="markShiftManual('${s.person.uid}', '${s.proj.id}')" style="width:80px; background:#111; border:1px solid #10b981; color:#10b981; padding:6px; border-radius:4px; margin-left:4px; font-weight:900; text-align:right; font-size:14px; outline:none;" ${s.math.isPaid ? 'disabled' : ''}></div>
+                        </td>
+                        <td style="padding:12px 15px; text-align:center;">
+                            ${s.math.isPaid 
+                              ? getPaidButtonHtml(s.id) 
+                              : `<button class="btn-main" id="pay-btn-${s.id}" onclick="approveAndPayShift('${s.id}')" style="margin:0;">PAY SHIFT</button>`
+                            }
+                        </td>
+                    </tr>`;
+                });
+                shiftsHtml += `</tbody></table></div>`;
+                deptTotal += personTotal;
+                
+                personsHtml += `
+                <div style="background:#1a1a1e; border:1px solid #333; border-radius:6px; overflow:hidden; margin-bottom:15px; margin-left:15px;">
+                    <div style="padding:10px 15px; background:rgba(255,255,255,0.03); border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-size:18px;">${person.obj.isFleet ? '🚚' : '👤'}</span>
+                            <div>
+                                <div style="color:#e4e4e7; font-weight:bold; font-size:13px;">${person.obj.name}</div>
+                                <div style="color:#a855f7; font-size:10px; font-weight:bold; text-transform:uppercase;">${person.obj.role}</div>
+                            </div>
+                        </div>
+                        <div style="display:flex; align-items:center; gap:15px;">
+                            <div id="subtotal-${safePerson}-${safeEv}" style="color:#10b981; font-weight:900; font-size:14px;">€ ${personTotal.toFixed(2)}</div>
+                            ${getBulkPayButtonHtml(pUid, evId, 'event', personEvAllPaid, 'PAY PERSON')}
+                        </div>
+                    </div>
+                    ${shiftsHtml}
+                </div>`;
+            });
+            
+            evTotal += deptTotal;
+            
+            deptsHtml += `
+            <div style="margin-bottom:10px;">
+                <div onclick="toggleFinEl('ev-dept-${safeEv}-${deptUid.replace(/[^a-zA-Z0-9]/g, '-')}')" style="background:#18181b; color:#fff; cursor:pointer; border:1px solid ${dept.obj.color}; border-left:4px solid ${dept.obj.color}; padding:8px 15px; font-size:11px; font-weight:900; text-transform:uppercase; display:flex; justify-content:space-between; align-items:center; border-radius:4px; margin-left:10px; margin-bottom:10px;">
+                    <div><span id="icon-ev-dept-${safeEv}-${deptUid.replace(/[^a-zA-Z0-9]/g, '-')}" style="margin-right:10px; display:inline-block; width:12px;">▼</span> ${dept.obj.name}</div>
+                    <div style="color:${dept.obj.color}; font-weight:900;">€ ${deptTotal.toFixed(2)}</div>
+                </div>
+                <div id="ev-dept-${safeEv}-${deptUid.replace(/[^a-zA-Z0-9]/g, '-')}" style="padding-top:5px;">
+                    ${personsHtml}
+                </div>
+            </div>`;
+        });
+        
+        let materialsHtml = '';
+        let matExpense = 0;
+        try {
+            let rState = JSON.parse(ev.obj.readinessState || '{}');
+            matExpense = parseFloat(rState.consumablesExpense) || 0;
+        } catch(e) {}
+        
+        if (matExpense > 0) {
+            materialsHtml = `
+            <div style="margin-top:20px; border-top:1px dashed #333; padding-top:15px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(239,68,68,0.05); border:1px solid rgba(239,68,68,0.2); padding:10px 15px; border-radius:6px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="font-size:18px;">✂️</span>
+                        <div>
+                            <div style="color:#f87171; font-weight:bold; font-size:13px;">Materials Expense</div>
+                            <div style="color:#888; font-size:11px;">Consumables used during the event</div>
+                        </div>
+                    </div>
+                    <div style="color:#ef4444; font-weight:900; font-size:16px;">€ ${matExpense.toFixed(2)}</div>
+                </div>
+            </div>`;
+        }
+
+        html += `
+        <div style="margin-bottom:20px; border:1px solid #333; border-radius:8px; overflow:hidden;">
+            <div onclick="toggleFinEl('ev-${safeEv}')" style="background:#1f1f23; padding:15px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; transition:background 0.2s;" onmouseover="this.style.background='#222'" onmouseout="this.style.background='#1f1f23'">
+                <div style="display:flex; align-items:center; gap:15px;">
+                    <span id="icon-ev-${safeEv}" style="color:#a1a1aa; font-size:12px; width:12px; text-align:center;">▶</span>
+                    <span style="font-size:24px;">📅</span>
+                    <div>
+                        <div style="color:#fff; font-weight:900; font-size:16px;">${ev.obj.name}</div>
+                    </div>
+                </div>
+                <div style="display:flex; align-items:center; gap:20px;">
+                    <div style="color:#f59e0b; font-size:11px; font-weight:bold;" onclick="event.stopPropagation()">
+                        EVENT MULT: <input type="number" step="0.1" value="${ev.obj.diffMult.toFixed(1)}" onchange="updateGlobalEventMult('${ev.obj.id}', this.value)" style="width:40px; background:transparent; border:1px dashed #f59e0b; color:#f59e0b; padding:2px; border-radius:4px; font-weight:bold; text-align:center; outline:none;">x
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="color:#888; font-size:10px; text-transform:uppercase; font-weight:bold;">Total Event Payout</div>
+                        <div id="grand-total-ev-${safeEv}" style="color:#10b981; font-weight:900; font-size:20px;">€ ${evTotal.toFixed(2)}</div>
+                    </div>
+                </div>
+            </div>
+            <div id="ev-${safeEv}" style="display:none; padding:15px; background:#0a0a0c;">
+                ${deptsHtml}
+                ${materialsHtml}
+            </div>
+        </div>`;
+    });
+    
+    if (!anyData) html = '<div style="text-align:center; padding: 40px; color: #888;">No shifts found for this date range.</div>';
+    container.innerHTML = html;
+    restoreFinToggles();
+}
+
+// @INDEX: FINANCIALS -> Interactive Ledger & Payments
+function markShiftManual(uid, evId) {
+    recalcGrandTotal(uid);
+    recalcEventGrandTotal(evId);
+    recalcEventPersonTotal(evId, uid);
+}
+
+function recalcGrandTotal(uid) {
+    let safePerson = uid.replace(/[^a-zA-Z0-9]/g, '-');
+    let grandTotal = 0;
+    let inputs = document.querySelectorAll(`.pay-total-${safePerson}`);
+    inputs.forEach(inp => {
+        grandTotal += parseFloat(inp.value) || 0;
+    });
+    let gtEl = document.getElementById(`grand-total-${uid}`);
+    if (gtEl) gtEl.innerText = `€ ${grandTotal.toFixed(2)}`;
+}
+
+function recalcEventGrandTotal(evId) {
+    let safeEv = evId.replace(/[^a-zA-Z0-9]/g, '-');
+    let grandTotal = 0;
+    let inputs = document.querySelectorAll(`.pay-total-ev-${safeEv}`);
+    inputs.forEach(inp => {
+        grandTotal += parseFloat(inp.value) || 0;
+    });
+    let gtEl = document.getElementById(`grand-total-ev-${safeEv}`);
+    if (gtEl) gtEl.innerText = `€ ${grandTotal.toFixed(2)}`;
+}
+
+function recalcEventPersonTotal(evId, pUid) {
+    let safeEv = evId.replace(/[^a-zA-Z0-9]/g, '-');
+    let safePerson = pUid.replace(/[^a-zA-Z0-9]/g, '-');
+    let total = 0;
+    let inputs = document.querySelectorAll(`.pay-total-${safePerson}.pay-total-ev-${safeEv}`);
+    inputs.forEach(inp => {
+        total += parseFloat(inp.value) || 0;
+    });
+    let subEl = document.getElementById(`subtotal-${safePerson}-${safeEv}`);
+    if (subEl) subEl.innerText = `€ ${total.toFixed(2)}`;
+}
+
+function updateGlobalEventMult(projId, newMult) {
+    let mult = parseFloat(newMult) || 1.0;
+    let proj = activePayrollData.projects.find(p => p.id === projId);
+    if (proj) proj.diffMult = mult;
+    
+    let startStr = document.getElementById('fin-payroll-start').value;
+    let endStr = document.getElementById('fin-payroll-end').value;
+    enrichShiftsWithMath(startStr, endStr);
+    if (currentPayrollView === 'person') renderPayrollByPerson(); else renderPayrollByEvent();
+    
+    google.script.run
+        .withFailureHandler(err => alert("Failed to save Event Multiplier: " + err.message))
+        .setProjectDifficultyMultiplier(projId, mult);
+}
+
+function approveAndPayShift(shiftId) {
+    let finalAmount = parseFloat(document.getElementById(`pay-total-${shiftId}`).value) || 0;
+    let btn = document.getElementById(`pay-btn-${shiftId}`);
+    let origText = btn.innerText;
+    btn.innerText = "SAVING...";
+    btn.disabled = true;
+    
+    let shift = activeEnrichedShifts.find(s => s.id === shiftId);
+    
+    if (!shift) {
+        alert("Shift not found.");
+        btn.innerText = origText; btn.disabled = false;
+        return;
+    }
+    
+    google.script.run
+        .withSuccessHandler(res => {
+            btn.outerHTML = getPaidButtonHtml(shiftId);
+            
+            document.getElementById(`pay-total-${shiftId}`).disabled = true;
+            
+            shift.status = 'Paid';
+            shift.amount = finalAmount;
+            shift.math.isPaid = true;
+        })
+        .withFailureHandler(err => {
+            alert("Payment lock failed: " + err.message);
+            btn.innerText = origText; btn.disabled = false;
+        })
+        .approveShiftPayments([shiftId], finalAmount.toFixed(2), "Paid");
+}
+
+function executeBulkPay(uid, evId, type, btnId) {
+    let btn = document.getElementById(btnId);
+    if(btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+    
+    let safePerson = uid.replace(/[^a-zA-Z0-9]/g, '-');
+    let safeEv = evId === 'ALL' ? '' : evId.replace(/[^a-zA-Z0-9]/g, '-');
+    
+    let selector = `.pay-total-${safePerson}`;
+    if (evId !== 'ALL') selector += `.pay-total-ev-${safeEv}`;
+    
+    let inputs = document.querySelectorAll(selector);
+    let allShifts = [];
+    let totalAmount = 0;
+    
+    let payload = [];
+    inputs.forEach(inp => {
+        if (inp.disabled) return; 
+        let shiftId = inp.id.replace('pay-total-', '');
+        let amount = parseFloat(inp.value) || 0;
+        let shiftObj = activeEnrichedShifts.find(s => s.id === shiftId);
+        if (shiftObj) {
+            payload.push({ id: shiftId, amount: amount.toFixed(2), obj: shiftObj });
+            let sBtn = document.getElementById(`pay-btn-${shiftId}`);
+            if (sBtn) { sBtn.innerText = "SAVING..."; sBtn.disabled = true; }
+        }
+    });
+    
+    if (payload.length === 0) {
+        if(btn) { btn.innerText = "PAY"; btn.disabled = false; }
+        return;
+    }
+    
+    google.script.run
+        .withSuccessHandler(res => {
+            payload.forEach(item => {
+                let shiftId = item.id;
+                let shiftObj = item.obj;
+                shiftObj.status = 'Paid';
+                shiftObj.amount = item.amount;
+                shiftObj.math.isPaid = true;
+                let sBtn = document.getElementById(`pay-btn-${shiftId}`);
+                if (sBtn) sBtn.outerHTML = getPaidButtonHtml(shiftId);
+                let inputEl = document.getElementById(`pay-total-${shiftId}`);
+                if (inputEl) { inputEl.value = item.amount; inputEl.disabled = true; }
+            });
+            if (currentPayrollView === 'person') renderPayrollByPerson(); else renderPayrollByEvent();
+        })
+        .withFailureHandler(err => {
+            alert("Payment lock failed: " + err.message);
+            if(btn) { btn.innerText = "PAY"; btn.disabled = false; }
+            payload.forEach(item => {
+                let sBtn = document.getElementById(`pay-btn-${item.id}`);
+                if (sBtn) { sBtn.innerText = "PAY SHIFT"; sBtn.disabled = false; }
+            });
+        })
+        .approveShiftPayments(payload.map(p => ({id: p.id, amount: p.amount})), "", "Paid");
+}
+
+let unpayTimers = {};
+
+function getPaidButtonHtml(shiftId) {
+    return `<button class="btn-outline pay-paid-btn" id="pay-btn-${shiftId}" 
+       onmousedown="startUnpay('${shiftId}')" onmouseup="cancelUnpay('${shiftId}')" onmouseleave="cancelUnpay('${shiftId}')"
+       ontouchstart="startUnpay('${shiftId}')" ontouchend="cancelUnpay('${shiftId}')"
+       style="margin:0; border-color:#10b981; color:#10b981; position:relative; overflow:hidden; user-select:none; -webkit-user-select:none; cursor:pointer;">
+       <span style="position:relative; z-index:2; pointer-events:none;">PAID ✓</span>
+       <div id="unpay-progress-${shiftId}" style="position:absolute; left:0; top:0; bottom:0; width:0%; background:rgba(239,68,68,0.5); z-index:1; pointer-events:none;"></div>
+     </button>`;
+}
+
+function startUnpay(shiftId) {
+    let prog = document.getElementById(`unpay-progress-${shiftId}`);
+    let btn = document.getElementById(`pay-btn-${shiftId}`);
+    if(!prog || !btn) return;
+    
+    prog.style.transition = 'width 1.5s linear';
+    prog.style.width = '100%';
+    btn.style.borderColor = '#ef4444';
+    btn.style.color = '#ef4444';
+    
+    unpayTimers[shiftId] = setTimeout(() => {
+        unpayShift(shiftId);
+    }, 1500);
+}
+
+function cancelUnpay(shiftId) {
+    if(unpayTimers[shiftId]) {
+        clearTimeout(unpayTimers[shiftId]);
+        delete unpayTimers[shiftId];
+    }
+    let prog = document.getElementById(`unpay-progress-${shiftId}`);
+    let btn = document.getElementById(`pay-btn-${shiftId}`);
+    if(prog) {
+        prog.style.transition = 'width 0.2s linear';
+        prog.style.width = '0%';
+    }
+    if(btn) {
+        btn.style.borderColor = '#10b981';
+        btn.style.color = '#10b981';
+    }
+}
+
+function unpayShift(shiftId) {
+    let btn = document.getElementById(`pay-btn-${shiftId}`);
+    if(!btn) return;
+    let origText = btn.innerHTML;
+    btn.innerHTML = `<span style="position:relative; z-index:2; pointer-events:none;">UNDOING...</span>`;
+    btn.disabled = true;
+    
+    let shift = activeEnrichedShifts.find(s => s.id === shiftId);
+    if (!shift) return;
+    
+    google.script.run
+        .withSuccessHandler(res => {
+            btn.outerHTML = `<button class="btn-main" id="pay-btn-${shiftId}" onclick="approveAndPayShift('${shiftId}')" style="margin:0;">PAY SHIFT</button>`;
+            let totInp = document.getElementById(`pay-total-${shiftId}`);
+            if(totInp) totInp.disabled = false;
+            shift.status = 'Pending';
+            shift.amount = '';
+            shift.math.isPaid = false;
+        })
+        .withFailureHandler(err => {
+            alert("Undo failed: " + err.message);
+            btn.innerHTML = origText; 
+            btn.disabled = false;
+            cancelUnpay(shiftId);
+        })
+        .approveShiftPayments([shiftId], "", "Pending");
+}
+
+let bulkPayTimers = {};
+
+function getBulkPayButtonHtml(uid, evId, type, isAllPaid, label) {
+    let btnId = `bulk-pay-btn-${uid}-${evId}-${type}`;
+    if (!isAllPaid) {
+        return `<button class="btn-main btn-sm" id="${btnId}" onclick="executeBulkPay('${uid}', '${evId}', '${type}', '${btnId}')" style="margin:0;">${label}</button>`;
+    } else {
+        return `<button class="btn-outline btn-sm bulk-unpay-btn" id="${btnId}" 
+           onmousedown="startBulkUnpay('${uid}', '${evId}', '${type}', '${btnId}', '${label}')" onmouseup="cancelBulkUnpay('${btnId}')" onmouseleave="cancelBulkUnpay('${btnId}')"
+           ontouchstart="startBulkUnpay('${uid}', '${evId}', '${type}', '${btnId}', '${label}')" ontouchend="cancelBulkUnpay('${btnId}')"
+           style="margin:0; padding:4px 8px !important; border-color:#10b981; color:#10b981; position:relative; overflow:hidden; user-select:none; -webkit-user-select:none; cursor:pointer;">
+           <span style="position:relative; z-index:2; pointer-events:none;">PAID ✓</span>
+           <div id="bulk-unpay-progress-${btnId}" style="position:absolute; left:0; top:0; bottom:0; width:0%; background:rgba(239,68,68,0.5); z-index:1; pointer-events:none;"></div>
+         </button>`;
+    }
+}
+
+function startBulkUnpay(uid, evId, type, btnId, origLabel) {
+    let prog = document.getElementById(`bulk-unpay-progress-${btnId}`);
+    let btn = document.getElementById(btnId);
+    if(!prog || !btn) return;
+    
+    prog.style.transition = 'width 1.5s linear';
+    prog.style.width = '100%';
+    btn.style.borderColor = '#ef4444';
+    btn.style.color = '#ef4444';
+    
+    bulkPayTimers[btnId] = setTimeout(() => {
+        executeBulkUnpay(uid, evId, type, btnId, origLabel);
+    }, 1500);
+}
+
+function cancelBulkUnpay(btnId) {
+    if(bulkPayTimers[btnId]) {
+        clearTimeout(bulkPayTimers[btnId]);
+        delete bulkPayTimers[btnId];
+    }
+    let prog = document.getElementById(`bulk-unpay-progress-${btnId}`);
+    let btn = document.getElementById(btnId);
+    if(prog) {
+        prog.style.transition = 'width 0.2s linear';
+        prog.style.width = '0%';
+    }
+    if(btn) {
+        btn.style.borderColor = '#10b981';
+        btn.style.color = '#10b981';
+    }
+}
+
+function executeBulkUnpay(uid, evId, type, btnId, origLabel) {
+    let btn = document.getElementById(btnId);
+    if(btn) { btn.innerHTML = `<span style="position:relative; z-index:2; pointer-events:none;">UNDOING...</span>`; btn.disabled = true; }
+    
+    let safePerson = uid.replace(/[^a-zA-Z0-9]/g, '-');
+    let safeEv = evId === 'ALL' ? '' : evId.replace(/[^a-zA-Z0-9]/g, '-');
+    
+    let selector = `.pay-total-${safePerson}`;
+    if (evId !== 'ALL') selector += `.pay-total-ev-${safeEv}`;
+    
+    let inputs = document.querySelectorAll(selector);
+    let allShifts = [];
+    
+    inputs.forEach(inp => {
+        let shiftId = inp.id.replace('pay-total-', '');
+        let shiftObj = activeEnrichedShifts.find(s => s.id === shiftId);
+        if (shiftObj && shiftObj.math.isPaid) {
+            allShifts.push(shiftObj);
+            let sBtn = document.getElementById(`pay-btn-${shiftId}`);
+            if (sBtn) { sBtn.innerHTML = `<span style="position:relative; z-index:2; pointer-events:none;">UNDOING...</span>`; sBtn.disabled = true; }
+        }
+    });
+    
+    if (allShifts.length === 0) {
+        if(btn) { btn.outerHTML = getBulkPayButtonHtml(uid, evId, type, false, origLabel); }
+        return;
+    }
+    
+    let shiftIds = allShifts.map(s => s.id);
+    
+    google.script.run
+        .withSuccessHandler(res => {
+            allShifts.forEach(shiftObj => {
+                let shiftId = shiftObj.id;
+                shiftObj.status = 'Pending';
+                shiftObj.amount = '';
+                shiftObj.math.isPaid = false;
+                
+                let sBtn = document.getElementById(`pay-btn-${shiftId}`);
+                if (sBtn) sBtn.outerHTML = `<button class="btn-main" id="pay-btn-${shiftId}" onclick="approveAndPayShift('${shiftId}')" style="margin:0;">PAY SHIFT</button>`;
+                let inputEl = document.getElementById(`pay-total-${shiftId}`);
+                if (inputEl) { inputEl.disabled = false; }
+            });
+            if (currentPayrollView === 'person') renderPayrollByPerson(); else renderPayrollByEvent();
+        })
+        .withFailureHandler(err => {
+            alert("Undo failed: " + err.message);
+            cancelBulkUnpay(btnId);
+            if (currentPayrollView === 'person') renderPayrollByPerson(); else renderPayrollByEvent();
+        })
+        .approveShiftPayments(shiftIds, "", "Pending");
+}
+
+// @INDEX: FINANCIALS -> Global Unpaid Viewer
+function showGlobalUnpaid(uid, name) {
+    globalUnpaidUids.add(uid);
+    let startStr = document.getElementById('fin-payroll-start').value;
+    let endStr = document.getElementById('fin-payroll-end').value;
+    enrichShiftsWithMath(startStr, endStr);
+    
+    if (currentPayrollView !== 'person') {
+        currentPayrollView = 'person';
+        document.getElementById('fin-tab-person').className = 'btn-main';
+        document.getElementById('fin-tab-event').className = 'btn-outline';
+        document.getElementById('fin-payroll-view-person').style.display = 'block';
+        document.getElementById('fin-payroll-view-event').style.display = 'none';
+    }
+    
+    let safePerson = uid.replace(/[^a-zA-Z0-9]/g, '-');
+    finToggleState['person-' + safePerson] = 'block';
+    
+    renderPayrollByPerson();
+}
+
+
+// @INDEX: FINANCIALS -> Settings & Overheads
+function loadFinSettingsUI() {
+    document.getElementById('fin-subtab-labor').style.opacity = '0.5';
+    google.script.run.withSuccessHandler(res => {
+        renderFinRolesUI(res.roles || {});
+        finOverheadsList = res.overheads || [];
+        renderFinOverheadsUI();
+        
+        let t = res.trucks || {};
+        const setV = (id, val) => { 
+            let el = document.getElementById(id); 
+            if (el) el.value = (val !== undefined && typeof val !== 'object') ? val : ''; 
+        };
+        setV('fin-set-truck-t1-in', t.truck_t1_in); setV('fin-set-truck-t1-out', t.truck_t1_out); setV('fin-set-truck-t1-stay', t.truck_t1_stay);
+        setV('fin-set-truck-t2-in', t.truck_t2_in); setV('fin-set-truck-t2-out', t.truck_t2_out); setV('fin-set-truck-t2-stay', t.truck_t2_stay);
+        setV('fin-set-truck-t3-in', t.truck_t3_in); setV('fin-set-truck-t3-out', t.truck_t3_out); setV('fin-set-truck-t3-stay', t.truck_t3_stay);
+        setV('fin-set-truck-t4-in', t.truck_t4_in); setV('fin-set-truck-t4-out', t.truck_t4_out); setV('fin-set-truck-t4-stay', t.truck_t4_stay);
+
+        let g = res.globals || {};
+        setV('fin-set-prep-rate', g.prep_rate); setV('fin-set-prep-hours', g.prep_hours);
+        setV('fin-set-recovery-rate', g.recovery_rate); setV('fin-set-recovery-hours', g.recovery_hours);
+        setV('fin-set-build-rate', g.build_rate); setV('fin-set-build-hours', g.build_hours);
+        setV('fin-set-duty-rate', g.duty_rate); setV('fin-set-duty-hours', g.duty_hours);
+        setV('fin-set-break-rate', g.break_rate); setV('fin-set-break-hours', g.break_hours);
+        setV('fin-set-default-shift-period', g.default_shift_period);
+        setV('fin-set-overtime-multiplier', g.overtime_multiplier);
+        setV('fin-set-followspot-bonus', g.followspot_bonus);
+        setV('fin-set-console-bonus', g.console_bonus);
+        setV('fin-set-extra-rate-standard', g.extra_rate_standard !== undefined ? g.extra_rate_standard : 15);
+        setV('fin-set-extra-rate-prep', g.extra_rate_prep !== undefined ? g.extra_rate_prep : 15);
+
+        document.getElementById('fin-subtab-labor').style.opacity = '1';
+    }).getFinancialSettings();
+}
+
+function switchFinSubTab(tab) {
+    document.getElementById('fin-subtab-labor').style.display = 'none';
+    document.getElementById('fin-subtab-overheads').style.display = 'none';
+    
+    document.getElementById('fin-subtab-btn-labor').className = 'btn-outline';
+    document.getElementById('fin-subtab-btn-overheads').className = 'btn-outline';
+    
+    document.getElementById('fin-subtab-' + tab).style.display = 'flex';
+    document.getElementById('fin-subtab-btn-' + tab).className = 'btn-main';
+}
+
+function renderFinRolesUI(savedRoles) {
+    let html = '';
+    if (typeof ROLE_COLORS !== 'undefined') {
+        Object.keys(ROLE_COLORS).sort().forEach(role => {
+                let saved = savedRoles[role] || { mult: 1.0 };
+            let bgCol = ROLE_COLORS[role].bg || '#86efac';
+            html += `
+            <div class="fin-role-row" data-role="${role.replace(/"/g, '&quot;')}" style="display:flex; flex-wrap:wrap; gap:10px; background:#222; padding:12px; border-radius:6px; border:1px solid #333; align-items:center;">
+                <div style="flex:1; min-width:120px; display:flex; align-items:center; gap:8px;">
+                    <span style="color:${bgCol}; font-weight:bold; font-size:13px;">${role}</span>
+                </div>
+                    <div style="width:80px;">
+                        <div class="input-label" style="font-size:9px;">Multiplier</div>
+                        <input type="number" step="0.1" class="role-mult" value="${saved.mult !== undefined ? saved.mult : 1.0}" style="padding:6px; width:100%; box-sizing:border-box;" title="Role Multiplier">
+                </div>
+            </div>`;
+        });
+    }
+    document.getElementById('fin-roles-container').innerHTML = html;
+}
+
+function addFinOverheadRow() {
+    finOverheadsList.push({ name: '', amount: 0, frequency: 'Monthly' });
+    renderFinOverheadsUI();
+}
+
+function renderFinOverheadsUI() {
+    let html = '';
+    finOverheadsList.forEach((item, idx) => {
+        html += `
+        <div style="display:flex; gap:10px; background:#222; padding:12px; border-radius:6px; border:1px solid #333; align-items:center;">
+            <div style="flex:2;">
+                <div class="input-label" style="font-size:9px;">Expense Name</div>
+                <input type="text" value="${item.name.replace(/"/g, '&quot;')}" oninput="finOverheadsList[${idx}].name = this.value" placeholder="e.g. Warehouse Rent" style="padding:6px; width:100%; box-sizing:border-box;">
+            </div>
+            <div style="flex:1;">
+                <div class="input-label" style="font-size:9px;">Amount (€)</div>
+                <input type="number" step="0.01" value="${item.amount}" oninput="finOverheadsList[${idx}].amount = parseFloat(this.value)||0" style="padding:6px; width:100%; box-sizing:border-box;">
+            </div>
+            <div style="flex:1;">
+                <div class="input-label" style="font-size:9px;">Frequency</div>
+                <select onchange="finOverheadsList[${idx}].frequency = this.value" style="padding:6px; width:100%; box-sizing:border-box; border-radius:4px; background:#111; color:#fff; border:1px solid #444; height:32px;">
+                    <option value="Monthly" ${item.frequency === 'Monthly' ? 'selected' : ''}>Monthly</option>
+                    <option value="Yearly" ${item.frequency === 'Yearly' ? 'selected' : ''}>Yearly</option>
+                </select>
+            </div>
+            <button class="btn-delete" style="margin-top:14px; padding:6px 12px !important;" onclick="finOverheadsList.splice(${idx}, 1); renderFinOverheadsUI();">X</button>
+        </div>`;
+    });
+    if(html === '') html = '<div style="color:#888; font-size:12px; font-style:italic; text-align:center; padding:20px;">No overheads added.</div>';
+    document.getElementById('fin-overheads-container').innerHTML = html;
+}
+
+function handleSaveFinancialSettings() {
+    let btn = event.currentTarget;
+    let orig = btn.innerText;
+    btn.innerText = "SAVING..."; btn.disabled = true;
+
+    let roles = {};
+    document.querySelectorAll('.fin-role-row').forEach(row => {
+        let role = row.dataset.role;
+        roles[role] = {
+            mult: parseFloat(row.querySelector('.role-mult').value) || 1.0
+        };
+    });
+
+    const getVal = (id, def = 0) => {
+        let el = document.getElementById(id);
+        if(!el) return def;
+        let v = parseFloat(el.value);
+        return isNaN(v) ? def : v;
+    };
+
+    let trucks = {
+        truck_t1_in: getVal('fin-set-truck-t1-in'), truck_t1_out: getVal('fin-set-truck-t1-out'), truck_t1_stay: getVal('fin-set-truck-t1-stay'),
+        truck_t2_in: getVal('fin-set-truck-t2-in'), truck_t2_out: getVal('fin-set-truck-t2-out'), truck_t2_stay: getVal('fin-set-truck-t2-stay'),
+        truck_t3_in: getVal('fin-set-truck-t3-in'), truck_t3_out: getVal('fin-set-truck-t3-out'), truck_t3_stay: getVal('fin-set-truck-t3-stay'),
+        truck_t4_in: getVal('fin-set-truck-t4-in'), truck_t4_out: getVal('fin-set-truck-t4-out'), truck_t4_stay: getVal('fin-set-truck-t4-stay')
+    };
+    
+    let globals = {
+        prep_rate: getVal('fin-set-prep-rate', 80),
+        prep_hours: getVal('fin-set-prep-hours', 8),
+        recovery_rate: getVal('fin-set-recovery-rate', 80),
+        recovery_hours: getVal('fin-set-recovery-hours', 8),
+        build_rate: getVal('fin-set-build-rate', 100),
+        build_hours: getVal('fin-set-build-hours', 6),
+        duty_rate: getVal('fin-set-duty-rate', 120),
+        duty_hours: getVal('fin-set-duty-hours', 8),
+        break_rate: getVal('fin-set-break-rate', 80),
+        break_hours: getVal('fin-set-break-hours', 4),
+        default_shift_period: getVal('fin-set-default-shift-period', 12),
+        overtime_multiplier: getVal('fin-set-overtime-multiplier', 1.5),
+        followspot_bonus: getVal('fin-set-followspot-bonus', 0),
+        console_bonus: getVal('fin-set-console-bonus', 0),
+        extra_rate_standard: getVal('fin-set-extra-rate-standard', 15),
+        extra_rate_prep: getVal('fin-set-extra-rate-prep', 15)
+    };
+
+    let payload = {
+        roles: roles,
+        overheads: finOverheadsList,
+        trucks: trucks,
+        globals: globals
+    };
+
+    google.script.run
+        .withSuccessHandler(() => {
+            btn.innerText = "SAVED ✓";
+            setTimeout(() => { btn.innerText = orig; btn.disabled = false; }, 2000);
+        })
+        .withFailureHandler(err => {
+            alert("Error saving settings: " + err.message);
+            btn.innerText = orig; btn.disabled = false;
+        })
+        .saveFinancialSettings(payload);
+}
+</script>

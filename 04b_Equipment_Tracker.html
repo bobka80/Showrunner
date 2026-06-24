@@ -1,0 +1,878 @@
+<script>
+/**
+ * 04b_Equipment_Tracker.html
+ * Domain: Unified Logistics Matrix (Equipment Availability, Tracking, Fleet Integration)
+ */
+
+// @INDEX: TRACKER -> State & Globals
+let trackerData = null;
+let trackerWatchlist = [];
+let trackerStartDate = new Date();
+let trackerEndDate = new Date();
+let trackerPlayheadDate = null;
+
+// Initialize Default: Month + 1 Week (e.g. Oct 1 to Nov 7)
+function initTrackerDates() {
+    let now = new Date();
+    trackerStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    trackerEndDate = new Date(now.getFullYear(), now.getMonth() + 1, 7); 
+    
+    // Default playhead to today, or start of month if today is outside bounds
+    let toLocalIso = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+    let todayIso = toLocalIso(now);
+    trackerPlayheadDate = (now >= trackerStartDate && now <= trackerEndDate) ? todayIso : toLocalIso(trackerStartDate);
+}
+
+function setTrackerDateInputs() {
+    const sInput = document.getElementById('tracker-start-date');
+    const eInput = document.getElementById('tracker-end-date');
+    
+    // Convert dates to YYYY-MM-DD for standard input values, adjusting for local timezone
+    const toLocalIso = (d) => {
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, '0') + "-" + String(d.getDate()).padStart(2, '0');
+    };
+    
+    if (sInput) sInput.value = toLocalIso(trackerStartDate);
+    if (eInput) eInput.value = toLocalIso(trackerEndDate);
+}
+
+// Overrides the existing function from 06b1_Admin_Assets_Core.html
+window.openAvailabilityDashboard = function() {
+    if (typeof closeModals === 'function') {
+        if (!closeModals()) return;
+    }
+    
+    initTrackerDates();
+    setTrackerDateInputs();
+    
+    document.getElementById('availability-modal-overlay').style.display = 'flex';
+    if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-availability');
+    
+    fetchTrackerData(); 
+};
+
+window.setTrackerPlayhead = function(isoStr) {
+    trackerPlayheadDate = isoStr;
+    // Re-render strictly to move the playhead line and rebuild the bottom list
+    renderTrackerGrid();
+};
+
+window.changeTrackerDate = function(monthOffset) {
+    trackerStartDate.setMonth(trackerStartDate.getMonth() + monthOffset);
+    trackerStartDate.setDate(1); // Always snap back to 1st of month on Prev/Next
+    
+    trackerEndDate = new Date(trackerStartDate.getFullYear(), trackerStartDate.getMonth() + 1, 7);
+    
+    setTrackerDateInputs();
+    fetchTrackerData();
+};
+
+window.applyTrackerCustomDates = function() {
+    const sInput = document.getElementById('tracker-start-date').value;
+    const eInput = document.getElementById('tracker-end-date').value;
+    if (sInput && eInput) {
+        // Parse hyphens so it doesn't default to UTC mismatch
+        let sPts = sInput.split('-');
+        let ePts = eInput.split('-');
+        trackerStartDate = new Date(sPts[0], sPts[1]-1, sPts[2]);
+        trackerEndDate = new Date(ePts[0], ePts[1]-1, ePts[2]);
+        
+        if (trackerEndDate < trackerStartDate) {
+            alert("End date cannot be before start date.");
+            initTrackerDates();
+            setTrackerDateInputs();
+        }
+        fetchTrackerData();
+    }
+};
+
+window.forceTrackerSync = function() {
+    const canvas = document.getElementById('tracker-canvas-inner');
+    if (canvas) canvas.innerHTML = '<div style="padding: 40px; text-align: center; color: #f59e0b; font-weight: bold; font-style: italic;">Deep Syncing Logistics & Shifts...</div>';
+    
+    localStorage.removeItem('sm_tracker_cache');
+    
+    google.script.run
+        .withSuccessHandler(data => {
+            if (data && data.shifts) {
+                globalRosterData = data;
+            }
+            fetchTrackerData();
+        })
+        .withFailureHandler(err => {
+            alert("Sync Error: " + err.message);
+            fetchTrackerData();
+        })
+        .getGlobalMonthData();
+};
+
+window.handleTrackerWatchlistInput = function(e) {
+    if (e.key === 'Enter') {
+        const input = document.getElementById('tracker-search-input');
+        const term = input.value.trim();
+        if (term && !trackerWatchlist.includes(term.toLowerCase())) {
+            trackerWatchlist.push(term.toLowerCase());
+            input.value = '';
+            renderTrackerWatchlist();
+            fetchTrackerData();
+        }
+    }
+};
+
+function renderTrackerWatchlist() {
+    const container = document.getElementById('tracker-watchlist-pills');
+    const clearBtn = document.getElementById('tracker-clear-btn');
+    if (!container || !clearBtn) return;
+    
+    if (trackerWatchlist.length === 0) {
+        container.innerHTML = '<div style="color:#555; font-size:11px; font-style:italic;">Watchlist is empty.</div>';
+        clearBtn.style.display = 'none';
+    } else {
+        container.innerHTML = trackerWatchlist.map(term => `<div style="display:flex; justify-content:space-between; align-items:center; background:#27272a; padding:6px 10px; border-radius:4px; font-size:11px; font-weight:bold; color:#fff; cursor:pointer; border:1px solid #3f3f46;" onmouseover="this.style.borderColor='#ef4444'" onmouseout="this.style.borderColor='#3f3f46'" onclick="removeFromWatchlist('${term}')" title="Remove from watchlist"><span>${term}</span><span style="color:#ef4444; font-size:14px; line-height:1;">&times;</span></div>`).join('');
+        clearBtn.style.display = 'block';
+    }
+}
+
+function removeFromWatchlist(term) {
+    trackerWatchlist = trackerWatchlist.filter(t => t !== term);
+    renderTrackerWatchlist();
+    fetchTrackerData();
+}
+
+function clearWatchlist() {
+    trackerWatchlist = [];
+    renderTrackerWatchlist();
+    fetchTrackerData();
+};
+
+window.goToProjectEquipmentFromTracker = function(projectId, e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // CRITICAL: Tell the system you are actively editing a project to allow the modal to load safely
+    window.activeProjectContext = projectId;
+    
+    if (typeof closeModals === 'function') closeModals();
+    
+    setTimeout(() => {
+        document.getElementById('edit-folder-id').value = projectId;
+        if (trackerData && trackerData.strips) {
+            let strip = trackerData.strips.find(s => s.id === projectId);
+            if (strip) {
+                let nameEl = document.getElementById('edit-proj-name');
+                if (nameEl) nameEl.value = strip.name;
+                let dateEl = document.getElementById('edit-proj-date');
+                if (dateEl) dateEl.value = strip.startStr || '';
+                let endEl = document.getElementById('edit-proj-end-date');
+                if (endEl) endEl.value = strip.endStr || strip.startStr || '';
+                
+                let typeEl = document.getElementById('edit-proj-type');
+                if (typeEl) typeEl.value = strip.type || 'Event';
+                
+                let statEl = document.getElementById('display-event-status');
+                if (statEl) statEl.innerText = (strip.status || 'DRAFT').toUpperCase();
+            }
+        }
+        document.getElementById('availability-modal-overlay').style.display = 'none';
+        
+        if (typeof startPresencePing === 'function') startPresencePing(projectId);
+        if (typeof openProjectAssetsModal === 'function') openProjectAssetsModal();
+    }, 150);
+};
+
+// @INDEX: TRACKER -> Network & Fetching
+function fetchTrackerData() {
+    const canvas = document.getElementById('tracker-canvas-inner');
+    if (!canvas) return;
+    
+    let startStr = document.getElementById('tracker-start-date').value;
+    let endStr = document.getElementById('tracker-end-date').value;
+    
+    // Fallback if inputs failed to populate on boot
+    if (!startStr || !endStr) {
+        initTrackerDates();
+        setTrackerDateInputs();
+        startStr = document.getElementById('tracker-start-date').value;
+        endStr = document.getElementById('tracker-end-date').value;
+    }
+    
+    let watchlistKey = JSON.stringify(trackerWatchlist);
+    let cacheKey = 'sm_tracker_cache';
+    let isCachedRendered = false;
+
+    try {
+        let cachedRaw = localStorage.getItem(cacheKey);
+        if (cachedRaw) {
+            let cachedObj = JSON.parse(cachedRaw);
+            if (cachedObj.startStr === startStr && cachedObj.endStr === endStr && cachedObj.watchlistKey === watchlistKey) {
+                trackerData = cachedObj.data;
+                renderTrackerGrid();
+                isCachedRendered = true;
+            }
+        }
+    } catch(e) {}
+
+    if (!isCachedRendered) {
+        canvas.innerHTML = '<div style="padding: 40px; text-align: center; color: #f59e0b; font-weight: bold; font-style: italic;">Fetching Live Logistics & Inventory...</div>';
+    }
+
+    google.script.run.withSuccessHandler(data => {
+        trackerData = data;
+        renderTrackerGrid();
+        try { localStorage.setItem(cacheKey, JSON.stringify({ startStr: startStr, endStr: endStr, watchlistKey: watchlistKey, data: data })); } catch(e) {}
+    }).withFailureHandler(err => {
+        canvas.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444; font-weight: bold;">Sync Error: ${err.message || err}</div>`;
+        console.error("Tracker Sync Error:", err);
+    }).getUnifiedTrackerData(startStr, endStr, trackerWatchlist);
+};
+
+// @INDEX: TRACKER -> Render Top Timeline & Playhead
+function renderTrackerGrid() {
+    const canvas = document.getElementById('tracker-canvas-inner');
+    if (!canvas) return;
+    
+    try {
+        if (!trackerData || !trackerData.startStr || !trackerData.endStr) throw new Error("Invalid payload from server.");
+    
+    const start = new Date(trackerData.startStr + "T00:00:00Z");
+    const end = new Date(trackerData.endStr + "T00:00:00Z");
+    let totalDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+    if (isNaN(totalDays) || totalDays <= 0) throw new Error("Invalid date range calculation.");
+    
+    let colWidth = 60; // Slightly narrower for denser packing
+    
+    // Dynamic Header Height & Track Calculation for Event Strips
+    let activeStrips = trackerData.strips ? trackerData.strips.filter(strip => {
+        let pStart = new Date(strip.startStr + "T00:00:00Z");
+        let pEnd = new Date(strip.endStr + "T00:00:00Z");
+        return !(pEnd < start || pStart > end);
+    }) : [];
+    
+    activeStrips.sort((a,b) => new Date(a.startStr) - new Date(b.startStr));
+    let tracks = [];
+    activeStrips.forEach(p => {
+        let pStartD = new Date(p.startStr + "T00:00:00Z").getTime();
+        let pEndD = new Date(p.endStr + "T00:00:00Z").getTime();
+        let placed = false;
+        for(let i=0; i<tracks.length; i++) { if(tracks[i] < pStartD) { p.track = i; tracks[i] = pEndD; placed = true; break; } }
+        if(!placed) { p.track = tracks.length; tracks.push(pEndD); }
+    });
+    
+    let evHeight = typeof MR_VISUAL_SETTINGS !== 'undefined' && MR_VISUAL_SETTINGS.eventHeight ? MR_VISUAL_SETTINGS.eventHeight : 24;
+    let trackHeight = evHeight + 4;
+    let baseHeaderHeight = 45; 
+    let headerHeight = Math.max(80, baseHeaderHeight + (tracks.length * trackHeight) + 15);
+    
+    // Split the UI: Top = Timeline Scrubber, Bottom = Dynamic Grid List
+    let html = `<div style="display:flex; flex-direction:column; height:100%; width:100%;">
+                  <!-- TOP TIMELINE SCRUBBER -->
+                  <div id="tracker-timeline-header" style="height: ${headerHeight + 20}px; overflow-x: auto; overflow-y: hidden; background: #111; border-bottom: 2px solid var(--accent); position: relative; flex-shrink: 0;">
+                      <div class="mr-grid-header" style="position:relative; min-height:${headerHeight}px; width:max-content;">
+                          <div style="display:flex; align-items: stretch; position:relative; width:${totalDays * colWidth}px;">`;
+    
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let d = 0; d < totalDays; d++) {
+        let currD = new Date(start);
+        currD.setUTCDate(currD.getUTCDate() + d);
+        let isWeekend = (currD.getUTCDay() === 0 || currD.getUTCDay() === 6);
+        let isoStr = currD.toISOString().split('T')[0];
+        let isToday = (isoStr === new Date().toISOString().split('T')[0]);
+        let isPlayhead = (isoStr === trackerPlayheadDate);
+        
+        let baseStyle = `width:${colWidth}px; min-width:${colWidth}px; height:${headerHeight}px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; padding-top:10px; font-weight:800; color:#fff; font-size:14px; box-sizing:border-box; cursor:pointer; transition:0.2s;`;
+        let customStyle = '';
+        
+        if (isPlayhead) {
+            customStyle = `background:rgba(255,255,255,0.1); border: 2px solid #fff; z-index:10; box-shadow: 0 0 12px rgba(255,255,255,0.2); position:relative;`;
+        } else {
+            customStyle = `border-right:1px solid #333; ${isToday ? 'background:#222228; border-bottom:2px solid var(--accent);' : (isWeekend ? 'background:#18181b;' : '')}`;
+        }
+        
+        html += `<div style="${baseStyle} ${customStyle}" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='${isPlayhead ? 'rgba(255,255,255,0.1)' : (isToday ? '#222228' : (isWeekend ? '#18181b' : 'transparent'))}'" onclick="setTrackerPlayhead('${isoStr}')">${currD.getUTCDate()} <span style="font-size:9px; color:${isPlayhead ? '#fff' : '#888'}; text-transform:uppercase;">${dayNames[currD.getUTCDay()]}</span></div>`;
+    }
+
+    // Dynamically draw Floating Gantt Event Strips
+    if (activeStrips.length > 0) {
+        
+        let mainC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['main'] ? PAINT_COLORS['main'].color : '#3b82f6';
+        let whC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['wh'] ? PAINT_COLORS['wh'].color : '#f97316';
+        let showC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['show'] ? PAINT_COLORS['show'].color : '#10b981';
+        let recoveryC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['recovery'] ? PAINT_COLORS['recovery'].color : '#a855f7';
+        let transitC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['transit'] ? PAINT_COLORS['transit'].color : '#06b6d4';
+
+        activeStrips.forEach(strip => {
+            let pStart = new Date(strip.startStr + "T00:00:00Z");
+            let pEnd = new Date(strip.endStr + "T00:00:00Z");
+            
+            let vStart = pStart < start ? start : pStart;
+            let vEnd = pEnd > end ? end : pEnd;
+            if (vEnd < start || vStart > end) return; 
+            
+            let offsetDays = (vStart.getTime() - start.getTime()) / 86400000;
+            let spanDays = Math.round((vEnd - vStart) / 86400000) + 1;
+            
+            let leftPx = Math.round(offsetDays * colWidth) + 4;
+            let widthPx = (spanDays * colWidth) - 8;
+            let topPx = baseHeaderHeight + (strip.track * trackHeight);
+            
+            let pPhases = [];
+            if (strip.fragments && strip.fragments.length > 0) {
+                let typeMap = { 'WAREHOUSE': 'wh', 'MAIN_EVENT': 'main', 'SHOW_DAY': 'show', 'RECOVERY': 'recovery', 'TRANSIT': 'transit' };
+                let sortedFrags = strip.fragments.sort((a,b) => String(a.date || '').localeCompare(String(b.date || '')));
+                sortedFrags.forEach(f => {
+                    let dTime = new Date(f.date + "T00:00:00Z").getTime();
+                    let uiType = typeMap[f.type] || 'main';
+                    let lastBlock = pPhases.find(b => b.type === uiType && b.endEpoch === dTime);
+                    if (lastBlock) lastBlock.endEpoch = dTime + 86400000;
+                    else pPhases.push({ type: uiType, startEpoch: dTime, endEpoch: dTime + 86400000 });
+                });
+            }
+            
+            let rawDbStatus = String(strip.status || 'Draft').toUpperCase();
+            let isCancelled = (rawDbStatus === 'CANCELLED');
+            let ledColor = isCancelled ? '#ef4444' : (rawDbStatus === 'APPROVED' ? '#10b981' : (rawDbStatus === 'NOT APPROVED' ? '#f97316' : '#a1a1aa'));
+            let typeKey = 'event'; 
+            if (strip.type) { let t = strip.type.toLowerCase(); if (t === 'meeting' || t === 'cross rent') typeKey = t.replace(/\s+/g, '-'); }
+            let borderVar = isCancelled ? '#333333' : `var(--cal-color-${typeKey}, #888888)`;
+            let bgHex = isCancelled ? 'rgba(30, 30, 34, 0.9)' : 'rgba(20, 20, 22, 0.9)';
+            let textCol = isCancelled ? '#666666' : '#ffffff';
+            
+            let innerBars = '';
+            if (pPhases.length > 0) {
+                let segStartEpoch = vStart.getTime();
+                let segTotalDays = spanDays;
+                pPhases.forEach(block => {
+                    let bStart = block.startEpoch;
+                    let bEnd = block.endEpoch - 86400000; 
+                    let visibleStart = Math.max(bStart, segStartEpoch);
+                    let visibleEnd = Math.min(bEnd, segStartEpoch + ((segTotalDays - 1) * 86400000));
+                    if (visibleEnd < visibleStart) return;
+                    let blockOffsetDays = Math.round((visibleStart - segStartEpoch) / 86400000);
+                    let blockSpanDays = Math.round((visibleEnd - visibleStart) / 86400000) + 1;
+                    let leftPct = Math.max(0, (blockOffsetDays / segTotalDays) * 100);
+                    let widthPct = Math.min(100 - leftPct, (blockSpanDays / segTotalDays) * 100);
+                    let bBgHex = block.type === 'wh' ? whC : block.type === 'main' ? mainC : block.type === 'show' ? showC : block.type === 'transit' ? transitC : recoveryC;
+                    let bTop = '0', bHeight = '20%';
+                    if (block.type === 'wh') { bTop = '0'; bHeight = '20%'; } else if (block.type === 'transit') { bTop = '20%'; bHeight = '20%'; } else if (block.type === 'main') { bTop = '40%'; bHeight = '20%'; } else if (block.type === 'show') { bTop = '60%'; bHeight = '20%'; } else if (block.type === 'recovery') { bTop = '80%'; bHeight = '20%'; }
+                    innerBars += `<div style="position: absolute; left: ${leftPct}%; width: ${widthPct}%; top: ${bTop}; height: ${bHeight}; background: ${bBgHex}; border-radius: 1px; z-index: 1;"></div>`;
+                });
+            }
+            
+            html += `<div class="event-custom-frame mr-event-strip" style="--event-border-color: ${borderVar}; --bg-hex: ${bgHex}; --text-col: ${textCol}; position:absolute; top:${topPx}px; left:${leftPx}px; width:${widthPx}px; height:${evHeight}px; border-radius: 4px; cursor: pointer; box-sizing: border-box; overflow: hidden; z-index: 30;" title="${strip.name}" onclick="goToProjectEquipmentFromTracker('${strip.id}', event)">
+                 <div class="solid-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${borderVar}; z-index:0;"></div>
+                 <div class="hover-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${bgHex}; z-index:0;"></div>
+                 <div class="bars-wrapper" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1;">${innerBars}</div>
+                 <div class="event-custom-title" style="position: absolute; left: 6px; top: 0; bottom: 0; display: flex; align-items: center; font-size: 11px; font-weight: 900; z-index: 10; white-space: nowrap; pointer-events: none;"><div style="width:6px; height:6px; border-radius:50%; background:${ledColor}; margin-right:4px; box-shadow: 0 0 3px ${ledColor}; flex-shrink:0;"></div><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: ${textCol};">${strip.name}</span></div>
+            </div>`;
+        });
+    }
+
+    html += `</div></div></div>
+             <!-- BOTTOM DYNAMIC LIST ENGINE -->
+             <div id="tracker-list-content" style="flex:1; overflow-y: auto; overflow-x: auto; background: var(--bg-dark); position:relative;"></div>
+           </div>`;
+    
+    canvas.innerHTML = html;
+    
+    // Mount GridEngine CSS strictly to the tracker target if not built
+    if (typeof window.GridEngine !== 'undefined') {
+        // Register an independent 'tracker' grid to decouple visual settings
+        if (!window.GridEngine.configs['tracker']) {
+            window.GridEngine.registerGrid('tracker', [
+                { key: 'name', label: 'Name', sortable: true },
+                { key: 'qty', label: 'Qty', sortable: true },
+                { key: 'avail', label: 'Avail', sortable: true, center: true },
+                { key: 'unit', label: 'Unit', sortable: true },
+                { key: 'rfid', label: 'RFID Tag', sortable: true },
+                { key: 'serial', label: 'Serial No.', sortable: true },
+                { key: 'brand', label: 'Brand', sortable: true },
+                { key: 'length', label: 'Length (m)', sortable: true },
+                { key: 'location', label: 'Location', sortable: true },
+                { key: 'tags', label: 'Tags', sortable: true },
+                { key: 'type', label: 'Type', sortable: true },
+                { key: 'level', label: 'Level', sortable: true, center: true },
+                { key: 'weight', label: 'Weight', sortable: true },
+                { key: 'dims', label: 'Dims', sortable: true },
+                { key: 'capacity', label: 'Cap.', sortable: true },
+                { key: 'power', label: 'Power', sortable: true },
+                { key: 'price', label: 'Price', sortable: true },
+                { key: 'rental', label: 'Rental', sortable: true },
+                { key: 'dateBought', label: 'Bought', sortable: true },
+                { key: 'lastService', label: 'Service', sortable: true },
+                { key: 'interval', label: 'Interval', sortable: true },
+                { key: 'dept', label: 'Dept', sortable: true },
+                { key: 'vendor', label: 'Vendor', sortable: true },
+                { key: 'status', label: 'Status', sortable: true, center: true },
+                { key: 'action', label: 'Action', sortable: false, center: true }
+            ]);
+        }
+        
+        // Bulletproof dynamic column synchronization
+        let trackerDefs = window.GridEngine.defs['tracker'];
+        trackerDefs.forEach((d, index) => {
+            if (typeof TRACKER_COL_VISIBILITY[d.key] === 'undefined') {
+                TRACKER_COL_VISIBILITY[d.key] = (d.key === 'length' || d.key === 'level' || d.key === 'serial' || d.key === 'vendor') ? false : true;
+            }
+            if (typeof TRACKER_COL_WIDTHS[d.key] === 'undefined') {
+                TRACKER_COL_WIDTHS[d.key] = d.key === 'qty' || d.key === 'avail' ? '60px' : '100px';
+            }
+            if (!TRACKER_COL_ORDER.includes(d.key)) {
+                TRACKER_COL_ORDER.splice(index, 0, d.key);
+            }
+        });
+
+        // ENGINE FIX: Strip 'container' ghost column from inherited memory so GridEngine indices align perfectly
+        let conf = window.GridEngine.configs['tracker'];
+        conf.order = TRACKER_COL_ORDER.filter(k => k !== 'container');
+        conf.order.forEach(k => {
+            if(!conf.cols[k]) conf.cols[k] = {};
+            let w = parseInt(TRACKER_COL_WIDTHS[k]);
+            if (isNaN(w) || w <= 0) w = 100; // Protect against 0px squeezing
+            conf.cols[k].w = w;
+            conf.cols[k].vis = TRACKER_COL_VISIBILITY[k] !== false;
+            conf.cols[k].mL = parseInt(TRACKER_COL_GAPS[k]) || 0;
+        });
+        
+        let dynamicCss = window.GridEngine.buildCSS('tracker');
+        if (dynamicCss && !document.getElementById('style-grid-tracker')) {
+            document.head.insertAdjacentHTML('beforeend', dynamicCss);
+        }
+    }
+    
+    renderTrackerList();
+    
+    } catch(err) {
+        canvas.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444; font-weight: bold;">Render Error: ${err.message}</div>`;
+    }
+}
+
+// @INDEX: TRACKER -> Render Dynamic Grid List (Bottom Half)
+function renderTrackerList() {
+    const listContainer = document.getElementById('tracker-list-content');
+    if (!listContainer) return;
+    
+    let html = window.GridEngine.buildHeader('tracker', {col: 'name', asc: true});
+    
+    let confA = window.GridEngine.configs['tracker'];
+    let defsA = window.GridEngine.defs['tracker'];
+    // Strict check: Only render data cells for columns that actually exist in the header definition
+    let visibleColsAssigned = confA.order.filter(k => confA.cols[k].vis && defsA.find(d => d.key === k));
+    const fs = typeof TRACKER_FONT_SIZE !== 'undefined' ? TRACKER_FONT_SIZE : 11;
+    const pad = typeof TRACKER_ROW_PADDING !== 'undefined' ? TRACKER_ROW_PADDING : 6;
+    const badgeFs = Math.max(8, fs - 2);
+    
+    const renderRow = (asset, displayQty, isIndent, overrideName = null, deployment = null, availQty = null) => {
+        let stat = asset.status || 'Active';
+        let color = stat === 'Active' ? '#10b981' : (stat === 'Maintenance' ? '#f59e0b' : '#ef4444');
+        let pLeft = isIndent ? 'padding-left:14px; box-sizing:border-box;' : '';
+        let displayName = overrideName || asset.name;
+        
+        let brand = asset.manufacturer ? asset.manufacturer : '-';
+        let tagsArr = [];
+        try { tagsArr = JSON.parse(asset.tags || '[]'); } catch(e){}
+        let tagHtml = typeof buildTagPathsHtml === 'function' ? buildTagPathsHtml(tagsArr, badgeFs) : '';
+        let tagText = tagHtml.replace(/<[^>]*>/g, ' ').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+        
+        let rowHtml = `<div class="ug-row tracker-container" style="padding:${pad}px 15px; font-size: ${fs}px; background:#0a0a0c; border-bottom:1px solid #222; transition:0.2s;" onmouseover="this.style.background='#151518'" onmouseout="this.style.background='#0a0a0c'">`;
+        
+        visibleColsAssigned.forEach((key, idx) => {
+            let isLastDataCol = (idx === visibleColsAssigned.length - 2 && visibleColsAssigned[visibleColsAssigned.length - 1] === 'action');
+            let isActionCol = (key === 'action');
+            let widthStyle = isActionCol ? `width: var(--tracker-w-${key}); margin-left: var(--tracker-ml-${key}); flex-shrink: 0; text-align:center; justify-content:center;` : `width: var(--tracker-w-${key}); margin-left: var(--tracker-ml-${key}); flex-shrink: 1; min-width: 0px;`;
+            
+            if (key === 'name') {
+                rowHtml += `<div style="${widthStyle} ${pLeft} color:#fff; font-weight:bold; font-size:${fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${displayName}">${displayName}</div>`;
+            } else if (key === 'avail') {
+                let aColor = availQty < 0 ? '#ef4444' : (availQty === 0 ? '#f59e0b' : '#10b981');
+                let aVal = availQty !== null ? availQty : '-';
+                rowHtml += `<div style="${widthStyle} color:${aColor}; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;">${aVal}</div>`;
+            } else if (key === 'qty') {
+                rowHtml += `<div style="${widthStyle} color:#86efac; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${displayQty}</div>`;
+            } else if (key === 'unit') {
+                let uVal = asset.unitNumber === 'M_BADGE' ? '<span style="color:#eab308; font-weight:bold;" title="Multiple Unique Values">M</span>' : (asset.unitNumber ? '#' + asset.unitNumber : '-');
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${asset.unitNumber}">${uVal}</div>`;
+            } else if (key === 'rfid') {
+                let rVal = asset.rfidTag === 'M_BADGE' ? '<span style="color:#eab308; font-weight:bold;" title="Multiple Unique Values">M</span>' : (asset.rfidTag || '-');
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${asset.rfidTag}">${rVal}</div>`;
+            } else if (key === 'serial') {
+                let sVal = asset.serialNumber === 'M_BADGE' ? '<span style="color:#eab308; font-weight:bold;" title="Multiple Unique Values">M</span>' : (asset.serialNumber || '-');
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${asset.serialNumber}">${sVal}</div>`;
+            } else if (key === 'brand') {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${brand}">${brand}</div>`;
+            } else if (key === 'length') {
+                rowHtml += `<div style="${widthStyle} color:#fff; font-weight:bold; font-size:${fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.length ? asset.length + 'm' : '-'}</div>`;
+            } else if (key === 'location') {
+                let locText = deployment ? deployment.location : '-';
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${locText}">${locText}</div>`;
+            } else if (key === 'tags') {
+                rowHtml += `<div style="${widthStyle} white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center;" title="${tagText}">${tagHtml}</div>`;
+            } else if (key === 'type') {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.type || 'Physical'}</div>`;
+            } else if (key === 'level') {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;">${asset.nestingLevel !== undefined ? asset.nestingLevel : 6}</div>`;
+            } else if (key === 'price') {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.price ? '$'+parseFloat(asset.price).toFixed(2) : '-'}</div>`;
+            } else if (key === 'rental') {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.rental ? '$'+parseFloat(asset.rental).toFixed(2) : '-'}</div>`;
+            } else if (key === 'dept') {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${typeof getDeptObj === 'function' ? getDeptObj(asset.department).name : '-'}</div>`;
+            } else if (key === 'vendor') {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.vendorUid || 'Internal'}</div>`;
+            } else if (key === 'status') {
+                rowHtml += `<div style="${widthStyle} text-align:center;"><span style="color:${color}; border:1px solid ${color}; padding:2px 4px; border-radius:4px; font-size:${badgeFs}px; font-weight:bold;">${stat.toUpperCase()}</span></div>`;
+            } else if (key === 'action') {
+                rowHtml += `<div style="${widthStyle} text-align:center; display: flex; gap: 4px; align-items: center;"><button class="btn-blue" style="flex:1; margin:0; padding:4px 0 !important; font-size:${badgeFs}px;" onclick="event.stopPropagation(); if(typeof openAssetModal === 'function') openAssetModal('${asset.uid}')">EDIT</button></div>`;
+            } else {
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${asset[key] || ''}">${asset[key] || '-'}</div>`;
+            }
+            
+            if (isLastDataCol) rowHtml += `<div class="ug-flex-spacer" style="flex: 1; min-width: 0px;"></div>`;
+        });
+        rowHtml += `</div>`;
+        return rowHtml;
+    };
+
+    let isWatchlistActive = trackerWatchlist.length > 0;
+    let eventsToRender = [];
+
+    let phDate = new Date(trackerPlayheadDate + "T00:00:00Z");
+
+    let pts = trackerPlayheadDate.split('-');
+    let phStartEpoch = Date.UTC(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10)) / 3600000;
+    let phEndEpoch = phStartEpoch + 24;
+
+    let truckSchedules = {};
+    const getTruckSchedule = (tUid, evId) => {
+        let key = tUid + "_" + evId;
+        if (truckSchedules[key]) return truckSchedules[key];
+        
+        let tShifts = [];
+        if (typeof globalRosterData !== 'undefined' && globalRosterData && globalRosterData.shifts) {
+            tShifts = globalRosterData.shifts.filter(s => (s.user_uid === tUid || s.email === tUid) && s.projectId === evId);
+        }
+        
+        const getAbsStart = (s) => {
+            if (s.absStart) return s.absStart;
+            if (!s.baseDate) return 0;
+            let pSplit = String(s.baseDate).split('-');
+            let shiftEpoch = Date.UTC(parseInt(pSplit[0], 10), parseInt(pSplit[1], 10) - 1, parseInt(pSplit[2], 10)) + (Number(s.start) * 3600000);
+            return shiftEpoch / 3600000;
+        };
+
+        tShifts.sort((a, b) => getAbsStart(a) - getAbsStart(b));
+        
+        let outLeg = { active: false, startEpoch: null, endEpoch: null, shifts: [] };
+        let inLeg = { active: false, startEpoch: null, endEpoch: null, shifts: [] };
+        
+        if (tShifts.length > 0) {
+            let outShifts = tShifts.filter(s => s.note === "⚠️ AUTO-OUTBOUND");
+            let inShifts = tShifts.filter(s => s.note === "⚠️ AUTO-INBOUND");
+            
+            if (outShifts.length === 0 && inShifts.length === 0) {
+                let evStrip = trackerData.strips.find(s => s.id === evId);
+                if (evStrip) {
+                    let evStart = new Date(evStrip.startStr + "T00:00:00Z").getTime() / 3600000;
+                    let evEnd = new Date(evStrip.endStr + "T00:00:00Z").getTime() / 3600000 + 24;
+                    let evMid = evStart + (evEnd - evStart) / 2;
+                    
+                    outShifts = tShifts.filter(s => getAbsStart(s) <= evMid);
+                    inShifts = tShifts.filter(s => getAbsStart(s) > evMid);
+                } else {
+                    outShifts = tShifts;
+                }
+            }
+            
+            if (outShifts.length > 0) {
+                outShifts.sort((a,b) => getAbsStart(a) - getAbsStart(b));
+                outLeg.startEpoch = getAbsStart(outShifts[0]);
+                outLeg.endEpoch = getAbsStart(outShifts[outShifts.length-1]) + Number(outShifts[outShifts.length-1].duration); 
+                outLeg.shifts = outShifts;
+                outLeg.active = true;
+            }
+            if (inShifts.length > 0) {
+                inShifts.sort((a,b) => getAbsStart(a) - getAbsStart(b));
+                inLeg.startEpoch = getAbsStart(inShifts[0]);
+                inLeg.endEpoch = getAbsStart(inShifts[inShifts.length-1]) + Number(inShifts[inShifts.length-1].duration);
+                inLeg.shifts = inShifts;
+                inLeg.active = true;
+            }
+        }
+        truckSchedules[key] = { outLeg, inLeg };
+        return truckSchedules[key];
+    };
+    
+    if (isWatchlistActive) {
+        if (trackerData.assets.length === 0) {
+            listContainer.innerHTML = html + `<div style="padding: 40px; text-align:center; color: #888;">No equipment matches your watchlist.</div>`;
+            return;
+        }
+        
+        // MODE B (WATCHLIST): Scan entire timeline for events containing watched assets
+        trackerData.strips.forEach(ev => {
+            let eventAssets = [];
+            trackerData.assets.forEach(asset => {
+                let projEnv = asset.projects.find(p => p.projectUid === ev.id);
+                if (projEnv && projEnv.deployments.length > 0) {
+                    eventAssets.push({ asset: asset, deps: projEnv.deployments });
+                }
+            });
+            if (eventAssets.length > 0) {
+                eventsToRender.push({ event: ev, assets: eventAssets });
+            }
+        });
+        
+        if (eventsToRender.length === 0) {
+            listContainer.innerHTML = html + `<div style="padding: 40px; text-align:center; color: #888;">The watched equipment is not assigned to any events in this timeframe.</div>`;
+            return;
+        }
+    } else {
+        // MODE A (NO WATCHLIST): Scan strictly for events active on the Playhead Date
+        let activeEventsOnPlayhead = trackerData.strips.filter(s => {
+            let start = new Date(s.startStr + "T00:00:00Z");
+            let end = new Date(s.endStr + "T00:00:00Z");
+            if (phDate >= start && phDate <= end) return true;
+            
+            let isActiveViaTruck = false;
+            trackerData.assets.forEach(asset => {
+                let projEnv = asset.projects.find(p => p.projectUid === s.id);
+                if (projEnv) {
+                    projEnv.deployments.forEach(d => {
+                        if (d.outboundTruckUid) {
+                            let sched = getTruckSchedule(d.outboundTruckUid, s.id);
+                            if (sched.outLeg.active && sched.outLeg.startEpoch < phEndEpoch && sched.outLeg.endEpoch > phStartEpoch) isActiveViaTruck = true;
+                        }
+                        if (d.inboundTruckUid) {
+                            let sched = getTruckSchedule(d.inboundTruckUid, s.id);
+                            if (sched.inLeg.active && sched.inLeg.startEpoch < phEndEpoch && sched.inLeg.endEpoch > phStartEpoch) isActiveViaTruck = true;
+                        }
+                    });
+                }
+            });
+            return isActiveViaTruck;
+        });
+
+        if (activeEventsOnPlayhead.length === 0) {
+            listContainer.innerHTML = html + `<div style="padding:40px; text-align:center; color:#888;">No active events on ${trackerPlayheadDate}.<br><br>Move the Playhead or search for equipment above.</div>`;
+            return;
+        }
+
+        activeEventsOnPlayhead.forEach(ev => {
+            let eventAssets = [];
+            trackerData.assets.forEach(asset => {
+                let projEnv = asset.projects.find(p => p.projectUid === ev.id);
+                if (projEnv) {
+                    let activeDeps = projEnv.deployments.filter(d => {
+                        let dS = new Date(d.startStr + "T00:00:00Z");
+                        let dE = new Date(d.endStr + "T00:00:00Z");
+                        if (phDate >= dS && phDate <= dE) return true;
+                        
+                        let isMoving = false;
+                        if (d.outboundTruckUid) {
+                            let sched = getTruckSchedule(d.outboundTruckUid, ev.id);
+                            if (sched.outLeg.active && sched.outLeg.startEpoch < phEndEpoch && sched.outLeg.endEpoch > phStartEpoch) isMoving = true;
+                        }
+                        if (d.inboundTruckUid) {
+                            let sched = getTruckSchedule(d.inboundTruckUid, ev.id);
+                            if (sched.inLeg.active && sched.inLeg.startEpoch < phEndEpoch && sched.inLeg.endEpoch > phStartEpoch) isMoving = true;
+                        }
+                        return isMoving;
+                    });
+                    if (activeDeps.length > 0) {
+                        eventAssets.push({ asset: asset, deps: activeDeps });
+                    }
+                }
+            });
+            eventsToRender.push({ event: ev, assets: eventAssets });
+        });
+    }
+
+    // --- RENDER THE UNIFIED EVENT LIST ---
+    eventsToRender.forEach(group => {
+        let ev = group.event;
+        let statusColor = ev.status === 'APPROVED' ? '#10b981' : '#3b82f6';
+        
+        html += `<div style="background:#1f1f23; border-left:4px solid ${statusColor}; padding:10px 15px; font-weight:900; color:#fff; text-transform:uppercase; font-size:11px; margin-top:5px; border-bottom:1px solid #333; cursor:pointer; display:flex; justify-content:space-between; align-items:center;" onclick="goToProjectEquipmentFromTracker('${ev.id}', event)">
+                    <div>${ev.name} <span style="color:#a1a1aa; font-size:10px; margin-left:8px; font-weight:bold;">${ev.startStr} to ${ev.endStr}</span></div>
+                 </div>`;
+
+        if (group.assets.length === 0) {
+            html += `<div style="padding:15px; color:#888; font-size:11px; font-style:italic;">No equipment allocated for this date.</div>`;
+            return;
+        }
+
+        // 1. Fallback Phase Timeline Logic (For when Shifts haven't been generated yet)
+        let allTransits = ev.fragments.filter(f => f.type === 'TRANSIT').sort((a,b) => a.date.localeCompare(b.date));
+        let outTransits = [];
+        let inTransits = [];
+        if (allTransits.length > 0) {
+            outTransits.push(allTransits[0]);
+            let currentGroup = outTransits;
+            for (let i = 1; i < allTransits.length; i++) {
+                let prevD = new Date(allTransits[i-1].date);
+                let currD = new Date(allTransits[i].date);
+                if (currD - prevD > 150000000) { // Gap > ~1.5 days (split outbound vs inbound)
+                    currentGroup = inTransits;
+                }
+                currentGroup.push(allTransits[i]);
+            }
+        }
+
+        let isOutboundDay = outTransits.some(f => f.date === trackerPlayheadDate);
+        let isInboundDay = inTransits.some(f => f.date === trackerPlayheadDate);
+        
+        const getLegTimeline = (transits) => {
+            if (!transits || transits.length === 0) return "";
+            let tStart = transits[0].date;
+            let tEnd = transits[transits.length-1].date;
+            let loadT = (transits[0].startTime || '').split(':').slice(0,2).join(':') || '00:00';
+            let unloadT = (transits[transits.length-1].endTime || '').split(':').slice(0,2).join(':') || '00:00';
+
+            if (tStart === trackerPlayheadDate && tEnd === trackerPlayheadDate) return `LOAD ${loadT} ➝ TRANSIT ➝ UNLOAD ${unloadT}`;
+            else if (tStart === trackerPlayheadDate) return `LOAD ${loadT} ➝ TRANSIT ➝`;
+            else if (tEnd === trackerPlayheadDate) return `➝ TRANSIT ➝ UNLOAD ${unloadT}`;
+            else return `➝ TRANSIT ➝`;
+        };
+
+        let aggregatedDeps = {};
+        
+        group.assets.forEach(ea => {
+            let asset = ea.asset;
+            
+            // ARCHITECTURAL RULE: HIDE FLUID KITS, KEEP LOOSE GEAR & FIXED RACKS
+            let isContainer = (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
+            if (isContainer && !asset.isFixedRack) return; // Skip Fluid Kits completely
+
+            let modelKey = getAssetModelKey(asset);
+            let usedOnPhDate = (trackerData.globalUsage && trackerData.globalUsage[modelKey] && trackerData.globalUsage[modelKey][trackerPlayheadDate]) ? trackerData.globalUsage[modelKey][trackerPlayheadDate] : 0;
+            let availQty = (asset.modelTotalQty !== undefined ? asset.modelTotalQty : asset.totalQty) - usedOnPhDate;
+            
+            ea.deps.forEach(dep => {
+                let itemKey = getAssetGroupingKey(asset);
+                let truckUid = 'none';
+                
+                let outT = dep.outboundTruckUid;
+                let inT = dep.inboundTruckUid;
+                
+                let pts = trackerPlayheadDate.split('-');
+                let phStartEpoch = Date.UTC(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10)) / 3600000;
+                let phEndEpoch = phStartEpoch + 24;
+
+                if (outT) {
+                    let sched = getTruckSchedule(outT, ev.id);
+                    if (sched.outLeg.active) {
+                        if (sched.outLeg.startEpoch < phEndEpoch && sched.outLeg.endEpoch > phStartEpoch) truckUid = outT;
+                    } else if (isOutboundDay) {
+                        truckUid = outT;
+                    }
+                }
+                
+                if (truckUid === 'none' && inT) {
+                    let sched = getTruckSchedule(inT, ev.id);
+                    if (sched.inLeg.active) {
+                        if (sched.inLeg.startEpoch < phEndEpoch && sched.inLeg.endEpoch > phStartEpoch) truckUid = inT;
+                    } else if (isInboundDay) {
+                        truckUid = inT;
+                    }
+                }
+
+                let k = truckUid + "|||" + dep.location + "|||" + dep.formula + "|||" + itemKey;
+                if (!aggregatedDeps[k]) aggregatedDeps[k] = { asset: asset, location: dep.location, formula: dep.formula, truckUid: truckUid, qty: 0, availQty: availQty, items: [] };
+                aggregatedDeps[k].qty += dep.qty;
+                aggregatedDeps[k].items.push(asset);
+            });
+        });
+        
+        let truckGroups = {};
+        Object.values(aggregatedDeps).forEach(agg => {
+            let tUid = agg.truckUid;
+            if (!truckGroups[tUid]) truckGroups[tUid] = [];
+            truckGroups[tUid].push(agg);
+        });
+
+        Object.keys(truckGroups).sort((a,b) => a==='none'?1:(b==='none'?-1:0)).forEach(tUid => {
+            if (tUid !== 'none') {
+                let tName = 'Unknown Truck';
+                if (typeof globalVehicles !== 'undefined') {
+                    let v = globalVehicles.find(x => x.id === tUid);
+                    if (v) tName = v.name;
+                }
+                
+                let headerTimelineStr = "";
+                let sched = getTruckSchedule(tUid, ev.id);
+
+                const formatT = (rawHours) => {
+                    let h = Math.floor(rawHours) % 24;
+                    let m = Math.round((rawHours % 1) * 60);
+                    return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+                };
+                
+                let inOutbound = sched.outLeg.active && sched.outLeg.startEpoch < phEndEpoch && sched.outLeg.endEpoch > phStartEpoch;
+                let inInbound = sched.inLeg.active && sched.inLeg.startEpoch < phEndEpoch && sched.inLeg.endEpoch > phStartEpoch;
+                
+                if (inOutbound && inInbound && sched.outLeg.endEpoch <= phEndEpoch && sched.inLeg.startEpoch >= phStartEpoch) {
+                    let unloadT = formatT(sched.outLeg.shifts[sched.outLeg.shifts.length-1].start);
+                    let loadT = formatT(sched.inLeg.shifts[0].start);
+                    headerTimelineStr = `UNLOAD ${unloadT} ➝ (AT VENUE) ➝ LOAD ${loadT}`;
+                } else if (inOutbound) {
+                    let leg = sched.outLeg;
+                    let loadT = formatT(leg.shifts[0].start);
+                    let unloadT = formatT(leg.shifts[leg.shifts.length-1].start);
+                    let loadsToday = leg.startEpoch >= phStartEpoch && leg.startEpoch < phEndEpoch;
+                    let unloadsToday = leg.endEpoch > phStartEpoch && leg.endEpoch <= phEndEpoch;
+
+                    if (loadsToday && unloadsToday) headerTimelineStr = `LOAD ${loadT} ➝ TRANSIT ➝ UNLOAD ${unloadT}`;
+                    else if (loadsToday) headerTimelineStr = `LOAD ${loadT} ➝ TRANSIT ➝`;
+                    else if (unloadsToday) headerTimelineStr = `➝ TRANSIT ➝ UNLOAD ${unloadT}`;
+                    else headerTimelineStr = `➝ TRANSIT ➝`;
+                } else if (inInbound) {
+                    let leg = sched.inLeg;
+                    let loadT = formatT(leg.shifts[0].start);
+                    let unloadT = formatT(leg.shifts[leg.shifts.length-1].start);
+                    let loadsToday = leg.startEpoch >= phStartEpoch && leg.startEpoch < phEndEpoch;
+                    let unloadsToday = leg.endEpoch > phStartEpoch && leg.endEpoch <= phEndEpoch;
+
+                    if (loadsToday && unloadsToday) headerTimelineStr = `LOAD ${loadT} ➝ TRANSIT ➝ UNLOAD ${unloadT}`;
+                    else if (loadsToday) headerTimelineStr = `LOAD ${loadT} ➝ TRANSIT ➝`;
+                    else if (unloadsToday) headerTimelineStr = `➝ TRANSIT ➝ UNLOAD ${unloadT}`;
+                    else headerTimelineStr = `➝ TRANSIT ➝`;
+                } else {
+                    if (isOutboundDay && isInboundDay) {
+                        let outUnload = (outTransits[outTransits.length-1].endTime || '').split(':').slice(0,2).join(':') || '00:00';
+                        let inLoad = (inTransits[0].startTime || '').split(':').slice(0,2).join(':') || '00:00';
+                        headerTimelineStr = `UNLOAD ${outUnload} ➝ (AT VENUE) ➝ LOAD ${inLoad}`;
+                    } else if (isOutboundDay) {
+                        headerTimelineStr = getLegTimeline(outTransits);
+                    } else if (isInboundDay) {
+                        headerTimelineStr = getLegTimeline(inTransits);
+                    }
+                }
+
+                let timelineBadge = headerTimelineStr ? `<span style="margin-left:15px; color:#ffffff; font-size:13px; font-family:monospace; font-weight:bold; letter-spacing:1px;">${headerTimelineStr}</span>` : '';
+
+                html += `<div style="background:#18181b; border-left:4px solid #3f3f46; padding:8px 15px; font-weight:bold; color:#a1a1aa; font-size:13px; border-bottom:1px solid #333; display:flex; align-items:center;">
+                            <span style="margin-right:8px; font-size:14px;">🚛</span> <span style="color:#e4e4e7;">${tName}</span> ${timelineBadge}
+                         </div>`;
+            }
+            
+            truckGroups[tUid].forEach(agg => {
+                let depObj = { location: agg.location, formula: agg.formula };
+                
+                let isMixedUnit = agg.items.some(x => x.unitNumber !== agg.asset.unitNumber);
+                let isMixedSerial = agg.items.some(x => x.serialNumber !== agg.asset.serialNumber);
+                let isMixedRfid = agg.items.some(x => x.rfidTag !== agg.asset.rfidTag);
+                
+                let repAsset = Object.assign({}, agg.asset);
+                if (isMixedUnit) repAsset.unitNumber = "M_BADGE";
+                if (isMixedSerial) repAsset.serialNumber = "M_BADGE";
+                if (isMixedRfid) repAsset.rfidTag = "M_BADGE";
+                
+                html += renderRow(repAsset, agg.qty, true, null, depObj, agg.availQty);
+            });
+        });
+    });
+    
+    listContainer.innerHTML = html;
+}
+</script>

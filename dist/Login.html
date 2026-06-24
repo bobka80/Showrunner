@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg-dark: #0a0a0c; --bg-card: #1a1a1e; --accent: #698b99; --text-main: #f4f4f5; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .login-card { background: var(--bg-card); padding: 40px; border-radius: 12px; border-top: 6px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; width: 100%; max-width: 320px; box-sizing: border-box;}
+    
+    input[type="password"] { width: 100%; padding: 14px; margin: 20px 0 15px 0; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; text-align: center; letter-spacing: 2px;}
+    .btn-main { width: 100%; padding: 14px; background: var(--accent); border: none; color: white; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.2s; letter-spacing: 1px;}
+    .btn-main:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h2 style="margin: 0 0 5px 0;">SYSTEM SECURE</h2>
+    <p style="color: #71717a; font-size: 12px; margin-bottom: 20px;">Enter Command Passcode</p>
+    <div id="error-display" style="color: #ef4444; font-size: 12px; font-weight: bold; margin-bottom: 15px; display: none;"></div>
+    
+    <form id="login-form" method="post" action="<?= scriptUrl ?>">
+      <div style="text-align: left; margin-bottom: 10px;">
+        <label style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Crew Name</label>
+        <input type="text" name="name" id="name-input" placeholder="e.g. John Doe" required style="width: 100%; padding: 14px; margin-top: 5px; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box;">
+      </div>
+      
+      <div style="text-align: left; margin-bottom: 20px;">
+        <label style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">6-Character Passcode</label>
+        <input type="password" name="passcode" id="pass-input" placeholder="••••••" maxlength="6" required style="width: 100%; padding: 14px; margin-top: 5px; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; letter-spacing: 4px; font-size: 18px; text-align: center;">
+      </div>
+
+      <label style="display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:#888; margin-bottom:20px; cursor:pointer;">
+         <input type="checkbox" id="remember-cb" style="margin:0;"> Remember Me (24 Hours)
+      </label>
+
+      <button type="submit" id="login-btn" class="btn-main">AUTHENTICATE</button>
+    </form>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const nameInput = document.getElementById('name-input');
+      const passInput = document.getElementById('pass-input');
+      const rememberCb = document.getElementById('remember-cb');
+      const form = document.getElementById('login-form');
+      const btn = document.getElementById('login-btn');
+      
+      // Use Google Apps Script's safe JSON encoding to avoid syntax breaking from quotes/newlines
+      const errorDisplayRaw = <?!= JSON.stringify(errorMsg || "") ?>;
+      const errorDisplay = errorDisplayRaw ? errorDisplayRaw.toString() : "";
+      const isError = (errorDisplay && errorDisplay.trim() !== '' && errorDisplay.trim() !== 'none');
+
+      const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000; 
+
+      if (isError) {
+         document.getElementById('error-display').innerText = errorDisplay;
+         document.getElementById('error-display').style.display = 'block';
+         localStorage.removeItem('sm_crew_name');
+         localStorage.removeItem('sm_crew_pass');
+         localStorage.removeItem('sm_crew_timestamp');
+         btn.innerText = 'AUTHENTICATE';
+      } else {
+         const savedName = localStorage.getItem('sm_crew_name');
+         const savedPass = localStorage.getItem('sm_crew_pass');
+         const savedTime = localStorage.getItem('sm_crew_timestamp');
+         
+         if (savedName) {
+           nameInput.value = savedName;
+           rememberCb.checked = true;
+           
+           if (savedPass && savedTime) {
+             const now = new Date().getTime();
+             if ((now - parseInt(savedTime, 10)) < TWENTY_FOUR_HOURS) {
+               // Passcode auto-injection removed for security.
+               // User must manually type passcode to re-authenticate.
+               passInput.focus();
+             } else {
+               localStorage.removeItem('sm_crew_pass');
+               localStorage.removeItem('sm_crew_timestamp');
+             }
+           }
+         }
+      }
+
+      // AUTO-SUBMIT LOGIC: Listen to every keystroke
+      passInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
+        if (this.value.length === 6) {
+          if (btn.disabled) return;
+          this.blur();
+          btn.click(); 
+        }
+      });
+
+      // @INDEX: LOGIN -> Authenticate Form Submit
+      // SAVE CREDENTIALS ON SUBMIT
+      form.addEventListener('submit', function() {
+        if (rememberCb.checked) {
+          localStorage.setItem('sm_crew_name', nameInput.value);
+          localStorage.setItem('sm_crew_timestamp', new Date().getTime().toString());
+          // DO NOT store 'sm_crew_pass' in plaintext in local storage.
+        } else {
+          localStorage.removeItem('sm_crew_name');
+          localStorage.removeItem('sm_crew_pass');
+          localStorage.removeItem('sm_crew_timestamp');
+        }
+        btn.innerText = 'VERIFYING...';
+        btn.style.opacity = '0.7';
+        btn.disabled = true;
+      });
+    });
+  </script>
+</body>
+</html>

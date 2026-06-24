@@ -1,0 +1,815 @@
+<script>
+/**
+ * 04_Month_Roster.html
+ * Domain: The 30-day macro view of all crew members and their availability.
+ */
+
+// ==========================================
+// --- MONTH ROSTER MATRIX ENGINE ---
+// ==========================================
+// @INDEX: ROSTER -> Open Month Roster UI
+let currentRosterDate = new Date();
+let lastRenderedMonthStr = "";
+
+function openMonthRoster() {
+  // Protect navigation by checking if current view is dirty
+  if (typeof closeModals === 'function') {
+      if (!closeModals()) return;
+  }
+  
+  // 1. Force hide the timeline editor to protect z-index
+  const shiftLayer = document.getElementById('shift-layer');
+  if (shiftLayer) shiftLayer.style.display = 'none';
+
+  // 3. Hard-open the month roster layer (using exact baseline logic)
+  const rosterLayer = document.getElementById('month-roster-layer');
+  if (rosterLayer) rosterLayer.style.display = 'flex';
+
+  if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-roster');
+
+  // 4. Safely render or fetch data
+  if (globalRosterData && globalRosterData.shifts) {
+    try {
+      renderMonthGrid();
+    } catch(e) {
+      document.getElementById('mr-canvas-inner').innerHTML = `<div style='padding:40px; color:#ef4444; text-align:center;'><b>Grid Render Error:</b><br>${e.message}</div>`;
+    }
+  } else {
+    document.getElementById('mr-canvas-inner').innerHTML = "<div style='padding:40px; color:#888; text-align:center;'>Fetching Data from Server...</div>";
+    loadMonthRosterData();
+  }
+}
+
+function changeRosterMonth(offset) {
+  currentRosterDate.setMonth(currentRosterDate.getMonth() + offset);
+  if (globalRosterData) renderMonthGrid();
+}
+
+function loadMonthRosterData() {
+  const canvas = document.getElementById('mr-canvas-inner');
+  if (!canvas) return;
+  canvas.innerHTML = "<div style='padding:40px; color:#888; text-align:center;'>Fetching Data from Server...</div>";
+
+  google.script.run
+    .withFailureHandler(err => {
+      canvas.innerHTML = `<div style='padding:40px; color:#ef4444; font-weight:bold; text-align:center;'>SERVER CRASH DETECTED:<br>${err.message}</div>`;
+    })
+    .withSuccessHandler(data => {
+      try {
+        if (!data) throw new Error("Server returned empty data.");
+
+        // Clean corrupted crew data
+        if (data.roster) {
+          data.roster.forEach(c => {
+            if (!c.email) c.email = "corrupted_email_" + Math.random();
+            if (!c.name) c.name = "Unknown Member";
+          });
+          
+          if (typeof globalVehicles !== 'undefined' && globalVehicles.length > 0) {
+              globalVehicles.forEach(v => {
+                  if (!data.roster.some(c => c.uid === v.id)) {
+                      data.roster.push({ uid: v.id, name: v.name, email: v.id, department: 'dept_trucks', isVehicle: true });
+                  }
+              });
+          }
+        }
+
+        // Clean corrupted shift dates so parsing doesn't crash the UI
+        if (data.shifts) {
+          data.shifts.forEach(s => {
+            if (!s.email) s.email = "unknown";
+            if (s.baseDate && typeof s.baseDate === 'string' && s.baseDate.includes('-')) {
+                let pts = s.baseDate.split('-');
+                if (pts.length === 3) {
+                    let shiftEpoch = Date.UTC(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10)) + (Number(s.start || 0) * 3600000);
+                    let trueDate = new Date(shiftEpoch);
+                    s.y = trueDate.getUTCFullYear();
+                    s.m = trueDate.getUTCMonth();
+                    s.d = trueDate.getUTCDate();
+                    s.absStart = shiftEpoch / 3600000;
+                    s.absEnd = s.absStart + Number(s.duration || 0);
+                }
+            }
+            
+            if (isTruck(s.email)) {
+                s.color = '#e5e7eb'; s.textCol = '#18181b';
+            } else if (typeof ROLE_COLORS !== 'undefined' && ROLE_COLORS[s.role]) {
+                s.color = ROLE_COLORS[s.role].bg; s.textCol = ROLE_COLORS[s.role].text;
+            } else {
+                s.color = '#86efac'; s.textCol = '#064e3b';
+            }
+          });
+        }
+
+        globalRosterData = data;
+        renderMonthGrid();
+
+      } catch(e) {
+        canvas.innerHTML = `<div style='padding:40px; color:#ef4444; font-weight:bold; text-align:center;'>CLIENT DATA CRASH DETECTED:<br>${e.message}</div>`;
+      }
+    }).getGlobalMonthData();
+}
+
+function highlightCol(colIndex) {
+  document.querySelectorAll('.col-' + colIndex).forEach(el => el.classList.add('active-col'));
+}
+function unhighlightCol(colIndex) {
+  document.querySelectorAll('.col-' + colIndex).forEach(el => el.classList.remove('active-col'));
+}
+
+// --- CUSTOM TOOLTIP ENGINE ---
+window.showCustomTooltip = function(e, desc, level) {
+    let tooltip = document.getElementById('custom-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'custom-tooltip';
+        document.body.appendChild(tooltip);
+    }
+    let borderColor = level === 'red' ? '#ef4444' : (level === 'orange' ? '#f97316' : (level === 'yellow' ? '#f59e0b' : '#333'));
+    tooltip.style.borderLeft = '4px solid ' + borderColor;
+    
+    let formattedDesc = desc.replace(/<br>/g, '<div style="margin-top:6px; border-top:1px solid #333; padding-top:6px;"></div>');
+    
+    tooltip.innerHTML = `<div style="font-weight:900; font-size:12px; margin-bottom:6px; color:${borderColor}; letter-spacing:1px;">⚠️ CONFLICT DETAILS</div>${formattedDesc}`;
+    tooltip.style.display = 'block';
+    
+    let x = e.clientX + 15;
+    let y = e.clientY + 15;
+    if (x + 280 > window.innerWidth) x = e.clientX - 295;
+    if (y + 100 > window.innerHeight) y = e.clientY - 115;
+    
+    tooltip.style.left = x + 'px';
+    tooltip.style.top = y + 'px';
+};
+
+window.hideCustomTooltip = function() {
+    let tooltip = document.getElementById('custom-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
+};
+
+// --- LEAVE MODAL CONTROLLERS ---
+function openLeaveModal(leaveDataStr = null) {
+  const modal = document.getElementById('leave-modal');
+  const emailSelect = document.getElementById('leave-email');
+  let rosterToUse = globalRosterData ? globalRosterData.roster : activeRoster;
+  
+  emailSelect.innerHTML = rosterToUse.map(c => `<option value="${c.uid}">${c.name} (${c.defaultRole || 'Technician'})</option>`).join('');
+  
+  if (leaveDataStr) {
+    let lData = JSON.parse(decodeURIComponent(leaveDataStr));
+    document.getElementById('leave-id').value = lData.id;
+    document.getElementById('leave-email').value = lData.user_uid || lData.email;
+    document.getElementById('leave-start').value = lData.start;
+    document.getElementById('leave-end').value = lData.end;
+    document.getElementById('leave-reason').value = lData.reason;
+    document.getElementById('leave-del-btn').style.display = 'block';
+  } else {
+    document.getElementById('leave-id').value = '';
+    document.getElementById('leave-start').value = '';
+    document.getElementById('leave-end').value = '';
+    document.getElementById('leave-reason').value = '';
+    document.getElementById('leave-del-btn').style.display = 'none';
+  }
+  modal.style.display = 'flex';
+}
+
+function saveLeaveAction() {
+  const btn = document.getElementById('leave-save-btn');
+  btn.innerText = 'SAVING...'; btn.disabled = true;
+  const leaveObj = {
+    id: document.getElementById('leave-id').value,
+            user_uid: document.getElementById('leave-email').value,
+    email: document.getElementById('leave-email').value,
+    start: document.getElementById('leave-start').value,
+    end: document.getElementById('leave-end').value,
+    reason: document.getElementById('leave-reason').value || 'Leave'
+  };
+
+  if(!leaveObj.start || !leaveObj.end) {
+    alert("Please provide both start and end dates.");
+    btn.innerText = 'SAVE LEAVE'; btn.disabled = false;
+    return;
+  }
+
+  google.script.run.withSuccessHandler(() => {
+    document.getElementById('leave-modal').style.display = 'none';
+    btn.innerText = 'SAVE LEAVE'; btn.disabled = false;
+    document.getElementById('mr-canvas-inner').innerHTML = "<div style='padding:40px; color:#888; text-align:center;'>Syncing...</div>";
+    refreshData(); 
+  }).saveLeave(leaveObj, ACTIVE_USER_NAME);
+}
+
+function deleteLeaveAction() {
+  if(!confirm("Are you sure you want to delete this leave?")) return;
+  const btn = document.getElementById('leave-del-btn');
+  btn.innerText = 'DELETING...'; btn.disabled = true;
+  
+  const id = document.getElementById('leave-id').value;
+  google.script.run.withSuccessHandler(() => {
+    document.getElementById('leave-modal').style.display = 'none';
+    btn.innerText = 'DELETE LEAVE'; btn.disabled = false;
+    document.getElementById('mr-canvas-inner').innerHTML = "<div style='padding:40px; color:#888; text-align:center;'>Syncing...</div>";
+    refreshData();
+  }).deleteLeave(id, ACTIVE_USER_NAME);
+}
+
+// @INDEX: ROSTER -> Render Matrix Grid
+function renderMonthGrid() {
+  const year = currentRosterDate.getFullYear();
+  const month = currentRosterDate.getMonth();
+  document.getElementById('mr-month-label').innerText = currentRosterDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  
+  let maxNameLen = 0;
+  if (globalRosterData && globalRosterData.roster) {
+    maxNameLen = Math.max(0, ...globalRosterData.roster.map(c => c.name.length));
+  }
+  let yWidth = Math.max(150, Math.min(260, maxNameLen * 8 + 50));
+  
+  let projectsMap = {};
+  
+  if (globalRosterData && globalRosterData.projects) {
+    globalRosterData.projects.forEach(p => {
+      let rawStatus = String(p.status || 'Draft').toUpperCase();
+      if (rawStatus === 'TRASHED' || rawStatus === 'DELETED') return;
+      
+      let allDates = [];
+      if (p.fragments && p.fragments.length > 0) {
+          p.fragments.forEach(f => {
+              if (f.date) allDates.push(new Date(Date.UTC(f.date.split('-')[0], parseInt(f.date.split('-')[1])-1, f.date.split('-')[2])).getTime());
+          });
+      }
+      
+      if (allDates.length > 0) {
+          let minEpoch = Math.min(...allDates);
+          let maxEpoch = Math.max(...allDates);
+          let minD = new Date(minEpoch);
+          let maxD = new Date(maxEpoch);
+          
+          projectsMap[p.id] = {
+              id: p.id,
+              name: p.title,
+              startStr: `${minD.getUTCFullYear()}-${String(minD.getUTCMonth()+1).padStart(2,'0')}-${String(minD.getUTCDate()).padStart(2,'0')}`,
+              endStr: `${maxD.getUTCFullYear()}-${String(maxD.getUTCMonth()+1).padStart(2,'0')}-${String(maxD.getUTCDate()).padStart(2,'0')}`,
+              status: p.status,
+              fragments: p.fragments,
+              pStart: new Date(minD.getUTCFullYear(), minD.getUTCMonth(), minD.getUTCDate()),
+              type: p.type || 'Event'
+          };
+      }
+    });
+  } else {
+    globalRosterData.shifts.forEach(s => {
+      if(!projectsMap[s.projectId]) {
+        let sDateStr = s.pStartDate || s.pWhDate || s.pTidyDate;
+        let eDateStr = s.pEndDate || s.pStartDate || s.pWhDate || s.pTidyDate;
+        if (sDateStr) {
+           let pts = sDateStr.split('-');
+           projectsMap[s.projectId] = { 
+               id: s.projectId, 
+               name: s.projectName.replace(/( WH 1| WH 2| TIDY| SHOW)$/g, ''), 
+               startStr: sDateStr, 
+               endStr: eDateStr, 
+               status: s.status,
+               pStart: new Date(pts[0], pts[1]-1, pts[2]),
+               type: 'Event'
+           };
+        }
+      }
+    });
+  }
+  
+  let activeProjects = [];
+  Object.values(projectsMap).forEach(p => {
+    if(!p.startStr) return;
+    let pStart = new Date(p.startStr.split('-')[0], parseInt(p.startStr.split('-')[1])-1, p.startStr.split('-')[2]);
+    let pEnd = p.endStr ? new Date(p.endStr.split('-')[0], parseInt(p.endStr.split('-')[1])-1, p.endStr.split('-')[2]) : pStart;
+    if(pEnd >= monthStart && pStart <= monthEnd) {
+      let startDay = pStart < monthStart ? 1 : pStart.getDate();
+      let endDay = pEnd > monthEnd ? daysInMonth : pEnd.getDate();
+      activeProjects.push({ ...p, startDay, endDay, pStart });
+    }
+  });
+  
+  activeProjects.sort((a,b) => a.pStart - b.pStart);
+  let tracks = [];
+  activeProjects.forEach(p => {
+    let placed = false;
+    for(let i=0; i<tracks.length; i++) { if(tracks[i] < p.startDay) { p.track = i; tracks[i] = p.endDay; placed = true; break; } }
+    if(!placed) { p.track = tracks.length; tracks.push(p.endDay); }
+    if(projectsMap[p.id]) projectsMap[p.id].track = p.track;
+  });
+  
+  let evHeight = MR_VISUAL_SETTINGS.eventHeight || 24;
+  let trackHeight = evHeight + 4;
+  let headerHeight = Math.max(50, 50 + (tracks.length * trackHeight) + 10);
+  let headerHtml = `<div class="mr-grid-header" style="min-height: ${headerHeight}px;"><div class="mr-corner" style="width: ${yWidth}px; min-width: ${yWidth}px;"></div><div style="display:flex; align-items: stretch; position:relative; width:${daysInMonth * 182}px;">`;
+  
+  for(let d=1; d<=daysInMonth; d++) {
+    let dateObj = new Date(year, month, d);
+    let dayName = dateObj.toLocaleDateString('en-US', {weekday: 'short'});
+    headerHtml += `<div class="mr-day-col col-${d}" onmouseenter="highlightCol(${d})" onmouseleave="unhighlightCol(${d})" style="${(new Date().toDateString() === dateObj.toDateString())?'background:#222228; border-bottom:2px solid var(--accent);':''} height:${headerHeight}px; justify-content:flex-start; padding-top:10px;">${d} <span>${dayName}</span></div>`;
+  }
+  
+  activeProjects.forEach(p => {
+    let left = (p.startDay - 1) * 182 + 4;
+    let width = ((p.endDay - p.startDay) + 1) * 182 - 8;
+    let top = 50 + (p.track * trackHeight);
+    
+    let pPhases = [];
+    if (p.fragments && p.fragments.length > 0) {
+        let typeMap = { 'WAREHOUSE': 'wh', 'MAIN_EVENT': 'main', 'SHOW_DAY': 'show', 'RECOVERY': 'recovery', 'TRANSIT': 'transit' };
+        let sortedFrags = p.fragments.sort((a,b) => String(a.date || '').localeCompare(String(b.date || '')));
+        sortedFrags.forEach(f => {
+            let dTime = new Date(Date.UTC(f.date.split('-')[0], f.date.split('-')[1]-1, f.date.split('-')[2])).getTime();
+            let uiType = typeMap[f.type] || 'main';
+            let lastBlock = pPhases.find(b => b.type === uiType && b.endEpoch === dTime);
+            if (lastBlock) lastBlock.endEpoch = dTime + 86400000;
+            else pPhases.push({ type: uiType, startEpoch: dTime, endEpoch: dTime + 86400000 });
+        });
+    }
+    let rawDbStatus = String(p.status || 'Draft').toUpperCase();
+    let isCancelled = (rawDbStatus === 'CANCELLED');
+    let ledColor = isCancelled ? '#ef4444' : (rawDbStatus === 'APPROVED' ? '#10b981' : (rawDbStatus === 'NOT APPROVED' ? '#f97316' : '#a1a1aa'));
+    let typeKey = 'event'; 
+    if (p.type) {
+        let t = p.type.toLowerCase();
+        if (t === 'meeting' || t === 'cross rent') typeKey = t.replace(/\s+/g, '-');
+    }
+    let borderVar = isCancelled ? '#333333' : `var(--cal-color-${typeKey}, #888888)`;
+    let bgHex = isCancelled ? 'rgba(30, 30, 34, 0.9)' : 'rgba(20, 20, 22, 0.9)';
+    let textCol = isCancelled ? '#666666' : '#ffffff';
+
+    let innerBars = '';
+    if (pPhases && pPhases.length > 0) {
+        let segStartEpoch = Date.UTC(p.pStart.getFullYear(), p.pStart.getMonth(), p.pStart.getDate());
+        let segTotalDays = (p.endDay - p.startDay) + 1;
+        let mainC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['main'] ? PAINT_COLORS['main'].color : '#3b82f6';
+        let whC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['wh'] ? PAINT_COLORS['wh'].color : '#f97316';
+        let showC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['show'] ? PAINT_COLORS['show'].color : '#10b981';
+        let recoveryC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['recovery'] ? PAINT_COLORS['recovery'].color : '#a855f7';
+        let transitC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['transit'] ? PAINT_COLORS['transit'].color : '#06b6d4';
+
+        pPhases.forEach(block => {
+            let bStart = block.startEpoch;
+            let bEnd = block.endEpoch - 86400000; 
+            let visibleStart = Math.max(bStart, segStartEpoch);
+            let visibleEnd = Math.min(bEnd, segStartEpoch + ((segTotalDays - 1) * 86400000));
+            if (visibleEnd < visibleStart) return;
+            
+            let offsetDays = Math.round((visibleStart - segStartEpoch) / 86400000);
+            let spanDays = Math.round((visibleEnd - visibleStart) / 86400000) + 1;
+            let leftPct = Math.max(0, (offsetDays / segTotalDays) * 100);
+            let widthPct = Math.min(100 - leftPct, (spanDays / segTotalDays) * 100);
+            let bBgHex = block.type === 'wh' ? whC : block.type === 'main' ? mainC : block.type === 'show' ? showC : block.type === 'transit' ? transitC : recoveryC;
+            let bTop = '0', bHeight = '20%';
+            if (block.type === 'wh') { bTop = '0'; bHeight = '20%'; }
+            else if (block.type === 'transit') { bTop = '20%'; bHeight = '20%'; }
+            else if (block.type === 'main') { bTop = '40%'; bHeight = '20%'; }
+            else if (block.type === 'show') { bTop = '60%'; bHeight = '20%'; }
+            else if (block.type === 'recovery') { bTop = '80%'; bHeight = '20%'; }
+            innerBars += `<div style="position: absolute; left: ${leftPct}%; width: ${widthPct}%; top: ${bTop}; height: ${bHeight}; background: ${bBgHex}; border-radius: 1px; z-index: 1;"></div>`;
+        });
+    }
+    
+    headerHtml += `
+    <div class="event-custom-frame mr-event-strip" data-project="${p.id}" onmouseenter="hoverEventShifts('${p.id}', true)" onmouseleave="hoverEventShifts('${p.id}', false)" style="--event-border-color: ${borderVar}; --bg-hex: ${bgHex}; --text-col: ${textCol}; position:absolute; top:${top}px; left:${left}px; width:${width}px; height: var(--mr-event-height, 24px); border-radius: 4px; cursor: pointer; box-sizing: border-box; overflow: hidden; z-index: 30;" onclick="goToEventTimeline('${p.id}', 'main')" title="${p.name}">
+         <div class="solid-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${borderVar}; z-index:0;"></div>
+         <div class="hover-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${bgHex}; z-index:0;"></div>
+         <div class="bars-wrapper" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1;">${innerBars}</div>
+         <div class="event-custom-title" style="position: absolute; left: 6px; top: 0; bottom: 0; display: flex; align-items: center; font-size: 11px; font-weight: 900; z-index: 10; white-space: nowrap; pointer-events: none;"><div style="width:6px; height:6px; border-radius:50%; background:${ledColor}; margin-right:4px; box-shadow: 0 0 3px ${ledColor}; flex-shrink:0;"></div><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: ${textCol};">${p.name}</span></div>
+    </div>`;
+  });
+  
+  headerHtml += '</div></div><div style="display:flex; flex-direction:column;">';
+  let shiftsMap = {};
+  globalRosterData.roster.forEach(c => { shiftsMap[c.uid] = {}; });
+  
+  globalRosterData.shifts.forEach(s => {
+    let targetUid = s.user_uid || s.email;
+    if(!s.baseDate || !shiftsMap[targetUid]) return;
+    let localStart = Number(s.start) % 24;
+    s.localStart = localStart;
+    s.localEnd = localStart + Number(s.duration);
+    if (s.y === year && s.m === month) {
+      if(!shiftsMap[targetUid][s.d]) shiftsMap[targetUid][s.d] = [];
+      shiftsMap[targetUid][s.d].push(s);
+    }
+  });
+  
+  let globalBadDays = {};
+  let leavesData = globalRosterData.leaves || [];
+  
+  globalRosterData.roster.forEach(c => {
+    globalBadDays[c.uid] = {};
+    let cLeaves = leavesData.filter(l => (l.user_uid || l.email) === c.uid);
+    cLeaves.forEach(l => {
+      for(let d=1; d<=daysInMonth; d++) {
+        let dString = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        if (dString >= l.start && dString <= l.end) {
+          globalBadDays[c.uid][d] = { lvl: 'leave', txt: 'LEAVE', reason: l.reason, id: l.id };
+        }
+      }
+    });
+  });
+
+  // 🚀 SHIFT-SPECIFIC CONFLICT MAPPING
+  let shiftConflicts = {};
+  if (typeof globalConflicts !== 'undefined') {
+      globalConflicts.forEach(conf => {
+          if (conf.entityId && !conf.acknowledged && conf.conflictEpoch && !conf.isAsset) {
+              if (!shiftConflicts[conf.entityId]) shiftConflicts[conf.entityId] = {};
+              if (!shiftConflicts[conf.entityId][conf.conflictEpoch]) {
+                  shiftConflicts[conf.entityId][conf.conflictEpoch] = conf;
+              } else {
+                  shiftConflicts[conf.entityId][conf.conflictEpoch].desc += '<br>' + conf.desc;
+              }
+          }
+      });
+  }
+  
+  let groupedRoster = {};
+  globalRosterData.roster.forEach(c => {
+    let rawDept = c.uid.includes('truck') ? 'dept_trucks' : (c.department || (SYSTEM_DEPARTMENTS[0] ? SYSTEM_DEPARTMENTS[0].uid : 'Lighting'));
+    let deptUid = typeof rawDept === 'object' ? (rawDept.uid || rawDept.name) : rawDept;
+    
+    // GHOST EXORCIST
+    if (deptUid === "[object Object]") deptUid = SYSTEM_DEPARTMENTS[0] ? SYSTEM_DEPARTMENTS[0].uid : 'Lighting';
+    
+    if(!groupedRoster[deptUid]) groupedRoster[deptUid] = [];
+    groupedRoster[deptUid].push(c);
+  });
+  
+  for (let deptUid in groupedRoster) {
+    let safeDept = deptUid.replace(/\s+/g, '-');
+    let deptUids = groupedRoster[deptUid].map(c => c.uid);
+    let deptObj = getDeptObj(deptUid);
+    let deptName = deptObj.name;
+    
+    headerHtml += `<div class="mr-grid-row" onclick="toggleDept('${safeDept}', 'mr')" style="background: #1f1f23; cursor: pointer; position: relative;">
+        <div class="mr-crew-row" style="background: #1f1f23; color: #fff; border: 1px solid ${deptObj.color}; border-right: none; width: ${yWidth}px; min-width: ${yWidth}px; font-size: 11px; font-weight: 900; text-transform: uppercase;"><span id="icon-mr-${safeDept}">▼</span> &nbsp; ${deptName}</div>
+        <div style="display:flex; align-items: stretch; position:relative; width:${daysInMonth * 182}px; background: #131316; border: 1px solid ${deptObj.color}; border-left: none;">
+           <div id="summary-mr-${safeDept}" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">`;
+           
+    for(let d=1; d<=daysInMonth; d++) {
+      let dayShifts = [];
+              deptUids.forEach(uid => {
+                if (shiftsMap[uid] && shiftsMap[uid][d]) dayShifts.push(...shiftsMap[uid][d]);
+      });
+      if (dayShifts.length > 0) {
+        dayShifts.sort((a,b) => a.localStart - b.localStart).forEach((s, idx) => {
+          let stackY = 12 + (idx % 6) * 5;
+          let leftOffset = (d - 1) * 182 + 5 + (s.localStart / 24) * 172;
+          let widthPx = Math.max(4, (Number(s.duration) / 24) * 172);
+          headerHtml += `<div style="position:absolute; left:${leftOffset}px; width:${widthPx}px; height:3px; background:${s.color || '#10b981'}; top:${stackY}px; border-radius:2px; opacity:0.9;"></div>`;
+        });
+      }
+    }
+    
+    headerHtml += `</div></div></div>`;
+    
+    groupedRoster[deptUid].forEach(c => {
+      headerHtml += `<div class="mr-grid-row mr-row-${safeDept}"><div class="mr-crew-row" style="width: ${yWidth}px; min-width: ${yWidth}px; align-items: center; display: flex;">${c.name}</div><div style="display:flex; align-items: stretch; position:relative; width:${daysInMonth * 182}px;">`;
+      let badDays = globalBadDays[c.uid] || {};
+      for(let d=1; d<=daysInMonth; d++) {
+        let dayShifts = ((shiftsMap[c.uid] && shiftsMap[c.uid][d]) ? shiftsMap[c.uid][d] : []).sort((a,b) => {
+           let tA = (projectsMap[a.projectId] && projectsMap[a.projectId].track !== undefined) ? projectsMap[a.projectId].track : 999;
+           let tB = (projectsMap[b.projectId] && projectsMap[b.projectId].track !== undefined) ? projectsMap[b.projectId].track : 999;
+           if (tA !== tB) return tA - tB;
+           return Number(a.localStart) - Number(b.localStart);
+        });
+        let restBadgeHtml = "";
+        if (badDays[d] && badDays[d].lvl === 'leave') {
+            let safeDesc = (badDays[d].reason || "LEAVE").replace(/"/g, '&quot;').replace(/'/g, "\\'");
+            restBadgeHtml = `<div class="rest-badge badge-leave" style="background:#7f1d1d; border:1px solid #f87171;" onmouseenter="showCustomTooltip(event, '${safeDesc}', 'red')" onmouseleave="hideCustomTooltip()">LEAVE</div>`;
+        }
+        let shiftsByTrack = {};
+        let maxTrackInCell = -1;
+        let untrackedShifts = [];
+        
+        dayShifts.forEach(s => {
+            let pObj = projectsMap[s.projectId];
+            if (pObj && pObj.track !== undefined) {
+                let t = pObj.track;
+                if (!shiftsByTrack[t]) shiftsByTrack[t] = [];
+                shiftsByTrack[t].push(s);
+                if (t > maxTrackInCell) maxTrackInCell = t;
+            } else {
+                untrackedShifts.push(s);
+            }
+        });
+
+        let pillsHtml = '';
+        for (let t = 0; t <= maxTrackInCell; t++) {
+            if (!shiftsByTrack[t]) {
+                pillsHtml += `<div style="height: var(--mr-shift-height, 22px); width: 100%;"></div>`;
+                continue;
+            }
+            let trackHtml = `<div style="display: flex; gap: 2px; width: 100%; min-height: var(--mr-shift-height, 22px); align-items: center;">`;
+            shiftsByTrack[t].sort((a,b) => a.localStart - b.localStart).forEach(s => {
+                let sEpochForConf = Math.round(s.absStart * 3600000);
+                let conf = shiftConflicts[c.uid] && shiftConflicts[c.uid][sEpochForConf];
+                let shiftBadgeHtml = '';
+                if (conf) {
+                    let txt = conf.type === 'HARD_OVERLAP' ? '0' : '!';
+                    let safeDesc = conf.desc.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+                    shiftBadgeHtml = `<div class="rest-badge badge-${conf.level}" style="margin: 0 !important; flex-shrink: 0;" onmouseenter="showCustomTooltip(event, '${safeDesc}', '${conf.level}')" onmouseleave="hideCustomTooltip()">${txt}</div>`;
+                }
+                let isArrow = (s.hasArrow === true || s.hasArrow === "true");
+                let isOpen = (s.hasArrow === 'open');
+                let timeStr = isOpen ? "OPEN SHIFT" : formatShiftTime(s.localStart) + '-' + formatShiftTime(s.localStart + Number(s.duration));
+                let flexGrow = Math.max(1, Number(s.duration));
+                let whBorder = s.isWh ? 'border:2px solid #ffffff;' : 'border:1px solid rgba(0,0,0,0.1);';
+                let moonIcon = (s.localStart < 6 || s.localEnd > 23.5) ? '<span style="filter:grayscale(100%) brightness(0%); display:inline-block; line-height:1;">🌙</span>' : '';
+                let arrowIcon = isOpen ? '<span style="display:inline-block; line-height:1; transform:translateY(1px);">?</span>' : ((Number(s.duration) > 12 || isArrow) ? '<span style="display:inline-block; line-height:1; transform:translateY(1px);">▶</span>' : '');
+                
+                trackHtml += `${shiftBadgeHtml}<div class="mr-shift-pill" data-project="${s.projectId}" style="flex: ${flexGrow}; background:${s.color||'#86efac'}; color:${s.textCol||'#064e3b'}; ${whBorder} box-sizing: border-box; display:flex; justify-content:space-between; align-items:center;" onmouseenter="hoverEventShifts('${s.projectId}', true)" onmouseleave="hoverEventShifts('${s.projectId}', false)" onclick="goToEventTimeline('${s.projectId}', 'main')" title="${s.projectName}\n${s.role}\n${timeStr}"><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; display:block; transform:translateY(1px);">${s.projectName}</span><span style="flex-shrink:0; font-size:inherit; margin-left:4px; display:flex; align-items:center; gap:2px;">${moonIcon}${arrowIcon}</span></div>`;
+            });
+            trackHtml += `</div>`;
+            pillsHtml += trackHtml;
+        }
+
+        if (untrackedShifts.length > 0) {
+            let trackHtml = `<div style="display: flex; gap: 2px; width: 100%; min-height: var(--mr-shift-height, 22px); align-items: center; flex-wrap: wrap;">`;
+            untrackedShifts.sort((a,b) => a.localStart - b.localStart).forEach(s => {
+                let sEpochForConf = Math.round(s.absStart * 3600000);
+                let conf = shiftConflicts[c.uid] && shiftConflicts[c.uid][sEpochForConf];
+                let shiftBadgeHtml = '';
+                if (conf) {
+                    let txt = conf.type === 'HARD_OVERLAP' ? '0' : '!';
+                    let safeDesc = conf.desc.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+                    shiftBadgeHtml = `<div class="rest-badge badge-${conf.level}" style="margin: 0 !important; flex-shrink: 0;" onmouseenter="showCustomTooltip(event, '${safeDesc}', '${conf.level}')" onmouseleave="hideCustomTooltip()">${txt}</div>`;
+                }
+                let isArrow = (s.hasArrow === true || s.hasArrow === "true");
+                let isOpen = (s.hasArrow === 'open');
+                let timeStr = isOpen ? "OPEN SHIFT" : formatShiftTime(s.localStart) + '-' + formatShiftTime(s.localStart + Number(s.duration));
+                let flexGrow = Math.max(1, Number(s.duration));
+                let whBorder = s.isWh ? 'border:2px solid #ffffff;' : 'border:1px solid rgba(0,0,0,0.1);';
+                let moonIcon = (s.localStart < 6 || s.localEnd > 23.5) ? '<span style="filter:grayscale(100%) brightness(0%); display:inline-block; line-height:1;">🌙</span>' : '';
+                let arrowIcon = isOpen ? '<span style="display:inline-block; line-height:1; transform:translateY(1px);">?</span>' : ((Number(s.duration) > 12 || isArrow) ? '<span style="display:inline-block; line-height:1; transform:translateY(1px);">▶</span>' : '');
+                
+                trackHtml += `${shiftBadgeHtml}<div class="mr-shift-pill" data-project="${s.projectId}" style="flex: ${flexGrow}; background:${s.color||'#86efac'}; color:${s.textCol||'#064e3b'}; ${whBorder} box-sizing: border-box; display:flex; justify-content:space-between; align-items:center;" onmouseenter="hoverEventShifts('${s.projectId}', true)" onmouseleave="hoverEventShifts('${s.projectId}', false)" onclick="goToEventTimeline('${s.projectId}', 'main')" title="${s.projectName}\n${s.role}\n${timeStr}"><span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; display:block; transform:translateY(1px);">${s.projectName}</span><span style="flex-shrink:0; font-size:inherit; margin-left:4px; display:flex; align-items:center; gap:2px;">${moonIcon}${arrowIcon}</span></div>`;
+            });
+            trackHtml += `</div>`;
+            pillsHtml += trackHtml;
+        }
+        let isToday = (new Date().toDateString() === new Date(year, month, d).toDateString());
+        let bgStyle = isToday ? 'background:rgba(255,255,255,0.02);' : '';
+        headerHtml += `<div class="mr-cell col-${d}" onmouseenter="highlightCol(${d})" onmouseleave="unhighlightCol(${d})" style="${bgStyle}" ondblclick="addLeaveFromGrid('${c.uid}', ${d})">${restBadgeHtml}${pillsHtml}</div>`;
+      }
+      
+      let cLeaves = (globalRosterData.leaves || []).filter(l => (l.user_uid || l.email) === c.uid);
+      cLeaves.forEach(l => {
+         let lStart = new Date(l.start + "T00:00:00Z");
+         let lEnd = new Date(l.end + "T00:00:00Z");
+         let mStart = new Date(Date.UTC(year, month, 1));
+         let mEnd = new Date(Date.UTC(year, month + 1, 0));
+         
+         if (lEnd >= mStart && lStart <= mEnd) {
+             let startDay = lStart < mStart ? 1 : lStart.getUTCDate();
+             let endDay = lEnd > mEnd ? daysInMonth : lEnd.getUTCDate();
+             let left = (startDay - 1) * 182 + 2;
+             let width = ((endDay - startDay) + 1) * 182 - 4;
+             let isSelected = selectedLeaveId === l.id ? ' selected' : '';
+             let confirmBtn = l.unconfirmed ? `<div onclick="confirmLeave('${l.id}', event)" style="position:absolute; top:-10px; right:-10px; background:#10b981; color:#fff; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; cursor:pointer; z-index:60; box-shadow:0 2px 4px rgba(0,0,0,0.5); border:2px solid #fff;" title="Confirm Leave">✔</div>` : '';
+             
+             headerHtml += `<div class="leave-block${isSelected}" data-id="${l.id}" style="left: ${left}px; width: ${width}px;" onclick="selectLeave('${l.id}', event)" ondblclick="openLeaveModalFromGrid('${l.id}', event)">
+                <div class="leave-handle leave-handle-left" onmousedown="initLeaveDrag('${l.id}', 'left', event)" ontouchstart="initLeaveDrag('${l.id}', 'left', event)"></div>
+                <span style="color:#ef4444; font-weight:900; font-size:12px; background:rgba(0,0,0,0.6); padding:2px 6px; border-radius:4px; pointer-events:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:90%;">${l.reason || 'LEAVE'}</span>
+                <div class="leave-handle leave-handle-right" onmousedown="initLeaveDrag('${l.id}', 'right', event)" ontouchstart="initLeaveDrag('${l.id}', 'right', event)"></div>
+                ${confirmBtn}
+             </div>`;
+         }
+      });
+      
+      headerHtml += `</div></div>`;
+    });
+  }
+  
+  headerHtml += '</div>';
+  const canvasInner = document.getElementById('mr-canvas-inner');
+  
+  let previousScroll = canvasInner.scrollLeft;
+  canvasInner.innerHTML = headerHtml;
+  
+  let currentMonthStr = year + '-' + month;
+  if (lastRenderedMonthStr === currentMonthStr) {
+    canvasInner.scrollLeft = previousScroll;
+  } else {
+    let now = new Date();
+    if (year === now.getFullYear() && month === now.getMonth()) {
+      canvasInner.scrollLeft = Math.max(0, (now.getDate() - 1.5) * 182);
+    } else { canvasInner.scrollLeft = 0; }
+    lastRenderedMonthStr = currentMonthStr;
+  }
+}
+
+// ==========================================
+// --- MONTH ROSTER LEAVE DRAG ENGINE ---
+// ==========================================
+// @INDEX: ROSTER -> Leave Drag Engine
+let activeLeaveDrag = null;
+let activeLeaveEl = null;
+let selectedLeaveId = null;
+
+function addLeaveFromGrid(uid, day) {
+    let year = currentRosterDate.getFullYear();
+    let month = currentRosterDate.getMonth();
+    let dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    
+    let newId = 'l_' + Date.now();
+    let newLeave = {
+        id: newId, user_uid: uid, email: uid,
+        start: dateStr, end: dateStr, reason: 'LEAVE',
+        unconfirmed: true
+    };
+    
+    if (!globalRosterData.leaves) globalRosterData.leaves = [];
+    globalRosterData.leaves.push(newLeave);
+    
+    selectedLeaveId = newId;
+    renderMonthGrid();
+}
+
+function confirmLeave(id, e) {
+    e.stopPropagation();
+    let l = globalRosterData.leaves.find(x => x.id === id);
+    if (l) {
+        let btn = e.currentTarget;
+        btn.innerHTML = "⏳";
+        btn.style.pointerEvents = "none";
+        l.unconfirmed = false;
+        google.script.run
+            .withSuccessHandler(() => {
+                selectedLeaveId = null;
+                renderMonthGrid();
+            })
+            .withFailureHandler(err => {
+                l.unconfirmed = true;
+                alert("Failed to validate leave: " + err.message);
+                renderMonthGrid();
+            })
+            .saveLeave(l, ACTIVE_USER_NAME);
+    }
+}
+
+function openLeaveModalFromGrid(id, e) {
+    if (e) e.stopPropagation();
+    let l = globalRosterData.leaves.find(x => x.id === id);
+    if (l) openLeaveModal(encodeURIComponent(JSON.stringify(l)));
+}
+
+function selectLeave(id, e) {
+    e.stopPropagation();
+    selectedLeaveId = id;
+    document.querySelectorAll('.leave-block').forEach(el => el.classList.remove('selected'));
+    let el = document.querySelector(`.leave-block[data-id="${id}"]`);
+    if (el) el.classList.add('selected');
+}
+
+function initLeaveDrag(id, edge, e) {
+    e.stopPropagation();
+    let leave = globalRosterData.leaves.find(l => l.id === id);
+    if (!leave) return;
+    
+    activeLeaveEl = document.querySelector(`.leave-block[data-id="${id}"]`);
+    if (!activeLeaveEl) return;
+    
+    selectedLeaveId = id;
+    document.querySelectorAll('.leave-block').forEach(el => el.classList.remove('selected'));
+    activeLeaveEl.classList.add('selected');
+    
+    activeLeaveDrag = {
+        id: id, edge: edge,
+        startX: e.touches ? e.touches[0].clientX : e.clientX,
+        leave: leave,
+        origLeft: parseFloat(activeLeaveEl.style.left) || 0,
+        origWidth: parseFloat(activeLeaveEl.style.width) || 182,
+        startD: new Date(leave.start + "T00:00:00Z").getTime(),
+        endD: new Date(leave.end + "T00:00:00Z").getTime()
+    };
+    
+    if (e.touches) {
+        document.addEventListener('touchmove', onLeaveDrag, {passive: false});
+        document.addEventListener('touchend', endLeaveDrag);
+    } else {
+        document.addEventListener('mousemove', onLeaveDrag);
+        document.addEventListener('mouseup', endLeaveDrag);
+    }
+}
+
+function onLeaveDrag(e) {
+    if (!activeLeaveDrag || !activeLeaveEl) return;
+    if (e.touches) e.preventDefault();
+    let currentX = e.touches ? e.touches[0].clientX : e.clientX;
+    let dx = currentX - activeLeaveDrag.startX;
+    let daysDelta = Math.round(dx / 182);
+    let pxDelta = daysDelta * 182;
+    
+    if (activeLeaveDrag.edge === 'left') {
+        let newLeft = activeLeaveDrag.origLeft + pxDelta;
+        let newWidth = activeLeaveDrag.origWidth - pxDelta;
+        if (newWidth >= 178) {
+            activeLeaveEl.style.left = newLeft + 'px';
+            activeLeaveEl.style.width = newWidth + 'px';
+        }
+    } else if (activeLeaveDrag.edge === 'right') {
+        let newWidth = activeLeaveDrag.origWidth + pxDelta;
+        if (newWidth >= 178) {
+            activeLeaveEl.style.width = newWidth + 'px';
+        }
+    }
+}
+
+function endLeaveDrag(e) {
+    document.removeEventListener('mousemove', onLeaveDrag);
+    document.removeEventListener('mouseup', endLeaveDrag);
+    document.removeEventListener('touchmove', onLeaveDrag);
+    document.removeEventListener('touchend', endLeaveDrag);
+    
+    if (activeLeaveDrag && activeLeaveEl) {
+        let currentX = (e.changedTouches && e.changedTouches.length > 0) ? e.changedTouches[0].clientX : e.clientX;
+        let dx = currentX - activeLeaveDrag.startX;
+        let daysDelta = Math.round(dx / 182);
+        let l = activeLeaveDrag.leave;
+        let changed = false;
+        
+        if (activeLeaveDrag.edge === 'left') {
+            let n = activeLeaveDrag.startD + (daysDelta * 86400000);
+            if (n <= activeLeaveDrag.endD) {
+                let d = new Date(n);
+                l.start = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+                changed = true;
+            }
+        } else if (activeLeaveDrag.edge === 'right') {
+            let n = activeLeaveDrag.endD + (daysDelta * 86400000);
+            if (n >= activeLeaveDrag.startD) {
+                let d = new Date(n);
+                l.end = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+                changed = true;
+            }
+        }
+        
+        if (changed) {
+            if (!l.unconfirmed) {
+                google.script.run.saveLeave(l, ACTIVE_USER_NAME);
+            }
+            renderMonthGrid();
+        } else {
+            activeLeaveEl.style.left = activeLeaveDrag.origLeft + 'px';
+            activeLeaveEl.style.width = activeLeaveDrag.origWidth + 'px';
+        }
+    }
+    activeLeaveDrag = null;
+    activeLeaveEl = null;
+}
+
+function goToEventTimeline(projectId, mode = 'main') {
+  closeModals();
+  setTimeout(() => {
+    let ev = calendar.getEventById(projectId);
+
+    if (ev) {
+       document.getElementById('edit-folder-id').value = projectId; 
+       document.getElementById('edit-proj-name').value = ev.title.replace(' WH', ''); 
+       
+       if (mode === 'wh') {
+           document.getElementById('edit-proj-wh-date').value = ev.extendedProps.rawDbData.whDate || '';
+       } else {
+           document.getElementById('edit-proj-date').value = ev.extendedProps.rawDbData.start || ''; 
+           document.getElementById('edit-old-date').value = ev.extendedProps.rawDbData.start || ''; 
+           let uiEndDate = ev.extendedProps.rawDbData.end || ev.extendedProps.rawDbData.start;
+           document.getElementById('edit-proj-end-date').value = uiEndDate;
+       }
+
+       cameFromRoster = true;
+       document.getElementById('month-roster-layer').style.display = 'none';
+       openShiftLayout(mode, false);
+    } else {
+       alert("Project not found in current calendar view. Sync calendar and try again.");
+    }
+  }, 150);
+}
+
+// ==========================================
+// --- CROSS-REFERENCE HOVER ENGINE ---
+// ==========================================
+function hoverEventShifts(projectId, isHovering) {
+  document.querySelectorAll('.mr-shift-pill, .mr-event-strip').forEach(el => {
+    if (isHovering) {
+      if (el.dataset.project === projectId) {
+        el.style.opacity = '1';
+        if (el.classList.contains('mr-event-strip')) el.classList.add('force-hover');
+      } else {
+        el.style.opacity = '0.2';
+        if (el.classList.contains('mr-event-strip')) el.classList.remove('force-hover');
+      }
+    } else {
+      el.style.opacity = '1';
+      if (el.classList.contains('mr-event-strip')) el.classList.remove('force-hover');
+    }
+  });
+}
+</script>

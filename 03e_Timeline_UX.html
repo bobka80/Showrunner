@@ -1,0 +1,253 @@
+<script>
+/**
+ * 03e_Timeline_UX.html
+ * Domain: Lasso selection, keyboard shortcuts, shift indicators, and inline note editors.
+ */
+
+// ==========================================
+// --- TIMELINE_UX -> Lasso Selection Engine ---
+// ==========================================
+document.addEventListener('mousedown', function(e) {
+    if (currentIsReadOnly) return;
+    if (!e.target.closest('.tt-grid-wrapper')) return;
+    if (e.target.closest('.shift-block') || e.target.closest('.action-zone') || e.target.closest('.mr-shift-pill') || e.target.closest('.shift-handle')) return;
+    
+    e.preventDefault(); 
+    
+    isLassoing = true;
+    wasLassoing = false;
+    lassoStartX = e.clientX;
+    lassoStartY = e.clientY;
+    
+    lassoBox = document.createElement('div');
+    lassoBox.className = 'lasso-box';
+    document.body.appendChild(lassoBox);
+    
+    updateLassoBox(e.clientX, e.clientY);
+    
+    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        selectedIds.clear(); selectedPhaseIds.clear();
+        drawShifts(); renderPhases();
+    }
+    baseSelectedIds = new Set(selectedIds);
+    baseSelectedPhaseIds = new Set(selectedPhaseIds);
+});
+
+document.addEventListener('mousemove', function(e) {
+    if (isLassoing && lassoBox) {
+        wasLassoing = true; 
+        updateLassoBox(e.clientX, e.clientY);
+        checkLassoIntersections();
+    }
+});
+
+document.addEventListener('mouseup', function(e) {
+    if (isLassoing) { 
+        isLassoing = false; 
+        if (lassoBox) lassoBox.remove(); 
+        lassoBox = null; 
+        setTimeout(() => { wasLassoing = false; }, 50);
+    }
+});
+
+function updateLassoBox(currentX, currentY) {
+    lassoBox.style.left = Math.min(lassoStartX, currentX) + 'px';
+    lassoBox.style.top = Math.min(lassoStartY, currentY) + 'px';
+    lassoBox.style.width = Math.abs(currentX - lassoStartX) + 'px';
+    lassoBox.style.height = Math.abs(currentY - lassoStartY) + 'px';
+}
+
+function checkLassoIntersections() {
+    if (!lassoBox) return;
+    const rect = lassoBox.getBoundingClientRect();
+    selectedIds.clear(); baseSelectedIds.forEach(id => selectedIds.add(id));
+    selectedPhaseIds.clear(); baseSelectedPhaseIds.forEach(id => selectedPhaseIds.add(id));
+
+    document.querySelectorAll('.shift-block, .phase-block').forEach(block => {
+        const bRect = block.getBoundingClientRect();
+        const overlap = !(rect.right < bRect.left || rect.left > bRect.right || rect.bottom < bRect.top || rect.top > bRect.bottom);
+        const id = block.dataset.id;
+        if (overlap && id) { if (id.startsWith('s_')) selectedIds.add(id); if (id.startsWith('p_')) selectedPhaseIds.add(id); block.classList.add('selected'); } 
+        else if (id) { if ((id.startsWith('s_') && !baseSelectedIds.has(id)) || (id.startsWith('p_') && !baseSelectedPhaseIds.has(id))) { block.classList.remove('selected'); } }
+    });
+}
+
+// ==========================================
+// --- TIMELINE_CREW -> Department Overrides ---
+// ==========================================
+function openDeptOverride(uid, name) {
+  if (currentIsReadOnly) return;
+  activeDeptOverrideUid = uid;
+  document.getElementById('dept-override-name').innerText = "Move " + name;
+  let cb = document.querySelector(`.internal-cb[value="${uid}"]`);
+  let currentDept = localDeptOverrides[uid] || (cb ? cb.dataset.dept : SYSTEM_DEPARTMENTS[0].uid);
+  
+  let selectEl = document.getElementById('dept-override-select');
+  selectEl.innerHTML = SYSTEM_DEPARTMENTS.map(d => `<option value="${d.uid}">${d.name}</option>`).join('');
+  if (!SYSTEM_DEPARTMENTS.some(d => d.uid === 'dept_trucks')) selectEl.innerHTML += `<option value="dept_trucks">Trucks</option>`;
+  
+  selectEl.value = currentDept;
+  document.getElementById('dept-override-panel').style.display = 'block';
+}
+
+function applyDeptOverride() {
+  if(!activeDeptOverrideUid) return;
+  localDeptOverrides[activeDeptOverrideUid] = document.getElementById('dept-override-select').value;
+  document.getElementById('dept-override-panel').style.display = 'none';
+  rebuildTimelineGrid();
+  window.isTimelineDirty = true;
+}
+
+function toggleAllTimelineDepts(expand) {
+    const rows = document.querySelectorAll('.tt-crew-row');
+    rows.forEach(r => {
+        if (r.onclick && r.onclick.toString().includes('toggleDept')) {
+            let safeDeptMatch = r.onclick.toString().match(/'([^']+)',\s*'tt'/);
+            if (safeDeptMatch && safeDeptMatch[1]) {
+                let safeDept = safeDeptMatch[1];
+                let icon = document.getElementById(`icon-tt-${safeDept}`);
+                let summaryContainer = document.getElementById(`summary-tt-${safeDept}`);
+                let targetRows = document.querySelectorAll(`.tt-row-${safeDept}`);
+                
+                if (icon) {
+                    icon.innerText = expand ? '▼' : '▶';
+                    targetRows.forEach(tr => tr.style.setProperty('display', expand ? '' : 'none', 'important'));
+                    if (summaryContainer) summaryContainer.style.display = expand ? 'none' : 'block';
+                }
+            }
+        }
+    });
+}
+
+// ==========================================
+// --- TIMELINE_UX -> Inline Note Editor ---
+// ==========================================
+function openNoteModal(id, type, e) {
+    if (currentIsReadOnly) return;
+    if (e) {
+        e.stopPropagation();
+        e.preventDefault(); 
+    }
+    
+    let block = type === 'shift' ? document.querySelector(`.shift-block[data-id="${id}"]`) : document.querySelector(`.shift-block[data-id="${id}"]`);
+    if (!block) return;
+    if (block.querySelector('.inline-note-input')) return;
+
+    let currentNote = "";
+    if (type === 'shift') { let s = shifts.find(x => x.id === id); if (s) currentNote = s.note || ""; } 
+    else { let p = activePhases.find(x => x.id === id); if (p) currentNote = p.note || ""; }
+    
+    let input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentNote;
+    input.className = 'inline-note-input';
+    input.placeholder = "Enter note...";
+    
+    input.style.cssText = 'position:absolute; top:-2px; left:-2px; width:calc(100% + 4px); min-width:180px; height:calc(100% + 4px); min-height: 32px; z-index:1000; background:rgba(20,20,24,0.98); color:#fff; border:2px solid var(--accent, #a855f7); padding:0 8px; font-size:12px; box-sizing:border-box; border-radius:4px; outline:none; box-shadow: 0 8px 24px rgba(0,0,0,0.8); text-align: left; pointer-events: auto !important; user-select: auto !important; -webkit-user-select: auto !important; cursor: text; transition: all 0.2s;';
+    
+    block.appendChild(input);
+    
+    setTimeout(() => {
+        if (document.body.contains(input)) {
+            input.focus();
+            input.setSelectionRange(input.value.length, input.value.length);
+            input.addEventListener('blur', commitNote);
+        }
+    }, 100);
+    
+    const commitNote = () => {
+        if (!document.body.contains(input)) return; 
+        let noteTxt = input.value.trim();
+        if (type === 'shift') { let s = shifts.find(x => x.id === id); if (s) s.note = noteTxt; drawShifts(); } 
+        else { let p = activePhases.find(x => x.id === id); if (p) p.note = noteTxt; renderPhases(); }
+        window.isTimelineDirty = true;
+    };
+    
+    input.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') {
+            input.blur();
+        } else if (ev.key === 'Escape') {
+            input.value = currentNote; 
+            input.blur(); 
+        }
+        ev.stopPropagation();
+    });
+    
+    ['mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'dblclick'].forEach(evt => {
+        input.addEventListener(evt, ev => ev.stopPropagation());
+    });
+}
+
+// ==========================================
+// --- TIMELINE_UX -> Shift Indicators ---
+// ==========================================
+function handleIndicatorClick(id, e) {
+  if (currentIsReadOnly) return;
+  e.stopPropagation(); 
+  
+  if (indicatorClickTimer) {
+      clearTimeout(indicatorClickTimer);
+      indicatorClickTimer = null;
+      let targetShift = shifts.find(s => s.id === id);
+      if (targetShift) {
+          let nextState = (targetShift.hasArrow === 'open') ? false : 'open';
+          toggleIndicatorState(id, nextState);
+      }
+  } else {
+      indicatorClickTimer = setTimeout(() => {
+          indicatorClickTimer = null;
+          let targetShift = shifts.find(s => s.id === id);
+          if (targetShift) {
+                  let isActive = (targetShift.hasArrow === true || targetShift.hasArrow === "true" || targetShift.hasArrow === 'open');
+                  let nextState = isActive ? false : true;
+              toggleIndicatorState(id, nextState);
+          }
+          }, 250);
+  }
+}
+
+function toggleIndicatorState(id, newState) {
+  let targetShift = shifts.find(s => s.id === id);
+  if(!targetShift || isTruck(targetShift.user_uid || targetShift.email)) return;
+  
+  if(selectedIds.has(id) && selectedIds.size > 1) {
+    shifts.forEach(s => { if(selectedIds.has(s.id) && !isTruck(s.user_uid || s.email)) s.hasArrow = newState; });
+  } else {
+    targetShift.hasArrow = newState;
+  }
+  drawShifts();
+  window.isTimelineDirty = true;
+}
+
+// ==========================================
+// --- TIMELINE_UX -> Keyboard Logic ---
+// ==========================================
+document.addEventListener('keydown', function(e) {
+    if (currentIsReadOnly) return;
+    const shiftLayer = document.getElementById('shift-layer');
+    if (!shiftLayer || shiftLayer.style.display === 'none') return;
+    
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        
+        let changed = false;
+        if (selectedIds && selectedIds.size > 0) {
+            shifts = shifts.filter(s => !selectedIds.has(s.id));
+            selectedIds.clear();
+            changed = true;
+        }
+        if (selectedPhaseIds && selectedPhaseIds.size > 0) {
+            activePhases = activePhases.filter(p => !selectedPhaseIds.has(p.id));
+            selectedPhaseIds.clear();
+            changed = true;
+        }
+        
+        if (changed) {
+            e.preventDefault();
+            drawShifts();
+            renderPhases();
+            window.isTimelineDirty = true;
+        }
+    }
+});
+</script>

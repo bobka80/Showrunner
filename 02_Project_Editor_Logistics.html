@@ -1,0 +1,830 @@
+<script>
+/**
+ * 02_Project_Editor_Logistics.html
+ * Domain: Logistics Hub Wizard, Truck Assignment, and Autonomous Scheduling.
+ */
+
+// ==========================================
+// --- LOGISTICS HUB WIZARD UI ---
+// ==========================================
+// @INDEX: LOGISTICS_WIZARD -> Logistics Hub & Autonomous Engine
+
+function openLogisticsHubModal() {
+    let projectId = document.getElementById('edit-folder-id').value;
+    if (!projectId || projectId === 'NEW') {
+        alert("⚠️ Please SAVE & SYNC the project first before opening Logistics.");
+        return;
+    }
+
+    const proceedToHub = (tData) => {
+        let outSelect = document.getElementById('logistics-out-trucks');
+        let inSelect = document.getElementById('logistics-in-trucks');
+        
+        // Detect Manual Truck Shifts
+        let tShifts = tData ? tData.shifts || [] : [];
+        let hasManualTruckShifts = false;
+        let truckMap = new Set();
+        if (typeof globalVehicles !== 'undefined') globalVehicles.forEach(v => truckMap.add(v.id));
+        
+        tShifts.forEach(s => {
+             let isTruck = truckMap.has(s.user_uid || s.email);
+             if (isTruck && s.note !== '⚠️ AUTO-OUTBOUND' && s.note !== '⚠️ AUTO-INBOUND') {
+                 hasManualTruckShifts = true;
+             }
+        });
+        
+        let timeToggle = document.getElementById('logistics-enable-times-toggle');
+        if (hasManualTruckShifts) {
+             timeToggle.checked = false; timeToggle.disabled = true; timeToggle.parentNode.style.opacity = '0.5';
+             document.getElementById('logistics-times-lock-msg').style.display = 'block';
+             document.getElementById('logistics-times-panel').style.display = 'none';
+        } else {
+             timeToggle.disabled = false; timeToggle.parentNode.style.opacity = '1'; timeToggle.checked = false;
+             document.getElementById('logistics-times-lock-msg').style.display = 'none';
+             document.getElementById('logistics-times-panel').style.display = 'none';
+        }
+        
+        let usedOutTrucks = new Set();
+        let usedInTrucks = new Set();
+        let hasAutoPack = false;
+
+        if (typeof currentProjectAssets !== 'undefined') {
+            currentProjectAssets.forEach(pa => {
+                if (pa.outboundTruckUid) usedOutTrucks.add(pa.outboundTruckUid);
+                if (pa.inboundTruckUid) usedInTrucks.add(pa.inboundTruckUid);
+                if (pa.isAuto) hasAutoPack = true;
+            });
+        }
+        
+        let isSym = true;
+        let hasTrucksAssigned = (usedOutTrucks.size > 0 || usedInTrucks.size > 0);
+        
+        if (hasTrucksAssigned) {
+            if (usedOutTrucks.size !== usedInTrucks.size) {
+                isSym = false;
+            } else {
+                let outArr = Array.from(usedOutTrucks);
+                for (let t of outArr) {
+                    if (!usedInTrucks.has(t)) isSym = false;
+                }
+            }
+            window.userSetSymmetricalToggle = isSym;
+        } else {
+            if (typeof window.userSetSymmetricalToggle !== 'undefined') {
+                isSym = window.userSetSymmetricalToggle;
+            }
+        }
+        
+        let optsOut = '';
+        let optsIn = '';
+        if (typeof globalVehicles !== 'undefined' && globalVehicles.length > 0) {
+            globalVehicles.forEach(v => { 
+                let selOut = usedOutTrucks.has(v.id) ? 'selected' : '';
+                let selIn = usedInTrucks.has(v.id) ? 'selected' : '';
+                optsOut += `<option value="${v.id}" ${selOut}>${v.name}</option>`; 
+                optsIn += `<option value="${v.id}" ${selIn}>${v.name}</option>`;
+            });
+        } else {
+            optsOut += `<option value="" disabled>No vehicles found in database.</option>`;
+            optsIn += `<option value="" disabled>No vehicles found in database.</option>`;
+        }
+        
+        outSelect.innerHTML = optsOut;
+        inSelect.innerHTML = optsIn;
+        
+        // Reset to defaults
+        document.getElementById('logistics-symmetrical-toggle').checked = isSym;
+        if (typeof updateAutoPackButtonState === 'function') updateAutoPackButtonState();
+        if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+
+        toggleLogisticsHubSymmetry();
+        
+        if (typeof toggleLogisticsDateMode === 'function') {
+            toggleLogisticsDateMode('out');
+            toggleLogisticsDateMode('in');
+        }
+        
+        loadLogisticsTimeDefaults('out');
+        loadLogisticsTimeDefaults('in');
+        
+        document.getElementById('logistics-hub-modal-overlay').style.display = 'flex';
+    };
+
+    if (window.paLoadedForProject !== projectId || typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
+        let btn = document.getElementById('logistics-hub-btn-layers') || document.getElementById('logistics-hub-btn');
+        let origText = btn ? btn.innerText : 'LOGISTICS HUB';
+        if (btn) { btn.innerText = "LOADING GEAR..."; btn.disabled = true; }
+        
+        let sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : "";
+        let eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : "";
+        
+        let targetAssets = null;
+        let targetTimeline = null;
+        
+        const finalizeLoad = () => {
+            if (targetAssets && targetTimeline) {
+                currentProjectAssets = targetAssets.current || [];
+                window.overlappingAllocations = targetAssets.overlapping || {};
+                window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                window.paLoadedForProject = projectId;
+                
+                const processFormulas = (arr) => {
+                    let exploded = [];
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                        let pa = arr[i];
+                        let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
+                        if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') {
+                            let parsedQty = parseInt(pa.qty, 10);
+                            if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
+                                arr.splice(i, 1);
+                                for (let k = 0; k < parsedQty; k++) {
+                                    let newPa = {...pa, qty: 1};
+                                    delete newPa.uid;
+                                    exploded.push(newPa);
+                                }
+                            }
+                        }
+                    }
+                    if (exploded.length > 0) arr.push(...exploded);
+                    
+                    arr.forEach(pa => {
+                        if (pa.formula === 'Manual') pa.formula = 'Standalone';
+                        if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
+                        if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
+                        if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } 
+                        else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
+                        else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
+                        else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
+                    });
+                };
+                processFormulas(currentProjectAssets);
+                processFormulas(window.originalProjectAssets);
+                
+                if (btn) { btn.innerText = origText; btn.disabled = false; }
+                proceedToHub(targetTimeline);
+            }
+        };
+
+        const fetchTimeline = () => {
+            google.script.run
+            .withFailureHandler(err => {
+                if (btn) { btn.innerText = origText; btn.disabled = false; }
+                alert("Error loading timeline data: " + err.message);
+            })
+            .withSuccessHandler(res => {
+                targetTimeline = res;
+                finalizeLoad();
+            }).getTimelineData(projectId, 'main');
+        };
+
+        const fetchAssets = () => {
+            if (window.paLoadedForProject === projectId && currentProjectAssets.length >= 0) {
+                targetAssets = { current: currentProjectAssets, overlapping: window.overlappingAllocations };
+                fetchTimeline();
+                return;
+            }
+            google.script.run
+            .withFailureHandler(err => {
+                if (btn) { btn.innerText = origText; btn.disabled = false; }
+                alert("Error loading assignments: " + err.message);
+            })
+            .withSuccessHandler(res => {
+                targetAssets = res;
+                fetchTimeline();
+            }).getProjectAssets(projectId, sDate, eDate);
+        };
+
+        if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
+            google.script.run.withFailureHandler(err => { if (btn) { btn.innerText = origText; btn.disabled = false; } alert("Error loading vault: " + err.message); }).withSuccessHandler(assets => { globalAssets = assets || []; fetchAssets(); }).getAssetRegistry(ACTIVE_USER_NAME);
+        } else {
+            fetchAssets();
+        }
+    } else {
+        proceedToHub();
+    }
+}
+
+function toggleLogisticsHubSymmetry() {
+    let isSym = document.getElementById('logistics-symmetrical-toggle').checked;
+    window.userSetSymmetricalToggle = isSym;
+    document.getElementById('logistics-in-asymmetric-panel').style.display = isSym ? 'none' : 'flex';
+    let inArrangeRow = document.getElementById('logistics-in-arrange-row');
+    if (inArrangeRow) inArrangeRow.style.display = isSym ? 'none' : 'flex';
+}
+
+window.toggleLogisticsTimesPanel = function() {
+    let isChecked = document.getElementById('logistics-enable-times-toggle').checked;
+    document.getElementById('logistics-times-panel').style.display = isChecked ? 'flex' : 'none';
+};
+
+window.toggleLogisticsDateMode = function(leg) {
+    let mode = document.getElementById('logistics-' + leg + '-day').value;
+    let loadDateInput = document.getElementById('logistics-' + leg + '-load-date');
+    let unloadDateInput = document.getElementById('logistics-' + leg + '-unload-date');
+    
+    if (mode === 'other') {
+        loadDateInput.style.display = 'block';
+        unloadDateInput.style.display = 'block';
+        
+        let sDateStr = document.getElementById('edit-proj-date').value;
+        let eDateStr = document.getElementById('edit-proj-end-date').value || sDateStr;
+        
+        if (!loadDateInput.value) {
+            if (leg === 'out' && sDateStr) {
+                let d = new Date(sDateStr + "T12:00:00Z");
+                d.setDate(d.getDate() - 1);
+                let iso = d.toISOString().split('T')[0];
+                loadDateInput.value = iso;
+                unloadDateInput.value = iso;
+            } else if (leg === 'in' && eDateStr) {
+                let d = new Date(eDateStr + "T12:00:00Z");
+                d.setDate(d.getDate() + 1);
+                let iso = d.toISOString().split('T')[0];
+                loadDateInput.value = iso;
+                unloadDateInput.value = iso;
+            }
+        }
+    } else {
+        loadDateInput.style.display = 'none';
+        unloadDateInput.style.display = 'none';
+    }
+}
+
+function loadLogisticsTimeDefaults(leg) {
+    let offset = document.getElementById('logistics-' + leg + '-day').value;
+    let savedLoad = localStorage.getItem(`sm_logistics_def_${leg}_load_${offset}`);
+    let savedUnload = localStorage.getItem(`sm_logistics_def_${leg}_unload_${offset}`);
+    
+    if (savedLoad) document.getElementById('logistics-' + leg + '-load').value = savedLoad;
+    if (savedUnload) document.getElementById('logistics-' + leg + '-unload').value = savedUnload;
+}
+
+function saveLogisticsTimeDefault(inputId, leg, offsetId, e) {
+    let offset = document.getElementById(offsetId).value;
+    let val = document.getElementById(inputId).value;
+    if (val) {
+        let type = inputId.includes('unload') ? 'unload' : 'load';
+        localStorage.setItem(`sm_logistics_def_${leg}_${type}_${offset}`, val);
+        let btn = e.currentTarget;
+        let orig = btn.innerText;
+        btn.innerText = "SAVED ✓";
+        setTimeout(() => { btn.innerText = orig; }, 1000);
+    }
+}
+
+window.executeLogisticsHub = function() {
+    let projectId = document.getElementById('edit-folder-id').value;
+    if (!projectId || projectId === 'NEW') {
+        alert("⚠️ Please SAVE & SYNC the project first before generating Logistics.");
+        return;
+    }
+
+    let btn = document.getElementById('btn-generate-logistics');
+    let origText = btn ? btn.innerText : "GENERATE LOGISTICS";
+    if (btn) { btn.innerText = "GENERATING..."; btn.disabled = true; }
+
+    let sDateStr = document.getElementById('edit-proj-date').value;
+    if (!sDateStr) {
+        alert("⚠️ Please set the Project Start Date on the timeline first.");
+        if (btn) { btn.innerText = origText; btn.disabled = false; }
+        return;
+    }
+
+    // Gather all logistics configuration data
+    let generateTimes = document.getElementById('logistics-enable-times-toggle').checked;
+    let isSym = document.getElementById('logistics-symmetrical-toggle').checked;
+    let outTrucks = Array.from(document.getElementById('logistics-out-trucks').selectedOptions).map(o => o.value);
+    let inTrucks = isSym ? outTrucks : Array.from(document.getElementById('logistics-in-trucks').selectedOptions).map(o => o.value);
+
+    if (outTrucks.length === 0) {
+        alert("⚠️ Please select at least one truck for the Outbound leg to continue.");
+        if (btn) { btn.innerText = origText; btn.disabled = false; }
+        return;
+    }
+    if (!isSym && inTrucks.length === 0) {
+        alert("⚠️ Please select at least one truck for the Inbound return leg to continue.");
+        if (btn) { btn.innerText = origText; btn.disabled = false; }
+        return;
+    }
+
+    let outStartHr = 0, outDur = 1, inStartHr = 0, inDur = 1;
+    let eDateStr = document.getElementById('edit-proj-end-date').value;
+
+    if (generateTimes) {
+        let outMode = document.getElementById('logistics-out-day').value;
+        let outLoadDateStr = document.getElementById('logistics-out-load-date').value;
+        let outUnloadDateStr = document.getElementById('logistics-out-unload-date').value;
+        let outLoad = document.getElementById('logistics-out-load').value || "08:00";
+        let outUnload = document.getElementById('logistics-out-unload').value || "10:00";
+        
+        let inMode = document.getElementById('logistics-in-day').value;
+        let inLoadDateStr = document.getElementById('logistics-in-load-date').value;
+        let inUnloadDateStr = document.getElementById('logistics-in-unload-date').value;
+        let inLoad = document.getElementById('logistics-in-load').value || "22:00";
+        let inUnload = document.getElementById('logistics-in-unload').value || "00:00";
+
+        // Time calculations
+        let baseStart = new Date(sDateStr + "T12:00:00Z");
+
+        let outLoadDateFinal = outMode === 'other' && outLoadDateStr ? outLoadDateStr : sDateStr;
+        let outUnloadDateFinal = outMode === 'other' && outUnloadDateStr ? outUnloadDateStr : outLoadDateFinal;
+        let inLoadDateFinal = inMode === 'other' && inLoadDateStr ? inLoadDateStr : (eDateStr || sDateStr);
+        let inUnloadDateFinal = inMode === 'other' && inUnloadDateStr ? inUnloadDateStr : inLoadDateFinal;
+
+        let parseT = (t) => { let p = t.split(':'); return parseInt(p[0], 10) + (parseInt(p[1], 10)/60); };
+        
+        let outLoadHr = parseT(outLoad);
+        let outUnloadHr = parseT(outUnload);
+        let outWhHr = Math.max(0, outLoadHr - 2);
+        let outWhTime = String(Math.floor(outWhHr)).padStart(2, '0') + ":" + String(Math.round((outWhHr % 1) * 60)).padStart(2, '0');
+
+        let inLoadHr = parseT(inLoad);
+        let inUnloadHr = parseT(inUnload);
+        let inRecHr = Math.min(24, inUnloadHr + 2);
+        let inRecTime = String(Math.floor(inRecHr)).padStart(2, '0') + ":" + String(Math.round((inRecHr % 1) * 60)).padStart(2, '0');
+
+        // Shift Calculations
+        let outLoadDateObj = new Date(outLoadDateFinal + "T12:00:00Z");
+        let outUnloadDateObj = new Date(outUnloadDateFinal + "T12:00:00Z");
+        let inLoadDateObj = new Date(inLoadDateFinal + "T12:00:00Z");
+        let inUnloadDateObj = new Date(inUnloadDateFinal + "T12:00:00Z");
+
+        outStartHr = (Math.round((outLoadDateObj - baseStart) / 86400000) * 24) + outLoadHr;
+        let outEndHr = (Math.round((outUnloadDateObj - baseStart) / 86400000) * 24) + outUnloadHr;
+        outDur = outEndHr - outStartHr;
+        if (outDur < 0 && outMode === 'same') outDur += 24; 
+        else if (outDur <= 0) outDur = 1;
+
+        inStartHr = (Math.round((inLoadDateObj - baseStart) / 86400000) * 24) + inLoadHr;
+        let inEndHr = (Math.round((inUnloadDateObj - baseStart) / 86400000) * 24) + inUnloadHr;
+        inDur = inEndHr - inStartHr;
+        if (inDur < 0 && inMode === 'same') inDur += 24;
+        else if (inDur <= 0) inDur = 1;
+    }
+
+    // Truck names dictionary for backend payload
+    let truckNames = {};
+    if (typeof globalVehicles !== 'undefined') {
+        globalVehicles.forEach(v => { truckNames[v.id] = v.name; });
+    }
+
+    // Readiness state
+    if (!window.currentReadinessState) window.currentReadinessState = {};
+    let outAutoPackLocal = false;
+    if (typeof currentProjectAssets !== 'undefined') {
+        currentProjectAssets.forEach(pa => { if (pa.isGenericAuto) outAutoPackLocal = true; });
+    }
+    if (outAutoPackLocal) window.currentReadinessState.eq = 'packed_auto';
+    
+    let outArranged = false, inArranged = false;
+    if (typeof currentProjectAssets !== 'undefined') {
+        currentProjectAssets.forEach(pa => {
+            if (pa.outboundTruckUid) outArranged = true;
+            if (pa.inboundTruckUid) inArranged = true;
+        });
+    }
+    if (outArranged || inArranged) window.currentReadinessState.truck = 'arranged_auto';
+    else if (outTrucks.length > 0 || inTrucks.length > 0) window.currentReadinessState.truck = 'assigned';
+
+    // Prepare Deltas
+    let deltas = typeof calculatePaDeltas === 'function' ? calculatePaDeltas() : [];
+
+    // Build Master Payload
+    let logData = {
+        generateTimes: generateTimes,
+        outTrucks: outTrucks,
+        inTrucks: inTrucks,
+        outStartHr: outStartHr,
+        outDur: outDur,
+        inStartHr: inStartHr,
+        inDur: inDur,
+        truckNames: truckNames,
+        readinessStateStr: JSON.stringify(window.currentReadinessState),
+        sDateStr: sDateStr,
+        eDateStr: eDateStr,
+        clientTimestamp: document.getElementById('edit-proj-version') ? document.getElementById('edit-proj-version').value : ''
+    };
+
+    // Fire single optimized network request
+    google.script.run
+        .withFailureHandler(err => {
+            alert("Generation Failed: " + err.message);
+            if (btn) { btn.innerText = origText; btn.disabled = false; }
+        })
+        .withSuccessHandler(res => {
+            if (btn) { btn.innerText = "SUCCESS ✓"; }
+            
+            // ✅ SYNC THE TIMESTAMP SO WE DONT GET COLLISION LOCKOUTS
+            if (res.timestamp && document.getElementById('edit-proj-version')) {
+                document.getElementById('edit-proj-version').value = res.timestamp;
+            }
+            
+            // If the backend updated assets (via deltas), refresh the local cache
+            if (res.assets) {
+                currentProjectAssets = res.assets.current || [];
+                window.overlappingAllocations = res.assets.overlapping || {};
+                window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                
+                const processFormulas = (arr) => {
+                    let exploded = [];
+                    for (let i = arr.length - 1; i >= 0; i--) {
+                        let pa = arr[i];
+                        let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
+                        if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') {
+                            let parsedQty = parseInt(pa.qty, 10);
+                            if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
+                                arr.splice(i, 1);
+                                for (let k = 0; k < parsedQty; k++) {
+                                    let newPa = {...pa, qty: 1};
+                                    delete newPa.uid;
+                                    exploded.push(newPa);
+                                }
+                            }
+                        }
+                    }
+                    if (exploded.length > 0) arr.push(...exploded);
+                    
+                    arr.forEach(pa => {
+                        if (pa.formula === 'Manual') pa.formula = 'Standalone';
+                        if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
+                        if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
+                        if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } 
+                        else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
+                        else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
+                        else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
+                    });
+                };
+                processFormulas(currentProjectAssets);
+                processFormulas(window.originalProjectAssets);
+            }
+
+            setTimeout(() => {
+                if (btn) { btn.innerText = origText; btn.disabled = false; }
+                document.getElementById('logistics-hub-modal-overlay').style.display = 'none';
+                if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+                if (typeof runSchedule === 'function') runSchedule();
+            }, 1500);
+        })
+        .generateLogisticsPayloadAPI(projectId, deltas, logData, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+};
+
+window.toggleAutoArrangeHub = async function(leg) {
+    let isSym = document.getElementById('logistics-symmetrical-toggle').checked;
+    let trucks = [];
+    if (leg === 'outbound') {
+        trucks = Array.from(document.getElementById('logistics-out-trucks').selectedOptions).map(o => o.value);
+    } else {
+        trucks = isSym ? Array.from(document.getElementById('logistics-out-trucks').selectedOptions).map(o => o.value) 
+                       : Array.from(document.getElementById('logistics-in-trucks').selectedOptions).map(o => o.value);
+    }
+
+    let isArranged = false;
+    if (typeof currentProjectAssets !== 'undefined') {
+        currentProjectAssets.forEach(pa => {
+            if (leg === 'outbound' && pa.outboundTruckUid) isArranged = true;
+            if (leg === 'inbound' && pa.inboundTruckUid) isArranged = true;
+        });
+    }
+
+    if (isArranged) {
+        if (typeof revertAutoArrange === 'function') revertAutoArrange(leg);
+    } else {
+        if (trucks.length === 0) return alert(`Please select at least one truck for the ${leg} leg to auto-arrange.`);
+        
+        // ALWAYS FORCE AUTO-PACK FIRST to ensure loose cables/bulk items are boxed and have dimensions
+        // before the truck tetris algorithm measures them.
+        if (typeof autoProvisionCableCases === 'function') autoProvisionCableCases();
+        
+        let hasContainers = false;
+        if (typeof currentProjectAssets !== 'undefined') {
+            hasContainers = currentProjectAssets.some(pa => {
+                let asset = globalAssets.find(a => a.id === pa.assetId);
+                return asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
+            });
+        }
+        if (!hasContainers) {
+            return alert("⚠️ No cases/containers found in this project. You must pack equipment into cases before auto-arranging trucks.");
+        }
+
+        let btn = document.getElementById(leg === 'outbound' ? 'logistics-out-autoarrange-btn' : 'logistics-in-autoarrange-btn');
+        if (btn) btn.innerHTML = "ARRANGING...";
+        
+        if (typeof explodeProjectAssets === 'function') explodeProjectAssets();
+        let deltas = typeof calculatePaDeltas === 'function' ? calculatePaDeltas() : [];
+        let restoreBtn = () => { if (btn) { btn.innerHTML = "AUTO ARRANGE"; btn.disabled = false; } };
+        
+        let arrangeLogic = async () => {
+            await window.headlessAutoArrangeAsync(leg, trucks);
+            if (window.currentPaMode === 'design' && typeof collapseProjectAssets === 'function') collapseProjectAssets();
+            if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+        };
+        
+        if (deltas.length > 0 && typeof window.autoSaveAndExecute === 'function') {
+            window.autoSaveAndExecute(arrangeLogic, false, restoreBtn, true);
+        } else {
+            window.autoSaveAndExecute(arrangeLogic, false, restoreBtn, true);
+        }
+    }
+};
+
+window.updateAutoArrangeButtonState = function() {
+    let outArranged = false, inArranged = false;
+    if (typeof currentProjectAssets !== 'undefined') {
+        currentProjectAssets.forEach(pa => {
+            if (pa.outboundTruckUid) outArranged = true;
+            if (pa.inboundTruckUid) inArranged = true;
+        });
+    }
+    const svgIcon = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px; transform:translateY(1px);"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>`;
+    
+    let outBtn = document.getElementById('logistics-out-autoarrange-btn');
+    if (outBtn) {
+        if (outArranged) { outBtn.style.setProperty('background', 'rgba(239, 68, 68, 0.1)', 'important'); outBtn.style.setProperty('border-color', '#ef4444', 'important'); outBtn.style.setProperty('color', '#ef4444', 'important'); outBtn.innerHTML = `⟲ UNDO ARRANGEMENT`; } 
+        else { outBtn.style.setProperty('background', 'transparent', 'important'); outBtn.style.setProperty('border-color', '#3b82f6', 'important'); outBtn.style.setProperty('color', '#3b82f6', 'important'); outBtn.innerHTML = `${svgIcon}AUTO ARRANGE`; }
+    }
+    let inBtn = document.getElementById('logistics-in-autoarrange-btn');
+    if (inBtn) {
+        if (inArranged) { inBtn.style.setProperty('background', 'rgba(239, 68, 68, 0.1)', 'important'); inBtn.style.setProperty('border-color', '#ef4444', 'important'); inBtn.style.setProperty('color', '#ef4444', 'important'); inBtn.innerHTML = `⟲ UNDO ARRANGEMENT`; } 
+        else { inBtn.style.setProperty('background', 'transparent', 'important'); inBtn.style.setProperty('border-color', '#a855f7', 'important'); inBtn.style.setProperty('color', '#a855f7', 'important'); inBtn.innerHTML = `${svgIcon}AUTO ARRANGE`; }
+    }
+};
+
+window.headlessAutoArrangeAsync = function(leg, truckIds) {
+    return new Promise((resolve) => {
+        if (!currentProjectAssets || currentProjectAssets.length === 0 || !truckIds || truckIds.length === 0) return resolve();
+        
+        let truckIdx = 0;
+        let targetTruckId = truckIds[truckIdx]; 
+        let getTruckDims = (tId) => {
+            let v = typeof globalVehicles !== 'undefined' ? globalVehicles.find(x => x.id === tId) : null;
+            return {
+                w: v && v.w ? parseFloat(v.w) * 100 : 240,
+                l: v && v.l ? parseFloat(v.l) * 100 : 700
+            };
+        };
+        let dims = getTruckDims(targetTruckId);
+        let truckW = dims.w;
+        let truckL = dims.l;
+
+        let casesToArrange = [];
+        currentProjectAssets.forEach(pa => {
+            if (pa.isShortage || pa.containerUid) return;
+            let asset = globalAssets.find(a => a.id === pa.assetId);
+            if (asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.type === 'Container')) {
+                let qty = parseInt(pa.qty, 10) || 1;
+                let w = 60, l = 120;
+                if (asset.dims) {
+                    let pts = asset.dims.split(/[*xX]/);
+                    if (pts.length >= 2) { l = parseFloat(pts[0]); w = parseFloat(pts[1]); if (l > 0 && l < 15 && w > 0 && w < 15) { l *= 100; w *= 100; } }
+                }
+                let weight = parseFloat(asset.weight) || 0;
+                for (let i = 0; i < qty; i++) {
+                    casesToArrange.push({ paUid: pa.uid, weight: weight, l: Math.max(l, w), w: Math.min(l, w), dept: pa.overrideDept || asset.department || 'Z' });
+                }
+            }
+        });
+
+        if (casesToArrange.length === 0) return resolve();
+        
+        let tempStacks = [];
+        let unassigned = [...casesToArrange];
+        unassigned.sort((a, b) => {
+            let dA = typeof getDeptObj === 'function' ? getDeptObj(a.dept).name : 'Z';
+            let dB = typeof getDeptObj === 'function' ? getDeptObj(b.dept).name : 'Z';
+            return dA.localeCompare(dB) || (b.l * b.w) - (a.l * a.w) || b.weight - a.weight;
+        });
+        
+        while (unassigned.length > 0) {
+            let base = unassigned.shift();
+            let chunk = [base];
+            
+            for (let i = 0; i < unassigned.length && chunk.length < 2; i++) {
+                let cand = unassigned[i];
+                if ((cand.l === base.l && cand.w === base.w) || (cand.l === base.w && cand.w === base.l)) {
+                    cand.l = base.l; cand.w = base.w; 
+                    chunk.push(cand);
+                    unassigned.splice(i, 1);
+                    i--; 
+                }
+            }
+            
+            if (chunk.length < 2) {
+                for (let i = 0; i < unassigned.length; i++) {
+                    let cand = unassigned[i];
+                    let fitsStandard = (cand.l <= base.l && cand.w <= base.w);
+                    let fitsRotated = (cand.w <= base.l && cand.l <= base.w);
+                    if ((fitsStandard || fitsRotated) && cand.weight <= base.weight) {
+                        if (fitsRotated && !fitsStandard) { let t = cand.l; cand.l = cand.w; cand.w = t; }
+                        chunk.push(cand);
+                        unassigned.splice(i, 1);
+                        break;
+                    }
+                }
+            }
+            
+            tempStacks.push({ l: base.l, w: base.w, items: chunk, weight: chunk.reduce((s, c) => s + c.weight, 0), dept: base.dept });
+        }
+        
+        tempStacks.sort((a,b) => {
+            let dA = typeof getDeptObj === 'function' ? getDeptObj(a.dept).name : 'Z';
+            let dB = typeof getDeptObj === 'function' ? getDeptObj(b.dept).name : 'Z';
+            return dA.localeCompare(dB) || b.weight - a.weight || (b.l * b.w) - (a.l * a.w);
+        });
+        
+        let currentX = 1000, currentY = 1000, maxRowL = 0;
+        let spatialPayload = [];
+        
+        let stagingCursorX = 5, stagingCursorY = 5, stagingMaxRowW = 0;
+
+        tempStacks.forEach(s => {
+            const placeStack = () => {
+                let remY = (1000 + truckW) - currentY;
+                let fitsStandard = (s.w <= remY);
+                let fitsRotated = (s.l <= remY);
+                
+                if (!fitsStandard && !fitsRotated) { 
+                    currentX += maxRowL; currentY = 1000; maxRowL = 0; remY = truckW; 
+                    fitsStandard = (s.w <= remY); fitsRotated = (s.l <= remY); 
+                }
+                
+                let shouldRotate = false;
+                if (currentY > 1000) {
+                    if (fitsStandard && s.l === maxRowL && (!fitsRotated || s.w !== maxRowL)) shouldRotate = false;
+                    else if (fitsRotated && s.w === maxRowL && (!fitsStandard || s.l !== maxRowL)) shouldRotate = true;
+                    else { if (fitsRotated && remY % s.l === 0 && remY % s.w !== 0) shouldRotate = true; else if (fitsStandard && remY % s.w === 0 && remY % s.l !== 0) shouldRotate = false; else if (fitsRotated && !fitsStandard) shouldRotate = true; else shouldRotate = false; }
+                } else {
+                    let divStandard = (truckW % s.w === 0); let divRotated = (truckW % s.l === 0);
+                    if (divRotated && !divStandard) shouldRotate = true; else if (divStandard && !divRotated) shouldRotate = false; else shouldRotate = false;
+                }
+                
+                if (shouldRotate) { let t = s.l; s.l = s.w; s.w = t; s.items.forEach(c => c.isRotated = true); }
+                
+                if (currentY + s.w > 1000 + truckW) {
+                    currentX += maxRowL; currentY = 1000; maxRowL = 0;
+                    if (s.l < s.w && s.w <= truckW) { let t = s.l; s.l = s.w; s.w = t; s.items.forEach(c => c.isRotated = !c.isRotated); }
+                }
+                
+                let isStaged = (currentX + s.l > 1000 + truckL);
+                
+                if (isStaged) {
+                    // Try to rollover to the next truck before staging
+                    if (truckIdx + 1 < truckIds.length) {
+                        truckIdx++;
+                        targetTruckId = truckIds[truckIdx];
+                        dims = getTruckDims(targetTruckId);
+                        truckW = dims.w; truckL = dims.l;
+                        currentX = 1000; currentY = 1000; maxRowL = 0;
+                        // Reset any rotation applied in this iteration so it starts fresh
+                        if (s.items[0].isRotated) { let t = s.l; s.l = s.w; s.w = t; s.items.forEach(c => c.isRotated = false); }
+                        return placeStack();
+                    }
+
+                    if (stagingCursorX > 5 && stagingCursorX + s.l > 295) {
+                        stagingCursorX = 5;
+                        stagingCursorY += stagingMaxRowW + 5;
+                        stagingMaxRowW = 0;
+                    }
+                    if (s.w > stagingMaxRowW) stagingMaxRowW = s.w;
+                }
+
+                s.items.forEach((c, zIdx) => {
+                    if (c.paUid) {
+                        spatialPayload.push({ paUid: c.paUid, truckUid: isStaged ? "" : targetTruckId, truckX: isStaged ? stagingCursorX : currentX, truckY: isStaged ? stagingCursorY : currentY, truckZ: zIdx, isRotated: c.isRotated || false, isStaged: isStaged });
+                        
+                        let localPa = currentProjectAssets.find(pa => pa.uid === c.paUid);
+                        if (localPa) {
+                            if (leg === 'outbound') {
+                                localPa.outboundTruckUid = isStaged ? "" : targetTruckId;
+                                localPa.outboundX = isStaged ? stagingCursorX : currentX;
+                                localPa.outboundY = isStaged ? stagingCursorY : currentY;
+                                localPa.outboundZ = zIdx;
+                                localPa.outboundRotated = c.isRotated || false;
+                                localPa.outboundStaged = isStaged;
+                            } else if (leg === 'inbound') {
+                                localPa.inboundTruckUid = isStaged ? "" : targetTruckId;
+                                localPa.inboundX = isStaged ? stagingCursorX : currentX;
+                                localPa.inboundY = isStaged ? stagingCursorY : currentY;
+                                localPa.inboundZ = zIdx;
+                                localPa.inboundRotated = c.isRotated || false;
+                                localPa.inboundStaged = isStaged;
+                            }
+                        }
+                    }
+                });
+                
+                if (!isStaged) { currentY += s.w; if (s.l > maxRowL) maxRowL = s.l; }
+                else { stagingCursorX += s.l + 5; }
+            };
+            
+            placeStack();
+        });
+
+        if (spatialPayload.length > 0) {
+            google.script.run.withSuccessHandler(resolve).withFailureHandler(resolve).saveTruckArrangementAPI(document.getElementById('edit-folder-id').value, spatialPayload, leg, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+        } else {
+            resolve();
+        }
+    });
+};
+
+window.revertAutoPack = function(skipConfirm = false) {
+    if (!skipConfirm && !confirm("This will unpack all auto-generated generic cases and delete them. Proceed?")) return;
+    let anyRemoved = false;
+    for (let i = currentProjectAssets.length - 1; i >= 0; i--) {
+        let pa = currentProjectAssets[i];
+        if (pa.isGenericAuto) {
+            let cid = (pa.formula && pa.formula !== 'Standalone') ? (pa.assetId + "|||" + pa.formula) : pa.assetId;
+            currentProjectAssets.forEach(child => { if (child.containerUid === cid) child.containerUid = ""; });
+            currentProjectAssets.splice(i, 1);
+            anyRemoved = true;
+        }
+    }
+    if (anyRemoved) {
+        if (typeof mergeLooseItems === 'function') mergeLooseItems();
+        if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+            
+            if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+            
+        if (!skipConfirm) alert("Auto-packed cases reverted.");
+    } else {
+        if (!skipConfirm) alert("No auto-packed cases found.");
+    }
+};
+
+window.revertAutoArrange = function(leg) {
+    if (!confirm(`This will clear all automatically assigned truck placements for the ${leg} leg, returning items to staging. Proceed?`)) return;
+    let projectId = document.getElementById('edit-folder-id').value;
+    let payload = [];
+    
+    let stagingCursorX = 5;
+    let stagingCursorY = 5;
+    let stagingMaxRowW = 0;
+
+    currentProjectAssets.forEach(pa => {
+        let w = 60, l = 120;
+        let asset = globalAssets.find(a => a.id === pa.assetId);
+        if (asset && asset.dims) {
+            let pts = asset.dims.split(/[*xX]/);
+            if (pts.length >= 2) {
+                l = parseFloat(pts[0]);
+                w = parseFloat(pts[1]);
+                if (l > 0 && l < 15 && w > 0 && w < 15) { l *= 100; w *= 100; }
+            }
+        }
+        let maxDim = Math.max(l, w);
+        let minDim = Math.min(l, w);
+        
+        if (leg === 'outbound' && pa.outboundTruckUid) {
+            pa.outboundTruckUid = ""; pa.outboundX = null; pa.outboundY = null; pa.outboundZ = null; pa.outboundStaged = true;
+            if (pa.uid) {
+                if (stagingCursorX > 5 && stagingCursorX + maxDim > 295) { stagingCursorX = 5; stagingCursorY += stagingMaxRowW + 5; stagingMaxRowW = 0; }
+                payload.push({ paUid: pa.uid, truckUid: "", truckX: stagingCursorX, truckY: stagingCursorY, truckZ: 0, isRotated: false, isStaged: true });
+                stagingCursorX += maxDim + 5;
+                if (minDim > stagingMaxRowW) stagingMaxRowW = minDim;
+            }
+        }
+        if (leg === 'inbound' && pa.inboundTruckUid) {
+            pa.inboundTruckUid = ""; pa.inboundX = null; pa.inboundY = null; pa.inboundZ = null; pa.inboundStaged = true;
+            if (pa.uid) {
+                if (stagingCursorX > 5 && stagingCursorX + maxDim > 295) { stagingCursorX = 5; stagingCursorY += stagingMaxRowW + 5; stagingMaxRowW = 0; }
+                payload.push({ paUid: pa.uid, truckUid: "", truckX: stagingCursorX, truckY: stagingCursorY, truckZ: 0, isRotated: false, isStaged: true });
+                stagingCursorX += maxDim + 5;
+                if (minDim > stagingMaxRowW) stagingMaxRowW = minDim;
+            }
+        }
+    });
+    
+    if (payload.length > 0) google.script.run.saveTruckArrangementAPI(projectId, payload, leg, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+
+    // --- CLEANUP SHIFTS ---
+    let noteToMatch = leg === 'outbound' ? "⚠️ AUTO-OUTBOUND" : "⚠️ AUTO-INBOUND";
+    google.script.run.withSuccessHandler(data => {
+        if (data && data.shifts) {
+            let cleanShifts = data.shifts.filter(s => s.note !== noteToMatch);
+            google.script.run
+                .withSuccessHandler(res => {
+                    let finalRes = { status: res };
+                    try { if (typeof res === 'string' && res.startsWith('{')) finalRes = JSON.parse(res); } catch(e){}
+                    if (finalRes.timestamp && document.getElementById('edit-proj-version')) {
+                        document.getElementById('edit-proj-version').value = finalRes.timestamp;
+                    }
+                })
+                .saveTimelineData(projectId, 'main', cleanShifts, data.assigned || [], data.phases || [], data.overrides || {}, data.timestamp || '', typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+        }
+    }).getTimelineData(projectId, 'main');
+
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+    
+    if (!window.currentReadinessState) window.currentReadinessState = {};
+    window.currentReadinessState.truck = 'assigned';
+    google.script.run.updateProjectReadiness(projectId, JSON.stringify(window.currentReadinessState));
+    if (typeof calendar !== 'undefined' && calendar) {
+        let ev = calendar.getEventById(projectId);
+        if (ev) { let raw = ev.extendedProps.rawDbData; raw.readinessState = window.currentReadinessState; ev.setExtendedProp('rawDbData', raw); calendar.render(); }
+    }
+    
+    if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+
+    alert(`Truck manifests reverted to staging for ${leg}.`);
+};
+</script>

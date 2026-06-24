@@ -1,0 +1,870 @@
+<script>
+/**
+ * 06b1_Admin_Assets_Core.html
+ * Domain: Asset Registry Engine, Equipment Inventory, and Storage logic.
+ */
+
+let currentAssetFilter = 'ALL';
+let currentAssetSort = [{ col: 'tags', asc: true }, { col: 'name', asc: true }, { col: 'length', asc: true }];
+let selectedAssetIds = new Set();
+let lastSelectedAssetId = null;
+let currentEditAssetId = null;
+let currentEditAssetIds = [];
+window.isInlineAuditMode = false;
+window.auditFlags = [];
+window.hideAuditBlocks = false;
+
+window.auditTouchedFields = new Set();
+window.markAuditField = function(field) {
+    if (!window.isInlineAuditMode) return;
+    window.auditTouchedFields.add(field);
+    let el = document.getElementById('chk-' + field);
+    if (el && !el.innerHTML.includes('✓')) {
+        el.style.background = '#10b981';
+        el.innerHTML = el.innerHTML.replace('✖', '✓');
+    }
+};
+window.resetAuditChecklist = function() {
+    window.auditTouchedFields.clear();
+    document.querySelectorAll('.audit-chk-badge').forEach(el => {
+        el.style.background = '#ef4444';
+        el.innerHTML = el.innerHTML.replace('✓', '✖');
+    });
+    let panel = document.getElementById('audit-checklist-panel');
+    if (panel) panel.style.display = window.isInlineAuditMode ? 'block' : 'none';
+};
+
+// ==========================================
+// --- INLINE AUDIT & BULK REVIEW ENGINE ---
+// ==========================================
+// @INDEX: AUDIT_REGISTRY -> Bulk Review Toggles
+window.toggleReviewStatus = function(clickedIdsParam, targetStatus) {
+    let idsToProcess = new Set();
+    let clickedIds = String(clickedIdsParam).split(',');
+    
+    // Feature 1: If ANY clicked item is part of the current selection, apply to ALL selected items
+    let isClickingASelection = clickedIds.some(id => selectedAssetIds.has(id));
+    
+    if (isClickingASelection) {
+        selectedAssetIds.forEach(id => idsToProcess.add(id));
+        clickedIds.forEach(id => idsToProcess.add(id));
+    } else {
+        clickedIds.forEach(id => idsToProcess.add(id));
+    }
+    
+    let idArray = Array.from(idsToProcess);
+    
+    // Optimistic visual update so the UI doesn't lag while Google saves it
+    if (!window.reviewedAssetIds) window.reviewedAssetIds = new Set();
+    idArray.forEach(id => {
+        if (targetStatus) window.reviewedAssetIds.add(id);
+        else window.reviewedAssetIds.delete(id);
+    });
+    
+    if (typeof renderAssetRegistry === 'function') renderAssetRegistry();
+    
+    google.script.run
+        .withFailureHandler(err => { console.error("Review Status Failed:", err); })
+        .setAssetReviewedStatus(idArray, targetStatus, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+};
+
+function loadAssetRegistry() {
+    const container = document.getElementById('asset-list-container');
+    let isCachedRendered = false;
+    
+    try {
+        let cachedRaw = localStorage.getItem('sm_vault_cache');
+        if (cachedRaw) {
+            let cachedObj = JSON.parse(cachedRaw);
+            globalAssets = cachedObj.assets || [];
+            window.auditFlags = cachedObj.auditFlags || [];
+            window.reviewedAssetIds = new Set(cachedObj.reviewedAssetIds || []);
+            if (window.isInlineAuditMode && window.auditFlags.length > 0) currentAssetFilter = 'ALL';
+            renderAssetRegistry();
+            isCachedRendered = true;
+        }
+    } catch(e) {}
+
+    if (!isCachedRendered) {
+        container.innerHTML = '<div style="color:#10b981; padding:40px; text-align:center; font-weight:bold;">Decrypting Asset Vault...</div>';
+    }
+    
+    const fetchAssets = () => {
+        let p1 = new Promise((resolve, reject) => google.script.run.withFailureHandler(reject).withSuccessHandler(resolve).getAssetRegistry(ACTIVE_USER_NAME));
+        let p2 = new Promise((resolve, reject) => google.script.run.withFailureHandler(reject).withSuccessHandler(resolve).getAuditFlags());
+        let p3 = new Promise((resolve, reject) => google.script.run.withFailureHandler(reject).withSuccessHandler(resolve).getReviewedAssets());
+        
+        Promise.all([p1, p2, p3]).then(results => {
+            globalAssets = Array.isArray(results[0]) ? results[0] : [];
+            window.auditFlags = Array.isArray(results[1]) ? results[1] : [];
+            window.reviewedAssetIds = new Set(Array.isArray(results[2]) ? results[2] : []);
+            try { localStorage.setItem('sm_vault_cache', JSON.stringify({ assets: globalAssets, auditFlags: window.auditFlags, reviewedAssetIds: Array.from(window.reviewedAssetIds) })); } catch(e) {}
+            if (window.isInlineAuditMode && window.auditFlags.length > 0) currentAssetFilter = 'ALL';
+                renderAssetRegistry();
+        }).catch(err => {
+            container.innerHTML = `<div style="color:#ef4444; padding:40px; text-align:center; font-weight:bold;">Error loading assets:<br>${err.message}</div>`;
+        });
+    };
+    
+    if (typeof globalWhRoots === 'undefined' || !globalWhRoots || globalWhRoots.length === 0) {
+        let cachedWhRendered = false;
+        try {
+            let cachedWh = localStorage.getItem('sm_wh_cache');
+            if (cachedWh) {
+                let parsed = JSON.parse(cachedWh);
+                globalWhRoots = parsed.roots || [];
+                globalWhZones = parsed.zones || [];
+                globalWhAreas = parsed.areas || [];
+                if (globalWhRoots.length > 0) {
+                    cachedWhRendered = true;
+                    fetchAssets();
+                }
+            }
+        } catch(e) {}
+        
+        if (!cachedWhRendered) {
+            google.script.run
+                .withFailureHandler(err => fetchAssets()) 
+                .withSuccessHandler(res => {
+                    globalWhRoots = res.roots || [];
+                    globalWhZones = res.zones || [];
+                    globalWhAreas = res.areas || [];
+                    try { localStorage.setItem('sm_wh_cache', JSON.stringify({roots: globalWhRoots, zones: globalWhZones, areas: globalWhAreas})); } catch(e) {}
+                    fetchAssets();
+                }).getWarehouseData();
+        }
+    } else {
+        fetchAssets();
+    }
+}
+
+// @INDEX: ASSET_REGISTRY -> Render Equipment Vault
+function renderAssetRegistry() {
+    const container = document.getElementById('asset-list-container');
+    if (!globalAssets || globalAssets.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding: 40px; color: #888;">No assets found in the registry.</div>';
+        return;
+    }
+
+    if (typeof ASSET_COL_VISIBILITY['qty'] === 'undefined') {
+        ASSET_COL_VISIBILITY['qty'] = true;
+        ASSET_COL_WIDTHS['qty'] = '60px';
+    }
+    if (!ASSET_COL_ORDER.includes('qty')) ASSET_COL_ORDER.splice(1, 0, 'qty');
+
+    if (typeof ASSET_COL_VISIBILITY['level'] === 'undefined') {
+        ASSET_COL_VISIBILITY['level'] = false;
+        ASSET_COL_WIDTHS['level'] = '60px';
+    }
+    if (!ASSET_COL_ORDER.includes('level')) ASSET_COL_ORDER.splice(10, 0, 'level');
+
+    if (typeof ASSET_COL_VISIBILITY['length'] === 'undefined') {
+        ASSET_COL_VISIBILITY['length'] = false;
+        ASSET_COL_WIDTHS['length'] = '80px';
+    }
+    if (!ASSET_COL_ORDER.includes('length')) ASSET_COL_ORDER.splice(5, 0, 'length');
+
+    if (typeof ASSET_COL_VISIBILITY['serial'] === 'undefined') {
+        ASSET_COL_VISIBILITY['serial'] = false;
+        ASSET_COL_WIDTHS['serial'] = '100px';
+    }
+    if (!ASSET_COL_ORDER.includes('serial')) ASSET_COL_ORDER.splice(4, 0, 'serial');
+
+    if (typeof ASSET_COL_VISIBILITY['vendor'] === 'undefined') {
+        ASSET_COL_VISIBILITY['vendor'] = false;
+        ASSET_COL_WIDTHS['vendor'] = '100px';
+    }
+    if (!ASSET_COL_ORDER.includes('vendor')) ASSET_COL_ORDER.splice(20, 0, 'vendor');
+
+    Object.keys(ASSET_COL_WIDTHS).forEach(k => {
+        container.style.setProperty(`--col-w-${k}`, ASSET_COL_WIDTHS[k]);
+    });
+    
+    let filtered = globalAssets;
+    if (currentAssetFilter === 'Physical') filtered = globalAssets.filter(a => (a.nestingLevel !== undefined ? a.nestingLevel : 6) == 6);
+    else if (currentAssetFilter === 'Bundles') filtered = globalAssets.filter(a => a.nestingLevel == 5);
+    else if (currentAssetFilter === 'Kits') filtered = globalAssets.filter(a => a.nestingLevel == 3 && (a.components && a.components.trim() !== ''));
+    else if (currentAssetFilter === 'Cases') filtered = globalAssets.filter(a => a.nestingLevel == 3 && (!a.components || a.components.trim() === ''));
+    else if (currentAssetFilter === 'Presets') filtered = globalAssets.filter(a => a.nestingLevel == 2);
+    
+    if (filtered.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding: 40px; color: #888;">No assets match this filter.</div>';
+        return;
+    }
+
+    let nameQuery = document.getElementById('search-name') ? document.getElementById('search-name').value.toLowerCase() : '';
+    let tagQuery = document.getElementById('search-tag') ? document.getElementById('search-tag').value.toLowerCase() : '';
+
+    const matchesSearch = (a) => {
+        let match = true;
+        if (nameQuery) {
+            let searchableText = `${a.name} ${a.length ? a.length + 'm' : ''} ${a.manufacturer || ''}`.toLowerCase();
+            let terms = nameQuery.trim().split(/\s+/);
+            if (!terms.every(t => searchableText.includes(t))) match = false;
+        }
+        if (tagQuery) {
+            let tagsArr = [];
+            try { 
+                let parsed = JSON.parse(a.tags || '[]'); 
+                tagsArr = Array.isArray(parsed) ? parsed : [parsed];
+            } catch(e){}
+            let hasTag = tagsArr.some(tId => {
+                let tObj = getTagObj(tId);
+                return tObj && tObj.name.toLowerCase().includes(tagQuery);
+            });
+            if (!hasTag) match = false;
+        }
+        return match;
+    };
+
+    let searchFiltered = filtered.filter(matchesSearch);
+    
+    let warningEl = document.getElementById('search-filter-warning');
+    if (warningEl) {
+        if ((nameQuery || tagQuery) && currentAssetFilter !== 'ALL' && globalAssets.filter(matchesSearch).length > searchFiltered.length) {
+            warningEl.style.display = 'block';
+        } else {
+            warningEl.style.display = 'none';
+        }
+    }
+    
+    searchFiltered.sort((a, b) => {
+        if (!Array.isArray(currentAssetSort)) currentAssetSort = [{ col: currentAssetSort.col || 'tags', asc: currentAssetSort.asc !== false }];
+        
+        for (let i = 0; i < currentAssetSort.length; i++) {
+            let sortObj = currentAssetSort[i];
+            let valA = '', valB = '';
+            if (sortObj.col === 'name') { valA = String(a.name || '').toLowerCase(); valB = String(b.name || '').toLowerCase(); }
+            else if (sortObj.col === 'qty') { valA = parseInt(a.totalQuantity) || 1; valB = parseInt(b.totalQuantity) || 1; }
+            else if (sortObj.col === 'unit') { valA = parseInt(a.unitNumber) || 0; valB = parseInt(b.unitNumber) || 0; }
+            else if (sortObj.col === 'rfid') { valA = String(a.rfidTag || '').toLowerCase(); valB = String(b.rfidTag || '').toLowerCase(); }
+            else if (sortObj.col === 'brand') { valA = String(a.manufacturer || '').toLowerCase(); valB = String(b.manufacturer || '').toLowerCase(); }
+            else if (sortObj.col === 'length') { valA = parseFloat(a.length) || 0; valB = parseFloat(b.length) || 0; }
+            else if (sortObj.col === 'serial') { valA = String(a.serialNumber || '').toLowerCase(); valB = String(b.serialNumber || '').toLowerCase(); }
+            else if (sortObj.col === 'vendor') { valA = String(a.vendorUid || '').toLowerCase(); valB = String(b.vendorUid || '').toLowerCase(); }
+            else if (sortObj.col === 'location') { 
+                const getLoc = (x) => {
+                    if (!x.whId || typeof globalWhRoots === 'undefined') return '-';
+                    let wh = globalWhRoots.find(w=>w.id===x.whId); if(!wh) return '-'; let s = wh.name;
+                    let z = typeof globalWhZones !== 'undefined' ? globalWhZones.find(zx=>zx.id===x.zoneId) : null;
+                    let ar = typeof globalWhAreas !== 'undefined' ? globalWhAreas.find(ax=>ax.id===x.areaId) : null;
+                    if(z) s += ' / ' + z.name;
+                    if(ar) s += ' / ' + ar.name;
+                    return s;
+                };
+                valA = getLoc(a).toLowerCase(); 
+                valB = getLoc(b).toLowerCase(); 
+            }
+            else if (sortObj.col === 'type') { valA = String(a.type || '').toLowerCase(); valB = String(b.type || '').toLowerCase(); }
+            else if (sortObj.col === 'level') { valA = a.nestingLevel !== undefined ? a.nestingLevel : 6; valB = b.nestingLevel !== undefined ? b.nestingLevel : 6; }
+            else if (sortObj.col === 'status') { valA = String(a.status || '').toLowerCase(); valB = String(b.status || '').toLowerCase(); }
+            else if (sortObj.col === 'weight') { valA = parseFloat(a.weight) || 0; valB = parseFloat(b.weight) || 0; }
+            else if (sortObj.col === 'capacity') { valA = parseInt(a.capacity) || 0; valB = parseInt(b.capacity) || 0; }
+            else if (sortObj.col === 'power') { valA = parseFloat(a.power) || 0; valB = parseFloat(b.power) || 0; }
+            else if (sortObj.col === 'price') { valA = parseFloat(a.price) || 0; valB = parseFloat(b.price) || 0; }
+            else if (sortObj.col === 'rental') { valA = parseFloat(a.rental) || 0; valB = parseFloat(b.rental) || 0; }
+            else if (sortObj.col === 'dateBought') { valA = String(a.dateBought || '').toLowerCase(); valB = String(b.dateBought || '').toLowerCase(); }
+            else if (sortObj.col === 'lastService') { valA = String(a.lastService || '').toLowerCase(); valB = String(b.lastService || '').toLowerCase(); }
+            else if (sortObj.col === 'interval') { valA = parseInt(a.serviceInterval) || 0; valB = parseInt(b.serviceInterval) || 0; }
+            else if (sortObj.col === 'dept') { valA = String(getDeptObj(a.department).name || '').toLowerCase(); valB = String(getDeptObj(b.department).name || '').toLowerCase(); }
+            else if (sortObj.col === 'tags') {
+                const getT = (x) => { try { let t=JSON.parse(x.tags||'[]'); if(t.length>0){ let idSet=new Set(t); let leafIds=t.filter(id=>{let node=getTagObj(id); if(!node||!node.children||node.children.length===0)return true; return !node.children.some(c=>idSet.has(c.id));}); if(leafIds.length===0) leafIds=t; let paths=leafIds.map(lId=>{let path=getTagPathById(lId); return path?path.map(id=>{let o=getTagObj(id); return o?o.name:'';}).join(' > '):'';}); return paths.sort().join(' | '); } }catch(e){} return ''; };
+                valA = getT(a).toLowerCase(); valB = getT(b).toLowerCase();
+            }
+            else if (sortObj.col === 'dims') { valA = String(a.dims || '').toLowerCase(); valB = String(b.dims || '').toLowerCase(); }
+            
+            if (valA < valB) return sortObj.asc ? -1 : 1;
+            if (valA > valB) return sortObj.asc ? 1 : -1;
+        }
+        
+        const getFallbackT = (x) => { try { let t=JSON.parse(x.tags||'[]'); if(t.length>0){ let idSet=new Set(t); let leafIds=t.filter(id=>{let node=getTagObj(id); if(!node||!node.children||node.children.length===0)return true; return !node.children.some(c=>idSet.has(c.id));}); if(leafIds.length===0) leafIds=t; let paths=leafIds.map(lId=>{let path=getTagPathById(lId); return path?path.map(id=>{let o=getTagObj(id); return o?o.name:'';}).join(' > '):'';}); return paths.sort().join(' | '); } }catch(e){} return ''; };
+        let tA = getFallbackT(a).toLowerCase(), tB = getFallbackT(b).toLowerCase();
+        if (tA < tB) return -1; if (tA > tB) return 1;
+        let nA = String(a.name || '').toLowerCase(), nB = String(b.name || '').toLowerCase();
+        if (nA < nB) return -1; if (nA > nB) return 1;
+        let lA = parseFloat(a.length)||0, lB = parseFloat(b.length)||0;
+        if (lA < lB) return -1; if (lA > lB) return 1;
+        return 0;
+    });
+
+    let byDept = {};
+    searchFiltered.forEach(a => {
+        let flag = null;
+        if (window.isInlineAuditMode && !window.hideAuditBlocks) {
+            flag = window.auditFlags.find(f => String(f.assetId) === String(a.id));
+            if (flag) {
+                if (flag.conflictType === 'DATA EXTRACTION' && !window.auditToggleExtractor) flag = null;
+                else if (flag.conflictType !== 'DATA EXTRACTION' && !window.auditToggleFuzzy) flag = null;
+            }
+        }
+        
+        if (flag) {
+            let d = 'merge_group_' + flag.groupId;
+            if (!byDept[d]) byDept[d] = [];
+            byDept[d].push(a);
+        } else {
+            let dObj = getDeptObj(a.department);
+            let d = dObj.uid || 'Unassigned';
+            if (!byDept[d]) byDept[d] = [];
+            byDept[d].push(a);
+        }
+    });
+    
+    const getIcon = (col) => {
+        if (!Array.isArray(currentAssetSort)) return currentAssetSort.col === col ? (currentAssetSort.asc ? ' ▲' : ' ▼') : '';
+        let sortIdx = currentAssetSort.findIndex(s => s.col === col);
+        if (sortIdx === -1) return '';
+        let numStr = currentAssetSort.length > 1 ? ` <span style="font-size:8px; opacity:0.7;">${sortIdx + 1}</span>` : '';
+        return (currentAssetSort[sortIdx].asc ? ' ▲' : ' ▼') + numStr;
+    };
+
+    const colsDef = [
+      { key: 'name', label: 'Name', sortable: true },
+      { key: 'qty', label: 'Qty', sortable: true },
+      { key: 'unit', label: 'Unit', sortable: true },
+      { key: 'rfid', label: 'RFID Tag', sortable: true },
+      { key: 'serial', label: 'Serial No.', sortable: true },
+      { key: 'brand', label: 'Brand', sortable: true },
+      { key: 'length', label: 'Length (m)', sortable: true },
+      { key: 'location', label: 'Location', sortable: true },
+      { key: 'tags', label: 'Tags', sortable: true },
+      { key: 'type', label: 'Type', sortable: true },
+      { key: 'level', label: 'Level', sortable: true, center: true },
+      { key: 'weight', label: 'Weight', sortable: true },
+      { key: 'dims', label: 'Dims', sortable: true },
+      { key: 'capacity', label: 'Cap.', sortable: true },
+      { key: 'power', label: 'Power', sortable: true },
+      { key: 'price', label: 'Price', sortable: true },
+      { key: 'rental', label: 'Rental', sortable: true },
+      { key: 'dateBought', label: 'Bought', sortable: true },
+      { key: 'lastService', label: 'Service', sortable: true },
+      { key: 'interval', label: 'Interval', sortable: true },
+      { key: 'dept', label: 'Dept', sortable: true },
+      { key: 'vendor', label: 'Vendor', sortable: true },
+      { key: 'status', label: 'Status', sortable: true, center: true },
+      { key: 'action', label: 'Action', sortable: false, center: true }
+    ];
+
+    if (!window.GridEngine.configs['vault']) {
+        window.GridEngine.registerGrid('vault', colsDef);
+    }
+    
+    // ALWAYS sync from globals so asynchronous server payloads correctly override defaults
+    let conf = window.GridEngine.configs['vault'];
+    conf.order = ASSET_COL_ORDER.slice();
+    if (typeof ASSET_COL_GAPS === 'undefined') window.ASSET_COL_GAPS = {};
+    ASSET_COL_ORDER.forEach(k => {
+        if (!conf.cols[k]) conf.cols[k] = {};
+        conf.cols[k].w = parseInt(ASSET_COL_WIDTHS[k]) || 100;
+        conf.cols[k].vis = ASSET_COL_VISIBILITY[k] !== false;
+        conf.cols[k].mL = parseInt(ASSET_COL_GAPS[k]) || 0;
+    });
+    
+    let gridConf = window.GridEngine.configs['vault'];
+    let visibleCols = gridConf.order.filter(k => gridConf.cols[k].vis);
+    
+    let dynamicCss = window.GridEngine.buildCSS('vault');
+    if (dynamicCss && !document.getElementById('style-grid-vault')) {
+        document.head.insertAdjacentHTML('beforeend', dynamicCss);
+    }
+
+    let auditBar = '';
+    if (window.isInlineAuditMode) {
+        let suggBtnStyle = window.hideAuditBlocks ? "border-color:#a855f7; color:#a855f7; margin:0; background:transparent;" : "border-color:#a855f7; color:#fff; margin:0; background:#a855f7;";
+        let suggBtnText = window.hideAuditBlocks ? "SUGGESTIONS: HIDDEN" : "SUGGESTIONS: VISIBLE";
+
+        let extBtnStyle = window.auditToggleExtractor ? "border-color:#f59e0b; color:#000; margin:0; background:#f59e0b;" : "border-color:#10b981; color:#10b981; margin:0; background:transparent;";
+        let fuzzyBtnStyle = window.auditToggleFuzzy ? "border-color:#f59e0b; color:#000; margin:0; background:#f59e0b;" : "border-color:#3b82f6; color:#3b82f6; margin:0; background:transparent;";
+
+        auditBar = `
+        <div style="padding:12px 25px; background:#18181b; border-bottom:2px solid #f59e0b; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; z-index:50;">
+           <div style="color:#f59e0b; font-weight:900; letter-spacing:1px; font-size:14px;">INLINE AUDIT MODE ACTIVE</div>
+           <div style="display:flex; gap:10px; align-items:center;">
+               <div id="audit-scanner-status" style="color:#a1a1aa; font-size:11px; margin-right:15px;">Scanning auto-detects misspellings and fragmented Bulk items.</div>
+               <button class="btn-outline btn-sm" style="${suggBtnStyle}" onclick="window.hideAuditBlocks = !window.hideAuditBlocks; renderAssetRegistry();">${suggBtnText}</button>
+               <button id="btn-run-extractor" class="btn-outline btn-sm" style="${extBtnStyle}" onclick="window.toggleExtractor()">DATA EXTRACTOR</button>
+               <button id="btn-run-scanner" class="btn-outline btn-sm" style="${fuzzyBtnStyle}" onclick="window.toggleFuzzy()">FUZZY SCANNER</button>
+               <button id="btn-reset-flags" class="btn-outline btn-sm" style="border-color:#ef4444; color:#ef4444; margin:0; position:relative; overflow:hidden; user-select:none;" onmousedown="if(typeof window.startResetHold === 'function') window.startResetHold(event)" onmouseup="if(typeof window.cancelResetHold === 'function') window.cancelResetHold()" onmouseleave="if(typeof window.cancelResetHold === 'function') window.cancelResetHold()" ontouchstart="if(typeof window.startResetHold === 'function') window.startResetHold(event)" ontouchend="if(typeof window.cancelResetHold === 'function') window.cancelResetHold()"><div id="reset-progress" style="position:absolute; bottom:0; left:0; height:100%; width:0%; background:rgba(239,68,68,0.3); pointer-events:none; transition: width 0.1s linear;"></div><span style="position:relative; z-index:1; pointer-events:none;">HOLD TO RESET</span></button>
+           </div>
+        </div>`;
+    }
+
+    let headerHtml = window.GridEngine.buildHeader('vault', currentAssetSort[0]);
+    let html = auditBar + headerHtml;
+    
+    let sortedDepts = Object.keys(byDept).sort((a,b) => {
+        if (a.startsWith('merge_group_') && !b.startsWith('merge_group_')) return -1;
+        if (!a.startsWith('merge_group_') && b.startsWith('merge_group_')) return 1;
+        if (a.startsWith('merge_group_') && b.startsWith('merge_group_')) return a.localeCompare(b);
+        return getDeptObj(a).name.localeCompare(getDeptObj(b).name);
+    });
+    
+    const renderSingleAssetRow = (a, isChild = false) => {
+        let brand = a.manufacturer ? a.manufacturer : '-';
+        let color = a.status === 'Active' ? '#10b981' : (a.status === 'Maintenance' ? '#f59e0b' : '#ef4444');
+        let whName = '-';
+        if (a.whId && typeof globalWhRoots !== 'undefined') { 
+            let wh = globalWhRoots.find(w => w.id === a.whId); 
+            if (wh) { 
+                whName = wh.name; 
+                let z = typeof globalWhZones !== 'undefined' ? globalWhZones.find(x => x.id === a.zoneId) : null;
+                let ar = typeof globalWhAreas !== 'undefined' ? globalWhAreas.find(x => x.id === a.areaId) : null;
+                    if (z) whName += ' / ' + z.name;
+                    if (ar) whName += ' / ' + ar.name;
+            } 
+        }
+        
+        let displayTitle = a.unitNumber ? `${a.name} #${a.unitNumber}` : a.name;
+        let fs = typeof ASSET_FONT_SIZE !== 'undefined' ? ASSET_FONT_SIZE : 11;
+        let pad = typeof ASSET_ROW_PADDING !== 'undefined' ? ASSET_ROW_PADDING : 6;
+        let badgeFs = Math.max(8, fs - 2);
+        let selClass = selectedAssetIds.has(a.id) ? 'row-selected' : '';
+
+        let tagsArr = [];
+        try { tagsArr = JSON.parse(a.tags || '[]'); } catch(e){}
+        let tagHtml = buildTagPathsHtml(tagsArr, badgeFs);
+        let tagText = tagHtml.replace(/<[^>]*>/g, ' ').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+
+        let rowHtml = `<div class="asset-row ug-row ${selClass} vault-container" data-id="${a.id}" onclick="handleAssetRowClick(event, '${a.id}')" style="padding:${pad}px 15px; font-size: ${fs}px; cursor:pointer; user-select: none; -webkit-user-select: none;">`;
+        
+        visibleCols.forEach((key, idx) => {
+            let isLastDataCol = (idx === visibleCols.length - 2 && visibleCols[visibleCols.length - 1] === 'action');
+            let isActionCol = (key === 'action');
+            let widthStyle = isActionCol ? `width: var(--vault-w-${key}); margin-left: var(--vault-ml-${key}); flex-shrink: 0; text-align:center; justify-content:center;` : `width: var(--vault-w-${key}); margin-left: var(--vault-ml-${key}); flex-shrink: 1; min-width: 0px;`;
+            
+            if (key === 'name') {
+                let pLeft = isChild ? 'padding-left:14px; box-sizing:border-box;' : '';
+                rowHtml += `<div style="${widthStyle} ${pLeft} color:#fff; font-weight:bold; font-size:${fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${a.name}">${a.name}</div>`;
+            }
+            else if (key === 'qty') {
+                if (a.isConsumable === true || a.isConsumable === 'true') {
+                    rowHtml += `<div style="${widthStyle} color:#f59e0b; font-weight:bold; font-size:${badgeFs}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center;"><span style="background:rgba(245,158,11,0.2); border:1px solid #f59e0b; padding:2px 4px; border-radius:4px;">CONSUMABLE</span></div>`;
+                } else {
+                    rowHtml += `<div style="${widthStyle} color:#fff; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.type === 'Bulk' ? (a.totalQuantity || 1) : 1}</div>`;
+                }
+            }
+            else if (key === 'unit') rowHtml += `<div style="${widthStyle} color:#a1a1aa; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${a.unitNumber}">${a.unitNumber ? '#' + a.unitNumber : '-'}</div>`;
+            else if (key === 'rfid') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${a.rfidTag}">${a.rfidTag || '-'}</div>`;
+        else if (key === 'serial') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${a.serialNumber}">${a.serialNumber || '-'}</div>`;
+            else if (key === 'brand') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${brand}">${brand}</div>`;
+            else if (key === 'length') rowHtml += `<div style="${widthStyle} color:#fff; font-weight:bold; font-size:${fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.length ? a.length + 'm' : '-'}</div>`;
+            else if (key === 'location') rowHtml += `<div onmouseenter="showAssetMiniMap(event, '${a.zoneId || ''}', '${a.areaId || ''}')" onmouseleave="hideAssetMiniMap()" style="${widthStyle} color:#888; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:${a.zoneId ? 'help' : 'default'};" title="${whName}">${whName}</div>`;
+            else if (key === 'tags') rowHtml += `<div style="${widthStyle} white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center;" title="${tagText}">${tagHtml}</div>`;
+            else if (key === 'type') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.type || 'Physical'}</div>`;
+            else if (key === 'level') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;">${a.nestingLevel !== undefined ? a.nestingLevel : 6}</div>`;
+            else if (key === 'weight') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.weight || '-'}</div>`;
+            else if (key === 'dims') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dims || '-'}</div>`;
+            else if (key === 'capacity') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.capacity !== undefined ? a.capacity : '-'}</div>`;
+            else if (key === 'power') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.power || '-'}</div>`;
+            else if (key === 'price') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '$'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
+            else if (key === 'rental') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
+            else if (key === 'dateBought') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dateBought || '-'}</div>`;
+            else if (key === 'lastService') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.lastService || '-'}</div>`;
+            else if (key === 'interval') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.serviceInterval ? a.serviceInterval+' Mo' : '-'}</div>`;
+            else if (key === 'dept') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${getDeptObj(a.department).name || '-'}</div>`;
+        else if (key === 'vendor') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.vendorUid || 'Internal'}</div>`;
+            else if (key === 'status') rowHtml += `<div style="${widthStyle} text-align:center;"><span style="color:${color}; border:1px solid ${color}; padding:2px 4px; border-radius:4px; font-size:${badgeFs}px; font-weight:bold;">${(a.status || 'Active').toUpperCase()}</span></div>`;
+            else if (key === 'action') {
+                let reviewedDot = '';
+                if (window.isInlineAuditMode) {
+                    let isRev = window.reviewedAssetIds && window.reviewedAssetIds.has(a.id);
+                    let dotCol = isRev ? '#10b981' : '#ef4444';
+                    reviewedDot = `<div style="width:12px; height:12px; border-radius:50%; background:${dotCol}; cursor:pointer; flex-shrink:0; margin-left:2px;" title="${isRev ? 'Reviewed' : 'Needs Review'}" onclick="event.stopPropagation(); toggleReviewStatus('${a.id}', ${!isRev})"></div>`;
+                }
+                rowHtml += `<div style="${widthStyle} text-align:center; display: flex; gap: 4px; align-items: center;"><button class="btn-blue req-db_edit_assets" style="flex:1; margin:0; padding:4px 0 !important; font-size:${badgeFs}px;" onclick="event.stopPropagation(); openAssetModal('${a.id}')">EDIT</button><button class="btn-delete req-db_delete_assets" style="flex:1; margin:0; padding:4px 0 !important; font-size:${badgeFs}px;" onclick="event.stopPropagation(); deleteAsset('${a.id}', '${displayTitle.replace(/'/g, "\\'")}')">DEL</button>${reviewedDot}</div>`;
+            }
+            
+            if (isLastDataCol) {
+                rowHtml += `<div class="ug-flex-spacer" style="flex: 1; min-width: 0px;"></div>`;
+            }
+        });
+
+        rowHtml += `</div>`;
+        return rowHtml;
+    };
+
+    for (let deptUid of sortedDepts) {
+        if (deptUid.startsWith('merge_group_')) {
+            let groupId = deptUid.replace('merge_group_', '');
+            let flagObj = window.auditFlags.find(f => f.groupId === groupId);
+            let cType = flagObj ? flagObj.conflictType : 'DUPLICATES';
+            
+            let isExt = cType === 'DATA EXTRACTION';
+            let color = isExt ? '#eab308' : '#f59e0b';
+            let btnAction = isExt ? `openExtractionReview('${groupId}')` : `openSmartMerge('${groupId}')`;
+            let btnText = isExt ? 'REVIEW EXTRACTION' : 'COMPARE & MERGE';
+            let titlePrefix = isExt ? 'SUGGESTION' : 'CONFLICT';
+            
+            html += `<div style="background: rgba(${isExt ? '234, 179, 8' : '245, 158, 11'}, 0.1); color: ${color}; border: 1px solid ${color}; border-right: none; border-left: none; padding: 10px 25px; font-size: 11px; font-weight: 900; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; margin-top: 5px; width: 100%; box-sizing: border-box;">
+                        <span>${titlePrefix}: ${cType}</span>
+                        <button class="btn-main btn-sm" style="margin:0; background:${color} !important; border-color:${color} !important; color:#000 !important;" onclick="${btnAction}">${btnText}</button>
+                     </div>
+                     <div style="width: 100%; box-sizing: border-box; border-left: 2px solid ${color};">`;
+            byDept[deptUid].forEach(a => { html += renderSingleAssetRow(a, false); });
+            html += `</div>`;
+            continue;
+        }
+        
+        let deptObj = getDeptObj(deptUid);
+        let deptName = deptObj.name;
+        let safeDept = (deptUid || 'Unassigned').replace(/\s+/g, '-');
+        html += `<div class="asset-dept-header" onclick="toggleAssetDept('${safeDept}')" style="background: #1f1f23; color: #fff; cursor: pointer; border: 1px solid ${deptObj.color}; border-right: none; border-left: none; padding: 10px 25px; font-size: 11px; font-weight: 900; text-transform: uppercase; display: flex; align-items: center; margin-top: 5px; width: 100%; box-sizing: border-box;">
+                    <span id="icon-asset-${safeDept}" style="margin-right: 10px; display: inline-block; width: 12px;">▼</span> ${deptName}
+                 </div>
+                 <div id="asset-group-${safeDept}" style="width: 100%; box-sizing: border-box;">`;
+                 
+        let groups = [];
+        let groupMap = {};
+        byDept[deptUid].forEach(a => {
+            let key = (a.name || 'Unnamed') + '|' + (a.manufacturer || '') + '|' + (a.length || '');
+            if (a.type === 'Bulk') key += '|' + a.id;
+            if (!groupMap[key]) {
+                groupMap[key] = [];
+                groups.push({ key: key, items: groupMap[key] });
+            }
+            groupMap[key].push(a);
+        });
+
+        for (let g of groups) {
+            let items = g.items;
+            if (items.length === 1) {
+                html += renderSingleAssetRow(items[0], false);
+            } else {
+                let rollId = 'roll-' + items[0].id;
+                let a = items[0];
+                let brand = a.manufacturer ? a.manufacturer : '-';
+                
+                let isMixedStatus = !items.every(x => x.status === a.status);
+                let pStatus = isMixedStatus ? 'Mixed' : (a.status || 'Active');
+                let pColor = pStatus === 'Active' ? '#10b981' : (pStatus === 'Maintenance' ? '#f59e0b' : (pStatus === 'Mixed' ? '#888' : '#ef4444'));
+
+                let isMixedLoc = !items.every(x => x.whId === a.whId && x.zoneId === a.zoneId);
+                let whName = isMixedLoc ? 'Mixed Locations' : '-';
+                if (!isMixedLoc && a.whId && typeof globalWhRoots !== 'undefined') {
+                    let wh = globalWhRoots.find(w => w.id === a.whId);
+                    if (wh) {
+                        whName = wh.name;
+                        let z = typeof globalWhZones !== 'undefined' ? globalWhZones.find(x => x.id === a.zoneId) : null;
+                        let ar = typeof globalWhAreas !== 'undefined' ? globalWhAreas.find(x => x.id === a.areaId) : null;
+                        if (z) whName += ' / ' + z.name;
+                        if (ar) whName += ' / ' + ar.name;
+                    }
+                }
+
+                let fs = typeof ASSET_FONT_SIZE !== 'undefined' ? ASSET_FONT_SIZE : 11;
+                let pad = typeof ASSET_ROW_PADDING !== 'undefined' ? ASSET_ROW_PADDING : 6;
+                let badgeFs = Math.max(8, fs - 2);
+
+                let tagSet = new Map();
+                items.forEach(x => { 
+                    try { 
+                        let tArr = JSON.parse(x.tags || '[]'); 
+                        tArr.forEach(tId => { 
+                            let tObj = getTagObj(tId);
+                            if(tObj && !tagSet.has(tId)) tagSet.set(tId, tObj); 
+                        });
+                    } catch(e){}
+                });
+                let tagHtml = buildTagPathsHtml(Array.from(tagSet.keys()), badgeFs);
+                let tagText = tagHtml.replace(/<[^>]*>/g, ' ').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+
+                let idsStr = items.map(x => x.id).join(',');
+                let safeName = a.name.replace(/'/g, "\\'");
+
+                let sumQty = items.reduce((sum, x) => sum + (x.type === 'Bulk' ? (parseInt(x.totalQuantity)||1) : 1), 0);
+
+                let mBadge = `<span style="color:#eab308; font-weight:bold;" title="Multiple Unique Values">M</span>`;
+                let isMixedLength = !items.every(x => x.length === a.length);
+                let pLengthText = isMixedLength ? mBadge : (a.length ? a.length + 'm' : '-');
+
+                let isGroupSelected = items.every(item => selectedAssetIds.has(item.id));
+                let grpSelClass = isGroupSelected ? 'row-selected' : '';
+                html += `<div class="asset-row parent-row ug-row vault-container ${grpSelClass}" data-id="${idsStr}" data-rollid="${rollId}" onclick="handleAssetRowClick(event, '${idsStr}')" style="padding:${pad}px 15px; font-size: ${fs}px; border-bottom:2px solid #1a1a1e; background: #151518; cursor:pointer;">`;
+
+                visibleCols.forEach((key, idx) => {
+                    let isLastDataCol = (idx === visibleCols.length - 2 && visibleCols[visibleCols.length - 1] === 'action');
+                    let isActionCol = (key === 'action');
+                    let widthStyle = isActionCol ? `width: var(--vault-w-${key}); margin-left: var(--vault-ml-${key}); flex-shrink: 0; text-align:center; justify-content:center;` : `width: var(--vault-w-${key}); margin-left: var(--vault-ml-${key}); flex-shrink: 1; min-width: 0px;`;
+
+                    if (key === 'name') html += `<div style="${widthStyle} display:flex; align-items:center;"><div id="icon-${rollId}" onclick="event.stopPropagation(); toggleRollup('${rollId}')" style="cursor:pointer; width:14px; text-align:center; color:#e4e4e7; flex-shrink:0; margin-left:-14px; margin-right:4px;" title="Expand/Collapse">▶</div><div style="flex:1; color:#fff; font-weight:bold; font-size:${fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${a.name}">${a.name}</div></div>`;
+                else if (key === 'qty') html += `<div style="${widthStyle} color:#fff; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sumQty}</div>`;
+                    else if (key === 'unit') html += `<div style="${widthStyle} display:flex; align-items:center;">${mBadge}</div>`;
+                    else if (key === 'rfid') html += `<div style="${widthStyle} display:flex; align-items:center;">${mBadge}</div>`;
+                else if (key === 'serial') html += `<div style="${widthStyle} display:flex; align-items:center;">${mBadge}</div>`;
+                    else if (key === 'brand') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${brand}">${brand}</div>`;
+                else if (key === 'length') html += `<div style="${widthStyle} color:#fff; font-weight:bold; font-size:${isMixedLength ? fs : fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${pLengthText}</div>`;
+                    else if (key === 'location') {
+                        let hoverEvts = (!isMixedLoc && a.zoneId) ? `onmouseenter="showAssetMiniMap(event, '${a.zoneId || ''}', '${a.areaId || ''}')" onmouseleave="hideAssetMiniMap()"` : '';
+                        let curStyle = (!isMixedLoc && a.zoneId) ? 'cursor:help;' : '';
+                        html += `<div ${hoverEvts} style="${widthStyle} color:${isMixedLoc ? '#e4e4e7' : '#888'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; ${curStyle}" title="${whName}">${whName}</div>`;
+                    }
+                    else if (key === 'tags') html += `<div style="${widthStyle} white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center;" title="${tagText}">${tagHtml}</div>`;
+                    else if (key === 'type') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.type || 'Physical'}</div>`;
+                    else if (key === 'level') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;">${a.nestingLevel !== undefined ? a.nestingLevel : 6}</div>`;
+                    else if (key === 'weight') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.weight || '-'}</div>`;
+                    else if (key === 'dims') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dims || '-'}</div>`;
+                    else if (key === 'capacity') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.capacity !== undefined ? a.capacity : '-'}</div>`;
+                    else if (key === 'power') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.power || '-'}</div>`;
+                    else if (key === 'price') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '$'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
+                    else if (key === 'rental') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
+                    else if (key === 'dateBought') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dateBought || '-'}</div>`;
+                    else if (key === 'lastService') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.lastService || '-'}</div>`;
+                    else if (key === 'interval') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.serviceInterval ? a.serviceInterval+' Mo' : '-'}</div>`;
+                    else if (key === 'dept') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${getDeptObj(a.department).name || '-'}</div>`;
+                else if (key === 'vendor') html += `<div style="${widthStyle} display:flex; align-items:center;">${mBadge}</div>`;
+                    else if (key === 'status') html += `<div style="${widthStyle} text-align:center;"><span style="color:${pColor}; border:1px solid ${pColor}; padding:2px 4px; border-radius:4px; font-size:${badgeFs}px; font-weight:bold;">${pStatus.toUpperCase()}</span></div>`;
+                    else if (key === 'action') {
+                        let reviewedDot = '';
+                        if (window.isInlineAuditMode) {
+                            let isRev = items.every(x => window.reviewedAssetIds && window.reviewedAssetIds.has(x.id));
+                            let dotCol = isRev ? '#10b981' : '#ef4444';
+                            reviewedDot = `<div style="width:12px; height:12px; border-radius:50%; background:${dotCol}; cursor:pointer; flex-shrink:0; margin-left:2px;" title="${isRev ? 'All Reviewed' : 'Needs Review'}" onclick="event.stopPropagation(); toggleReviewStatus('${idsStr}', ${!isRev})"></div>`;
+                        }
+                        html += `<div style="${widthStyle} text-align:center; display: flex; gap: 4px; align-items: center;"><button class="btn-blue req-db_edit_assets" style="flex:1; margin:0; padding:4px 0 !important; font-size:${badgeFs}px; opacity:0.8;" onclick="event.stopPropagation(); editAssetGroup('${idsStr}')">EDIT</button><button class="btn-delete req-db_delete_assets" style="flex:1; margin:0; padding:4px 0 !important; font-size:${badgeFs}px; opacity:0.8;" onclick="event.stopPropagation(); deleteAssetGroup('${idsStr}', '${safeName}')">DEL</button>${reviewedDot}</div>`;
+                    }
+                    
+                    if (isLastDataCol) {
+                        html += `<div class="ug-flex-spacer" style="flex: 1; min-width: 0px;"></div>`;
+                    }
+                });
+                html += `</div>`;
+
+                html += `<div id="child-group-${rollId}" style="display: none; border-left: 2px solid #e4e4e7; margin-left: 6px; padding-left: 6px; background: rgba(255, 255, 255, 0.05); width: 100%; box-sizing: border-box;">`;
+                items.forEach(child => {
+                    html += renderSingleAssetRow(child, true);
+                });
+                html += `</div>`;
+            }
+        }
+        html += `</div>`;
+    }
+    container.innerHTML = html;
+}
+
+function showAssetMiniMap(e, zoneId, areaId) {
+    if (!zoneId) return;
+    let z = globalWhZones.find(x => x.id === zoneId);
+    if (!z || !z.points || z.points.length === 0) return;
+    let zAreas = globalWhAreas.filter(a => a.zoneId === zoneId);
+    let minX = Math.min(...z.points.map(p=>p.x)), maxX = Math.max(...z.points.map(p=>p.x));
+    let minY = Math.min(...z.points.map(p=>p.y)), maxY = Math.max(...z.points.map(p=>p.y));
+    zAreas.forEach(a => {
+        if (a.points && a.points.length > 0) {
+            minX = Math.min(minX, ...a.points.map(p=>p.x)); maxX = Math.max(maxX, ...a.points.map(p=>p.x));
+            minY = Math.min(minY, ...a.points.map(p=>p.y)); maxY = Math.max(maxY, ...a.points.map(p=>p.y));
+        }
+    });
+    let pW = maxX - minX; let pH = maxY - minY;
+    if (pW === 0 || pH === 0) return;
+    let pad = Math.max(pW, pH) * 0.05; 
+    let viewBox = `${minX - pad} ${minY - pad} ${pW + pad*2} ${pH + pad*2}`;
+    let svg = `<svg width="200" height="120" viewBox="${viewBox}" style="background:#111; border:1px solid #444; border-radius:4px; box-shadow:0 4px 12px rgba(0,0,0,0.8); display:block;">`;
+    let zPts = z.points.map(p => `${p.x},${p.y}`).join(' ');
+    svg += `<polygon points="${zPts}" style="fill:rgba(59,130,246,0.1); stroke:#3b82f6; stroke-width:${Math.max(1, pW*0.005)};" />`;
+    zAreas.forEach(a => {
+        if(a.points && a.points.length > 0) {
+            let aPts = a.points.map(p => `${p.x},${p.y}`).join(' ');
+            let isTarget = (a.id === areaId);
+            let baseColor = '#10b981';
+            if (a.department && typeof SYSTEM_DEPARTMENTS !== 'undefined') {
+                let dObj = getDeptObj(a.department);
+                if (dObj && dObj.uid) baseColor = dObj.color;
+            }
+            let r = parseInt(baseColor.slice(1, 3), 16) || 16;
+            let g = parseInt(baseColor.slice(3, 5), 16) || 185;
+            let b = parseInt(baseColor.slice(5, 7), 16) || 129;
+            let fill = isTarget ? `rgba(${r},${g},${b},0.8)` : `rgba(255,255,255,0.05)`;
+            let stroke = isTarget ? '#ffffff' : '#555555';
+            let sw = isTarget ? Math.max(2, pW*0.01) : Math.max(1, pW*0.005);
+            let textColor = isTarget ? '#ffffff' : '#777777';
+            svg += `<polygon points="${aPts}" style="fill:${fill}; stroke:${stroke}; stroke-width:${sw};" />`;
+            let aMinX = Math.min(...a.points.map(p=>p.x)), aMaxX = Math.max(...a.points.map(p=>p.x));
+            let aMinY = Math.min(...a.points.map(p=>p.y)), aMaxY = Math.max(...a.points.map(p=>p.y));
+            let cx = aMinX + (aMaxX - aMinX)/2; let cy = aMinY + (aMaxY - aMinY)/2;
+            let fontSize = Math.max(3, (aMaxX - aMinX) * 0.15);
+            svg += `<text x="${cx}" y="${cy}" style="fill:${textColor}; font-size:${fontSize}px; font-family:sans-serif; font-weight:bold; pointer-events:none; text-anchor:middle; dominant-baseline:middle;">${a.name}</text>`;
+        }
+    });
+    svg += `</svg>`;
+    let tooltip = document.getElementById('asset-mini-map-tooltip');
+    if (!tooltip) { tooltip = document.createElement('div'); tooltip.id = 'asset-mini-map-tooltip'; tooltip.style.position = 'fixed'; tooltip.style.zIndex = '99999'; tooltip.style.pointerEvents = 'none'; document.body.appendChild(tooltip); }
+    tooltip.innerHTML = svg;
+    let left = e.clientX + 15; let top = e.clientY + 15;
+    if (left + 200 > window.innerWidth) left = e.clientX - 200 - 15;
+    if (top + 120 > window.innerHeight) top = e.clientY - 120 - 15;
+    tooltip.style.left = left + 'px'; tooltip.style.top = top + 'px'; tooltip.style.display = 'block';
+}
+function hideAssetMiniMap() { let tooltip = document.getElementById('asset-mini-map-tooltip'); if (tooltip) tooltip.style.display = 'none'; }
+
+function toggleAssetDept(safeDept) {
+    const group = document.getElementById(`asset-group-${safeDept}`);
+    const icon = document.getElementById(`icon-asset-${safeDept}`);
+    if (!group || !icon) return;
+    let isClosing = icon.innerText === '▼';
+    group.style.display = isClosing ? 'none' : 'block';
+    icon.innerText = isClosing ? '▶' : '▼';
+}
+function toggleRollup(rollId) {
+    let grp = document.getElementById('child-group-' + rollId);
+    let icon = document.getElementById('icon-' + rollId);
+    if (!grp || !icon) return;
+    let isClosed = grp.style.display === 'none';
+    grp.style.display = isClosed ? 'block' : 'none';
+    icon.innerText = isClosed ? '▼' : '▶';
+}
+function editAssetGroup(idsStr) { 
+    selectedAssetIds.clear(); 
+    let ids = idsStr.split(',');
+    ids.forEach(id => selectedAssetIds.add(id)); 
+    updateAssetSelectionUI();
+    openAssetModal(ids); 
+}
+function deleteAssetGroup(idsStr, name) {
+    let ids = idsStr.split(',');
+    if (!confirm(`PERMANENT WARNING: Delete all ${ids.length} units of ${name} from the Vault?`)) return;
+    document.getElementById('asset-list-container').innerHTML = '<div style="color:#ef4444; padding:40px; text-align:center; font-weight:bold;">Deleting Assets...</div>';
+    google.script.run.withSuccessHandler(() => { selectedAssetIds.clear(); updateAssetSelectionUI(); loadAssetRegistry(); }).deleteVaultAsset(ACTIVE_USER_NAME, ids);
+}
+function deleteAsset(id, name) {
+    let idsToDelete = [];
+    if (selectedAssetIds.has(id) && selectedAssetIds.size > 1) idsToDelete = Array.from(selectedAssetIds);
+    else idsToDelete = [id];
+    let msg = idsToDelete.length > 1 ? `PERMANENT WARNING: Delete ${idsToDelete.length} selected assets from the Vault?` : `PERMANENT WARNING: Delete ${name} from the Vault?`;
+    if (!confirm(msg)) return;
+    document.getElementById('asset-list-container').innerHTML = '<div style="color:#ef4444; padding:40px; text-align:center; font-weight:bold;">Deleting Asset...</div>';
+    google.script.run.withSuccessHandler(() => { selectedAssetIds.clear(); updateAssetSelectionUI(); loadAssetRegistry(); }).deleteVaultAsset(ACTIVE_USER_NAME, idsToDelete);
+}
+
+function handleAssetRowClick(e, idsParam) {
+    if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+    
+    let isParentRow = e.currentTarget && e.currentTarget.classList.contains('parent-row');
+    let rollId = isParentRow ? e.currentTarget.dataset.rollid : null;
+
+    let selectionChanged = false;
+    let ids = String(idsParam).split(',');
+    
+    if (e.shiftKey && lastSelectedAssetId) {
+        let allVisualEls = Array.from(document.querySelectorAll('.asset-row.vault-container'));
+        let allVisualIds = allVisualEls.map(el => el.dataset.id);
+        
+        let idx1 = allVisualIds.findIndex(idStr => idStr && idStr.split(',').includes(lastSelectedAssetId));
+        let idx2 = allVisualIds.indexOf(idsParam);
+        
+        if (idx1 !== -1 && idx2 !== -1) {
+            if (!e.ctrlKey && !e.metaKey) selectedAssetIds.clear();
+            let startIdx = Math.min(idx1, idx2);
+            let endIdx = Math.max(idx1, idx2);
+            for (let i = startIdx; i <= endIdx; i++) {
+                if (allVisualIds[i]) {
+                    allVisualIds[i].split(',').forEach(id => selectedAssetIds.add(id));
+                }
+            }
+            selectionChanged = true;
+        }
+    } else if (e.ctrlKey || e.metaKey) {
+        let allSelected = ids.every(id => selectedAssetIds.has(id));
+        if (allSelected) {
+            ids.forEach(id => selectedAssetIds.delete(id));
+        } else {
+            ids.forEach(id => selectedAssetIds.add(id));
+        }
+        lastSelectedAssetId = ids[0];
+        selectionChanged = true;
+    } else {
+        if (selectedAssetIds.size === ids.length && ids.every(id => selectedAssetIds.has(id))) {
+            selectedAssetIds.clear();
+            selectionChanged = true;
+        } else {
+            selectedAssetIds.clear();
+            ids.forEach(id => selectedAssetIds.add(id));
+            lastSelectedAssetId = ids[0];
+            selectionChanged = true;
+        }
+    }
+    
+    if (selectionChanged) {
+        updateAssetSelectionUI();
+    }
+}
+
+function updateAssetSelectionUI() {
+    let printBtn = document.getElementById('btn-print-qr');
+    if (printBtn) {
+        let editBtn = document.getElementById('btn-edit-multiple');
+        if (!editBtn) {
+            editBtn = document.createElement('button');
+            editBtn.id = 'btn-edit-multiple';
+            editBtn.className = 'btn-main';
+            editBtn.style.background = '#3b82f6';
+            editBtn.style.borderColor = '#3b82f6';
+            editBtn.style.marginLeft = '10px';
+            editBtn.onclick = () => { openAssetModal(Array.from(selectedAssetIds)); };
+            printBtn.parentNode.insertBefore(editBtn, printBtn.nextSibling);
+        }
+
+        if (selectedAssetIds.size > 0) {
+            printBtn.style.setProperty('display', 'inline-flex');
+            printBtn.innerText = `PRINT QR (${selectedAssetIds.size})`;
+        } else {
+            printBtn.style.setProperty('display', 'none');
+        }
+        
+        if (selectedAssetIds.size > 1) {
+            editBtn.style.setProperty('display', 'inline-flex', 'important');
+            editBtn.innerText = `EDIT MULTIPLE (${selectedAssetIds.size})`;
+        } else {
+            editBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
+
+    document.querySelectorAll('.asset-row.vault-container').forEach(row => {
+        let ids = row.dataset.id ? row.dataset.id.split(',') : [];
+        if (ids.length > 0 && ids.every(id => selectedAssetIds.has(id))) {
+            row.classList.add('row-selected');
+        } else {
+            row.classList.remove('row-selected');
+        }
+    });
+}
+
+function toggleAssetSort(e, col) {
+    if (!Array.isArray(currentAssetSort)) currentAssetSort = [{ col: currentAssetSort.col || 'tags', asc: currentAssetSort.asc !== false }];
+    if (e && e.shiftKey) {
+        let existing = currentAssetSort.find(s => s.col === col);
+        if (existing) {
+            existing.asc = !existing.asc;
+        } else {
+            currentAssetSort.push({ col: col, asc: true });
+        }
+    } else {
+        if (currentAssetSort.length > 0 && currentAssetSort[0].col === col) {
+            currentAssetSort[0].asc = !currentAssetSort[0].asc;
+            currentAssetSort = [currentAssetSort[0]];
+        } else {
+            currentAssetSort = [{ col: col, asc: true }];
+        }
+    }
+    renderAssetRegistry();
+}
+
+function setAssetFilter(filter) {
+    currentAssetFilter = filter;
+    
+    ['ALL', 'Physical', 'Bundles', 'Kits', 'Cases', 'Presets'].forEach(f => {
+        let btn = document.getElementById('btn-filter-' + f.toLowerCase());
+        if (btn) {
+            if (f === filter) {
+                btn.style.setProperty('background', 'rgba(255,255,255,0.15)', 'important');
+                btn.style.setProperty('color', '#fff', 'important');
+                btn.style.setProperty('border-color', '#fff', 'important');
+            } else {
+                btn.style.setProperty('background', 'transparent', 'important');
+                btn.style.setProperty('color', '#a1a1aa', 'important');
+                btn.style.setProperty('border-color', 'transparent', 'important');
+            }
+        }
+    });
+    if (typeof renderAssetRegistry === 'function') renderAssetRegistry();
+}
+</script>

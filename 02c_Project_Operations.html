@@ -1,0 +1,348 @@
+<script>
+/**
+ * 02c_Project_Operations.html
+ * Domain: Warehouse Scanner and Physical Operations.
+ */
+
+window.opsQueue = [];
+window.opsTimer = null;
+
+// @INDEX: OPERATIONS -> Start Operation UI
+window.startOperationUI = function(type, e) {
+    let projectId = document.getElementById('edit-folder-id').value;
+    if (!projectId || projectId === 'NEW') return alert("⚠️ Please SAVE the project first.");
+    
+    let btn = e.currentTarget;
+    let origText = btn.innerText;
+    btn.innerText = "STARTING..."; btn.disabled = true;
+
+    google.script.run
+    .withSuccessHandler(res => {
+        btn.innerText = origText; btn.disabled = false;
+        document.getElementById('pa-operation-bar').style.display = 'flex';
+        document.getElementById('pa-op-status').innerText = type + " ACTIVE";
+        document.getElementById('pa-rfid-scanner').focus();
+        
+        
+        let lastScanDiv = document.getElementById('pa-last-scanned');
+        if (lastScanDiv) lastScanDiv.innerHTML = '';
+        
+        if (res.resumed && res.scannedMap) {
+            document.getElementById('pa-scanned-count').innerText = res.scannedCount + " Scanned";
+            if (typeof currentProjectAssets !== 'undefined') {
+                currentProjectAssets.forEach(p => p.scannedQty = 0);
+                Object.keys(res.scannedMap).forEach(id => {
+                    let totalQty = res.scannedMap[id];
+                    let matchingPas = currentProjectAssets.filter(p => p.assetId === id);
+                    matchingPas.forEach(p => {
+                        let needed = parseInt(p.qty, 10) - (p.scannedQty || 0);
+                        if (needed > 0 && totalQty > 0) {
+                            let take = Math.min(needed, totalQty);
+                            p.scannedQty = (p.scannedQty || 0) + take;
+                            totalQty -= take;
+                        }
+                    });
+                    if (totalQty > 0 && matchingPas.length > 0) matchingPas[0].scannedQty = (matchingPas[0].scannedQty || 0) + totalQty;
+                });
+            }
+        } else {
+            document.getElementById('pa-scanned-count').innerText = "0 Scanned";
+            if (typeof currentProjectAssets !== 'undefined') currentProjectAssets.forEach(p => p.scannedQty = 0);
+        }
+        
+        window.currentOperationType = type;
+        if (typeof togglePaMode === 'function') togglePaMode('operation');
+        if (typeof evalOperationButtons === 'function') evalOperationButtons();
+    })
+    .withFailureHandler(err => {
+        btn.innerText = origText; btn.disabled = false;
+        alert("Error: " + err.message);
+    }).startEventOperation(projectId, type, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+};
+
+// @INDEX: OPERATIONS -> RFID Scan Handler
+window.handleRfidScan = function() {
+    let input = document.getElementById('pa-rfid-scanner');
+    let tag = input.value.trim().toLowerCase();
+    if (!tag) return;
+    
+    let projectId = document.getElementById('edit-folder-id').value;
+
+    let targetAsset = null;
+    for (let i = 0; i < globalAssets.length; i++) {
+        let a = globalAssets[i];
+        let rfid = (a.rfidTag || "").toLowerCase();
+        let uid = (a.id || "").toLowerCase();
+        let unit = (a.unitNumber || "").toLowerCase();
+        let name = (a.name || "").toLowerCase();
+        let nameUnit = name + (unit ? " #" + unit : "");
+        let nameUnitSpace = name + (unit ? " " + unit : "");
+
+        if (rfid === tag || uid === tag || unit === tag || name === tag || nameUnit === tag || nameUnitSpace === tag) {
+            targetAsset = a;
+            break;
+        }
+    }
+
+    if (targetAsset) {
+        executeManualScanCall(projectId, targetAsset.id, input, 1);
+        return;
+    }
+
+    input.value = "SCANNING..."; input.disabled = true;
+
+    google.script.run
+    .withSuccessHandler(res => {
+        input.value = ""; input.disabled = false; input.focus();
+        if(res.success) {
+            if (res.scannedMap) {
+                document.getElementById('pa-scanned-count').innerText = res.scannedCount + " Scanned";
+                if (typeof currentProjectAssets !== 'undefined') {
+                    currentProjectAssets.forEach(p => p.scannedQty = 0);
+                    Object.keys(res.scannedMap).forEach(id => {
+                        let totalQty = res.scannedMap[id];
+                        let matchingPas = currentProjectAssets.filter(p => p.assetId === id);
+                        matchingPas.forEach(p => {
+                            let needed = parseInt(p.qty, 10) - (p.scannedQty || 0);
+                            if (needed > 0 && totalQty > 0) {
+                                let take = Math.min(needed, totalQty);
+                                p.scannedQty = (p.scannedQty || 0) + take;
+                                totalQty -= take;
+                            }
+                        });
+                        if (totalQty > 0 && matchingPas.length > 0) matchingPas[0].scannedQty = (matchingPas[0].scannedQty || 0) + totalQty;
+                    });
+                }
+            }
+            if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+            
+            let lastScanDiv = document.getElementById('pa-last-scanned');
+            if (!lastScanDiv) {
+                lastScanDiv = document.createElement('div');
+                lastScanDiv.id = 'pa-last-scanned';
+                lastScanDiv.style.cssText = 'color: #10b981; font-weight: bold; font-size: 13px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+                let opBar = document.getElementById('pa-operation-bar');
+                if (opBar) opBar.insertBefore(lastScanDiv, document.getElementById('pa-scanned-count'));
+            }
+            if (lastScanDiv && res.equipment) lastScanDiv.innerHTML = `<span style="color:#888; font-size:10px; margin-right:6px;">LAST:</span>${res.equipment.name}`;
+            input.style.backgroundColor = 'rgba(16,185,129,0.2)';
+            setTimeout(() => input.style.backgroundColor = '#0a0a0c', 300);
+        }
+    })
+    .withFailureHandler(err => {
+        alert("Scan Failed: " + err.message);
+        input.value = ""; input.disabled = false; input.focus();
+        input.style.backgroundColor = 'rgba(239,68,68,0.2)';
+        setTimeout(() => input.style.backgroundColor = '#0a0a0c', 300);
+    }).processRfidScan(projectId, tag, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+};
+
+// @INDEX: OPERATIONS -> Trigger Manual Scan
+window.triggerManualScan = function(assetId, scanQtyOverride) {
+    let scanQty = parseInt(scanQtyOverride, 10) || 1;
+    let projectId = document.getElementById('edit-folder-id').value;
+    let input = document.getElementById('pa-rfid-scanner');
+    
+    let deltas = typeof calculatePaDeltas === 'function' ? calculatePaDeltas() : [];
+    
+    if (deltas.length > 0) {
+        input.value = "SAVING..."; input.disabled = true;
+        google.script.run
+        .withSuccessHandler(res => {
+            window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+            executeManualScanCall(projectId, assetId, input, scanQty);
+        })
+        .withFailureHandler(err => {
+            alert("Failed to auto-save equipment: " + err.message);
+            input.value = ""; input.disabled = false; input.focus();
+        }).saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+    } else {
+        executeManualScanCall(projectId, assetId, input, scanQty);
+    }
+};
+
+function executeManualScanCall(projectId, assetId, input, scanQty) {
+    let q = parseInt(scanQty, 10) || 1;
+    let asset = globalAssets.find(a => a.id === assetId);
+    let aName = asset ? asset.name : "Asset";
+
+    let addedCount = 0;
+    let applyScanned = (id, count) => {
+        if (typeof currentProjectAssets !== 'undefined') {
+            let incompletePa = currentProjectAssets.find(p => p.assetId === id && (p.scannedQty || 0) < parseInt(p.qty, 10));
+            if (incompletePa) incompletePa.scannedQty = (incompletePa.scannedQty || 0) + count;
+            else {
+                let anyPa = currentProjectAssets.find(p => p.assetId === id);
+                if (anyPa) anyPa.scannedQty = (anyPa.scannedQty || 0) + count;
+            }
+            addedCount += count;
+        }
+    };
+
+    let childrenIds = [];
+    if (typeof currentProjectAssets !== 'undefined') {
+        currentProjectAssets.forEach(pa => {
+            let cid = pa.containerUid || "";
+            if (!cid) {
+                let a = globalAssets.find(x => x.id === pa.assetId);
+                if (a) {
+                    let parent = typeof getParentCaseForAsset === 'function' ? getParentCaseForAsset(a.name) : null;
+                    let autoContainer = parent ? currentProjectAssets.find(p => p.isAuto && p.assetId === parent.id && (p.location||'General') === (pa.location||'General') && (p.formula||'Manual') === (pa.formula||'Manual')) : null;
+                    if (autoContainer) cid = autoContainer.assetId;
+                }
+            }
+            if (cid === assetId) childrenIds.push({ id: pa.assetId, qty: parseInt(pa.qty, 10) || 1 });
+        });
+    }
+
+    applyScanned(assetId, q);
+    childrenIds.forEach(child => { applyScanned(child.id, child.qty * q); });
+
+    let currentCount = parseInt(document.getElementById('pa-scanned-count').innerText) || 0;
+    document.getElementById('pa-scanned-count').innerText = (currentCount + addedCount) + " Scanned";
+
+    let lastScanDiv = document.getElementById('pa-last-scanned');
+    if (!lastScanDiv) {
+        lastScanDiv = document.createElement('div');
+        lastScanDiv.id = 'pa-last-scanned';
+        lastScanDiv.style.cssText = 'color: #10b981; font-weight: bold; font-size: 13px; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
+        let opBar = document.getElementById('pa-operation-bar');
+        if (opBar) opBar.insertBefore(lastScanDiv, document.getElementById('pa-scanned-count'));
+    }
+    lastScanDiv.innerHTML = `<span style="color:#888; font-size:10px; margin-right:6px;">LAST:</span>${aName}`;
+
+    if (input) {
+        input.value = ""; input.focus();
+        input.style.backgroundColor = 'rgba(16,185,129,0.2)';
+        setTimeout(() => input.style.backgroundColor = '#0a0a0c', 300);
+    }
+
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+
+    window.opsQueue.push({ action: 'scan', assetId: assetId, scanQty: q });
+    resetOpsTimer(projectId);
+};
+
+window.undoManualScan = function(assetId, undoQtyOverride) {
+    let undoQty = parseInt(undoQtyOverride, 10) || 1;
+    let projectId = document.getElementById('edit-folder-id').value;
+    let input = document.getElementById('pa-rfid-scanner');
+    
+    let removedCount = 0;
+    let removeScanned = (id, count) => {
+        let targetQty = count;
+        let matchingPas = currentProjectAssets.filter(p => p.assetId === id && (p.scannedQty || 0) > 0);
+        matchingPas.forEach(p => {
+            if (targetQty > 0 && p.scannedQty > 0) {
+                let take = Math.min(targetQty, p.scannedQty);
+                p.scannedQty -= take;
+                targetQty -= take;
+                removedCount += take;
+            }
+        });
+    };
+
+    let childrenIds = [];
+    if (typeof currentProjectAssets !== 'undefined') {
+        currentProjectAssets.forEach(pa => {
+            let cid = pa.containerUid || "";
+            if (!cid) {
+                let asset = globalAssets.find(a => a.id === pa.assetId);
+                if (asset) {
+                    let parent = typeof getParentCaseForAsset === 'function' ? getParentCaseForAsset(asset.name) : null;
+                    let autoContainer = parent ? currentProjectAssets.find(p => p.isAuto && p.assetId === parent.id && (p.location||'General') === (pa.location||'General') && (p.formula||'Manual') === (pa.formula||'Manual')) : null;
+                    if (autoContainer) cid = autoContainer.assetId;
+                }
+            }
+            if (cid === assetId) childrenIds.push({ id: pa.assetId, qty: parseInt(pa.qty, 10) || 1 });
+        });
+    }
+    
+    removeScanned(assetId, undoQty);
+    childrenIds.forEach(child => { removeScanned(child.id, child.qty * undoQty); });
+
+    let currentCount = parseInt(document.getElementById('pa-scanned-count').innerText) || 0;
+    document.getElementById('pa-scanned-count').innerText = Math.max(0, currentCount - removedCount) + " Scanned";
+
+    if (input) {
+        input.value = ""; input.focus();
+        input.style.backgroundColor = 'rgba(239,68,68,0.2)';
+        setTimeout(() => input.style.backgroundColor = '#0a0a0c', 300);
+    }
+
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+
+    window.opsQueue.push({ action: 'undo', assetId: assetId, undoQty: undoQty });
+    resetOpsTimer(projectId);
+};
+
+// @INDEX: OPERATIONS -> Batch Ops Ledger Queue
+function resetOpsTimer(projectId) {
+    if (window.opsTimer) clearTimeout(window.opsTimer);
+    
+    let statusEl = document.getElementById('pa-op-status');
+    if (statusEl && window.currentOperationType) {
+        statusEl.innerHTML = `${window.currentOperationType} ACTIVE <span style="font-size:9px; color:#a1a1aa; display:inline-block; margin-left:8px;">(Queued...)</span>`;
+    }
+
+    window.opsTimer = setTimeout(() => {
+        commitOpsBatch(projectId);
+    }, 1500);
+}
+
+function commitOpsBatch(projectId) {
+    if (window.opsQueue.length === 0) return;
+    let batch = [...window.opsQueue];
+    window.opsQueue = [];
+
+    let statusEl = document.getElementById('pa-op-status');
+    if (statusEl && window.currentOperationType) {
+        statusEl.innerHTML = `${window.currentOperationType} ACTIVE <span style="font-size:9px; color:#10b981; display:inline-block; margin-left:8px;">(Saving...)</span>`;
+    }
+
+    google.script.run
+    .withSuccessHandler(res => {
+        if (statusEl && window.currentOperationType) statusEl.innerHTML = `${window.currentOperationType} ACTIVE`;
+    })
+    .withFailureHandler(err => {
+        if (statusEl && window.currentOperationType) statusEl.innerHTML = `${window.currentOperationType} ACTIVE <span style="font-size:9px; color:#ef4444; display:inline-block; margin-left:8px;">(Save Failed!)</span>`;
+        alert("Background Save Failed: " + err.message + "\\n\\nResyncing to actual database state...");
+        startOperationUI(window.currentOperationType, { currentTarget: document.getElementById('btn-stop-operation') });
+    })
+    .batchProcessOperations(projectId, batch, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+};
+
+window.stopOperationUI = function(e) {
+    document.getElementById('pa-operation-bar').style.display = 'none';
+    window.currentOperationType = null;
+    if (typeof togglePaMode === 'function') togglePaMode('packing');
+    if (typeof evalOperationButtons === 'function') evalOperationButtons();
+};
+
+window.finalizeOperationUI = function(e) {
+    let projectId = document.getElementById('edit-folder-id').value;
+    let btn = e.currentTarget;
+    let origText = btn.innerText;
+    btn.innerText = "FINALIZING..."; btn.disabled = true;
+
+    google.script.run
+    .withSuccessHandler(res => {
+        btn.innerText = origText; btn.disabled = false;
+        document.getElementById('pa-operation-bar').style.display = 'none';
+        alert(res.message);
+        
+        if (res.newStatus) {
+            let statEl = document.getElementById('display-event-status');
+            if (statEl) statEl.innerText = res.newStatus.toUpperCase();
+        }
+        
+        window.currentOperationType = null;
+        if (typeof togglePaMode === 'function') togglePaMode('design');
+        if (typeof evalOperationButtons === 'function') evalOperationButtons();
+    })
+    .withFailureHandler(err => {
+        btn.innerText = origText; btn.disabled = false;
+        alert("Error: " + err.message);
+    }).finalizeEventOperation(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+};
+</script>
