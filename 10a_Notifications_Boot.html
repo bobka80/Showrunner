@@ -267,6 +267,9 @@
     if (ev.data.type === 'SHOWRUNNER_PARENT_TOKEN_READY') {
       if (!thisDeviceRegistered) window.startFcmBridgeRegistration();
     }
+    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_AUTH') {
+      refreshFcmRegKeyAndNotifyParent();
+    }
     if (ev.data.type === 'SHOWRUNNER_PUSH_STATE') {
       updateInAppPushHint(ev.data.needsAttention, ev.data.message);
     }

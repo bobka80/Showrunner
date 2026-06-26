@@ -17,7 +17,8 @@
   let pendingFcmAuth = null;
   let regKeySaveInFlight = false;
   let regKeyRetryTimer = null;
-  const SW_BUILD = '290';
+  let fcmAuthRequestTimer = null;
+  const SW_BUILD = '291';
   let serverSaveConfirmed = false;
   let tokenBroadcastTimer = null;
 
@@ -216,6 +217,36 @@
     document.head.appendChild(script);
   }
 
+  function requestFcmAuthFromIframe() {
+    if (!frame || !frame.contentWindow) return;
+    try {
+      frame.contentWindow.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_AUTH' }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  function startFcmAuthRequestLoop() {
+    if (fcmAuthRequestTimer) return;
+    var elapsed = 0;
+    fcmAuthRequestTimer = setInterval(function() {
+      if (serverSaveConfirmed || !fcmToken) {
+        clearInterval(fcmAuthRequestTimer);
+        fcmAuthRequestTimer = null;
+        return;
+      }
+      if (!pendingFcmAuth) {
+        requestFcmAuthFromIframe();
+        setDockStatus(['Step 1: token OK', 'linking to your account…']);
+      } else {
+        trySaveTokenViaRegKey();
+      }
+      elapsed += 3000;
+      if (elapsed >= 180000) {
+        clearInterval(fcmAuthRequestTimer);
+        fcmAuthRequestTimer = null;
+      }
+    }, 3000);
+  }
+
   function registerTokenViaRegKeyJsonp(regKey) {
     const baseUrl = getRegisterBaseUrl();
     if (!regKey || !baseUrl || !fcmToken || regKeySaveInFlight) return;
@@ -361,6 +392,7 @@
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
       pendingFcmAuth = ev.data;
+      setDockStatus(['Step 1: token OK', 'Step 2: saving to server…']);
       if (isMobileDevice() && Notification.permission !== 'granted') {
         showBanner();
       }
@@ -436,9 +468,11 @@
     }
 
     logPush('token ready');
-    setDockStatus(['Step 1: token OK', 'waiting for login…']);
+    setDockStatus(['Step 1: token OK', 'linking to your account…']);
     flushPendingBridge();
     trySaveTokenViaRegKey();
+    requestFcmAuthFromIframe();
+    startFcmAuthRequestLoop();
     startTokenBroadcast();
     notifyIframeTokenReady();
 
