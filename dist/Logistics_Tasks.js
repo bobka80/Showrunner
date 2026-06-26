@@ -237,6 +237,15 @@ function saveTaskData(taskObj, crewName) {
             if(nSheet.map['Timestamp'] !== undefined) r[nSheet.map['Timestamp']] = new Date().toISOString();
             sheets.notifs.appendRow(r);
         });
+        try {
+            dispatchPushToIdentifiers(
+                taskObj.assignees,
+                'New task assigned',
+                taskObj.title || 'You have a new task',
+                getShowrunnerHostingLink_(),
+                crewName
+            );
+        } catch (pushErr) { /* in-app notifs saved */ }
     }
     flushCache();
     writeToAuditLog(crewName || "System", isNew ? "CREATE" : "UPDATE", "TASKS", "GLOBAL", taskObj.id, `Saved task with ${taskObj.todos ? taskObj.todos.length : 0} to-dos and ${taskObj.assets ? taskObj.assets.length : 0} assets.`);

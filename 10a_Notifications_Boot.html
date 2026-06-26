@@ -1,7 +1,7 @@
 <script>
 /**
  * 10a_Notifications_Boot.html
- * Hosting shell bridge — iframe requests save; parent Hosting page calls server via JSONP.
+ * Hosting shell bridge — auto-saves FCM token when parent posts it.
  */
 
 (function() {
@@ -9,7 +9,8 @@
   window.__srFcmBootInstalled = true;
 
   var bridgeRegistered = false;
-  var bridgeInFlight = false;
+  var saveInFlight = false;
+  var lastSavedToken = '';
 
   window.isShowrunnerHostingShell = (window.self !== window.top);
 
@@ -21,11 +22,20 @@
     } catch (e) { /* ignore */ }
   }
 
-  function onBridgeRegistered(res) {
-    bridgeInFlight = false;
+  function notifyParentSaved() {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'SHOWRUNNER_FCM_SAVE_ACK' }, '*');
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function onSaveComplete(res) {
+    saveInFlight = false;
     if (res && res.success) {
       bridgeRegistered = true;
       window.__srFcmLastError = '';
+      notifyParentSaved();
     } else {
       window.__srFcmLastError = (res && res.message) ? res.message : 'Registration failed.';
     }
@@ -34,29 +44,25 @@
     }
   }
 
-  function waitForParentSave(ms) {
-    return new Promise(function(resolve) {
-      var done = false;
-      function onReg(ev) {
-        if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_REGISTERED') return;
-        window.removeEventListener('message', onReg);
-        if (!done) {
-          done = true;
-          resolve(ev.data);
-        }
-      }
-      window.addEventListener('message', onReg);
-      setTimeout(function() {
-        window.removeEventListener('message', onReg);
-        if (!done) {
-          done = true;
-          resolve({ success: false, message: 'Timed out — bottom-right should say “token saved”. Click RETRY.' });
-        }
-      }, ms || 20000);
-    });
+  function saveTokenToServer(token) {
+    if (!token || !window.isShowrunnerHostingShell) return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    if (bridgeRegistered && token === lastSavedToken) return;
+    if (saveInFlight) return;
+
+    saveInFlight = true;
+    google.script.run
+      .withFailureHandler(function(err) {
+        onSaveComplete({ success: false, message: (err && err.message) ? err.message : String(err) });
+      })
+      .withSuccessHandler(function(res) {
+        if (res && res.success) lastSavedToken = token;
+        onSaveComplete(res);
+      })
+      .saveMyFcmDeviceToken(ACTIVE_USER_NAME, token);
   }
 
-  function requestTokenFromParent() {
+  function requestTokenFromParent(timeoutMs) {
     return new Promise(function(resolve) {
       var done = false;
       function onMsg(ev) {
@@ -77,8 +83,55 @@
           done = true;
           resolve(null);
         }
-      }, 3000);
+      }, timeoutMs || 5000);
     });
+  }
+
+  function pollParentForToken(maxMs, intervalMs) {
+    var elapsed = 0;
+    var interval = intervalMs || 3000;
+    var max = maxMs || 90000;
+
+    function attempt() {
+      if (bridgeRegistered) return;
+      requestTokenFromParent(4000).then(function(token) {
+        if (token) saveTokenToServer(token);
+      });
+      elapsed += interval;
+      if (!bridgeRegistered && elapsed < max) {
+        setTimeout(attempt, interval);
+      }
+    }
+    attempt();
+  }
+
+  function tryJsonpBridgeFallback() {
+    if (bridgeRegistered || saveInFlight) return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+
+    google.script.run
+      .withFailureHandler(function() { /* direct save + polling handles retry */ })
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) return;
+        requestTokenFromParent(5000).then(function(token) {
+          if (token) {
+            google.script.run
+              .withFailureHandler(function() { /* ignore */ })
+              .withSuccessHandler(onSaveComplete)
+              .registerFcmTokenWithBridge(ACTIVE_USER_NAME, token, res.nonce, 'web-hosting');
+            return;
+          }
+          try {
+            window.parent.postMessage({
+              type: 'SHOWRUNNER_FCM_BRIDGE',
+              nonce: res.nonce,
+              registerUrl: res.registerUrl,
+              label: 'web-hosting'
+            }, '*');
+          } catch (e) { /* ignore */ }
+        });
+      })
+      .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
   }
 
   window.startFcmBridgeRegistration = function() {
@@ -89,49 +142,15 @@
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
       return;
     }
-    if (bridgeRegistered || bridgeInFlight) {
+    if (bridgeRegistered) {
       notifyParentReady();
       return;
     }
 
-    bridgeInFlight = true;
-    google.script.run
-      .withFailureHandler(function(err) {
-        onBridgeRegistered({ success: false, message: (err && err.message) ? err.message : String(err) });
-      })
-      .withSuccessHandler(function(res) {
-        if (!res || !res.success) {
-          onBridgeRegistered(res || { success: false, message: 'Bridge setup failed.' });
-          return;
-        }
-
-        requestTokenFromParent().then(function(token) {
-          if (token) {
-            google.script.run
-              .withFailureHandler(function(err) {
-                onBridgeRegistered({ success: false, message: (err && err.message) ? err.message : String(err) });
-              })
-              .withSuccessHandler(function(saveRes) {
-                onBridgeRegistered(saveRes);
-              })
-              .registerFcmTokenWithBridge(ACTIVE_USER_NAME, token, res.nonce, 'web-hosting');
-            return;
-          }
-
-          try {
-            window.parent.postMessage({
-              type: 'SHOWRUNNER_FCM_BRIDGE',
-              nonce: res.nonce,
-              registerUrl: res.registerUrl,
-              label: 'web-hosting'
-            }, '*');
-          } catch (e) { /* ignore */ }
-
-          waitForParentSave(20000).then(onBridgeRegistered);
-          pollServerRegistration(30000);
-        });
-      })
-      .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
+    notifyParentReady();
+    pollParentForToken(90000, 3000);
+    tryJsonpBridgeFallback();
+    pollServerRegistration(90000);
   };
 
   function pollServerRegistration(ms) {
@@ -141,29 +160,39 @@
         clearInterval(poll);
         return;
       }
-      elapsed += 2000;
+      if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+      elapsed += 3000;
       google.script.run
         .withSuccessHandler(function(res) {
           if (res && res.registered) {
             clearInterval(poll);
-            onBridgeRegistered({ success: true });
+            bridgeRegistered = true;
+            window.__srFcmLastError = '';
+            notifyParentSaved();
+            if (typeof window.onShowrunnerFcmRegistered === 'function') {
+              window.onShowrunnerFcmRegistered({ success: true });
+            }
           }
         })
         .getFcmRegistrationStatus(ACTIVE_USER_NAME);
       if (elapsed >= ms) clearInterval(poll);
-    }, 2000);
+    }, 3000);
   }
 
   window.retryShowrunnerFcmBridge = function() {
     bridgeRegistered = false;
-    bridgeInFlight = false;
+    saveInFlight = false;
+    lastSavedToken = '';
     window.startFcmBridgeRegistration();
   };
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
+    if (ev.data.type === 'SHOWRUNNER_FCM_TOKEN' && ev.data.token) {
+      saveTokenToServer(ev.data.token);
+    }
     if (ev.data.type === 'SHOWRUNNER_FCM_REGISTERED') {
-      onBridgeRegistered(ev.data);
+      onSaveComplete(ev.data);
     }
   });
 
@@ -179,13 +208,15 @@
   }
 
   var retryTimer = setInterval(function() {
-    if (!bridgeRegistered && !bridgeInFlight && window.isShowrunnerHostingShell) {
-      window.startFcmBridgeRegistration();
+    if (!bridgeRegistered && !saveInFlight && window.isShowrunnerHostingShell) {
+      if (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
+        window.startFcmBridgeRegistration();
+      }
     } else if (bridgeRegistered) {
       clearInterval(retryTimer);
     }
-  }, 6000);
+  }, 12000);
 
-  setTimeout(function() { clearInterval(retryTimer); }, 180000);
+  setTimeout(function() { clearInterval(retryTimer); }, 300000);
 })();
 </script>

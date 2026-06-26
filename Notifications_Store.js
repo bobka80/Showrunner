@@ -34,6 +34,14 @@ function saveFcmDeviceToken(crewName, tokenRaw) {
   return registerFcmToken(crewName, token, 'web-manual', crewName);
 }
 
+/** Logged-in user saves their own device token (iframe → google.script.run, no JSONP nonce). */
+function saveMyFcmDeviceToken(crewName, tokenRaw) {
+  if (!crewName) return { success: false, message: 'Not logged in.' };
+  const token = String(tokenRaw || '').trim();
+  if (token.length < 20) return { success: false, message: 'Invalid FCM token.' };
+  return registerFcmToken(crewName, token, 'web-hosting', crewName);
+}
+
 function getFirebasePushSetupStatus(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
@@ -55,7 +63,7 @@ function prepareFcmRegistrationBridge(crewName) {
   const profile = getUserSecurityProfile(crewName);
   if (!profile || !profile.uid) return { success: false, message: 'Unknown user (no uid for ' + crewName + ').' };
   const nonce = Utilities.getUuid().replace(/-/g, '');
-  CacheService.getScriptCache().put('fcm_bridge_' + nonce, String(crewName).trim(), 300);
+  CacheService.getScriptCache().put('fcm_bridge_' + nonce, String(crewName).trim(), 600);
   return {
     success: true,
     nonce: nonce,
@@ -71,8 +79,9 @@ function completeFcmRegistrationViaBridge_(nonce, token, label) {
   const cacheKey = 'fcm_bridge_' + cleanNonce;
   const crewName = cache.get(cacheKey);
   if (!crewName) return { success: false, message: 'Registration link expired — click RETRY DEVICE REGISTER.' };
-  cache.remove(cacheKey);
-  return registerFcmToken(crewName, token, label || 'web-hosting', crewName);
+  const result = registerFcmToken(crewName, token, label || 'web-hosting', crewName);
+  if (result && result.success) cache.remove(cacheKey);
+  return result;
 }
 
 function registerFcmTokenWithBridge(crewName, token, nonce, label) {
@@ -85,8 +94,9 @@ function registerFcmTokenWithBridge(crewName, token, nonce, label) {
   if (!cachedName || cachedName.toLowerCase() !== cleanName.toLowerCase()) {
     return { success: false, message: 'Registration link expired — click RETRY DEVICE REGISTER.' };
   }
-  cache.remove(cacheKey);
-  return registerFcmToken(cleanName, token, label || 'web-hosting', cleanName);
+  const result = registerFcmToken(cleanName, token, label || 'web-hosting', cleanName);
+  if (result && result.success) cache.remove(cacheKey);
+  return result;
 }
 
 function registerFcmToken(crewName, token, deviceLabel, actor) {

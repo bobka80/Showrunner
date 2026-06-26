@@ -244,6 +244,27 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
             r[3] = false; r[4] = nowIso;
             sheets.notifs.appendRow(r);
         });
+
+        try {
+            if (newlyAddedUids.length > 0) {
+                dispatchPushToIdentifiers(
+                    newlyAddedUids,
+                    'Schedule update',
+                    'You were added to: ' + pName,
+                    getShowrunnerHostingLink_(),
+                    actor
+                );
+            }
+            if (modifiedUids.size > 0) {
+                dispatchPushToIdentifiers(
+                    Array.from(modifiedUids),
+                    'Shift time changed',
+                    'Your shift was updated for: ' + pName,
+                    getShowrunnerHostingLink_(),
+                    actor
+                );
+            }
+        } catch (pushErr) { /* in-app notifs saved */ }
     }
 
     if (typeof flushCache !== 'undefined') flushCache();
