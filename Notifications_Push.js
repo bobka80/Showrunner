@@ -131,3 +131,9 @@ function sendTestPushNotification(crewName) {
   }
   return { success: false, message: 'Send failed: ' + (result.errors[0] || 'unknown error') };
 }
+
+/** Run once from Apps Script editor after deploy to grant UrlFetchApp (FCM) permission. */
+function authorizeShowrunnerExternalRequests() {
+  const resp = UrlFetchApp.fetch('https://www.google.com/generate_204', { muteHttpExceptions: true });
+  return 'External request authorized (HTTP ' + resp.getResponseCode() + '). Push send should work now.';
+}
