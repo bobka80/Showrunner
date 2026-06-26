@@ -14,6 +14,12 @@
   let pushStarted = false;
   let pendingBridge = null;
 
+  function showCopyButton(enabled) {
+    if (!copyBtn) return;
+    copyBtn.disabled = !enabled;
+    copyBtn.textContent = enabled ? 'Copy push token' : 'Copy push token (wait for token ready)';
+  }
+
   function setStatus(msg, clickable) {
     if (!statusEl) return;
     statusEl.textContent = 'Push: ' + msg;
@@ -22,8 +28,10 @@
       wrap.style.pointerEvents = clickable ? 'auto' : 'none';
       wrap.style.cursor = clickable ? 'pointer' : 'default';
     }
-    if (copyBtn && fcmToken) copyBtn.style.display = 'block';
+    showCopyButton(!!fcmToken);
   }
+
+  showCopyButton(false);
 
   function hideBanner() {
     if (bannerEl) bannerEl.classList.add('hidden');

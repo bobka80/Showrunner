@@ -16,9 +16,12 @@
       max-width: 280px;
     }
     #push-copy-btn {
-      display: none; margin-top: 6px; width: 100%;
+      display: block; margin-top: 6px; width: 100%;
       background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #fff;
       font-weight: 700; font-size: 10px; padding: 6px 8px; border-radius: 4px; cursor: pointer;
+    }
+    #push-copy-btn:disabled {
+      opacity: 0.45; cursor: not-allowed; border-color: #555; color: #888;
     }
     #push-copy-btn:hover { background: rgba(16,185,129,0.4); }
     #push-enable-banner {
@@ -47,6 +50,6 @@
   <div id="push-status"><span id="push-status-text">Push: starting…</span><button type="button" id="push-copy-btn">Copy push token</button></div>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
-  <script src="/host-boot.js"></script>
+  <script src="/host-boot.js?v=279"></script>
 </body>
 </html>
