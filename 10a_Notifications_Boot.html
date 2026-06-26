@@ -8,9 +8,11 @@
   if (window.__srFcmBootInstalled) return;
   window.__srFcmBootInstalled = true;
 
-  var bridgeRegistered = false;
+  var thisDeviceRegistered = false;
   var saveInFlight = false;
   var lastSavedToken = '';
+  var currentDeviceToken = '';
+  var currentDeviceLabel = 'web-hosting';
 
   window.isShowrunnerHostingShell = (window.self !== window.top);
 
@@ -33,7 +35,7 @@
   function onSaveComplete(res) {
     saveInFlight = false;
     if (res && res.success) {
-      bridgeRegistered = true;
+      thisDeviceRegistered = true;
       window.__srFcmLastError = '';
       notifyParentSaved();
     } else {
@@ -44,10 +46,29 @@
     }
   }
 
-  function saveTokenToServer(token) {
+  function checkThisDeviceRegistered() {
+    if (!currentDeviceToken || typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.registered) {
+          thisDeviceRegistered = true;
+          lastSavedToken = currentDeviceToken;
+          window.__srFcmLastError = '';
+          notifyParentSaved();
+          if (typeof window.onShowrunnerFcmRegistered === 'function') {
+            window.onShowrunnerFcmRegistered({ success: true });
+          }
+        }
+      })
+      .isFcmTokenRegistered(ACTIVE_USER_NAME, currentDeviceToken);
+  }
+
+  function saveTokenToServer(token, label) {
     if (!token || !window.isShowrunnerHostingShell) return;
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
-    if (bridgeRegistered && token === lastSavedToken) return;
+    currentDeviceToken = token;
+    if (label) currentDeviceLabel = label;
+    if (thisDeviceRegistered && token === lastSavedToken) return;
     if (saveInFlight) return;
 
     saveInFlight = true;
@@ -56,10 +77,13 @@
         onSaveComplete({ success: false, message: (err && err.message) ? err.message : String(err) });
       })
       .withSuccessHandler(function(res) {
-        if (res && res.success) lastSavedToken = token;
+        if (res && res.success) {
+          lastSavedToken = token;
+          thisDeviceRegistered = true;
+        }
         onSaveComplete(res);
       })
-      .saveMyFcmDeviceToken(ACTIVE_USER_NAME, token);
+      .saveMyFcmDeviceToken(ACTIVE_USER_NAME, token, currentDeviceLabel);
   }
 
   function requestTokenFromParent(timeoutMs) {
@@ -70,7 +94,7 @@
         window.removeEventListener('message', onMsg);
         if (!done) {
           done = true;
-          resolve(ev.data.token);
+          resolve(ev.data);
         }
       }
       window.addEventListener('message', onMsg);
@@ -90,15 +114,17 @@
   function pollParentForToken(maxMs, intervalMs) {
     var elapsed = 0;
     var interval = intervalMs || 3000;
-    var max = maxMs || 90000;
+    var max = maxMs || 180000;
 
     function attempt() {
-      if (bridgeRegistered) return;
-      requestTokenFromParent(4000).then(function(token) {
-        if (token) saveTokenToServer(token);
+      if (thisDeviceRegistered) return;
+      requestTokenFromParent(5000).then(function(payload) {
+        if (payload && payload.token) {
+          saveTokenToServer(payload.token, payload.label);
+        }
       });
       elapsed += interval;
-      if (!bridgeRegistered && elapsed < max) {
+      if (!thisDeviceRegistered && elapsed < max) {
         setTimeout(attempt, interval);
       }
     }
@@ -106,29 +132,30 @@
   }
 
   function tryJsonpBridgeFallback() {
-    if (bridgeRegistered || saveInFlight) return;
+    if (thisDeviceRegistered || saveInFlight) return;
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
 
     google.script.run
       .withFailureHandler(function() { /* direct save + polling handles retry */ })
       .withSuccessHandler(function(res) {
         if (!res || !res.success) return;
-        requestTokenFromParent(5000).then(function(token) {
-          if (token) {
-            google.script.run
-              .withFailureHandler(function() { /* ignore */ })
-              .withSuccessHandler(onSaveComplete)
-              .registerFcmTokenWithBridge(ACTIVE_USER_NAME, token, res.nonce, 'web-hosting');
+        requestTokenFromParent(8000).then(function(payload) {
+          if (!payload || !payload.token) {
+            try {
+              window.parent.postMessage({
+                type: 'SHOWRUNNER_FCM_BRIDGE',
+                nonce: res.nonce,
+                registerUrl: res.registerUrl,
+                label: currentDeviceLabel
+              }, '*');
+            } catch (e) { /* ignore */ }
             return;
           }
-          try {
-            window.parent.postMessage({
-              type: 'SHOWRUNNER_FCM_BRIDGE',
-              nonce: res.nonce,
-              registerUrl: res.registerUrl,
-              label: 'web-hosting'
-            }, '*');
-          } catch (e) { /* ignore */ }
+          saveTokenToServer(payload.token, payload.label);
+          google.script.run
+            .withFailureHandler(function() { /* ignore */ })
+            .withSuccessHandler(onSaveComplete)
+            .registerFcmTokenWithBridge(ACTIVE_USER_NAME, payload.token, res.nonce, payload.label || currentDeviceLabel);
         });
       })
       .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
@@ -142,31 +169,34 @@
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
       return;
     }
-    if (bridgeRegistered) {
+    if (thisDeviceRegistered) {
       notifyParentReady();
       return;
     }
 
     notifyParentReady();
-    pollParentForToken(90000, 3000);
+    if (currentDeviceToken) checkThisDeviceRegistered();
+    pollParentForToken(180000, 3000);
     tryJsonpBridgeFallback();
-    pollServerRegistration(90000);
+    pollThisDeviceRegistration(180000);
   };
 
-  function pollServerRegistration(ms) {
+  function pollThisDeviceRegistration(ms) {
     var elapsed = 0;
     var poll = setInterval(function() {
-      if (bridgeRegistered) {
+      if (thisDeviceRegistered) {
         clearInterval(poll);
         return;
       }
+      if (!currentDeviceToken) return;
       if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
       elapsed += 3000;
       google.script.run
         .withSuccessHandler(function(res) {
           if (res && res.registered) {
             clearInterval(poll);
-            bridgeRegistered = true;
+            thisDeviceRegistered = true;
+            lastSavedToken = currentDeviceToken;
             window.__srFcmLastError = '';
             notifyParentSaved();
             if (typeof window.onShowrunnerFcmRegistered === 'function') {
@@ -174,13 +204,13 @@
             }
           }
         })
-        .getFcmRegistrationStatus(ACTIVE_USER_NAME);
+        .isFcmTokenRegistered(ACTIVE_USER_NAME, currentDeviceToken);
       if (elapsed >= ms) clearInterval(poll);
     }, 3000);
   }
 
   window.retryShowrunnerFcmBridge = function() {
-    bridgeRegistered = false;
+    thisDeviceRegistered = false;
     saveInFlight = false;
     lastSavedToken = '';
     window.startFcmBridgeRegistration();
@@ -189,10 +219,13 @@
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_FCM_TOKEN' && ev.data.token) {
-      saveTokenToServer(ev.data.token);
+      saveTokenToServer(ev.data.token, ev.data.label);
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_REGISTERED') {
       onSaveComplete(ev.data);
+    }
+    if (ev.data.type === 'SHOWRUNNER_PARENT_TOKEN_READY') {
+      if (!thisDeviceRegistered) window.startFcmBridgeRegistration();
     }
   });
 
@@ -207,16 +240,22 @@
     setTimeout(bootBridge, 300);
   }
 
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible' && !thisDeviceRegistered) {
+      window.startFcmBridgeRegistration();
+    }
+  });
+
   var retryTimer = setInterval(function() {
-    if (!bridgeRegistered && !saveInFlight && window.isShowrunnerHostingShell) {
+    if (!thisDeviceRegistered && !saveInFlight && window.isShowrunnerHostingShell) {
       if (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
         window.startFcmBridgeRegistration();
       }
-    } else if (bridgeRegistered) {
+    } else if (thisDeviceRegistered) {
       clearInterval(retryTimer);
     }
-  }, 12000);
+  }, 10000);
 
-  setTimeout(function() { clearInterval(retryTimer); }, 300000);
+  setTimeout(function() { clearInterval(retryTimer); }, 600000);
 })();
 </script>

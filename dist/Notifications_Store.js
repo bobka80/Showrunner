@@ -35,11 +35,29 @@ function saveFcmDeviceToken(crewName, tokenRaw) {
 }
 
 /** Logged-in user saves their own device token (iframe → google.script.run, no JSONP nonce). */
-function saveMyFcmDeviceToken(crewName, tokenRaw) {
+function saveMyFcmDeviceToken(crewName, tokenRaw, deviceLabel) {
   if (!crewName) return { success: false, message: 'Not logged in.' };
   const token = String(tokenRaw || '').trim();
   if (token.length < 20) return { success: false, message: 'Invalid FCM token.' };
-  return registerFcmToken(crewName, token, 'web-hosting', crewName);
+  return registerFcmToken(crewName, token, deviceLabel || 'web-hosting', crewName);
+}
+
+function isFcmTokenRegistered(crewName, tokenRaw) {
+  const token = String(tokenRaw || '').trim();
+  if (!crewName || token.length < 20) {
+    return { registered: false, message: 'No token to check.' };
+  }
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) {
+    return { registered: false, message: 'Unknown user profile.' };
+  }
+  const devices = getFcmDevicesForUid_(profile.uid);
+  const found = devices.some(function(d) { return d && d.token === token; });
+  return {
+    registered: found,
+    deviceCount: devices.length,
+    message: found ? 'This device is registered.' : 'This device is not registered yet.'
+  };
 }
 
 function getFirebasePushSetupStatus(crewName) {
@@ -184,6 +202,9 @@ function getFcmRegistrationStatus(crewName) {
   return {
     registered: true,
     deviceCount: devices.length,
+    devices: devices.map(function(d) {
+      return { label: d.label || 'web', updatedAt: d.updatedAt || '' };
+    }),
     labels: labels.join(', '),
     label: labels[labels.length - 1] || '',
     updatedAt: latest ? latest.updatedAt : '',
