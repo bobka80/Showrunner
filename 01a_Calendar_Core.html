@@ -611,6 +611,15 @@ document.addEventListener('DOMContentLoaded', function() {
             let cachePayload = Object.assign({}, payload);
             localStorage.setItem('sm_phantom_payload', JSON.stringify(cachePayload));
         } catch(e) {}
+        if (payload.fcmRegKey && window.parent && window.parent !== window) {
+            try {
+                window.parent.postMessage({
+                    type: 'SHOWRUNNER_FCM_AUTH',
+                    regKey: payload.fcmRegKey,
+                    crewName: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : ''
+                }, '*');
+            } catch (e) { /* ignore */ }
+        }
     }).getBootPayload(ACTIVE_USER_NAME);
     
   // Async fetch clients for dropdowns & cache

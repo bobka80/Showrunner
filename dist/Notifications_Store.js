@@ -97,8 +97,41 @@ function completeFcmRegistrationViaKey_(regKey, token, label) {
   const crewName = cache.get(cacheKey);
   if (!crewName) return { success: false, message: 'Registration key expired — log in again.' };
   const result = registerFcmToken(crewName, token, label || 'web-hosting', crewName);
-  if (result && result.success) cache.remove(cacheKey);
+  try {
+    writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', 'FCM_MOBILE', label || 'web',
+      (result && result.success)
+        ? ('Saved token (' + (label || 'web') + ') devices=' + (result.deviceCount || 1))
+        : ('Save failed: ' + ((result && result.message) || 'unknown')));
+  } catch (e) { /* optional */ }
+  if (result && result.success) {
+    cache.put(cacheKey, crewName, 120);
+  }
   return result;
+}
+
+function verifyFcmTokenSavedForKey_(regKey, tokenPrefix) {
+  const cleanKey = String(regKey || '').trim();
+  const prefix = String(tokenPrefix || '').trim();
+  if (!cleanKey || prefix.length < 8) {
+    return { saved: false, message: 'Missing check data.' };
+  }
+  const cache = CacheService.getScriptCache();
+  const crewName = cache.get('fcm_regkey_' + cleanKey);
+  if (!crewName) {
+    return { saved: false, message: 'Key expired — stay logged in and retry.' };
+  }
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) return { saved: false, message: 'Unknown user.' };
+  const devices = getFcmDevicesForUid_(profile.uid);
+  const found = devices.some(function(d) {
+    return d && d.token && String(d.token).indexOf(prefix) === 0;
+  });
+  return {
+    saved: found,
+    deviceCount: devices.length,
+    labels: devices.map(function(d) { return d.label || 'web'; }).join(', '),
+    message: found ? 'Phone registered on server.' : 'Token not on server yet.'
+  };
 }
 
 function prepareFcmRegistrationBridge(crewName) {

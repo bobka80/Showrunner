@@ -7,6 +7,7 @@
   const enableBtn = document.getElementById('push-enable-btn');
   const enableBtnDesk = document.getElementById('push-enable-btn-desk');
   const dockMsgEl = document.getElementById('push-dock-msg');
+  const dockStatusEl = document.getElementById('push-dock-status');
   const frame = document.getElementById('app-frame');
   let firebaseConfig = null;
   let fcmToken = null;
@@ -16,7 +17,8 @@
   let pendingFcmAuth = null;
   let regKeySaveInFlight = false;
   let regKeyRetryTimer = null;
-  const SW_BUILD = '289';
+  const SW_BUILD = '290';
+  let serverSaveConfirmed = false;
   let tokenBroadcastTimer = null;
 
   function isMobileDevice() {
@@ -69,6 +71,13 @@
     } catch (e) { /* ignore */ }
   }
 
+  function setDockStatus(lines) {
+    if (!dockStatusEl) return;
+    var text = Array.isArray(lines) ? lines.join(' · ') : String(lines || '');
+    dockStatusEl.textContent = text;
+    logPush(text);
+  }
+
   function setDockMessage(msg) {
     if (dockMsgEl) dockMsgEl.textContent = msg;
   }
@@ -85,7 +94,8 @@
       if (bannerEl) bannerEl.classList.add('hidden');
       hideIosInstallBanner();
       if (m === 'denied') {
-        setDockMessage('Chrome blocked this site. Tap ⋮ → Settings → Site settings → Notifications → allow sm-showrunner-97405.web.app');
+        setDockMessage('Chrome blocked this site. Fix in Chrome before retrying.');
+        setDockStatus(['Step 1: BLOCKED', 'Chrome ⋮ → Settings → Site settings → Notifications → Allow web.app']);
         if (enableBtn) enableBtn.textContent = 'I fixed it — retry';
       } else if (m === 'retry') {
         setDockMessage('Permission OK but phone registration failed. Tap retry (HyperOS: also allow Chrome autostart).');
@@ -102,6 +112,7 @@
   }
 
   function hidePushPrompt() {
+    if (isMobileDevice() && !serverSaveConfirmed && fcmToken && pendingFcmAuth) return;
     document.body.classList.remove('push-dock-open');
     if (bannerEl) bannerEl.classList.add('hidden');
     hideIosInstallBanner();
@@ -179,10 +190,37 @@
     } catch (e) { /* ignore */ }
   }
 
+  function verifySaveOnServer(regKey) {
+    if (!regKey || !fcmToken) return;
+    const cb = '__srFcmChk_' + Date.now();
+    const tp = encodeURIComponent(fcmToken.slice(0, 12));
+    const url = getRegisterBaseUrl()
+      + '?action=fcmcheck'
+      + '&key=' + encodeURIComponent(regKey)
+      + '&tp=' + tp
+      + '&callback=' + encodeURIComponent(cb);
+    window[cb] = function(res) {
+      delete window[cb];
+      if (res && res.saved) {
+        serverSaveConfirmed = true;
+        setDockStatus(['Step 3: SAVED', (res.deviceCount || 1) + ' device(s)', res.labels || '']);
+        hidePushPrompt();
+        notifyIframeRegistered(true);
+      } else {
+        setDockStatus(['Step 3: NOT SAVED', (res && res.message) ? res.message : 'Retrying…']);
+      }
+    };
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = function() { delete window[cb]; };
+    document.head.appendChild(script);
+  }
+
   function registerTokenViaRegKeyJsonp(regKey) {
     const baseUrl = getRegisterBaseUrl();
     if (!regKey || !baseUrl || !fcmToken || regKeySaveInFlight) return;
     regKeySaveInFlight = true;
+    setDockStatus(['Step 2: saving to server…']);
     logPush('saving token via login key');
 
     const cb = '__srFcmKey_' + Date.now();
@@ -198,11 +236,12 @@
       regKeySaveInFlight = false;
       if (res && res.success) {
         logPush('token saved via login key');
-        hidePushPrompt();
-        hideIosInstallBanner();
-        notifyIframeRegistered(true);
+        setDockStatus(['Step 2: server accepted', 'Checking…']);
+        verifySaveOnServer(regKey);
       } else {
-        logPush('login key save failed: ' + ((res && res.message) || 'rejected'));
+        var err = (res && res.message) ? res.message : 'rejected';
+        logPush('login key save failed: ' + err);
+        setDockStatus(['Step 2: SAVE FAILED', err]);
       }
     };
 
@@ -212,6 +251,7 @@
       delete window[cb];
       regKeySaveInFlight = false;
       logPush('login key save failed — network');
+      setDockStatus(['Step 2: NETWORK ERROR', 'Could not reach server']);
     };
     document.head.appendChild(script);
   }
@@ -308,6 +348,7 @@
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
       stopTokenBroadcast();
+      serverSaveConfirmed = true;
       hidePushPrompt();
       logPush('registration confirmed by app');
     }
@@ -351,18 +392,35 @@
       return false;
     }
     hideIosInstallBanner();
+    setDockStatus(['Step 1: getting push token…', 'permission=' + Notification.permission]);
 
     try {
       var swUrl = '/firebase-messaging-sw.js?build=' + SW_BUILD;
       var reg = await navigator.serviceWorker.register(swUrl);
       if (reg && reg.update) await reg.update();
+      await navigator.serviceWorker.ready;
       if (!messaging) messaging = firebase.messaging();
-      fcmToken = await messaging.getToken({
-        vapidKey: firebaseConfig.vapidKey,
-        serviceWorkerRegistration: reg
-      });
+
+      var attempts = isRetry ? 1 : 3;
+      var lastErr = null;
+      for (var i = 0; i < attempts; i++) {
+        try {
+          fcmToken = await messaging.getToken({
+            vapidKey: firebaseConfig.vapidKey,
+            serviceWorkerRegistration: reg
+          });
+          if (fcmToken) break;
+        } catch (innerErr) {
+          lastErr = innerErr;
+          if (i < attempts - 1) {
+            await new Promise(function(r) { setTimeout(r, 1500); });
+          }
+        }
+      }
+      if (!fcmToken && lastErr) throw lastErr;
     } catch (err) {
       if (!isRetry && /push service error/i.test(String(err && err.message))) {
+        setDockStatus(['Step 1: push error — resetting', 'HyperOS: allow Chrome autostart']);
         logPush('push service error — retrying after reset');
         await resetPushRegistration();
         return obtainFcmToken(true);
@@ -372,12 +430,13 @@
 
     if (!fcmToken) {
       logPush('no token — check VAPID');
+      setDockStatus(['Step 1: NO TOKEN', 'Check Chrome notification permission']);
       showPushPrompt('retry');
       return false;
     }
 
     logPush('token ready');
-    hidePushPrompt();
+    setDockStatus(['Step 1: token OK', 'waiting for login…']);
     flushPendingBridge();
     trySaveTokenViaRegKey();
     startTokenBroadcast();
@@ -429,7 +488,9 @@
     } catch (err) {
       pushStarted = false;
       console.error(err);
-      logPush(formatTokenError(err));
+      var errMsg = formatTokenError(err);
+      logPush(errMsg);
+      setDockStatus(['Step 1: FAILED', errMsg]);
       if (isIosInBrowserTab()) {
         showIosInstallBanner();
       } else {

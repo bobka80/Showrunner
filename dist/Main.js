@@ -99,6 +99,17 @@ function doGet(e) {
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'fcmcheck') {
+    const result = verifyFcmTokenSavedForKey_(e.parameter.key || '', e.parameter.tp || '');
+    const json = JSON.stringify(result);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
   loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
   loginTemplate.errorMsg = "none";
@@ -111,6 +122,15 @@ function doPost(e) {
   if (action === 'fcmreg') {
     const result = completeFcmRegistrationViaBridge_(
       e.parameter.nonce || '',
+      e.parameter.token || '',
+      e.parameter.label || 'web-hosting'
+    );
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  if (action === 'fcmregkey') {
+    const result = completeFcmRegistrationViaKey_(
+      e.parameter.key || '',
       e.parameter.token || '',
       e.parameter.label || 'web-hosting'
     );
@@ -188,7 +208,8 @@ function getBootPayload(crewName) {
     monthData: monthData,
     tasks: extras.tasks,
     notifs: extras.notifs,
-    conflicts: conflicts
+    conflicts: conflicts,
+    fcmRegKey: createFcmRegistrationKey_(crewName)
   };
 }
 
