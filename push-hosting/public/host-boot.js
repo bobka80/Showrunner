@@ -19,7 +19,7 @@
   let regKeySaveInFlight = false;
   let regKeyRetryTimer = null;
   let fcmAuthRequestTimer = null;
-  const SW_BUILD = '294';
+  const SW_BUILD = '295';
   let serverSaveConfirmed = false;
   let tokenBroadcastTimer = null;
 
@@ -210,15 +210,70 @@
     } catch (e) { /* ignore */ }
   }
 
-  function postTokenToApp() {
-    if (!fcmToken || !frame || !frame.contentWindow) return;
+  function postTokenToTarget(target) {
+    if (!fcmToken || !target || !target.postMessage) return;
     try {
-      frame.contentWindow.postMessage({
+      target.postMessage({
         type: 'SHOWRUNNER_FCM_TOKEN',
         token: fcmToken,
         label: deviceLabel()
       }, '*');
     } catch (e) { /* ignore */ }
+  }
+
+  function burstTokenToTarget(target) {
+    if (!target) return;
+    postTokenToTarget(target);
+    setTimeout(function() { postTokenToTarget(target); }, 120);
+    setTimeout(function() { postTokenToTarget(target); }, 500);
+    setTimeout(function() { postTokenToTarget(target); }, 1500);
+  }
+
+  function postTokenToApp() {
+    if (!fcmToken || !frame || !frame.contentWindow) return;
+    postTokenToTarget(frame.contentWindow);
+  }
+
+  async function ensureFcmTokenForSave() {
+    if (fcmToken) return true;
+    if (Notification.permission !== 'granted') return false;
+    try {
+      return await obtainFcmToken(false);
+    } catch (e) {
+      logPush('ensure token failed: ' + ((e && e.message) || e));
+      return false;
+    }
+  }
+
+  async function handleSaveRequestFromApp(source) {
+    requestFcmAuthFromIframe();
+    if (!fcmToken) {
+      setDockStatus(['Save requested…', 'getting phone token…']);
+      var got = await ensureFcmTokenForSave();
+      if (!got) {
+        pushStarted = false;
+        if (Notification.permission === 'default' || Notification.permission === 'denied') {
+          showPushPrompt(Notification.permission === 'denied' ? 'denied' : 'allow');
+        } else {
+          showPushPrompt('retry');
+        }
+        if (source) {
+          try {
+            source.postMessage({
+              type: 'SHOWRUNNER_FCM_TOKEN_STATUS',
+              hasToken: false,
+              permission: Notification.permission,
+              message: 'Allow notifications in the green bar above.'
+            }, '*');
+          } catch (e) { /* ignore */ }
+        }
+        return;
+      }
+    }
+    burstTokenToTarget(source || (frame && frame.contentWindow));
+    trySaveTokenViaRegKey();
+    startRegKeyRetryLoop();
+    startFcmAuthRequestLoop();
   }
 
   function verifySaveOnServer(regKey) {
@@ -298,11 +353,13 @@
       if (res && res.success) {
         logPush('token saved via login key');
         setDockStatus(['Step 2: server accepted', 'Checking…']);
+        notifyIframeRegistered(true, 'Saved on server.');
         verifySaveOnServer(regKey);
       } else {
         var err = (res && res.message) ? res.message : 'rejected';
         logPush('login key save failed: ' + err);
         setDockStatus(['Step 2: SAVE FAILED', err]);
+        notifyIframeRegistered(false, err);
       }
     };
 
@@ -345,6 +402,11 @@
     if (!fcmToken) {
       pendingBridge = data;
       logPush('token pending — waiting for login');
+      if (Notification.permission === 'granted') {
+        ensureFcmTokenForSave().then(function(got) {
+          if (got && pendingBridge) registerTokenViaBridgeJsonp(pendingBridge);
+        });
+      }
       return;
     }
     pendingBridge = null;
@@ -405,7 +467,11 @@
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_APP_READY' || ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
-      postTokenToApp();
+      if (fcmToken) {
+        burstTokenToTarget(ev.source || (frame && frame.contentWindow));
+      } else if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
+        handleSaveRequestFromApp(ev.source);
+      }
       if (ev.data.type === 'SHOWRUNNER_APP_READY' && ev.data.regKey) {
         pendingFcmAuth = {
           regKey: ev.data.regKey,
@@ -415,6 +481,9 @@
         trySaveTokenViaRegKey();
         startRegKeyRetryLoop();
       }
+    }
+    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_SAVE') {
+      handleSaveRequestFromApp(ev.source);
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
       stopTokenBroadcast();
@@ -427,7 +496,13 @@
       showPushPrompt(Notification.permission === 'denied' ? 'denied' : 'allow');
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
-      registerTokenViaBridgeJsonp(ev.data);
+      if (!fcmToken && Notification.permission === 'granted') {
+        ensureFcmTokenForSave().then(function() {
+          registerTokenViaBridgeJsonp(ev.data);
+        });
+      } else {
+        registerTokenViaBridgeJsonp(ev.data);
+      }
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
       pendingFcmAuth = ev.data;
