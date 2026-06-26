@@ -1,15 +1,20 @@
 /**
- * Firebase Hosting shell — loads Showrunner in iframe + registers FCM silently.
+ * Firebase Hosting shell — Showrunner iframe + FCM (host-only token save).
  */
 (function() {
   const PROD_GAS_EXEC = 'https://script.google.com/macros/s/AKfycbxynTt5JaKQiv1Iu_ahSQBcrBDKpuhz98lac4G-bJO5PMtmvgJr_uKZ1Y58lxOOupSwlw/exec';
   const bannerEl = document.getElementById('push-enable-banner');
   const enableBtn = document.getElementById('push-enable-btn');
   const enableBtnDesk = document.getElementById('push-enable-btn-desk');
-  const linkBtn = document.getElementById('push-link-btn');
   const dockMsgEl = document.getElementById('push-dock-msg');
   const dockStatusEl = document.getElementById('push-dock-status');
   const frame = document.getElementById('app-frame');
+  const installPanel = document.getElementById('install-pwa-panel');
+  const installBtn = document.getElementById('install-pwa-btn-install');
+  const installDoneBtn = document.getElementById('install-pwa-btn-done');
+  const installSkipBtn = document.getElementById('install-pwa-btn-skip');
+
+  const SW_BUILD = '297';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -17,30 +22,15 @@
   let pendingBridge = null;
   let pendingFcmAuth = null;
   let regKeySaveInFlight = false;
-  let regKeyRetryTimer = null;
-  let fcmAuthRequestTimer = null;
-  const SW_BUILD = '296';
+  let registrationLoopTimer = null;
   let serverSaveConfirmed = false;
-  let tokenBroadcastTimer = null;
-  const installPanel = document.getElementById('install-pwa-panel');
-  const installBtn = document.getElementById('install-pwa-btn-install');
-  const installDoneBtn = document.getElementById('install-pwa-btn-done');
-  const installSkipBtn = document.getElementById('install-pwa-btn-skip');
+  let regKeyFailCount = 0;
   let deferredInstallPrompt = null;
   let shellInitStarted = false;
 
   function isMobileDevice() {
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }
-
-  function deviceLabel() {
-    if (isStandalonePwa() && isMobileDevice()) return 'pwa-mobile';
-    return isMobileDevice() ? 'web-mobile' : 'web-desktop';
-  }
-
-  function logPush(msg) {
-    try { console.log('[Showrunner push]', msg); } catch (e) { /* ignore */ }
   }
 
   function isIosDevice() {
@@ -55,6 +45,15 @@
 
   function isIosInBrowserTab() {
     return isIosDevice() && !isStandalonePwa();
+  }
+
+  function deviceLabel() {
+    if (isStandalonePwa() && isMobileDevice()) return 'pwa-mobile';
+    return isMobileDevice() ? 'web-mobile' : 'web-desktop';
+  }
+
+  function logPush(msg) {
+    try { console.log('[Showrunner push]', msg); } catch (e) { /* ignore */ }
   }
 
   function shouldShowInstallPanel() {
@@ -92,16 +91,6 @@
     initShell();
   }
 
-  function showIosInstallBanner() {
-    showInstallPanel();
-    document.body.classList.remove('push-dock-open');
-    if (bannerEl) bannerEl.classList.add('hidden');
-  }
-
-  function hideIosInstallBanner() {
-    hideInstallPanel();
-  }
-
   function notifyIframePushState(needsAttention, message) {
     if (!frame || !frame.contentWindow) return;
     try {
@@ -118,7 +107,7 @@
     if (!dock || !frame) return;
     function apply() {
       if (document.body.classList.contains('push-dock-open')) {
-        var h = Math.max(dock.offsetHeight, dock.scrollHeight, 160);
+        var h = Math.max(dock.offsetHeight, dock.scrollHeight, 120);
         frame.style.top = h + 'px';
         frame.style.height = 'calc(100% - ' + h + 'px)';
       } else {
@@ -160,19 +149,19 @@
     if (isMobileDevice()) {
       document.body.classList.add('push-dock-open');
       if (bannerEl) bannerEl.classList.add('hidden');
-      hideIosInstallBanner();
+      hideInstallPanel();
       if (m === 'denied') {
-        setDockMessage('Chrome blocked this site. Fix in Chrome before retrying.');
-        setDockStatus(['Step 1: BLOCKED', 'Chrome ⋮ → Settings → Site settings → Notifications → Allow web.app']);
+        setDockMessage('Notifications blocked. Allow web.app in browser settings, then retry.');
+        setDockStatus(['Step 1: BLOCKED', 'Site settings → Notifications → Allow']);
         if (enableBtn) enableBtn.textContent = 'I fixed it — retry';
       } else if (m === 'retry') {
-        setDockMessage('Permission OK but phone registration failed. Tap retry (HyperOS: also allow Chrome autostart).');
-        if (enableBtn) enableBtn.textContent = 'Retry push setup';
+        setDockMessage('Registration failed. Tap retry (Android: allow Chrome autostart).');
+        if (enableBtn) enableBtn.textContent = 'Retry alerts setup';
       } else {
-        setDockMessage('Tap below — Chrome must show Allow. Required for phone alerts.');
+        setDockMessage('Allow notifications to get shift and task alerts on this device.');
         if (enableBtn) enableBtn.textContent = 'Allow notifications';
       }
-      notifyIframePushState(true, 'Tap Save push to my account inside the app.');
+      notifyIframePushState(true, 'Tap Allow notifications in the green bar above.');
       syncDockLayout();
       return;
     }
@@ -185,24 +174,8 @@
     if (isMobileDevice() && !serverSaveConfirmed && fcmToken && pendingFcmAuth) return;
     document.body.classList.remove('push-dock-open');
     if (bannerEl) bannerEl.classList.add('hidden');
-    hideIosInstallBanner();
     notifyIframePushState(false, '');
     syncDockLayout();
-  }
-
-  function showBanner() {
-    if (Notification.permission === 'denied') {
-      showPushPrompt('denied');
-    } else if (Notification.permission === 'granted' && !fcmToken) {
-      showPushPrompt('retry');
-    } else {
-      showPushPrompt('allow');
-    }
-  }
-
-  function hideBanner() {
-    if (isMobileDevice() && !fcmToken) return;
-    hidePushPrompt();
   }
 
   function getRegisterBaseUrl() {
@@ -220,100 +193,37 @@
     } catch (e) { /* ignore */ }
   }
 
-  function stopTokenBroadcast() {
-    if (tokenBroadcastTimer) {
-      clearInterval(tokenBroadcastTimer);
-      tokenBroadcastTimer = null;
-    }
-  }
-
-  function startTokenBroadcast() {
-    stopTokenBroadcast();
-    if (!fcmToken) return;
-    postTokenToApp();
-    var elapsed = 0;
-    tokenBroadcastTimer = setInterval(function() {
-      if (!fcmToken) {
-        stopTokenBroadcast();
-        return;
-      }
-      postTokenToApp();
-      elapsed += 3000;
-      if (elapsed >= 300000) stopTokenBroadcast();
-    }, 3000);
-  }
-
-  function notifyIframeTokenReady() {
+  function requestFcmAuthFromIframe() {
     if (!frame || !frame.contentWindow) return;
     try {
-      frame.contentWindow.postMessage({ type: 'SHOWRUNNER_PARENT_TOKEN_READY' }, '*');
+      frame.contentWindow.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_AUTH' }, '*');
     } catch (e) { /* ignore */ }
   }
 
-  function postTokenToTarget(target) {
-    if (!fcmToken || !target || !target.postMessage) return;
-    try {
-      target.postMessage({
-        type: 'SHOWRUNNER_FCM_TOKEN',
-        token: fcmToken,
-        label: deviceLabel()
-      }, '*');
-    } catch (e) { /* ignore */ }
-  }
-
-  function burstTokenToTarget(target) {
-    if (!target) return;
-    postTokenToTarget(target);
-    setTimeout(function() { postTokenToTarget(target); }, 120);
-    setTimeout(function() { postTokenToTarget(target); }, 500);
-    setTimeout(function() { postTokenToTarget(target); }, 1500);
-  }
-
-  function postTokenToApp() {
-    if (!fcmToken || !frame || !frame.contentWindow) return;
-    postTokenToTarget(frame.contentWindow);
-  }
-
-  async function ensureFcmTokenForSave() {
-    if (fcmToken) return true;
-    if (Notification.permission !== 'granted') return false;
-    try {
-      return await obtainFcmToken(false);
-    } catch (e) {
-      logPush('ensure token failed: ' + ((e && e.message) || e));
-      return false;
+  function stopRegistrationLoop() {
+    if (registrationLoopTimer) {
+      clearInterval(registrationLoopTimer);
+      registrationLoopTimer = null;
     }
   }
 
-  async function handleSaveRequestFromApp(source) {
-    requestFcmAuthFromIframe();
-    if (!fcmToken) {
-      setDockStatus(['Save requested…', 'getting phone token…']);
-      var got = await ensureFcmTokenForSave();
-      if (!got) {
-        pushStarted = false;
-        if (Notification.permission === 'default' || Notification.permission === 'denied') {
-          showPushPrompt(Notification.permission === 'denied' ? 'denied' : 'allow');
-        } else {
-          showPushPrompt('retry');
-        }
-        if (source) {
-          try {
-            source.postMessage({
-              type: 'SHOWRUNNER_FCM_TOKEN_STATUS',
-              hasToken: false,
-              permission: Notification.permission,
-              message: 'Allow notifications in the green bar above.'
-            }, '*');
-          } catch (e) { /* ignore */ }
-        }
+  function startRegistrationLoop() {
+    if (registrationLoopTimer || serverSaveConfirmed) return;
+    var elapsed = 0;
+    registrationLoopTimer = setInterval(function() {
+      if (serverSaveConfirmed || !fcmToken) {
+        stopRegistrationLoop();
         return;
       }
-    }
-    burstTokenToTarget(source || (frame && frame.contentWindow));
-    trySaveTokenViaRegKey();
-    startRegKeyRetryLoop();
-    startFcmAuthRequestLoop();
+      if (!pendingFcmAuth || !pendingFcmAuth.regKey) {
+        setDockStatus(['Step 1: token OK', 'Step 2: waiting for account link…']);
+        requestFcmAuthFromIframe();
+      } else if (!regKeySaveInFlight) {
+        trySaveTokenViaRegKey();
+      }
+      elapsed += 4000;
+      if (elapsed >= 300000) stopRegistrationLoop();
+    }, 4000);
   }
 
   function verifySaveOnServer(regKey) {
@@ -329,11 +239,13 @@
       delete window[cb];
       if (res && res.saved) {
         serverSaveConfirmed = true;
+        regKeyFailCount = 0;
+        stopRegistrationLoop();
         setDockStatus(['Step 3: SAVED', (res.deviceCount || 1) + ' device(s)', res.labels || '']);
         hidePushPrompt();
-        notifyIframeRegistered(true);
-      } else {
-        setDockStatus(['Step 3: NOT SAVED', (res && res.message) ? res.message : 'Retrying…']);
+        notifyIframeRegistered(true, 'Alerts linked to your account.');
+      } else if (!regKeySaveInFlight) {
+        setDockStatus(['Step 3: checking…', (res && res.message) ? res.message : 'Retrying']);
       }
     };
     const script = document.createElement('script');
@@ -342,42 +254,12 @@
     document.head.appendChild(script);
   }
 
-  function requestFcmAuthFromIframe() {
-    if (!frame || !frame.contentWindow) return;
-    try {
-      frame.contentWindow.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_AUTH' }, '*');
-    } catch (e) { /* ignore */ }
-  }
-
-  function startFcmAuthRequestLoop() {
-    if (fcmAuthRequestTimer) return;
-    var elapsed = 0;
-    fcmAuthRequestTimer = setInterval(function() {
-      if (serverSaveConfirmed || !fcmToken) {
-        clearInterval(fcmAuthRequestTimer);
-        fcmAuthRequestTimer = null;
-        return;
-      }
-      if (!pendingFcmAuth) {
-        requestFcmAuthFromIframe();
-        setDockStatus(['Step 1: token OK', 'tap Save push in app below']);
-      } else {
-        trySaveTokenViaRegKey();
-      }
-      elapsed += 3000;
-      if (elapsed >= 180000) {
-        clearInterval(fcmAuthRequestTimer);
-        fcmAuthRequestTimer = null;
-      }
-    }, 3000);
-  }
-
   function registerTokenViaRegKeyJsonp(regKey) {
     const baseUrl = getRegisterBaseUrl();
     if (!regKey || !baseUrl || !fcmToken || regKeySaveInFlight) return;
     regKeySaveInFlight = true;
     setDockStatus(['Step 2: saving to server…']);
-    logPush('saving token via login key');
+    logPush('saving via login key');
 
     const cb = '__srFcmKey_' + Date.now();
     const url = baseUrl
@@ -391,15 +273,23 @@
       delete window[cb];
       regKeySaveInFlight = false;
       if (res && res.success) {
-        logPush('token saved via login key');
-        setDockStatus(['Step 2: server accepted', 'Checking…']);
-        notifyIframeRegistered(true, 'Saved on server.');
+        regKeyFailCount = 0;
+        logPush('server accepted token');
+        setDockStatus(['Step 2: server accepted', 'Step 3: verifying…']);
         verifySaveOnServer(regKey);
       } else {
+        regKeyFailCount += 1;
         var err = (res && res.message) ? res.message : 'rejected';
-        logPush('login key save failed: ' + err);
+        logPush('save failed: ' + err);
         setDockStatus(['Step 2: SAVE FAILED', err]);
         notifyIframeRegistered(false, err);
+        if (/expired|log in/i.test(err) || regKeyFailCount >= 2) {
+          pendingFcmAuth = null;
+          requestFcmAuthFromIframe();
+        }
+        if (regKeyFailCount >= 3 && pendingBridge) {
+          registerTokenViaBridgeJsonp(pendingBridge);
+        }
       }
     };
 
@@ -408,8 +298,8 @@
     script.onerror = function() {
       delete window[cb];
       regKeySaveInFlight = false;
-      logPush('login key save failed — network');
-      setDockStatus(['Step 2: NETWORK ERROR', 'Could not reach server']);
+      regKeyFailCount += 1;
+      setDockStatus(['Step 2: NETWORK ERROR', 'Retrying…']);
     };
     document.head.appendChild(script);
   }
@@ -419,39 +309,14 @@
     registerTokenViaRegKeyJsonp(pendingFcmAuth.regKey);
   }
 
-  function startRegKeyRetryLoop() {
-    if (regKeyRetryTimer) return;
-    var elapsed = 0;
-    regKeyRetryTimer = setInterval(function() {
-      if (!pendingFcmAuth) return;
-      if (!fcmToken && isMobileDevice() && Notification.permission !== 'granted') {
-        showBanner();
-      }
-      trySaveTokenViaRegKey();
-      elapsed += 4000;
-      if (elapsed >= 300000) {
-        clearInterval(regKeyRetryTimer);
-        regKeyRetryTimer = null;
-      }
-    }, 4000);
-  }
-
   function registerTokenViaBridgeJsonp(data) {
     const baseUrl = getRegisterBaseUrl();
-    if (!data || !data.nonce || !baseUrl) return;
-    if (!fcmToken) {
-      pendingBridge = data;
-      logPush('token pending — waiting for login');
-      if (Notification.permission === 'granted') {
-        ensureFcmTokenForSave().then(function(got) {
-          if (got && pendingBridge) registerTokenViaBridgeJsonp(pendingBridge);
-        });
-      }
+    if (!data || !data.nonce || !baseUrl || !fcmToken) {
+      if (data) pendingBridge = data;
       return;
     }
     pendingBridge = null;
-    logPush('saving token via bridge');
-
+    logPush('fallback save via bridge');
     const cb = '__srFcmReg_' + Date.now();
     const url = baseUrl
       + '?action=fcmreg'
@@ -459,35 +324,29 @@
       + '&token=' + encodeURIComponent(fcmToken)
       + '&label=' + encodeURIComponent(data.label || deviceLabel())
       + '&callback=' + encodeURIComponent(cb);
-
     window[cb] = function(res) {
       delete window[cb];
       if (res && res.success) {
-        logPush('token saved');
+        serverSaveConfirmed = true;
+        stopRegistrationLoop();
         hidePushPrompt();
-        hideIosInstallBanner();
-        notifyIframeRegistered(true);
+        notifyIframeRegistered(true, 'Alerts linked.');
       } else {
-        logPush('save failed: ' + ((res && res.message) || 'rejected'));
         notifyIframeRegistered(false, (res && res.message) ? res.message : 'Save rejected');
       }
     };
-
     const script = document.createElement('script');
     script.src = url;
-    script.onerror = function() {
-      delete window[cb];
-      logPush('save failed — network');
-      notifyIframeRegistered(false, 'Could not reach server to save token.');
-    };
+    script.onerror = function() { delete window[cb]; };
     document.head.appendChild(script);
   }
 
-  function flushPendingBridge() {
-    if (pendingBridge && fcmToken) {
-      registerTokenViaBridgeJsonp(pendingBridge);
-    }
-    postTokenToApp();
+  function onAccountLink(auth) {
+    pendingFcmAuth = auth;
+    if (!fcmToken) return;
+    setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
+    trySaveTokenViaRegKey();
+    startRegistrationLoop();
   }
 
   function loadConfigJsonp() {
@@ -506,58 +365,34 @@
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
-    if (ev.data.type === 'SHOWRUNNER_APP_READY' || ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
-      if (fcmToken) {
-        burstTokenToTarget(ev.source || (frame && frame.contentWindow));
-      } else if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
-        handleSaveRequestFromApp(ev.source);
-      }
-      if (ev.data.type === 'SHOWRUNNER_APP_READY' && ev.data.regKey) {
-        pendingFcmAuth = {
-          regKey: ev.data.regKey,
-          crewName: ev.data.crewName || ''
-        };
-        setDockStatus(['Step 1: token OK', 'account found', 'saving…']);
-        trySaveTokenViaRegKey();
-        startRegKeyRetryLoop();
-      }
+    if (ev.data.type === 'SHOWRUNNER_APP_READY' && ev.data.regKey) {
+      onAccountLink({ regKey: ev.data.regKey, crewName: ev.data.crewName || '' });
     }
-    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_SAVE') {
-      handleSaveRequestFromApp(ev.source);
+    if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
+      onAccountLink(ev.data);
+      if (isMobileDevice() && Notification.permission !== 'granted') {
+        showPushPrompt('allow');
+      }
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
-      stopTokenBroadcast();
       serverSaveConfirmed = true;
+      stopRegistrationLoop();
       hidePushPrompt();
-      logPush('registration confirmed by app');
     }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_PUSH_PERMISSION') {
       pushStarted = false;
       showPushPrompt(Notification.permission === 'denied' ? 'denied' : 'allow');
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
-      if (!fcmToken && Notification.permission === 'granted') {
-        ensureFcmTokenForSave().then(function() {
-          registerTokenViaBridgeJsonp(ev.data);
-        });
-      } else {
-        registerTokenViaBridgeJsonp(ev.data);
-      }
-    }
-    if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
-      pendingFcmAuth = ev.data;
-      setDockStatus(['Step 1: token OK', 'Step 2: saving to server…']);
-      if (isMobileDevice() && Notification.permission !== 'granted') {
-        showBanner();
-      }
-      trySaveTokenViaRegKey();
-      startRegKeyRetryLoop();
+      pendingBridge = ev.data;
+      if (fcmToken && regKeyFailCount >= 3) registerTokenViaBridgeJsonp(ev.data);
     }
   });
 
   if (frame) {
     frame.addEventListener('load', function() {
-      flushPendingBridge();
+      requestFcmAuthFromIframe();
+      if (fcmToken) trySaveTokenViaRegKey();
     });
   }
 
@@ -574,11 +409,11 @@
 
   async function obtainFcmToken(isRetry) {
     if (isIosInBrowserTab()) {
-      showIosInstallBanner();
+      showInstallPanel();
       return false;
     }
-    hideIosInstallBanner();
-    setDockStatus(['Step 1: getting push token…', 'permission=' + Notification.permission]);
+    hideInstallPanel();
+    setDockStatus(['Step 1: getting alert token…']);
 
     try {
       var swUrl = '/firebase-messaging-sw.js?build=' + SW_BUILD;
@@ -598,16 +433,13 @@
           if (fcmToken) break;
         } catch (innerErr) {
           lastErr = innerErr;
-          if (i < attempts - 1) {
-            await new Promise(function(r) { setTimeout(r, 1500); });
-          }
+          if (i < attempts - 1) await new Promise(function(r) { setTimeout(r, 1500); });
         }
       }
       if (!fcmToken && lastErr) throw lastErr;
     } catch (err) {
       if (!isRetry && /push service error/i.test(String(err && err.message))) {
-        setDockStatus(['Step 1: push error — resetting', 'HyperOS: allow Chrome autostart']);
-        logPush('push service error — retrying after reset');
+        setDockStatus(['Step 1: push error — resetting', 'Allow Chrome autostart on Xiaomi']);
         await resetPushRegistration();
         return obtainFcmToken(true);
       }
@@ -615,26 +447,22 @@
     }
 
     if (!fcmToken) {
-      logPush('no token — check VAPID');
-      setDockStatus(['Step 1: NO TOKEN', 'Check Chrome notification permission']);
+      setDockStatus(['Step 1: NO TOKEN', 'Check notification permission']);
       showPushPrompt('retry');
       return false;
     }
 
-    logPush('token ready');
-    setDockMessage('Token OK — tap Save push inside the app (scroll to top if needed).');
-    setDockStatus(['Step 1: token OK', 'tap Save push in app below']);
-    notifyIframePushState(true, 'Tap the green Save push to my account button at the top of this app.');
-    flushPendingBridge();
-    trySaveTokenViaRegKey();
+    logPush('token ready — auto-linking');
+    setDockMessage('Linking alerts to your account…');
+    setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
+    notifyIframePushState(true, 'Setting up alerts — allow notifications above if prompted.');
     requestFcmAuthFromIframe();
-    startFcmAuthRequestLoop();
-    startTokenBroadcast();
-    notifyIframeTokenReady();
+    trySaveTokenViaRegKey();
+    startRegistrationLoop();
 
     messaging.onMessage(function(payload) {
-      const title = (payload.notification && payload.notification.title) || 'Showrunner';
-      const body = (payload.notification && payload.notification.body) || '';
+      var title = (payload.notification && payload.notification.title) || 'Showrunner';
+      var body = (payload.notification && payload.notification.body) || '';
       if (Notification.permission === 'granted') {
         new Notification(title, { body: body });
       }
@@ -645,73 +473,44 @@
   async function requestNotificationsAndRegister() {
     if (pushStarted) return;
     pushStarted = true;
-
     try {
       if (!('Notification' in window)) {
-        logPush('not supported in this browser');
         pushStarted = false;
         return;
       }
-
       var permission = Notification.permission;
       if (permission === 'denied') {
         pushStarted = false;
         showPushPrompt('denied');
         return;
       }
-
       if (permission === 'default') {
         permission = await Notification.requestPermission();
       }
-
       if (permission !== 'granted') {
         pushStarted = false;
         showPushPrompt(permission === 'denied' ? 'denied' : 'allow');
         return;
       }
-
       await obtainFcmToken(false);
-      if (!fcmToken) {
-        pushStarted = false;
-        showPushPrompt('retry');
-      }
+      if (!fcmToken) pushStarted = false;
     } catch (err) {
       pushStarted = false;
       console.error(err);
-      var errMsg = formatTokenError(err);
-      logPush(errMsg);
-      setDockStatus(['Step 1: FAILED', errMsg]);
-      if (isIosInBrowserTab()) {
-        showIosInstallBanner();
-      } else {
-        showPushPrompt('retry');
-      }
+      setDockStatus(['Step 1: FAILED', (err && err.message) ? err.message : String(err)]);
+      if (isIosInBrowserTab()) showInstallPanel();
+      else showPushPrompt('retry');
     }
-  }
-
-  function formatTokenError(err) {
-    var msg = (err && err.message) ? err.message : String(err || 'init failed');
-    if (/push service error/i.test(msg) && isIosInBrowserTab()) {
-      return 'iPhone: Add to Home Screen first';
-    }
-    return msg;
   }
 
   async function initShell() {
     try {
-      logPush('loading config');
       firebaseConfig = await loadConfigJsonp();
-      if (!firebaseConfig.apiKey || !firebaseConfig.messagingSenderId || !firebaseConfig.appId) {
+      if (!firebaseConfig.apiKey || !firebaseConfig.vapidKey || firebaseConfig.vapidKeyValid === false) {
         logPush('config incomplete');
         return;
       }
-      if (!firebaseConfig.vapidKey || firebaseConfig.vapidKeyValid === false) {
-        logPush('VAPID key missing or invalid');
-        return;
-      }
-
       if (frame) frame.src = PROD_GAS_EXEC;
-
       firebase.initializeApp({
         apiKey: firebaseConfig.apiKey,
         authDomain: firebaseConfig.authDomain,
@@ -720,16 +519,12 @@
         messagingSenderId: firebaseConfig.messagingSenderId,
         appId: firebaseConfig.appId
       });
-
-      if (!('Notification' in window)) {
-        logPush('not supported');
-        return;
-      }
+      if (!('Notification' in window)) return;
 
       if (Notification.permission === 'granted') {
         pushStarted = true;
         if (isIosInBrowserTab()) {
-          showIosInstallBanner();
+          showInstallPanel();
           return;
         }
         var gotToken = await obtainFcmToken(false);
@@ -739,24 +534,14 @@
         }
         return;
       }
-
       if (Notification.permission === 'denied') {
         showPushPrompt('denied');
         return;
       }
-
       showPushPrompt('allow');
-      if (isMobileDevice()) {
-        setTimeout(function() {
-          if (!fcmToken && Notification.permission === 'default') {
-            notifyIframePushState(true, 'Tap Allow notifications in the green bar above.');
-          }
-        }, 2000);
-      }
     } catch (err) {
       console.error(err);
-      logPush(formatTokenError(err));
-      if (!isIosInBrowserTab()) showBanner();
+      if (!isIosInBrowserTab()) showPushPrompt('allow');
     }
   }
 
@@ -766,9 +551,7 @@
       if (e) e.preventDefault();
       pushStarted = false;
       if (Notification.permission === 'granted' && !fcmToken) {
-        resetPushRegistration().then(function() {
-          requestNotificationsAndRegister();
-        });
+        resetPushRegistration().then(requestNotificationsAndRegister);
         return;
       }
       requestNotificationsAndRegister();
@@ -779,19 +562,6 @@
 
   bindPushButton(enableBtn);
   bindPushButton(enableBtnDesk);
-  if (linkBtn) {
-    function onLinkTap(e) {
-      if (e) e.preventDefault();
-      linkBtn.style.opacity = '0.7';
-      setTimeout(function() { linkBtn.style.opacity = '1'; }, 150);
-      setDockStatus(['Tapped — linking…']);
-      requestFcmAuthFromIframe();
-      trySaveTokenViaRegKey();
-      startFcmAuthRequestLoop();
-    }
-    linkBtn.addEventListener('click', onLinkTap);
-    linkBtn.addEventListener('touchend', onLinkTap, { passive: false });
-  }
 
   window.addEventListener('beforeinstallprompt', function(e) {
     e.preventDefault();
@@ -805,7 +575,7 @@
       deferredInstallPrompt.prompt();
       deferredInstallPrompt.userChoice.then(function(choice) {
         deferredInstallPrompt = null;
-        installBtn.style.display = 'none';
+        if (installBtn) installBtn.style.display = 'none';
         if (choice.outcome === 'accepted') {
           try { localStorage.removeItem('sr_pwa_install_skip'); } catch (err) { /* ignore */ }
         }
@@ -817,7 +587,7 @@
     installDoneBtn.addEventListener('click', function() {
       var sub = installPanel && installPanel.querySelector('.install-sub');
       if (sub) {
-        sub.textContent = 'Close this browser tab, then open Showrunner from your home screen icon. Alerts and full-screen mode work from the icon only.';
+        sub.textContent = 'Close this tab and open Showrunner from your home screen icon.';
       }
       try { localStorage.removeItem('sr_pwa_install_skip'); } catch (err) { /* ignore */ }
     });
@@ -830,9 +600,6 @@
     });
   }
 
-  if (shouldShowInstallPanel()) {
-    showInstallPanel();
-  } else {
-    startShellOnce();
-  }
+  if (shouldShowInstallPanel()) showInstallPanel();
+  else startShellOnce();
 })();
