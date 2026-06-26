@@ -768,6 +768,11 @@
     body:not(.perm-task_manage_global):not(.perm-root) .req-task_manage_global { display: none !important; }
     body:not(.perm-task_manage_personal):not(.perm-root) .req-task_manage_personal { display: none !important; }
 
+    .task-personal-only .task-admin-only { display: none !important; }
+    .task-personal-only #task-new-todo,
+    .task-personal-only button[onclick="addTaskTodo()"] { display: none !important; }
+    .task-personal-only .btn-delete[onclick^="removeTaskTodo"] { display: none !important; }
+
     /* Project editor — crew briefing (read-only) mode */
     .editor-briefing-mode .pe-mgr-only { display: none !important; }
     body:not(.perm-manager-tier):not(.perm-root) .pe-manager-only { display: none !important; }

@@ -48,7 +48,8 @@ function getLatestGasVersion() {
 }
 
 function parseDeploymentId(output) {
-  const m = output.match(/-\s*(AKfycb[\w-]+)\s*@/);
+  const m = output.match(/Deployed\s+(AKfycb\S+)\s*@/i)
+    || output.match(/-\s*(AKfycb\S+)\s*@/);
   return m ? m[1] : null;
 }
 

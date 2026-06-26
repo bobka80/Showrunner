@@ -9,7 +9,7 @@
 // @INDEX: AUDIT_LOG -> Enterprise Audit Logger
 
 function verifyAuditSchema() {
-  const ss = SpreadsheetApp.openById(AUDIT_LOG_SHEET_ID);
+  const ss = SpreadsheetApp.openById(getAuditLogSheetId());
   let sheet = ss.getSheetByName("Audit_Logs");
   const headers = ["Timestamp", "Actor", "Action_Type", "Module", "Project_ID", "Target_Name", "Delta_Payload"];
   
@@ -84,7 +84,7 @@ function getEntityAuditHistory(targetUid) {
         }
     } catch(e) {}
 
-    const ss = SpreadsheetApp.openById(AUDIT_LOG_SHEET_ID);
+    const ss = SpreadsheetApp.openById(getAuditLogSheetId());
     const sheet = ss.getSheetByName("Audit_Logs");
     if (!sheet) return [];
     
@@ -123,7 +123,7 @@ function getEntityAuditHistory(targetUid) {
 // ==========================================
 // @INDEX: AUDIT_DB -> External Audit & Merge Engine
 function verifyAuditDatabaseSchema() {
-    const ss = SpreadsheetApp.openById(AUDIT_DB_SHEET_ID);
+    const ss = SpreadsheetApp.openById(getAuditDbSheetId());
     let sheet = ss.getSheetByName("Merge_Flags");
     const headers = ["uid", "group_id", "asset_id", "conflict_type", "status"];
     if (!sheet) {
@@ -212,7 +212,7 @@ function resolveAuditGroup(groupId, masterPayload, slaveIdsToDelete, totalQty, a
 }
 
 function verifyReviewedDatabaseSchema() {
-    const ss = SpreadsheetApp.openById(AUDIT_DB_SHEET_ID);
+    const ss = SpreadsheetApp.openById(getAuditDbSheetId());
     let sheet = ss.getSheetByName("Reviewed_Assets");
     if (!sheet) {
         sheet = ss.insertSheet("Reviewed_Assets");

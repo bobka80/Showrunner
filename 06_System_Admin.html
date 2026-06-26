@@ -160,9 +160,10 @@ function switchResourceTab(tabId) {
     document.getElementById('tab-content-vehicles').style.display = 'none';
     document.getElementById('tab-content-warehouse').style.display = 'none';
     if (document.getElementById('tab-content-clients')) document.getElementById('tab-content-clients').style.display = 'none';
+    if (document.getElementById('tab-content-database')) document.getElementById('tab-content-database').style.display = 'none';
     
     // Reset all buttons to unselected state
-    const btnIds = ['crew', 'assets', 'vehicles', 'warehouse', 'clients'];
+    const btnIds = ['crew', 'assets', 'vehicles', 'warehouse', 'clients', 'database'];
     btnIds.forEach(id => {
         const btn = document.getElementById('tab-btn-' + id);
         if (btn) {
@@ -198,10 +199,18 @@ function switchResourceTab(tabId) {
     if (btnAddVehicle) btnAddVehicle.style.setProperty('display', (tabId === 'vehicles') ? 'inline-flex' : 'none');
     if (btnSaveWarehouse) btnSaveWarehouse.style.setProperty('display', (tabId === 'warehouse') ? 'inline-flex' : 'none');
     if (btnAddClient) btnAddClient.style.setProperty('display', (tabId === 'clients') ? 'inline-flex' : 'none');
+
+    const searchName = document.getElementById('search-name');
+    const searchTag = document.getElementById('search-tag');
+    const searchWarn = document.getElementById('search-filter-warning');
+    if (searchName && searchName.parentElement && searchName.parentElement.parentElement) {
+        searchName.parentElement.parentElement.style.display = (tabId === 'database') ? 'none' : '';
+    }
+    if (searchWarn) searchWarn.style.display = 'none';
     
     // Clear global search bars when swapping tabs
-    if (document.getElementById('search-name')) document.getElementById('search-name').value = '';
-    if (document.getElementById('search-tag')) document.getElementById('search-tag').value = '';
+    if (searchName) searchName.value = '';
+    if (searchTag) searchTag.value = '';
     
     if (tabId === 'warehouse') {
         // 🚀 LAZY LOAD WAREHOUSE DATA
@@ -243,6 +252,8 @@ function switchResourceTab(tabId) {
         if (typeof loadAssetRegistry === 'function') loadAssetRegistry();
     } else if (tabId === 'vehicles') {
         loadVehicles();
+    } else if (tabId === 'database') {
+        if (typeof loadDatabaseOpsPanel === 'function') loadDatabaseOpsPanel();
     }
 }
 </script>

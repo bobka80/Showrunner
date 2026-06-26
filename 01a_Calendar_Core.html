@@ -144,8 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
           
           // Reads Live from Database
           let readiness = arg.event.extendedProps.rawDbData.readinessState || {};
+          const showLogisticsBadges = (typeof canViewLogistics === 'function') ? canViewLogistics() : true;
 
           let bList = '';
+          if (showLogisticsBadges) {
           // Crew (C)
           if (readiness.crew === 'draft') bList += `<div style="background:#facc15; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">C</div>`;
           else if (readiness.crew === 'finished') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 2px #4ade80; font-size:10px; font-weight:bold;">C</div>`;
@@ -159,6 +161,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (readiness.truck === 'assigned') bList += `<div style="background:#facc15; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:bold;">T</div>`;
           else if (readiness.truck === 'arranged_human') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 3px #4ade80; font-size:10px; font-weight:bold;">T</div>`;
           else if (readiness.truck === 'arranged_auto') bList += `<div style="background:#4ade80; color:#000; width:14px; height:14px; border-radius:2px; display:flex; align-items:center; justify-content:center; box-shadow: 0 0 0 1px #18181b, 0 0 0 3px #f97316; font-size:10px; font-weight:bold;">T</div>`;
+          }
 
           let badgesHtml = '';
           let badgesWidth = 0;

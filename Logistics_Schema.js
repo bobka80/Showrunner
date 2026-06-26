@@ -9,7 +9,7 @@
 // @INDEX: SCHEMA_ENGINE -> Relational Engine Schema
 function verifyDatabaseSchema(readOnly = false) {
   if (cachedEngineSheets && readOnly) return cachedEngineSheets;
-  const ss = SpreadsheetApp.openById(ENGINE_SHEET_ID); 
+  const ss = SpreadsheetApp.openById(getEngineSheetId()); 
   
   const sheetsArr = ss.getSheets();
   const sm = {};

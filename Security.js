@@ -284,7 +284,7 @@ function authenticateUser(crewName, passcode) {
 
         let uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : "";
 
-        return { success: true, name: crewData[i][cMap['Name']] || hardName, access: normalizeAccessTier(sysAccess), permissions: bundle, tunnelingActive: isTunneling, uid: uid }; 
+        return { success: true, name: crewData[i][cMap['Name']] || hardName, access: normalizeAccessTier(sysAccess), permissions: bundle, tunnelingActive: isTunneling, uid: uid, email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : '' }; 
       }
     }
     
@@ -328,7 +328,7 @@ function verifyBackendPermission(crewName, permissionKey) {
 
 const IMPLICIT_MANAGER_IAM_KEYS = [
   'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
-  'event_view_pricing', 'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal'
+  'event_view_pricing', 'task_manage_global', 'task_manage_personal'
 ];
 
 function effectiveBackendPermission(crewName, permissionKey) {
@@ -409,6 +409,12 @@ function assertActorCanPerformAssetOperations(actor) {
 function assertActorCanManageGlobalTasks(actor) {
   if (!effectiveBackendPermission(actor, 'task_manage_global')) {
     throw new Error('🛑 PERMISSION DENIED: Cannot manage global tasks.');
+  }
+}
+
+function assertActorCanViewLogistics(actor) {
+  if (!effectiveBackendPermission(actor, 'view_logistics')) {
+    throw new Error('🛑 PERMISSION DENIED: Equipment tracker / logistics view is not enabled for your role.');
   }
 }
 

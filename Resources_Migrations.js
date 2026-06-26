@@ -10,7 +10,7 @@
 
 function runDatabaseUserUidMigration() {
   const vaultSs = SpreadsheetApp.openById(getVaultSheetId());
-  const engineSs = SpreadsheetApp.openById(ENGINE_SHEET_ID);
+  const engineSs = SpreadsheetApp.openById(getEngineSheetId());
   
   // 1. Build Email -> UID map from Crew Roster
   const crewSheet = vaultSs.getSheetByName("Crew_Roster");
@@ -59,7 +59,7 @@ function runDatabaseUserUidMigration() {
 
 function runDepartmentRelationalMigration() {
     const vaultSs = SpreadsheetApp.openById(getVaultSheetId());
-    const engineSs = SpreadsheetApp.openById(ENGINE_SHEET_ID);
+    const engineSs = SpreadsheetApp.openById(getEngineSheetId());
     const sheets = verifyVaultSchema();
     
     let deptData = sheets.departments.getDataRange().getValues();

@@ -10,7 +10,7 @@
 // @INDEX: LOGISTICS_WIZARD -> Logistics Hub & Autonomous Engine
 
 function openLogisticsHubModal() {
-    if (typeof effectiveHasPerm === 'function' && !effectiveHasPerm('view_logistics')) {
+    if (typeof canViewLogistics === 'function' && !canViewLogistics()) {
         alert('🛑 Permission Denied: Live logistics tracking is not enabled for your role.');
         return;
     }

@@ -35,7 +35,7 @@ function escapeHTML(str) {
 // ==========================================
 const IMPLICIT_MANAGER_IAM_KEYS = [
   'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
-  'event_view_pricing', 'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal'
+  'event_view_pricing', 'task_manage_global', 'task_manage_personal'
 ];
 
 window.effectiveHasPerm = function(key) {
@@ -98,6 +98,32 @@ window.canEditAssets = function() {
 
 window.canUseAssetCheckout = function() {
   return canEditAssets();
+};
+
+window.canViewLogistics = function() {
+  return userHasPerm('view_logistics');
+};
+
+window.canViewMonthRoster = function() {
+  return userHasPerm('view_month_roster');
+};
+
+window.canManageGlobalTasks = function() {
+  return effectiveHasPerm('task_manage_global');
+};
+
+window.canManagePersonalTasks = function() {
+  return effectiveHasPerm('task_manage_personal');
+};
+
+window.isTaskAssignedToMe = function(task) {
+  if (!task || !Array.isArray(task.assignees)) return false;
+  const email = (typeof ACTIVE_USER_EMAIL !== 'undefined' && ACTIVE_USER_EMAIL) ? String(ACTIVE_USER_EMAIL).toLowerCase().trim() : '';
+  const uid = (typeof ACTIVE_USER_UID !== 'undefined' && ACTIVE_USER_UID) ? String(ACTIVE_USER_UID).trim() : '';
+  return task.assignees.some(function(a) {
+    const val = String(a || '').toLowerCase().trim();
+    return (email && val === email) || (uid && val === uid);
+  });
 };
 
 window.isTimelineReadOnly = function(projectId) {
@@ -250,7 +276,7 @@ function syncEffectivePermClasses() {
     'fin_view_roi', 'fin_view_internal', 'hr_view_rates'
   ];
   keys.forEach(function(k) {
-    if (effectiveHasPerm(k)) document.body.classList.add('perm-' + k);
+    if (typeof userHasPerm === 'function' && userHasPerm(k)) document.body.classList.add('perm-' + k);
   });
   if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('MANAGER')) {
     document.body.classList.add('perm-manager-tier');

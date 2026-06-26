@@ -51,6 +51,7 @@ function getTimelineData(folderId, mode) {
 
 function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor = "System UI", subEvents = null) {
   return executeWithRetry(() => {
+    assertActorCanEditTimeline(actor);
     const sheets = verifyDatabaseSchema();
 
     const processSheet = (sheet) => {

@@ -769,43 +769,9 @@ function processChecklistAction(projectId, taskName, srcFolderName, searchString
 // ==========================================
 // --- AUTOMATED DATABASE BACKUP ENGINE ---
 // ==========================================
-function runNightlyBackup(forceManual = false) {
+function runNightlyBackup(forceManual = false, actor) {
   return executeWithRetry(() => {
-    let props = PropertiesService.getScriptProperties();
-    let todayStr = new Date().toISOString().split('T')[0];
-    let lastBackup = props.getProperty('LAST_BACKUP_DATE');
-    
-    // Double-backup protection (bypass if manually forced by the user)
-    if (!forceManual && lastBackup === todayStr) return "Backup already completed for today.";
-    
-    // 1. Get or Create Cold Storage Backup Folder
-    const SYSTEM_ROOT_ID = '1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre';
-    let rootDrive = DriveApp.getFolderById(SYSTEM_ROOT_ID);
-    let backupFolders = rootDrive.searchFolders("title = '05_DATABASE_BACKUPS'");
-    let backupFolder = backupFolders.hasNext() ? backupFolders.next() : rootDrive.createFolder("05_DATABASE_BACKUPS");
-    
-    // 2. Clone Databases (Using Constants from Resources.js)
-    let engineFile = DriveApp.getFileById(ENGINE_SHEET_ID);
-    let vaultFile = DriveApp.getFileById(getVaultSheetId());
-    
-    // Add timestamp for manual runs to prevent exact name collisions on the same day
-    let timeStamp = forceManual ? "_" + new Date().getTime() : "";
-    
-    engineFile.makeCopy(`ENGINE_BACKUP_${todayStr}${timeStamp}`, backupFolder);
-    vaultFile.makeCopy(`VAULT_BACKUP_${todayStr}${timeStamp}`, backupFolder);
-    
-    // 3. Prune Old Backups (> 30 days) to prevent storage overflow
-    let thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    let files = backupFolder.getFiles();
-    while (files.hasNext()) {
-      let file = files.next();
-      if (file.getDateCreated() < thirtyDaysAgo) file.setTrashed(true);
-    }
-    
-    // 4. Mark Complete
-    if (!forceManual) props.setProperty('LAST_BACKUP_DATE', todayStr);
-    return "Backup successfully saved to the Vault.";
+    return runVerifiedNightlyBackup_(!!forceManual, actor || 'System');
   });
 }
 
@@ -828,7 +794,7 @@ function runMonthlyLogArchive(actor = "System UI") {
     logCutoff.setDate(logCutoff.getDate() - 60); 
     const logCutoffIso = logCutoff.toISOString();
 
-    const logSs = SpreadsheetApp.openById(AUDIT_LOG_SHEET_ID);
+    const logSs = SpreadsheetApp.openById(getAuditLogSheetId());
     const logSheet = logSs.getSheetByName("Audit_Logs");
     let message = "No logs older than 2 months to archive.";
 
@@ -932,7 +898,7 @@ function runYearlyEngineArchive(actor = "System UI") {
 
     let message = "Engine has not reached 18-month capacity. No projects archived.";
     if (pToDelete.length > 0) {
-        DriveApp.getFileById(ENGINE_SHEET_ID).makeCopy(`ENGINE_COLD_ARCHIVE_${dateSuffix}`, archiveFolder);
+        DriveApp.getFileById(getEngineSheetId()).makeCopy(`ENGINE_COLD_ARCHIVE_${dateSuffix}`, archiveFolder);
         pToDelete.forEach(id => deleteProjectFull(id, "Archived Event", "", actor));
         message = `Engine hit 18-month limit. Archived and purged ${pToDelete.length} project(s) older than 6 months.`;
     }

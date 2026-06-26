@@ -38,6 +38,10 @@ function setTrackerDateInputs() {
 
 // Overrides the existing function from 06b1_Admin_Assets_Core.html
 window.openAvailabilityDashboard = function() {
+    if (typeof userHasPerm === 'function' && !userHasPerm('view_logistics')) {
+        alert('🛑 Permission Denied: Equipment tracker is not enabled for your role.');
+        return;
+    }
     if (typeof closeModals === 'function') {
         if (!closeModals()) return;
     }
@@ -225,7 +229,7 @@ function fetchTrackerData() {
     }).withFailureHandler(err => {
         canvas.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444; font-weight: bold;">Sync Error: ${err.message || err}</div>`;
         console.error("Tracker Sync Error:", err);
-    }).getUnifiedTrackerData(startStr, endStr, trackerWatchlist);
+    }).getUnifiedTrackerData(startStr, endStr, trackerWatchlist, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
 };
 
 // @INDEX: TRACKER -> Render Top Timeline & Playhead

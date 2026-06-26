@@ -1,6 +1,6 @@
 # RBAC & Event Access — Master Plan (Handoff)
 
-> **Status:** Phases 1–4 implemented — **OK go Phase 5** when ready.  
+> **Status:** Phases 1–5 implemented — **OK go Phase 6** when ready.  
 > **Last updated:** 2026-06-25  
 > **Use this file** at the start of a new chat: `@docs/ai/RBAC_EVENT_ACCESS_PLAN.md`
 
@@ -203,10 +203,12 @@ Today only **some** keys gate UI (`req-*` in `Styles.html`); **most event/logist
 - CHECK-OUT/IN: `canUseAssetCheckout()` + backend `assertActorCanPerformAssetOperations` on all ops APIs
 - `updateProjectReadiness` gated server-side
 
-### Phase 5 — Sidebar & tasks
-- Month roster + logistics nav from checkboxes
-- `task_manage_global` for global tasks
-- `task_manage_personal` forced for crew role
+### Phase 5 — Sidebar & tasks ✅ (2026-06-25)
+- Month roster nav: `view_month_roster` reveals crew-conflict/roster sidebar (not manager-only)
+- Logistics C/E/T badges on calendar gated by `view_logistics`
+- Global tasks: `task_manage_global` for create/edit/delete; crew sees assigned tasks only
+- Personal tasks: `savePersonalTaskData` — assignees can update status + todos only
+- `task_manage_personal` always on at login; task drawer uses `req-task_manage_personal`
 
 ### Phase 6 — QA
 - Role templates in IAM

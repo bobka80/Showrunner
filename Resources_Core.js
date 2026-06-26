@@ -1,12 +1,34 @@
 /**
  * SM Showrunner (smuruner) - Clean 8 Architecture
  * Resources_Core.js - System Core & Schema Engine
+ * Sync: 2026-06-25 — getVaultSheetId / getEngineSheetId registry getters
  */
 
 const VAULT_SHEET_ID = '1EzqvZQM5VanEB1_XxZT7lRd8YfXSTMcBVRVx3mGElz8';
 const ENGINE_SHEET_ID = '1AIa5GuEq4J4mDUqfI2Sp5RkAt6RW-aUd3VG0anB-PFk';
 const AUDIT_LOG_SHEET_ID = '1gR70dun6Xc4Q_njxd2PXrT9rty_1X_4qiZby8V4RyOA';
 const AUDIT_DB_SHEET_ID = '1UdEONWScrTQSoa_spIEjfN3lJdMcxu9zLCXVZZcJbG8';
+
+const SYSTEM_ROOT_ID = '1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre';
+const DB_BACKUP_FOLDER_NAME = '05_DATABASE_BACKUPS';
+const REPLACED_DB_FOLDER_ID = '1aZSru-d8OryHpNCooPm78oWdFjSauTPN';
+
+function getActiveSheetId(propKey, fallbackId) {
+  try {
+    const v = PropertiesService.getScriptProperties().getProperty(propKey);
+    if (v && String(v).length > 10) return v;
+  } catch (e) { /* ignore */ }
+  return fallbackId;
+}
+
+function setActiveSheetId(propKey, id) {
+  PropertiesService.getScriptProperties().setProperty(propKey, String(id));
+}
+
+function getEngineSheetId() { return getActiveSheetId('ACTIVE_ENGINE_SHEET_ID', ENGINE_SHEET_ID); }
+function getVaultSheetId() { return getActiveSheetId('ACTIVE_VAULT_SHEET_ID', VAULT_SHEET_ID); }
+function getAuditLogSheetId() { return getActiveSheetId('ACTIVE_AUDIT_LOG_SHEET_ID', AUDIT_LOG_SHEET_ID); }
+function getAuditDbSheetId() { return getActiveSheetId('ACTIVE_AUDIT_DB_SHEET_ID', AUDIT_DB_SHEET_ID); }
 
 let cachedEngineSheets = null;
 let cachedVaultSheets = null;
@@ -16,7 +38,7 @@ let sheetDataCache = {};
 // @INDEX: SCHEMA_VAULT -> Relational Schema Engine
 function verifyVaultSchema(readOnly = false) {
   if (cachedVaultSheets && readOnly) return cachedVaultSheets;
-  const ss = SpreadsheetApp.openById(VAULT_SHEET_ID); // STATIC VAULT ID
+  const ss = SpreadsheetApp.openById(getVaultSheetId());
   
   const sheetsArr = ss.getSheets();
   const sm = {};
@@ -355,12 +377,16 @@ function executeWithRetry(operation, maxRetries = 5) {
   // Auto-detect read operations to bypass the strict ScriptLock turnstile
   let opStr = operation.toString();
   let isExplicitRead = opStr.includes('verifyDatabaseSchema(true)') || opStr.includes('verifyVaultSchema(true)') || opStr.includes('getSheetData');
-  let isWrite = opStr.includes('appendRow') || opStr.includes('setValue') || opStr.includes('clearContents') || opStr.includes('delete') || opStr.includes('writeToAuditLog');
+  let isWrite = opStr.includes('appendRow') || opStr.includes('setValue') || opStr.includes('clearContents') || opStr.includes('delete') || opStr.includes('writeToAuditLog') || opStr.includes('makeCopy');
+  let isBackupOp = opStr.includes('backupDatabase') || opStr.includes('runVerifiedNightlyBackup') || opStr.includes('beginDatabaseBackupLock') || opStr.includes('endDatabaseBackupLock') || opStr.includes('pruneOldBackupsSafely_');
   let bypassLock = (typeof IS_READ_ONLY_EXECUTION !== 'undefined' && IS_READ_ONLY_EXECUTION) || (isExplicitRead && !isWrite);
 
   while (attempt < maxRetries) {
     let lock = bypassLock ? null : LockService.getScriptLock();
     try {
+      if (isWrite && !isBackupOp && typeof isBackupInProgress_ === 'function' && isBackupInProgress_()) {
+        throw new Error('Database backup in progress. Please wait and try again.');
+      }
       // Try to acquire an execution lock for up to 15 seconds to prevent collision
       if (lock && !lock.tryLock(15000)) {
         throw new Error("Server is currently busy processing another user's request.");

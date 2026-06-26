@@ -5,11 +5,11 @@
     <input type="hidden" id="task-id">
     
     <div style="display:flex; gap:10px; margin-top: 10px;">
-       <div style="flex:2;">
+       <div style="flex:2;" class="task-admin-only">
            <div class="input-label">Task Title</div>
            <input type="text" id="task-title" placeholder="What needs to be done?" style="margin:0;">
        </div>
-       <div style="flex:1;">
+       <div style="flex:1;" class="task-admin-only">
            <div class="input-label">Priority</div>
            <select id="task-priority" style="margin:0;">
               <option value="High">High</option>
@@ -26,21 +26,21 @@
        <button class="btn-add" style="width:auto; margin:0; padding:8px 15px !important;" onclick="addTaskTodo()">ADD</button>
     </div>
     
-    <div class="input-label" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+    <div class="input-label task-admin-only" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
        <span>Assigned Crew</span>
        <button class="btn-outline btn-sm" style="margin:0; border-color:var(--accent); color:var(--accent);" onclick="openTaskCrewModal()">+ ADD CREW</button>
     </div>
-    <div id="task-assigned-crew-list" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px;"></div>
+    <div id="task-assigned-crew-list" class="task-admin-only" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px;"></div>
     <input type="hidden" id="task-assignees-hidden">
 
-    <div class="input-label" style="margin-top:10px;">Assets / Notes</div>
-    <textarea id="task-notes" rows="3" style="width:100%; padding:10px; background:#27272a; border:1px solid #333; color:#fff; border-radius:6px; resize:vertical; font-family: inherit; box-sizing: border-box;"></textarea>
+    <div class="input-label task-admin-only" style="margin-top:10px;">Assets / Notes</div>
+    <textarea id="task-notes" class="task-admin-only" rows="3" style="width:100%; padding:10px; background:#27272a; border:1px solid #333; color:#fff; border-radius:6px; resize:vertical; font-family: inherit; box-sizing: border-box;"></textarea>
 
-    <div class="input-label" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+    <div class="input-label task-admin-only" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
        <span>Assigned Assets</span>
        <button class="btn-outline btn-sm" style="margin:0; border-color:#f97316; color:#f97316;" onclick="alert('RFID/Asset DB link pending architecture integration.')">+ ADD ASSET</button>
     </div>
-    <div id="task-assigned-assets-list" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px; background:#111; border:1px dashed #333; border-radius:4px; padding:5px; color:#888; font-size:10px; align-items:center; justify-content:center;">
+    <div id="task-assigned-assets-list" class="task-admin-only" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px; background:#111; border:1px dashed #333; border-radius:4px; padding:5px; color:#888; font-size:10px; align-items:center; justify-content:center;">
         No assets assigned
     </div>
     <input type="hidden" id="task-assets-hidden">

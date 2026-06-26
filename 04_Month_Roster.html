@@ -12,6 +12,10 @@ let currentRosterDate = new Date();
 let lastRenderedMonthStr = "";
 
 function openMonthRoster() {
+  if (typeof userHasPerm === 'function' && !userHasPerm('view_month_roster')) {
+    alert('🛑 Permission Denied: Month roster matrix is not enabled for your role.');
+    return;
+  }
   // Protect navigation by checking if current view is dirty
   if (typeof closeModals === 'function') {
       if (!closeModals()) return;

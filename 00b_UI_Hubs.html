@@ -9,6 +9,7 @@
       <button id="tab-btn-vehicles" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('vehicles')">VEHICLES</button>
       <button id="tab-btn-warehouse" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('warehouse')">WAREHOUSE</button>
       <button id="tab-btn-clients" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('clients')">CLIENTS</button>
+      <button id="tab-btn-database" class="req-root-only" style="margin-left: 200px; background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('database')">DATABASE</button>
 
       <div style="flex:1;"></div>
       <div style="display:flex; flex-direction:column; position:relative; justify-content:center;">
@@ -123,13 +124,20 @@
         </div>
     </div>
 
+    <div id="tab-content-database" class="req-root-only" style="display:none; flex-direction:column; flex:1; overflow:hidden; background: #0a0a0c;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar);">
+            <div style="color:#f59e0b; font-weight:800; font-size:14px; letter-spacing:1px;">DATABASE OPERATIONS (ROOT)</div>
+            <button class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="loadDatabaseOpsPanel()">REFRESH</button>
+        </div>
+        <div id="db-ops-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;"></div>
+    </div>
+
     <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
       <div id="footer-left-crew" style="display: flex; gap: 12px;">
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openIamDashboard()">ROLE EDITOR</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openAssignmentManager()">ASSIGNMENTS</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openDeptManager()">DEPTS</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openMealManager()">MEALS</button>
-        <button class="btn-outline req-root-only" style="margin:0; border-color: #f59e0b; color: #f59e0b;" onclick="triggerDatabaseBackup()">TEST BACKUP</button>
       </div>
       <div id="footer-left-assets" style="display: none; gap: 12px; align-items: center;">
         <button id="btn-filter-all" class="btn-outline" style="margin:0; border-color: #fff; color: #fff; background: rgba(255,255,255,0.15) !important;" onclick="setAssetFilter('ALL')">ALL</button>
@@ -210,9 +218,6 @@
        
     </div>
     <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
-        <button class="btn-outline" style="width:auto; margin:0; border-color: #f59e0b; color: #f59e0b;" onclick="triggerDatabaseBackup()">TEST BACKUP</button>
-        <button class="btn-outline" style="width:auto; margin:0; border-color: #a855f7; color: #a855f7;" onclick="triggerMonthlyLogArchive()">ARCHIVE LOGS</button>
-        <button class="btn-outline" style="width:auto; margin:0; margin-right:auto; border-color: #a855f7; color: #a855f7;" onclick="triggerYearlyEngineArchive()">ARCHIVE ENGINE</button>
         <button id="btn-save-mgr" class="btn-main" style="width:auto; margin:0;" onclick="submitManagerConfig()">SAVE CONFIGURATION</button>
     </div>
   </div>

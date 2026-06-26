@@ -10,7 +10,9 @@ function renderTasksAndNotifs(payload) {
     globalNotifs = payload.notifs || [];
     
     let tHtml = '';
+    const canGlobal = (typeof canManageGlobalTasks === 'function') && canManageGlobalTasks();
     globalTasks.forEach(t => {
+        if (!canGlobal && typeof isTaskAssignedToMe === 'function' && !isTaskAssignedToMe(t)) return;
         let priority = t.priority || 'Medium';
         let color = priority === 'High' ? '#ef4444' : (priority === 'Low' ? '#3b82f6' : '#f59e0b');
         let statusBadge = t.status === 'Finished' ? '<span style="color:#10b981; font-weight:900; margin-left:5px;">✓</span>' : '';
@@ -21,14 +23,10 @@ function renderTasksAndNotifs(payload) {
                 <b style="font-size:13px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHTML(t.title)} ${statusBadge}</b>
                 <span style="font-size:9px; font-weight:900; color:${color}; border:1px solid ${color}; padding:2px 4px; border-radius:4px; flex-shrink:0;">${priority.toUpperCase()}</span>
             </div>
-            
-            <div style="display:flex; gap: 4px; justify-content:center;">
-               <button class="btn-outline btn-sm" style="padding: 2px 6px !important; font-size: 8px !important; margin:0; border-color:#333; color:#a1a1aa;" onclick="toggleAllTimelineDepts(false)">COLLAPSE ALL</button>
-               <button class="btn-outline btn-sm" style="padding: 2px 6px !important; font-size: 8px !important; margin:0; border-color:#333; color:#a1a1aa;" onclick="toggleAllTimelineDepts(true)">EXPAND ALL</button>
-            </div>
             <div style="font-size:10px; color:#888;">${numAssignees} Assignees • Status: ${escapeHTML(t.status)}</div>
         </div>`;
     });
+    if (tHtml === '') tHtml = '<div style="color:#888; font-size:12px; text-align:center; padding:16px;">No tasks assigned to you.</div>';
     document.getElementById('tasks-list').innerHTML = tHtml;
 
     let nHtml = '';
@@ -162,8 +160,28 @@ document.addEventListener('click', function(e) {
     }
 });
 
+function applyTaskModalMode(personalOnly) {
+    const overlay = document.getElementById('task-modal-overlay');
+    if (!overlay) return;
+    overlay.classList.toggle('task-personal-only', !!personalOnly);
+    const saveBtn = document.getElementById('btn-save-task');
+    if (saveBtn) saveBtn.innerText = personalOnly ? 'SAVE PROGRESS' : 'SAVE TASK';
+}
+
 function openTaskModal(id) {
+    const creating = !id;
+    if (creating && typeof canManageGlobalTasks === 'function' && !canManageGlobalTasks()) {
+        return alert('🛑 Permission Denied: Only managers can create global tasks.');
+    }
+
     let task = id ? globalTasks.find(t => t.id === id) : null;
+    if (task && typeof canManageGlobalTasks === 'function' && !canManageGlobalTasks()) {
+        if (typeof isTaskAssignedToMe === 'function' && !isTaskAssignedToMe(task)) {
+            return alert('🛑 Permission Denied: This task is not assigned to you.');
+        }
+    }
+
+    const personalOnly = !!task && typeof canManageGlobalTasks === 'function' && !canManageGlobalTasks();
     document.getElementById('task-id').value = task ? task.id : '';
     document.getElementById('task-title').value = task ? task.title : '';
     document.getElementById('task-priority').value = task ? (task.priority || 'Medium') : 'Medium';
@@ -182,7 +200,8 @@ function openTaskModal(id) {
     document.getElementById('task-assets-hidden').value = JSON.stringify(assets);
     renderTaskAssets(assets);
     
-    document.getElementById('btn-delete-task').style.display = task ? 'block' : 'none';
+    document.getElementById('btn-delete-task').style.display = (task && !personalOnly) ? 'block' : 'none';
+    applyTaskModalMode(personalOnly);
     document.getElementById('task-modal-overlay').style.display = 'flex';
 }
 
@@ -270,7 +289,8 @@ function renderTaskAssets(assets) {
 function saveTask() {
     const btn = document.getElementById('btn-save-task');
     const title = document.getElementById('task-title').value;
-    if(!title) return alert("A task title is required.");
+    const personalOnly = document.getElementById('task-modal-overlay').classList.contains('task-personal-only');
+    if (!personalOnly && !title) return alert("A task title is required.");
     btn.innerText = "SAVING..."; btn.disabled = true;
     
     let safetyTimer = setTimeout(() => {
@@ -307,6 +327,9 @@ function saveTask() {
 }
 
 function deleteTask() {
+    if (typeof canManageGlobalTasks === 'function' && !canManageGlobalTasks()) {
+        return alert('🛑 Permission Denied: Cannot delete tasks.');
+    }
     if(!confirm("Are you sure you want to delete this task permanently?")) return;
     const btn = document.getElementById('btn-delete-task');
     btn.innerText = "DELETING..."; btn.disabled = true;

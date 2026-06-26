@@ -341,8 +341,9 @@ function saveProjectAssetsAPI(projectId, assignedList, actor = "System UI") {
 // --- UNIFIED EQUIPMENT TRACKER ENGINE ---
 // ==========================================
 // @INDEX: TRACKER_ENGINE -> Unified Equipment Matrix Data
-function getUnifiedTrackerData(startStr, endStr, searchTerms) {
+function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
     return executeWithRetry(() => {
+        assertActorCanViewLogistics(actor || 'System');
         const vaultSheets = verifyVaultSchema(true);
         const dbSheets = verifyDatabaseSchema(true);
         

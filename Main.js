@@ -22,6 +22,7 @@ function doPost(e) {
     template.userName = authResult.name;
     template.userAccess = normalizeAccessTier(authResult.access);
     template.userUid = authResult.uid || '';
+    template.userEmail = authResult.email || '';
     template.showSettingsNav = accessTierAtLeastValue(template.userAccess, 'MANAGER');
     template.userPermissionsB64 = Utilities.base64Encode(JSON.stringify(authResult.permissions || {}));
     return template.evaluate()

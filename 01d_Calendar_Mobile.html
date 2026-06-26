@@ -24,7 +24,7 @@ function openMobileEvents() {
 }
 
 function openMobileRFID() {
-    if (USER_ACCESS !== 'ROOT' && USER_ACCESS !== 'Admin' && USER_ACCESS !== 'EDITOR') {
+    if (typeof accessTierAtLeast === 'function' && !accessTierAtLeast('EDITOR')) {
         alert("Permission Denied: You need EDITOR credentials or higher to access the Asset Registry.");
         return;
     }

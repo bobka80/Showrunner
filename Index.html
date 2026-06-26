@@ -80,7 +80,7 @@
               </div>
           </div>
 
-          <div id="nav-task-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('task-drawer-wrapper').style.display='flex'" onmouseleave="document.getElementById('task-drawer-wrapper').style.display='none'">
+          <div id="nav-task-container" class="req-task_manage_personal" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('task-drawer-wrapper').style.display='flex'" onmouseleave="document.getElementById('task-drawer-wrapper').style.display='none'">
               <button class="nav-icon-btn" title="Global Tasks" onclick="openTaskModal()">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
               </button>
@@ -104,8 +104,8 @@
               <svg id="nav-icon-project" style="display: none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           </button>
           
-          <div id="asset-conflict-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('asset-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('asset-conflict-drawer').style.display='none'">
-              <button id="nav-btn-availability" class="nav-icon-btn" onclick="openAvailabilityDashboard()" title="Global Availability & Fleet">
+          <div id="asset-conflict-container" class="nav-gated req-view_logistics" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('asset-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('asset-conflict-drawer').style.display='none'">
+              <button id="nav-btn-availability" class="nav-icon-btn req-view_logistics" onclick="openAvailabilityDashboard()" title="Global Availability & Fleet">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                   <div id="asset-conflict-badges" style="position: absolute; right: 2px; top: 2px; display: flex; flex-direction: column; gap: 2px; pointer-events: none;"></div>
               </button>
@@ -179,6 +179,7 @@
 <meta name="user-access" content="<?= userAccess ?>">
 <meta name="user-name" content="<?= userName ?>">
 <meta name="user-uid" content="<?= userUid ?>">
+<meta name="user-email" content="<?= userEmail ?>">
 <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
 
 <script>
@@ -209,7 +210,9 @@
   const USER_ACCESS = normalizeAccessTier(document.querySelector('meta[name="user-access"]').content);
   const ACTIVE_USER_NAME = document.querySelector('meta[name="user-name"]').content;
   const ACTIVE_USER_UID = (document.querySelector('meta[name="user-uid"]') || {}).content || '';
+  const ACTIVE_USER_EMAIL = (document.querySelector('meta[name="user-email"]') || {}).content || '';
   window.ACTIVE_USER_UID = ACTIVE_USER_UID;
+  window.ACTIVE_USER_EMAIL = ACTIVE_USER_EMAIL;
   
   let USER_PERMISSIONS = {};
   try {
@@ -266,10 +269,14 @@
   }
 
   if (isManagerOrAbove) {
-    revealNavItem(document.getElementById('asset-conflict-container'));
-    revealNavItem(document.getElementById('crew-conflict-container'));
     revealNavItem(document.getElementById('nav-btn-manager'));
     document.body.classList.add('perm-manager-tier');
+  }
+  if (userHasPerm('view_logistics')) {
+    revealNavItem(document.getElementById('asset-conflict-container'));
+  }
+  if (userHasPerm('view_month_roster')) {
+    revealNavItem(document.getElementById('crew-conflict-container'));
   }
   if (showFinancials) revealNavItem(document.getElementById('nav-btn-financials'));
   if (showMaster) revealNavItem(document.getElementById('nav-btn-master'));

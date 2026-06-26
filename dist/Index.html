@@ -776,6 +776,11 @@
     body:not(.perm-task_manage_global):not(.perm-root) .req-task_manage_global { display: none !important; }
     body:not(.perm-task_manage_personal):not(.perm-root) .req-task_manage_personal { display: none !important; }
 
+    .task-personal-only .task-admin-only { display: none !important; }
+    .task-personal-only #task-new-todo,
+    .task-personal-only button[onclick="addTaskTodo()"] { display: none !important; }
+    .task-personal-only .btn-delete[onclick^="removeTaskTodo"] { display: none !important; }
+
     /* Project editor — crew briefing (read-only) mode */
     .editor-briefing-mode .pe-mgr-only { display: none !important; }
     body:not(.perm-manager-tier):not(.perm-root) .pe-manager-only { display: none !important; }
@@ -1110,7 +1115,7 @@
               </div>
           </div>
 
-          <div id="nav-task-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('task-drawer-wrapper').style.display='flex'" onmouseleave="document.getElementById('task-drawer-wrapper').style.display='none'">
+          <div id="nav-task-container" class="req-task_manage_personal" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('task-drawer-wrapper').style.display='flex'" onmouseleave="document.getElementById('task-drawer-wrapper').style.display='none'">
               <button class="nav-icon-btn" title="Global Tasks" onclick="openTaskModal()">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
               </button>
@@ -1134,8 +1139,8 @@
               <svg id="nav-icon-project" style="display: none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           </button>
           
-          <div id="asset-conflict-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('asset-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('asset-conflict-drawer').style.display='none'">
-              <button id="nav-btn-availability" class="nav-icon-btn" onclick="openAvailabilityDashboard()" title="Global Availability & Fleet">
+          <div id="asset-conflict-container" class="nav-gated req-view_logistics" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('asset-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('asset-conflict-drawer').style.display='none'">
+              <button id="nav-btn-availability" class="nav-icon-btn req-view_logistics" onclick="openAvailabilityDashboard()" title="Global Availability & Fleet">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                   <div id="asset-conflict-badges" style="position: absolute; right: 2px; top: 2px; display: flex; flex-direction: column; gap: 2px; pointer-events: none;"></div>
               </button>
@@ -1209,6 +1214,7 @@
 <meta name="user-access" content="<?= userAccess ?>">
 <meta name="user-name" content="<?= userName ?>">
 <meta name="user-uid" content="<?= userUid ?>">
+<meta name="user-email" content="<?= userEmail ?>">
 <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
 
 
@@ -2529,11 +2535,11 @@
     <input type="hidden" id="task-id">
     
     <div style="display:flex; gap:10px; margin-top: 10px;">
-       <div style="flex:2;">
+       <div style="flex:2;" class="task-admin-only">
            <div class="input-label">Task Title</div>
            <input type="text" id="task-title" placeholder="What needs to be done?" style="margin:0;">
        </div>
-       <div style="flex:1;">
+       <div style="flex:1;" class="task-admin-only">
            <div class="input-label">Priority</div>
            <select id="task-priority" style="margin:0;">
               <option value="High">High</option>
@@ -2550,21 +2556,21 @@
        <button class="btn-add" style="width:auto; margin:0; padding:8px 15px !important;" onclick="addTaskTodo()">ADD</button>
     </div>
     
-    <div class="input-label" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+    <div class="input-label task-admin-only" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
        <span>Assigned Crew</span>
        <button class="btn-outline btn-sm" style="margin:0; border-color:var(--accent); color:var(--accent);" onclick="openTaskCrewModal()">+ ADD CREW</button>
     </div>
-    <div id="task-assigned-crew-list" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px;"></div>
+    <div id="task-assigned-crew-list" class="task-admin-only" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px;"></div>
     <input type="hidden" id="task-assignees-hidden">
 
-    <div class="input-label" style="margin-top:10px;">Assets / Notes</div>
-    <textarea id="task-notes" rows="3" style="width:100%; padding:10px; background:#27272a; border:1px solid #333; color:#fff; border-radius:6px; resize:vertical; font-family: inherit; box-sizing: border-box;"></textarea>
+    <div class="input-label task-admin-only" style="margin-top:10px;">Assets / Notes</div>
+    <textarea id="task-notes" class="task-admin-only" rows="3" style="width:100%; padding:10px; background:#27272a; border:1px solid #333; color:#fff; border-radius:6px; resize:vertical; font-family: inherit; box-sizing: border-box;"></textarea>
 
-    <div class="input-label" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+    <div class="input-label task-admin-only" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
        <span>Assigned Assets</span>
        <button class="btn-outline btn-sm" style="margin:0; border-color:#f97316; color:#f97316;" onclick="alert('RFID/Asset DB link pending architecture integration.')">+ ADD ASSET</button>
     </div>
-    <div id="task-assigned-assets-list" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px; background:#111; border:1px dashed #333; border-radius:4px; padding:5px; color:#888; font-size:10px; align-items:center; justify-content:center;">
+    <div id="task-assigned-assets-list" class="task-admin-only" style="display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; min-height: 28px; background:#111; border:1px dashed #333; border-radius:4px; padding:5px; color:#888; font-size:10px; align-items:center; justify-content:center;">
         No assets assigned
     </div>
     <input type="hidden" id="task-assets-hidden">

@@ -19,6 +19,7 @@ function getTasksAndNotifs(crewName) {
     let aData = getSheetData(sheets.taskAssignees);
     let tdData = getSheetData(sheets.taskTodos);
     let asData = getSheetData(sheets.taskAssets);
+    const canGlobalTasks = effectiveBackendPermission(crewName, 'task_manage_global');
     
     for(let i=1; i<tData.length; i++) {
         let taskId = tData[i][tData.hMap['uid']];
@@ -26,6 +27,8 @@ function getTasksAndNotifs(crewName) {
         
         let assignees = [];
         for(let a=1; a<aData.length; a++) { if(aData[a][aData.hMap['task_uid']] === taskId) assignees.push(aData[a][aData.hMap['user_uid']]); }
+
+        if (!canGlobalTasks && !actorIsAssignedToTask(profile, assignees)) continue;
         
         let todos = [];
         for(let t=1; t<tdData.length; t++) { if(tdData[t][tdData.hMap['task_uid']] === taskId) todos.push({ text: tdData[t][tdData.hMap['description']], done: tdData[t][tdData.hMap['is_done']] }); }
@@ -61,8 +64,89 @@ function getTasksAndNotifs(crewName) {
   });
 }
 
+function actorIsAssignedToTask(profile, assignees) {
+  if (!profile || !assignees || !assignees.length) return false;
+  const email = profile.email ? String(profile.email).toLowerCase().trim() : '';
+  const uid = profile.uid ? String(profile.uid).trim() : '';
+  return assignees.some(function(a) {
+    const val = String(a || '').toLowerCase().trim();
+    return (email && val === email) || (uid && val === uid);
+  });
+}
+
+function getTaskAssignees_(sheets, taskId) {
+  const aData = getSheetData(sheets.taskAssignees);
+  const aMap = aData.hMap || {};
+  const assignees = [];
+  for (let i = 1; i < aData.length; i++) {
+    if (aData[i][aMap['task_uid']] === taskId) assignees.push(aData[i][aMap['user_uid']]);
+  }
+  return assignees;
+}
+
+function savePersonalTaskData(taskObj, crewName) {
+  return executeWithRetry(() => {
+    if (!taskObj || !taskObj.id) {
+      throw new Error('🛑 PERMISSION DENIED: Cannot create tasks without global task permission.');
+    }
+    if (!effectiveBackendPermission(crewName, 'task_manage_personal')) {
+      throw new Error('🛑 PERMISSION DENIED: Cannot update tasks.');
+    }
+    const profile = getUserSecurityProfile(crewName);
+    const sheets = verifyDatabaseSchema();
+    const assignees = getTaskAssignees_(sheets, taskObj.id);
+    if (!actorIsAssignedToTask(profile, assignees)) {
+      throw new Error('🛑 PERMISSION DENIED: You are not assigned to this task.');
+    }
+
+    const getMap = (sheet) => {
+      let data = sheet.getDataRange().getValues();
+      let m = {};
+      if (data.length > 0) data[0].forEach((h, i) => m[h.toString().trim()] = i);
+      return { data: data, map: m };
+    };
+
+    let tSheet = getMap(sheets.tasks);
+    let rowIndex = -1;
+    for (let i = 1; i < tSheet.data.length; i++) {
+      if (tSheet.data[i][tSheet.map['uid']] === taskObj.id) { rowIndex = i + 1; break; }
+    }
+    if (rowIndex < 0) throw new Error('Task not found.');
+
+    if (tSheet.map['Status'] !== undefined) {
+      sheets.tasks.getRange(rowIndex, tSheet.map['Status'] + 1).setValue(taskObj.status || 'Pending');
+    }
+
+    let tdSheet = getMap(sheets.taskTodos);
+    let tdKept = [tdSheet.data[0]];
+    for (let i = 1; i < tdSheet.data.length; i++) {
+      if (tdSheet.data[i][tdSheet.map['task_uid']] !== taskObj.id) tdKept.push(tdSheet.data[i]);
+    }
+    sheets.taskTodos.clearContents();
+    if (tdKept.length > 0) sheets.taskTodos.getRange(1, 1, tdKept.length, tdKept[0].length).setValues(tdKept);
+    if (taskObj.todos && taskObj.todos.length > 0) {
+      let newTd = taskObj.todos.map(function(t) {
+        let r = new Array(Object.keys(tdSheet.map).length).fill('');
+        if (tdSheet.map['uid'] !== undefined) r[tdSheet.map['uid']] = Utilities.getUuid();
+        if (tdSheet.map['task_uid'] !== undefined) r[tdSheet.map['task_uid']] = taskObj.id;
+        if (tdSheet.map['description'] !== undefined) r[tdSheet.map['description']] = t.text;
+        if (tdSheet.map['is_done'] !== undefined) r[tdSheet.map['is_done']] = t.done;
+        return r;
+      });
+      sheets.taskTodos.getRange(sheets.taskTodos.getLastRow() + 1, 1, newTd.length, Object.keys(tdSheet.map).length).setValues(newTd);
+    }
+
+    flushCache();
+    writeToAuditLog(crewName || 'System', 'UPDATE', 'TASKS', 'PERSONAL', taskObj.id, 'Personal task progress update.');
+    return 'Saved';
+  });
+}
+
 function saveTaskData(taskObj, crewName) {
   return executeWithRetry(() => {
+    if (!effectiveBackendPermission(crewName, 'task_manage_global')) {
+      return savePersonalTaskData(taskObj, crewName);
+    }
     const sheets = verifyDatabaseSchema();
     let isNew = !taskObj.id;
     taskObj.id = taskObj.id || Utilities.getUuid();
@@ -162,6 +246,7 @@ function saveTaskData(taskObj, crewName) {
 
 function deleteTaskData(taskId, actor = "System UI") {
   return executeWithRetry(() => {
+    assertActorCanManageGlobalTasks(actor);
     const sheets = verifyDatabaseSchema();
     
     const wipeFromSheet = (sheet, colName) => {

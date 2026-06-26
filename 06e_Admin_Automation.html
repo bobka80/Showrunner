@@ -861,7 +861,7 @@ function fetchEntitySummary(uid, btnId) {
     let btn = document.getElementById(btnId);
     if (!btn) return;
     if (!uid || uid === 'NEW') { btn.style.display = 'none'; return; }
-    if (typeof USER_ACCESS !== 'undefined' && !['ROOT', 'Admin', 'EDITOR'].includes(USER_ACCESS)) return;
+    if (typeof accessTierAtLeast === 'function' && !accessTierAtLeast('EDITOR')) return;
 
     btn.style.display = 'inline-flex';
     btn.innerHTML = `<span style="opacity:0.5;">LOADING...</span>`;

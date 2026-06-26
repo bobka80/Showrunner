@@ -52,7 +52,7 @@ function populateRoleEditorForm(role) {
   }
 
   if (nameInput) nameInput.value = role.name || role.id || '';
-  if (sysAccessInput) sysAccessInput.value = role.sysAccess || 'CREW';
+  if (sysAccessInput) sysAccessInput.value = normalizeAccessTier(role.sysAccess || 'CREW');
   if (delBtn) delBtn.style.display = 'inline-flex';
   if (dupBtn) dupBtn.style.display = 'inline-flex';
   keys.forEach(function(k) { setRoleFormCheckbox(k, isPermTruthy(role[k])); });
@@ -217,8 +217,10 @@ function openMasterSettings(targetTab = null) {
     : function(key) { const v = USER_PERMISSIONS[key]; return v === true || v === 'true'; };
 
   const isRoot = (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ROOT');
-  const isAdmin = isRoot || (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ADMIN');
-  const isManagerOnly = !isAdmin && USER_ACCESS === 'MANAGER';
+  const isAdmin = (typeof accessTierAtLeast === 'function') ? accessTierAtLeast('ADMIN') : isRoot;
+  const isManagerOnly = (typeof accessTierAtLeast === 'function')
+    ? (accessTierAtLeast('MANAGER') && !accessTierAtLeast('ADMIN'))
+    : false;
 
   const canSeeDbTab = function(permKey) {
     if (isRoot || isAdmin) return true;
@@ -231,7 +233,8 @@ function openMasterSettings(targetTab = null) {
     { id: 'assets', btn: 'tab-btn-assets', visible: canSeeDbTab('db_view_assets') },
     { id: 'vehicles', btn: 'tab-btn-vehicles', visible: canSeeDbTab('db_view_vehicles') },
     { id: 'warehouse', btn: 'tab-btn-warehouse', visible: canSeeDbTab('db_view_warehouses') },
-    { id: 'clients', btn: 'tab-btn-clients', visible: canSeeDbTab('db_view_clients') }
+    { id: 'clients', btn: 'tab-btn-clients', visible: canSeeDbTab('db_view_clients') },
+    { id: 'database', btn: 'tab-btn-database', visible: isRoot }
   ];
 
   const visibleTabs = [];
