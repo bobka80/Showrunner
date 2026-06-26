@@ -183,31 +183,90 @@ window.saveLocationModal = function() {
     if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
 };
 
+window.weatherCondEmoji = function(cond) {
+    if (cond === 'CLOUD') return '☁️';
+    if (cond === 'FOG') return '🌫️';
+    if (cond === 'RAIN') return '🌧️';
+    if (cond === 'SNOW') return '❄️';
+    if (cond === 'STORM') return '⛈️';
+    return '☀️';
+};
+
+window.weatherCondLabel = function(cond) {
+    if (cond === 'STORM') return 'STORM';
+    if (cond === 'SNOW') return 'SNOW';
+    if (cond === 'RAIN') return 'RAIN';
+    if (cond === 'FOG') return 'FOG';
+    if (cond === 'CLOUD') return 'CLOUD';
+    return 'DRY';
+};
+
+window.weatherCondSeverity = function(cond) {
+    if (cond === 'STORM') return 6;
+    if (cond === 'SNOW') return 5;
+    if (cond === 'RAIN') return 4;
+    if (cond === 'FOG') return 3;
+    if (cond === 'CLOUD') return 2;
+    return 1;
+};
+
+window.weatherWorstCond = function(days) {
+    let worstCond = 'CLR';
+    let worstRank = 1;
+    for (let i = 0; i < days.length; i++) {
+        let rank = window.weatherCondSeverity(days[i].cond);
+        if (rank > worstRank) {
+            worstRank = rank;
+            worstCond = days[i].cond;
+        }
+    }
+    let hasRainy = days.some(function(d) { return d.rainProb > 50; });
+    if (hasRainy && window.weatherCondSeverity('RAIN') > worstRank) {
+        worstCond = 'RAIN';
+    }
+    return worstCond;
+};
+
 window.updateLiveWeatherWidget = async function() {
     let isOutdoor = document.getElementById('edit-proj-outdoor').checked;
-    let container = document.getElementById('weather-widget-container');
-    if (!container) return;
-    
-    // Add horizontal scroll listener on first run
-    if (!container.hasWheelListener) {
-        container.addEventListener('wheel', function(e) {
-            if (container.scrollWidth > container.clientWidth) {
-                e.preventDefault();
-                container.scrollLeft += e.deltaY;
-            }
-        });
-        container.hasWheelListener = true;
+    let wrap = document.getElementById('weather-widget-wrap');
+    let summary = document.getElementById('weather-widget-summary');
+    let detail = document.getElementById('weather-widget-detail');
+    if (!wrap || !summary || !detail) return;
+
+    function scrollWeatherDetail(e) {
+        if (detail.scrollWidth <= detail.clientWidth) return;
+        e.preventDefault();
+        detail.scrollLeft += e.deltaY;
+    }
+
+    if (!detail.hasWheelListener) {
+        detail.addEventListener('wheel', scrollWeatherDetail, { passive: false });
+        detail.hasWheelListener = true;
+    }
+    if (!wrap.hasWheelListener) {
+        wrap.addEventListener('wheel', scrollWeatherDetail, { passive: false });
+        wrap.hasWheelListener = true;
+    }
+
+    function syncDetailMaxWidth() {
+        let miniCal = document.getElementById('mini-project-calendar');
+        let cap = miniCal && miniCal.offsetWidth > 0 ? miniCal.offsetWidth : 400;
+        detail.style.maxWidth = Math.min(cap, window.innerWidth * 0.8) + 'px';
     }
 
     if (!isOutdoor) {
-        container.style.display = 'none';
+        wrap.style.display = 'none';
         return;
     }
+
+    wrap.style.display = 'block';
+    syncDetailMaxWidth();
 
     let lat = document.getElementById('edit-proj-lat').value;
     let lng = document.getElementById('edit-proj-lng').value;
     let locText = document.getElementById('edit-proj-location').value.trim();
-    
+
     let sDateStr = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
     let eDateStr = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : sDateStr;
 
@@ -227,77 +286,101 @@ window.updateLiveWeatherWidget = async function() {
     }
 
     if (!lat || !lng || !sDateStr) {
-        container.style.display = 'flex';
-        container.innerHTML = '<div style="color:#a1a1aa; font-size:10px; padding:4px; text-align:center;">Set Map Location & Date</div>';
+        summary.innerHTML = '<div class="ww-line ww-line--muted">SET LOC & DATE</div>';
+        detail.innerHTML = '';
         return;
     }
 
-    container.style.display = 'flex';
-    container.innerHTML = '<div style="color:#10b981; font-size:10px; padding:4px; text-align:center;">Fetching...</div>';
+    summary.innerHTML = '<div class="ww-line ww-line--muted">FETCHING...</div>';
+    detail.innerHTML = '';
 
     try {
         let url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lng + "&daily=weathercode,temperature_2m_max,temperature_2m_min,windspeed_10m_max,precipitation_probability_max&timezone=auto&forecast_days=14";
         let res = await fetch(url);
         let data = await res.json();
-        
+
         if (!data || !data.daily) throw new Error("No data");
-        
+
         let daily = data.daily;
-        let html = '';
         let sDate = new Date(sDateStr + "T00:00:00Z");
         let eDate = new Date(eDateStr + "T23:59:59Z");
-        let hasForecast = false;
-        
+        let days = [];
+
         for (let i = 0; i < daily.time.length; i++) {
             let dStr = daily.time[i];
-            let dObj = new Date(dStr + "T12:00:00Z"); 
-            
+            let dObj = new Date(dStr + "T12:00:00Z");
+
             if (dObj >= sDate && dObj <= eDate) {
-                hasForecast = true;
                 let code = daily.weathercode[i];
                 let maxT = daily.temperature_2m_max[i];
                 let minT = daily.temperature_2m_min[i];
                 let wind = daily.windspeed_10m_max[i];
                 let rainProb = daily.precipitation_probability_max[i] || 0;
-                
-                let icon = 'SUN'; let desc = 'Clear'; 
-                if (code == null) { icon = 'CLR'; desc = 'Unknown'; } 
-                else if (code >= 1 && code <= 3) { icon = 'CLOUD'; desc = 'Cloudy'; }
-                else if (code >= 45 && code <= 48) { icon = 'FOG'; desc = 'Fog'; } 
-                else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) { icon = 'RAIN'; desc = 'Rain'; }
-                else if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) { icon = 'SNOW'; desc = 'Snow'; }
-                else if (code >= 95) { icon = 'STORM'; desc = 'Storm'; }
-                
-                let alertBorder = '';
-                if (maxT > 35 || maxT < 5 || wind > 40 || rainProb > 50) {
-                    alertBorder = 'border-top: 2px solid #ef4444;';
-                } else {
-                    alertBorder = 'border-top: 2px solid #333;';
-                }
-                
-                let dayName = dObj.toLocaleDateString(undefined, {weekday: 'short', day: 'numeric', timeZone: 'UTC'});
-                
-                html += '<div style="background:#0a0a0c; ' + alertBorder + ' border-radius:4px; padding:6px 10px; display:flex; flex-direction:row; align-items:center; justify-content:space-between; gap: 10px; min-width:140px; height:100%; box-sizing:border-box; flex-shrink:0;">' +
-                    '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-width: 45px;">' +
-                        '<div style="color:#a1a1aa; font-size:11px; font-weight:bold; text-transform:uppercase;">' + dayName + '</div>' +
-                        '<div style="font-size:11px; font-weight:bold; color:#f59e0b; margin-top:2px;" title="' + desc + '">' + icon + '</div>' +
-                    '</div>' +
-                    '<div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:center; flex:1;">' +
-                        '<div style="color:#fff; font-size:14px; font-weight:bold; line-height:1.2; white-space:nowrap;">' + Math.round(maxT) + 'C<span style="color:#888; font-weight:normal; font-size:11px; margin-left:4px;">' + Math.round(minT) + 'C</span></div>' +
-                        '<div style="color:#06b6d4; font-size:12px; font-weight:bold; margin-top:3px; white-space:nowrap;" title="Max Wind Speed">Wind: ' + Math.round(wind) + ' <span style="font-weight:normal; opacity:0.7; font-size:10px;">km/h</span></div>' +
-                        '<div style="color:#3b82f6; font-size:12px; font-weight:bold; margin-top:1px; white-space:nowrap;" title="Chance of Rain">Rain: ' + rainProb + '<span style="font-weight:normal; opacity:0.7; font-size:10px;">%</span></div>' +
-                    '</div>' +
-                '</div>';
+
+                let cond = 'CLR';
+                if (code == null) { cond = 'CLR'; }
+                else if (code >= 1 && code <= 3) { cond = 'CLOUD'; }
+                else if (code >= 45 && code <= 48) { cond = 'FOG'; }
+                else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) { cond = 'RAIN'; }
+                else if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) { cond = 'SNOW'; }
+                else if (code >= 95) { cond = 'STORM'; }
+
+                days.push({
+                    dObj: dObj,
+                    maxT: maxT,
+                    minT: minT,
+                    wind: wind,
+                    rainProb: rainProb,
+                    cond: cond
+                });
             }
         }
-        
-        if (hasForecast) {
-            container.innerHTML = html;
-        } else {
-            container.innerHTML = '<div style="color:#a1a1aa; font-size:10px; padding:4px; text-align:center;">Outside 14-day window.</div>';
+
+        if (!days.length) {
+            summary.innerHTML = '<div class="ww-line ww-line--muted">OUTSIDE 14D</div>';
+            detail.innerHTML = '';
+            return;
         }
+
+        let hasRainy = days.some(function(d) { return d.rainProb > 50; });
+        let eventMin = Math.min.apply(null, days.map(function(d) { return d.minT; }));
+        let eventMax = Math.max.apply(null, days.map(function(d) { return d.maxT; }));
+        let peakWind = Math.max.apply(null, days.map(function(d) { return d.wind; }));
+
+        let worstCond = window.weatherWorstCond(days);
+        let condLabel = window.weatherCondLabel(worstCond);
+        let condAlert = worstCond === 'RAIN' || worstCond === 'SNOW' || worstCond === 'STORM' || worstCond === 'FOG';
+        let tempAlert = eventMin < 5 || eventMax > 35;
+        let windAlert = peakWind > 40;
+
+        summary.innerHTML =
+            '<div class="ww-line ww-line--cond' + (condAlert ? ' ww-line--alert' : '') + '">' + condLabel + '</div>' +
+            '<div class="ww-line' + (tempAlert ? ' ww-line--alert' : '') + '">' + Math.round(eventMin) + '° – ' + Math.round(eventMax) + '°C</div>' +
+            '<div class="ww-line' + (windAlert ? ' ww-line--alert' : '') + '">' + Math.round(peakWind) + ' km/h</div>';
+
+        let detailHtml = '';
+        for (let j = 0; j < days.length; j++) {
+            let d = days[j];
+            let dayAlert = d.maxT > 35 || d.minT < 5 || d.wind > 40 || d.rainProb > 50;
+            let dayName = d.dObj.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', timeZone: 'UTC' });
+            let emoji = window.weatherCondEmoji(d.cond);
+
+            detailHtml += '<div class="weather-widget-day' + (dayAlert ? ' weather-widget-day--alert' : '') + '">' +
+                '<div class="weather-widget-day__date">' + dayName + '</div>' +
+                '<div class="weather-widget-day__cond" title="' + d.cond + '">' + emoji + '</div>' +
+                '<div class="weather-widget-day__stats">' +
+                    '<div class="ww-temp">' + Math.round(d.maxT) + '° <span style="color:#888;font-weight:600;">' + Math.round(d.minT) + '°</span></div>' +
+                    '<div class="ww-wind">' + Math.round(d.wind) + ' km/h</div>' +
+                    '<div class="ww-rain">' + d.rainProb + '%</div>' +
+                '</div>' +
+            '</div>';
+        }
+
+        detail.innerHTML = detailHtml;
+        syncDetailMaxWidth();
     } catch (e) {
-        container.innerHTML = '<div style="color:#ef4444; font-size:10px; padding:4px; text-align:center;">Failed to load.</div>';
+        summary.innerHTML = '<div class="ww-line ww-line--alert">FAILED</div>';
+        detail.innerHTML = '';
     }
 };
 </script>
