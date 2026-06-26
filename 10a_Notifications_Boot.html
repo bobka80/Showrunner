@@ -13,6 +13,8 @@
   var registeredToken = null;
   var registerAttempts = 0;
 
+  window.isShowrunnerHostingShell = (window.self !== window.top);
+
   function notifyParentReady() {
     try {
       if (window.parent && window.parent !== window) {
@@ -24,6 +26,10 @@
 
   function registerTokenWithBackend(token, label) {
     if (!token) return;
+    if (!window.isShowrunnerHostingShell) {
+      window.__srFcmLastError = 'Open the Hosting URL (web.app), not the direct Apps Script link.';
+      return;
+    }
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
       pendingToken = token;
       pendingLabel = label || 'web';
@@ -34,21 +40,57 @@
     registerAttempts++;
     google.script.run
       .withFailureHandler(function(err) {
-        console.warn('FCM token register failed:', err && err.message ? err.message : err);
         window.__srFcmLastError = (err && err.message) ? err.message : String(err);
+        console.warn('FCM token register failed:', window.__srFcmLastError);
+        if (typeof window.onShowrunnerFcmRegistered === 'function') {
+          window.onShowrunnerFcmRegistered({ success: false, message: window.__srFcmLastError });
+        }
       })
       .withSuccessHandler(function(res) {
+        if (res && res.success === false) {
+          window.__srFcmLastError = res.message || 'Registration failed.';
+          if (typeof window.onShowrunnerFcmRegistered === 'function') {
+            window.onShowrunnerFcmRegistered(res);
+          }
+          return;
+        }
         registeredToken = token;
         pendingToken = null;
         window.__srFcmLastError = '';
         console.log('FCM token registered for', ACTIVE_USER_NAME);
         if (typeof window.onShowrunnerFcmRegistered === 'function') {
-          window.onShowrunnerFcmRegistered(res);
+          window.onShowrunnerFcmRegistered(res || { success: true });
         }
-        notifyParentReady();
       })
       .registerFcmToken(ACTIVE_USER_NAME, token, label || 'web', ACTIVE_USER_NAME);
   }
+
+  window.pullShowrunnerFcmToken = function() {
+    return new Promise(function(resolve) {
+      if (!window.isShowrunnerHostingShell) {
+        resolve(null);
+        return;
+      }
+      var done = false;
+      function onMsg(ev) {
+        if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN' || !ev.data.token) return;
+        window.removeEventListener('message', onMsg);
+        if (!done) {
+          done = true;
+          resolve(ev.data.token);
+        }
+      }
+      window.addEventListener('message', onMsg);
+      notifyParentReady();
+      setTimeout(function() {
+        window.removeEventListener('message', onMsg);
+        if (!done) {
+          done = true;
+          resolve(null);
+        }
+      }, 8000);
+    });
+  };
 
   window.addEventListener('message', function(ev) {
     if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN') return;
@@ -56,21 +98,31 @@
   });
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', notifyParentReady);
+    document.addEventListener('DOMContentLoaded', function() {
+      notifyParentReady();
+      window.pullShowrunnerFcmToken().then(function(token) {
+        if (token) registerTokenWithBackend(token, 'web-hosting');
+      });
+    });
   } else {
-    setTimeout(notifyParentReady, 300);
+    setTimeout(function() {
+      notifyParentReady();
+      window.pullShowrunnerFcmToken().then(function(token) {
+        if (token) registerTokenWithBackend(token, 'web-hosting');
+      });
+    }, 300);
   }
 
   var retryTimer = setInterval(function() {
     if (pendingToken && typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
       registerTokenWithBackend(pendingToken, pendingLabel);
     }
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' }, '*');
+    if (window.isShowrunnerHostingShell) {
+      notifyParentReady();
     }
-    if (registerAttempts > 0 && registeredToken) clearInterval(retryTimer);
+    if (registeredToken) clearInterval(retryTimer);
   }, 3000);
 
-  setTimeout(function() { clearInterval(retryTimer); }, 120000);
+  setTimeout(function() { clearInterval(retryTimer); }, 180000);
 })();
 </script>

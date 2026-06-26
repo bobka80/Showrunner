@@ -4,6 +4,8 @@
  * ROOT tools — test push notification (Phase 1).
  */
 
+var SHOWRUNNER_HOSTING_URL = 'https://sm-showrunner-97405.web.app';
+
 function renderPushAdminPanel(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -16,12 +18,20 @@ function renderPushAdminPanel(containerId) {
     '<div style="background:#18181b; border:1px solid #333; border-radius:8px; padding:14px; margin-top:12px;">' +
       '<div style="color:#f59e0b; font-size:11px; font-weight:900; letter-spacing:0.05em; margin-bottom:8px;">PUSH NOTIFICATIONS (PHASE 1)</div>' +
       '<div style="color:#a1a1aa; font-size:11px; line-height:1.45; margin-bottom:10px;">' +
-        'Crew must open the <strong>Hosting URL</strong> (web.app), allow notifications, and log in. ' +
-        'Then use this test button on the same device.' +
+        'Push only works from the <strong>Hosting URL</strong> — not the direct Google Apps Script bookmark. ' +
+        'Android: Chrome OK. iPhone: use <strong>Safari</strong> + Add to Home Screen (Chrome on iPhone does not support web push).' +
       '</div>' +
-      '<button class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">SEND TEST PUSH TO ME</button>' +
+      '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="display:inline-block; margin:0 8px 8px 0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>' +
+      '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981;" onclick="retryShowrunnerFcmRegistration()">RETRY DEVICE REGISTER</button>' +
+      '<button class="btn-outline btn-sm" style="margin:0 0 8px 0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">SEND TEST PUSH TO ME</button>' +
       '<div id="push-admin-status" style="color:#71717a; font-size:10px; margin-top:8px;">Checking device registration…</div>' +
     '</div>';
+
+  if (typeof window.onShowrunnerFcmRegistered !== 'function') {
+    window.onShowrunnerFcmRegistered = function() {
+      setTimeout(refreshPushAdminStatus, 300);
+    };
+  }
 
   refreshPushAdminStatus();
 }
@@ -29,19 +39,51 @@ function renderPushAdminPanel(containerId) {
 function refreshPushAdminStatus() {
   const status = document.getElementById('push-admin-status');
   if (!status) return;
+
+  var inShell = (window.self !== window.top);
+  if (!inShell) {
+    status.innerHTML = '<span style="color:#ef4444;">Wrong entry point — you are on the direct Apps Script URL. Push cannot register here. Open <a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" style="color:#10b981;">' + SHOWRUNNER_HOSTING_URL + '</a>, allow notifications, log in, then return to DATABASE on that tab.</span>';
+    return;
+  }
+
+  if (window.__srFcmLastError) {
+    status.innerHTML = '<span style="color:#ef4444;">Register error: ' + window.__srFcmLastError + '</span>';
+  }
+
   google.script.run
     .withFailureHandler(function(err) {
       status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
     })
     .withSuccessHandler(function(res) {
       if (!res || !res.registered) {
-        status.innerHTML = '<span style="color:#f59e0b;">No device token yet. Open the Hosting URL, allow notifications, log in here, wait ~10s, then retry.</span>';
+        var hint = window.__srFcmLastError
+          ? ('Register error: ' + window.__srFcmLastError)
+          : 'No device token yet. Allow notifications on this tab, wait ~10s, then click RETRY DEVICE REGISTER.';
+        status.innerHTML = '<span style="color:#f59e0b;">' + hint + '</span>';
         return;
       }
       var when = res.updatedAt ? (' · ' + res.updatedAt.slice(0, 16).replace('T', ' ')) : '';
       status.innerHTML = '<span style="color:#10b981;">Device registered' + when + '</span>';
     })
     .getFcmRegistrationStatus(ACTIVE_USER_NAME);
+}
+
+function retryShowrunnerFcmRegistration() {
+  const status = document.getElementById('push-admin-status');
+  if (status) status.textContent = 'Requesting push token from Hosting shell…';
+  if (typeof window.pullShowrunnerFcmToken !== 'function') {
+    if (status) status.innerHTML = '<span style="color:#ef4444;">Not in Hosting shell — open ' + SHOWRUNNER_HOSTING_URL + '</span>';
+    return;
+  }
+  window.pullShowrunnerFcmToken().then(function(token) {
+    if (!token) {
+      if (status) status.innerHTML = '<span style="color:#f59e0b;">No token from browser yet. Check bottom-right chip says “token ready” and notifications are allowed.</span>';
+      setTimeout(refreshPushAdminStatus, 500);
+      return;
+    }
+    if (status) status.textContent = 'Saving device token…';
+    setTimeout(refreshPushAdminStatus, 2000);
+  });
 }
 
 function runShowrunnerTestPush() {

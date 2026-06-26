@@ -5,24 +5,30 @@
 // @INDEX: NOTIFICATIONS -> FCM Token Store
 // getFirebasePublicConfig() lives in Main.js (fcfg endpoint).
 function registerFcmToken(crewName, token, deviceLabel, actor) {
-  if (!crewName || !token) throw new Error('Missing crew name or FCM token.');
-  const profile = getUserSecurityProfile(crewName);
-  if (!profile || !profile.uid) throw new Error('Unknown user.');
-  const uid = String(profile.uid).trim();
-  const cleanToken = String(token).trim();
-  if (cleanToken.length < 20) throw new Error('Invalid FCM token.');
+  try {
+    if (!crewName || !token) return { success: false, message: 'Missing crew name or FCM token.' };
+    const profile = getUserSecurityProfile(crewName);
+    if (!profile || !profile.uid) return { success: false, message: 'Unknown user (no uid for ' + crewName + ').' };
+    const uid = String(profile.uid).trim();
+    const cleanToken = String(token).trim();
+    if (cleanToken.length < 20) return { success: false, message: 'Invalid FCM token length.' };
 
-  const props = PropertiesService.getScriptProperties();
-  const key = 'FCM_TOKEN_' + uid;
-  const payload = {
-    token: cleanToken,
-    email: profile.email || '',
-    label: deviceLabel || 'web',
-    updatedAt: new Date().toISOString()
-  };
-  props.setProperty(key, JSON.stringify(payload));
-  writeToAuditLog(actor || crewName, 'UPDATE', 'NOTIFICATIONS', uid, 'FCM Token', 'Registered push token (' + payload.label + ').');
-  return { success: true, uid: uid };
+    const props = PropertiesService.getScriptProperties();
+    const key = 'FCM_TOKEN_' + uid;
+    const payload = {
+      token: cleanToken,
+      email: profile.email || '',
+      label: deviceLabel || 'web',
+      updatedAt: new Date().toISOString()
+    };
+    props.setProperty(key, JSON.stringify(payload));
+    try {
+      writeToAuditLog(actor || crewName, 'UPDATE', 'NOTIFICATIONS', uid, 'FCM Token', 'Registered push token (' + payload.label + ').');
+    } catch (auditErr) { /* token saved — audit optional */ }
+    return { success: true, uid: uid };
+  } catch (err) {
+    return { success: false, message: (err && err.message) ? err.message : String(err) };
+  }
 }
 
 function getFcmRegistrationStatus(crewName) {

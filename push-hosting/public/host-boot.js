@@ -28,12 +28,15 @@
   }
 
   function postTokenToApp() {
-    if (!fcmToken || !appReady || !frame || !frame.contentWindow) return;
-    frame.contentWindow.postMessage({
+    if (!fcmToken) return;
+    const msg = {
       type: 'SHOWRUNNER_FCM_TOKEN',
       token: fcmToken,
       label: 'web-hosting'
-    }, '*');
+    };
+    if (appReady && frame && frame.contentWindow) {
+      try { frame.contentWindow.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+    }
   }
 
   window.addEventListener('message', function(ev) {
@@ -43,6 +46,13 @@
       postTokenToApp();
     }
   });
+
+  if (frame) {
+    frame.addEventListener('load', function() {
+      appReady = true;
+      postTokenToApp();
+    });
+  }
 
   async function initPush() {
     try {
@@ -75,14 +85,16 @@
 
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
-        setStatus('permission denied');
+        setStatus('permission denied — enable in browser settings');
         return;
       }
 
       const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
       const messaging = firebase.messaging();
-      messaging.useServiceWorker(reg);
-      fcmToken = await messaging.getToken({ vapidKey: firebaseConfig.vapidKey });
+      fcmToken = await messaging.getToken({
+        vapidKey: firebaseConfig.vapidKey,
+        serviceWorkerRegistration: reg
+      });
       if (!fcmToken) {
         setStatus('no token — check Hosting + VAPID');
         return;
