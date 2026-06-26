@@ -128,10 +128,31 @@
           } catch (e) { /* ignore */ }
 
           waitForParentSave(20000).then(onBridgeRegistered);
+          pollServerRegistration(30000);
         });
       })
       .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
   };
+
+  function pollServerRegistration(ms) {
+    var elapsed = 0;
+    var poll = setInterval(function() {
+      if (bridgeRegistered) {
+        clearInterval(poll);
+        return;
+      }
+      elapsed += 2000;
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.registered) {
+            clearInterval(poll);
+            onBridgeRegistered({ success: true });
+          }
+        })
+        .getFcmRegistrationStatus(ACTIVE_USER_NAME);
+      if (elapsed >= ms) clearInterval(poll);
+    }, 2000);
+  }
 
   window.retryShowrunnerFcmBridge = function() {
     bridgeRegistered = false;

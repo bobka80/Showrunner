@@ -30,6 +30,16 @@ function renderPushAdminPanel(containerId) {
         '<input id="push-vapid-input" type="text" placeholder="Paste Web Push public key here (not AIza API key)" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:11px; margin-bottom:8px;">' +
         '<button class="btn-outline btn-sm" style="margin:0; border-color:#698b99; color:#698b99;" onclick="saveShowrunnerVapidKey()">SAVE VAPID KEY</button>' +
         '<span id="push-vapid-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>' +
+        '<div id="push-vapid-active" style="color:#71717a; font-size:10px; margin-top:6px;"></div>' +
+      '</div>' +
+      '<div style="margin-bottom:10px; padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">' +
+        '<div style="color:#888; font-size:10px; font-weight:800; margin-bottom:6px;">DEVICE TOKEN (manual save)</div>' +
+        '<div style="color:#71717a; font-size:10px; line-height:1.4; margin-bottom:8px;">' +
+          'If bottom-right says <strong>token ready</strong> but not saved: on the Hosting page click <strong>Copy push token</strong>, paste below, then SAVE DEVICE TOKEN.' +
+        '</div>' +
+        '<textarea id="push-device-token-input" rows="3" placeholder="Paste device token here" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:10px; margin-bottom:8px; resize:vertical;"></textarea>' +
+        '<button class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="saveShowrunnerDeviceToken()">SAVE DEVICE TOKEN</button>' +
+        '<span id="push-device-token-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>' +
       '</div>' +
       '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="display:inline-block; margin:0 8px 8px 0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>' +
       '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981;" onclick="retryShowrunnerFcmRegistration()">RETRY DEVICE REGISTER</button>' +
@@ -71,6 +81,31 @@ function saveShowrunnerVapidKey() {
     .saveFirebaseVapidKey(ACTIVE_USER_NAME, input.value.trim());
 }
 
+function saveShowrunnerDeviceToken() {
+  var input = document.getElementById('push-device-token-input');
+  var note = document.getElementById('push-device-token-status');
+  if (!input || !input.value.trim()) {
+    if (note) note.innerHTML = '<span style="color:#ef4444;">Paste the device token first (Copy push token on Hosting page).</span>';
+    return;
+  }
+  if (note) note.textContent = 'Saving…';
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (note) note.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+    })
+    .withSuccessHandler(function(res) {
+      if (!note) return;
+      if (res && res.success) {
+        note.innerHTML = '<span style="color:#10b981;">Device token saved. Try SEND TEST PUSH TO ME.</span>';
+        input.value = '';
+      } else {
+        note.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Save failed') + '</span>';
+      }
+      refreshPushAdminStatus();
+    })
+    .saveFcmDeviceToken(ACTIVE_USER_NAME, input.value.trim());
+}
+
 function refreshPushAdminStatus() {
   const status = document.getElementById('push-admin-status');
   if (!status) return;
@@ -97,6 +132,11 @@ function refreshPushAdminStatus() {
           : 'VAPID key missing or invalid. Paste the Web Push public key above and click SAVE VAPID KEY.';
         status.innerHTML = '<span style="color:#ef4444;">' + vapidHint + '</span>';
         return;
+      }
+
+      var vapidActive = document.getElementById('push-vapid-active');
+      if (vapidActive && setup.vapidKeyPrefix) {
+        vapidActive.innerHTML = 'Server VAPID starts with <strong>' + setup.vapidKeyPrefix + '…</strong> (' + setup.vapidKeyLength + ' chars) — compare to Firebase <em>Current pair</em>.';
       }
 
       google.script.run

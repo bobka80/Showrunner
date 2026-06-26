@@ -3,7 +3,8 @@
  */
 (function() {
   const PROD_GAS_EXEC = 'https://script.google.com/macros/s/AKfycbxynTt5JaKQiv1Iu_ahSQBcrBDKpuhz98lac4G-bJO5PMtmvgJr_uKZ1Y58lxOOupSwlw/exec';
-  const statusEl = document.getElementById('push-status');
+  const statusEl = document.getElementById('push-status-text');
+  const copyBtn = document.getElementById('push-copy-btn');
   const bannerEl = document.getElementById('push-enable-banner');
   const enableBtn = document.getElementById('push-enable-btn');
   const frame = document.getElementById('app-frame');
@@ -16,8 +17,12 @@
   function setStatus(msg, clickable) {
     if (!statusEl) return;
     statusEl.textContent = 'Push: ' + msg;
-    statusEl.style.pointerEvents = clickable ? 'auto' : 'none';
-    statusEl.style.cursor = clickable ? 'pointer' : 'default';
+    const wrap = document.getElementById('push-status');
+    if (wrap) {
+      wrap.style.pointerEvents = clickable ? 'auto' : 'none';
+      wrap.style.cursor = clickable ? 'pointer' : 'default';
+    }
+    if (copyBtn && fcmToken) copyBtn.style.display = 'block';
   }
 
   function hideBanner() {
@@ -258,8 +263,20 @@
       requestNotificationsAndRegister();
     });
   }
-  if (statusEl) {
-    statusEl.addEventListener('click', function() {
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function(ev) {
+      ev.stopPropagation();
+      if (!fcmToken) return;
+      navigator.clipboard.writeText(fcmToken).then(function() {
+        setStatus('token copied — paste in DATABASE', false);
+      }).catch(function() {
+        window.prompt('Copy this device token:', fcmToken);
+      });
+    });
+  }
+  const statusWrap = document.getElementById('push-status');
+  if (statusWrap) {
+    statusWrap.addEventListener('click', function() {
       if (Notification.permission !== 'granted') {
         pushStarted = false;
         showBanner();

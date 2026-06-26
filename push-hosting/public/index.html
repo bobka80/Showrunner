@@ -13,8 +13,14 @@
       position: fixed; right: 8px; bottom: 8px; z-index: 9999;
       background: rgba(24,24,27,0.92); border: 1px solid #333; color: #a1a1aa;
       font-size: 11px; line-height: 1.3; padding: 6px 8px; border-radius: 6px;
-      max-width: 260px;
+      max-width: 280px;
     }
+    #push-copy-btn {
+      display: none; margin-top: 6px; width: 100%;
+      background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #fff;
+      font-weight: 700; font-size: 10px; padding: 6px 8px; border-radius: 4px; cursor: pointer;
+    }
+    #push-copy-btn:hover { background: rgba(16,185,129,0.4); }
     #push-enable-banner {
       position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 10000;
       background: rgba(24,24,27,0.96); border: 1px solid #10b981; color: #f4f4f5;
@@ -38,7 +44,7 @@
     <button type="button" id="push-enable-btn">Allow notifications</button>
   </div>
   <iframe id="app-frame" title="SM Showrunner" allow="clipboard-read; clipboard-write"></iframe>
-  <div id="push-status">Push: starting…</div>
+  <div id="push-status"><span id="push-status-text">Push: starting…</span><button type="button" id="push-copy-btn">Copy push token</button></div>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
   <script src="/host-boot.js"></script>

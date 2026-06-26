@@ -23,6 +23,17 @@ function saveFirebaseVapidKey(crewName, vapidKeyRaw) {
   return { success: true, message: 'VAPID key saved. Hard-refresh the Hosting URL and click Allow notifications again.' };
 }
 
+function saveFcmDeviceToken(crewName, tokenRaw) {
+  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+    return { success: false, message: 'ROOT privileges required.' };
+  }
+  const token = String(tokenRaw || '').trim();
+  if (token.length < 20) {
+    return { success: false, message: 'Paste the full device token (long string from Copy push token).' };
+  }
+  return registerFcmToken(crewName, token, 'web-manual', crewName);
+}
+
 function getFirebasePushSetupStatus(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
@@ -33,6 +44,7 @@ function getFirebasePushSetupStatus(crewName) {
     success: true,
     vapidKeyValid: cfg.vapidKeyValid,
     vapidKeyLength: (cfg.vapidKey || '').length,
+    vapidKeyPrefix: (cfg.vapidKey || '').slice(0, 4),
     vapidLooksLikeApiKey: (cfg.vapidKey || '').indexOf('AIza') === 0,
     deviceRegistered: !!(reg && reg.registered),
     hostingUrl: cfg.hostingUrl
