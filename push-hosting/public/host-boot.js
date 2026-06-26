@@ -19,7 +19,7 @@
   let regKeySaveInFlight = false;
   let regKeyRetryTimer = null;
   let fcmAuthRequestTimer = null;
-  const SW_BUILD = '292';
+  const SW_BUILD = '294';
   let serverSaveConfirmed = false;
   let tokenBroadcastTimer = null;
 
@@ -73,6 +73,32 @@
     } catch (e) { /* ignore */ }
   }
 
+  function syncDockLayout() {
+    var dock = document.getElementById('push-mobile-dock');
+    if (!dock || !frame) return;
+    function apply() {
+      if (document.body.classList.contains('push-dock-open')) {
+        var h = Math.max(dock.offsetHeight, dock.scrollHeight, 160);
+        frame.style.top = h + 'px';
+        frame.style.height = 'calc(100% - ' + h + 'px)';
+      } else {
+        frame.style.top = '0';
+        frame.style.height = '100%';
+      }
+    }
+    apply();
+    requestAnimationFrame(function() {
+      apply();
+      requestAnimationFrame(apply);
+    });
+  }
+
+  var dockEl = document.getElementById('push-mobile-dock');
+  if (dockEl && typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(function() { syncDockLayout(); }).observe(dockEl);
+  }
+  window.addEventListener('resize', syncDockLayout);
+
   function setDockStatus(lines) {
     if (!dockStatusEl) return;
     var text = Array.isArray(lines) ? lines.join(' · ') : String(lines || '');
@@ -106,11 +132,13 @@
         setDockMessage('Tap below — Chrome must show Allow. Required for phone alerts.');
         if (enableBtn) enableBtn.textContent = 'Allow notifications';
       }
-      notifyIframePushState(true, 'Tap the green Allow button in the bar above.');
+      notifyIframePushState(true, 'Tap Save push to my account inside the app.');
+      syncDockLayout();
       return;
     }
     if (bannerEl) bannerEl.classList.remove('hidden');
     notifyIframePushState(true, '');
+    syncDockLayout();
   }
 
   function hidePushPrompt() {
@@ -119,6 +147,7 @@
     if (bannerEl) bannerEl.classList.add('hidden');
     hideIosInstallBanner();
     notifyIframePushState(false, '');
+    syncDockLayout();
   }
 
   function showBanner() {
@@ -236,7 +265,7 @@
       }
       if (!pendingFcmAuth) {
         requestFcmAuthFromIframe();
-        setDockStatus(['Step 1: token OK', 'linking to your account…']);
+        setDockStatus(['Step 1: token OK', 'tap Save push in app below']);
       } else {
         trySaveTokenViaRegKey();
       }
@@ -478,7 +507,9 @@
     }
 
     logPush('token ready');
-    setDockStatus(['Step 1: token OK', 'linking to your account…']);
+    setDockMessage('Token OK — tap Save push inside the app (scroll to top if needed).');
+    setDockStatus(['Step 1: token OK', 'tap Save push in app below']);
+    notifyIframePushState(true, 'Tap the green Save push to my account button at the top of this app.');
     flushPendingBridge();
     trySaveTokenViaRegKey();
     requestFcmAuthFromIframe();
@@ -634,17 +665,17 @@
   bindPushButton(enableBtn);
   bindPushButton(enableBtnDesk);
   if (linkBtn) {
-    linkBtn.addEventListener('click', function(e) {
+    function onLinkTap(e) {
       if (e) e.preventDefault();
+      linkBtn.style.opacity = '0.7';
+      setTimeout(function() { linkBtn.style.opacity = '1'; }, 150);
+      setDockStatus(['Tapped — linking…']);
       requestFcmAuthFromIframe();
       trySaveTokenViaRegKey();
-      setDockStatus(['Step 1: token OK', 'linking to your account…']);
-    });
-    linkBtn.addEventListener('touchend', function(e) {
-      e.preventDefault();
-      requestFcmAuthFromIframe();
-      trySaveTokenViaRegKey();
-    }, { passive: false });
+      startFcmAuthRequestLoop();
+    }
+    linkBtn.addEventListener('click', onLinkTap);
+    linkBtn.addEventListener('touchend', onLinkTap, { passive: false });
   }
 
   initShell();

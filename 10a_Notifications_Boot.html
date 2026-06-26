@@ -81,14 +81,21 @@
     } catch (e) { /* ignore */ }
   }
 
+  function setInAppPushStatus(text) {
+    var el = document.getElementById('sr-push-hint-status');
+    if (el) el.textContent = text || '';
+  }
+
   function onSaveComplete(res) {
     saveInFlight = false;
     if (res && res.success) {
       thisDeviceRegistered = true;
       window.__srFcmLastError = '';
+      setInAppPushStatus('Saved on server.');
       notifyParentSaved();
     } else {
       window.__srFcmLastError = (res && res.message) ? res.message : 'Registration failed.';
+      setInAppPushStatus(window.__srFcmLastError);
     }
     if (typeof window.onShowrunnerFcmRegistered === 'function') {
       window.onShowrunnerFcmRegistered(res || { success: false });
@@ -286,6 +293,29 @@
     }
   });
 
+  function linkPushToMyAccount() {
+    if (!window.isShowrunnerHostingShell) return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
+      updateInAppPushHint(true, 'Log in first, then tap Save push again.');
+      return;
+    }
+    updateInAppPushHint(true, 'Saving push to your account…');
+    var metaKey = getFcmRegKey();
+    if (metaKey) pushFcmAuthToParent(metaKey);
+    refreshFcmRegKeyAndNotifyParent();
+    tryJsonpBridgeFallback();
+    requestTokenFromParent(8000).then(function(payload) {
+      if (payload && payload.token) {
+        saveTokenToServer(payload.token, payload.label || 'web-mobile');
+      } else {
+        try { window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' }, '*'); } catch (e) { /* ignore */ }
+        updateInAppPushHint(true, 'Waiting for phone token… Allow notifications in the green bar above, then tap Save push again.');
+      }
+    });
+    try { window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' }, '*'); } catch (e) { /* ignore */ }
+  }
+  window.linkPushToMyAccount = linkPushToMyAccount;
+
   function updateInAppPushHint(needsAttention, message) {
     if (!window.isShowrunnerHostingShell || thisDeviceRegistered) {
       var gone = document.getElementById('sr-push-hint');
@@ -304,13 +334,14 @@
       hint.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#0f172a;border-bottom:2px solid #10b981;color:#e4e4e7;padding:10px 12px;font-size:12px;line-height:1.4;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
       document.body.appendChild(hint);
     }
-    var msg = message || 'Enable push notifications using the green bar above this app.';
-    hint.innerHTML = msg + ' <button type="button" id="sr-push-hint-btn" style="display:block;margin:8px auto 0;background:#10b981;border:none;color:#fff;font-weight:800;padding:10px 14px;border-radius:6px;font-size:12px;">Open notification setup</button>';
-    var btn = document.getElementById('sr-push-hint-btn');
+    var msg = message || 'Tap the green Save button below (works on Android).';
+    hint.innerHTML =
+      '<div style="margin-bottom:8px;">' + msg + '</div>' +
+      '<button type="button" id="sr-push-save-btn" style="display:block;margin:0 auto;background:#10b981;border:none;color:#fff;font-weight:800;padding:14px 16px;border-radius:6px;font-size:14px;width:100%;max-width:300px;touch-action:manipulation;-webkit-tap-highlight-color:rgba(16,185,129,0.45);">Save push to my account</button>' +
+      '<div id="sr-push-hint-status" style="font-size:10px;color:#71717a;margin-top:8px;"></div>';
+    var btn = document.getElementById('sr-push-save-btn');
     if (btn) {
-      btn.onclick = function() {
-        try { window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_PUSH_PERMISSION' }, '*'); } catch (e) { /* ignore */ }
-      };
+      btn.onclick = function() { linkPushToMyAccount(); };
     }
   }
 
@@ -318,6 +349,9 @@
     notifyParentReady();
     notifyParentFcmAuth();
     window.startFcmBridgeRegistration();
+    if (window.isShowrunnerHostingShell && typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
+      updateInAppPushHint(true, 'Logged in — tap Save push below when notifications are allowed.');
+    }
   }
 
   if (document.readyState === 'loading') {
