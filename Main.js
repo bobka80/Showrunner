@@ -3,19 +3,52 @@
  * Main.gs - Routing, Global Includes, and Software Summary
  */
 
+// @INDEX: ROUTING -> Firebase public config (fcfg endpoint)
+function getFirebasePublicConfig() {
+  const p = PropertiesService.getScriptProperties();
+  const projectId = p.getProperty('FIREBASE_PROJECT_ID') || 'sm-showrunner-97405';
+  const gasUrl = ScriptApp.getService().getUrl();
+  let webCfg = {};
+  const webCfgRaw = p.getProperty('FIREBASE_WEB_CONFIG');
+  if (webCfgRaw) {
+    try { webCfg = JSON.parse(webCfgRaw); } catch (e) { /* ignore */ }
+  }
+  return {
+    apiKey: p.getProperty('FIREBASE_WEB_API_KEY') || p.getProperty('FIREBASE_API_KEY') || webCfg.apiKey || '',
+    authDomain: p.getProperty('FIREBASE_AUTH_DOMAIN') || webCfg.authDomain || (projectId + '.firebaseapp.com'),
+    projectId: projectId,
+    storageBucket: p.getProperty('FIREBASE_STORAGE_BUCKET') || webCfg.storageBucket || (projectId + '.firebasestorage.app'),
+    messagingSenderId: p.getProperty('FIREBASE_MESSAGING_SENDER_ID') || webCfg.messagingSenderId || '',
+    appId: p.getProperty('FIREBASE_APP_ID') || webCfg.appId || '',
+    vapidKey: p.getProperty('FIREBASE_VAPID_KEY') || webCfg.vapidKey || '',
+    gasExecUrl: gasUrl,
+    hostingUrl: p.getProperty('FIREBASE_HOSTING_URL') || ('https://' + projectId + '.web.app')
+  };
+}
+
 // @INDEX: ROUTING -> Web App Get/Post
 function doGet(e) {
   e = e || {};
   const action = (e.parameter && e.parameter.action) ? String(e.parameter.action) : '';
   if (action === 'fcfg') {
-    const cfg = getFirebasePublicConfig();
-    const json = JSON.stringify(cfg);
-    const callback = e.parameter.callback;
-    if (callback) {
-      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
-        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    try {
+      const cfg = getFirebasePublicConfig();
+      const json = JSON.stringify(cfg);
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+    } catch (err) {
+      const payload = JSON.stringify({ error: (err && err.message) ? err.message : String(err) });
+      const callback = e.parameter.callback;
+      if (callback) {
+        return ContentService.createTextOutput(String(callback) + '(' + payload + ');')
+          .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
     }
-    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
   }
 
   let loginTemplate = HtmlService.createTemplateFromFile('Login');

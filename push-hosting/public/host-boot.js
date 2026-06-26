@@ -2,7 +2,7 @@
  * Firebase Hosting shell — loads Showrunner in iframe + registers FCM.
  */
 (function() {
-  const PROD_GAS_EXEC = 'https://script.google.com/macros/s/AKfycbzilZyZ-qzQoUPBr0Y5r1G7nGVsPMq2XTwRRfNQZTm7/exec';
+  const PROD_GAS_EXEC = 'https://script.google.com/macros/s/AKfycbxynTt5JaKQiv1Iu_ahSQBcrBDKpuhz98lac4G-bJO5PMtmvgJr_uKZ1Y58lxOOupSwlw/exec';
   const statusEl = document.getElementById('push-status');
   const frame = document.getElementById('app-frame');
   let firebaseConfig = null;

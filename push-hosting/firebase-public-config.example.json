@@ -1,0 +1,9 @@
+{
+  "apiKey": "PASTE_FROM_FIREBASE_WEB_APP",
+  "authDomain": "sm-showrunner-97405.firebaseapp.com",
+  "projectId": "sm-showrunner-97405",
+  "storageBucket": "sm-showrunner-97405.firebasestorage.app",
+  "messagingSenderId": "PASTE_FROM_FIREBASE_WEB_APP",
+  "appId": "PASTE_FROM_FIREBASE_WEB_APP",
+  "vapidKey": "PASTE_VAPID_KEY"
+}
