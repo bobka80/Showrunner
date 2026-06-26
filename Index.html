@@ -185,6 +185,14 @@
 <meta name="user-email" content="<?= userEmail ?>">
 <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
 <meta name="fcm-reg-key" content="<?= fcmRegKey ?>">
+<script>
+  (function() {
+    var k = document.querySelector('meta[name="fcm-reg-key"]');
+    if (k && k.content) {
+      try { localStorage.setItem('sr_fcm_reg_key', String(k.content).trim()); } catch (e) { /* ignore */ }
+    }
+  })();
+</script>
 
 <script>
   console.log("🔥 APP BOOT VERSION: 2026-06-25 RBAC-Phase1");

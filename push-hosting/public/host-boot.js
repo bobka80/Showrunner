@@ -6,6 +6,7 @@
   const bannerEl = document.getElementById('push-enable-banner');
   const enableBtn = document.getElementById('push-enable-btn');
   const enableBtnDesk = document.getElementById('push-enable-btn-desk');
+  const linkBtn = document.getElementById('push-link-btn');
   const dockMsgEl = document.getElementById('push-dock-msg');
   const dockStatusEl = document.getElementById('push-dock-status');
   const frame = document.getElementById('app-frame');
@@ -18,7 +19,7 @@
   let regKeySaveInFlight = false;
   let regKeyRetryTimer = null;
   let fcmAuthRequestTimer = null;
-  const SW_BUILD = '291';
+  const SW_BUILD = '292';
   let serverSaveConfirmed = false;
   let tokenBroadcastTimer = null;
 
@@ -376,6 +377,15 @@
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_APP_READY' || ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
       postTokenToApp();
+      if (ev.data.type === 'SHOWRUNNER_APP_READY' && ev.data.regKey) {
+        pendingFcmAuth = {
+          regKey: ev.data.regKey,
+          crewName: ev.data.crewName || ''
+        };
+        setDockStatus(['Step 1: token OK', 'account found', 'saving…']);
+        trySaveTokenViaRegKey();
+        startRegKeyRetryLoop();
+      }
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
       stopTokenBroadcast();
@@ -623,6 +633,19 @@
 
   bindPushButton(enableBtn);
   bindPushButton(enableBtnDesk);
+  if (linkBtn) {
+    linkBtn.addEventListener('click', function(e) {
+      if (e) e.preventDefault();
+      requestFcmAuthFromIframe();
+      trySaveTokenViaRegKey();
+      setDockStatus(['Step 1: token OK', 'linking to your account…']);
+    });
+    linkBtn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      requestFcmAuthFromIframe();
+      trySaveTokenViaRegKey();
+    }, { passive: false });
+  }
 
   initShell();
 })();

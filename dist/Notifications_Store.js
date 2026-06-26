@@ -85,7 +85,7 @@ function createFcmRegistrationKey_(crewName) {
   const cleanName = String(crewName || '').trim();
   if (!cleanName) return '';
   const key = Utilities.getUuid().replace(/-/g, '');
-  CacheService.getScriptCache().put('fcm_regkey_' + key, cleanName, 900);
+  CacheService.getScriptCache().put('fcm_regkey_' + key, cleanName, 3600);
   return key;
 }
 

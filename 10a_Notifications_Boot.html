@@ -18,13 +18,27 @@
 
   function getFcmRegKey() {
     var el = document.querySelector('meta[name="fcm-reg-key"]');
-    return (el && el.content) ? String(el.content).trim() : '';
+    var meta = (el && el.content) ? String(el.content).trim() : '';
+    if (meta) return meta;
+    try {
+      var stored = localStorage.getItem('sr_fcm_reg_key');
+      return stored ? String(stored).trim() : '';
+    } catch (e) { return ''; }
   }
 
   function notifyParentReady() {
     try {
       if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type: 'SHOWRUNNER_APP_READY' }, '*');
+        var regKey = getFcmRegKey();
+        var crew = (typeof ACTIVE_USER_NAME !== 'undefined') ? ACTIVE_USER_NAME : '';
+        window.parent.postMessage({
+          type: 'SHOWRUNNER_APP_READY',
+          crewName: crew,
+          regKey: regKey
+        }, '*');
+        if (regKey && crew) {
+          pushFcmAuthToParent(regKey);
+        }
       }
     } catch (e) { /* ignore */ }
   }
@@ -43,17 +57,13 @@
   function refreshFcmRegKeyAndNotifyParent() {
     if (!window.isShowrunnerHostingShell || thisDeviceRegistered) return;
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    var metaKey = getFcmRegKey();
+    if (metaKey) pushFcmAuthToParent(metaKey);
     google.script.run
-      .withFailureHandler(function() {
-        var metaKey = getFcmRegKey();
-        if (metaKey) pushFcmAuthToParent(metaKey);
-      })
+      .withFailureHandler(function() { /* meta already sent */ })
       .withSuccessHandler(function(res) {
         if (res && res.success && res.regKey) {
           pushFcmAuthToParent(res.regKey);
-        } else {
-          var metaKey = getFcmRegKey();
-          if (metaKey) pushFcmAuthToParent(metaKey);
         }
       })
       .issueFcmRegistrationKey(ACTIVE_USER_NAME);
@@ -269,6 +279,7 @@
     }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_AUTH') {
       refreshFcmRegKeyAndNotifyParent();
+      if (!thisDeviceRegistered) tryJsonpBridgeFallback();
     }
     if (ev.data.type === 'SHOWRUNNER_PUSH_STATE') {
       updateInAppPushHint(ev.data.needsAttention, ev.data.message);
