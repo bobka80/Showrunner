@@ -145,3 +145,26 @@ At the end of a good brainstorm, the AI should leave:
 - Explicit wait: **"Say OK go to start implementation."**
 
 The director approves by saying **OK go**. Only then does coding begin.
+
+---
+
+## Milestone before new work
+
+When starting a **new major update** on top of tested production, the director can say **"Milestone now"** (optionally with follow-up instructions in the same message).
+
+**AI behavior:**
+
+1. Run **`node milestone.js`** first — production Apps Script snapshot (see [MILESTONE_NOW.md](MILESTONE_NOW.md)).
+2. **Only after** milestone succeeds, proceed with build/fix work from the rest of the message.
+3. If milestone fails (e.g. missing `deploy-config.json`), stop and explain the blocker — do not start the new feature until fixed or the director explicitly says to skip.
+
+**Examples**
+
+| Director says | AI does |
+|---------------|---------|
+| *Milestone now* | Milestone only |
+| *Milestone now — then build the Database tab* | Milestone → then implement Database tab |
+| *Milestone* / *OK ship* | Milestone only (same as before) |
+| *OK go* (no milestone) | Dev work only — no production snapshot |
+
+Quick reference for the director: root **[MILESTONE_NOW.md](../../MILESTONE_NOW.md)**.

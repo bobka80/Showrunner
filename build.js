@@ -116,17 +116,28 @@ function getFrontendLogicChunk(index) {
   fs.writeFileSync(path.join(DIST_DIR, 'LogicPayload_Master.js'), masterLogic);
   console.log(`Compiled LogicPayload_Master.js`);
 
-  // 6. Copy all necessary backend .js files, appsscript.json, and Login.html
+  // 6. Copy backend .js files, appsscript.json, and Login.html (never Node tooling)
+  const NODE_ONLY = new Set([
+    'build.js', 'watch.js',
+    'dev-push.js', 'works-save.js', 'milestone.js',
+    'rollback-works.js', 'rollback-milestone.js',
+    'test.js', 'test_db.js', 'run_test.js'
+  ]);
   const files = fs.readdirSync(__dirname);
   let filesCopied = 0;
   files.forEach(file => {
-    if (file === 'build.js' || file === 'watch.js' || file.startsWith('scratch_') || file.startsWith('temp_')) return;
+    if (NODE_ONLY.has(file) || file.startsWith('scratch_') || file.startsWith('temp_')) return;
     if (fs.statSync(path.join(__dirname, file)).isDirectory()) return;
-    
+
     if (file.endsWith('.js') || file === 'appsscript.json' || file === 'Login.html') {
       fs.copyFileSync(path.join(__dirname, file), path.join(DIST_DIR, file));
       filesCopied++;
     }
+  });
+  // Remove Node tooling left over from older builds
+  NODE_ONLY.forEach(file => {
+    const stale = path.join(DIST_DIR, file);
+    if (fs.existsSync(stale)) fs.unlinkSync(stale);
   });
 
   console.log(`Copied ${filesCopied} backend script files to dist/`);

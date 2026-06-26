@@ -1,9 +1,16 @@
 /**
  * Production milestone — Apps Script version + deploy + RELEASES.md + Git commit.
  *
- * Usage: node milestone.js "Major: Print Studio wired"
+ * Director logic:
+ *   1. Read latest GAS version (e.g. 265)
+ *   2. Push current code → create NEXT version with a proper name (e.g. 266)
+ *   3. Deploy that new version to the web app
  *
- * Requires deploy-config.json with productionDeploymentId (see deploy-config.example.json).
+ * Usage: node milestone.js "Pre database operations panel — IAM baseline"
+ *
+ * deploy-config.json is optional:
+ *   - If productionDeploymentId is set → update that same production URL
+ *   - If missing → clasp creates a new deployment; ID is saved to deploy-config.json
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -13,31 +20,58 @@ const build = require('./build');
 const MAX_MILESTONE_LOG = 50;
 const LOG_PATH = path.join(__dirname, 'RELEASES.md');
 const CONFIG_PATH = path.join(__dirname, 'deploy-config.json');
+const EXAMPLE_CONFIG_PATH = path.join(__dirname, 'deploy-config.example.json');
 const note = process.argv.slice(2).join(' ').trim() || 'Milestone';
 
 function run(cmd) {
-  return execSync(cmd, { cwd: __dirname, encoding: 'utf8', stdio: ['pipe', 'pipe', 'inherit'] }).trim();
+  return execSync(cmd, { cwd: __dirname, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 }
 
 function runInherit(cmd) {
   execSync(cmd, { cwd: __dirname, stdio: 'inherit' });
 }
 
-function loadDeploymentId() {
-  if (!fs.existsSync(CONFIG_PATH)) {
-    console.error('\nMissing deploy-config.json');
-    console.error('Copy deploy-config.example.json → deploy-config.json');
-    console.error('Run: clasp list-deployments');
-    console.error('Paste your Production Web App deployment ID.\n');
-    process.exit(1);
+function parseClaspVersions(output) {
+  const versions = [];
+  for (const line of output.split('\n')) {
+    const m = line.match(/^\s*(\d+)\s*-\s*(.*)$/);
+    if (m) versions.push({ num: parseInt(m[1], 10), desc: m[2].trim() });
   }
-  const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-  const id = cfg.productionDeploymentId;
-  if (!id || id.includes('PASTE')) {
-    console.error('\nSet productionDeploymentId in deploy-config.json\n');
-    process.exit(1);
+  return versions;
+}
+
+function getLatestGasVersion() {
+  const list = run('clasp list-versions');
+  const versions = parseClaspVersions(list);
+  if (!versions.length) return null;
+  return versions.reduce((max, v) => (v.num > max.num ? v : max), versions[0]);
+}
+
+function parseDeploymentId(output) {
+  const m = output.match(/-\s*(AKfycb[\w-]+)\s*@/);
+  return m ? m[1] : null;
+}
+
+function loadOptionalDeploymentId() {
+  if (!fs.existsSync(CONFIG_PATH)) return null;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
+    const id = cfg.productionDeploymentId;
+    if (id && !String(id).includes('PASTE')) return id;
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function saveDeploymentId(deploymentId) {
+  let cfg = {};
+  if (fs.existsSync(CONFIG_PATH)) {
+    try { cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch (e) { /* ignore */ }
+  } else if (fs.existsSync(EXAMPLE_CONFIG_PATH)) {
+    try { cfg = JSON.parse(fs.readFileSync(EXAMPLE_CONFIG_PATH, 'utf8')); } catch (e) { /* ignore */ }
   }
-  return id;
+  cfg.productionDeploymentId = deploymentId;
+  cfg.notes = 'Auto-saved by milestone.js — production web app deployment ID';
+  fs.writeFileSync(CONFIG_PATH, JSON.stringify(cfg, null, 2) + '\n');
 }
 
 function updateReleasesLog(gasVersion, deployId, text) {
@@ -65,7 +99,7 @@ function updateReleasesLog(gasVersion, deployId, text) {
   const body = [
     '# Production Milestones (Apps Script versions)',
     '',
-    'Created only on **Milestone** / **OK ship** / major feature or major fix — not on every "This works".',
+    'Created only on **Milestone** / **OK ship** / **Milestone now** — not on every "This works".',
     '',
     '| # | Date | GAS version | Deployment | Note |',
     '|---|------|-------------|------------|------|',
@@ -83,32 +117,75 @@ function updateReleasesLog(gasVersion, deployId, text) {
 console.log('=== Production milestone (Apps Script layer) ===\n');
 console.log('Note:', note, '\n');
 
-const deploymentId = loadDeploymentId();
+const before = getLatestGasVersion();
+if (before) {
+  console.log(`Latest Apps Script version now: ${before.num} — "${before.desc}"`);
+  console.log(`Next version will be: ${before.num + 1}\n`);
+} else {
+  console.log('Could not read existing versions; clasp will assign the next number.\n');
+}
 
 build();
 runInherit('clasp push');
 
 console.log('\nCreating Apps Script version...');
-const versionOut = run(`clasp version "${note.replace(/"/g, "'")}"`);
+const safeNote = note.replace(/"/g, "'");
+let versionOut = '';
+try {
+  versionOut = run(`clasp version "${safeNote}"`);
+  if (versionOut) console.log(versionOut);
+} catch (e) {
+  const err = (e.stdout || e.stderr || e.message || '').toString();
+  if (err) console.error(err);
+  process.exit(1);
+}
+
 let gasVersion = null;
 const m = versionOut.match(/(\d+)\s*$/m) || versionOut.match(/version\s+(\d+)/i);
 if (m) gasVersion = m[1];
 if (!gasVersion) {
-  const list = run('clasp list-versions');
-  const nums = list.match(/\d+/g);
-  if (nums && nums.length) gasVersion = nums[nums.length - 1];
+  const after = getLatestGasVersion();
+  if (after) gasVersion = String(after.num);
 }
 if (!gasVersion) {
   console.error('Could not determine new version number. Check clasp list-versions.');
   process.exit(1);
 }
 
-console.log(`Deploying version ${gasVersion} to production (${deploymentId})...`);
-runInherit(`clasp deploy -i ${deploymentId} -V ${gasVersion} -d "${note.replace(/"/g, "'")}"`);
+const existingDeployId = loadOptionalDeploymentId();
+let deploymentId = existingDeployId;
+let deployOut = '';
+
+console.log(`\nDeploying version ${gasVersion}...`);
+const deployDesc = safeNote.replace(/"/g, "'");
+try {
+  if (existingDeployId) {
+    console.log(`Updating production deployment ${existingDeployId.slice(0, 12)}…`);
+    deployOut = run(`clasp deploy -i ${existingDeployId} -V ${gasVersion} -d "${deployDesc}"`);
+  } else {
+    console.log('No production deployment ID saved yet — creating a new web app deployment.');
+    deployOut = run(`clasp deploy -V ${gasVersion} -d "${deployDesc}"`);
+    const newId = parseDeploymentId(deployOut);
+    if (newId) {
+      deploymentId = newId;
+      saveDeploymentId(newId);
+      console.log(`Saved production deployment ID to deploy-config.json`);
+    }
+  }
+  if (deployOut) console.log(deployOut);
+} catch (e) {
+  const err = (e.stdout || e.stderr || e.message || '').toString();
+  if (err) console.error(err);
+  process.exit(1);
+}
+
+if (!deploymentId) {
+  deploymentId = parseDeploymentId(deployOut) || 'unknown';
+}
 
 updateReleasesLog(gasVersion, deploymentId, note);
 
-const safeMsg = `Milestone v${gasVersion}: ${note.replace(/"/g, "'")}`;
+const safeMsg = `Milestone v${gasVersion}: ${safeNote}`;
 run('git add -A');
 try {
   run(`git commit -m "${safeMsg}"`);
@@ -118,4 +195,8 @@ try {
 
 console.log(`\nMilestone complete — Apps Script version ${gasVersion}`);
 console.log('Updated RELEASES.md');
-console.log('Production web app now uses this version.');
+if (existingDeployId) {
+  console.log('Production web app URL updated to this version.');
+} else {
+  console.log('New deployment created. Bookmark the web app URL from Apps Script → Deploy → Manage deployments.');
+}

@@ -22,15 +22,16 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 ## Layer 2 — Milestone (Apps Script / production — rare)
 
-**Trigger:** Director says **"Milestone"**, **"OK ship"**, or confirms a **major feature / major fix** is ready for production.
+**Trigger:** Director says **"Milestone"**, **"OK ship"**, **"Milestone now"**, or confirms a **major feature / major fix** is ready for production.
+
+**"Milestone now" (before new work):** AI runs **`milestone.js` first**, then continues with any other instructions in the same message (e.g. start a new feature). Full protocol: **[MILESTONE_NOW.md](MILESTONE_NOW.md)**.
 
 **What happens (automatic via `node milestone.js "note"`):**
-1. `node build.js`
-2. `clasp push`
-3. `clasp version` (frozen snapshot on Google — max ~200 per project)
-4. `clasp deploy` to **production** deployment ID (from `deploy-config.json`)
+1. Reads latest GAS version (e.g. 265) — next will be 266
+2. `node build.js` + `clasp push`
+3. `clasp version "<note>"` — frozen snapshot with your name on Google
+4. `clasp deploy` that new version (updates saved production URL if `deploy-config.json` exists; otherwise creates a new deployment and saves the ID)
 5. Git commit + row in root **`RELEASES.md`**
-6. Prune old unused GAS versions if count &gt; 50 (keeps versions in use by deployments)
 
 **Does NOT:** Run on **"This works"** alone.
 
@@ -59,6 +60,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 | **OK go** | Dev push only | `dev-push.js` (or manual build + push) |
 | **This works** | Git save | `works-save.js` |
 | **Milestone** / **OK ship** | Apps Script production | `milestone.js` |
+| **Milestone now** (+ optional follow-up) | Apps Script production **first**, then dev/build | `milestone.js` → then other work |
 | **Rollback to last this works** | Git | `rollback-works.js` |
 | **Rollback production** | Apps Script | `rollback-milestone.js` |
 
@@ -73,9 +75,8 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
    ```
    *(Only for this project folder — no --global needed unless you want it everywhere.)*
 2. Install [clasp](https://github.com/google/clasp) and log in: `clasp login`
-3. Copy `deploy-config.example.json` → `deploy-config.json`
-4. Run `clasp list-deployments` → paste **Production Web App** deployment ID
-5. First **"This works"** creates the first Git save (`node works-save.js "note"`)
+3. *(Optional)* Copy `deploy-config.example.json` → `deploy-config.json` and paste a **Production Web App** deployment ID if you already have a fixed crew URL. Otherwise the first **Milestone** saves one automatically.
+4. First **"This works"** creates the first Git save (`node works-save.js "note"`)
 
 ---
 

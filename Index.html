@@ -104,7 +104,7 @@
               <svg id="nav-icon-project" style="display: none;" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           </button>
           
-          <div id="asset-conflict-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('asset-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('asset-conflict-drawer').style.display='none'">
+          <div id="asset-conflict-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('asset-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('asset-conflict-drawer').style.display='none'">
               <button id="nav-btn-availability" class="nav-icon-btn" onclick="openAvailabilityDashboard()" title="Global Availability & Fleet">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                   <div id="asset-conflict-badges" style="position: absolute; right: 2px; top: 2px; display: flex; flex-direction: column; gap: 2px; pointer-events: none;"></div>
@@ -117,7 +117,7 @@
               </div>
           </div>
 
-          <div id="crew-conflict-container" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('crew-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('crew-conflict-drawer').style.display='none'">
+          <div id="crew-conflict-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('crew-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('crew-conflict-drawer').style.display='none'">
               <button id="nav-btn-roster" class="nav-icon-btn" onclick="openMonthRoster()" title="Month Roster & Crew Conflicts">
                   <div style="position: relative; display: inline-flex;">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="7" y1="14" x2="17" y2="14"></line><line x1="11" y1="18" x2="21" y2="18"></line></svg>
@@ -132,7 +132,7 @@
               </div>
           </div>
 
-          <button id="nav-btn-financials" class="nav-icon-btn" onclick="if(typeof openFinancialsHub === 'function') openFinancialsHub()" title="Financials & Payroll">
+          <button id="nav-btn-financials" class="nav-icon-btn nav-gated" onclick="if(typeof openFinancialsHub === 'function') openFinancialsHub()" title="Financials & Payroll">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
           </button>
       </div>
@@ -144,7 +144,7 @@
 
           <? if (userAccess === 'ROOT' || userAccess === 'Admin' || userAccess === 'ADMIN' || userAccess === 'Manager' || userAccess === 'MANAGER') { ?>
           
-          <div id="nav-settings-container" style="position: relative; width: 100%; display: flex; justify-content: center;">
+          <div id="nav-settings-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;">
               <button id="nav-btn-settings" class="nav-icon-btn" onclick="toggleContextualSettings()" title="Contextual Visual Settings">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
               </button>
@@ -159,11 +159,11 @@
               </div>
           </div>
 
-          <button id="nav-btn-manager" class="nav-icon-btn" onclick="openManagerSettings()" title="User Profile / Manager Hub">
+          <button id="nav-btn-manager" class="nav-icon-btn nav-gated" onclick="openManagerSettings()" title="User Profile / Manager Hub">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
           </button>
           
-          <button id="nav-btn-master" class="nav-icon-btn" onclick="openMasterSettings()" title="Master Settings">
+          <button id="nav-btn-master" class="nav-icon-btn nav-gated" onclick="openMasterSettings()" title="Master Settings">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </button>
           <? } ?>
@@ -181,7 +181,7 @@
 <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
 
 <script>
-  console.log("🔥 APP BOOT VERSION: 2026-06-18 22:56");
+  console.log("🔥 APP BOOT VERSION: 2026-06-24 IAM-Roles-only");
   const USER_ACCESS = document.querySelector('meta[name="user-access"]').content;
   const ACTIVE_USER_NAME = document.querySelector('meta[name="user-name"]').content;
   
@@ -200,23 +200,40 @@
      if (value === true || value === "true") document.body.classList.add('perm-' + key);
   }
 
+  window.userHasPerm = function(key) {
+    const v = USER_PERMISSIONS[key];
+    return v === true || v === 'true';
+  };
+
   // Evaluate Access Tiers
-  const isAdmin = (USER_ACCESS === 'ROOT' || USER_ACCESS === 'ADMIN');
+  const isRoot = (USER_ACCESS === 'ROOT');
+  const isAdmin = (isRoot || USER_ACCESS === 'ADMIN');
   const isManagerOrAbove = (isAdmin || USER_ACCESS === 'MANAGER');
   
-  // Financials Icon Visibility: Must be Manager+ AND have Finance permissions (or be Admin)
-  const hasFinPerm = USER_PERMISSIONS.fin_view_roi === true || USER_PERMISSIONS.fin_view_internal === true || USER_PERMISSIONS.hr_view_rates === true;
+  // Financials: Manager+ tier only; Managers need a finance checkbox, Admin/Root always see it
+  const hasFinPerm = userHasPerm('fin_view_roi') || userHasPerm('fin_view_internal') || userHasPerm('hr_view_rates');
   const showFinancials = isManagerOrAbove && (isAdmin || hasFinPerm);
-  const finBtn = document.getElementById('nav-btn-financials');
-  if (finBtn && !showFinancials) finBtn.style.display = 'none';
 
-  // Master and Visual Settings Visibility: Must have Database permissions (or be Admin)
-  const hasDbPerm = USER_PERMISSIONS.db_view_assets === true || USER_PERMISSIONS.db_view_vehicles === true || USER_PERMISSIONS.db_view_warehouses === true || USER_PERMISSIONS.db_view_clients === true;
+  // Master Settings: Admin/Root or any database-view checkbox
+  const hasDbPerm = userHasPerm('db_view_assets') || userHasPerm('db_view_vehicles') || userHasPerm('db_view_warehouses') || userHasPerm('db_view_clients');
   const showMaster = isAdmin || hasDbPerm;
-  const masterBtn = document.getElementById('nav-btn-master');
-  const settingsContainer = document.getElementById('nav-settings-container');
-  if (masterBtn && !showMaster) masterBtn.style.display = 'none';
-  if (settingsContainer && !isAdmin) settingsContainer.style.display = 'none';
+
+  // Reveal sidebar icons the user is allowed to see (all others stay hidden via .nav-gated)
+  function revealNavItem(el) {
+    if (!el) return;
+    el.classList.remove('nav-gated');
+  }
+
+  if (isManagerOrAbove) {
+    revealNavItem(document.getElementById('asset-conflict-container'));
+    revealNavItem(document.getElementById('crew-conflict-container'));
+    revealNavItem(document.getElementById('nav-btn-manager'));
+  }
+  if (showFinancials) revealNavItem(document.getElementById('nav-btn-financials'));
+  if (showMaster) revealNavItem(document.getElementById('nav-btn-master'));
+  if (isAdmin) revealNavItem(document.getElementById('nav-settings-container'));
+
+  document.getElementById('left-nav-bar')?.classList.add('nav-perms-ready');
 </script>
 
 <?!= include('00a_UI_Layers'); ?>

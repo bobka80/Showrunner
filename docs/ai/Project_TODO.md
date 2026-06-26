@@ -34,6 +34,19 @@
 - [ ] **Automated Task Notifications:** Tie the Notification Engine to the Checklist/Task progression (e.g., "Lighting Prep is 100% Complete" automatically pushes an alert to the PM).
 - [ ] **Freelancer Shift Placeholders & Bidding:** Allow creation of "TBD" shift placeholders (e.g., "Need 4 more riggers"). Build a future engine to broadcast these open shifts to a pool of freelancers, allowing them to accept/bid, and automatically choosing the best candidate based on internal ratings.
 
+## Database Operations (Root Settings Tab) — agreed brainstorm, not started
+
+- [ ] **Root-only DATABASE tab** in Master Settings — consolidate backup, archive tools (move from Manager Hub)
+- [ ] **Separate Engine / Vault backup** actions + explorer dropdown (sort by last modified, newest first)
+- [ ] **Live status panel** — current Engine/Vault names, modified date, Open in Drive
+- [ ] **Dynamic DB registry** (Script Properties) — replace hard-coded sheet IDs; prerequisite for restore
+- [ ] **Promote backup to live** — copy/rename in Drive on host account + point app to new ID
+- [ ] **Test drill** documented for director on HEAD deployment
+
+See brainstorm in session; say **Milestone now — OK go** when ready to implement.
+
+---
+
 ## IMMEDIATE ACTION PLAN: Financials, Fleet Tiers & Beta Prep
 
 - [ ] **Dynamic Payroll & Multiplier Engine:** Implement a dual-multiplier matrix.

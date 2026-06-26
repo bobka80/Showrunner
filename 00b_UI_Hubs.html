@@ -4,7 +4,7 @@
     <div style="height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 15px; gap: 10px;">
       <div style="color:#fff; font-weight:900; font-size:16px; margin-right: 20px; letter-spacing: 1px;">🗂️ RESOURCES</div>
       
-      <button id="tab-btn-crew" class="req-sys_manage_users" style="background: #27272a; border: 1px solid #3f3f46; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('crew')">CREW</button>
+      <button id="tab-btn-crew" class="req-root-only" style="background: #27272a; border: 1px solid #3f3f46; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('crew')">CREW</button>
       <button id="tab-btn-assets" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('assets')">ASSETS</button>
       <button id="tab-btn-vehicles" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('vehicles')">VEHICLES</button>
       <button id="tab-btn-warehouse" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('warehouse')">WAREHOUSE</button>
@@ -125,11 +125,11 @@
 
     <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
       <div id="footer-left-crew" style="display: flex; gap: 12px;">
-        <button class="btn-outline req-sys_manage_roles" style="margin:0;" onclick="openIamDashboard()">ROLE EDITOR</button>
-        <button class="btn-outline req-sys_manage_roles" style="margin:0;" onclick="openAssignmentManager()">ASSIGNMENTS</button>
-        <button class="btn-outline req-sys_manage_roles" style="margin:0;" onclick="openDeptManager()">DEPTS</button>
-        <button class="btn-outline req-sys_manage_roles" style="margin:0;" onclick="openMealManager()">MEALS</button>
-        <button class="btn-outline req-sys_manage_roles" style="margin:0; border-color: #f59e0b; color: #f59e0b;" onclick="triggerDatabaseBackup()">TEST BACKUP</button>
+        <button class="btn-outline req-root-only" style="margin:0;" onclick="openIamDashboard()">ROLE EDITOR</button>
+        <button class="btn-outline req-root-only" style="margin:0;" onclick="openAssignmentManager()">ASSIGNMENTS</button>
+        <button class="btn-outline req-root-only" style="margin:0;" onclick="openDeptManager()">DEPTS</button>
+        <button class="btn-outline req-root-only" style="margin:0;" onclick="openMealManager()">MEALS</button>
+        <button class="btn-outline req-root-only" style="margin:0; border-color: #f59e0b; color: #f59e0b;" onclick="triggerDatabaseBackup()">TEST BACKUP</button>
       </div>
       <div id="footer-left-assets" style="display: none; gap: 12px; align-items: center;">
         <button id="btn-filter-all" class="btn-outline" style="margin:0; border-color: #fff; color: #fff; background: rgba(255,255,255,0.15) !important;" onclick="setAssetFilter('ALL')">ALL</button>
@@ -139,15 +139,15 @@
         <button id="btn-filter-cases" class="btn-outline" style="margin:0; border-color: transparent; color: #a1a1aa; background: transparent !important;" onclick="setAssetFilter('Cases')">CASES</button>
         <button id="btn-filter-presets" class="btn-outline" style="margin:0; border-color: transparent; color: #a1a1aa; background: transparent !important;" onclick="setAssetFilter('Presets')">PRESETS</button>
         <div style="width: 10px;"></div>
-        <button id="btn-tag-dictionary" class="btn-outline req-db_edit_assets" style="margin:0; border-color: #a855f7; color: #a855f7;" onclick="openTagManager()">TAG DICTIONARY</button>
+        <button id="btn-tag-dictionary" class="btn-outline req-root-only" style="margin:0; border-color: #a855f7; color: #a855f7;" onclick="openTagManager()">TAG DICTIONARY</button>
         <button id="btn-inline-audit" class="btn-outline req-db_edit_assets" style="margin:0; margin-left:100px; border-color: #f59e0b; color: #f59e0b; transition:0.2s;" onclick="toggleInlineAuditMode()">INLINE AUDIT MODE</button>
       </div>
       <div id="footer-left-clients" style="display: none; gap: 12px; align-items: center;"></div>
       <div style="display: flex; gap: 12px; align-items: center; margin-left: auto;">
         <button id="btn-print-qr" class="btn-blue req-db_edit_assets" style="margin:0; display:none;" onclick="openQRStudio()">🖨️ PRINT LABELS (0)</button>
-        <button id="btn-add-member" class="btn-add req-sys_manage_users" style="margin:0;" onclick="openAddMemberModal()">ADD MEMBER</button>
+        <button id="btn-add-member" class="btn-add req-root-only" style="margin:0;" onclick="openAddMemberModal()">ADD MEMBER</button>
         <button id="btn-add-asset" class="btn-add req-db_edit_assets" style="margin:0; display:none;" onclick="openAssetModal()">ADD NEW ASSET</button>
-        <button id="btn-add-vehicle" class="btn-add req-wh_edit_registry" style="margin:0; display:none;" onclick="openVehicleModal()">ADD NEW VEHICLE</button>
+        <button id="btn-add-vehicle" class="btn-add" style="margin:0; display:none;" onclick="openVehicleModal()">ADD NEW VEHICLE</button>
         <button id="btn-add-client" class="btn-add" style="margin:0; display:none;" onclick="openClientModal()">ADD CLIENT</button>
         <button id="btn-save-warehouse" class="btn-main" style="margin:0; display:none;" onclick="saveZone()">SAVE ZONE</button>
       </div>

@@ -31,7 +31,8 @@ The director does not execute file splits manually. The AI owns the technical st
 
 ## 6. Versioning (see DEPLOY_AND_ROLLBACK.md)
 - **"This works"** → Git save via `works-save.js` (not Apps Script).
-- **Milestone** → Apps Script version via `milestone.js`.
+- **Milestone** / **OK ship** → Apps Script version via `milestone.js`.
+- **Milestone now** → `milestone.js` **first**, then continue with other work in the same message ([MILESTONE_NOW.md](MILESTONE_NOW.md)).
 
 ## 4. AI Context Anchors (`docs/ai/FILE_MAP.md`)
 Whenever you chop a file, you must update the master Component Registry (`docs/ai/FILE_MAP.md`):

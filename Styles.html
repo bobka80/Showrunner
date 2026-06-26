@@ -161,6 +161,11 @@
         border-left: 3px solid var(--accent) !important;
     }
 
+    /* Sidebar: hide permission-gated icons until boot script reveals them */
+    #left-nav-bar .nav-gated {
+        display: none !important;
+    }
+
     /* --- CALENDAR STRIP HOVER & TOGGLE ENGINE --- */
     /* Default Solid Color State */
     .event-custom-frame { background: var(--bg-dark) !important; border: 2px solid var(--event-border-color) !important; transition: background 0.2s !important; }
@@ -743,29 +748,13 @@
     /* If the body DOES NOT have the permission AND IS NOT ROOT, ruthlessly hide the element. */
     /* If they DO have the permission, this rule is ignored, allowing normal UI toggling to work. */
     
-    body:not(.perm-sys_manage_users):not(.perm-root) .req-sys_manage_users { display: none !important; }
-    body:not(.perm-sys_manage_roles):not(.perm-root) .req-sys_manage_roles { display: none !important; }
-    body:not(.perm-sys_audit_logs):not(.perm-root) .req-sys_audit_logs { display: none !important; }
+    body:not(.perm-root) .req-root-only { display: none !important; }
     body:not(.perm-db_view_assets):not(.perm-root) .req-db_view_assets { display: none !important; }
     body:not(.perm-db_edit_assets):not(.perm-root) .req-db_edit_assets { display: none !important; }
     body:not(.perm-db_delete_assets):not(.perm-root) .req-db_delete_assets { display: none !important; }
-    body:not(.perm-log_view_master):not(.perm-root) .req-log_view_master { display: none !important; }
-    body:not(.perm-log_edit_master):not(.perm-root) .req-log_edit_master { display: none !important; }
-    body:not(.perm-log_edit_phase):not(.perm-root) .req-log_edit_phase { display: none !important; }
-    body:not(.perm-log_view_unassigned):not(.perm-root) .req-log_view_unassigned { display: none !important; }
-    body:not(.perm-wh_view):not(.perm-root) .req-wh_view { display: none !important; }
-    body:not(.perm-wh_edit_registry):not(.perm-root) .req-wh_edit_registry { display: none !important; }
-    body:not(.perm-wh_edit_kits):not(.perm-root) .req-wh_edit_kits { display: none !important; }
-    body:not(.perm-wh_prophylactic):not(.perm-root) .req-wh_prophylactic { display: none !important; }
-    body:not(.perm-task_manage_all):not(.perm-root) .req-task_manage_all { display: none !important; }
-    body:not(.perm-task_edit_self):not(.perm-root) .req-task_edit_self { display: none !important; }
     body:not(.perm-hr_view_rates):not(.perm-root) .req-hr_view_rates { display: none !important; }
     body:not(.perm-fin_view_roi):not(.perm-root) .req-fin_view_roi { display: none !important; }
     body:not(.perm-fin_view_internal):not(.perm-root) .req-fin_view_internal { display: none !important; }
-    body:not(.perm-proj_create):not(.perm-root) .req-proj_create { display: none !important; }
-    body:not(.perm-proj_delete):not(.perm-root) .req-proj_delete { display: none !important; }
-    body:not(.perm-proj_view_all):not(.perm-root) .req-proj_view_all { display: none !important; }
-    body:not(.perm-proj_edit_all):not(.perm-root) .req-proj_edit_all { display: none !important; }
 
     /* ==========================================
        --- THE CSS COLOR ENGINE ---

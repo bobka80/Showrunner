@@ -7,6 +7,76 @@
 let globalRoles = [];
 let globalIamDirectory = [];
 
+// Checkbox ids in the Role Matrix form (must match 00c_UI_Forms.html — no db_delete_assets; derived on save)
+const IAM_ROLE_FORM_KEYS = [
+  'Is_Tunneling', 'db_view_assets', 'db_edit_assets', 'db_view_vehicles', 'db_view_warehouses',
+  'db_view_clients', 'fin_view_roi', 'fin_view_internal', 'hr_view_rates',
+  'event_create_standard', 'event_create_crossrent', 'event_edit_timeline',
+  'event_assets_window', 'event_view_pricing', 'view_month_roster',
+  'view_logistics', 'task_manage_global', 'task_manage_personal'
+];
+
+function isPermTruthy(val) {
+  return val === true || val === 'true' || val === 'TRUE' || val === 1 || val === '1';
+}
+
+function setRoleFormCheckbox(key, checked) {
+  const el = document.getElementById(key);
+  if (el && el.type === 'checkbox') el.checked = !!checked;
+}
+
+function findRoleBySelectValue(val) {
+  if (!val || val === 'NEW' || !globalRoles || !globalRoles.length) return null;
+  return globalRoles.find(function(r) {
+    return isMatch(getRoleOptionValue(r), val)
+      || isMatch(r.id, val)
+      || isMatch(r.key, val)
+      || isMatch(r.name, val);
+  }) || null;
+}
+
+function populateRoleEditorForm(role) {
+  const keys = IAM_ROLE_FORM_KEYS;
+  const nameInput = document.getElementById('role-name');
+  const sysAccessInput = document.getElementById('role-sysAccess');
+  const delBtn = document.getElementById('btn-delete-role');
+  const dupBtn = document.getElementById('btn-duplicate-role');
+
+  if (!role) {
+    if (nameInput) nameInput.value = '';
+    if (sysAccessInput) sysAccessInput.value = 'CREW';
+    if (delBtn) delBtn.style.display = 'none';
+    if (dupBtn) dupBtn.style.display = 'none';
+    keys.forEach(function(k) { setRoleFormCheckbox(k, false); });
+    return;
+  }
+
+  if (nameInput) nameInput.value = role.name || role.id || '';
+  if (sysAccessInput) sysAccessInput.value = role.sysAccess || 'CREW';
+  if (delBtn) delBtn.style.display = 'inline-flex';
+  if (dupBtn) dupBtn.style.display = 'inline-flex';
+  keys.forEach(function(k) { setRoleFormCheckbox(k, isPermTruthy(role[k])); });
+}
+
+function populateRoleSelectDropdown(preferredValue) {
+  const select = document.getElementById('role-select');
+  if (!select) return;
+
+  select.innerHTML = '<option value="NEW" style="display:none;">---</option>';
+  if (globalRoles && globalRoles.length > 0) {
+    globalRoles.forEach(function(r) {
+      const val = getRoleOptionValue(r);
+      const txt = getRoleOptionLabel(r);
+      select.innerHTML += '<option value="' + val + '">' + txt + '</option>';
+    });
+    const match = preferredValue && findRoleBySelectValue(preferredValue);
+    select.value = match ? getRoleOptionValue(match) : getRoleOptionValue(globalRoles[0]);
+  } else {
+    select.value = 'NEW';
+  }
+  handleRoleSelectionChange();
+}
+
 // Helper: Aggressively cleans objects and hidden spaces
 function safeText(val) {
     if (val === null || val === undefined) return "";
@@ -23,6 +93,41 @@ function isMatch(val1, val2) {
     return safeText(val1).toLowerCase() === safeText(val2).toLowerCase();
 }
 
+function getRoleOptionValue(r) {
+    if (typeof r === 'string') return safeText(r);
+    return safeText(r.key || r.id);
+}
+
+function getRoleOptionLabel(r) {
+    if (typeof r === 'string') return safeText(r);
+    return safeText(r.name || r.key || r.id);
+}
+
+function userMatchesRole(user, r) {
+    if (!user || !r) return false;
+    let val = getRoleOptionValue(r);
+    let label = getRoleOptionLabel(r);
+    let rid = typeof r === 'string' ? r : safeText(r.id);
+    return isMatch(user.roleId, val)
+        || isMatch(user.roleId, rid)
+        || isMatch(user.roleId, label)
+        || isMatch(user.roleName, label)
+        || isMatch(user.roleName, val);
+}
+
+function resolveRoleDisplayName(roleRef, resolvedName) {
+    let resolved = safeText(resolvedName);
+    if (resolved) return resolved;
+
+    let ref = safeText(roleRef);
+    if (!ref) return 'None';
+    if (globalRoles && globalRoles.length) {
+        const hit = globalRoles.find(r => userMatchesRole({ roleId: ref, roleName: '' }, r) || isMatch(ref, getRoleOptionLabel(r)));
+        if (hit) return getRoleOptionLabel(hit);
+    }
+    return ref;
+}
+
 function openAddMemberModal() {
     document.getElementById('add-member-modal-overlay').style.display = 'flex';
     
@@ -34,7 +139,11 @@ function openAddMemberModal() {
 
     const roleSelect = document.getElementById('add-member-role');
     roleSelect.innerHTML = '<option value="">Select Logic Key...</option>';
-    if (typeof globalRoles !== 'undefined') globalRoles.forEach(r => { let rName = typeof r === 'string' ? r : (r.name || r.id); roleSelect.innerHTML += `<option value="${rName}">${rName}</option>`; });
+    if (typeof globalRoles !== 'undefined') globalRoles.forEach(r => {
+        let val = getRoleOptionValue(r);
+        let label = getRoleOptionLabel(r);
+        roleSelect.innerHTML += `<option value="${val}">${label}</option>`;
+    });
 
     const assignSelect = document.getElementById('add-member-assign');
     assignSelect.innerHTML = '<option value="">Select Assignment...</option>';
@@ -103,90 +212,71 @@ function openMasterSettings(targetTab = null) {
   document.getElementById('master-settings-overlay').style.display='flex'; 
   if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-master');
 
-  let isRoot = (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ROOT');
-  let isAdmin = isRoot || (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ADMIN');
+  const hasPerm = (typeof window.userHasPerm === 'function')
+    ? window.userHasPerm
+    : function(key) { const v = USER_PERMISSIONS[key]; return v === true || v === 'true'; };
 
-  // Enforce Granular Tab Visibility
-  const bCrew = document.getElementById('tab-btn-crew');
-  const bAssets = document.getElementById('tab-btn-assets');
-  const bVehicles = document.getElementById('tab-btn-vehicles');
-  const bWarehouse = document.getElementById('tab-btn-warehouse');
-  const bClients = document.getElementById('tab-btn-clients');
+  const isRoot = (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ROOT');
+  const isAdmin = isRoot || (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ADMIN');
+  const isManagerOnly = !isAdmin && USER_ACCESS === 'MANAGER';
 
-  if (bCrew) bCrew.style.display = isAdmin ? 'inline-block' : 'none';
-  if (bAssets) bAssets.style.display = (isAdmin || USER_PERMISSIONS.db_view_assets) ? 'inline-block' : 'none';
-  if (bVehicles) bVehicles.style.display = (isAdmin || USER_PERMISSIONS.db_view_vehicles) ? 'inline-block' : 'none';
-  if (bWarehouse) bWarehouse.style.display = (isAdmin || USER_PERMISSIONS.db_view_warehouses) ? 'inline-block' : 'none';
-  if (bClients) bClients.style.display = (isAdmin || USER_PERMISSIONS.db_view_clients) ? 'inline-block' : 'none';
+  const canSeeDbTab = function(permKey) {
+    if (isRoot || isAdmin) return true;
+    if (isManagerOnly) return hasPerm(permKey);
+    return hasPerm(permKey);
+  };
 
-  // Smart Fallback Router
-  if (!targetTab) {
-      if (isAdmin) targetTab = 'crew';
-      else if (USER_PERMISSIONS.db_view_assets) targetTab = 'assets';
-      else if (USER_PERMISSIONS.db_view_vehicles) targetTab = 'vehicles';
-      else if (USER_PERMISSIONS.db_view_warehouses) targetTab = 'warehouse';
-      else if (USER_PERMISSIONS.db_view_clients) targetTab = 'clients';
-      else targetTab = 'assets';
+  const tabDefs = [
+    { id: 'crew', btn: 'tab-btn-crew', visible: isRoot },
+    { id: 'assets', btn: 'tab-btn-assets', visible: canSeeDbTab('db_view_assets') },
+    { id: 'vehicles', btn: 'tab-btn-vehicles', visible: canSeeDbTab('db_view_vehicles') },
+    { id: 'warehouse', btn: 'tab-btn-warehouse', visible: canSeeDbTab('db_view_warehouses') },
+    { id: 'clients', btn: 'tab-btn-clients', visible: canSeeDbTab('db_view_clients') }
+  ];
+
+  const visibleTabs = [];
+  tabDefs.forEach(function(t) {
+    const el = document.getElementById(t.btn);
+    if (el) el.style.display = t.visible ? 'inline-block' : 'none';
+    if (t.visible) visibleTabs.push(t.id);
+  });
+
+  if (!targetTab || visibleTabs.indexOf(targetTab) === -1) {
+    targetTab = visibleTabs[0] || 'assets';
   }
   switchResourceTab(targetTab);
-  
-  document.getElementById('roster-list-container').innerHTML = '<div style="color:#10b981; padding:40px; text-align:center; font-weight:bold; font-size:16px;">Decrypting Vault Data...</div>';
-  
-  google.script.run
-    .withFailureHandler(function(error) {
-       document.getElementById('roster-list-container').innerHTML = `<div style="color:#ef4444; padding:40px; text-align:center; font-weight:bold; font-size:16px;">Server Error:<br>${error.message}</div>`;
-    })
-    .withSuccessHandler(function(response) {
-       if (response && response.error) {
-          document.getElementById('roster-list-container').innerHTML = `<div style="color:#ef4444; padding:40px; text-align:center; font-weight:bold; font-size:16px;">Access Denied:<br>${response.error}</div>`;
-          return;
-       }
-       globalRoles = response.roles || [];
-              globalIamDirectory = response.crew || [];
-       renderRosterList(); 
-    }).getSecureIamDirectory(ACTIVE_USER_NAME);
+
+  const rosterEl = document.getElementById('roster-list-container');
+  if (isRoot && rosterEl) {
+    rosterEl.innerHTML = '<div style="color:#10b981; padding:40px; text-align:center; font-weight:bold; font-size:16px;">Decrypting Vault Data...</div>';
+    google.script.run
+      .withFailureHandler(function(error) {
+         rosterEl.innerHTML = `<div style="color:#ef4444; padding:40px; text-align:center; font-weight:bold; font-size:16px;">Server Error:<br>${error.message}</div>`;
+      })
+      .withSuccessHandler(function(response) {
+         if (response && response.error) {
+            rosterEl.innerHTML = `<div style="color:#ef4444; padding:40px; text-align:center; font-weight:bold; font-size:16px;">Access Denied:<br>${response.error}</div>`;
+            return;
+         }
+         globalRoles = response.roles || [];
+         globalIamDirectory = response.crew || [];
+         renderRosterList();
+      }).getSecureIamDirectory(ACTIVE_USER_NAME);
+  } else if (rosterEl) {
+    rosterEl.innerHTML = '';
+  }
 }
 
 // @INDEX: IAM -> Handle Role Selection Change
 function handleRoleSelectionChange() {
   const val = document.getElementById('role-select').value;
-  const nameInput = document.getElementById('role-name');
-  const sysAccessInput = document.getElementById('role-sysAccess');
-  const delBtn = document.getElementById('btn-delete-role');
-  const dupBtn = document.getElementById('btn-duplicate-role');
-  
-  const keys = [
-    'Is_Tunneling', 'db_view_assets', 'db_view_vehicles', 'db_view_warehouses', 
-    'db_view_clients', 'fin_view_roi', 'fin_view_internal', 'hr_view_rates',
-    'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 
-    'event_assets_window', 'event_view_pricing', 'view_month_roster', 
-    'view_logistics', 'task_manage_global', 'task_manage_personal'
-  ];
-  
+
   if (val === 'NEW') {
-      nameInput.value = "";
-      sysAccessInput.value = "VIEWER";
-      delBtn.style.display = 'none';
-      dupBtn.style.display = 'none';
-      keys.forEach(k => document.getElementById(k).checked = false);
-      return;
+    populateRoleEditorForm(null);
+    return;
   }
-  
-  const role = globalRoles.find(r => {
-      let rid = typeof r === 'string' ? r : (r.id || r.name);
-      return rid === val;
-  });
-  
-  if (role) {
-      nameInput.value = role.name || role.id || "";
-      sysAccessInput.value = role.sysAccess || "VIEWER";
-      delBtn.style.display = 'inline-flex';
-      dupBtn.style.display = 'inline-flex';
-      
-      keys.forEach(k => {
-          document.getElementById(k).checked = !!role[k];
-      });
-  }
+
+  populateRoleEditorForm(findRoleBySelectValue(val));
 }
 
 // @INDEX: IAM -> Delete Role Configuration
@@ -194,7 +284,7 @@ function deleteRole() {
   const val = document.getElementById('role-select').value;
   if (val === 'NEW') return;
   
-  const roleObj = globalRoles.find(r => r.id === val);
+  const roleObj = findRoleBySelectValue(val);
   const displayName = roleObj ? (roleObj.name || roleObj.id) : val;
 
   if (!confirm(`Are you sure you want to completely delete the role "${displayName}"? This may break permissions for users currently assigned to it.`)) return;
@@ -240,55 +330,72 @@ function duplicateRole() {
 // @INDEX: IAM -> Open Role Editor & Populate Dropdown
 function openIamDashboard() {
   document.getElementById('iam-modal-overlay').style.display = 'flex';
-  
+
   const select = document.getElementById('role-select');
-  select.innerHTML = '<option value="NEW" style="display:none;">---</option>';
-  
-  if (globalRoles && globalRoles.length > 0) {
-      globalRoles.forEach(r => {
-          let val = typeof r === 'string' ? r : (r.id || r.name);
-          let txt = typeof r === 'string' ? r : (r.name || r.id);
-          select.innerHTML += `<option value="${val}">${txt}</option>`;
-      });
-      
-      let firstVal = typeof globalRoles[0] === 'string' ? globalRoles[0] : (globalRoles[0].id || globalRoles[0].name);
-      select.value = firstVal;
-  } else {
-      select.value = 'NEW';
+  if (select) {
+    select.innerHTML = '<option value="">Loading roles...</option>';
+    select.disabled = true;
   }
-  
-  handleRoleSelectionChange();
+
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (select) select.disabled = false;
+      alert('Could not load roles: ' + err.message);
+    })
+    .withSuccessHandler(function(response) {
+      if (select) select.disabled = false;
+      if (response && response.error) {
+        alert(response.error);
+        return;
+      }
+      globalRoles = response.roles || [];
+      globalIamDirectory = response.crew || globalIamDirectory;
+      populateRoleSelectDropdown();
+    })
+    .getSecureIamDirectory(ACTIVE_USER_NAME);
 }
 
 // @INDEX: IAM -> Save Role Configuration
 function submitRole() {
-  const keys = [
-    'Is_Tunneling', 'db_view_assets', 'db_view_vehicles', 'db_view_warehouses', 
-    'db_view_clients', 'fin_view_roi', 'fin_view_internal', 'hr_view_rates',
-    'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 
-    'event_assets_window', 'event_view_pricing', 'view_month_roster', 
-    'view_logistics', 'task_manage_global', 'task_manage_personal'
-  ];
-  
-  const payload = { 
+  const keys = IAM_ROLE_FORM_KEYS;
+
+  const payload = {
       id: document.getElementById('role-select').value,
       name: document.getElementById('role-name').value,
       sysAccess: document.getElementById('role-sysAccess').value
   };
-  
+
   if (!payload.name) return alert("Role Name is required.");
 
-  // Loop through and grab all checkboxes instantly
-  keys.forEach(k => payload[k] = document.getElementById(k).checked);
+  keys.forEach(function(k) {
+    const el = document.getElementById(k);
+    payload[k] = el && el.type === 'checkbox' ? el.checked : false;
+  });
+
+  if (payload.db_edit_assets) payload.db_view_assets = true;
+  if (!payload.db_view_assets) payload.db_edit_assets = false;
+  payload.db_delete_assets = !!payload.db_edit_assets;
 
   const btn = document.getElementById('btn-save-role');
   btn.innerText = "SAVING TO DATABASE...";
-  
-  google.script.run.withSuccessHandler(res => {
+
+  google.script.run.withSuccessHandler(function(res) {
     alert(res.message);
     btn.innerText = "SAVE ROLE";
-    openMasterSettings(); // Refresh dropdowns in background
-    document.getElementById('iam-modal-overlay').style.display='none';
+    google.script.run
+      .withSuccessHandler(function(response) {
+        if (response && !response.error) {
+          globalRoles = response.roles || [];
+          globalIamDirectory = response.crew || globalIamDirectory;
+        }
+        openMasterSettings();
+        document.getElementById('iam-modal-overlay').style.display = 'none';
+      })
+      .withFailureHandler(function() {
+        openMasterSettings();
+        document.getElementById('iam-modal-overlay').style.display = 'none';
+      })
+      .getSecureIamDirectory(ACTIVE_USER_NAME);
   }).saveRoleConfig(ACTIVE_USER_NAME, payload);
 }
 
@@ -343,7 +450,7 @@ function renderRosterList() {
               <select disabled style="width:100%; padding:8px; background:#18181b; border:1px solid #27272a; color:#a1a1aa; border-radius:4px;">${mealOptions}</select>
            </div>
            <div style="flex:1;">
-              <input type="text" disabled value="${user.roleName || user.roleId}" style="width:100%; padding:8px; background:#18181b; border:1px solid #27272a; color:#a1a1aa; border-radius:4px; text-align:center; box-sizing:border-box;">
+              <input type="text" disabled value="${resolveRoleDisplayName(user.roleId, user.roleName)}" style="width:100%; padding:8px; background:#18181b; border:1px solid #27272a; color:#a1a1aa; border-radius:4px; text-align:center; box-sizing:border-box;">
            </div>
            <div style="flex:1;">
               <input type="password" disabled value="${user.passcode}" style="width:100%; padding:8px; background:#18181b; border:1px solid #27272a; color:#a1a1aa; border-radius:4px; text-align:center;">
@@ -374,10 +481,11 @@ function openEditMemberModal(userIndex) {
     const sRole = document.getElementById('edit-member-role');
     sRole.innerHTML = '<option value="">None</option>';
     if(globalRoles) {
-        globalRoles.forEach(r => { 
-            let rName = safeText(r.name);
-            let isSelected = isMatch(user.roleId, r.id) || isMatch(user.roleId, r.name) ? 'selected' : '';
-            sRole.innerHTML += `<option value="${rName}" ${isSelected}>${rName}</option>`; 
+        globalRoles.forEach(r => {
+            let val = getRoleOptionValue(r);
+            let label = getRoleOptionLabel(r);
+            let isSelected = userMatchesRole(user, r) ? 'selected' : '';
+            sRole.innerHTML += `<option value="${val}" ${isSelected}>${label}</option>`;
         });
     }
 

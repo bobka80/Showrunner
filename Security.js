@@ -16,12 +16,115 @@ function getHeaderMap(dataMatrix) {
     // Add explicitly normalized fallbacks for system properties
     map['Role_ID'] = map['roleid'] !== undefined ? map['roleid'] : map['Role_ID'];
     map['Role_Name'] = map['rolename'] !== undefined ? map['rolename'] : map['Role_Name'];
-    map['System_Access'] = map['systemaccess'] !== undefined ? map['systemaccess'] : map['sysaccess'] !== undefined ? map['sysaccess'] : map['System_Access'];
-    map['sysAccess'] = map['System_Access'];
+    map['sysAccess'] = map['sysaccess'] !== undefined ? map['sysaccess']
+      : (map['System_Access'] !== undefined ? map['System_Access'] : map['sysAccess']);
+    map['System_Access'] = map['sysaccess'] !== undefined ? map['sysaccess']
+      : (map['System_Access'] !== undefined ? map['System_Access'] : map['sysAccess']);
     map['Name'] = map['name'] !== undefined ? map['name'] : map['crewname'] !== undefined ? map['crewname'] : map['Name'];
     map['Passcode'] = map['passcode'] !== undefined ? map['passcode'] : map['password'] !== undefined ? map['password'] : map['Passcode'];
+    map['uid'] = map['uid'] !== undefined ? map['uid'] : (map['UID'] !== undefined ? map['UID'] : map['Uid']);
   }
   return map;
+}
+
+function getSheetCell(row, colMap, key) {
+  if (colMap[key] === undefined || row[colMap[key]] == null) return "";
+  return row[colMap[key]].toString().trim();
+}
+
+const IAM_PERMISSION_KEYS = [
+  'Is_Tunneling', 'db_view_assets', 'db_edit_assets', 'db_delete_assets',
+  'db_view_vehicles', 'db_view_warehouses', 'db_view_clients',
+  'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
+  'event_view_pricing', 'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal',
+  'hr_view_rates', 'fin_view_roi', 'fin_view_internal'
+];
+
+function isTruthyCell(val) {
+  return val === true || val === 'TRUE' || val === 'true' || val === 1 || val === '1';
+}
+
+function loadRolePermissionsBundle(roleRow, rMap) {
+  let bundle = {};
+  IAM_PERMISSION_KEYS.forEach(k => {
+    if (k === 'Is_Tunneling') return;
+    if (rMap[k] !== undefined) bundle[k] = isTruthyCell(roleRow[rMap[k]]);
+  });
+  // View Assets: allow manage actions unless "Manage Assets" is explicitly turned off
+  if (bundle.db_view_assets) {
+    const editCol = rMap['db_edit_assets'];
+    const editVal = editCol !== undefined ? roleRow[editCol] : null;
+    const manageExplicitlyOff = editVal === false || editVal === 'FALSE' || editVal === 'false' || editVal === 0 || editVal === '0';
+    if (!manageExplicitlyOff) {
+      bundle.db_edit_assets = true;
+      bundle.db_delete_assets = true;
+    }
+  }
+  if (bundle.db_edit_assets) bundle.db_delete_assets = true;
+  return bundle;
+}
+
+function getRoleRowFields(row, rMap) {
+  const rId = getSheetCell(row, rMap, 'Role_ID');
+  const rName = getSheetCell(row, rMap, 'Role_Name');
+  const legacyUid = getSheetCell(row, rMap, 'uid');
+  const displayName = rName || rId;
+  const vaultKey = rId || legacyUid;
+  return { rId, rName, displayName, vaultKey, legacyUid };
+}
+
+function crewRoleRefMatchesRow(crewRoleRef, row, rMap) {
+  if (!crewRoleRef) return false;
+  const f = getRoleRowFields(row, rMap);
+  const key = crewRoleRef.toString().trim().toLowerCase();
+  return (f.rId && f.rId.toLowerCase() === key)
+    || (f.rName && f.rName.toLowerCase() === key)
+    || (f.legacyUid && f.legacyUid.toLowerCase() === key);
+}
+
+function normalizeCrewRoleId(roleRef, roleData, rMap) {
+  if (!roleRef) return "";
+  const incoming = roleRef.toString().trim();
+  for (let i = 1; i < roleData.length; i++) {
+    if (crewRoleRefMatchesRow(incoming, roleData[i], rMap)) {
+      return getRoleRowFields(roleData[i], rMap).vaultKey;
+    }
+  }
+  return incoming;
+}
+
+// Resolves a crew Role_ID reference (uuid or logic key) to the human-readable role name.
+function resolveRoleDisplayName(roleRef, roleData, rMap) {
+  if (!roleRef) return "";
+  for (let i = 1; i < roleData.length; i++) {
+    if (crewRoleRefMatchesRow(roleRef, roleData[i], rMap)) {
+      return getRoleRowFields(roleData[i], rMap).displayName;
+    }
+  }
+  return roleRef.toString().trim();
+}
+
+function buildRoleDirectory(roleData, rMap) {
+  let rolesList = [];
+  let roleMap = {};
+  for (let i = 1; i < roleData.length; i++) {
+    const f = getRoleRowFields(roleData[i], rMap);
+    if (!f.rId && !f.rName) continue;
+    if (f.rId) roleMap[f.rId.toLowerCase()] = f.displayName;
+    if (f.rName) roleMap[f.rName.toLowerCase()] = f.displayName;
+    if (f.legacyUid) roleMap[f.legacyUid.toLowerCase()] = f.displayName;
+    let entry = {
+      id: f.rId,
+      key: f.vaultKey,
+      name: f.displayName,
+      sysAccess: getSheetCell(roleData[i], rMap, 'sysAccess')
+    };
+    IAM_PERMISSION_KEYS.forEach(k => {
+      if (rMap[k] !== undefined) entry[k] = isTruthyCell(roleData[i][rMap[k]]);
+    });
+    rolesList.push(entry);
+  }
+  return { rolesList, roleMap };
 }
 
 // ==========================================
@@ -76,23 +179,12 @@ function authenticateUser(crewName, passcode) {
         // DYNAMIC MATRIX LOOKUP (Reads straight from the Sheet)
         if (roleId !== "") {
           for (let r = 1; r < roleData.length; r++) {
-            if (roleData[r][rMap['Role_ID']] && roleData[r][rMap['Role_ID']].toString().trim() === roleId) {
-              sysAccess                  = roleData[r][rMap['System_Access']] ? roleData[r][rMap['System_Access']].toString().toUpperCase().trim() : sysAccess;
-              isTunneling                = (roleData[r][rMap['Is_Tunneling']] === true);
-              bundle.sys_manage_users    = (roleData[r][rMap['sys_manage_users']] === true);
-              bundle.sys_audit_logs      = (roleData[r][rMap['sys_audit_logs']] === true);
-              bundle.log_edit_master     = (roleData[r][rMap['log_edit_master']] === true);
-              bundle.log_edit_phase      = (roleData[r][rMap['log_edit_phase']] === true);
-              bundle.log_view_unassigned = (roleData[r][rMap['log_view_unassigned']] === true);
-              bundle.wh_edit_registry    = (roleData[r][rMap['wh_edit_registry']] === true);
-              bundle.wh_edit_kits        = (roleData[r][rMap['wh_edit_kits']] === true);
-              bundle.wh_prophylactic     = (roleData[r][rMap['wh_prophylactic']] === true);
-              bundle.task_manage_all     = (roleData[r][rMap['task_manage_all']] === true);
-              bundle.task_edit_self      = (roleData[r][rMap['task_edit_self']] === true);
-              bundle.hr_view_rates       = (roleData[r][rMap['hr_view_rates']] === true);
-              bundle.fin_view_roi        = (roleData[r][rMap['fin_view_roi']] === true);
-              bundle.fin_view_internal   = (roleData[r][rMap['fin_view_internal']] === true);
-              break; 
+            if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
+              const roleSys = getSheetCell(roleData[r], rMap, 'sysAccess');
+              if (roleSys) sysAccess = roleSys.toUpperCase();
+              isTunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
+              bundle = loadRolePermissionsBundle(roleData[r], rMap);
+              break;
             }
           }
         }
@@ -100,14 +192,12 @@ function authenticateUser(crewName, passcode) {
         // PERMANENT SUPERADMIN OVERRIDE: Prevent the system owner from ever getting locked out.
         if (dbName === 'bogdan') {
             sysAccess = 'ROOT';
-            bundle.sys_manage_users = true;
-            bundle.sys_manage_roles = true;
-            bundle.sys_audit_logs = true;
             bundle.db_view_assets = true;
             bundle.db_view_vehicles = true;
             bundle.db_view_warehouses = true;
             bundle.db_view_clients = true;
-            bundle.log_edit_master = true;
+            bundle.db_edit_assets = true;
+            bundle.db_delete_assets = true;
         }
 
         return { success: true, name: crewData[i][cMap['Name']] || hardName, access: sysAccess, permissions: bundle, tunnelingActive: isTunneling }; 
@@ -144,10 +234,11 @@ function verifyBackendPrivilege(crewName, requiredTier) {
             let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
             if (roleId !== "") {
                 for (let r = 1; r < roleData.length; r++) {
-                    if (roleData[r][rMap['Role_ID']] && roleData[r][rMap['Role_ID']].toString().trim() === roleId) {
-                        sysAccess = roleData[r][rMap['System_Access']] ? roleData[r][rMap['System_Access']].toString().toUpperCase().trim() : sysAccess;
+                    if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
+                        const roleSys = getSheetCell(roleData[r], rMap, 'sysAccess');
+                        if (roleSys) sysAccess = roleSys.toUpperCase();
                         if (sysAccess === 'ROOT') return true;
-                        return (roleData[r][rMap[requiredTier]] === true);
+                        return isTruthyCell(roleData[r][rMap[requiredTier]]);
                     }
                 }
             }
@@ -179,9 +270,9 @@ function getUserSecurityProfile(crewName) {
       let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
       let isTunneling = false;
       for (let r = 1; r < roleData.length; r++) {
-        if (roleData[r][rMap['Role_ID']] && roleData[r][rMap['Role_ID']].toString().trim() === roleId) { 
-            isTunneling = (roleData[r][rMap['Is_Tunneling']] === true); 
-            break; 
+        if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
+            isTunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
+            break;
         }
       }
       return { email: email, uid: uid, tunneling: isTunneling };
@@ -221,25 +312,12 @@ function getSystemDirectory() {
       }
     }
 
-    let rolesList = [];
-    let roleMap = {};
-    for (let i = 1; i < roleData.length; i++) {
-      let rUid = roleData[i][rMap['uid']] ? roleData[i][rMap['uid']].toString().trim() : "";
-      let rId = roleData[i][rMap['Role_ID']] ? roleData[i][rMap['Role_ID']].toString().trim() : "";
-      let rName = roleData[i][rMap['Role_Name']] ? roleData[i][rMap['Role_Name']].toString().trim() : "";
-      let displayName = rName || rId || "Unknown Role";
-      if (rUid) roleMap[rUid.toLowerCase()] = displayName;
-      if (rId) roleMap[rId.toLowerCase()] = displayName;
-      if (rName) roleMap[rName.toLowerCase()] = displayName;
+    const { rolesList, roleMap } = buildRoleDirectory(roleData, rMap);
 
-      if (rId || rUid) {
-         rolesList.push({ id: rUid || rId, name: displayName });
-      }
-    }
-
-    // Now securely inject the role name into the crew list
     crewList.forEach(crew => {
-       crew.roleName = roleMap[crew.roleId.toLowerCase()] || crew.roleId;
+       crew.roleName = roleMap[crew.roleId.toLowerCase()]
+         || resolveRoleDisplayName(crew.roleId, roleData, rMap)
+         || crew.roleId;
     });
 
     return {
@@ -289,25 +367,12 @@ function getSecureIamDirectory(adminName) {
         });
       }
     }
-    let rolesList = [];
-    let roleMap = {};
-    for (let i = 1; i < roleData.length; i++) {
-      let rUid = roleData[i][rMap['uid']] ? roleData[i][rMap['uid']].toString().trim() : "";
-      let rId = roleData[i][rMap['Role_ID']] ? roleData[i][rMap['Role_ID']].toString().trim() : "";
-      let rName = roleData[i][rMap['Role_Name']] ? roleData[i][rMap['Role_Name']].toString().trim() : "";
-      let displayName = rName || rId || "Unknown Role";
-      if (rUid) roleMap[rUid.toLowerCase()] = displayName;
-      if (rId) roleMap[rId.toLowerCase()] = displayName;
-      if (rName) roleMap[rName.toLowerCase()] = displayName;
+    const { rolesList, roleMap } = buildRoleDirectory(roleData, rMap);
 
-      if (rId || rUid) {
-         rolesList.push({ id: rUid || rId, name: displayName });
-      }
-    }
-
-    // Now securely inject the role name into the crew list
     crewList.forEach(crew => {
-       crew.roleName = roleMap[crew.roleId.toLowerCase()] || crew.roleId;
+       crew.roleName = roleMap[crew.roleId.toLowerCase()]
+         || resolveRoleDisplayName(crew.roleId, roleData, rMap)
+         || crew.roleId;
     });
 
     return { roles: rolesList, crew: crewList };
@@ -319,18 +384,22 @@ function saveDirectoryUpdate(adminName, updates) {
     if (!verifyBackendPrivilege(adminName, "ROOT")) return { success: false, message: "🛑 API DENIED: ROOT privileges required." };
     const sheets = verifyVaultSchema();
     const crewSheet = sheets.crew;
+    const roleSheet = sheets.roles;
+    const roleData = roleSheet.getDataRange().getValues();
+    const rMap = getHeaderMap(roleData);
     const data = crewSheet.getDataRange().getValues();
     const cMap = getHeaderMap(data);
     
     let hasChanges = false;
     let updatedUids = [];
     updates.forEach(update => {
+      const normalizedRoleId = normalizeCrewRoleId(update.roleId, roleData, rMap);
       for(let i = 1; i < data.length; i++) {
          if (data[i][cMap['uid']] && data[i][cMap['uid']].toString().trim() === update.uid.trim()) {
             if(cMap['Job_Title'] !== undefined) data[i][cMap['Job_Title']] = update.jobTitle;  
             if(cMap['Department'] !== undefined) data[i][cMap['Department']] = update.dept;      
             if(cMap['Meal'] !== undefined) data[i][cMap['Meal']] = update.meal;      
-            if(cMap['Role_ID'] !== undefined) data[i][cMap['Role_ID']] = update.roleId;    
+            if(cMap['Role_ID'] !== undefined) data[i][cMap['Role_ID']] = normalizedRoleId;    
             if(cMap['Passcode'] !== undefined) data[i][cMap['Passcode']] = update.passcode; 
             if(cMap['Payroll_Multiplier'] !== undefined) data[i][cMap['Payroll_Multiplier']] = update.payrollMultiplier; 
             if(cMap['uid'] !== undefined) updatedUids.push(data[i][cMap['uid']]);
@@ -357,45 +426,63 @@ function saveRoleConfig(adminName, roleData) {
     const data = roleSheet.getDataRange().getValues();
     const rMap = getHeaderMap(data);
 
-    // Build array dynamically based on headers
-    let generatedUid = Utilities.getUuid();
+    let roleUuid = (roleData.id && roleData.id !== 'NEW') ? roleData.id.toString().trim() : Utilities.getUuid();
     let newRow = new Array(data[0].length).fill("");
-    if(rMap['uid'] !== undefined) newRow[rMap['uid']] = generatedUid;
-    if(rMap['Role_ID'] !== undefined) newRow[rMap['Role_ID']] = roleData.name;
-    if(rMap['System_Access'] !== undefined) newRow[rMap['System_Access']] = roleData.sysAccess;
-    if(rMap['Is_Tunneling'] !== undefined) newRow[rMap['Is_Tunneling']] = roleData.Is_Tunneling;
-    if(rMap['sys_manage_users'] !== undefined) newRow[rMap['sys_manage_users']] = roleData.sys_manage_users;
-    if(rMap['sys_audit_logs'] !== undefined) newRow[rMap['sys_audit_logs']] = roleData.sys_audit_logs;
-    if(rMap['log_edit_master'] !== undefined) newRow[rMap['log_edit_master']] = roleData.log_edit_master;
-    if(rMap['log_edit_phase'] !== undefined) newRow[rMap['log_edit_phase']] = roleData.log_edit_phase;
-    if(rMap['log_view_unassigned'] !== undefined) newRow[rMap['log_view_unassigned']] = roleData.log_view_unassigned;
-    if(rMap['wh_edit_registry'] !== undefined) newRow[rMap['wh_edit_registry']] = roleData.wh_edit_registry;
-    if(rMap['wh_edit_kits'] !== undefined) newRow[rMap['wh_edit_kits']] = roleData.wh_edit_kits;
-    if(rMap['wh_prophylactic'] !== undefined) newRow[rMap['wh_prophylactic']] = roleData.wh_prophylactic;
-    if(rMap['task_manage_all'] !== undefined) newRow[rMap['task_manage_all']] = roleData.task_manage_all;
-    if(rMap['task_edit_self'] !== undefined) newRow[rMap['task_edit_self']] = roleData.task_edit_self;
-    if(rMap['hr_view_rates'] !== undefined) newRow[rMap['hr_view_rates']] = roleData.hr_view_rates;
-    if(rMap['fin_view_roi'] !== undefined) newRow[rMap['fin_view_roi']] = roleData.fin_view_roi;
-    if(rMap['fin_view_internal'] !== undefined) newRow[rMap['fin_view_internal']] = roleData.fin_view_internal;
+    if (rMap['Role_ID'] !== undefined) newRow[rMap['Role_ID']] = roleUuid;
+    if (rMap['Role_Name'] !== undefined) newRow[rMap['Role_Name']] = roleData.name;
+    if (rMap['sysAccess'] !== undefined) newRow[rMap['sysAccess']] = roleData.sysAccess;
+    IAM_PERMISSION_KEYS.forEach(k => {
+      if (rMap[k] !== undefined) newRow[rMap[k]] = !!roleData[k];
+    });
+    if (rMap['db_delete_assets'] !== undefined && roleData.db_delete_assets === undefined && roleData.db_edit_assets !== undefined) {
+      newRow[rMap['db_delete_assets']] = !!roleData.db_edit_assets;
+    }
 
-    // Update if exists
     for (let i = 1; i < data.length; i++) {
-      if (data[i][rMap['Role_ID']] && data[i][rMap['Role_ID']].toString().toLowerCase() === roleData.name.toLowerCase()) {
-        let targetUid = generatedUid;
-        if(rMap['uid'] !== undefined && data[i][rMap['uid']]) {
-            newRow[rMap['uid']] = data[i][rMap['uid']]; // Preserve UID
-            targetUid = data[i][rMap['uid']];
-        }
+      if (crewRoleRefMatchesRow(roleData.id, data[i], rMap)
+          || (roleData.name && getSheetCell(data[i], rMap, 'Role_Name').toLowerCase() === roleData.name.toLowerCase())) {
+        let existingId = getSheetCell(data[i], rMap, 'Role_ID');
+        if (existingId) newRow[rMap['Role_ID']] = existingId;
         roleSheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
         if (typeof flushCache !== 'undefined') flushCache();
-        writeToAuditLog(adminName, "UPDATE", "IAM_ROLES", "GLOBAL", targetUid, "Modified role permissions.");
+        writeToAuditLog(adminName, "UPDATE", "IAM_ROLES", "GLOBAL", newRow[rMap['Role_ID']], "Modified role permissions.");
         return { success: true, message: `Role '${roleData.name}' updated successfully.` };
       }
     }
     roleSheet.appendRow(newRow);
     if (typeof flushCache !== 'undefined') flushCache();
-    writeToAuditLog(adminName, "CREATE", "IAM_ROLES", "GLOBAL", generatedUid, "Created new role.");
+    writeToAuditLog(adminName, "CREATE", "IAM_ROLES", "GLOBAL", roleUuid, "Created new role.");
     return { success: true, message: `New Role '${roleData.name}' created successfully.` };
+  });
+}
+
+function deleteRoleConfig(adminName, roleIdRef) {
+  return executeWithRetry(() => {
+    if (!verifyBackendPrivilege(adminName, "ROOT")) return { success: false, message: "🛑 API DENIED: ROOT privileges required." };
+    const sheets = verifyVaultSchema();
+    const roleSheet = sheets.roles;
+    const data = roleSheet.getDataRange().getValues();
+    const rMap = getHeaderMap(data);
+
+    let keptRows = [data[0]];
+    let deletedName = "";
+    let deletedId = "";
+    for (let i = 1; i < data.length; i++) {
+      if (crewRoleRefMatchesRow(roleIdRef, data[i], rMap)) {
+        deletedName = getSheetCell(data[i], rMap, 'Role_Name') || getSheetCell(data[i], rMap, 'Role_ID');
+        deletedId = getSheetCell(data[i], rMap, 'Role_ID');
+      } else {
+        keptRows.push(data[i]);
+      }
+    }
+    if (!deletedId && !deletedName) {
+      return { success: false, message: "Role not found." };
+    }
+    roleSheet.clearContents();
+    roleSheet.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
+    if (typeof flushCache !== 'undefined') flushCache();
+    writeToAuditLog(adminName, "DELETE", "IAM_ROLES", "GLOBAL", deletedId || deletedName, `Deleted role '${deletedName}'.`);
+    return { success: true, message: `Role '${deletedName}' deleted.` };
   });
 }
 
@@ -432,6 +519,9 @@ function provisionNewUser(adminName, payload) {
     if (!verifyBackendPrivilege(adminName, "ROOT")) return { success: false, message: "🛑 API DENIED: ROOT privileges required." };
     const sheets = verifyVaultSchema();
     const crewSheet = sheets.crew;
+    const roleSheet = sheets.roles;
+    const roleData = roleSheet.getDataRange().getValues();
+    const rMap = getHeaderMap(roleData);
     const data = crewSheet.getDataRange().getValues();
     const cMap = getHeaderMap(data);
     
@@ -454,7 +544,7 @@ function provisionNewUser(adminName, payload) {
     if(cMap['Meal'] !== undefined) newRow[cMap['Meal']] = payload.meal || "";
     if(cMap['IsManager'] !== undefined) newRow[cMap['IsManager']] = false;
     if(cMap['IsFreelancer'] !== undefined) newRow[cMap['IsFreelancer']] = (payload.systemAccess === "VIEWER");
-    if(cMap['Role_ID'] !== undefined) newRow[cMap['Role_ID']] = payload.roleId;
+    if(cMap['Role_ID'] !== undefined) newRow[cMap['Role_ID']] = normalizeCrewRoleId(payload.roleId, roleData, rMap);
     if(cMap['Passcode'] !== undefined) newRow[cMap['Passcode']] = payload.passcode.trim();
     if(cMap['Payroll_Multiplier'] !== undefined) newRow[cMap['Payroll_Multiplier']] = payload.payrollMultiplier;
     if(cMap['OrderIndex'] !== undefined) newRow[cMap['OrderIndex']] = "";

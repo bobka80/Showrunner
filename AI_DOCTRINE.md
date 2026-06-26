@@ -52,6 +52,7 @@ Deep engineering rules (30-table model, audit, financials prep): **[Engineering 
 | [File_Splitting_Guide.md](docs/ai/File_Splitting_Guide.md) | Protocol for chopping large UI files safely |
 | [Project_TODO.md](docs/ai/Project_TODO.md) | Master feature roadmap — maintain per Doctrine rules 2 and 3 |
 | [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) | Two-layer saves: Git "This works" vs Apps Script milestones |
+| [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md) | **Milestone now** — production snapshot before new work |
 
 ---
 
@@ -68,6 +69,7 @@ Deep engineering rules (30-table model, audit, financials prep): **[Engineering 
 5. **Two-Layer Versioning:** See **[DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md)** and root **`WORKS_LOG.md`** / **`RELEASES.md`**.
    - **"This works"** → `node works-save.js` (Git save, last 50 — **not** production).
    - **"Milestone" / "OK ship"** → `node milestone.js` (Apps Script version + production).
+   - **"Milestone now"** → **`milestone.js` FIRST**, then continue with any other instructions in the same message. See **[MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md)**.
    - **"OK go"** only → `node dev-push.js` (dev test, no save).
 
 ---

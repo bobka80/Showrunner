@@ -62,7 +62,7 @@ function verifyVaultSchema(readOnly = false) {
       return undefined;
   };
   
-  let roleSheetObj = resolveSheet(["Role_Permissions", "IAM Roles", "Roles", "IAM"]);
+  let roleSheetObj = resolveSheet(["IAM Roles", "Roles", "IAM"]);
 
   cachedVaultSheets = { tags: tagSheet, departments: deptSheet, crew: sm["Crew_Roster"], roles: roleSheetObj, config: sm["System_Config"], clients: sm["Clients"], vehicles: sm["Vehicles"], warehouses: sm["Warehouses"], subzones: sm["Subzones"], areas: sm["Storage_Areas"], assets: sm["Assets"], vendors: sm["Vendors"] };
   if (readOnly) return cachedVaultSheets;
@@ -80,38 +80,42 @@ function verifyVaultSchema(readOnly = false) {
     crewSheet.getRange(1, 1, 1, crewHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
   }
 
-  // TABLE 2: ROLE PERMISSIONS (Expanded 15-Column Matrix)
-  let roleSheet = sm["Role_Permissions"];
-  const roleHeaders = [
-    "uid", "Role_ID", "Is_Tunneling", 
-    "sys_manage_users", "sys_audit_logs", 
-    "log_edit_master", "log_edit_phase", "log_view_unassigned", 
-    "wh_edit_registry", "wh_edit_kits", "wh_prophylactic", 
-    "task_manage_all", "task_edit_self", 
+  // TABLE 2: IAM ROLES (current credential matrix — legacy Role_Permissions is ignored)
+  let roleSheet = resolveSheet(["IAM Roles", "Roles", "IAM"]);
+  const iamRoleHeaders = [
+    "Role_ID", "Role_Name", "sysAccess", "Is_Tunneling",
+    "db_view_assets", "db_edit_assets", "db_delete_assets",
+    "db_view_vehicles", "db_view_warehouses", "db_view_clients",
+    "event_create_standard", "event_create_crossrent", "event_edit_timeline",
+    "event_assets_window", "event_view_pricing", "view_month_roster", "view_logistics",
+    "task_manage_global", "task_manage_personal",
     "hr_view_rates", "fin_view_roi", "fin_view_internal"
   ];
   if (!roleSheet) {
-    roleSheet = ss.insertSheet("Role_Permissions");
-    roleSheet.appendRow(roleHeaders);
-    roleSheet.getRange(1, 1, 1, roleHeaders.length).setFontWeight("bold").setBackground("#b91c1c").setFontColor("#ffffff");
+    roleSheet = ss.insertSheet("IAM Roles");
+    roleSheet.appendRow(iamRoleHeaders);
+    roleSheet.getRange(1, 1, 1, iamRoleHeaders.length).setFontWeight("bold").setBackground("#b91c1c").setFontColor("#ffffff");
     roleSheet.setFrozenRows(1);
-    
-    // Auto-Seed Default Roles based on your Matrix (Dynamic, not hardcoded)
     let getU = Utilities.getUuid;
-    roleSheet.appendRow([getU(), "Admin",        false, true, true, true, true, true, true, true, true, true, true, true, true, true]);
-    roleSheet.appendRow([getU(), "Manager",      false, false, false, true, true, false, true, true, true, true, true, false, true, false]);
-    roleSheet.appendRow([getU(), "Power Crew",   false, false, false, false, true, false, true, true, true, true, true, false, false, false]);
-    roleSheet.appendRow([getU(), "Company Crew", false, false, false, false, false, false, false, false, false, false, true, false, false, false]);
-    roleSheet.appendRow([getU(), "Freelancer",   true,  false, false, false, false, false, false, false, false, false, true, false, false, false]); // Tunneling ON
-    
-    // Inject Checkboxes for all 14 boolean columns
+    roleSheet.appendRow([getU(), "Admin", "ROOT", false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]);
     let checkboxRule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
-    roleSheet.getRange(2, 3, 50, 14).setDataValidation(checkboxRule);
+    roleSheet.getRange(2, 4, 50, iamRoleHeaders.length - 3).setDataValidation(checkboxRule);
   } else {
-    if (roleSheet.getMaxColumns() < roleHeaders.length) roleSheet.insertColumnsAfter(roleSheet.getMaxColumns(), roleHeaders.length - roleSheet.getMaxColumns());
-    roleSheet.getRange(1, 1, 1, roleHeaders.length).setFontWeight("bold").setBackground("#b91c1c").setFontColor("#ffffff");
+    let headers = roleSheet.getRange(1, 1, 1, Math.max(1, roleSheet.getLastColumn())).getValues()[0]
+      .map(h => String(h || "").trim());
+    iamRoleHeaders.forEach(h => {
+      let norm = h.toLowerCase().replace(/[\s_]+/g, "");
+      let found = headers.some(x => x.toLowerCase().replace(/[\s_]+/g, "") === norm);
+      if (!found) {
+        roleSheet.insertColumnAfter(roleSheet.getLastColumn());
+        roleSheet.getRange(1, roleSheet.getLastColumn()).setValue(h);
+        headers.push(h);
+      }
+    });
+    roleSheet.getRange(1, 1, 1, roleSheet.getLastColumn()).setFontWeight("bold").setBackground("#b91c1c").setFontColor("#ffffff");
+    roleSheet.setFrozenRows(1);
   }
-  
+
   let configSheet = sm["System_Config"];
   const configHeaders = ["uid", "Asset_Key", "Asset_Payload"];
   if (!configSheet) { 

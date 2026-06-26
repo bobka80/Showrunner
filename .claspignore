@@ -3,7 +3,12 @@ node_modules/
 .git/
 build.js
 watch.js
-scratch_*.js
-temp_*.js
-*.md
+dev-push.js
+works-save.js
+milestone.js
+rollback-works.js
+rollback-milestone.js
+test.js
+test_db.js
+run_test.js
 

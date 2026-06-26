@@ -4,6 +4,7 @@
   },
   "scripts": {
     "build": "node build.js",
+    "watch": "node watch.js",
     "dev-push": "node dev-push.js",
     "works-save": "node works-save.js",
     "milestone": "node milestone.js",
