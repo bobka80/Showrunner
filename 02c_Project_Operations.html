@@ -9,6 +9,9 @@ window.opsTimer = null;
 
 // @INDEX: OPERATIONS -> Start Operation UI
 window.startOperationUI = function(type, e) {
+    if (window.projectAssetsReadOnly || (typeof canUseAssetCheckout === 'function' && !canUseAssetCheckout())) {
+        return alert('🛑 Permission Denied: Asset checkout requires asset window access.');
+    }
     let projectId = document.getElementById('edit-folder-id').value;
     if (!projectId || projectId === 'NEW') return alert("⚠️ Please SAVE the project first.");
     
@@ -294,6 +297,12 @@ function commitOpsBatch(projectId) {
     if (window.opsQueue.length === 0) return;
     let batch = [...window.opsQueue];
     window.opsQueue = [];
+
+    if (window.isDatabaseBackupLocked && window.isDatabaseBackupLocked()) {
+        window.opsQueue = batch.concat(window.opsQueue);
+        setTimeout(function() { commitOpsBatch(projectId); }, 2000);
+        return;
+    }
 
     let statusEl = document.getElementById('pa-op-status');
     if (statusEl && window.currentOperationType) {

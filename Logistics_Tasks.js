@@ -63,6 +63,7 @@ function getTasksAndNotifs(crewName) {
 
 function saveTaskData(taskObj, crewName) {
   return executeWithRetry(() => {
+    assertActorCanManageGlobalTasks(crewName);
     const sheets = verifyDatabaseSchema();
     let isNew = !taskObj.id;
     taskObj.id = taskObj.id || Utilities.getUuid();
@@ -162,6 +163,7 @@ function saveTaskData(taskObj, crewName) {
 
 function deleteTaskData(taskId, actor = "System UI") {
   return executeWithRetry(() => {
+    assertActorCanManageGlobalTasks(actor);
     const sheets = verifyDatabaseSchema();
     
     const wipeFromSheet = (sheet, colName) => {

@@ -9,6 +9,7 @@
 // @INDEX: CRUD_PROJECTS -> Project & Checklists Save
 function saveProjectData(projectData, timelinesArray, actor = "System UI") {
   return executeWithRetry(() => {
+    projectData = enforceCrossRentOnlyProjectFields_(actor, projectData || {});
     const sheets = verifyDatabaseSchema();
     const projectId = projectData.Project_ID || Utilities.getUuid();
     const isNewProject = !projectData.Project_ID;
@@ -40,6 +41,8 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     // ----------------------------------------------
 
     // Find the row and perform concurrency check
+    let existingDbName = "";
+    let existingDbStatus = "";
     for (let i = 1; i < indexData.length; i++) {
       if (indexData[i][iMap['uid']] === projectId) {
           if (!isNewProject && iMap['Last_Updated'] !== undefined) {
@@ -53,11 +56,18 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
                   }
               }
           }
+          if (iMap['Project_Name'] !== undefined) existingDbName = String(indexData[i][iMap['Project_Name']] || "");
+          if (iMap['Status'] !== undefined) existingDbStatus = String(indexData[i][iMap['Status']] || "");
           rowIndex = i + 1;
           if (iMap['Checklist_State'] !== undefined) existingState = indexData[i][iMap['Checklist_State']];
           if (iMap['Readiness_State'] !== undefined) existingReadiness = indexData[i][iMap['Readiness_State']];
           break;
       }
+    }
+
+    if (!isNewProject && !verifyBackendPrivilege(actor, 'MANAGER')) {
+      projectData.Project_Name = existingDbName || projectData.Project_Name;
+      projectData.Status = existingDbStatus || projectData.Status;
     }
     
     let rowContent = new Array(iCols).fill("");
@@ -257,6 +267,7 @@ function getExistingProjects() {
 
 function setProjectStatus(projectId, status, actor = "System UI") {
   return executeWithRetry(() => {
+    assertActorCanManageProject(actor);
     const sheets = verifyDatabaseSchema();
     let indexData = sheets.index.getDataRange().getValues();
     let map = {};
@@ -275,6 +286,7 @@ function setProjectStatus(projectId, status, actor = "System UI") {
 
 function restoreProjectWithConflictCheck(projectId, actor = "System UI") {
   return executeWithRetry(() => {
+    assertActorCanManageProject(actor);
     let globalData = getGlobalMonthData(); 
     let allShifts = globalData.shifts;
     
@@ -339,6 +351,7 @@ function restoreProjectWithConflictCheck(projectId, actor = "System UI") {
 
 function deleteProjectFull(projectId, projectName, oldDate, actor = "System UI") {
   return executeWithRetry(() => {
+    assertActorCanManageProject(actor);
     const sheets = verifyDatabaseSchema();
     
     const processSheet = (sheet, colName) => {
@@ -389,8 +402,13 @@ function setProjectDifficultyMultiplier(projectId, mult, actor = "System UI") {
   });
 }
 
-function updateProjectReadiness(projectId, stateStr) {
+function updateProjectReadiness(projectId, stateStr, actor = "System UI") {
   return executeWithRetry(() => {
+    if (!effectiveBackendPermission(actor, 'event_edit_timeline')
+        && !effectiveBackendPermission(actor, 'event_assets_window')
+        && !verifyBackendPrivilege(actor, 'MANAGER')) {
+      throw new Error('🛑 PERMISSION DENIED: Cannot update project readiness.');
+    }
     const sheets = verifyDatabaseSchema();
     let indexData = sheets.index.getDataRange().getValues();
     let iMap = {};
@@ -411,7 +429,7 @@ function updateProjectReadiness(projectId, stateStr) {
 
 function saveEventFromUI(projectData, timelinesArray, actor = "System UI") {
   try {
-    // 1. Inject directly into the ENGINE Relational Sheet
+    assertActorCanSaveProject(actor, projectData || {});
     let newId = saveProjectData(projectData, timelinesArray, actor);
     
     // 2. Sync fragments natively to Google Calendar

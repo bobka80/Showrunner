@@ -10,6 +10,7 @@
 
 function saveProjectAssetsDelta(projectId, deltas, actor = "System UI") {
     return executeWithRetry(() => {
+        assertActorCanEditProjectAssets(actor);
         const sheets = verifyDatabaseSchema();
         let data = sheets.projectAssets.getDataRange().getValues();
         let map = {}; if(data.length > 0) data[0].forEach((h,i)=>map[h.toString().trim()]=i);
@@ -190,6 +191,7 @@ function getProjectAssets(projectId, startDateStr, endDateStr) {
 // ==========================================
 function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor = "System UI") {
     return executeWithRetry(() => {
+        assertActorCanEditProjectAssets(actor);
         const sheets = verifyDatabaseSchema();
         let data = sheets.projectAssets.getDataRange().getValues();
         let map = {}; if(data.length > 0) data[0].forEach((h,i)=>map[h.toString().trim()]=i);
@@ -301,6 +303,7 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
 
 function saveProjectAssetsAPI(projectId, assignedList, actor = "System UI") {
     return executeWithRetry(() => {
+        assertActorCanEditProjectAssets(actor);
         const sheets = verifyDatabaseSchema();
         let data = sheets.projectAssets.getDataRange().getValues();
         let map = {};

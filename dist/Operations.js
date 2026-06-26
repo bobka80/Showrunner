@@ -9,6 +9,7 @@
 // @INDEX: OPS_BACKEND -> Start Session
 function startEventOperation(projectId, operationType, actor = "System UI") {
     return executeWithRetry(() => {
+        assertActorCanPerformAssetOperations(actor);
         const sheets = verifyDatabaseSchema();
         let indexData = sheets.index.getDataRange().getValues();
         let iMap = {};
@@ -66,6 +67,7 @@ function startEventOperation(projectId, operationType, actor = "System UI") {
 // @INDEX: OPS_BACKEND -> RFID Processor
 function processRfidScan(projectId, rfidTag, actor = "System UI") {
     return executeWithRetry(() => {
+        assertActorCanPerformAssetOperations(actor);
         const vaultSheets = verifyVaultSchema(true);
         const assetData = getSheetData(vaultSheets.assets);
         let aMap = assetData.hMap;
@@ -110,6 +112,7 @@ function processRfidScan(projectId, rfidTag, actor = "System UI") {
 // @INDEX: OPS_BACKEND -> Ledger Committer
 function batchProcessOperations(projectId, batch, actor = "System UI") {
     return executeWithRetry(() => {
+        assertActorCanPerformAssetOperations(actor);
         const sheets = verifyDatabaseSchema();
         let indexData = sheets.index.getDataRange().getValues();
         let iMap = {};
@@ -228,6 +231,7 @@ function batchProcessOperations(projectId, batch, actor = "System UI") {
 // ==========================================
 function finalizeEventOperation(projectId, actor = "System UI") {
     return executeWithRetry(() => {
+        assertActorCanPerformAssetOperations(actor);
         const sheets = verifyDatabaseSchema();
         let indexData = sheets.index.getDataRange().getValues();
         let iMap = {};

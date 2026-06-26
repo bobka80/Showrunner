@@ -148,6 +148,13 @@ window.calculatePaDeltas = function() {
 window.isBackgroundSyncing = false;
 
 window.autoSaveAndExecute = function(callback, optimistic = true, failureCallback = null, forceSync = false) {
+    if (window.isDatabaseBackupLocked && window.isDatabaseBackupLocked()) {
+        if (failureCallback) failureCallback();
+        setTimeout(function() {
+            window.autoSaveAndExecute(callback, optimistic, failureCallback, forceSync);
+        }, 2000);
+        return;
+    }
     let deltas = window.calculatePaDeltas();
     if (deltas.length === 0 && !forceSync) {
         if (callback) callback();
@@ -284,6 +291,10 @@ window.autoSaveAndExecute = function(callback, optimistic = true, failureCallbac
 };
 
 function saveProjectAssets() {
+    if (window.projectAssetsReadOnly) {
+        return alert('🛑 Read-only view — you cannot edit project assets.');
+    }
+    if (window.guardDatabaseBackupLock && window.guardDatabaseBackupLock('equipment save')) return;
     if (window.currentOperationType) {
         alert("⚠️ Please PAUSE the active operation before saving the equipment list.");
         return;

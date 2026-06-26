@@ -44,6 +44,87 @@ function isTruthyCell(val) {
   return val === true || val === 'TRUE' || val === 'true' || val === 1 || val === '1';
 }
 
+const ACCESS_TIER_ORDER = ['CREW', 'EDITOR', 'MANAGER', 'ADMIN', 'ROOT'];
+
+function normalizeAccessTier(tier) {
+  if (tier == null || tier === '') return 'CREW';
+  const raw = tier.toString().trim();
+  const upper = raw.toUpperCase();
+  if (ACCESS_TIER_ORDER.indexOf(upper) !== -1) return upper;
+  const titled = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  const titleMap = { Crew: 'CREW', Editor: 'EDITOR', Manager: 'MANAGER', Admin: 'ADMIN', Root: 'ROOT' };
+  if (titleMap[titled]) return titleMap[titled];
+  return 'CREW';
+}
+
+function accessTierRank(tier) {
+  const idx = ACCESS_TIER_ORDER.indexOf(normalizeAccessTier(tier));
+  return idx === -1 ? 1 : idx + 1;
+}
+
+function accessTierAtLeastValue(tier, minTier) {
+  return accessTierRank(tier) >= accessTierRank(minTier);
+}
+
+function resolveCrewSysAccess(crewName, crewData, roleData, cMap, rMap) {
+  if (!crewName) return null;
+  const target = crewName.toLowerCase().trim();
+  for (let i = 0; i < crewData.length; i++) {
+    let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
+    let hardName = crewData[i][2];
+    let dbNameRaw = mappedName || hardName;
+    let dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : "";
+    if (dbName !== target) continue;
+
+    let sysAccess = crewData[i][cMap['System_Access']] ? crewData[i][cMap['System_Access']].toString().trim() : "";
+    let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
+    if (roleId !== "") {
+      for (let r = 1; r < roleData.length; r++) {
+        if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
+          const roleSys = getSheetCell(roleData[r], rMap, 'sysAccess');
+          if (roleSys) sysAccess = roleSys;
+          break;
+        }
+      }
+    }
+    return normalizeAccessTier(sysAccess);
+  }
+  return null;
+}
+
+function resolveCrewPermissionBundle(crewName, crewData, roleData, cMap, rMap) {
+  if (!crewName) return {};
+  const target = crewName.toLowerCase().trim();
+  for (let i = 0; i < crewData.length; i++) {
+    let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
+    let hardName = crewData[i][2];
+    let dbNameRaw = mappedName || hardName;
+    let dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : "";
+    if (dbName !== target) continue;
+
+    let bundle = {};
+    let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
+    if (roleId !== "") {
+      for (let r = 1; r < roleData.length; r++) {
+        if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
+          bundle = loadRolePermissionsBundle(roleData[r], rMap);
+          break;
+        }
+      }
+    }
+    if (dbName === 'bogdan') {
+      bundle.db_view_assets = true;
+      bundle.db_view_vehicles = true;
+      bundle.db_view_warehouses = true;
+      bundle.db_view_clients = true;
+      bundle.db_edit_assets = true;
+      bundle.db_delete_assets = true;
+    }
+    return bundle;
+  }
+  return {};
+}
+
 function loadRolePermissionsBundle(roleRow, rMap) {
   let bundle = {};
   IAM_PERMISSION_KEYS.forEach(k => {
@@ -117,7 +198,7 @@ function buildRoleDirectory(roleData, rMap) {
       id: f.rId,
       key: f.vaultKey,
       name: f.displayName,
-      sysAccess: getSheetCell(roleData[i], rMap, 'sysAccess')
+      sysAccess: normalizeAccessTier(getSheetCell(roleData[i], rMap, 'sysAccess'))
     };
     IAM_PERMISSION_KEYS.forEach(k => {
       if (rMap[k] !== undefined) entry[k] = isTruthyCell(roleData[i][rMap[k]]);
@@ -199,8 +280,11 @@ function authenticateUser(crewName, passcode) {
             bundle.db_edit_assets = true;
             bundle.db_delete_assets = true;
         }
+        bundle.task_manage_personal = true;
 
-        return { success: true, name: crewData[i][cMap['Name']] || hardName, access: sysAccess, permissions: bundle, tunnelingActive: isTunneling }; 
+        let uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : "";
+
+        return { success: true, name: crewData[i][cMap['Name']] || hardName, access: normalizeAccessTier(sysAccess), permissions: bundle, tunnelingActive: isTunneling, uid: uid }; 
       }
     }
     
@@ -212,41 +296,167 @@ function authenticateUser(crewName, passcode) {
 // ==========================================
 // --- BACKEND RBAC GATEWAY VERIFIER ---
 // ==========================================
+// requiredTier = minimum sysAccess level: CREW | EDITOR | MANAGER | ADMIN | ROOT
 function verifyBackendPrivilege(crewName, requiredTier) {
-    if (!crewName) return false;
-    if (crewName.toLowerCase().trim() === 'bogdan') return true; // Bogdan exclusive ROOT bypass
-    
+    if (!crewName || !requiredTier) return false;
+    if (crewName.toLowerCase().trim() === 'bogdan') return true;
+
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
     const roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
     const rMap = getHeaderMap(roleData);
-    
-    for (let i = 0; i < crewData.length; i++) {
-        let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
-        let hardName = crewData[i][2];
-        let dbNameRaw = mappedName || hardName;
-        let dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : "";
-        
-        if (dbName === crewName.toLowerCase().trim()) {
-            let sysAccess = crewData[i][cMap['System_Access']] ? crewData[i][cMap['System_Access']].toString().toUpperCase().trim() : "";
-            
-            let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
-            if (roleId !== "") {
-                for (let r = 1; r < roleData.length; r++) {
-                    if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
-                        const roleSys = getSheetCell(roleData[r], rMap, 'sysAccess');
-                        if (roleSys) sysAccess = roleSys.toUpperCase();
-                        if (sysAccess === 'ROOT') return true;
-                        return isTruthyCell(roleData[r][rMap[requiredTier]]);
-                    }
-                }
-            }
-            if (sysAccess === 'ROOT') return true;
-            return false;
-        }
+
+    const actual = resolveCrewSysAccess(crewName, crewData, roleData, cMap, rMap);
+    if (!actual) return false;
+    return accessTierAtLeastValue(actual, requiredTier);
+}
+
+function verifyBackendPermission(crewName, permissionKey) {
+    if (!crewName || !permissionKey) return false;
+    if (crewName.toLowerCase().trim() === 'bogdan') return true;
+    if (IAM_PERMISSION_KEYS.indexOf(permissionKey) === -1) return false;
+
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const roleData = getSheetData(sheets.roles);
+    const cMap = getHeaderMap(crewData);
+    const rMap = getHeaderMap(roleData);
+    const bundle = resolveCrewPermissionBundle(crewName, crewData, roleData, cMap, rMap);
+    return bundle[permissionKey] === true;
+}
+
+const IMPLICIT_MANAGER_IAM_KEYS = [
+  'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
+  'event_view_pricing', 'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal'
+];
+
+function effectiveBackendPermission(crewName, permissionKey) {
+  if (!crewName || !permissionKey) return false;
+  if (crewName.toLowerCase().trim() === 'bogdan') return true;
+  if (permissionKey === 'task_manage_personal') return true;
+  if (verifyBackendPrivilege(crewName, 'ROOT')) return true;
+  if (verifyBackendPermission(crewName, permissionKey)) return true;
+  if (IMPLICIT_MANAGER_IAM_KEYS.indexOf(permissionKey) !== -1 && verifyBackendPrivilege(crewName, 'MANAGER')) {
+    return true;
+  }
+  return false;
+}
+
+function crewHasShiftOnProject(crewName, projectId) {
+  if (!crewName || !projectId) return false;
+  const profile = getUserSecurityProfile(crewName);
+  const uid = profile.uid;
+  if (!uid) return false;
+  const sheets = verifyDatabaseSchema(true);
+  const shiftData = getSheetData(sheets.shifts);
+  const sMap = shiftData.hMap || {};
+  for (let i = 1; i < shiftData.length; i++) {
+    if (String(shiftData[i][sMap['project_uid']]) !== String(projectId)) continue;
+    const u = shiftData[i][sMap['user_uid']];
+    if (String(u) === String(uid)) return true;
+  }
+  return false;
+}
+
+function assertActorCanCreateProject(actor, projectData) {
+  const pType = String(projectData.type || projectData.Project_Type || projectData.Type || 'Event').toLowerCase();
+  const isCrossRent = pType.indexOf('cross') !== -1;
+  if (actorIsCrossRentOnlyCreator(actor)) {
+    if (!isCrossRent) {
+      throw new Error('🛑 PERMISSION DENIED: Cross-rent only role cannot create standard events.');
     }
-    return false;
+    return;
+  }
+  if (isCrossRent) {
+    if (!effectiveBackendPermission(actor, 'event_create_crossrent') && !effectiveBackendPermission(actor, 'event_create_standard')) {
+      throw new Error('🛑 PERMISSION DENIED: Cannot create cross-rent events.');
+    }
+    return;
+  }
+  if (!effectiveBackendPermission(actor, 'event_create_standard')) {
+    throw new Error('🛑 PERMISSION DENIED: Cannot create standard events.');
+  }
+}
+
+function assertActorCanSaveProject(actor, projectData) {
+  const isNew = !projectData.Project_ID;
+  if (isNew) {
+    assertActorCanCreateProject(actor, projectData);
+    return;
+  }
+  if (effectiveBackendPermission(actor, 'event_create_standard') || effectiveBackendPermission(actor, 'event_create_crossrent')) return;
+  if (verifyBackendPrivilege(actor, 'MANAGER')) return;
+  throw new Error('🛑 PERMISSION DENIED: Cannot save project changes.');
+}
+
+function assertActorCanEditTimeline(actor) {
+  if (!effectiveBackendPermission(actor, 'event_edit_timeline')) {
+    throw new Error('🛑 PERMISSION DENIED: Cannot edit event timeline or phases.');
+  }
+}
+
+function assertActorCanEditProjectAssets(actor) {
+  if (!effectiveBackendPermission(actor, 'event_assets_window')) {
+    throw new Error('🛑 PERMISSION DENIED: Cannot edit project assets.');
+  }
+}
+
+function assertActorCanPerformAssetOperations(actor) {
+  assertActorCanEditProjectAssets(actor);
+}
+
+function assertActorCanManageGlobalTasks(actor) {
+  if (!effectiveBackendPermission(actor, 'task_manage_global')) {
+    throw new Error('🛑 PERMISSION DENIED: Cannot manage global tasks.');
+  }
+}
+
+function assertActorCanManageProject(actor) {
+  if (!verifyBackendPrivilege(actor, 'MANAGER')) {
+    throw new Error('🛑 PERMISSION DENIED: Manager access required for project lifecycle changes.');
+  }
+}
+
+function actorIsCrossRentOnlyCreator(actor) {
+  if (!actor) return false;
+  return verifyBackendPermission(actor, 'event_create_crossrent')
+    && !verifyBackendPermission(actor, 'event_create_standard');
+}
+
+function shouldFilterCalendarToAssignedShifts(profile) {
+  if (!profile || !profile.uid) return false;
+  if (profile.tunneling) return true;
+  if (profile.isFreelancer) return true;
+  return false;
+}
+
+function applyShiftCalendarFilter(profile, projects, monthData, conflicts) {
+  if (!shouldFilterCalendarToAssignedShifts(profile) || !profile.uid) {
+    return { projects: projects, monthData: monthData, conflicts: conflicts };
+  }
+  const uid = profile.uid;
+  const filteredShifts = (monthData.shifts || []).filter(function(s) {
+    return String(s.user_uid || s.email) === String(uid);
+  });
+  const assignedProjectIds = new Set(filteredShifts.map(function(s) { return s.projectId; }));
+  const filteredProjects = (projects || []).filter(function(p) {
+    return assignedProjectIds.has(p.id);
+  });
+  const filteredMonthData = Object.assign({}, monthData, { shifts: filteredShifts });
+  let filteredConflicts = conflicts;
+  if (Array.isArray(conflicts)) {
+    filteredConflicts = conflicts.filter(function(c) {
+      return !c.projectId || assignedProjectIds.has(c.projectId);
+    });
+  }
+  return { projects: filteredProjects, monthData: filteredMonthData, conflicts: filteredConflicts };
+}
+
+function enforceCrossRentOnlyProjectFields_(actor, projectData) {
+  if (!actorIsCrossRentOnlyCreator(actor) || !projectData) return projectData;
+  projectData.Type = 'Cross Rent';
+  return projectData;
 }
 
 // ==========================================
@@ -254,8 +464,10 @@ function verifyBackendPrivilege(crewName, requiredTier) {
 // ==========================================
 // @INDEX: SECURITY -> User Security Profile Extractor
 function getUserSecurityProfile(crewName) {
-  if (!crewName) return { email: null, uid: null, tunneling: false };
-  if (crewName.toLowerCase().trim() === 'bogdan') return { email: 'bobby@showrider.com', uid: 'UID_BOGDAN', tunneling: false };
+  if (!crewName) return { email: null, uid: null, tunneling: false, isFreelancer: false, sysAccess: 'CREW' };
+  if (crewName.toLowerCase().trim() === 'bogdan') {
+    return { email: 'bobby@showrider.com', uid: 'UID_BOGDAN', tunneling: false, isFreelancer: false, sysAccess: 'ROOT' };
+  }
 
   const sheets = verifyVaultSchema(true);
   const crewData = getSheetData(sheets.crew);
@@ -268,17 +480,31 @@ function getUserSecurityProfile(crewName) {
       let email = crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : null;
       let uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : null;
       let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
+      let sysAccess = crewData[i][cMap['System_Access']] ? crewData[i][cMap['System_Access']].toString().trim() : 'CREW';
+      let isFreelancer = false;
+      if (cMap['IsFreelancer'] !== undefined) {
+        isFreelancer = isTruthyCell(crewData[i][cMap['IsFreelancer']]);
+      }
       let isTunneling = false;
       for (let r = 1; r < roleData.length; r++) {
         if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
             isTunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
+            if (rMap['sysAccess'] !== undefined && roleData[r][rMap['sysAccess']]) {
+              sysAccess = roleData[r][rMap['sysAccess']].toString().trim();
+            }
             break;
         }
       }
-      return { email: email, uid: uid, tunneling: isTunneling };
+      return {
+        email: email,
+        uid: uid,
+        tunneling: isTunneling,
+        isFreelancer: isFreelancer,
+        sysAccess: normalizeAccessTier(sysAccess)
+      };
     }
   }
-  return { email: null, uid: null, tunneling: false };
+  return { email: null, uid: null, tunneling: false, isFreelancer: false, sysAccess: 'CREW' };
 }
 
 // ==========================================
@@ -430,7 +656,7 @@ function saveRoleConfig(adminName, roleData) {
     let newRow = new Array(data[0].length).fill("");
     if (rMap['Role_ID'] !== undefined) newRow[rMap['Role_ID']] = roleUuid;
     if (rMap['Role_Name'] !== undefined) newRow[rMap['Role_Name']] = roleData.name;
-    if (rMap['sysAccess'] !== undefined) newRow[rMap['sysAccess']] = roleData.sysAccess;
+    if (rMap['sysAccess'] !== undefined) newRow[rMap['sysAccess']] = normalizeAccessTier(roleData.sysAccess || 'CREW');
     IAM_PERMISSION_KEYS.forEach(k => {
       if (rMap[k] !== undefined) newRow[rMap[k]] = !!roleData[k];
     });

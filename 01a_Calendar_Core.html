@@ -309,6 +309,9 @@ document.addEventListener('DOMContentLoaded', function() {
       
       // CLICK LOGIC
       dateClick: function(info) {
+          if (typeof canCreateOnCalendar !== 'function' || !canCreateOnCalendar()) {
+              return;
+          }
           window.isProjectDirty = true;
           window.activeProjectContext = 'NEW';
           if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
@@ -322,8 +325,13 @@ document.addEventListener('DOMContentLoaded', function() {
           if (document.getElementById('edit-proj-end-date')) document.getElementById('edit-proj-end-date').value = info.dateStr || '';
           
           document.getElementById('display-event-status').innerText = 'DRAFT';
-          document.getElementById('edit-proj-type').value = 'Event';
-          document.getElementById('display-event-type').innerText = 'EVENT';
+          if (typeof isCrossRentOnlyCreator === 'function' && isCrossRentOnlyCreator()) {
+            document.getElementById('edit-proj-type').value = 'Cross Rent';
+            document.getElementById('display-event-type').innerText = 'CROSS RENT';
+          } else {
+            document.getElementById('edit-proj-type').value = 'Event';
+            document.getElementById('display-event-type').innerText = 'EVENT';
+          }
           if(document.getElementById('edit-proj-client')) document.getElementById('edit-proj-client').value = '';
           if(document.getElementById('restore-project-btn')) document.getElementById('restore-project-btn').style.display = 'none';
           
@@ -339,6 +347,7 @@ document.addEventListener('DOMContentLoaded', function() {
           window.currentReadinessState = {};
           if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
           bootMiniCalendar(info.dateStr, 'NEW');
+          if (typeof applyProjectEditorMode === 'function') applyProjectEditorMode('NEW');
       },
       
       eventClick: function(info) {
@@ -405,6 +414,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
 
           bootMiniCalendar(originalStart, pId);
+          if (typeof applyProjectEditorMode === 'function') applyProjectEditorMode(pId);
           if (typeof startPresencePing === 'function') startPresencePing(pId);
           if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
       }
@@ -661,6 +671,9 @@ function refreshData() {
 function applyRefreshPayload(payload) {
   try {
   if (!payload) return;
+  if (payload.monthData && Array.isArray(payload.monthData.shifts)) {
+    window.globalMonthShifts = payload.monthData.shifts;
+  }
   calendar.removeAllEvents();
   const events = [];
 

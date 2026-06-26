@@ -763,6 +763,46 @@
     body:not(.perm-hr_view_rates):not(.perm-root) .req-hr_view_rates { display: none !important; }
     body:not(.perm-fin_view_roi):not(.perm-root) .req-fin_view_roi { display: none !important; }
     body:not(.perm-fin_view_internal):not(.perm-root) .req-fin_view_internal { display: none !important; }
+    body:not(.perm-db_view_vehicles):not(.perm-root) .req-db_view_vehicles { display: none !important; }
+    body:not(.perm-db_view_warehouses):not(.perm-root) .req-db_view_warehouses { display: none !important; }
+    body:not(.perm-db_view_clients):not(.perm-root) .req-db_view_clients { display: none !important; }
+    body:not(.perm-event_create_standard):not(.perm-root) .req-event_create_standard { display: none !important; }
+    body:not(.perm-event_create_crossrent):not(.perm-root) .req-event_create_crossrent { display: none !important; }
+    body:not(.perm-event_edit_timeline):not(.perm-root) .req-event_edit_timeline { display: none !important; }
+    body:not(.perm-event_assets_window):not(.perm-root) .req-event_assets_window { display: none !important; }
+    body:not(.perm-event_view_pricing):not(.perm-root) .req-event_view_pricing { display: none !important; }
+    body:not(.perm-view_month_roster):not(.perm-root) .req-view_month_roster { display: none !important; }
+    body:not(.perm-view_logistics):not(.perm-root) .req-view_logistics { display: none !important; }
+    body:not(.perm-task_manage_global):not(.perm-root) .req-task_manage_global { display: none !important; }
+    body:not(.perm-task_manage_personal):not(.perm-root) .req-task_manage_personal { display: none !important; }
+
+    /* Project editor — crew briefing (read-only) mode */
+    .editor-briefing-mode .pe-mgr-only { display: none !important; }
+    body:not(.perm-manager-tier):not(.perm-root) .pe-manager-only { display: none !important; }
+    #btn-display-event-type.pe-type-readonly { cursor: default !important; }
+    .editor-crossrent-only #type-dropdown { display: none !important; }
+    .editor-crossrent-only #btn-display-event-type { display: none !important; }
+    .editor-crossrent-only #pe-event-type-locked { display: block !important; }
+    .editor-briefing-mode #edit-proj-name,
+    .editor-briefing-mode #edit-proj-location,
+    .editor-briefing-mode #edit-proj-distance { pointer-events: none; opacity: 0.9; }
+    .editor-briefing-mode #edit-proj-location { border-radius: 6px; border-right: 1px solid #333; }
+    .editor-briefing-mode #edit-proj-outdoor,
+    .editor-briefing-mode #edit-proj-in-sofia { pointer-events: none; }
+    .editor-briefing-mode button[onclick="toggleStatusMenu()"] { pointer-events: none !important; cursor: default !important; }
+    .pa-readonly-mode #btn-save-pa,
+    .pa-readonly-mode #pa-search-cli,
+    .pa-readonly-mode #mode-toggle-btn,
+    .pa-readonly-mode #pa-new-sublist-btn,
+    .pa-readonly-mode #pa-add-container-btn { display: none !important; }
+    .pa-readonly-mode .eq-dept-finished-cb,
+    .pa-readonly-mode .pa-dept-finished-cb { display: none !important; pointer-events: none !important; }
+    .pa-readonly-mode #pa-vault-list input,
+    .pa-readonly-mode #pa-assigned-list input,
+    .pa-readonly-mode #pa-view-logistics input { pointer-events: none !important; }
+    .tt-readonly-mode #tt-save-btn,
+    .tt-readonly-mode #tt-crew-finished-wrap,
+    .tt-readonly-mode .tt-bottom-actions button[onclick="openCrewManager()"] { display: none !important; }
 
     /* ==========================================
        --- THE CSS COLOR ENGINE ---
@@ -1077,7 +1117,7 @@
               <div id="task-drawer-wrapper" style="position: absolute; left: 60px; top: 0; width: 320px; background: #1a1a1e; border: 1px solid #333; border-radius: 0 8px 8px 0; display: none; flex-direction: column; overflow: hidden; z-index: 100; box-shadow: 10px 5px 25px rgba(0,0,0,0.8);">
                   <div style="padding: 12px 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; background: #111;">
                       <span style="color: var(--accent); font-weight: 900; font-size: 12px;">ACTIVE TASKS</span>
-                      <button class="btn-outline btn-sm" style="margin:0; border-color:var(--accent); color:var(--accent);" onclick="openTaskModal()">+ ADD</button>
+                      <button class="btn-outline btn-sm req-task_manage_global" style="margin:0; border-color:var(--accent); color:var(--accent);" onclick="openTaskModal()">+ ADD</button>
                   </div>
                   <div id="tasks-list" style="max-height: 66vh; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
               </div>
@@ -1108,7 +1148,7 @@
           </div>
 
           <div id="crew-conflict-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('crew-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('crew-conflict-drawer').style.display='none'">
-              <button id="nav-btn-roster" class="nav-icon-btn" onclick="openMonthRoster()" title="Month Roster & Crew Conflicts">
+              <button id="nav-btn-roster" class="nav-icon-btn req-view_month_roster" onclick="openMonthRoster()" title="Month Roster & Crew Conflicts">
                   <div style="position: relative; display: inline-flex;">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="7" y1="14" x2="17" y2="14"></line><line x1="11" y1="18" x2="21" y2="18"></line></svg>
                       <div id="crew-conflict-badges" style="position: absolute; right: -6px; top: -6px; display: flex; flex-direction: column; gap: 2px; pointer-events: none;"></div>
@@ -1132,7 +1172,7 @@
       <!-- Bottom Section (Settings) -->
       <div style="display: flex; flex-direction: column; gap: 5px; width: 100%; align-items: center;">
 
-          <? if (userAccess === 'ROOT' || userAccess === 'Admin' || userAccess === 'ADMIN' || userAccess === 'Manager' || userAccess === 'MANAGER') { ?>
+          <? if (showSettingsNav) { ?>
           
           <div id="nav-settings-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;">
               <button id="nav-btn-settings" class="nav-icon-btn" onclick="toggleContextualSettings()" title="Contextual Visual Settings">
@@ -1168,6 +1208,7 @@
 
 <meta name="user-access" content="<?= userAccess ?>">
 <meta name="user-name" content="<?= userName ?>">
+<meta name="user-uid" content="<?= userUid ?>">
 <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
 
 
@@ -1233,7 +1274,7 @@
   <div class="tt-bottom-actions">
       <button onclick="openCrewManager()" class="btn-blue" style="margin: 0; width: auto;">EDIT CREW</button>
       <div style="flex: 1;"></div>
-      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
+      <label id="tt-crew-finished-wrap" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
           <input type="checkbox" id="tt-crew-finished-cb" style="width:16px; height:16px; margin:0; accent-color:#10b981;" onchange="window.isTimelineDirty = true;"> CREW FINISHED
       </label>
       <button id="tt-cancel-btn" class="btn-close" style="margin: 0; width: auto;" onclick="cancelShifts()">CANCEL (ESC)</button>
@@ -1266,6 +1307,7 @@
       <button id="tab-btn-vehicles" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('vehicles')">VEHICLES</button>
       <button id="tab-btn-warehouse" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('warehouse')">WAREHOUSE</button>
       <button id="tab-btn-clients" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('clients')">CLIENTS</button>
+      <button id="tab-btn-database" class="req-root-only" style="margin-left: 200px; background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('database')">DATABASE</button>
 
       <div style="flex:1;"></div>
       <div style="display:flex; flex-direction:column; position:relative; justify-content:center;">
@@ -1380,13 +1422,20 @@
         </div>
     </div>
 
+    <div id="tab-content-database" class="req-root-only" style="display:none; flex-direction:column; flex:1; overflow:hidden; background: #0a0a0c;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar);">
+            <div style="color:#f59e0b; font-weight:800; font-size:14px; letter-spacing:1px;">DATABASE OPERATIONS (ROOT)</div>
+            <button class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="loadDatabaseOpsPanel()">REFRESH</button>
+        </div>
+        <div id="db-ops-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;"></div>
+    </div>
+
     <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
       <div id="footer-left-crew" style="display: flex; gap: 12px;">
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openIamDashboard()">ROLE EDITOR</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openAssignmentManager()">ASSIGNMENTS</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openDeptManager()">DEPTS</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openMealManager()">MEALS</button>
-        <button class="btn-outline req-root-only" style="margin:0; border-color: #f59e0b; color: #f59e0b;" onclick="triggerDatabaseBackup()">TEST BACKUP</button>
       </div>
       <div id="footer-left-assets" style="display: none; gap: 12px; align-items: center;">
         <button id="btn-filter-all" class="btn-outline" style="margin:0; border-color: #fff; color: #fff; background: rgba(255,255,255,0.15) !important;" onclick="setAssetFilter('ALL')">ALL</button>
@@ -1467,9 +1516,6 @@
        
     </div>
     <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
-        <button class="btn-outline" style="width:auto; margin:0; border-color: #f59e0b; color: #f59e0b;" onclick="triggerDatabaseBackup()">TEST BACKUP</button>
-        <button class="btn-outline" style="width:auto; margin:0; border-color: #a855f7; color: #a855f7;" onclick="triggerMonthlyLogArchive()">ARCHIVE LOGS</button>
-        <button class="btn-outline" style="width:auto; margin:0; margin-right:auto; border-color: #a855f7; color: #a855f7;" onclick="triggerYearlyEngineArchive()">ARCHIVE ENGINE</button>
         <button id="btn-save-mgr" class="btn-main" style="width:auto; margin:0;" onclick="submitManagerConfig()">SAVE CONFIGURATION</button>
     </div>
   </div>
@@ -2799,22 +2845,22 @@
         <div style="display:flex; align-items:center; gap: 12px; flex: 1;">
             <h3 id="edit-orig-title" style="margin:0; color:#fff;">Configure Project</h3>
             <div style="position: relative;">
-               <button class="btn-delete btn-sm" style="margin:0;" onclick="toggleTrashMenu()">TRASH</button>
+               <button class="btn-delete btn-sm pe-manager-only" style="margin:0;" onclick="toggleTrashMenu()">TRASH</button>
                <div id="trash-dropdown" style="display:none; position:absolute; top: 100%; right:0; width:140px; background:#1a1a1e; border:1px solid #ef4444; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
                   <button id="trash-project-btn" class="btn-delete btn-sm" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Trashed')">TRASH</button>
                   <button id="delete-project-btn" class="btn-delete btn-sm" style="width:100%; margin-bottom:8px;" onclick="runFullDelete()">DELETE</button>
                   <button id="restore-project-btn" class="btn-outline btn-sm" style="width:100%; margin:0; display:none;" onclick="runRestoreProject()">RESTORE</button>
                </div>
             </div>
-            <button id="project-history-btn" class="btn-outline btn-sm" style="display:none; border-color:#3f3f46; color:#a1a1aa; margin:0;" onclick="openUniversalHistory(document.getElementById('edit-folder-id').value)">
+            <button id="project-history-btn" class="btn-outline btn-sm pe-manager-only" style="display:none; border-color:#3f3f46; color:#a1a1aa; margin:0;" onclick="openUniversalHistory(document.getElementById('edit-folder-id').value)">
                 <span style="opacity:0.5;">LOADING...</span>
             </button>
         </div>
         
         <div style="display:flex; gap: 5px; align-items: center; justify-content: flex-end; flex: 1;">
-           <button id="logistics-hub-btn-layers" class="btn-outline" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openLogisticsHubModal()">LOGISTICS HUB</button>
-           <button class="btn-outline" style="margin:0;" onclick="openDriveFolder()">FOLDER</button>
-           <button id="print-eq-btn" class="btn-outline" style="margin:0;" onclick="triggerPrint()">PDF</button>
+           <button id="logistics-hub-btn-layers" class="btn-outline req-view_logistics pe-mgr-only" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openLogisticsHubModal()">LOGISTICS HUB</button>
+           <button class="btn-outline pe-mgr-only" style="margin:0;" onclick="openDriveFolder()">FOLDER</button>
+           <button id="print-eq-btn" class="btn-outline pe-mgr-only" style="margin:0;" onclick="triggerPrint()">PDF</button>
         </div>
     </div>
     <input type="hidden" id="edit-folder-id">
@@ -2829,18 +2875,18 @@
     <input type="hidden" id="edit-proj-transit-date">
     <input type="hidden" id="edit-proj-type" value="Event">
     
-    <div style="display:flex; gap:10px; margin-top:16px; position:relative; align-items:center; flex-wrap: wrap;">
+    <div class="pe-editor-toolbar-row" style="display:flex; gap:10px; margin-top:16px; position:relative; align-items:center; flex-wrap: wrap; min-height: 42px; padding-right: 140px;">
       <input type="text" id="edit-proj-name" placeholder="Title" oninput="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; box-sizing: border-box;">
       
-      <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
+      <div class="pe-mgr-only" style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
           <input list="edit-proj-client-list" id="edit-proj-client" placeholder="Select Client..." oninput="window.isProjectDirty=true" onchange="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:6px; box-sizing: border-box;">
           <datalist id="edit-proj-client-list"></datalist>
           <button class="btn-outline" style="width:auto; margin:0; padding: 0 10px; height: 42px; box-sizing: border-box; flex-shrink: 0;" onclick="openClientModal()" title="New Client">+ NEW CLIENT</button>
       </div>
       
-      <div style="display:flex; gap:0; align-items:center;">
-          <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="window.isProjectDirty=true" style="width: 180px; margin:0; padding:12px; background:#1a1a1e; color:#fff; border:1px solid #333; border-radius:6px 0 0 6px; box-sizing: border-box; border-right:none;">
-          <button class="btn-outline" style="margin:0; padding: 0 12px; height: 42px; box-sizing: border-box; flex-shrink: 0; border-radius: 0 6px 6px 0;" onclick="window.openLocationMap()" title="Set Location Map">📍</button>
+      <div style="display:flex; gap:0; align-items:center; flex: 1 1 320px; min-width: 220px; max-width: 520px;">
+          <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="window.isProjectDirty=true" style="width: 100%; flex: 1; min-width: 0; margin:0; padding:12px; background:#1a1a1e; color:#fff; border:1px solid #333; border-radius:6px 0 0 6px; box-sizing: border-box; border-right:none;">
+          <button class="btn-outline pe-mgr-only" style="margin:0; padding: 0 12px; height: 42px; box-sizing: border-box; flex-shrink: 0; border-radius: 0 6px 6px 0;" onclick="window.openLocationMap()" title="Set Location Map">📍</button>
       </div>
       
       <input type="hidden" id="edit-proj-lat">
@@ -2859,7 +2905,7 @@
           </label>
       </div>
       
-      <div style="position: relative; width: 70px; height: 42px; flex-shrink: 0;">
+      <div class="pe-mgr-only" style="position: relative; width: 70px; height: 42px; flex-shrink: 0;">
           <div class="input-label" style="position:absolute; top:-16px; left:0; width:100%; text-align:center; margin:0; font-size:9px; white-space:nowrap; color:#f59e0b;">DIFF. MULT</div>
           <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="window.isProjectDirty=true" style="width: 100%; height: 42px; padding: 10px; margin: 0; text-align: center; background:#18181b; color:#f59e0b; font-weight:bold; border:1px solid #f59e0b; border-radius:6px; box-sizing: border-box;">
       </div>
@@ -2873,32 +2919,35 @@
           <input type="number" id="edit-proj-distance" placeholder="0" oninput="window.isProjectDirty=true" style="width: 100%; height: 42px; padding: 10px; margin: 0; text-align: center; background:#18181b; color:#fff; border:1px solid #333; border-radius:6px; box-sizing: border-box;">
       </div>
       
-      <div style="position: relative; width: 130px; margin-left: auto;">
-        <button class="btn-outline" style="width:100%; margin:0;" onclick="toggleTypeMenu()"><span id="display-event-type">EVENT</span></button>
-        <div id="type-dropdown" style="display:none; position:absolute; top: 100%; left:0; width:100%; background:#1a1a1e; border:1px solid #333; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
-           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="setEventType('Event')">Event</button>
-           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="setEventType('Cross Rent')">Cross Rent</button>
-           <button class="btn-outline" style="width:100%; margin:0;" onclick="setEventType('Meeting')">Meeting</button>
+      <div id="pe-event-meta-right" style="position:absolute; right:0; top:0; display:flex; gap:5px; align-items:center; flex-shrink:0; height:42px;">
+        <div id="pe-event-type-wrap" style="position: relative; width: 130px;">
+          <div id="pe-event-type-locked" class="btn-outline" style="display:none; width:100%; margin:0; text-align:center; box-sizing:border-box; height:42px; line-height:42px; padding:0 8px; pointer-events:none; cursor:default; opacity:0.95;">CROSS RENT</div>
+          <button id="btn-display-event-type" class="btn-outline pe-type-picker" style="width:100%; margin:0;" onclick="toggleTypeMenu()"><span id="display-event-type">EVENT</span></button>
+          <div id="type-dropdown" class="pe-type-picker" style="display:none; position:absolute; top: 100%; right:0; width:100%; background:#1a1a1e; border:1px solid #333; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
+             <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="setEventType('Event')">Event</button>
+             <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="setEventType('Cross Rent')">Cross Rent</button>
+             <button class="btn-outline" style="width:100%; margin:0;" onclick="setEventType('Meeting')">Meeting</button>
+          </div>
         </div>
-      </div>
 
-      <div style="position: relative; width: 140px;">
-        <button class="btn-outline" style="width:100%; margin:0;" onclick="toggleStatusMenu()"><span id="display-event-status">DRAFT</span></button>
-        <div id="status-dropdown" style="display:none; position:absolute; top: 100%; left:0; width:100%; background:#1a1a1e; border:1px solid #333; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
-           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Approved')">Approved</button>
-           <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Not Approved')">Not Approved</button>
-           <button id="cancel-project-btn" class="btn-delete" style="width:100%; margin:0;" onclick="runSetStatus('Cancelled')">Cancelled</button>
+        <div class="pe-manager-only" style="position: relative; width: 140px;">
+          <button class="btn-outline" style="width:100%; margin:0;" onclick="toggleStatusMenu()"><span id="display-event-status">DRAFT</span></button>
+          <div id="status-dropdown" style="display:none; position:absolute; top: 100%; right:0; width:100%; background:#1a1a1e; border:1px solid #333; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
+             <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Approved')">Approved</button>
+             <button class="btn-outline" style="width:100%; margin-bottom:8px;" onclick="runSetStatus('Not Approved')">Not Approved</button>
+             <button id="cancel-project-btn" class="btn-delete" style="width:100%; margin:0;" onclick="runSetStatus('Cancelled')">Cancelled</button>
+          </div>
         </div>
       </div>
     </div>
     
     <div id="event-context-menu" style="display: none; position: fixed; background: #1a1a1e; border: 1px solid #444; border-radius: 6px; padding: 5px; z-index: 99999; box-shadow: 0 8px 16px rgba(0,0,0,0.8); width: 140px;">
             <div style="color: #a1a1aa; font-size: 9px; font-weight: bold; padding: 4px 8px; border-bottom: 1px solid #333; margin-bottom: 4px;">CHANGE TYPE</div>
-            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #3b82f6; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('main')">MAIN EVENT</button>
-            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #10b981; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('show')">SHOW DAY</button>
-            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #f97316; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('wh')">WAREHOUSE</button>
-            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #a855f7; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('recovery')">RECOVERY</button>
-            <button class="btn-outline" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 4px 0; color: #06b6d4; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('transit')">TRANSIT</button>
+            <button class="btn-outline mini-phase-btn" data-mini-phase="main" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #3b82f6; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('main')">MAIN EVENT</button>
+            <button class="btn-outline mini-phase-btn" data-mini-phase="show" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #10b981; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('show')">SHOW DAY</button>
+            <button class="btn-outline mini-phase-btn" data-mini-phase="wh" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #f97316; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('wh')">WAREHOUSE</button>
+            <button class="btn-outline mini-phase-btn" data-mini-phase="recovery" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #a855f7; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('recovery')">RECOVERY</button>
+            <button class="btn-outline mini-phase-btn" data-mini-phase="transit" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 4px 0; color: #06b6d4; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('transit')">TRANSIT</button>
             <div style="border-top: 1px solid #333; padding-top: 4px;">
                 <button class="btn-delete" style="width: 100%; text-align: left; padding: 6px 8px; margin: 0; font-size: 11px;" onclick="updateEventPhase('delete')">DELETE STRIP</button>
             </div>
@@ -2912,10 +2961,10 @@
          <button class="btn-outline" style="margin:0; border-color:#f97316; color:#f97316;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
       </div>
       <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
-         <button id="manual-crew-email-btn" class="btn-outline" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
+         <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
          
          <button class="btn-close" style="margin: 0; width:auto;" onclick="cancelProjectEditor()">CANCEL</button>
-         <button id="update-btn" class="btn-main" style="margin: 0; width:auto;" onclick="runSchedule()">SAVE & SYNC CALENDAR</button>
+         <button id="update-btn" class="btn-main pe-mgr-only" style="margin: 0; width:auto;" onclick="runSchedule()">SAVE & SYNC CALENDAR</button>
       </div>
     </div>
   </div>
@@ -3365,6 +3414,8 @@
 
   </div>
 </div>
+
+
 
 
 

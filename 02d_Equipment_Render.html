@@ -1192,6 +1192,7 @@ function renderProjectAssetsUI() {
 }
 
 window.toggleEqDeptFinished = function(deptUid, isFinished) {
+    if (window.projectAssetsReadOnly) return;
     if (!window.currentReadinessState) window.currentReadinessState = {};
     if (!window.currentReadinessState.eq_depts) window.currentReadinessState.eq_depts = [];
     
@@ -1207,7 +1208,7 @@ window.toggleEqDeptFinished = function(deptUid, isFinished) {
 window.updateEqReadinessToDatabase = function() {
     let pId = document.getElementById('edit-folder-id').value;
     if (pId && pId !== 'NEW') {
-        google.script.run.updateProjectReadiness(pId, JSON.stringify(window.currentReadinessState));
+        google.script.run.updateProjectReadiness(pId, JSON.stringify(window.currentReadinessState), typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
         if (typeof calendar !== 'undefined' && calendar) {
             let ev = calendar.getEventById(pId);
             if (ev) {

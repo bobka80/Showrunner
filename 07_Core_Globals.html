@@ -31,6 +31,234 @@ function escapeHTML(str) {
 }
 
 // ==========================================
+// --- RBAC HELPERS (Phase 1) ---
+// ==========================================
+const IMPLICIT_MANAGER_IAM_KEYS = [
+  'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
+  'event_view_pricing', 'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal'
+];
+
+window.effectiveHasPerm = function(key) {
+  if (!key) return false;
+  if (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ROOT') return true;
+  if (key === 'task_manage_personal') return true;
+  if (typeof userHasPerm === 'function' && userHasPerm(key)) return true;
+  if (IMPLICIT_MANAGER_IAM_KEYS.indexOf(key) !== -1 && typeof accessTierAtLeast === 'function' && accessTierAtLeast('MANAGER')) {
+    return true;
+  }
+  return false;
+};
+
+window.hasExplicitPerm = function(key) {
+  if (!key) return false;
+  if (typeof userHasPerm === 'function') return userHasPerm(key);
+  return false;
+};
+
+window.canCreateStandard = function() {
+  return effectiveHasPerm('event_create_standard');
+};
+
+window.canCreateCrossRent = function() {
+  return effectiveHasPerm('event_create_crossrent');
+};
+
+window.canCreateOnCalendar = function() {
+  return canCreateStandard() || canCreateCrossRent();
+};
+
+window.isCrossRentOnlyCreator = function() {
+  return hasExplicitPerm('event_create_crossrent') && !hasExplicitPerm('event_create_standard');
+};
+
+window.canPaintMiniCalendar = function(projectId) {
+  if (typeof isBriefingMode === 'function' && isBriefingMode(projectId)) return false;
+  if (canDrawPhases()) return true;
+  if (isCrossRentOnlyCreator()) return true;
+  return false;
+};
+
+window.allowedMiniCalPhases = function() {
+  if (isCrossRentOnlyCreator()) return ['wh', 'recovery'];
+  return ['main', 'show', 'wh', 'recovery', 'transit'];
+};
+
+window.defaultMiniCalPhase = function() {
+  const allowed = allowedMiniCalPhases();
+  return allowed.indexOf('wh') !== -1 ? 'wh' : allowed[0];
+};
+
+window.canDrawPhases = function() {
+  return effectiveHasPerm('event_edit_timeline');
+};
+
+window.canEditAssets = function() {
+  return effectiveHasPerm('event_assets_window');
+};
+
+window.canUseAssetCheckout = function() {
+  return canEditAssets();
+};
+
+window.isTimelineReadOnly = function(projectId) {
+  const pid = projectId || (document.getElementById('edit-folder-id') || {}).value || '';
+  if (typeof isBriefingMode === 'function' && isBriefingMode(pid)) return true;
+  return (typeof canDrawPhases === 'function') && !canDrawPhases();
+};
+
+window.canManageProjectLifecycle = function() {
+  return (typeof accessTierAtLeast === 'function') && accessTierAtLeast('MANAGER');
+};
+
+window.canEditProjectTitle = function() {
+  return canManageProjectLifecycle();
+};
+
+window.canEditEventType = function() {
+  if (isCrossRentOnlyCreator()) return false;
+  const pid = (document.getElementById('edit-folder-id') || {}).value || '';
+  if (typeof isBriefingMode === 'function' && isBriefingMode(pid)) return false;
+  if (canManageProjectLifecycle()) return true;
+  return effectiveHasPerm('event_create_standard') || effectiveHasPerm('event_create_crossrent');
+};
+
+window.isAssignedToProject = function(projectId) {
+  if (!projectId || projectId === 'NEW') return false;
+  const uid = (typeof ACTIVE_USER_UID !== 'undefined' && ACTIVE_USER_UID) ? ACTIVE_USER_UID : '';
+  if (!uid) return false;
+  const shifts = window.globalMonthShifts;
+  if (!Array.isArray(shifts)) return false;
+  return shifts.some(function(s) {
+    return String(s.projectId) === String(projectId) && String(s.user_uid || s.email) === String(uid);
+  });
+};
+
+window.isBriefingMode = function(projectId) {
+  if (!projectId || projectId === 'NEW') return !canCreateOnCalendar();
+  if (canCreateStandard() || canCreateCrossRent()) return false;
+  if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('MANAGER')) return false;
+  return true;
+};
+
+window.canFullEditProject = window.canFullEditProject || function(projectId) {
+  if (projectId === 'NEW') return (typeof canCreateOnCalendar === 'function') ? canCreateOnCalendar() : false;
+  if (effectiveHasPerm('event_create_standard') || effectiveHasPerm('event_create_crossrent')) return true;
+  if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('MANAGER')) return true;
+  return false;
+};
+
+window.applyProjectEditorMode = function(projectId) {
+  const pid = projectId || (document.getElementById('edit-folder-id') || {}).value || '';
+  const briefing = isBriefingMode(pid);
+  window.projectEditorBriefing = briefing;
+  window.projectAssetsReadOnly = briefing || !canEditAssets();
+
+  const overlay = document.getElementById('edit-modal-overlay');
+  if (overlay) {
+    overlay.classList.toggle('editor-briefing-mode', briefing);
+    const crossRentOnly = (typeof isCrossRentOnlyCreator === 'function') && isCrossRentOnlyCreator();
+    overlay.classList.toggle('editor-crossrent-only', crossRentOnly);
+    if (crossRentOnly) {
+      const typeHidden = document.getElementById('edit-proj-type');
+      const typeLabel = document.getElementById('display-event-type');
+      if (typeHidden) typeHidden.value = 'Cross Rent';
+      if (typeLabel) typeLabel.innerText = 'CROSS RENT';
+    }
+  }
+
+  const canTitle = (typeof canEditProjectTitle === 'function') && canEditProjectTitle();
+  const titleEl = document.getElementById('edit-proj-name');
+  if (titleEl) {
+    titleEl.readOnly = briefing || !canTitle;
+    titleEl.disabled = false;
+    titleEl.style.opacity = (briefing || !canTitle) ? '0.9' : '1';
+    titleEl.style.pointerEvents = (briefing || !canTitle) ? 'none' : '';
+  }
+
+  const lockIds = ['edit-proj-location', 'edit-proj-distance', 'edit-proj-outdoor', 'edit-proj-in-sofia'];
+  lockIds.forEach(function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (!briefing) {
+      el.disabled = false;
+      el.readOnly = false;
+      return;
+    }
+    el.disabled = briefing;
+    el.readOnly = briefing && el.type !== 'checkbox';
+  });
+
+  if (!briefing && canTitle) {
+    const statusBtn = document.querySelector('#edit-modal-overlay button[onclick="toggleStatusMenu()"]');
+    if (statusBtn) {
+      statusBtn.disabled = false;
+      statusBtn.style.pointerEvents = '';
+      statusBtn.style.opacity = '';
+    }
+  } else if (briefing) {
+    const statusBtn = document.querySelector('#edit-modal-overlay button[onclick="toggleStatusMenu()"]');
+    if (statusBtn) {
+      statusBtn.disabled = true;
+      statusBtn.style.pointerEvents = 'none';
+      statusBtn.style.opacity = '0.85';
+    }
+  }
+
+  const crossRentOnly = (typeof isCrossRentOnlyCreator === 'function') && isCrossRentOnlyCreator();
+  const typeLocked = document.getElementById('pe-event-type-locked');
+  const typeBtn = document.getElementById('btn-display-event-type');
+  const typeDropdown = document.getElementById('type-dropdown');
+  if (crossRentOnly) {
+    const typeHidden = document.getElementById('edit-proj-type');
+    if (typeHidden) typeHidden.value = 'Cross Rent';
+    if (typeLocked) typeLocked.style.display = 'block';
+    if (typeBtn) typeBtn.style.display = 'none';
+    if (typeDropdown) typeDropdown.style.display = 'none';
+  } else {
+    if (typeLocked) typeLocked.style.display = 'none';
+    if (typeBtn) typeBtn.style.display = '';
+    const canType = (typeof canEditEventType === 'function') && canEditEventType();
+    if (typeBtn) {
+      typeBtn.classList.toggle('pe-type-readonly', !canType);
+      typeBtn.disabled = !canType;
+      typeBtn.style.pointerEvents = canType ? '' : 'none';
+      typeBtn.style.opacity = canType ? '' : '0.9';
+      typeBtn.style.cursor = canType ? '' : 'default';
+      typeBtn.title = canType ? '' : 'Event type (read-only)';
+    }
+  }
+
+  const toolbarRow = document.querySelector('#edit-modal-overlay .pe-editor-toolbar-row');
+  if (toolbarRow) {
+    toolbarRow.style.paddingRight = (typeof canManageProjectLifecycle === 'function' && canManageProjectLifecycle()) ? '285px' : '140px';
+  }
+
+  if (briefing && typeof bootMiniCalendar === 'function') {
+    const d = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+    bootMiniCalendar(d, pid);
+  }
+};
+
+window.globalMonthShifts = window.globalMonthShifts || [];
+
+function syncEffectivePermClasses() {
+  const keys = [
+    'db_view_assets', 'db_view_vehicles', 'db_view_warehouses', 'db_view_clients',
+    'db_edit_assets', 'db_delete_assets', 'event_create_standard', 'event_create_crossrent',
+    'event_edit_timeline', 'event_assets_window', 'event_view_pricing',
+    'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal',
+    'fin_view_roi', 'fin_view_internal', 'hr_view_rates'
+  ];
+  keys.forEach(function(k) {
+    if (effectiveHasPerm(k)) document.body.classList.add('perm-' + k);
+  });
+  if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('MANAGER')) {
+    document.body.classList.add('perm-manager-tier');
+  }
+}
+syncEffectivePermClasses();
+
+// ==========================================
 // --- THEME ENGINE (LOCAL PREFERENCES) ---
 // ==========================================
 // @INDEX: GLOBALS -> CSS Theme Engine
@@ -508,55 +736,140 @@ function updateActiveNav(activeId) {
 // --- DATABASE BACKUP ENGINE (CLIENT-SIDE) ---
 // ==========================================
 // @INDEX: GLOBALS -> Database Backup Engine
-function triggerDatabaseBackup() {
+window.DATABASE_BACKUP_IN_PROGRESS = false;
+window._dbBackupCountdownTimer = null;
+
+window.isDatabaseBackupLocked = function() {
+  return !!window.DATABASE_BACKUP_IN_PROGRESS;
+};
+
+window.setDatabaseBackupLock = function(active) {
+  window.DATABASE_BACKUP_IN_PROGRESS = !!active;
+  document.body.classList.toggle('db-backup-locked', !!active);
+  const panel = document.getElementById('db-ops-panel');
+  if (panel) panel.style.pointerEvents = active ? 'none' : '';
+  if (panel) panel.style.opacity = active ? '0.45' : '';
+};
+
+window.guardDatabaseBackupLock = function(actionLabel) {
+  if (!window.isDatabaseBackupLocked()) return false;
+  alert('Database backup in progress — ' + (actionLabel || 'save') + ' is blocked until backup finishes.');
+  return true;
+};
+
+function waitForPendingSavesBeforeBackup_(callback) {
+  const maxWait = 45000;
+  const start = Date.now();
+  (function poll() {
+    if (!window.isBackgroundSyncing || Date.now() - start > maxWait) {
+      callback();
+      return;
+    }
+    setTimeout(poll, 400);
+  })();
+}
+
+function releaseDatabaseBackupSession_(overlay, onComplete) {
+  window.setDatabaseBackupLock(false);
+  google.script.run
+    .withFailureHandler(function() {})
+    .endDatabaseBackupLock(ACTIVE_USER_NAME);
+  if (typeof onComplete === 'function') onComplete();
+}
+
+function runDatabaseBackupJob_(mainText, subText, onComplete) {
+  const finish = function(success, message) {
+    mainText.innerHTML = success
+      ? '<span style="font-size: 24px; font-weight: 900; color: #10b981;">SUCCESS</span>'
+      : '<span style="font-size: 24px; font-weight: 900; color: #ef4444;">ERROR</span>';
+    subText.innerText = message;
+    const overlay = document.getElementById('backup-modal-overlay');
+    setTimeout(function() {
+      if (overlay) overlay.style.display = 'none';
+      releaseDatabaseBackupSession_(null, onComplete);
+    }, success ? 3000 : 5000);
+  };
+
+  google.script.run
+    .withSuccessHandler(function(res) { finish(true, res); })
+    .withFailureHandler(function(err) { finish(false, err.message); })
+    .runNightlyBackup(true, ACTIVE_USER_NAME);
+}
+
+function triggerDatabaseBackup(onComplete) {
+  if (window.isDatabaseBackupLocked()) {
+    alert('A database backup is already in progress.');
+    return;
+  }
+
   const overlay = document.getElementById('backup-modal-overlay');
   const subText = document.getElementById('backup-modal-sub');
   const mainText = document.getElementById('backup-modal-text');
-  
+  if (!overlay || !subText || !mainText) return;
+
   overlay.style.display = 'flex';
   overlay.style.pointerEvents = 'none';
   overlay.style.background = 'transparent';
   overlay.style.backdropFilter = 'none';
-  
+
   let count = 20;
   let phase = 1;
-  
-  mainText.innerHTML = `The database will start backing up in <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #ef4444;">${count}</span><br> seconds.`;
-  subText.innerText = "Please save your work. The interface will lock soon.";
 
-  const timer = setInterval(() => {
+  mainText.innerHTML = 'Engine + Vault backup starts in <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #ef4444;">' + count + '</span><br> seconds.';
+  subText.innerText = 'Please save your work. The interface will lock soon.';
+
+  if (window._dbBackupCountdownTimer) clearInterval(window._dbBackupCountdownTimer);
+
+  window._dbBackupCountdownTimer = setInterval(function() {
     count--;
     const newCountdownEl = document.getElementById('backup-countdown');
     if (newCountdownEl) newCountdownEl.innerText = count;
-    
+
     if (count <= 0) {
       if (phase === 1) {
         phase = 2;
         count = 10;
+        window.setDatabaseBackupLock(true);
+        google.script.run
+          .withFailureHandler(function() {})
+          .beginDatabaseBackupLock(ACTIVE_USER_NAME);
         overlay.style.pointerEvents = 'auto';
         overlay.style.background = 'rgba(0,0,0,0.8)';
         overlay.style.backdropFilter = 'blur(8px)';
-        mainText.innerHTML = `Interface locked. Safety buffer: <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #f59e0b;">${count}</span><br> seconds.`;
-        subText.innerText = "Waiting for pending background saves to complete...";
+        mainText.innerHTML = 'Interface locked. Safety buffer: <br><span id="backup-countdown" style="font-size: 48px; font-weight: 900; color: #f59e0b;">' + count + '</span><br> seconds.';
+        subText.innerText = 'Waiting for pending background saves to complete...';
       } else if (phase === 2) {
-        clearInterval(timer);
-        mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #10b981;">BACKING UP NOW...</span>`;
-        subText.innerText = "Processing files in Google Drive. Please wait.";
-        
-        google.script.run
-          .withSuccessHandler(res => {
-             mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #10b981;">SUCCESS</span>`;
-             subText.innerText = res;
-             setTimeout(() => { overlay.style.display = 'none'; }, 3000);
-          })
-          .withFailureHandler(err => {
-             mainText.innerHTML = `<span style="font-size: 24px; font-weight: 900; color: #ef4444;">ERROR</span>`;
-             subText.innerText = err.message;
-             setTimeout(() => { overlay.style.display = 'none'; }, 5000);
-          })
-          .runNightlyBackup(true, ACTIVE_USER_NAME);
+        clearInterval(window._dbBackupCountdownTimer);
+        window._dbBackupCountdownTimer = null;
+        mainText.innerHTML = '<span style="font-size: 24px; font-weight: 900; color: #10b981;">BACKING UP NOW...</span>';
+        subText.innerText = 'Copying Engine + Vault to 05_DATABASE_BACKUPS. Please wait.';
+        waitForPendingSavesBeforeBackup_(function() {
+          runDatabaseBackupJob_(mainText, subText, onComplete);
+        });
       }
     }
   }, 1000);
+}
+
+// Root-only: warn on login if Drive backups are stale (file-based check, not function return)
+function showGlobalBackupHealthBanner(health) {
+  if (!health || health.healthy) return;
+  let el = document.getElementById('backup-health-global-banner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'backup-health-global-banner';
+    el.style.cssText = 'position:fixed; top:60px; left:60px; right:0; z-index:2400; background:#450a0a; border-bottom:2px solid #ef4444; color:#fff; padding:10px 20px; font-size:12px; font-weight:bold; display:flex; align-items:center; justify-content:space-between; gap:12px; box-sizing:border-box;';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '<span style="flex:1; line-height:1.4;">⚠️ DATABASE BACKUP: ' + (health.warning || 'Last night\'s backup may have failed.') + ' Open Resources → DATABASE.</span>'
+    + '<button type="button" onclick="document.getElementById(\'backup-health-global-banner\').style.display=\'none\'" style="background:transparent; border:1px solid #ef4444; color:#fca5a5; padding:4px 10px; border-radius:4px; cursor:pointer; font-size:11px; flex-shrink:0;">DISMISS</button>';
+  el.style.display = 'flex';
+}
+
+if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('ROOT')) {
+  google.script.run
+    .withFailureHandler(function() {})
+    .withSuccessHandler(showGlobalBackupHealthBanner)
+    .getDatabaseBackupHealth(ACTIVE_USER_NAME);
 }
 </script>

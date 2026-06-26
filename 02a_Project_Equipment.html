@@ -135,6 +135,11 @@ window.evalOperationButtons = function() {
     let btn = document.getElementById('btn-master-operation');
     
     if (!btn) return;
+
+    if (window.projectAssetsReadOnly || (typeof canUseAssetCheckout === 'function' && !canUseAssetCheckout())) {
+        btn.style.display = 'none';
+        return;
+    }
     
     if (window.currentOperationType) {
         btn.style.borderColor = '#ef4444';
@@ -173,6 +178,26 @@ window.cancelProjectAssetsModal = function() {
     document.getElementById('project-assets-modal-overlay').style.display = 'none';
 };
 
+function applyProjectAssetsReadOnly(readOnly) {
+    window.projectAssetsReadOnly = !!readOnly;
+    const saveBtn = document.getElementById('btn-save-pa');
+    if (saveBtn) saveBtn.style.display = readOnly ? 'none' : '';
+    const hideIds = [
+      'mode-toggle-btn', 'pa-new-sublist-btn', 'pa-add-container-btn', 'btn-arrange-truck',
+      'btn-auto-add-cases', 'btn-loadin-plan', 'pa-search-cli', 'pa-add-sel-btn',
+      'toggle-auto-fill-cases-btn', 'btn-master-operation'
+    ];
+    hideIds.forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = readOnly ? 'none' : '';
+    });
+    const clipActions = document.getElementById('pa-clipboard-actions');
+    if (clipActions) clipActions.style.display = readOnly ? 'none' : '';
+    const overlay = document.getElementById('project-assets-modal-overlay');
+    if (overlay) overlay.classList.toggle('pa-readonly-mode', !!readOnly);
+    if (!readOnly && typeof evalOperationButtons === 'function') evalOperationButtons();
+}
+
 // @INDEX: PA_MODAL -> Project Assets Modal Management
 function openProjectAssetsModal() {
     const projectId = document.getElementById('edit-folder-id').value;
@@ -180,8 +205,12 @@ function openProjectAssetsModal() {
         alert("⚠️ Please SAVE the project first to generate a Project ID before assigning equipment.");
         return;
     }
+
+    const assetsReadOnly = (typeof isBriefingMode === 'function' && isBriefingMode(projectId))
+      || (typeof canEditAssets === 'function' && !canEditAssets());
+    window.projectAssetsReadOnly = assetsReadOnly;
     
-    if (window.isProjectDirty) {
+    if (window.isProjectDirty && !assetsReadOnly) {
         if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {
             if (typeof runSchedule === 'function') runSchedule();
         }
@@ -218,6 +247,7 @@ function openProjectAssetsModal() {
 
     document.getElementById('pa-modal-title').innerText = "EQUIPMENT: " + document.getElementById('edit-proj-name').value;
     document.getElementById('project-assets-modal-overlay').style.display = 'flex';
+    if (typeof applyProjectAssetsReadOnly === 'function') applyProjectAssetsReadOnly(assetsReadOnly);
     
     if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
         try {

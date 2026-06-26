@@ -20,7 +20,9 @@ function doPost(e) {
   if (authResult.success) {
     let template = HtmlService.createTemplateFromFile('Index');
     template.userName = authResult.name;
-    template.userAccess = authResult.access;
+    template.userAccess = normalizeAccessTier(authResult.access);
+    template.userUid = authResult.uid || '';
+    template.showSettingsNav = accessTierAtLeastValue(template.userAccess, 'MANAGER');
     template.userPermissionsB64 = Utilities.base64Encode(JSON.stringify(authResult.permissions || {}));
     return template.evaluate()
       .setTitle('SM Showrunner Command Center')
@@ -55,11 +57,10 @@ function getBootPayload(crewName) {
   
   let conflicts = getActiveConflicts();
 
-  if (profile.tunneling && profile.uid) {
-     monthData.shifts = monthData.shifts.filter(s => (s.user_uid || s.email) === profile.uid);
-     let assignedProjectIds = new Set(monthData.shifts.map(s => s.projectId));
-     projects = projects.filter(p => assignedProjectIds.has(p.id));
-  }
+  const filtered = applyShiftCalendarFilter(profile, projects, monthData, conflicts);
+  projects = filtered.projects;
+  monthData = filtered.monthData;
+  conflicts = filtered.conflicts;
   let extras = getTasksAndNotifs(crewName);
 
   return {
@@ -91,11 +92,10 @@ function getRefreshPayload(crewName) {
   
   let conflicts = getActiveConflicts();
 
-  if (profile.tunneling && profile.uid) {
-     monthData.shifts = monthData.shifts.filter(s => (s.user_uid || s.email) === profile.uid);
-     let assignedProjectIds = new Set(monthData.shifts.map(s => s.projectId));
-     projects = projects.filter(p => assignedProjectIds.has(p.id));
-  }
+  const filtered = applyShiftCalendarFilter(profile, projects, monthData, conflicts);
+  projects = filtered.projects;
+  monthData = filtered.monthData;
+  conflicts = filtered.conflicts;
   let extras = getTasksAndNotifs(crewName);
 
   return { projects: projects, monthData: monthData, managerConfig: getManagerConfig(crewName), tasks: extras.tasks, notifs: extras.notifs, conflicts: conflicts };

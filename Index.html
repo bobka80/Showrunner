@@ -87,7 +87,7 @@
               <div id="task-drawer-wrapper" style="position: absolute; left: 60px; top: 0; width: 320px; background: #1a1a1e; border: 1px solid #333; border-radius: 0 8px 8px 0; display: none; flex-direction: column; overflow: hidden; z-index: 100; box-shadow: 10px 5px 25px rgba(0,0,0,0.8);">
                   <div style="padding: 12px 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; background: #111;">
                       <span style="color: var(--accent); font-weight: 900; font-size: 12px;">ACTIVE TASKS</span>
-                      <button class="btn-outline btn-sm" style="margin:0; border-color:var(--accent); color:var(--accent);" onclick="openTaskModal()">+ ADD</button>
+                      <button class="btn-outline btn-sm req-task_manage_global" style="margin:0; border-color:var(--accent); color:var(--accent);" onclick="openTaskModal()">+ ADD</button>
                   </div>
                   <div id="tasks-list" style="max-height: 66vh; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;"></div>
               </div>
@@ -118,7 +118,7 @@
           </div>
 
           <div id="crew-conflict-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;" onmouseenter="document.getElementById('crew-conflict-drawer').style.display='flex'" onmouseleave="document.getElementById('crew-conflict-drawer').style.display='none'">
-              <button id="nav-btn-roster" class="nav-icon-btn" onclick="openMonthRoster()" title="Month Roster & Crew Conflicts">
+              <button id="nav-btn-roster" class="nav-icon-btn req-view_month_roster" onclick="openMonthRoster()" title="Month Roster & Crew Conflicts">
                   <div style="position: relative; display: inline-flex;">
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="7" y1="14" x2="17" y2="14"></line><line x1="11" y1="18" x2="21" y2="18"></line></svg>
                       <div id="crew-conflict-badges" style="position: absolute; right: -6px; top: -6px; display: flex; flex-direction: column; gap: 2px; pointer-events: none;"></div>
@@ -142,7 +142,7 @@
       <!-- Bottom Section (Settings) -->
       <div style="display: flex; flex-direction: column; gap: 5px; width: 100%; align-items: center;">
 
-          <? if (userAccess === 'ROOT' || userAccess === 'Admin' || userAccess === 'ADMIN' || userAccess === 'Manager' || userAccess === 'MANAGER') { ?>
+          <? if (showSettingsNav) { ?>
           
           <div id="nav-settings-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;">
               <button id="nav-btn-settings" class="nav-icon-btn" onclick="toggleContextualSettings()" title="Contextual Visual Settings">
@@ -178,12 +178,38 @@
 
 <meta name="user-access" content="<?= userAccess ?>">
 <meta name="user-name" content="<?= userName ?>">
+<meta name="user-uid" content="<?= userUid ?>">
 <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
 
 <script>
-  console.log("🔥 APP BOOT VERSION: 2026-06-24 IAM-Roles-only");
-  const USER_ACCESS = document.querySelector('meta[name="user-access"]').content;
+  console.log("🔥 APP BOOT VERSION: 2026-06-25 RBAC-Phase1");
+  const ACCESS_TIER_ORDER = ['CREW', 'EDITOR', 'MANAGER', 'ADMIN', 'ROOT'];
+
+  function normalizeAccessTier(tier) {
+    if (tier == null || tier === '') return 'CREW';
+    const raw = tier.toString().trim();
+    const upper = raw.toUpperCase();
+    if (ACCESS_TIER_ORDER.indexOf(upper) !== -1) return upper;
+    const titled = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    const titleMap = { Crew: 'CREW', Editor: 'EDITOR', Manager: 'MANAGER', Admin: 'ADMIN', Root: 'ROOT' };
+    if (titleMap[titled]) return titleMap[titled];
+    return 'CREW';
+  }
+
+  function accessTierRank(tier) {
+    const idx = ACCESS_TIER_ORDER.indexOf(normalizeAccessTier(tier));
+    return idx === -1 ? 1 : idx + 1;
+  }
+
+  window.normalizeAccessTier = normalizeAccessTier;
+  window.accessTierAtLeast = function(minTier) {
+    return accessTierRank(USER_ACCESS) >= accessTierRank(minTier);
+  };
+
+  const USER_ACCESS = normalizeAccessTier(document.querySelector('meta[name="user-access"]').content);
   const ACTIVE_USER_NAME = document.querySelector('meta[name="user-name"]').content;
+  const ACTIVE_USER_UID = (document.querySelector('meta[name="user-uid"]') || {}).content || '';
+  window.ACTIVE_USER_UID = ACTIVE_USER_UID;
   
   let USER_PERMISSIONS = {};
   try {
@@ -196,6 +222,7 @@
   }
   
   if (USER_ACCESS === 'ROOT') document.body.classList.add('perm-root');
+  document.body.classList.add('perm-task_manage_personal');
   for (const [key, value] of Object.entries(USER_PERMISSIONS)) {
      if (value === true || value === "true") document.body.classList.add('perm-' + key);
   }
@@ -205,10 +232,24 @@
     return v === true || v === 'true';
   };
 
-  // Evaluate Access Tiers
+  window.canCreateOnCalendar = function() {
+    if (USER_ACCESS === 'ROOT') return true;
+    if (userHasPerm('event_create_standard') || userHasPerm('event_create_crossrent')) return true;
+    if (accessTierAtLeast('MANAGER')) return true;
+    return false;
+  };
+
+  window.canFullEditProject = function(projectId) {
+    if (projectId === 'NEW') return canCreateOnCalendar();
+    if (userHasPerm('event_create_standard') || userHasPerm('event_create_crossrent')) return true;
+    if (accessTierAtLeast('MANAGER')) return true;
+    return false;
+  };
+
+  // Evaluate Access Tiers (canonical ALL-CAPS via normalizeAccessTier)
   const isRoot = (USER_ACCESS === 'ROOT');
-  const isAdmin = (isRoot || USER_ACCESS === 'ADMIN');
-  const isManagerOrAbove = (isAdmin || USER_ACCESS === 'MANAGER');
+  const isAdmin = accessTierAtLeast('ADMIN');
+  const isManagerOrAbove = accessTierAtLeast('MANAGER');
   
   // Financials: Manager+ tier only; Managers need a finance checkbox, Admin/Root always see it
   const hasFinPerm = userHasPerm('fin_view_roi') || userHasPerm('fin_view_internal') || userHasPerm('hr_view_rates');
@@ -228,6 +269,7 @@
     revealNavItem(document.getElementById('asset-conflict-container'));
     revealNavItem(document.getElementById('crew-conflict-container'));
     revealNavItem(document.getElementById('nav-btn-manager'));
+    document.body.classList.add('perm-manager-tier');
   }
   if (showFinancials) revealNavItem(document.getElementById('nav-btn-financials'));
   if (showMaster) revealNavItem(document.getElementById('nav-btn-master'));
@@ -281,6 +323,7 @@
 <?!= include('06d_Admin_Fleet'); ?>
 <?!= include('06e_Admin_Automation'); ?>
 <?!= include('06f_Admin_Audit'); ?>
+<?!= include('06g_Admin_Database'); ?>
 <?!= include('08_Conflict_Manager'); ?>
 <?!= include('09_Financials_Hub'); ?>
 

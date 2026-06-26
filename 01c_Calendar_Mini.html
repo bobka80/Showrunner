@@ -18,6 +18,11 @@ function bootMiniCalendar(targetDateString, projectId) {
     const container = document.getElementById('mini-project-calendar');
     if (!container) return;
     
+    const miniReadOnly = (typeof canPaintMiniCalendar === 'function')
+      ? !canPaintMiniCalendar(projectId)
+      : ((typeof isBriefingMode === 'function' && isBriefingMode(projectId))
+        || (typeof canDrawPhases === 'function' && !canDrawPhases()));
+    
     if (miniCalendar) {
         miniCalendar.destroy();
         miniCalendar = null;
@@ -35,9 +40,9 @@ function bootMiniCalendar(targetDateString, projectId) {
             height: '100%',
             
             selectable: false, 
-            editable: true,    
-            eventDurationEditable: true, 
-            eventResizableFromStart: true, 
+            editable: !miniReadOnly,    
+            eventDurationEditable: !miniReadOnly, 
+            eventResizableFromStart: !miniReadOnly, 
             eventDisplay: 'block', 
             eventLongPressDelay: 250,
             
@@ -59,7 +64,9 @@ function bootMiniCalendar(targetDateString, projectId) {
                 if (now - lastMiniClickTime < 300) {
                     clearTimeout(miniClickTimer);
                     
-                    let phase = 'main';
+                    let phase = (typeof defaultMiniCalPhase === 'function') ? defaultMiniCalPhase() : 'main';
+                    const allowed = (typeof allowedMiniCalPhases === 'function') ? allowedMiniCalPhases() : ['main', 'show', 'wh', 'recovery', 'transit'];
+                    if (allowed.indexOf(phase) === -1) phase = allowed[0];
                     
                     miniCalendar.addEvent({
                         id: 'mc_' + Date.now() + Math.random(),
@@ -92,6 +99,7 @@ function bootMiniCalendar(targetDateString, projectId) {
                 currentEditingEvent = info.event;
                 
                 const menu = document.getElementById('event-context-menu');
+                if (typeof applyMiniPhaseMenuVisibility === 'function') applyMiniPhaseMenuVisibility();
                 menu.style.display = 'block';
                 
                 menu.style.left = info.jsEvent.clientX + 'px';
@@ -177,6 +185,16 @@ function closeEventMenu() {
     setTimeout(() => { currentEditingEvent = null; }, 100); 
 }
 
+window.applyMiniPhaseMenuVisibility = function() {
+  const menu = document.getElementById('event-context-menu');
+  if (!menu) return;
+  const allowed = (typeof allowedMiniCalPhases === 'function') ? allowedMiniCalPhases() : ['main', 'show', 'wh', 'recovery', 'transit'];
+  menu.querySelectorAll('[data-mini-phase]').forEach(function(btn) {
+    const phase = btn.getAttribute('data-mini-phase');
+    btn.style.display = (phase === 'delete' || allowed.indexOf(phase) !== -1) ? '' : 'none';
+  });
+};
+
 window.updateEventTime = function(type, val) {
     window.isProjectDirty = true;
     if (!currentEditingEvent) return;
@@ -193,6 +211,9 @@ document.addEventListener('click', function(e) {
 function updateEventPhase(newPhase) {
     window.isProjectDirty = true;
     if (!currentEditingEvent) return;
+
+    const allowed = (typeof allowedMiniCalPhases === 'function') ? allowedMiniCalPhases() : ['main', 'show', 'wh', 'recovery', 'transit'];
+    if (newPhase !== 'delete' && allowed.indexOf(newPhase) === -1) return;
     
     if (newPhase === 'delete') {
         currentEditingEvent.remove();

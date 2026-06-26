@@ -160,27 +160,33 @@ function openShiftLayout(mode, isReadOnly = false) {
   
   const saveBtn = document.getElementById('tt-save-btn');
   const cancelBtn = document.getElementById('tt-cancel-btn');
+  const finishedWrap = document.getElementById('tt-crew-finished-wrap');
+  const editCrewBtn = document.querySelector('.tt-bottom-actions button[onclick="openCrewManager()"]');
+  const shiftLayer = document.getElementById('shift-layer');
   
   let finishedCb = document.getElementById('tt-crew-finished-cb');
-  if (finishedCb) {
+  if (finishedCb && !isReadOnly) {
       finishedCb.checked = (window.currentReadinessState.crew === 'finished');
-      finishedCb.disabled = isReadOnly;
   }
 
+  if (shiftLayer) shiftLayer.classList.toggle('tt-readonly-mode', isReadOnly);
+
   if (isReadOnly) { 
-      saveBtn.style.display = 'block'; 
-      saveBtn.innerText = "🔒 LOCKED (READ ONLY)";
-      saveBtn.disabled = true;
-      saveBtn.style.opacity = '0.5';
-      saveBtn.style.cursor = 'not-allowed';
-      cancelBtn.innerText = "CLOSE (ESC)"; 
+      if (saveBtn) saveBtn.style.display = 'none';
+      if (finishedWrap) finishedWrap.style.display = 'none';
+      if (editCrewBtn) editCrewBtn.style.display = 'none';
+      if (cancelBtn) cancelBtn.innerText = "CLOSE (ESC)"; 
   } else { 
-      saveBtn.style.display = 'block'; 
-      saveBtn.disabled = false;
-      saveBtn.style.opacity = '1';
-      saveBtn.style.cursor = 'pointer';
-      cancelBtn.innerText = "CANCEL (ESC)"; 
-      saveBtn.innerText = "LOADING..."; 
+      if (saveBtn) {
+          saveBtn.style.display = 'block';
+          saveBtn.disabled = false;
+          saveBtn.style.opacity = '1';
+          saveBtn.style.cursor = 'pointer';
+          saveBtn.innerText = "LOADING...";
+      }
+      if (finishedWrap) finishedWrap.style.display = 'flex';
+      if (editCrewBtn) editCrewBtn.style.display = '';
+      if (cancelBtn) cancelBtn.innerText = "CANCEL (ESC)"; 
   }
   
   window.isTimelineDirty = false;
@@ -360,16 +366,16 @@ function cancelShifts() {
 }
 
 function launchMasterTimeline() {
-    // 1. Check if this is a brand new project that hasn't been saved yet
     let folderId = document.getElementById('edit-folder-id').value;
     
     if (folderId === 'NEW' || !folderId) {
-        // Stop the user and warn them
         alert("⚠️ DATABASE LOCK: You cannot open the Timeline for a brand new project yet.\n\nYou must click 'SAVE & SYNC CALENDAR' first to officially create the project. Once it is saved, click it again to open the Timeline!");
         return; 
     }
 
-    if (window.isProjectDirty) {
+    const forceReadOnly = (typeof isTimelineReadOnly === 'function' && isTimelineReadOnly(folderId));
+
+    if (window.isProjectDirty && !forceReadOnly) {
         if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {
             if (typeof runSchedule === 'function') runSchedule();
         }
@@ -379,16 +385,13 @@ function launchMasterTimeline() {
     // 2. If it is an official, saved project, hide the modal safely
     document.getElementById('edit-modal-overlay').style.display = 'none';
     
-    // 3. The Bouncer Logic
-    if (window.isTimelineOccupiedBy) {
-        // Someone is inside. Trigger the Loud-to-Quiet UX, and force Read-Only mode.
+    if (window.isTimelineOccupiedBy && !forceReadOnly) {
         showLoudToQuietWarning(window.isTimelineOccupiedBy);
-        if(typeof openShiftLayout === 'function') openShiftLayout('main', true); // isReadOnly = true
+        if(typeof openShiftLayout === 'function') openShiftLayout('main', true);
     } else {
-        // Room is empty. Lock the door behind us and enter.
-        window.activePresenceModule = 'timeline';
-        if (typeof startPresencePing === 'function') startPresencePing(folderId); // Force ping instantly
-        if(typeof openShiftLayout === 'function') openShiftLayout('main', false);
+        window.activePresenceModule = forceReadOnly ? 'main' : 'timeline';
+        if (!forceReadOnly && typeof startPresencePing === 'function') startPresencePing(folderId);
+        if(typeof openShiftLayout === 'function') openShiftLayout('main', forceReadOnly);
     }
 }
 
@@ -444,6 +447,9 @@ function rebuildTimelineGrid() {
 // --- TIMELINE_CORE -> Save Engine ---
 // ==========================================
 function saveAndCloseShifts() {
+  if (currentIsReadOnly) return;
+  if (typeof canDrawPhases === 'function' && !canDrawPhases()) return;
+  if (window.guardDatabaseBackupLock && window.guardDatabaseBackupLock('timeline save')) return;
   const crewUids = Array.from(document.querySelectorAll('.internal-cb:checked')).map(cb => cb.value);
   let localShiftsToSave = shifts.filter(s => crewUids.includes(s.user_uid || s.email) || isTruck(s.user_uid || s.email));
   
@@ -540,7 +546,7 @@ function saveAndCloseShifts() {
   if (projBtn) { projBtn.innerText = "SYNCING SHIFTS..."; projBtn.disabled = true; }
   
   // Asynchronously push readiness status 
-  google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState));
+  google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState), ACTIVE_USER_NAME);
   
   google.script.run
       .withFailureHandler(err => {

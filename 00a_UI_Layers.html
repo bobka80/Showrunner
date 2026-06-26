@@ -59,7 +59,7 @@
   <div class="tt-bottom-actions">
       <button onclick="openCrewManager()" class="btn-blue" style="margin: 0; width: auto;">EDIT CREW</button>
       <div style="flex: 1;"></div>
-      <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
+      <label id="tt-crew-finished-wrap" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
           <input type="checkbox" id="tt-crew-finished-cb" style="width:16px; height:16px; margin:0; accent-color:#10b981;" onchange="window.isTimelineDirty = true;"> CREW FINISHED
       </label>
       <button id="tt-cancel-btn" class="btn-close" style="margin: 0; width: auto;" onclick="cancelShifts()">CANCEL (ESC)</button>
