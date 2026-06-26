@@ -91,6 +91,18 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  e = e || {};
+  const action = (e.parameter && e.parameter.action) ? String(e.parameter.action) : '';
+  if (action === 'fcmreg') {
+    const result = completeFcmRegistrationViaBridge_(
+      e.parameter.nonce || '',
+      e.parameter.token || '',
+      e.parameter.label || 'web-hosting'
+    );
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   let crewName = e.parameter.name || "";
   let passcode = e.parameter.passcode || "";
   

@@ -43,7 +43,7 @@ function prepareFcmRegistrationBridge(crewName) {
   const profile = getUserSecurityProfile(crewName);
   if (!profile || !profile.uid) return { success: false, message: 'Unknown user (no uid for ' + crewName + ').' };
   const nonce = Utilities.getUuid().replace(/-/g, '');
-  CacheService.getScriptCache().put('fcm_bridge_' + nonce, String(crewName).trim(), 180);
+  CacheService.getScriptCache().put('fcm_bridge_' + nonce, String(crewName).trim(), 300);
   return {
     success: true,
     nonce: nonce,
@@ -61,6 +61,20 @@ function completeFcmRegistrationViaBridge_(nonce, token, label) {
   if (!crewName) return { success: false, message: 'Registration link expired — click RETRY DEVICE REGISTER.' };
   cache.remove(cacheKey);
   return registerFcmToken(crewName, token, label || 'web-hosting', crewName);
+}
+
+function registerFcmTokenWithBridge(crewName, token, nonce, label) {
+  const cleanNonce = String(nonce || '').trim();
+  const cleanName = String(crewName || '').trim();
+  if (!cleanNonce || !cleanName) return { success: false, message: 'Missing bridge data.' };
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'fcm_bridge_' + cleanNonce;
+  const cachedName = cache.get(cacheKey);
+  if (!cachedName || cachedName.toLowerCase() !== cleanName.toLowerCase()) {
+    return { success: false, message: 'Registration link expired — click RETRY DEVICE REGISTER.' };
+  }
+  cache.remove(cacheKey);
+  return registerFcmToken(cleanName, token, label || 'web-hosting', cleanName);
 }
 
 function registerFcmToken(crewName, token, deviceLabel, actor) {

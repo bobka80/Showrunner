@@ -9,9 +9,9 @@
   const frame = document.getElementById('app-frame');
   let firebaseConfig = null;
   let fcmToken = null;
-  let appReady = false;
   let messaging = null;
   let pushStarted = false;
+  let pendingBridge = null;
 
   function setStatus(msg, clickable) {
     if (!statusEl) return;
@@ -28,6 +28,67 @@
     if (bannerEl) bannerEl.classList.remove('hidden');
   }
 
+  function getRegisterBaseUrl(data) {
+    return (firebaseConfig && firebaseConfig.gasExecUrl) || PROD_GAS_EXEC || (data && data.registerUrl) || '';
+  }
+
+  function notifyIframeRegistered(success, message) {
+    if (!frame || !frame.contentWindow) return;
+    try {
+      frame.contentWindow.postMessage({
+        type: 'SHOWRUNNER_FCM_REGISTERED',
+        success: !!success,
+        message: message || ''
+      }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  function postTokenToApp() {
+    if (!fcmToken || !frame || !frame.contentWindow) return;
+    try {
+      frame.contentWindow.postMessage({
+        type: 'SHOWRUNNER_FCM_TOKEN',
+        token: fcmToken,
+        label: 'web-hosting'
+      }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  function registerTokenViaBridgeHttp(data) {
+    const baseUrl = getRegisterBaseUrl(data);
+    if (!data || !data.nonce || !baseUrl) return;
+    if (!fcmToken) {
+      pendingBridge = data;
+      setStatus('token ready — waiting for login save…', false);
+      return;
+    }
+    pendingBridge = null;
+
+    fetch(baseUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'action=fcmreg'
+        + '&nonce=' + encodeURIComponent(data.nonce)
+        + '&token=' + encodeURIComponent(fcmToken)
+        + '&label=' + encodeURIComponent(data.label || 'web-hosting')
+    }).then(function() {
+      setStatus('token saved');
+      notifyIframeRegistered(true);
+    }).catch(function() {
+      setStatus('save failed — click RETRY', true);
+      notifyIframeRegistered(false, 'Network error saving token');
+    });
+  }
+
+  function flushPendingBridge() {
+    if (pendingBridge && fcmToken) {
+      registerTokenViaBridgeHttp(pendingBridge);
+    } else if (fcmToken) {
+      postTokenToApp();
+    }
+  }
+
   function loadConfigJsonp() {
     return new Promise(function(resolve, reject) {
       const cb = '__srFcfg_' + Date.now();
@@ -42,76 +103,23 @@
     });
   }
 
-  function postTokenToApp() {
-    if (!fcmToken) return;
-    const msg = {
-      type: 'SHOWRUNNER_FCM_TOKEN',
-      token: fcmToken,
-      label: 'web-hosting'
-    };
-    if (appReady && frame && frame.contentWindow) {
-      try { frame.contentWindow.postMessage(msg, '*'); } catch (e) { /* ignore */ }
-    }
-  }
-
-  function registerTokenViaBridge(data) {
-    if (!fcmToken || !data || !data.nonce || !data.registerUrl) {
-      setStatus('waiting for login to save token…', false);
-      return;
-    }
-    const cb = '__srFcmReg_' + Date.now();
-    const url = data.registerUrl
-      + '?action=fcmreg'
-      + '&nonce=' + encodeURIComponent(data.nonce)
-      + '&token=' + encodeURIComponent(fcmToken)
-      + '&label=' + encodeURIComponent(data.label || 'web-hosting')
-      + '&callback=' + encodeURIComponent(cb);
-    window[cb] = function(res) {
-      delete window[cb];
-      if (res && res.success) {
-        setStatus('token saved');
-        if (frame && frame.contentWindow) {
-          try {
-            frame.contentWindow.postMessage({ type: 'SHOWRUNNER_FCM_REGISTERED', success: true }, '*');
-          } catch (e) { /* ignore */ }
-        }
-      } else {
-        setStatus('save failed — click RETRY in DATABASE', true);
-        if (frame && frame.contentWindow) {
-          try {
-            frame.contentWindow.postMessage({
-              type: 'SHOWRUNNER_FCM_REGISTERED',
-              success: false,
-              message: (res && res.message) ? res.message : 'Save failed'
-            }, '*');
-          } catch (e) { /* ignore */ }
-        }
-      }
-    };
-    const script = document.createElement('script');
-    script.src = url;
-    script.onerror = function() {
-      setStatus('save failed — network error', true);
-    };
-    document.head.appendChild(script);
-  }
-
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_APP_READY') {
-      appReady = true;
+      postTokenToApp();
+    }
+    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
       postTokenToApp();
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
-      appReady = true;
-      registerTokenViaBridge(ev.data);
+      registerTokenViaBridgeHttp(ev.data);
     }
   });
 
   if (frame) {
     frame.addEventListener('load', function() {
-      appReady = true;
       postTokenToApp();
+      flushPendingBridge();
     });
   }
 
@@ -127,12 +135,7 @@
       return false;
     }
     setStatus('token ready');
-    postTokenToApp();
-    var postAttempts = 0;
-    var postRetry = setInterval(function() {
-      postTokenToApp();
-      if (++postAttempts >= 40) clearInterval(postRetry);
-    }, 3000);
+    flushPendingBridge();
 
     messaging.onMessage(function(payload) {
       const title = (payload.notification && payload.notification.title) || 'Showrunner';
@@ -162,7 +165,7 @@
 
       if (permission !== 'granted') {
         pushStarted = false;
-        setStatus('blocked — click lock icon in address bar → Notifications → Allow', true);
+        setStatus('blocked — allow in site settings (lock icon)', true);
         showBanner();
         if (enableBtn) enableBtn.textContent = 'Try again';
         return;

@@ -1,7 +1,7 @@
 <script>
 /**
  * 10a_Notifications_Boot.html
- * Hosting shell bridge — parent page saves FCM token via secure nonce URL.
+ * Hosting shell — parent supplies FCM token, iframe saves via google.script.run + nonce bridge.
  */
 
 (function() {
@@ -9,6 +9,7 @@
   window.__srFcmBootInstalled = true;
 
   var bridgeRegistered = false;
+  var bridgeInFlight = false;
 
   window.isShowrunnerHostingShell = (window.self !== window.top);
 
@@ -20,6 +21,67 @@
     } catch (e) { /* ignore */ }
   }
 
+  function onBridgeRegistered(res) {
+    if (res && res.success) {
+      bridgeRegistered = true;
+      window.__srFcmLastError = '';
+    } else {
+      window.__srFcmLastError = (res && res.message) ? res.message : 'Registration failed.';
+    }
+    if (typeof window.onShowrunnerFcmRegistered === 'function') {
+      window.onShowrunnerFcmRegistered(res || { success: false });
+    }
+  }
+
+  function saveTokenWithBridge(nonce, token) {
+    google.script.run
+      .withFailureHandler(function(err) {
+        bridgeInFlight = false;
+        onBridgeRegistered({ success: false, message: (err && err.message) ? err.message : String(err) });
+      })
+      .withSuccessHandler(function(res) {
+        bridgeInFlight = false;
+        onBridgeRegistered(res);
+      })
+      .registerFcmTokenWithBridge(ACTIVE_USER_NAME, token, nonce, 'web-hosting');
+  }
+
+  function requestTokenFromParent(nonce, registerUrl) {
+    return new Promise(function(resolve) {
+      var done = false;
+      function onMsg(ev) {
+        if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN' || !ev.data.token) return;
+        window.removeEventListener('message', onMsg);
+        if (!done) {
+          done = true;
+          resolve(ev.data.token);
+        }
+      }
+      window.addEventListener('message', onMsg);
+      try {
+        window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' }, '*');
+      } catch (e) { /* ignore */ }
+      setTimeout(function() {
+        window.removeEventListener('message', onMsg);
+        if (!done) {
+          done = true;
+          resolve(null);
+        }
+      }, 5000);
+    }).then(function(token) {
+      if (token) return token;
+      try {
+        window.parent.postMessage({
+          type: 'SHOWRUNNER_FCM_BRIDGE',
+          nonce: nonce,
+          registerUrl: registerUrl,
+          label: 'web-hosting'
+        }, '*');
+      } catch (e) { /* ignore */ }
+      return null;
+    });
+  }
+
   window.startFcmBridgeRegistration = function() {
     if (!window.isShowrunnerHostingShell) {
       window.__srFcmLastError = 'Open the Hosting URL (web.app), not the direct Apps Script link.';
@@ -28,36 +90,32 @@
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
       return;
     }
-    if (bridgeRegistered) {
+    if (bridgeRegistered || bridgeInFlight) {
       notifyParentReady();
       return;
     }
 
+    bridgeInFlight = true;
     google.script.run
       .withFailureHandler(function(err) {
-        window.__srFcmLastError = (err && err.message) ? err.message : String(err);
-        if (typeof window.onShowrunnerFcmRegistered === 'function') {
-          window.onShowrunnerFcmRegistered({ success: false, message: window.__srFcmLastError });
-        }
+        bridgeInFlight = false;
+        onBridgeRegistered({ success: false, message: (err && err.message) ? err.message : String(err) });
       })
       .withSuccessHandler(function(res) {
         if (!res || !res.success) {
-          window.__srFcmLastError = (res && res.message) ? res.message : 'Bridge setup failed.';
-          if (typeof window.onShowrunnerFcmRegistered === 'function') {
-            window.onShowrunnerFcmRegistered({ success: false, message: window.__srFcmLastError });
-          }
+          bridgeInFlight = false;
+          onBridgeRegistered(res || { success: false, message: 'Bridge setup failed.' });
           return;
         }
-        try {
-          window.parent.postMessage({
-            type: 'SHOWRUNNER_FCM_BRIDGE',
-            nonce: res.nonce,
-            registerUrl: res.registerUrl,
-            label: 'web-hosting'
-          }, '*');
-        } catch (e) {
-          window.__srFcmLastError = 'Could not reach Hosting shell.';
-        }
+        requestTokenFromParent(res.nonce, res.registerUrl).then(function(token) {
+          if (token) {
+            saveTokenWithBridge(res.nonce, token);
+            return;
+          }
+          bridgeInFlight = false;
+          window.__srFcmLastError = 'Hosting shell has no token yet — wait for “token ready”, then RETRY.';
+          onBridgeRegistered({ success: false, message: window.__srFcmLastError });
+        });
       })
       .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
   };
@@ -65,15 +123,8 @@
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_FCM_REGISTERED') {
-      if (ev.data.success) {
-        bridgeRegistered = true;
-        window.__srFcmLastError = '';
-      } else {
-        window.__srFcmLastError = ev.data.message || 'Registration failed.';
-      }
-      if (typeof window.onShowrunnerFcmRegistered === 'function') {
-        window.onShowrunnerFcmRegistered(ev.data);
-      }
+      bridgeInFlight = false;
+      onBridgeRegistered(ev.data);
     }
   });
 
@@ -89,12 +140,12 @@
   }
 
   var retryTimer = setInterval(function() {
-    if (!bridgeRegistered && window.isShowrunnerHostingShell) {
+    if (!bridgeRegistered && !bridgeInFlight && window.isShowrunnerHostingShell) {
       window.startFcmBridgeRegistration();
-    } else {
+    } else if (bridgeRegistered) {
       clearInterval(retryTimer);
     }
-  }, 4000);
+  }, 5000);
 
   setTimeout(function() { clearInterval(retryTimer); }, 180000);
 })();
