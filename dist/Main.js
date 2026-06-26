@@ -4,6 +4,18 @@
  */
 
 // @INDEX: ROUTING -> Firebase public config (fcfg endpoint)
+function sanitizeFirebaseVapidKey_(raw) {
+  if (!raw) return '';
+  return String(raw).trim().replace(/^["']|["']$/g, '').replace(/\s+/g, '');
+}
+
+function isValidFirebaseVapidKey_(key) {
+  if (!key) return false;
+  if (key.indexOf('AIza') === 0) return false;
+  if (key.length < 80 || key.length > 200) return false;
+  return /^[A-Za-z0-9_-]+$/.test(key);
+}
+
 function getFirebasePublicConfig() {
   const p = PropertiesService.getScriptProperties();
   const projectId = p.getProperty('FIREBASE_PROJECT_ID') || 'sm-showrunner-97405';
@@ -16,6 +28,9 @@ function getFirebasePublicConfig() {
   const defaults = (projectId === 'sm-showrunner-97405')
     ? { messagingSenderId: '729666442966', appId: '1:729666442966:web:3481078f7d39b4e6701b77' }
     : {};
+  const vapidKey = sanitizeFirebaseVapidKey_(
+    p.getProperty('FIREBASE_VAPID_KEY') || webCfg.vapidKey || ''
+  );
   return {
     apiKey: p.getProperty('FIREBASE_WEB_API_KEY') || p.getProperty('FIREBASE_API_KEY') || webCfg.apiKey || '',
     authDomain: p.getProperty('FIREBASE_AUTH_DOMAIN') || webCfg.authDomain || (projectId + '.firebaseapp.com'),
@@ -23,7 +38,8 @@ function getFirebasePublicConfig() {
     storageBucket: p.getProperty('FIREBASE_STORAGE_BUCKET') || webCfg.storageBucket || (projectId + '.firebasestorage.app'),
     messagingSenderId: p.getProperty('FIREBASE_MESSAGING_SENDER_ID') || webCfg.messagingSenderId || defaults.messagingSenderId || '',
     appId: p.getProperty('FIREBASE_APP_ID') || webCfg.appId || defaults.appId || '',
-    vapidKey: p.getProperty('FIREBASE_VAPID_KEY') || webCfg.vapidKey || '',
+    vapidKey: vapidKey,
+    vapidKeyValid: isValidFirebaseVapidKey_(vapidKey),
     gasExecUrl: gasUrl,
     hostingUrl: p.getProperty('FIREBASE_HOSTING_URL') || ('https://' + projectId + '.web.app')
   };

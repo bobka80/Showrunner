@@ -5,6 +5,7 @@
  */
 
 var SHOWRUNNER_HOSTING_URL = 'https://sm-showrunner-97405.web.app';
+var FIREBASE_VAPID_CONSOLE_URL = 'https://console.firebase.google.com/project/sm-showrunner-97405/settings/cloudmessaging';
 
 function renderPushAdminPanel(containerId) {
   const el = document.getElementById(containerId);
@@ -18,13 +19,22 @@ function renderPushAdminPanel(containerId) {
     '<div style="background:#18181b; border:1px solid #333; border-radius:8px; padding:14px; margin-top:12px;">' +
       '<div style="color:#f59e0b; font-size:11px; font-weight:900; letter-spacing:0.05em; margin-bottom:8px;">PUSH NOTIFICATIONS (PHASE 1)</div>' +
       '<div style="color:#a1a1aa; font-size:11px; line-height:1.45; margin-bottom:10px;">' +
-        'Push only works from the <strong>Hosting URL</strong> — not the direct Google Apps Script bookmark. ' +
-        'Android: Chrome OK. iPhone: use <strong>Safari</strong> + Add to Home Screen (Chrome on iPhone does not support web push).' +
+        'Push only works from the <strong>Hosting URL</strong>. Android: Chrome OK. iPhone: <strong>Safari</strong> + Add to Home Screen.' +
+      '</div>' +
+      '<div style="margin-bottom:10px; padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">' +
+        '<div style="color:#888; font-size:10px; font-weight:800; margin-bottom:6px;">VAPID KEY (Web Push certificate)</div>' +
+        '<div style="color:#71717a; font-size:10px; line-height:1.4; margin-bottom:8px;">' +
+          'Firebase Console → Project settings → Cloud Messaging → <strong>Web Push certificates</strong> → copy the <strong>public key</strong> (~88 chars, starts with B). ' +
+          '<a href="' + FIREBASE_VAPID_CONSOLE_URL + '" target="_blank" style="color:#10b981;">Open Cloud Messaging settings</a>' +
+        '</div>' +
+        '<input id="push-vapid-input" type="text" placeholder="Paste Web Push public key here (not AIza API key)" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:11px; margin-bottom:8px;">' +
+        '<button class="btn-outline btn-sm" style="margin:0; border-color:#698b99; color:#698b99;" onclick="saveShowrunnerVapidKey()">SAVE VAPID KEY</button>' +
+        '<span id="push-vapid-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>' +
       '</div>' +
       '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="display:inline-block; margin:0 8px 8px 0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>' +
       '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981;" onclick="retryShowrunnerFcmRegistration()">RETRY DEVICE REGISTER</button>' +
       '<button class="btn-outline btn-sm" style="margin:0 0 8px 0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">SEND TEST PUSH TO ME</button>' +
-      '<div id="push-admin-status" style="color:#71717a; font-size:10px; margin-top:8px;">Checking device registration…</div>' +
+      '<div id="push-admin-status" style="color:#71717a; font-size:10px; margin-top:8px;">Checking push setup…</div>' +
     '</div>';
 
   if (typeof window.onShowrunnerFcmRegistered !== 'function') {
@@ -36,36 +46,74 @@ function renderPushAdminPanel(containerId) {
   refreshPushAdminStatus();
 }
 
+function saveShowrunnerVapidKey() {
+  var input = document.getElementById('push-vapid-input');
+  var note = document.getElementById('push-vapid-status');
+  if (!input || !input.value.trim()) {
+    if (note) note.innerHTML = '<span style="color:#ef4444;">Paste the Web Push public key first.</span>';
+    return;
+  }
+  if (note) note.textContent = 'Saving…';
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (note) note.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+    })
+    .withSuccessHandler(function(res) {
+      if (!note) return;
+      if (res && res.success) {
+        note.innerHTML = '<span style="color:#10b981;">' + res.message + '</span>';
+        input.value = '';
+      } else {
+        note.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Save failed') + '</span>';
+      }
+      refreshPushAdminStatus();
+    })
+    .saveFirebaseVapidKey(ACTIVE_USER_NAME, input.value.trim());
+}
+
 function refreshPushAdminStatus() {
   const status = document.getElementById('push-admin-status');
   if (!status) return;
 
   var inShell = (window.self !== window.top);
   if (!inShell) {
-    status.innerHTML = '<span style="color:#ef4444;">Wrong entry point — you are on the direct Apps Script URL. Push cannot register here. Open <a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" style="color:#10b981;">' + SHOWRUNNER_HOSTING_URL + '</a>, allow notifications, log in, then return to DATABASE on that tab.</span>';
+    status.innerHTML = '<span style="color:#ef4444;">Wrong entry point — open <a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" style="color:#10b981;">' + SHOWRUNNER_HOSTING_URL + '</a> first.</span>';
     return;
-  }
-
-  if (window.__srFcmLastError) {
-    status.innerHTML = '<span style="color:#ef4444;">Register error: ' + window.__srFcmLastError + '</span>';
   }
 
   google.script.run
     .withFailureHandler(function(err) {
       status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
     })
-    .withSuccessHandler(function(res) {
-      if (!res || !res.registered) {
-        var hint = window.__srFcmLastError
-          ? ('Register error: ' + window.__srFcmLastError)
-          : 'No device token yet. Allow notifications on this tab, wait ~10s, then click RETRY DEVICE REGISTER.';
-        status.innerHTML = '<span style="color:#f59e0b;">' + hint + '</span>';
+    .withSuccessHandler(function(setup) {
+      if (!setup || !setup.success) {
+        status.innerHTML = '<span style="color:#ef4444;">' + ((setup && setup.message) || 'Setup check failed') + '</span>';
         return;
       }
-      var when = res.updatedAt ? (' · ' + res.updatedAt.slice(0, 16).replace('T', ' ')) : '';
-      status.innerHTML = '<span style="color:#10b981;">Device registered' + when + '</span>';
+
+      if (!setup.vapidKeyValid) {
+        var vapidHint = setup.vapidLooksLikeApiKey
+          ? 'VAPID key looks like an API key (AIza…). Paste the Web Push public key from Cloud Messaging instead.'
+          : 'VAPID key missing or invalid. Paste the Web Push public key above and click SAVE VAPID KEY.';
+        status.innerHTML = '<span style="color:#ef4444;">' + vapidHint + '</span>';
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.registered) {
+            var when = res.updatedAt ? (' · ' + res.updatedAt.slice(0, 16).replace('T', ' ')) : '';
+            status.innerHTML = '<span style="color:#10b981;">VAPID OK · Device registered' + when + '</span>';
+            return;
+          }
+          var regHint = window.__srFcmLastError
+            ? ('Register error: ' + window.__srFcmLastError)
+            : 'VAPID OK · No device token yet. Click Allow notifications on this tab, then RETRY DEVICE REGISTER.';
+          status.innerHTML = '<span style="color:#f59e0b;">' + regHint + '</span>';
+        })
+        .getFcmRegistrationStatus(ACTIVE_USER_NAME);
     })
-    .getFcmRegistrationStatus(ACTIVE_USER_NAME);
+    .getFirebasePushSetupStatus(ACTIVE_USER_NAME);
 }
 
 function retryShowrunnerFcmRegistration() {
@@ -77,7 +125,7 @@ function retryShowrunnerFcmRegistration() {
   }
   window.pullShowrunnerFcmToken().then(function(token) {
     if (!token) {
-      if (status) status.innerHTML = '<span style="color:#f59e0b;">No token from browser yet. Check bottom-right chip says “token ready” and notifications are allowed.</span>';
+      if (status) status.innerHTML = '<span style="color:#f59e0b;">No token from browser. Fix VAPID key if chip says invalid key, allow notifications, refresh Hosting page.</span>';
       setTimeout(refreshPushAdminStatus, 500);
       return;
     }

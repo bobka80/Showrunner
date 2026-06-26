@@ -7,17 +7,36 @@
   <link rel="manifest" href="/manifest.json">
   <title>SM Showrunner</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #0a0a0c; overflow: hidden; }
+    html, body { margin: 0; height: 100%; background: #0a0a0c; overflow: hidden; font-family: Inter, system-ui, sans-serif; }
     #app-frame { width: 100%; height: 100%; border: none; display: block; }
     #push-status {
       position: fixed; right: 8px; bottom: 8px; z-index: 9999;
       background: rgba(24,24,27,0.92); border: 1px solid #333; color: #a1a1aa;
-      font: 11px/1.3 Inter, system-ui, sans-serif; padding: 6px 8px; border-radius: 6px;
-      max-width: 220px; pointer-events: none;
+      font-size: 11px; line-height: 1.3; padding: 6px 8px; border-radius: 6px;
+      max-width: 260px;
     }
+    #push-enable-banner {
+      position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 10000;
+      background: rgba(24,24,27,0.96); border: 1px solid #10b981; color: #f4f4f5;
+      font-size: 12px; line-height: 1.4; padding: 12px 14px; border-radius: 8px;
+      max-width: 360px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); text-align: center;
+    }
+    #push-enable-banner p { margin: 0 0 10px 0; color: #a1a1aa; font-size: 11px; }
+    #push-enable-btn {
+      background: rgba(16,185,129,0.25); border: 1px solid #10b981; color: #fff;
+      font-weight: 800; font-size: 11px; letter-spacing: 0.04em; padding: 10px 14px;
+      border-radius: 6px; cursor: pointer; text-transform: uppercase;
+    }
+    #push-enable-btn:hover { background: rgba(16,185,129,0.45); }
+    #push-enable-banner.hidden { display: none; }
   </style>
 </head>
 <body>
+  <div id="push-enable-banner" class="hidden">
+    <div style="color:#10b981; font-weight:900; font-size:11px; margin-bottom:6px;">PUSH NOTIFICATIONS</div>
+    <p>Chrome needs you to click once to allow notifications for Showrunner.</p>
+    <button type="button" id="push-enable-btn">Allow notifications</button>
+  </div>
   <iframe id="app-frame" title="SM Showrunner" allow="clipboard-read; clipboard-write"></iframe>
   <div id="push-status">Push: starting…</div>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>

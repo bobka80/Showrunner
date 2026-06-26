@@ -4,6 +4,40 @@
 
 // @INDEX: NOTIFICATIONS -> FCM Token Store
 // getFirebasePublicConfig() lives in Main.js (fcfg endpoint).
+
+function saveFirebaseVapidKey(crewName, vapidKeyRaw) {
+  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+    return { success: false, message: 'ROOT privileges required.' };
+  }
+  const vapidKey = sanitizeFirebaseVapidKey_(vapidKeyRaw);
+  if (!isValidFirebaseVapidKey_(vapidKey)) {
+    return {
+      success: false,
+      message: 'Invalid VAPID key. Use the Web Push public key from Firebase Console → Project settings → Cloud Messaging → Web Push certificates (starts with B, ~88 chars). Not the API key (AIza…).'
+    };
+  }
+  PropertiesService.getScriptProperties().setProperty('FIREBASE_VAPID_KEY', vapidKey);
+  try {
+    writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', 'VAPID', 'Firebase VAPID', 'Updated FIREBASE_VAPID_KEY.');
+  } catch (e) { /* saved */ }
+  return { success: true, message: 'VAPID key saved. Hard-refresh the Hosting URL and click Allow notifications again.' };
+}
+
+function getFirebasePushSetupStatus(crewName) {
+  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+    return { success: false, message: 'ROOT privileges required.' };
+  }
+  const cfg = getFirebasePublicConfig();
+  const reg = getFcmRegistrationStatus(crewName);
+  return {
+    success: true,
+    vapidKeyValid: cfg.vapidKeyValid,
+    vapidKeyLength: (cfg.vapidKey || '').length,
+    vapidLooksLikeApiKey: (cfg.vapidKey || '').indexOf('AIza') === 0,
+    deviceRegistered: !!(reg && reg.registered),
+    hostingUrl: cfg.hostingUrl
+  };
+}
 function registerFcmToken(crewName, token, deviceLabel, actor) {
   try {
     if (!crewName || !token) return { success: false, message: 'Missing crew name or FCM token.' };
