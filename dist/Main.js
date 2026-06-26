@@ -13,13 +13,16 @@ function getFirebasePublicConfig() {
   if (webCfgRaw) {
     try { webCfg = JSON.parse(webCfgRaw); } catch (e) { /* ignore */ }
   }
+  const defaults = (projectId === 'sm-showrunner-97405')
+    ? { messagingSenderId: '729666442966', appId: '1:729666442966:web:3481078f7d39b4e6701b77' }
+    : {};
   return {
     apiKey: p.getProperty('FIREBASE_WEB_API_KEY') || p.getProperty('FIREBASE_API_KEY') || webCfg.apiKey || '',
     authDomain: p.getProperty('FIREBASE_AUTH_DOMAIN') || webCfg.authDomain || (projectId + '.firebaseapp.com'),
     projectId: projectId,
     storageBucket: p.getProperty('FIREBASE_STORAGE_BUCKET') || webCfg.storageBucket || (projectId + '.firebasestorage.app'),
-    messagingSenderId: p.getProperty('FIREBASE_MESSAGING_SENDER_ID') || webCfg.messagingSenderId || '',
-    appId: p.getProperty('FIREBASE_APP_ID') || webCfg.appId || '',
+    messagingSenderId: p.getProperty('FIREBASE_MESSAGING_SENDER_ID') || webCfg.messagingSenderId || defaults.messagingSenderId || '',
+    appId: p.getProperty('FIREBASE_APP_ID') || webCfg.appId || defaults.appId || '',
     vapidKey: p.getProperty('FIREBASE_VAPID_KEY') || webCfg.vapidKey || '',
     gasExecUrl: gasUrl,
     hostingUrl: p.getProperty('FIREBASE_HOSTING_URL') || ('https://' + projectId + '.web.app')
