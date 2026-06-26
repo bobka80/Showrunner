@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '297';
+  const SW_BUILD = '300';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -25,6 +25,8 @@
   let registrationLoopTimer = null;
   let serverSaveConfirmed = false;
   let regKeyFailCount = 0;
+  let pushResetAttempts = 0;
+  let lastPushError = '';
   let deferredInstallPrompt = null;
   let shellInitStarted = false;
 
@@ -54,6 +56,30 @@
 
   function logPush(msg) {
     try { console.log('[Showrunner push]', msg); } catch (e) { /* ignore */ }
+  }
+
+  function isPushServiceError(err) {
+    return /push service error|registration failed/i.test(String((err && err.message) || err || ''));
+  }
+
+  function formatPushError(err) {
+    var msg = (err && err.message) ? err.message : String(err || 'init failed');
+    if (isPushServiceError(err)) {
+      if (isIosInBrowserTab()) return 'iPhone: open from home screen icon first';
+      return 'Push service error — tap Reset below (Xiaomi: enable Chrome autostart)';
+    }
+    return msg;
+  }
+
+  function showPushServiceHelp() {
+    setDockMessage('Phone could not reach Google push service.');
+    setDockStatus([
+      'Step 1: PUSH ERROR',
+      'Settings → Apps → Chrome → Autostart ON',
+      'Then tap Reset & set up alerts'
+    ]);
+    if (enableBtn) enableBtn.textContent = 'Reset & set up alerts';
+    notifyIframePushState(true, 'Tap Reset & set up alerts in the green bar above.');
   }
 
   function shouldShowInstallPanel() {
@@ -155,8 +181,12 @@
         setDockStatus(['Step 1: BLOCKED', 'Site settings → Notifications → Allow']);
         if (enableBtn) enableBtn.textContent = 'I fixed it — retry';
       } else if (m === 'retry') {
-        setDockMessage('Registration failed. Tap retry (Android: allow Chrome autostart).');
-        if (enableBtn) enableBtn.textContent = 'Retry alerts setup';
+        setDockMessage('Tap below to register this device for shift alerts.');
+        if (enableBtn) {
+          enableBtn.textContent = lastPushError && isPushServiceError({ message: lastPushError })
+            ? 'Reset & set up alerts'
+            : 'Set up shift alerts';
+        }
       } else {
         setDockMessage('Allow notifications to get shift and task alerts on this device.');
         if (enableBtn) enableBtn.textContent = 'Allow notifications';
@@ -200,6 +230,13 @@
     } catch (e) { /* ignore */ }
   }
 
+  function requestFcmBridgeFromIframe() {
+    if (!frame || !frame.contentWindow) return;
+    try {
+      frame.contentWindow.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_BRIDGE' }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
   function stopRegistrationLoop() {
     if (registrationLoopTimer) {
       clearInterval(registrationLoopTimer);
@@ -216,7 +253,13 @@
         return;
       }
       if (!pendingFcmAuth || !pendingFcmAuth.regKey) {
-        setDockStatus(['Step 1: token OK', 'Step 2: waiting for account link…']);
+        if (elapsed >= 8000) {
+          setDockMessage('Still linking — finish logging in below if you see the login screen.');
+          setDockStatus(['Step 1: token OK', 'Step 2: linking account…', 'trying alternate path']);
+          requestFcmBridgeFromIframe();
+        } else {
+          setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
+        }
         requestFcmAuthFromIframe();
       } else if (!regKeySaveInFlight) {
         trySaveTokenViaRegKey();
@@ -328,10 +371,14 @@
       delete window[cb];
       if (res && res.success) {
         serverSaveConfirmed = true;
+        regKeyFailCount = 0;
         stopRegistrationLoop();
+        logPush('token saved via bridge');
+        setDockStatus(['Step 3: SAVED', 'alerts linked']);
         hidePushPrompt();
-        notifyIframeRegistered(true, 'Alerts linked.');
+        notifyIframeRegistered(true, 'Alerts linked to your account.');
       } else {
+        logPush('bridge save failed: ' + ((res && res.message) || 'rejected'));
         notifyIframeRegistered(false, (res && res.message) ? res.message : 'Save rejected');
       }
     };
@@ -384,8 +431,16 @@
       showPushPrompt(Notification.permission === 'denied' ? 'denied' : 'allow');
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
-      pendingBridge = ev.data;
-      if (fcmToken && regKeyFailCount >= 3) registerTokenViaBridgeJsonp(ev.data);
+      registerTokenViaBridgeJsonp(ev.data);
+    }
+    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN' && fcmToken && ev.source) {
+      try {
+        ev.source.postMessage({
+          type: 'SHOWRUNNER_FCM_TOKEN',
+          token: fcmToken,
+          label: deviceLabel()
+        }, '*');
+      } catch (e) { /* ignore */ }
     }
   });
 
@@ -396,18 +451,31 @@
     });
   }
 
-  async function resetPushRegistration() {
+  async function deepResetPush() {
     if (messaging) {
       try { await messaging.deleteToken(); } catch (e) { /* ignore */ }
     }
+    messaging = null;
     fcmToken = null;
     try {
       var regs = await navigator.serviceWorker.getRegistrations();
       await Promise.all(regs.map(function(r) { return r.unregister(); }));
     } catch (e) { /* ignore */ }
+    try {
+      if (typeof caches !== 'undefined' && caches.keys) {
+        var keys = await caches.keys();
+        await Promise.all(keys.map(function(k) { return caches.delete(k); }));
+      }
+    } catch (e) { /* ignore */ }
+    await new Promise(function(r) { setTimeout(r, 2500); });
   }
 
-  async function obtainFcmToken(isRetry) {
+  async function resetPushRegistration() {
+    pushResetAttempts = 0;
+    await deepResetPush();
+  }
+
+  async function obtainFcmToken(fromUserTap) {
     if (isIosInBrowserTab()) {
       showInstallPanel();
       return false;
@@ -416,15 +484,15 @@
     setDockStatus(['Step 1: getting alert token…']);
 
     try {
-      var swUrl = '/firebase-messaging-sw.js?build=' + SW_BUILD;
+      var swUrl = '/firebase-messaging-sw.js';
       var reg = await navigator.serviceWorker.register(swUrl);
       if (reg && reg.update) await reg.update();
       await navigator.serviceWorker.ready;
+      await new Promise(function(r) { setTimeout(r, fromUserTap ? 400 : 800); });
       if (!messaging) messaging = firebase.messaging();
 
-      var attempts = isRetry ? 1 : 3;
       var lastErr = null;
-      for (var i = 0; i < attempts; i++) {
+      for (var i = 0; i < 3; i++) {
         try {
           fcmToken = await messaging.getToken({
             vapidKey: firebaseConfig.vapidKey,
@@ -433,18 +501,24 @@
           if (fcmToken) break;
         } catch (innerErr) {
           lastErr = innerErr;
-          if (i < attempts - 1) await new Promise(function(r) { setTimeout(r, 1500); });
+          if (i < 2) await new Promise(function(r) { setTimeout(r, 2000); });
         }
       }
       if (!fcmToken && lastErr) throw lastErr;
     } catch (err) {
-      if (!isRetry && /push service error/i.test(String(err && err.message))) {
-        setDockStatus(['Step 1: push error — resetting', 'Allow Chrome autostart on Xiaomi']);
-        await resetPushRegistration();
+      lastPushError = (err && err.message) ? err.message : String(err);
+      if (isPushServiceError(err) && pushResetAttempts < 3) {
+        pushResetAttempts += 1;
+        setDockStatus(['Step 1: resetting push…', 'try ' + pushResetAttempts + ' of 3']);
+        logPush('push service error — deep reset ' + pushResetAttempts);
+        await deepResetPush();
         return obtainFcmToken(true);
       }
       throw err;
     }
+
+    pushResetAttempts = 0;
+    lastPushError = '';
 
     if (!fcmToken) {
       setDockStatus(['Step 1: NO TOKEN', 'Check notification permission']);
@@ -492,14 +566,20 @@
         showPushPrompt(permission === 'denied' ? 'denied' : 'allow');
         return;
       }
-      await obtainFcmToken(false);
+      await obtainFcmToken(true);
       if (!fcmToken) pushStarted = false;
     } catch (err) {
       pushStarted = false;
       console.error(err);
-      setDockStatus(['Step 1: FAILED', (err && err.message) ? err.message : String(err)]);
-      if (isIosInBrowserTab()) showInstallPanel();
-      else showPushPrompt('retry');
+      lastPushError = (err && err.message) ? err.message : String(err);
+      if (isPushServiceError(err)) {
+        showPushServiceHelp();
+        showPushPrompt('retry');
+      } else {
+        setDockStatus(['Step 1: FAILED', formatPushError(err)]);
+        if (isIosInBrowserTab()) showInstallPanel();
+        else showPushPrompt('retry');
+      }
     }
   }
 
@@ -522,13 +602,21 @@
       if (!('Notification' in window)) return;
 
       if (Notification.permission === 'granted') {
-        pushStarted = true;
         if (isIosInBrowserTab()) {
           showInstallPanel();
           return;
         }
+        if (isMobileDevice()) {
+          pushStarted = false;
+          showPushPrompt('retry');
+          setDockMessage('Tap below to connect shift alerts to this phone.');
+          setDockStatus(['Step 1: ready', 'Tap the button — required on Android']);
+          if (enableBtn) enableBtn.textContent = 'Set up shift alerts';
+          return;
+        }
+        pushStarted = true;
         var gotToken = await obtainFcmToken(false);
-        if (!gotToken && isMobileDevice()) {
+        if (!gotToken) {
           pushStarted = false;
           showPushPrompt('retry');
         }
@@ -550,6 +638,13 @@
     function onTap(e) {
       if (e) e.preventDefault();
       pushStarted = false;
+      var needsReset = !fcmToken && (lastPushError || Notification.permission === 'granted');
+      if (needsReset && isMobileDevice()) {
+        deepResetPush().then(function() {
+          requestNotificationsAndRegister();
+        });
+        return;
+      }
       if (Notification.permission === 'granted' && !fcmToken) {
         resetPushRegistration().then(requestNotificationsAndRegister);
         return;

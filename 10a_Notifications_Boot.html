@@ -1,7 +1,7 @@
 <script>
 /**
  * 10a_Notifications_Boot.html
- * Hosting shell bridge — identity only (reg key → parent saves token).
+ * Hosting shell bridge — sends login key + bridge nonce to parent (parent saves token).
  */
 
 (function() {
@@ -21,8 +21,14 @@
     } catch (e) { return ''; }
   }
 
+  function storeRegKey(regKey) {
+    if (!regKey) return;
+    try { localStorage.setItem('sr_fcm_reg_key', String(regKey).trim()); } catch (e) { /* ignore */ }
+  }
+
   function pushFcmAuthToParent(regKey) {
     if (!regKey || typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    storeRegKey(regKey);
     try {
       window.parent.postMessage({
         type: 'SHOWRUNNER_FCM_AUTH',
@@ -32,16 +38,38 @@
     } catch (e) { /* ignore */ }
   }
 
+  function pushBridgeToParent() {
+    if (!window.isShowrunnerHostingShell || pushLinked) return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    google.script.run
+      .withFailureHandler(function() { /* reg-key path may still work */ })
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success || !res.nonce) return;
+        try {
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_FCM_BRIDGE',
+            nonce: res.nonce,
+            label: 'pwa-mobile'
+          }, '*');
+        } catch (e) { /* ignore */ }
+      })
+      .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
+  }
+
   function refreshFcmRegKeyAndNotifyParent() {
     if (!window.isShowrunnerHostingShell || pushLinked) return;
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
     var metaKey = getFcmRegKey();
     if (metaKey) pushFcmAuthToParent(metaKey);
     google.script.run
-      .withFailureHandler(function() { /* meta already sent */ })
+      .withFailureHandler(function() {
+        pushBridgeToParent();
+      })
       .withSuccessHandler(function(res) {
         if (res && res.success && res.regKey) {
           pushFcmAuthToParent(res.regKey);
+        } else {
+          pushBridgeToParent();
         }
       })
       .issueFcmRegistrationKey(ACTIVE_USER_NAME);
@@ -92,13 +120,20 @@
       bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999998;background:#0f172a;border-bottom:1px solid #10b981;color:#a1a1aa;padding:8px 12px;font-size:11px;line-height:1.4;text-align:center;';
       document.body.appendChild(bar);
     }
-    bar.textContent = message || 'Allow notifications in the bar above to link shift alerts.';
+    bar.textContent = message || 'Finish logging in below if needed — alerts link automatically.';
+  }
+
+  function respondToParentPushRequest() {
+    notifyParentReady();
+    refreshFcmRegKeyAndNotifyParent();
+    pushBridgeToParent();
   }
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
-    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_AUTH') {
-      refreshFcmRegKeyAndNotifyParent();
+    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_AUTH' ||
+        ev.data.type === 'SHOWRUNNER_REQUEST_FCM_BRIDGE') {
+      respondToParentPushRequest();
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_REGISTERED') {
       onHostRegistered(ev.data);
@@ -110,8 +145,7 @@
 
   function bootBridge() {
     if (!window.isShowrunnerHostingShell) return;
-    notifyParentReady();
-    refreshFcmRegKeyAndNotifyParent();
+    respondToParentPushRequest();
   }
 
   if (document.readyState === 'loading') {
@@ -122,10 +156,21 @@
 
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && !pushLinked) {
-      notifyParentReady();
-      refreshFcmRegKeyAndNotifyParent();
+      respondToParentPushRequest();
     }
   });
+
+  var linkRetryTimer = setInterval(function() {
+    if (pushLinked || !window.isShowrunnerHostingShell) {
+      clearInterval(linkRetryTimer);
+      return;
+    }
+    if (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
+      respondToParentPushRequest();
+    }
+  }, 6000);
+
+  setTimeout(function() { clearInterval(linkRetryTimer); }, 600000);
 
   window.retryShowrunnerFcmBridge = function() {
     pushLinked = false;
