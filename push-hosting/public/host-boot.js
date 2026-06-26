@@ -19,9 +19,15 @@
   let regKeySaveInFlight = false;
   let regKeyRetryTimer = null;
   let fcmAuthRequestTimer = null;
-  const SW_BUILD = '295';
+  const SW_BUILD = '296';
   let serverSaveConfirmed = false;
   let tokenBroadcastTimer = null;
+  const installPanel = document.getElementById('install-pwa-panel');
+  const installBtn = document.getElementById('install-pwa-btn-install');
+  const installDoneBtn = document.getElementById('install-pwa-btn-done');
+  const installSkipBtn = document.getElementById('install-pwa-btn-skip');
+  let deferredInstallPrompt = null;
+  let shellInitStarted = false;
 
   function isMobileDevice() {
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
@@ -29,6 +35,7 @@
   }
 
   function deviceLabel() {
+    if (isStandalonePwa() && isMobileDevice()) return 'pwa-mobile';
     return isMobileDevice() ? 'web-mobile' : 'web-desktop';
   }
 
@@ -50,16 +57,49 @@
     return isIosDevice() && !isStandalonePwa();
   }
 
+  function shouldShowInstallPanel() {
+    if (!isMobileDevice()) return false;
+    if (isStandalonePwa()) return false;
+    try {
+      if (localStorage.getItem('sr_pwa_install_skip') === '1') return false;
+    } catch (e) { /* ignore */ }
+    return true;
+  }
+
+  function showInstallPanel() {
+    if (!installPanel) return false;
+    if (!shouldShowInstallPanel() && !isIosInBrowserTab()) return false;
+    installPanel.classList.add('visible');
+    document.body.classList.add('install-panel-open');
+    var iosSteps = document.getElementById('install-steps-ios');
+    var androidSteps = document.getElementById('install-steps-android');
+    if (iosSteps) iosSteps.style.display = isIosDevice() ? 'block' : 'none';
+    if (androidSteps) androidSteps.style.display = isIosDevice() ? 'none' : 'block';
+    if (installBtn) installBtn.style.display = deferredInstallPrompt ? 'block' : 'none';
+    return true;
+  }
+
+  function hideInstallPanel() {
+    if (!installPanel) return;
+    installPanel.classList.remove('visible');
+    document.body.classList.remove('install-panel-open');
+  }
+
+  function startShellOnce() {
+    if (shellInitStarted) return;
+    shellInitStarted = true;
+    hideInstallPanel();
+    initShell();
+  }
+
   function showIosInstallBanner() {
-    var iosBanner = document.getElementById('push-ios-banner');
-    if (iosBanner) iosBanner.classList.remove('hidden');
+    showInstallPanel();
     document.body.classList.remove('push-dock-open');
     if (bannerEl) bannerEl.classList.add('hidden');
   }
 
   function hideIosInstallBanner() {
-    var iosBanner = document.getElementById('push-ios-banner');
-    if (iosBanner) iosBanner.classList.add('hidden');
+    hideInstallPanel();
   }
 
   function notifyIframePushState(needsAttention, message) {
@@ -113,8 +153,8 @@
   function showPushPrompt(mode) {
     var m = mode || 'allow';
     if (isIosInBrowserTab()) {
-      showIosInstallBanner();
-      notifyIframePushState(true, 'Add Showrunner to Home Screen for iPhone alerts.');
+      showInstallPanel();
+      notifyIframePushState(true, 'Add Showrunner to your home screen first (Share → Add to Home Screen).');
       return;
     }
     if (isMobileDevice()) {
@@ -753,5 +793,46 @@
     linkBtn.addEventListener('touchend', onLinkTap, { passive: false });
   }
 
-  initShell();
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    if (installBtn) installBtn.style.display = 'block';
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', function() {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      deferredInstallPrompt.userChoice.then(function(choice) {
+        deferredInstallPrompt = null;
+        installBtn.style.display = 'none';
+        if (choice.outcome === 'accepted') {
+          try { localStorage.removeItem('sr_pwa_install_skip'); } catch (err) { /* ignore */ }
+        }
+      });
+    });
+  }
+
+  if (installDoneBtn) {
+    installDoneBtn.addEventListener('click', function() {
+      var sub = installPanel && installPanel.querySelector('.install-sub');
+      if (sub) {
+        sub.textContent = 'Close this browser tab, then open Showrunner from your home screen icon. Alerts and full-screen mode work from the icon only.';
+      }
+      try { localStorage.removeItem('sr_pwa_install_skip'); } catch (err) { /* ignore */ }
+    });
+  }
+
+  if (installSkipBtn) {
+    installSkipBtn.addEventListener('click', function() {
+      try { localStorage.setItem('sr_pwa_install_skip', '1'); } catch (err) { /* ignore */ }
+      startShellOnce();
+    });
+  }
+
+  if (shouldShowInstallPanel()) {
+    showInstallPanel();
+  } else {
+    startShellOnce();
+  }
 })();

@@ -8,17 +8,23 @@
 
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
-  <meta name="theme-color" content="#10b981">
+  <meta name="theme-color" content="#0a0a0c">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
 
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
   <meta name="apple-mobile-web-app-title" content="Showrunner">
+
+  <meta name="mobile-web-app-capable" content="yes">
 
   <link rel="manifest" href="/manifest.json">
 
-  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 
-  <title>SM Showrunner</title>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+  <title>Showrunner</title>
 
   <style>
 
@@ -31,6 +37,76 @@
       top: 0; height: 100%; z-index: 1;
 
     }
+
+    #install-pwa-panel {
+
+      display: none; position: fixed; inset: 0; z-index: 2147483646;
+
+      background: #0a0a0c; color: #f4f4f5; overflow-y: auto;
+
+      padding: calc(20px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+
+      box-sizing: border-box; text-align: center;
+
+    }
+
+    #install-pwa-panel.visible { display: flex; flex-direction: column; align-items: center; }
+
+    #install-pwa-panel .install-icon {
+
+      width: 96px; height: 96px; border-radius: 22px; margin: 12px auto 16px;
+
+      box-shadow: 0 12px 40px rgba(235, 28, 36, 0.25);
+
+    }
+
+    #install-pwa-panel h1 { margin: 0 0 6px; font-size: 22px; font-weight: 900; color: #fff; }
+
+    #install-pwa-panel .install-sub { margin: 0 0 20px; color: #a1a1aa; font-size: 13px; line-height: 1.45; max-width: 340px; }
+
+    #install-pwa-panel .install-steps {
+
+      text-align: left; background: #18181b; border: 1px solid #333; border-radius: 10px;
+
+      padding: 14px 16px; max-width: 360px; width: 100%; box-sizing: border-box;
+
+      font-size: 12px; line-height: 1.55; color: #d4d4d8; margin-bottom: 16px;
+
+    }
+
+    #install-pwa-panel .install-steps strong { color: #10b981; }
+
+    #install-pwa-panel .install-steps.ios strong { color: #f59e0b; }
+
+    #install-pwa-btn-install {
+
+      display: none; width: 100%; max-width: 360px; margin: 0 auto 10px;
+
+      background: #10b981; border: none; color: #fff; font-weight: 800;
+
+      font-size: 14px; padding: 14px 16px; border-radius: 8px; cursor: pointer;
+
+      touch-action: manipulation;
+
+    }
+
+    #install-pwa-btn-done, #install-pwa-btn-skip {
+
+      width: 100%; max-width: 360px; margin: 6px auto 0;
+
+      background: transparent; border: 1px solid #444; color: #a1a1aa;
+
+      font-weight: 700; font-size: 12px; padding: 12px 16px; border-radius: 8px;
+
+      cursor: pointer; touch-action: manipulation;
+
+    }
+
+    #install-pwa-btn-done { border-color: #10b981; color: #10b981; }
+
+  </style>
+
+  <style>
 
     #push-mobile-dock {
 
@@ -48,6 +124,8 @@
 
     body.push-dock-open #push-mobile-dock { display: block; }
 
+    body.install-panel-open #app-frame { visibility: hidden; }
+
     #push-mobile-dock p { margin: 0 0 8px 0; color: #a1a1aa; font-size: 11px; line-height: 1.4; }
 
     #push-mobile-dock .dock-title { color: #10b981; font-weight: 900; font-size: 11px; margin-bottom: 6px; }
@@ -62,11 +140,7 @@
 
     }
 
-    #push-enable-btn {
-
-      background: #10b981; border: none; color: #fff; letter-spacing: 0.03em;
-
-    }
+    #push-enable-btn { background: #10b981; border: none; color: #fff; letter-spacing: 0.03em; }
 
     #push-enable-btn:active, #push-link-btn:active { opacity: 0.75; transform: scale(0.98); }
 
@@ -100,25 +174,11 @@
 
     #push-enable-banner.hidden { display: none; }
 
-    #push-ios-banner {
-
-      position: fixed; left: 50%; top: 12px; transform: translateX(-50%); z-index: 2147483647;
-
-      background: rgba(24,24,27,0.98); border: 1px solid #f59e0b; color: #f4f4f5;
-
-      font-size: 12px; line-height: 1.45; padding: 14px 16px; border-radius: 8px;
-
-      max-width: 340px; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-
-    }
-
-    #push-ios-banner.hidden { display: none; }
-
     @media (max-width: 900px) { #push-enable-banner { display: none !important; } }
 
     @media (min-width: 901px) {
 
-      #push-mobile-dock { display: none !important; }
+      #push-mobile-dock, #install-pwa-panel { display: none !important; }
 
       body.push-dock-open #app-frame { top: 0 !important; height: 100% !important; }
 
@@ -130,11 +190,43 @@
 
 <body>
 
-  <div id="push-ios-banner" class="hidden">
+  <div id="install-pwa-panel" aria-label="Install Showrunner">
 
-    <div style="color:#f59e0b; font-weight:900; font-size:11px; margin-bottom:8px;">IPHONE SETUP</div>
+    <img class="install-icon" src="/apple-touch-icon.png" width="96" height="96" alt="Showrunner icon">
 
-    <p style="margin:0; color:#a1a1aa; font-size:11px;">To get schedule alerts on iPhone: in Safari tap <strong>Share</strong> → <strong>Add to Home Screen</strong>, then open the <strong>Showrunner</strong> icon and allow notifications.</p>
+    <h1>Install Showrunner</h1>
+
+    <p class="install-sub">Add to your home screen for schedule access and shift alerts — no browser bar, works like an app.</p>
+
+    <div id="install-steps-ios" class="install-steps ios" style="display:none;">
+
+      <strong>iPhone</strong><br>
+
+      1. Tap <strong>Share</strong> (square with arrow) at the bottom of Safari<br>
+
+      2. Tap <strong>Add to Home Screen</strong><br>
+
+      3. Tap <strong>Add</strong> — then open <strong>Showrunner</strong> from your home screen
+
+    </div>
+
+    <div id="install-steps-android" class="install-steps" style="display:none;">
+
+      <strong>Android</strong><br>
+
+      1. Tap the menu <strong>⋮</strong> in Chrome (or use Install below)<br>
+
+      2. Tap <strong>Add to Home screen</strong> or <strong>Install app</strong><br>
+
+      3. Open <strong>Showrunner</strong> from your home screen
+
+    </div>
+
+    <button type="button" id="install-pwa-btn-install">Install Showrunner</button>
+
+    <button type="button" id="install-pwa-btn-done">I added it — open from home screen</button>
+
+    <button type="button" id="install-pwa-btn-skip">Continue in browser for now</button>
 
   </div>
 
@@ -168,9 +260,8 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 
-  <script src="/host-boot.js?v=295"></script>
+  <script src="/host-boot.js?v=296"></script>
 
 </body>
 
 </html>
-

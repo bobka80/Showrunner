@@ -14,6 +14,19 @@
 </head>
 <body>
 
+<div id="sr-hosting-only-banner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:999999; background:#0f172a; border-bottom:2px solid #eb1c24; color:#f4f4f5; padding:12px 14px; font-size:12px; line-height:1.45; text-align:center; box-shadow:0 4px 16px rgba(0,0,0,0.5);">
+  <strong style="color:#eb1c24;">Use the Showrunner home screen app</strong> for schedule and alerts.
+  <a href="https://sm-showrunner-97405.web.app" style="color:#10b981; font-weight:800; text-decoration:none;"> Open web.app → Add to Home Screen</a>
+</div>
+<script>
+(function() {
+  if (window.self !== window.top) return;
+  if (!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) return;
+  var el = document.getElementById('sr-hosting-only-banner');
+  if (el) el.style.display = 'block';
+})();
+</script>
+
 <!-- @INDEX: SHELL -> Mobile Dashboard -->
 <!-- MOBILE DASHBOARD SHELL (Takes over on phones) -->
 <div id="mobile-dashboard" style="display:none;">
