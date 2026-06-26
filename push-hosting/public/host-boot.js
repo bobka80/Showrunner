@@ -28,8 +28,8 @@
     if (bannerEl) bannerEl.classList.remove('hidden');
   }
 
-  function getRegisterBaseUrl(data) {
-    return (firebaseConfig && firebaseConfig.gasExecUrl) || PROD_GAS_EXEC || (data && data.registerUrl) || '';
+  function getRegisterBaseUrl() {
+    return PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
   }
 
   function notifyIframeRegistered(success, message) {
@@ -54,39 +54,52 @@
     } catch (e) { /* ignore */ }
   }
 
-  function registerTokenViaBridgeHttp(data) {
-    const baseUrl = getRegisterBaseUrl(data);
+  function registerTokenViaBridgeJsonp(data) {
+    const baseUrl = getRegisterBaseUrl();
     if (!data || !data.nonce || !baseUrl) return;
     if (!fcmToken) {
       pendingBridge = data;
-      setStatus('token ready — waiting for login save…', false);
+      setStatus('token ready — log in to save…', false);
       return;
     }
     pendingBridge = null;
+    setStatus('saving token…', false);
 
-    fetch(baseUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'action=fcmreg'
-        + '&nonce=' + encodeURIComponent(data.nonce)
-        + '&token=' + encodeURIComponent(fcmToken)
-        + '&label=' + encodeURIComponent(data.label || 'web-hosting')
-    }).then(function() {
-      setStatus('token saved');
-      notifyIframeRegistered(true);
-    }).catch(function() {
-      setStatus('save failed — click RETRY', true);
-      notifyIframeRegistered(false, 'Network error saving token');
-    });
+    const cb = '__srFcmReg_' + Date.now();
+    const url = baseUrl
+      + '?action=fcmreg'
+      + '&nonce=' + encodeURIComponent(data.nonce)
+      + '&token=' + encodeURIComponent(fcmToken)
+      + '&label=' + encodeURIComponent(data.label || 'web-hosting')
+      + '&callback=' + encodeURIComponent(cb);
+
+    window[cb] = function(res) {
+      delete window[cb];
+      if (res && res.success) {
+        setStatus('token saved');
+        notifyIframeRegistered(true);
+      } else {
+        const msg = (res && res.message) ? res.message : 'Save rejected by server';
+        setStatus('save failed', true);
+        notifyIframeRegistered(false, msg);
+      }
+    };
+
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = function() {
+      delete window[cb];
+      setStatus('save failed — network', true);
+      notifyIframeRegistered(false, 'Could not reach Apps Script to save token.');
+    };
+    document.head.appendChild(script);
   }
 
   function flushPendingBridge() {
     if (pendingBridge && fcmToken) {
-      registerTokenViaBridgeHttp(pendingBridge);
-    } else if (fcmToken) {
-      postTokenToApp();
+      registerTokenViaBridgeJsonp(pendingBridge);
     }
+    postTokenToApp();
   }
 
   function loadConfigJsonp() {
@@ -105,20 +118,16 @@
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
-    if (ev.data.type === 'SHOWRUNNER_APP_READY') {
-      postTokenToApp();
-    }
-    if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
+    if (ev.data.type === 'SHOWRUNNER_APP_READY' || ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
       postTokenToApp();
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
-      registerTokenViaBridgeHttp(ev.data);
+      registerTokenViaBridgeJsonp(ev.data);
     }
   });
 
   if (frame) {
     frame.addEventListener('load', function() {
-      postTokenToApp();
       flushPendingBridge();
     });
   }
@@ -204,7 +213,7 @@
         return;
       }
 
-      if (frame) frame.src = firebaseConfig.gasExecUrl || PROD_GAS_EXEC;
+      if (frame) frame.src = PROD_GAS_EXEC;
 
       firebase.initializeApp({
         apiKey: firebaseConfig.apiKey,
