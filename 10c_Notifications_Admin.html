@@ -108,7 +108,7 @@ function refreshPushAdminStatus() {
           }
           var regHint = window.__srFcmLastError
             ? ('Register error: ' + window.__srFcmLastError)
-            : 'VAPID OK · No device token yet. Click Allow notifications on this tab, then RETRY DEVICE REGISTER.';
+            : 'VAPID OK · Token ready in browser but not saved yet. Click RETRY DEVICE REGISTER (bottom-right chip should say “token saved”).';
           status.innerHTML = '<span style="color:#f59e0b;">' + regHint + '</span>';
         })
         .getFcmRegistrationStatus(ACTIVE_USER_NAME);
@@ -118,20 +118,17 @@ function refreshPushAdminStatus() {
 
 function retryShowrunnerFcmRegistration() {
   const status = document.getElementById('push-admin-status');
-  if (status) status.textContent = 'Requesting push token from Hosting shell…';
-  if (typeof window.pullShowrunnerFcmToken !== 'function') {
+  if (status) status.textContent = 'Saving device token via Hosting shell…';
+  if (window.self === window.top) {
     if (status) status.innerHTML = '<span style="color:#ef4444;">Not in Hosting shell — open ' + SHOWRUNNER_HOSTING_URL + '</span>';
     return;
   }
-  window.pullShowrunnerFcmToken().then(function(token) {
-    if (!token) {
-      if (status) status.innerHTML = '<span style="color:#f59e0b;">No token from browser. Fix VAPID key if chip says invalid key, allow notifications, refresh Hosting page.</span>';
-      setTimeout(refreshPushAdminStatus, 500);
-      return;
-    }
-    if (status) status.textContent = 'Saving device token…';
-    setTimeout(refreshPushAdminStatus, 2000);
-  });
+  if (typeof window.startFcmBridgeRegistration === 'function') {
+    window.startFcmBridgeRegistration();
+    setTimeout(refreshPushAdminStatus, 2500);
+    return;
+  }
+  if (status) status.innerHTML = '<span style="color:#f59e0b;">Bridge not ready — refresh Hosting page and log in again.</span>';
 }
 
 function runShowrunnerTestPush() {

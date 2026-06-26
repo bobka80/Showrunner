@@ -38,6 +38,31 @@ function getFirebasePushSetupStatus(crewName) {
     hostingUrl: cfg.hostingUrl
   };
 }
+function prepareFcmRegistrationBridge(crewName) {
+  if (!crewName) return { success: false, message: 'Not logged in.' };
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) return { success: false, message: 'Unknown user (no uid for ' + crewName + ').' };
+  const nonce = Utilities.getUuid().replace(/-/g, '');
+  CacheService.getScriptCache().put('fcm_bridge_' + nonce, String(crewName).trim(), 180);
+  return {
+    success: true,
+    nonce: nonce,
+    registerUrl: ScriptApp.getService().getUrl(),
+    crewName: String(crewName).trim()
+  };
+}
+
+function completeFcmRegistrationViaBridge_(nonce, token, label) {
+  const cleanNonce = String(nonce || '').trim();
+  if (!cleanNonce) return { success: false, message: 'Missing registration nonce.' };
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'fcm_bridge_' + cleanNonce;
+  const crewName = cache.get(cacheKey);
+  if (!crewName) return { success: false, message: 'Registration link expired — click RETRY DEVICE REGISTER.' };
+  cache.remove(cacheKey);
+  return registerFcmToken(crewName, token, label || 'web-hosting', crewName);
+}
+
 function registerFcmToken(crewName, token, deviceLabel, actor) {
   try {
     if (!crewName || !token) return { success: false, message: 'Missing crew name or FCM token.' };

@@ -54,11 +54,57 @@
     }
   }
 
+  function registerTokenViaBridge(data) {
+    if (!fcmToken || !data || !data.nonce || !data.registerUrl) {
+      setStatus('waiting for login to save token…', false);
+      return;
+    }
+    const cb = '__srFcmReg_' + Date.now();
+    const url = data.registerUrl
+      + '?action=fcmreg'
+      + '&nonce=' + encodeURIComponent(data.nonce)
+      + '&token=' + encodeURIComponent(fcmToken)
+      + '&label=' + encodeURIComponent(data.label || 'web-hosting')
+      + '&callback=' + encodeURIComponent(cb);
+    window[cb] = function(res) {
+      delete window[cb];
+      if (res && res.success) {
+        setStatus('token saved');
+        if (frame && frame.contentWindow) {
+          try {
+            frame.contentWindow.postMessage({ type: 'SHOWRUNNER_FCM_REGISTERED', success: true }, '*');
+          } catch (e) { /* ignore */ }
+        }
+      } else {
+        setStatus('save failed — click RETRY in DATABASE', true);
+        if (frame && frame.contentWindow) {
+          try {
+            frame.contentWindow.postMessage({
+              type: 'SHOWRUNNER_FCM_REGISTERED',
+              success: false,
+              message: (res && res.message) ? res.message : 'Save failed'
+            }, '*');
+          } catch (e) { /* ignore */ }
+        }
+      }
+    };
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = function() {
+      setStatus('save failed — network error', true);
+    };
+    document.head.appendChild(script);
+  }
+
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
-    if (ev.data.type === 'SHOWRUNNER_APP_READY' || ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
+    if (ev.data.type === 'SHOWRUNNER_APP_READY') {
       appReady = true;
       postTokenToApp();
+    }
+    if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
+      appReady = true;
+      registerTokenViaBridge(ev.data);
     }
   });
 

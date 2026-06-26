@@ -1,17 +1,14 @@
 <script>
 /**
  * 10a_Notifications_Boot.html
- * Receives FCM token from Firebase Hosting parent frame; registers with GAS backend.
+ * Hosting shell bridge — parent page saves FCM token via secure nonce URL.
  */
 
 (function() {
   if (window.__srFcmBootInstalled) return;
   window.__srFcmBootInstalled = true;
 
-  var pendingToken = null;
-  var pendingLabel = 'web';
-  var registeredToken = null;
-  var registerAttempts = 0;
+  var bridgeRegistered = false;
 
   window.isShowrunnerHostingShell = (window.self !== window.top);
 
@@ -19,109 +16,85 @@
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type: 'SHOWRUNNER_APP_READY' }, '*');
-        window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' }, '*');
       }
     } catch (e) { /* ignore */ }
   }
 
-  function registerTokenWithBackend(token, label) {
-    if (!token) return;
+  window.startFcmBridgeRegistration = function() {
     if (!window.isShowrunnerHostingShell) {
       window.__srFcmLastError = 'Open the Hosting URL (web.app), not the direct Apps Script link.';
       return;
     }
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
-      pendingToken = token;
-      pendingLabel = label || 'web';
       return;
     }
-    if (registeredToken === token) return;
+    if (bridgeRegistered) {
+      notifyParentReady();
+      return;
+    }
 
-    registerAttempts++;
     google.script.run
       .withFailureHandler(function(err) {
         window.__srFcmLastError = (err && err.message) ? err.message : String(err);
-        console.warn('FCM token register failed:', window.__srFcmLastError);
         if (typeof window.onShowrunnerFcmRegistered === 'function') {
           window.onShowrunnerFcmRegistered({ success: false, message: window.__srFcmLastError });
         }
       })
       .withSuccessHandler(function(res) {
-        if (res && res.success === false) {
-          window.__srFcmLastError = res.message || 'Registration failed.';
+        if (!res || !res.success) {
+          window.__srFcmLastError = (res && res.message) ? res.message : 'Bridge setup failed.';
           if (typeof window.onShowrunnerFcmRegistered === 'function') {
-            window.onShowrunnerFcmRegistered(res);
+            window.onShowrunnerFcmRegistered({ success: false, message: window.__srFcmLastError });
           }
           return;
         }
-        registeredToken = token;
-        pendingToken = null;
-        window.__srFcmLastError = '';
-        console.log('FCM token registered for', ACTIVE_USER_NAME);
-        if (typeof window.onShowrunnerFcmRegistered === 'function') {
-          window.onShowrunnerFcmRegistered(res || { success: true });
+        try {
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_FCM_BRIDGE',
+            nonce: res.nonce,
+            registerUrl: res.registerUrl,
+            label: 'web-hosting'
+          }, '*');
+        } catch (e) {
+          window.__srFcmLastError = 'Could not reach Hosting shell.';
         }
       })
-      .registerFcmToken(ACTIVE_USER_NAME, token, label || 'web', ACTIVE_USER_NAME);
-  }
-
-  window.pullShowrunnerFcmToken = function() {
-    return new Promise(function(resolve) {
-      if (!window.isShowrunnerHostingShell) {
-        resolve(null);
-        return;
-      }
-      var done = false;
-      function onMsg(ev) {
-        if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN' || !ev.data.token) return;
-        window.removeEventListener('message', onMsg);
-        if (!done) {
-          done = true;
-          resolve(ev.data.token);
-        }
-      }
-      window.addEventListener('message', onMsg);
-      notifyParentReady();
-      setTimeout(function() {
-        window.removeEventListener('message', onMsg);
-        if (!done) {
-          done = true;
-          resolve(null);
-        }
-      }, 8000);
-    });
+      .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
   };
 
   window.addEventListener('message', function(ev) {
-    if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN') return;
-    registerTokenWithBackend(ev.data.token, ev.data.label || 'web-hosting');
+    if (!ev.data) return;
+    if (ev.data.type === 'SHOWRUNNER_FCM_REGISTERED') {
+      if (ev.data.success) {
+        bridgeRegistered = true;
+        window.__srFcmLastError = '';
+      } else {
+        window.__srFcmLastError = ev.data.message || 'Registration failed.';
+      }
+      if (typeof window.onShowrunnerFcmRegistered === 'function') {
+        window.onShowrunnerFcmRegistered(ev.data);
+      }
+    }
   });
 
+  function bootBridge() {
+    notifyParentReady();
+    window.startFcmBridgeRegistration();
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      notifyParentReady();
-      window.pullShowrunnerFcmToken().then(function(token) {
-        if (token) registerTokenWithBackend(token, 'web-hosting');
-      });
-    });
+    document.addEventListener('DOMContentLoaded', bootBridge);
   } else {
-    setTimeout(function() {
-      notifyParentReady();
-      window.pullShowrunnerFcmToken().then(function(token) {
-        if (token) registerTokenWithBackend(token, 'web-hosting');
-      });
-    }, 300);
+    setTimeout(bootBridge, 300);
   }
 
   var retryTimer = setInterval(function() {
-    if (pendingToken && typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
-      registerTokenWithBackend(pendingToken, pendingLabel);
+    if (!bridgeRegistered && window.isShowrunnerHostingShell) {
+      window.startFcmBridgeRegistration();
+    } else {
+      clearInterval(retryTimer);
     }
-    if (window.isShowrunnerHostingShell) {
-      notifyParentReady();
-    }
-    if (registeredToken) clearInterval(retryTimer);
-  }, 3000);
+  }, 4000);
 
   setTimeout(function() { clearInterval(retryTimer); }, 180000);
 })();
