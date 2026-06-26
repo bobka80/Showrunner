@@ -267,7 +267,38 @@
     if (ev.data.type === 'SHOWRUNNER_PARENT_TOKEN_READY') {
       if (!thisDeviceRegistered) window.startFcmBridgeRegistration();
     }
+    if (ev.data.type === 'SHOWRUNNER_PUSH_STATE') {
+      updateInAppPushHint(ev.data.needsAttention, ev.data.message);
+    }
   });
+
+  function updateInAppPushHint(needsAttention, message) {
+    if (!window.isShowrunnerHostingShell || thisDeviceRegistered) {
+      var gone = document.getElementById('sr-push-hint');
+      if (gone) gone.remove();
+      return;
+    }
+    if (!needsAttention) {
+      var el = document.getElementById('sr-push-hint');
+      if (el) el.remove();
+      return;
+    }
+    var hint = document.getElementById('sr-push-hint');
+    if (!hint) {
+      hint = document.createElement('div');
+      hint.id = 'sr-push-hint';
+      hint.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;background:#0f172a;border-bottom:2px solid #10b981;color:#e4e4e7;padding:10px 12px;font-size:12px;line-height:1.4;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.5);';
+      document.body.appendChild(hint);
+    }
+    var msg = message || 'Enable push notifications using the green bar above this app.';
+    hint.innerHTML = msg + ' <button type="button" id="sr-push-hint-btn" style="display:block;margin:8px auto 0;background:#10b981;border:none;color:#fff;font-weight:800;padding:10px 14px;border-radius:6px;font-size:12px;">Open notification setup</button>';
+    var btn = document.getElementById('sr-push-hint-btn');
+    if (btn) {
+      btn.onclick = function() {
+        try { window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_PUSH_PERMISSION' }, '*'); } catch (e) { /* ignore */ }
+      };
+    }
+  }
 
   function bootBridge() {
     notifyParentReady();

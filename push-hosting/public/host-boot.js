@@ -5,6 +5,8 @@
   const PROD_GAS_EXEC = 'https://script.google.com/macros/s/AKfycbxynTt5JaKQiv1Iu_ahSQBcrBDKpuhz98lac4G-bJO5PMtmvgJr_uKZ1Y58lxOOupSwlw/exec';
   const bannerEl = document.getElementById('push-enable-banner');
   const enableBtn = document.getElementById('push-enable-btn');
+  const enableBtnDesk = document.getElementById('push-enable-btn-desk');
+  const dockMsgEl = document.getElementById('push-dock-msg');
   const frame = document.getElementById('app-frame');
   let firebaseConfig = null;
   let fcmToken = null;
@@ -14,7 +16,7 @@
   let pendingFcmAuth = null;
   let regKeySaveInFlight = false;
   let regKeyRetryTimer = null;
-  const SW_BUILD = '288';
+  const SW_BUILD = '289';
   let tokenBroadcastTimer = null;
 
   function isMobileDevice() {
@@ -47,6 +49,7 @@
   function showIosInstallBanner() {
     var iosBanner = document.getElementById('push-ios-banner');
     if (iosBanner) iosBanner.classList.remove('hidden');
+    document.body.classList.remove('push-dock-open');
     if (bannerEl) bannerEl.classList.add('hidden');
   }
 
@@ -55,12 +58,69 @@
     if (iosBanner) iosBanner.classList.add('hidden');
   }
 
-  function hideBanner() {
+  function notifyIframePushState(needsAttention, message) {
+    if (!frame || !frame.contentWindow) return;
+    try {
+      frame.contentWindow.postMessage({
+        type: 'SHOWRUNNER_PUSH_STATE',
+        needsAttention: !!needsAttention,
+        message: message || ''
+      }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  function setDockMessage(msg) {
+    if (dockMsgEl) dockMsgEl.textContent = msg;
+  }
+
+  function showPushPrompt(mode) {
+    var m = mode || 'allow';
+    if (isIosInBrowserTab()) {
+      showIosInstallBanner();
+      notifyIframePushState(true, 'Add Showrunner to Home Screen for iPhone alerts.');
+      return;
+    }
+    if (isMobileDevice()) {
+      document.body.classList.add('push-dock-open');
+      if (bannerEl) bannerEl.classList.add('hidden');
+      hideIosInstallBanner();
+      if (m === 'denied') {
+        setDockMessage('Chrome blocked this site. Tap ⋮ → Settings → Site settings → Notifications → allow sm-showrunner-97405.web.app');
+        if (enableBtn) enableBtn.textContent = 'I fixed it — retry';
+      } else if (m === 'retry') {
+        setDockMessage('Permission OK but phone registration failed. Tap retry (HyperOS: also allow Chrome autostart).');
+        if (enableBtn) enableBtn.textContent = 'Retry push setup';
+      } else {
+        setDockMessage('Tap below — Chrome must show Allow. Required for phone alerts.');
+        if (enableBtn) enableBtn.textContent = 'Allow notifications';
+      }
+      notifyIframePushState(true, 'Tap the green Allow button in the bar above.');
+      return;
+    }
+    if (bannerEl) bannerEl.classList.remove('hidden');
+    notifyIframePushState(true, '');
+  }
+
+  function hidePushPrompt() {
+    document.body.classList.remove('push-dock-open');
     if (bannerEl) bannerEl.classList.add('hidden');
+    hideIosInstallBanner();
+    notifyIframePushState(false, '');
   }
 
   function showBanner() {
-    if (bannerEl) bannerEl.classList.remove('hidden');
+    if (Notification.permission === 'denied') {
+      showPushPrompt('denied');
+    } else if (Notification.permission === 'granted' && !fcmToken) {
+      showPushPrompt('retry');
+    } else {
+      showPushPrompt('allow');
+    }
+  }
+
+  function hideBanner() {
+    if (isMobileDevice() && !fcmToken) return;
+    hidePushPrompt();
   }
 
   function getRegisterBaseUrl() {
@@ -138,7 +198,7 @@
       regKeySaveInFlight = false;
       if (res && res.success) {
         logPush('token saved via login key');
-        hideBanner();
+        hidePushPrompt();
         hideIosInstallBanner();
         notifyIframeRegistered(true);
       } else {
@@ -201,7 +261,7 @@
       delete window[cb];
       if (res && res.success) {
         logPush('token saved');
-        hideBanner();
+        hidePushPrompt();
         hideIosInstallBanner();
         notifyIframeRegistered(true);
       } else {
@@ -248,9 +308,12 @@
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
       stopTokenBroadcast();
-      hideBanner();
-      hideIosInstallBanner();
+      hidePushPrompt();
       logPush('registration confirmed by app');
+    }
+    if (ev.data.type === 'SHOWRUNNER_REQUEST_PUSH_PERMISSION') {
+      pushStarted = false;
+      showPushPrompt(Notification.permission === 'denied' ? 'denied' : 'allow');
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
       registerTokenViaBridgeJsonp(ev.data);
@@ -309,12 +372,12 @@
 
     if (!fcmToken) {
       logPush('no token — check VAPID');
-      showBanner();
+      showPushPrompt('retry');
       return false;
     }
 
     logPush('token ready');
-    hideBanner();
+    hidePushPrompt();
     flushPendingBridge();
     trySaveTokenViaRegKey();
     startTokenBroadcast();
@@ -333,27 +396,36 @@
   async function requestNotificationsAndRegister() {
     if (pushStarted) return;
     pushStarted = true;
-    hideBanner();
 
     try {
       if (!('Notification' in window)) {
         logPush('not supported in this browser');
+        pushStarted = false;
         return;
       }
 
       var permission = Notification.permission;
+      if (permission === 'denied') {
+        pushStarted = false;
+        showPushPrompt('denied');
+        return;
+      }
+
       if (permission === 'default') {
         permission = await Notification.requestPermission();
       }
 
       if (permission !== 'granted') {
         pushStarted = false;
-        showBanner();
-        if (enableBtn) enableBtn.textContent = 'Try again';
+        showPushPrompt(permission === 'denied' ? 'denied' : 'allow');
         return;
       }
 
       await obtainFcmToken(false);
+      if (!fcmToken) {
+        pushStarted = false;
+        showPushPrompt('retry');
+      }
     } catch (err) {
       pushStarted = false;
       console.error(err);
@@ -361,8 +433,7 @@
       if (isIosInBrowserTab()) {
         showIosInstallBanner();
       } else {
-        showBanner();
-        if (enableBtn) enableBtn.textContent = 'Try again';
+        showPushPrompt('retry');
       }
     }
   }
@@ -406,27 +477,30 @@
 
       if (Notification.permission === 'granted') {
         pushStarted = true;
-        hideBanner();
         if (isIosInBrowserTab()) {
           showIosInstallBanner();
           return;
         }
-        await obtainFcmToken(false);
+        var gotToken = await obtainFcmToken(false);
+        if (!gotToken && isMobileDevice()) {
+          pushStarted = false;
+          showPushPrompt('retry');
+        }
         return;
       }
 
       if (Notification.permission === 'denied') {
-        showBanner();
-        if (enableBtn) enableBtn.textContent = 'Try again';
+        showPushPrompt('denied');
         return;
       }
 
-      if (isIosInBrowserTab()) {
-        showIosInstallBanner();
-      } else if (isMobileDevice()) {
-        showBanner();
-      } else {
-        showBanner();
+      showPushPrompt('allow');
+      if (isMobileDevice()) {
+        setTimeout(function() {
+          if (!fcmToken && Notification.permission === 'default') {
+            notifyIframePushState(true, 'Tap Allow notifications in the green bar above.');
+          }
+        }, 2000);
       }
     } catch (err) {
       console.error(err);
@@ -435,12 +509,25 @@
     }
   }
 
-  if (enableBtn) {
-    enableBtn.addEventListener('click', function() {
+  function bindPushButton(btn) {
+    if (!btn) return;
+    function onTap(e) {
+      if (e) e.preventDefault();
       pushStarted = false;
+      if (Notification.permission === 'granted' && !fcmToken) {
+        resetPushRegistration().then(function() {
+          requestNotificationsAndRegister();
+        });
+        return;
+      }
       requestNotificationsAndRegister();
-    });
+    }
+    btn.addEventListener('click', onTap);
+    btn.addEventListener('touchend', onTap, { passive: false });
   }
+
+  bindPushButton(enableBtn);
+  bindPushButton(enableBtnDesk);
 
   initShell();
 })();
