@@ -173,7 +173,8 @@ function refreshPushAdminStatus() {
         .withSuccessHandler(function(res) {
           if (res && res.registered) {
             var when = res.updatedAt ? (' · ' + res.updatedAt.slice(0, 16).replace('T', ' ')) : '';
-            status.innerHTML = '<span style="color:#10b981;">VAPID OK · Device registered' + when + '</span>';
+            var count = res.deviceCount > 1 ? (res.deviceCount + ' devices') : '1 device';
+            status.innerHTML = '<span style="color:#10b981;">VAPID OK · ' + count + ' registered' + when + '</span>';
             return;
           }
           var regHint = window.__srFcmLastError

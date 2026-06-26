@@ -110,64 +110,115 @@ function registerFcmToken(crewName, token, deviceLabel, actor) {
 
     const props = PropertiesService.getScriptProperties();
     const key = 'FCM_TOKEN_' + uid;
-    const payload = {
-      token: cleanToken,
-      email: profile.email || '',
-      label: deviceLabel || 'web',
-      updatedAt: new Date().toISOString()
-    };
-    props.setProperty(key, JSON.stringify(payload));
+    const record = parseFcmTokenRecord_(props.getProperty(key));
+    const devices = record.devices || [];
+    const now = new Date().toISOString();
+    const label = deviceLabel || 'web';
+    let found = false;
+    for (let i = 0; i < devices.length; i++) {
+      if (devices[i].token === cleanToken) {
+        devices[i].label = label;
+        devices[i].updatedAt = now;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      devices.push({ token: cleanToken, label: label, updatedAt: now });
+    }
+    const maxDevices = 5;
+    while (devices.length > maxDevices) {
+      devices.sort(function(a, b) { return String(a.updatedAt).localeCompare(String(b.updatedAt)); });
+      devices.shift();
+    }
+    props.setProperty(key, JSON.stringify({
+      email: profile.email || record.email || '',
+      devices: devices
+    }));
     try {
-      writeToAuditLog(actor || crewName, 'UPDATE', 'NOTIFICATIONS', uid, 'FCM Token', 'Registered push token (' + payload.label + ').');
-    } catch (auditErr) { /* token saved — audit optional */ }
-    return { success: true, uid: uid };
+      writeToAuditLog(actor || crewName, 'UPDATE', 'NOTIFICATIONS', uid, 'FCM Token',
+        'Registered push token (' + label + '). Devices=' + devices.length);
+    } catch (auditErr) { /* token saved */ }
+    return { success: true, uid: uid, deviceCount: devices.length };
   } catch (err) {
     return { success: false, message: (err && err.message) ? err.message : String(err) };
   }
 }
 
+function parseFcmTokenRecord_(raw) {
+  if (!raw) return { devices: [] };
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.devices)) {
+      return { email: parsed.email || '', devices: parsed.devices };
+    }
+    if (parsed && parsed.token) {
+      return {
+        email: parsed.email || '',
+        devices: [{
+          token: String(parsed.token),
+          label: parsed.label || 'web',
+          updatedAt: parsed.updatedAt || ''
+        }]
+      };
+    }
+  } catch (e) { /* unreadable */ }
+  return { devices: [] };
+}
+
+function getFcmDevicesForUid_(uid) {
+  if (!uid) return [];
+  const raw = PropertiesService.getScriptProperties().getProperty('FCM_TOKEN_' + String(uid).trim());
+  return parseFcmTokenRecord_(raw).devices || [];
+}
+
 function getFcmRegistrationStatus(crewName) {
   const profile = getUserSecurityProfile(crewName);
   if (!profile || !profile.uid) return { registered: false, message: 'Unknown user profile.' };
-  const raw = PropertiesService.getScriptProperties().getProperty('FCM_TOKEN_' + String(profile.uid).trim());
-  if (!raw) return { registered: false, message: 'No token saved yet.' };
-  try {
-    const parsed = JSON.parse(raw);
-    return {
-      registered: !!(parsed && parsed.token),
-      label: parsed.label || '',
-      updatedAt: parsed.updatedAt || '',
-      message: parsed.token ? 'Device registered for push.' : 'No token saved yet.'
-    };
-  } catch (e) {
-    return { registered: false, message: 'Token record unreadable.' };
-  }
+  const devices = getFcmDevicesForUid_(profile.uid);
+  if (!devices.length) return { registered: false, message: 'No token saved yet.' };
+  const labels = devices.map(function(d) { return d.label || 'web'; });
+  const latest = devices.reduce(function(best, d) {
+    return (!best || String(d.updatedAt) > String(best.updatedAt)) ? d : best;
+  }, null);
+  return {
+    registered: true,
+    deviceCount: devices.length,
+    labels: labels.join(', '),
+    label: labels[labels.length - 1] || '',
+    updatedAt: latest ? latest.updatedAt : '',
+    message: devices.length === 1
+      ? '1 device registered for push.'
+      : (devices.length + ' devices registered for push.')
+  };
 }
 
-function getFcmTokenForUser(crewName) {
+function getFcmTokensForUser(crewName) {
   const profile = getUserSecurityProfile(crewName);
-  if (!profile || !profile.uid) return null;
-  const raw = PropertiesService.getScriptProperties().getProperty('FCM_TOKEN_' + String(profile.uid).trim());
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw);
-    return parsed && parsed.token ? String(parsed.token) : null;
-  } catch (e) {
-    return null;
-  }
+  if (!profile || !profile.uid) return [];
+  return getFcmDevicesForUid_(profile.uid)
+    .map(function(d) { return d && d.token ? String(d.token) : ''; })
+    .filter(function(t) { return t.length > 20; });
+}
+
+/** @deprecated use getFcmTokensForUser — returns first token only */
+function getFcmTokenForUser(crewName) {
+  const tokens = getFcmTokensForUser(crewName);
+  return tokens.length ? tokens[0] : null;
 }
 
 function getFcmTokensForUids(uidList) {
-  const props = PropertiesService.getScriptProperties();
   const tokens = [];
+  const seen = {};
   (uidList || []).forEach(function(uid) {
     if (!uid) return;
-    const raw = props.getProperty('FCM_TOKEN_' + String(uid).trim());
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.token) tokens.push(String(parsed.token));
-    } catch (e) { /* skip */ }
+    getFcmDevicesForUid_(uid).forEach(function(d) {
+      const t = d && d.token ? String(d.token) : '';
+      if (t.length > 20 && !seen[t]) {
+        seen[t] = true;
+        tokens.push(t);
+      }
+    });
   });
   return tokens;
 }

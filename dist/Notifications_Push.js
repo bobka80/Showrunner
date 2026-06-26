@@ -115,19 +115,23 @@ function sendTestPushNotification(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
   }
-  const token = getFcmTokenForUser(crewName);
-  if (!token) {
+  const tokens = getFcmTokensForUser(crewName);
+  if (!tokens.length) {
     return { success: false, message: 'No FCM token for this user. Open ' + (getFirebasePublicConfig().hostingUrl || 'the Hosting URL') + ', allow notifications, and log in.' };
   }
   const result = sendFcmToTokens_(
-    [token],
+    tokens,
     'Showrunner test',
     'Push notifications are working.',
     getFirebasePublicConfig().hostingUrl
   );
   if (result.sent > 0) {
-    writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', crewName, 'Test Push', 'Sent test FCM notification.');
-    return { success: true, message: 'Test push sent to your registered device.' };
+    writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', crewName, 'Test Push',
+      'Sent test FCM to ' + result.sent + '/' + tokens.length + ' device(s).');
+    var msg = result.sent === tokens.length
+      ? ('Test push sent to ' + result.sent + ' registered device(s).')
+      : ('Test push sent to ' + result.sent + ' of ' + tokens.length + ' device(s).');
+    return { success: true, message: msg };
   }
   return { success: false, message: 'Send failed: ' + (result.errors[0] || 'unknown error') };
 }
