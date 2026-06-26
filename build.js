@@ -121,6 +121,7 @@ function getFrontendLogicChunk(index) {
     'build.js', 'watch.js',
     'dev-push.js', 'works-save.js', 'milestone.js',
     'rollback-works.js', 'rollback-milestone.js',
+    'deploy-hosting.js',
     'test.js', 'test_db.js', 'run_test.js'
   ]);
   const files = fs.readdirSync(__dirname);

@@ -5,6 +5,19 @@
 
 // @INDEX: ROUTING -> Web App Get/Post
 function doGet(e) {
+  e = e || {};
+  const action = (e.parameter && e.parameter.action) ? String(e.parameter.action) : '';
+  if (action === 'fcfg') {
+    const cfg = getFirebasePublicConfig();
+    const json = JSON.stringify(cfg);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
   loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
   loginTemplate.errorMsg = "none";

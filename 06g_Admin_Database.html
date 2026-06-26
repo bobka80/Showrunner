@@ -18,6 +18,7 @@ function loadDatabaseOpsPanel() {
     })
     .withSuccessHandler(function(res) {
       renderDatabaseOpsPanel(res);
+      if (typeof renderPushAdminPanel === 'function') renderPushAdminPanel('push-admin-panel');
     })
     .getLiveDatabaseStatus(ACTIVE_USER_NAME);
 }

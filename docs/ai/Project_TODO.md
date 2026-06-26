@@ -16,7 +16,7 @@
 - [ ] **Fleet Payload Assignment:** Link the Check-Out scanner so that sealed flight cases (and their nested contents) can be directly assigned as payloads to specific Truck timelines.
 - [ ] **The "Truck Arrangement Brain" (Algorithmic Load Planner):** Isolate truck packing logic into a dedicated rules engine. This "Brain" will blend basic Tetris logic with weighted human heuristics (e.g., LED walls stack 3-high at the front, Line arrays follow). It will autonomously score and prioritize conflicting constraints like weight distribution (center of gravity), stackability limits, and operational presets to emulate human decision-making.
 
-- [ ] **Missing Logistics Notifications:** Bind an alert badge/notification to the Project Editor when an event is saved without defined transit legs, prompting the manager to define the logistics.
+- [ ] **Missing Logistics Notifications:** Bind an alert badge/notification to the Project Editor when an event is saved without defined transit legs — **also wire to Push Notifications (Option 1)** when FCM is live.
 
 ## Phase 3: Compliance, Health & Safety 
 - [ ] **Regulatory Health Checks:** Build a documentation engine for legal health checks, storage method compliance, and rigging safety validations.
@@ -31,8 +31,53 @@
 
 ## Phase 5: UX, External APIs & Operations
 - [ ] **Personal User Hub:** Build a restricted "My Profile" modal (accessible via the left nav bar) for standard crew members to update contact info, dietary preferences, and passwords.
-- [ ] **Automated Task Notifications:** Tie the Notification Engine to the Checklist/Task progression (e.g., "Lighting Prep is 100% Complete" automatically pushes an alert to the PM).
 - [ ] **Freelancer Shift Placeholders & Bidding:** Allow creation of "TBD" shift placeholders (e.g., "Need 4 more riggers"). Build a future engine to broadcast these open shifts to a pool of freelancers, allowing them to accept/bid, and automatically choosing the best candidate based on internal ratings.
+
+---
+
+## Push Notifications — Option 1 (Chosen): Firebase Hosting + FCM + Event-Driven GAS
+
+**Decision:** Browser-only push — no native App Store app. Crew use Chrome/Safari; on iPhone they **Add to Home Screen** from our Firebase Hosting URL (e.g. `showrunner.web.app`). True lock-screen push is **not** possible on the raw `script.google.com` Apps Script URL alone (no service worker). Firebase **FCM + Hosting** on the free Spark plan ($0).
+
+### Architecture (how it works)
+- **Firebase Hosting** — front door URL users bookmark/install; registers service worker + FCM.
+- **Apps Script (GAS)** — stays the backend (sheets, saves, crons). On each meaningful save, GAS calls FCM API via `UrlFetchApp`.
+- **Notifications sheet + bell UI** — kept as audit trail and in-app fallback (already built).
+- **Event-driven only** — when something saves → notify affected users. **Never** poll/scan the whole system on a timer for changes.
+- **One system action per event** — e.g. one truck shift save → collect 20 crew → **one batch FCM send** (20 phones buzz, but **one** backend job, not ×20 quota burn).
+
+### Notification scenarios (v1 scope)
+**Crew & managers on a project** (when they are assigned / on that show):
+- [ ] Assigned to a project
+- [ ] Master timeline changed (phases, show days)
+- [ ] Truck / logistics timeline changed
+- [ ] Another crew member flags a shift conflict (“I can’t work this day”)
+- [ ] Checklist / task milestone (e.g. “Lighting prep 100%”) → notify PM
+
+**Managers** (role-based, even if also on crew):
+- [ ] Overdue internal jobs: offer not created, invoice not created, asset list not built, crew not fully staffed
+- [ ] Weather alert for outdoor projects (wire existing `dispatchWeatherAlerts` to FCM, not sheet-only)
+
+**Rules:**
+- [ ] One push per **logical save** — debounce rapid edits (don’t spam on every drag pixel)
+- [ ] Per-user preferences: which alert types they want; store FCM token + chat opt-in in crew profile
+- [ ] Email optional digest only — do **not** rely on `MailApp` for high-volume alerts (100/day limit on free Gmail)
+- [ ] No aggressive client polling — push delivers; bell refreshes on app open + light refresh while open
+
+### Implementation phases
+- [ ] **P1 — Infrastructure:** Firebase project, Hosting URL, service worker, FCM subscribe flow in UI, store device tokens in crew/system config
+- [ ] **P2 — Dispatch core:** `dispatchPushNotification(userUids[], message, deepLink)` from GAS; batch FCM HTTP v1; log to Notifications sheet
+- [ ] **P3 — Wire saves:** Project assign, timeline save, truck save, show-day save, crew conflict report
+- [ ] **P4 — Manager overdue cron:** Once-daily check for late offers/invoices/assets/crew (not per-minute scanning)
+- [ ] **P5 — Weather:** Connect existing weather engine to FCM batch send
+- [ ] **P6 — Admin UI:** Notification preferences per user; test push button for ROOT
+
+### Quota note (30–50 people, many scenarios)
+FCM + batch sends are **not** the bottleneck at this scale. Risks are **email limits**, **polling**, and **alert spam** — avoided by event-driven batch design above.
+
+*(Consolidates earlier scattered notification bullets in Phases 2 and 5.)*
+
+---
 
 ## Database Operations (Root Settings Tab)
 
@@ -63,6 +108,6 @@
     - *Tier 2 (Box Van w/ Tail Lift):* ~4.2m L x 2.1m W x 2.2m H (Standard AV cases)
     - *Tier 3 (Rigid Truck):* ~7.5m L x 2.4m W x 2.5m H (Medium/Large PA & Lighting)
     - *Tier 4 (Artic Lorry / Trailer):* ~13.6m L x 2.4m W x 2.6m H (Arena Tours)
-- [ ] **Firebase Push Notification Engine:** Deploy Service Worker + FCM for real-time mobile lock-screen alerts.
+- [ ] **Push Notifications (Option 1):** See dedicated section above — Firebase Hosting + FCM; do not duplicate here.
 - [ ] **Security & RBAC Beta Audit:** Final lockdown of Role-Permissions matrix and data tunneling before beta deployment.
 

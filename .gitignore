@@ -18,3 +18,4 @@ Desktop.ini
 
 # Optional local deploy override (copy from deploy-config.example.json)
 deploy-config.json
+push-hosting/.env.local

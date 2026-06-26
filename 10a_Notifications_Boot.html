@@ -1,0 +1,44 @@
+<script>
+/**
+ * 10a_Notifications_Boot.html
+ * Receives FCM token from Firebase Hosting parent frame; registers with GAS backend.
+ */
+
+(function() {
+  if (window.__srFcmBootInstalled) return;
+  window.__srFcmBootInstalled = true;
+
+  window.addEventListener('message', function(ev) {
+    if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN') return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    const token = ev.data.token;
+    if (!token) return;
+
+    google.script.run
+      .withFailureHandler(function(err) {
+        console.warn('FCM token register failed:', err && err.message ? err.message : err);
+      })
+      .withSuccessHandler(function(res) {
+        console.log('FCM token registered for', ACTIVE_USER_NAME);
+        if (typeof window.onShowrunnerFcmRegistered === 'function') {
+          window.onShowrunnerFcmRegistered(res);
+        }
+      })
+      .registerFcmToken(ACTIVE_USER_NAME, token, ev.data.label || 'web', ACTIVE_USER_NAME);
+  });
+
+  function notifyParentReady() {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'SHOWRUNNER_APP_READY' }, '*');
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', notifyParentReady);
+  } else {
+    setTimeout(notifyParentReady, 500);
+  }
+})();
+</script>

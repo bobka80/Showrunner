@@ -1,0 +1,44 @@
+<script>
+/**
+ * 10c_Notifications_Admin.html
+ * ROOT tools — test push notification (Phase 1).
+ */
+
+function renderPushAdminPanel(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (typeof accessTierAtLeast !== 'function' || !accessTierAtLeast('ROOT')) {
+    el.innerHTML = '';
+    return;
+  }
+
+  el.innerHTML =
+    '<div style="background:#18181b; border:1px solid #333; border-radius:8px; padding:14px; margin-top:12px;">' +
+      '<div style="color:#f59e0b; font-size:11px; font-weight:900; letter-spacing:0.05em; margin-bottom:8px;">PUSH NOTIFICATIONS (PHASE 1)</div>' +
+      '<div style="color:#a1a1aa; font-size:11px; line-height:1.45; margin-bottom:10px;">' +
+        'Crew must open the <strong>Hosting URL</strong> (web.app), allow notifications, and log in. ' +
+        'Then use this test button on the same device.' +
+      '</div>' +
+      '<button class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">SEND TEST PUSH TO ME</button>' +
+      '<div id="push-admin-status" style="color:#71717a; font-size:10px; margin-top:8px;"></div>' +
+    '</div>';
+}
+
+function runShowrunnerTestPush() {
+  const status = document.getElementById('push-admin-status');
+  if (status) status.textContent = 'Sending...';
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (status) status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+    })
+    .withSuccessHandler(function(res) {
+      if (!status) return;
+      if (res && res.success) {
+        status.innerHTML = '<span style="color:#10b981;">' + res.message + '</span>';
+      } else {
+        status.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Failed') + '</span>';
+      }
+    })
+    .sendTestPushNotification(ACTIVE_USER_NAME);
+}
+</script>
