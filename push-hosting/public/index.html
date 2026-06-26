@@ -10,15 +10,17 @@
     html, body { margin: 0; height: 100%; background: #0a0a0c; overflow: hidden; font-family: Inter, system-ui, sans-serif; }
     #app-frame { width: 100%; height: 100%; border: none; display: block; }
     #push-status {
-      position: fixed; right: 8px; bottom: 8px; z-index: 9999;
-      background: rgba(24,24,27,0.92); border: 1px solid #333; color: #a1a1aa;
-      font-size: 11px; line-height: 1.3; padding: 6px 8px; border-radius: 6px;
-      max-width: 280px;
+      position: fixed; right: 8px; bottom: 8px; z-index: 2147483000;
+      background: rgba(24,24,27,0.96); border: 1px solid #333; color: #a1a1aa;
+      font-size: 11px; line-height: 1.3; padding: 8px 10px; border-radius: 6px;
+      max-width: 280px; pointer-events: auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.55);
     }
     #push-copy-btn {
-      display: block; margin-top: 6px; width: 100%;
-      background: rgba(16,185,129,0.2); border: 1px solid #10b981; color: #fff;
-      font-weight: 700; font-size: 10px; padding: 6px 8px; border-radius: 4px; cursor: pointer;
+      display: block; margin-top: 8px; width: 100%;
+      background: rgba(16,185,129,0.35); border: 1px solid #10b981; color: #fff;
+      font-weight: 700; font-size: 11px; padding: 8px 10px; border-radius: 4px; cursor: pointer;
+      pointer-events: auto; position: relative; z-index: 2147483001;
     }
     #push-copy-btn:disabled {
       opacity: 0.45; cursor: not-allowed; border-color: #555; color: #888;
@@ -50,6 +52,6 @@
   <div id="push-status"><span id="push-status-text">Push: starting…</span><button type="button" id="push-copy-btn">Copy push token</button></div>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
-  <script src="/host-boot.js?v=279"></script>
+  <script src="/host-boot.js?v=280"></script>
 </body>
 </html>

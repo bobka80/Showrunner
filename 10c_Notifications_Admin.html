@@ -32,14 +32,14 @@ function renderPushAdminPanel(containerId) {
         '<span id="push-vapid-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>' +
         '<div id="push-vapid-active" style="color:#71717a; font-size:10px; margin-top:6px;"></div>' +
       '</div>' +
-      '<div style="margin-bottom:10px; padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">' +
+      '<div style="margin-bottom:10px; padding:10px; border:1px solid #333; border-radius:6px; background:#121214; position:relative; z-index:5;">' +
         '<div style="color:#888; font-size:10px; font-weight:800; margin-bottom:6px;">DEVICE TOKEN (manual save)</div>' +
         '<div style="color:#71717a; font-size:10px; line-height:1.4; margin-bottom:8px;">' +
           'If bottom-right says <strong>token ready</strong> but not saved: on the Hosting page click <strong>Copy push token</strong>, paste below, then SAVE DEVICE TOKEN.' +
         '</div>' +
         '<textarea id="push-device-token-input" rows="3" placeholder="Paste device token here" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:10px; margin-bottom:8px; resize:vertical;"></textarea>' +
-        '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981;" onclick="fetchDeviceTokenFromHosting()">GET TOKEN FROM HOSTING</button>' +
-        '<button class="btn-outline btn-sm" style="margin:0 0 8px 0; border-color:#10b981; color:#10b981;" onclick="saveShowrunnerDeviceToken()">SAVE DEVICE TOKEN</button>' +
+        '<button type="button" class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981; position:relative; z-index:6; pointer-events:auto;" onclick="fetchDeviceTokenFromHosting()">GET TOKEN FROM HOSTING</button>' +
+        '<button type="button" class="btn-outline btn-sm" style="margin:0 0 8px 0; border-color:#10b981; color:#10b981; position:relative; z-index:6; pointer-events:auto;" onclick="saveShowrunnerDeviceToken()">SAVE DEVICE TOKEN</button>' +
         '<span id="push-device-token-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>' +
       '</div>' +
       '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="display:inline-block; margin:0 8px 8px 0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>' +

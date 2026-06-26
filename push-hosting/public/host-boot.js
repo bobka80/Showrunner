@@ -25,8 +25,8 @@
     statusEl.textContent = 'Push: ' + msg;
     const wrap = document.getElementById('push-status');
     if (wrap) {
-      wrap.style.pointerEvents = clickable ? 'auto' : 'none';
-      wrap.style.cursor = clickable ? 'pointer' : 'default';
+      wrap.style.pointerEvents = 'auto';
+      statusEl.style.cursor = clickable ? 'pointer' : 'default';
     }
     showCopyButton(!!fcmToken);
   }
