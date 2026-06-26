@@ -179,6 +179,9 @@ function refreshPushAdminStatus() {
               detail = ' (' + res.devices.map(function(d) { return d.label; }).join(', ') + ')';
             }
             status.innerHTML = '<span style="color:#10b981;">VAPID OK · ' + count + ' registered' + detail + when + '</span>';
+            if (res.deviceCount < 2) {
+              status.innerHTML += '<br><span style="color:#71717a;">Phone: open web.app in Chrome → Allow notifications → log in. Expect web-mobile in list above.</span>';
+            }
             return;
           }
           var regHint = window.__srFcmLastError

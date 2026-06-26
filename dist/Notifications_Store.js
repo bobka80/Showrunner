@@ -76,6 +76,11 @@ function getFirebasePushSetupStatus(crewName) {
     hostingUrl: cfg.hostingUrl
   };
 }
+function issueFcmRegistrationKey(crewName) {
+  if (!crewName) return { success: false, message: 'Not logged in.' };
+  return { success: true, regKey: createFcmRegistrationKey_(crewName) };
+}
+
 function createFcmRegistrationKey_(crewName) {
   const cleanName = String(crewName || '').trim();
   if (!cleanName) return '';

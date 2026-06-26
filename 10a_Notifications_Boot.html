@@ -29,11 +29,8 @@
     } catch (e) { /* ignore */ }
   }
 
-  function notifyParentFcmAuth() {
-    if (!window.isShowrunnerHostingShell) return;
-    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
-    var regKey = getFcmRegKey();
-    if (!regKey) return;
+  function pushFcmAuthToParent(regKey) {
+    if (!regKey || typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
     try {
       window.parent.postMessage({
         type: 'SHOWRUNNER_FCM_AUTH',
@@ -41,6 +38,29 @@
         crewName: ACTIVE_USER_NAME
       }, '*');
     } catch (e) { /* ignore */ }
+  }
+
+  function refreshFcmRegKeyAndNotifyParent() {
+    if (!window.isShowrunnerHostingShell || thisDeviceRegistered) return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    google.script.run
+      .withFailureHandler(function() {
+        var metaKey = getFcmRegKey();
+        if (metaKey) pushFcmAuthToParent(metaKey);
+      })
+      .withSuccessHandler(function(res) {
+        if (res && res.success && res.regKey) {
+          pushFcmAuthToParent(res.regKey);
+        } else {
+          var metaKey = getFcmRegKey();
+          if (metaKey) pushFcmAuthToParent(metaKey);
+        }
+      })
+      .issueFcmRegistrationKey(ACTIVE_USER_NAME);
+  }
+
+  function notifyParentFcmAuth() {
+    refreshFcmRegKeyAndNotifyParent();
   }
 
   function notifyParentSaved() {
@@ -277,6 +297,14 @@
     }
   }, 10000);
 
-  setTimeout(function() { clearInterval(retryTimer); }, 600000);
+  var keyRefreshTimer = setInterval(function() {
+    if (!thisDeviceRegistered && typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
+      refreshFcmRegKeyAndNotifyParent();
+    } else if (thisDeviceRegistered) {
+      clearInterval(keyRefreshTimer);
+    }
+  }, 12000);
+
+  setTimeout(function() { clearInterval(keyRefreshTimer); }, 600000);
 })();
 </script>

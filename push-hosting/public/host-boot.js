@@ -13,7 +13,8 @@
   let pendingBridge = null;
   let pendingFcmAuth = null;
   let regKeySaveInFlight = false;
-  const SW_BUILD = '287';
+  let regKeyRetryTimer = null;
+  const SW_BUILD = '288';
   let tokenBroadcastTimer = null;
 
   function isMobileDevice() {
@@ -160,6 +161,23 @@
     registerTokenViaRegKeyJsonp(pendingFcmAuth.regKey);
   }
 
+  function startRegKeyRetryLoop() {
+    if (regKeyRetryTimer) return;
+    var elapsed = 0;
+    regKeyRetryTimer = setInterval(function() {
+      if (!pendingFcmAuth) return;
+      if (!fcmToken && isMobileDevice() && Notification.permission !== 'granted') {
+        showBanner();
+      }
+      trySaveTokenViaRegKey();
+      elapsed += 4000;
+      if (elapsed >= 300000) {
+        clearInterval(regKeyRetryTimer);
+        regKeyRetryTimer = null;
+      }
+    }, 4000);
+  }
+
   function registerTokenViaBridgeJsonp(data) {
     const baseUrl = getRegisterBaseUrl();
     if (!data || !data.nonce || !baseUrl) return;
@@ -239,7 +257,11 @@
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
       pendingFcmAuth = ev.data;
+      if (isMobileDevice() && Notification.permission !== 'granted') {
+        showBanner();
+      }
       trySaveTokenViaRegKey();
+      startRegKeyRetryLoop();
     }
   });
 
@@ -401,6 +423,8 @@
 
       if (isIosInBrowserTab()) {
         showIosInstallBanner();
+      } else if (isMobileDevice()) {
+        showBanner();
       } else {
         showBanner();
       }
