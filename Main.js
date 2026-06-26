@@ -84,6 +84,21 @@ function doGet(e) {
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'fcmregkey') {
+    const result = completeFcmRegistrationViaKey_(
+      e.parameter.key || '',
+      e.parameter.token || '',
+      e.parameter.label || 'web-hosting'
+    );
+    const json = JSON.stringify(result);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
   loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
   loginTemplate.errorMsg = "none";
@@ -116,6 +131,7 @@ function doPost(e) {
     template.userEmail = authResult.email || '';
     template.showSettingsNav = accessTierAtLeastValue(template.userAccess, 'MANAGER');
     template.userPermissionsB64 = Utilities.base64Encode(JSON.stringify(authResult.permissions || {}));
+    template.fcmRegKey = createFcmRegistrationKey_(authResult.name);
     return template.evaluate()
       .setTitle('SM Showrunner Command Center')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1')

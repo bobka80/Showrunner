@@ -76,6 +76,26 @@ function getFirebasePushSetupStatus(crewName) {
     hostingUrl: cfg.hostingUrl
   };
 }
+function createFcmRegistrationKey_(crewName) {
+  const cleanName = String(crewName || '').trim();
+  if (!cleanName) return '';
+  const key = Utilities.getUuid().replace(/-/g, '');
+  CacheService.getScriptCache().put('fcm_regkey_' + key, cleanName, 900);
+  return key;
+}
+
+function completeFcmRegistrationViaKey_(regKey, token, label) {
+  const cleanKey = String(regKey || '').trim();
+  if (!cleanKey) return { success: false, message: 'Missing registration key.' };
+  const cache = CacheService.getScriptCache();
+  const cacheKey = 'fcm_regkey_' + cleanKey;
+  const crewName = cache.get(cacheKey);
+  if (!crewName) return { success: false, message: 'Registration key expired — log in again.' };
+  const result = registerFcmToken(crewName, token, label || 'web-hosting', crewName);
+  if (result && result.success) cache.remove(cacheKey);
+  return result;
+}
+
 function prepareFcmRegistrationBridge(crewName) {
   if (!crewName) return { success: false, message: 'Not logged in.' };
   const profile = getUserSecurityProfile(crewName);

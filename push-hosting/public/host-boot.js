@@ -11,7 +11,9 @@
   let messaging = null;
   let pushStarted = false;
   let pendingBridge = null;
-  const SW_BUILD = '286';
+  let pendingFcmAuth = null;
+  let regKeySaveInFlight = false;
+  const SW_BUILD = '287';
   let tokenBroadcastTimer = null;
 
   function isMobileDevice() {
@@ -116,6 +118,48 @@
     } catch (e) { /* ignore */ }
   }
 
+  function registerTokenViaRegKeyJsonp(regKey) {
+    const baseUrl = getRegisterBaseUrl();
+    if (!regKey || !baseUrl || !fcmToken || regKeySaveInFlight) return;
+    regKeySaveInFlight = true;
+    logPush('saving token via login key');
+
+    const cb = '__srFcmKey_' + Date.now();
+    const url = baseUrl
+      + '?action=fcmregkey'
+      + '&key=' + encodeURIComponent(regKey)
+      + '&token=' + encodeURIComponent(fcmToken)
+      + '&label=' + encodeURIComponent(deviceLabel())
+      + '&callback=' + encodeURIComponent(cb);
+
+    window[cb] = function(res) {
+      delete window[cb];
+      regKeySaveInFlight = false;
+      if (res && res.success) {
+        logPush('token saved via login key');
+        hideBanner();
+        hideIosInstallBanner();
+        notifyIframeRegistered(true);
+      } else {
+        logPush('login key save failed: ' + ((res && res.message) || 'rejected'));
+      }
+    };
+
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = function() {
+      delete window[cb];
+      regKeySaveInFlight = false;
+      logPush('login key save failed — network');
+    };
+    document.head.appendChild(script);
+  }
+
+  function trySaveTokenViaRegKey() {
+    if (!pendingFcmAuth || !pendingFcmAuth.regKey || !fcmToken) return;
+    registerTokenViaRegKeyJsonp(pendingFcmAuth.regKey);
+  }
+
   function registerTokenViaBridgeJsonp(data) {
     const baseUrl = getRegisterBaseUrl();
     if (!data || !data.nonce || !baseUrl) return;
@@ -193,6 +237,10 @@
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
       registerTokenViaBridgeJsonp(ev.data);
     }
+    if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
+      pendingFcmAuth = ev.data;
+      trySaveTokenViaRegKey();
+    }
   });
 
   if (frame) {
@@ -246,6 +294,7 @@
     logPush('token ready');
     hideBanner();
     flushPendingBridge();
+    trySaveTokenViaRegKey();
     startTokenBroadcast();
     notifyIframeTokenReady();
 

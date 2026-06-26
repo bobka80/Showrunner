@@ -16,11 +16,30 @@
 
   window.isShowrunnerHostingShell = (window.self !== window.top);
 
+  function getFcmRegKey() {
+    var el = document.querySelector('meta[name="fcm-reg-key"]');
+    return (el && el.content) ? String(el.content).trim() : '';
+  }
+
   function notifyParentReady() {
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type: 'SHOWRUNNER_APP_READY' }, '*');
       }
+    } catch (e) { /* ignore */ }
+  }
+
+  function notifyParentFcmAuth() {
+    if (!window.isShowrunnerHostingShell) return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    var regKey = getFcmRegKey();
+    if (!regKey) return;
+    try {
+      window.parent.postMessage({
+        type: 'SHOWRUNNER_FCM_AUTH',
+        regKey: regKey,
+        crewName: ACTIVE_USER_NAME
+      }, '*');
     } catch (e) { /* ignore */ }
   }
 
@@ -175,6 +194,7 @@
     }
 
     notifyParentReady();
+    notifyParentFcmAuth();
     if (currentDeviceToken) checkThisDeviceRegistered();
     pollParentForToken(180000, 3000);
     tryJsonpBridgeFallback();
@@ -231,6 +251,7 @@
 
   function bootBridge() {
     notifyParentReady();
+    notifyParentFcmAuth();
     window.startFcmBridgeRegistration();
   }
 
