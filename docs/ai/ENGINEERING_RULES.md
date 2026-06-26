@@ -158,6 +158,14 @@ NEVER mix these engines. See [FRAGILE_ZONES.md](FRAGILE_ZONES.md).
 - Update [FILE_MAP.md](FILE_MAP.md) and [ARCHITECTURE.md](ARCHITECTURE.md) on architectural changes
 - Log production incidents in [FRAGILE_ZONES.md](FRAGILE_ZONES.md) Incident Log (director approval required)
 - New `.html` modules: add to [FILE_MAP.md](FILE_MAP.md) **and** `Index.html` includes
+- New structural UI (buttons, modals, hubs): follow [UI_DOCTRINE.md](UI_DOCTRINE.md); do not conflate with Module Visual Settings
+
+---
+
+## 18. STRUCTURAL UI (NOT VISUAL SETTINGS)
+
+- **Structural:** `Styles.html` classes — buttons, modals, hub chrome, form labels → [UI_DOCTRINE.md](UI_DOCTRINE.md)
+- **User-tunable density:** calendar event height, timeline rows, grid columns, phase colors → `06c_Admin_Visuals.html` / `GridEngine` — never “normalize” these in structural CSS passes
 
 ---
 

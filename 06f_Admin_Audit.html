@@ -2,11 +2,11 @@
   <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
 
     <!-- Header -->
-    <div style="height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink: 0;">
-      <div style="color:#f59e0b; font-weight:900; font-size:16px; margin-right: 20px; letter-spacing: 1px;">🕵️ DATABASE AUDIT STUDIO</div>
+    <div class="view-header">
+      <div class="view-header-title view-header-title--amber" style="margin-right: 8px;">🕵️ DATABASE AUDIT STUDIO</div>
       
-      <button id="audit-tab-btn-dup" style="background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchAuditTab('dup')">DUPLICATE MERGE</button>
-      <button id="audit-tab-btn-item" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchAuditTab('item')">ITEM BY ITEM REVIEW</button>
+      <button id="audit-tab-btn-dup" class="btn-tab active" onclick="switchAuditTab('dup')">DUPLICATE MERGE</button>
+      <button id="audit-tab-btn-item" class="btn-tab" onclick="switchAuditTab('item')">ITEM BY ITEM REVIEW</button>
 
       <div style="flex:1;"></div>
       <button class="btn-close" style="margin:0; width:auto;" onclick="closeAuditStudio()">CLOSE</button>
@@ -68,8 +68,8 @@ function switchAuditTab(tab) {
     let btnDup = document.getElementById('audit-tab-btn-dup');
     let btnItem = document.getElementById('audit-tab-btn-item');
     
-    btnDup.style.cssText = (tab === 'dup') ? 'background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;' : 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
-    btnItem.style.cssText = (tab === 'item') ? 'background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;' : 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    btnDup.classList.toggle('active', tab === 'dup');
+    btnItem.classList.toggle('active', tab === 'item');
     
     if (tab === 'dup') runDuplicateScan();
     if (tab === 'item') loadNextUnaudited();

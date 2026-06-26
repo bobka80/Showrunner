@@ -176,38 +176,38 @@ function createRuleRow(r) {
  return `
  <div class="rule-row" style="display:flex; flex-direction:column; gap:10px; background:#222; padding:12px; border-radius:6px; border: 1px solid #333;">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-size:11px; font-weight:800; color:#f97316;">AUTOMATION TASK</div>
+        <div style="font-size:11px; font-weight:800; color:#f97316; text-transform:uppercase;">AUTOMATION TASK</div>
         <button class="btn-delete" style="width:auto; margin:0; padding:4px 8px; height:auto; font-size:10px;" onclick="this.closest('.rule-row').remove()" title="Delete Rule">X</button>
     </div>
 
     <div style="display:flex; gap:10px; align-items:center;">
         <div style="flex:1;">
-            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Task Name</div>
-            <input type="text" class="rule-task" placeholder="e.g. Rider" value="${String(r.taskName || r.word || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+            <div class="input-label" style="margin-bottom:2px;">Task Name</div>
+            <input type="text" class="rule-task input-compact" placeholder="e.g. Rider" value="${String(r.taskName || r.word || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
         </div>
         <div style="flex:1;">
-            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Source (Template)</div>
+            <div class="input-label" style="margin-bottom:2px;">Source (Template)</div>
             <div style="display:flex; gap:5px;">
-               <input type="text" class="rule-src-name" disabled placeholder="Event Root" value="${String(r.srcFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
-               <button class="btn-outline" style="width:auto; margin:0; padding:6px 10px; height: 30px;" onclick="openSharedDrivePicker('rule-src', this)" title="Browse">📁</button>
+               <input type="text" class="rule-src-name input-compact" disabled placeholder="Event Root" value="${String(r.srcFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; box-sizing:border-box;">
+               <button class="btn-outline btn-sm" style="width:auto; margin:0;" onclick="openSharedDrivePicker('rule-src', this)" title="Browse">📁</button>
             </div>
         </div>
         <div style="flex:1.5;">
-            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Search Contains</div>
-            <input type="text" class="rule-search" placeholder="Tech Rider" value="${String(r.searchString || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+            <div class="input-label" style="margin-bottom:2px;">Search Contains</div>
+            <input type="text" class="rule-search input-compact" placeholder="Tech Rider" value="${String(r.searchString || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
         </div>
     </div>
 
     <div style="display:flex; gap:10px; align-items:center;">
         <div style="flex:1;">
-            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Append Suffix</div>
-            <input type="text" class="rule-suffix" placeholder="_FINAL" value="${String(r.suffix || '').replace(/"/g, '&quot;')}" style="width:100%; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
+            <div class="input-label" style="margin-bottom:2px;">Append Suffix</div>
+            <input type="text" class="rule-suffix input-compact" placeholder="_FINAL" value="${String(r.suffix || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
         </div>
         <div style="flex:2;">
-            <div style="font-size:9px; color:#888; margin-bottom:2px; text-transform:uppercase; font-weight:bold;">Destination (Template)</div>
+            <div class="input-label" style="margin-bottom:2px;">Destination (Template)</div>
             <div style="display:flex; gap:5px;">
-               <input type="text" class="rule-dest-name" disabled placeholder="Event Root" value="${String(r.destFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; padding:6px; height: 30px; box-sizing:border-box; font-size:11px;">
-               <button class="btn-blue" style="width:auto; margin:0; padding:6px 10px; height: 30px;" onclick="openSharedDrivePicker('rule-dest', this)" title="Browse">📁</button>
+               <input type="text" class="rule-dest-name input-compact" disabled placeholder="Event Root" value="${String(r.destFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; box-sizing:border-box;">
+               <button class="btn-outline btn-sm" style="width:auto; margin:0;" onclick="openSharedDrivePicker('rule-dest', this)" title="Browse">📁</button>
             </div>
         </div>
     </div>

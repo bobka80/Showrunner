@@ -25,7 +25,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Main.js`**: GAS backend entry point. Handles HTTP GET/POST routing and the high-speed boot payload.
 - **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits.
 - **`Security.js`**: Manages user authentication and extracts security profiles.
-- **`Styles.html`**: The global CSS engine. Defines core theme variables, custom color engines, and universal UI states.
+- **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.
 - **`07_Core_Globals.html`**: Centralized utility functions, live tag parsers, and the CSS theme engine initialization.
 - **`07b_Grid_Engine.html`**: The interactive Drag & Drop data grid core.
 - **`07c_Generalization_Engine.html`**: The Blueprint template engine.
@@ -303,16 +303,8 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 
 ---
 
-## CSS Cheat Sheet (Design System)
+## CSS / Structural UI
 
-To ensure uniform UI scaling and prevent layout breaks, strictly use these predefined Vanilla CSS classes rather than inventing inline CSS:
+**Full specification:** [UI_DOCTRINE.md](UI_DOCTRINE.md) — mandatory for new buttons, modals, hubs, and tabs.
 
-- **`btn-main` / `btn-blue`**: Primary submission or call-to-action buttons.
-- **`btn-outline`**: Secondary actions or toggles.
-- **`btn-delete` / `btn-close`**: Destructive actions, cancels, or modal closers.
-- **`btn-add`**: Buttons that spawn new items or entities.
-- **`btn-sm`**: Add this modifier class to any of the buttons above to uniformly shrink them for compact UI areas.
-- **`btn-mobile-nav`**: Specific large touch buttons for mobile menus.
-
-> [!WARNING]
-> **NEVER USE `style="padding: ... !important"` ON BUTTONS.** Hardcoded padding overrides destroy the uniform heights of `btn-sm` and other classes when placed next to each other. Rely exclusively on the standard CSS class sizing.
+Quick reference: `btn-main`, `btn-outline`, `btn-outline-purple`, `btn-outline-orange`, `btn-tab`, `view-header`, `modal-title`, `input-label`, `crew-cb`, `btn-sm`. Do not use inline `padding: … !important` on buttons.

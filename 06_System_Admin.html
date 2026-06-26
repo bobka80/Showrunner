@@ -166,11 +166,7 @@ function switchResourceTab(tabId) {
     const btnIds = ['crew', 'assets', 'vehicles', 'warehouse', 'clients', 'database'];
     btnIds.forEach(id => {
         const btn = document.getElementById('tab-btn-' + id);
-        if (btn) {
-            btn.style.setProperty('background', 'transparent', 'important');
-            btn.style.setProperty('border-color', 'transparent', 'important');
-            btn.style.setProperty('color', '#a1a1aa', 'important');
-        }
+        if (btn) btn.classList.remove('active');
     });
     
     // Show active panel
@@ -178,11 +174,7 @@ function switchResourceTab(tabId) {
     
     // Highlight active button
     const activeBtn = document.getElementById('tab-btn-' + tabId);
-    if (activeBtn) {
-        activeBtn.style.setProperty('background', 'rgba(255,255,255,0.15)', 'important');
-        activeBtn.style.setProperty('border-color', '#fff', 'important');
-        activeBtn.style.setProperty('color', '#fff', 'important');
-    }
+    if (activeBtn) activeBtn.classList.add('active');
     
     // Toggle footer buttons dynamically
     const btnAddMember = document.getElementById('btn-add-member');

@@ -16,14 +16,16 @@ This doctrine applies to **any AI agent** working in this repository (Cursor, Cl
 
 4. **The Brainstorming Phase Lockout:** If the user mentions **"brainstorm"**, **"brainstorming"**, **"planning mode"**, **"we're planning"**, **"don't code"**, or similar phrasing, you enter a strict **No-Code Lockout**. You must stop writing and editing code entirely. You are restricted to chatting and planning ONLY. You cannot write or edit code until the user explicitly commands **"OK go"**, **"OK do it"**, or **"OK do the code"**. If you believe a code edit is necessary during this phase, you MUST ask for explicit approval first. During brainstorm, do NOT treat casual ideas as implementation requests.
 
-5. **Plain-Language Handoff After Fixes:** After any bug fix or feature change, you MUST tell the director (in plain language, no jargon required):
+5. **Structural UI Compliance:** Any new buttons, modals, hub headers, form labels, or tabs MUST follow **[UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md)**. Reuse existing CSS classes from `Styles.html` before adding inline styles. Do not override Module Visual Settings (calendar/timeline/grid density) when “fixing consistency.”
+
+6. **Plain-Language Handoff After Fixes:** After any bug fix or feature change, you MUST tell the director (in plain language, no jargon required):
    - What was wrong
    - What you changed (conceptually, not file-by-file unless helpful)
    - **How to test it** — numbered steps they can follow in the UI
    - What to report back if it still fails
    - **Ask to document:** *"Do you want me to add this to the Incident Log in FRAGILE_ZONES.md so we don't hit the same break again?"* — write only if they say yes
 
-6. **Fragile-Zone Disclosure Before Edits:** Before editing any area listed in `docs/ai/FRAGILE_ZONES.md`, you MUST state in plain language which zone you are touching and what could break if the change goes wrong. Wait for approval if the user is in a cautious or brainstorm-adjacent mode.
+7. **Fragile-Zone Disclosure Before Edits:** Before editing any area listed in `docs/ai/FRAGILE_ZONES.md`, you MUST state in plain language which zone you are touching and what could break if the change goes wrong. Wait for approval if the user is in a cautious or brainstorm-adjacent mode.
 
 Failure to read the documents below or adhere to this Doctrine will result in broken logic. This application uses an advanced distributed state machine, optimistic healing engines, and a specific compiler strategy for Google Apps Script.
 
@@ -39,6 +41,8 @@ Pre-change checklist for dangerous areas: **[Fragile Zones](docs/ai/FRAGILE_ZONE
 
 Deep engineering rules (30-table model, audit, financials prep): **[Engineering Rules](docs/ai/ENGINEERING_RULES.md)**
 
+Structural UI (buttons, modals, hubs — not Visual Settings): **[UI Doctrine](docs/ai/UI_DOCTRINE.md)**
+
 ---
 
 ## Required Reading
@@ -51,6 +55,8 @@ Deep engineering rules (30-table model, audit, financials prep): **[Engineering 
 | [FILE_MAP.md](docs/ai/FILE_MAP.md) | Index of all `0X_...html` components and `@INDEX:` markers |
 | [File_Splitting_Guide.md](docs/ai/File_Splitting_Guide.md) | Protocol for chopping large UI files safely |
 | [Project_TODO.md](docs/ai/Project_TODO.md) | Master feature roadmap — maintain per Doctrine rules 2 and 3 |
+| [ENGINEERING_RULES.md](docs/ai/ENGINEERING_RULES.md) | Deep engineering mandates (UID, audit, financials prep) |
+| [UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md) | **Structural UI** — buttons, modals, hubs, tabs (not Visual Settings) |
 | [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) | Two-layer saves: Git "This works" vs Apps Script milestones |
 | [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md) | **Milestone now** — production snapshot before new work |
 

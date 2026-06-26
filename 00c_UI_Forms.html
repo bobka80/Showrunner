@@ -1,7 +1,7 @@
 <!-- @INDEX: FORMS -> Crew & IAM Provisioning -->
 <div id="add-member-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
   <div class="modal" style="max-width: 600px; width: 95%;">
-    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">👤 Provision New User</h3>
+    <h3 class="modal-title">👤 Provision New User</h3>
     <div style="display:flex; gap:10px; margin-bottom: 15px;">
         <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Full Name</div><input type="text" id="add-member-name" placeholder="John Doe" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></div>
         <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Email Address</div><input type="email" id="add-member-email" placeholder="john@company.com" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></div>
@@ -25,7 +25,7 @@
 
 <div id="edit-member-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
   <div class="modal" style="max-width: 750px; width: 95%;">
-    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">✏️ Edit Crew Profile</h3>
+    <h3 class="modal-title">✏️ Edit Crew Profile</h3>
     <input type="hidden" id="edit-member-uid">
     <div style="display:flex; gap:10px; margin-bottom: 15px;">
         <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Full Name</div><input type="text" id="edit-member-name" disabled style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#27272a; border:1px solid #3f3f46; color:#a1a1aa; border-radius:4px;"></div>
@@ -59,7 +59,7 @@
 
 <div id="iam-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
   <div class="modal" style="max-width: 680px; width: 95%;">
-    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">🔑 Role Matrix Editor</h3>
+    <h3 class="modal-title">🔑 Role Matrix Editor</h3>
     
     <div style="display:flex; gap:10px; margin-bottom:15px; align-items:flex-end;">
       <div style="flex:1;">
@@ -96,68 +96,68 @@
       
       <!-- GLOBAL VIEWS -->
       <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Global Database Views</div>
-      <input type="checkbox" id="db_view_assets" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="db_view_assets" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_assets').click()">View Asset Registry</div>
-      <input type="checkbox" id="db_edit_assets" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="db_edit_assets" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_edit_assets').click()">Manage Assets (Add, Edit, Delete, Audit, Print)</div>
-      <input type="checkbox" id="db_view_vehicles" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="db_view_vehicles" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_vehicles').click()">View Vehicles Directory</div>
-      <input type="checkbox" id="db_view_warehouses" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="db_view_warehouses" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_warehouses').click()">View Warehouse Roots</div>
-      <input type="checkbox" id="db_view_clients" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="db_view_clients" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('db_view_clients').click()">View Clients Directory</div>
       
       <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
 
       <!-- LOGISTICS & EVENTS -->
       <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Events & Logistics</div>
-      <input type="checkbox" id="event_create_standard" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="event_create_standard" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_create_standard').click()">Create Standard Events</div>
       
-      <input type="checkbox" id="event_create_crossrent" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="event_create_crossrent" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_create_crossrent').click()">Create Cross-Rent Events</div>
 
-      <input type="checkbox" id="event_edit_timeline" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="event_edit_timeline" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_edit_timeline').click()">Edit Event Timeline & Phases</div>
       
-      <input type="checkbox" id="event_assets_window" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="event_assets_window" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_assets_window').click()">Access Event Assets Window (Pack Gear)</div>
 
-      <input type="checkbox" id="event_view_pricing" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="event_view_pricing" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#10b981; font-size:15px; font-weight:bold; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('event_view_pricing').click()">💵 View Pricing/Offers in Assets Window</div>
 
       <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
 
-      <input type="checkbox" id="view_month_roster" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="view_month_roster" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('view_month_roster').click()">View Master Month Roster Matrix</div>
 
-      <input type="checkbox" id="view_logistics" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="view_logistics" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('view_logistics').click()">View Live Logistics Phase Tracking</div>
 
       <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
 
       <!-- TASKS -->
       <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Tasks & Freelancers</div>
-      <input type="checkbox" id="task_manage_global" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="task_manage_global" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('task_manage_global').click()">Manage Global Workbox Tasks</div>
 
-      <input type="checkbox" id="task_manage_personal" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="task_manage_personal" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('task_manage_personal').click()">Mark Self-Assigned Tasks as Done</div>
 
-      <input type="checkbox" id="Is_Tunneling" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;"> 
+      <input type="checkbox" id="Is_Tunneling" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;"> 
       <div style="color:#f59e0b; font-size:15px; font-weight:bold; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('Is_Tunneling').click()">🛡️ Freelancer Node-Lock (Tunneling)</div>
 
       <div style="grid-column: 1 / -1; height: 1px; background: #333; margin: 4px 0;"></div>
 
       <!-- FINANCIALS -->
       <div style="grid-column: 1 / -1; color:#9ca3af; font-size:12px; font-weight:bold; text-transform:uppercase;">Financials & Deep Vault</div>
-      <input type="checkbox" id="hr_view_rates" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="hr_view_rates" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('hr_view_rates').click()">HR: View Crew Day-Rates & Details</div>
 
-      <input type="checkbox" id="fin_view_roi" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="fin_view_roi" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('fin_view_roi').click()">Financials: View Project ROI & Margin</div>
 
-      <input type="checkbox" id="fin_view_internal" style="transform: scale(1.3); margin:0; justify-self:center; cursor:pointer;">
+      <input type="checkbox" id="fin_view_internal" class="crew-cb" style="margin:0; justify-self:center; cursor:pointer;">
       <div style="color:#e4e4e7; font-size:15px; white-space:nowrap; cursor:pointer;" onclick="document.getElementById('fin_view_internal').click()">Financials: View Deep Vault Internal Prices</div>
 
     </div>
@@ -179,7 +179,7 @@
     
     <!-- Main Form Content -->
     <div style="flex:2; overflow-y:auto; padding-right:15px; display:flex; flex-direction:column;">
-      <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">📦 Provision Asset</h3>
+      <h3 class="modal-title">📦 Provision Asset</h3>
 
       <div id="audit-checklist-panel" style="display:none; background: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; border-radius: 6px; padding: 10px; margin-bottom: 15px;">
         <div style="font-size: 11px; font-weight: bold; color: #3b82f6; margin-bottom: 8px; text-transform: uppercase;">Audit Checklist (Touch fields to verify)</div>
@@ -341,7 +341,7 @@
 
 <div id="qr-studio-modal" class="modal-overlay" style="z-index: 6000; display:none;">
   <div class="modal" style="max-width: 1800px; width: 98vw; height: 95vh; max-height: 95vh; display: flex; flex-direction: column;">
-    <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">🖨️ QR Label Print Studio</h3>
+    <h3 class="modal-title">🖨️ QR Label Print Studio</h3>
 
     <div style="display:flex; gap:20px; flex:1; overflow:hidden;">
         <!-- Left: Settings & Aliasing -->
@@ -471,7 +471,7 @@
     <input type="hidden" id="veh-id">
     
     <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-bottom: 15px; color:#f59e0b; font-weight:bold; font-size:12px;">
-        <input type="checkbox" id="veh-generic" onchange="toggleGenericVehicle()" style="width:18px; height:18px; margin:0; accent-color:#f59e0b;">
+        <input type="checkbox" id="veh-generic" class="crew-cb" onchange="toggleGenericVehicle()" style="margin:0;">
         Generic / Random Rental Truck (Hide Plate & Model)
     </label>
 

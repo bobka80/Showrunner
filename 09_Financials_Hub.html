@@ -3,15 +3,15 @@
   <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
 
     <!-- TOP NAVIGATION TABS -->
-    <div style="height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 15px; gap: 10px; flex-shrink:0;">
-      <div style="color:#10b981; font-weight:900; font-size:16px; margin-right: 20px; letter-spacing: 1px; display:flex; align-items:center; gap:8px;">
+    <div class="view-header">
+      <div class="view-header-title view-header-title--green" style="margin-right: 8px; display:flex; align-items:center; gap:8px;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
           FINANCIALS HUB
       </div>
       
-      <button id="fin-tab-btn-payroll" style="background: #27272a; border: 1px solid #3f3f46; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchFinancialTab('payroll')">PAYROLL & LABOR</button>
-      <button id="fin-tab-btn-pnl" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchFinancialTab('pnl')">P&L PREDICTIONS</button>
-      <button id="fin-tab-btn-settings" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;" onclick="switchFinancialTab('settings')">FINANCIAL SETTINGS</button>
+      <button id="fin-tab-btn-payroll" class="btn-tab active" onclick="switchFinancialTab('payroll')">PAYROLL & LABOR</button>
+      <button id="fin-tab-btn-pnl" class="btn-tab" onclick="switchFinancialTab('pnl')">P&L PREDICTIONS</button>
+      <button id="fin-tab-btn-settings" class="btn-tab" onclick="switchFinancialTab('settings')">FINANCIAL SETTINGS</button>
 
       <div style="flex:1;"></div>
       <button class="btn-close" style="width:auto; margin:0;" onclick="closeFinancialsHub()">CLOSE</button>
@@ -21,15 +21,15 @@
     <div id="fin-content-payroll" style="display:flex; flex-direction:column; flex:1; overflow:hidden; background: #0a0a0c;">
         <!-- Sub-Header / Toggles -->
         <div style="display:flex; justify-content:space-between; align-items:center; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar);">
-            <div style="display:flex; gap:10px; background:#18181b; padding:4px; border-radius:6px; border:1px solid #333;">
-                <button id="fin-view-btn-person" class="btn-main" style="margin:0; padding:6px 15px !important;" onclick="switchPayrollView('person')">VIEW BY PERSON</button>
-                <button id="fin-view-btn-event" class="btn-outline" style="margin:0; padding:6px 15px !important; border-color:transparent; color:#888;" onclick="switchPayrollView('event')">VIEW BY EVENT</button>
+            <div class="tab-bar tab-bar--segmented">
+                <button id="fin-view-btn-person" class="btn-tab active" style="margin:0;" onclick="switchPayrollView('person')">VIEW BY PERSON</button>
+                <button id="fin-view-btn-event" class="btn-tab" style="margin:0;" onclick="switchPayrollView('event')">VIEW BY EVENT</button>
             </div>
-            <div style="display:flex; gap:10px; align-items:center;">
-                <span style="color:#888; font-size:11px; font-weight:bold;">START:</span>
-                <input type="date" id="fin-payroll-start" style="padding:6px 10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; font-size:12px; height: 32px; box-sizing: border-box;">
-                <span style="color:#888; font-size:11px; font-weight:bold;">END:</span>
-                <input type="date" id="fin-payroll-end" style="padding:6px 10px; background:#111; color:#fff; border:1px solid #333; border-radius:4px; font-size:12px; height: 32px; box-sizing: border-box;">
+            <div class="view-header-actions">
+                <span class="input-label" style="margin:0;">START:</span>
+                <input type="date" id="fin-payroll-start" class="input-compact">
+                <span class="input-label" style="margin:0;">END:</span>
+                <input type="date" id="fin-payroll-end" class="input-compact">
                 <button class="btn-outline btn-sm" id="btn-calc-payroll" style="border-color:#10b981; color:#10b981; margin:0;" onclick="calculatePayrollEngine()">CALCULATE PAYROLL</button>
             </div>
         </div>
@@ -65,9 +65,9 @@
             <div style="max-width: 800px; margin: 0 auto; display:flex; flex-direction:column; gap:25px;">
                 
                 <!-- Setting Tabs Navigation -->
-                <div style="display:flex; gap:10px;">
-                    <button id="fin-subtab-btn-labor" class="btn-main" onclick="switchFinSubTab('labor')">LABOR & FLEET RATES</button>
-                    <button id="fin-subtab-btn-overheads" class="btn-outline" onclick="switchFinSubTab('overheads')">COMPANY OVERHEADS</button>
+                <div class="tab-bar">
+                    <button id="fin-subtab-btn-labor" class="btn-tab active" onclick="switchFinSubTab('labor')">LABOR & FLEET RATES</button>
+                    <button id="fin-subtab-btn-overheads" class="btn-tab" onclick="switchFinSubTab('overheads')">COMPANY OVERHEADS</button>
                 </div>
 
                 <!-- Subtab: Labor & Fleet -->
@@ -76,7 +76,7 @@
                     <!-- Left Side: Standard Rates, OT, Trucks -->
                     <div style="display:flex; flex-direction:column; gap:20px;">
                         <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
-                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Standard Phase Rates</h3>
+                            <h3 class="section-title">Standard Phase Rates</h3>
                             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                                 <div>
                                     <div class="input-label">Preparation (Warehouse)</div>
@@ -117,7 +117,7 @@
                         </div>
                         
                         <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
-                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Global Overtime & Bonuses</h3>
+                            <h3 class="section-title">Global Overtime & Bonuses</h3>
                             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                                 <div><div class="input-label">Overtime Threshold (Hrs)</div><input type="number" id="fin-set-default-shift-period" placeholder="e.g., 12"></div>
                                 <div><div class="input-label">Overtime Multiplier</div><input type="number" step="0.1" id="fin-set-overtime-multiplier" placeholder="e.g., 1.5x"></div>
@@ -127,7 +127,7 @@
                         </div>
                         
                         <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
-                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Extra Hourly Rates</h3>
+                            <h3 class="section-title">Extra Hourly Rates</h3>
                             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                                 <div><div class="input-label">Standard Events (€/hr)</div><input type="number" id="fin-set-extra-rate-standard" placeholder="e.g., 15"></div>
                                 <div><div class="input-label">Prep & Recovery (€/hr)</div><input type="number" id="fin-set-extra-rate-prep" placeholder="e.g., 15"></div>
@@ -135,7 +135,7 @@
                         </div>
                         
                         <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
-                            <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Default Trucking Fleet Rates</h3>
+                            <h3 class="section-title">Default Trucking Fleet Rates</h3>
                             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
                                 <div>
                                     <div class="input-label">Tier 1 (Cargo Van)</div>
@@ -167,7 +167,7 @@
                     
                     <!-- Right Side: Roles -->
                     <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
-                        <h3 style="margin:0 0 15px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:10px;">Role Specifics & Colors</h3>
+                        <h3 class="section-title">Role Specifics & Colors</h3>
                         <p style="color:#a1a1aa; font-size:11px; margin-top:0; margin-bottom:15px; line-height:1.4;">Adjust the multiplier for each role. This applies on top of the Standard Phase Rates calculated dynamically from the timeline.</p>
                         <div id="fin-roles-container" style="display:flex; flex-direction:column; gap:8px; max-height:600px; overflow-y:auto; padding-right:5px;">
                             <div style="color:#888; font-size:12px; font-style:italic;">Loading Dictionary...</div>
@@ -178,7 +178,7 @@
                 <!-- Subtab: Overheads -->
                 <div id="fin-subtab-overheads" style="display:none; flex-direction:column; gap:20px;">
                     <div style="background:#1a1a1e; border:1px solid #333; border-radius:8px; padding:20px;">
-                        <h3 style="margin:0 0 20px 0; color:#fff; border-bottom:1px solid #333; padding-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 class="section-title" style="display:flex; justify-content:space-between; align-items:center; padding-bottom:15px;">
                             <span>Company Overheads & Indirect Expenses</span>
                             <button class="btn-outline btn-sm" style="margin:0; border-color:#f97316; color:#f97316;" onclick="addFinOverheadRow()">+ ADD EXPENSE</button>
                         </h3>
@@ -226,16 +226,13 @@ function switchFinancialTab(tabId) {
     document.getElementById('fin-content-pnl').style.display = 'none';
     document.getElementById('fin-content-settings').style.display = 'none';
     
-    document.getElementById('fin-tab-btn-payroll').style.cssText = 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
-    document.getElementById('fin-tab-btn-pnl').style.cssText = 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
-    document.getElementById('fin-tab-btn-settings').style.cssText = 'background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
+    ['payroll', 'pnl', 'settings'].forEach(function(t) {
+        var btn = document.getElementById('fin-tab-btn-' + t);
+        if (btn) btn.classList.toggle('active', t === tabId);
+    });
     
     document.getElementById('fin-content-' + tabId).style.display = 'flex';
     
-    let activeBtn = document.getElementById('fin-tab-btn-' + tabId);
-    if (activeBtn) {
-        activeBtn.style.cssText = 'background: rgba(255,255,255,0.15); border: 1px solid #fff; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; cursor: pointer; transition: 0.2s;';
-    }
     if (tabId === 'settings') {
         loadFinSettingsUI();
     }
@@ -250,26 +247,14 @@ function switchPayrollView(view) {
     
     if (view === 'person') {
         document.getElementById('fin-payroll-view-person').style.display = 'flex';
-        btnPerson.className = 'btn-main';
-        btnPerson.style.borderColor = '#10b981';
-        btnPerson.style.color = '#000';
-        
-        btnEvent.className = 'btn-outline';
-        btnEvent.style.borderColor = 'transparent';
-        btnEvent.style.color = '#888';
-        btnEvent.style.background = 'transparent';
+        btnPerson.classList.add('active');
+        btnEvent.classList.remove('active');
         currentPayrollView = 'person';
         if (activePayrollData) renderPayrollByPerson();
     } else {
         document.getElementById('fin-payroll-view-event').style.display = 'flex';
-        btnEvent.className = 'btn-main';
-        btnEvent.style.borderColor = '#10b981';
-        btnEvent.style.color = '#000';
-        
-        btnPerson.className = 'btn-outline';
-        btnPerson.style.borderColor = 'transparent';
-        btnPerson.style.color = '#888';
-        btnPerson.style.background = 'transparent';
+        btnEvent.classList.add('active');
+        btnPerson.classList.remove('active');
         currentPayrollView = 'event';
         if (activePayrollData) renderPayrollByEvent();
     }
@@ -1279,11 +1264,12 @@ function switchFinSubTab(tab) {
     document.getElementById('fin-subtab-labor').style.display = 'none';
     document.getElementById('fin-subtab-overheads').style.display = 'none';
     
-    document.getElementById('fin-subtab-btn-labor').className = 'btn-outline';
-    document.getElementById('fin-subtab-btn-overheads').className = 'btn-outline';
+    ['labor', 'overheads'].forEach(function(t) {
+        var btn = document.getElementById('fin-subtab-btn-' + t);
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
     
     document.getElementById('fin-subtab-' + tab).style.display = 'flex';
-    document.getElementById('fin-subtab-btn-' + tab).className = 'btn-main';
 }
 
 function renderFinRolesUI(savedRoles) {

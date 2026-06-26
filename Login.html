@@ -9,8 +9,8 @@
     .login-card { background: var(--bg-card); padding: 40px; border-radius: 12px; border-top: 6px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; width: 100%; max-width: 320px; box-sizing: border-box;}
     
     input[type="password"] { width: 100%; padding: 14px; margin: 20px 0 15px 0; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; text-align: center; letter-spacing: 2px;}
-    .btn-main { width: 100%; padding: 14px; background: var(--accent); border: none; color: white; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.2s; letter-spacing: 1px;}
-    .btn-main:hover { opacity: 0.9; }
+    .btn-main { width: 100%; padding: 14px; background: rgba(16, 185, 129, 0.4); border: 1px solid #10b981; color: white; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.2s; letter-spacing: 0.5px; text-transform: uppercase; font-size: 12px; box-sizing: border-box;}
+    .btn-main:hover { background: rgba(16, 185, 129, 0.6); }
   </style>
 </head>
 <body>
@@ -21,16 +21,16 @@
     
     <form id="login-form" method="post" action="<?= scriptUrl ?>">
       <div style="text-align: left; margin-bottom: 10px;">
-        <label style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">Crew Name</label>
+        <label class="input-label">Crew Name</label>
         <input type="text" name="name" id="name-input" placeholder="e.g. John Doe" required style="width: 100%; padding: 14px; margin-top: 5px; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box;">
       </div>
       
       <div style="text-align: left; margin-bottom: 20px;">
-        <label style="font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold;">6-Character Passcode</label>
+        <label class="input-label">6-Character Passcode</label>
         <input type="password" name="passcode" id="pass-input" placeholder="••••••" maxlength="6" required style="width: 100%; padding: 14px; margin-top: 5px; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; letter-spacing: 4px; font-size: 18px; text-align: center;">
       </div>
 
-      <label style="display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; color:#888; margin-bottom:20px; cursor:pointer;">
+      <label style="display:flex; align-items:center; justify-content:center; gap:8px; font-size:11px; font-weight:700; color:#888; margin-bottom:20px; cursor:pointer;">
          <input type="checkbox" id="remember-cb" style="margin:0;"> Remember Me (24 Hours)
       </label>
 

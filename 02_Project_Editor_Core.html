@@ -2,7 +2,7 @@
   <div class="modal">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
         <div style="display:flex; align-items:center; gap: 12px; flex: 1;">
-            <h3 id="edit-orig-title" style="margin:0; color:#fff;">Configure Project</h3>
+            <h3 id="edit-orig-title" class="modal-title modal-title--plain" style="margin:0;">Configure Project</h3>
             <div style="position: relative;">
                <button class="btn-delete btn-sm pe-manager-only" style="margin:0;" onclick="toggleTrashMenu()">TRASH</button>
                <div id="trash-dropdown" style="display:none; position:absolute; top: 100%; right:0; width:140px; background:#1a1a1e; border:1px solid #ef4444; padding:10px; box-sizing:border-box; border-radius:6px; z-index:50; margin-top:5px;">
@@ -116,8 +116,8 @@
 
     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
       <div style="display:flex; gap:12px; align-items:center;">
-         <button id="master-timeline-btn" class="btn-purple" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
-         <button class="btn-outline" style="margin:0; border-color:#f97316; color:#f97316;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
+         <button id="master-timeline-btn" class="btn-outline btn-outline-purple" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
+         <button class="btn-outline btn-outline-orange" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
       </div>
       <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
@@ -187,7 +187,7 @@ function startPresencePing(projectId) {
             if (tlBtn) {
                 tlBtn.disabled = false;
                 tlBtn.innerText = `OPEN TIMELINE`;
-                tlBtn.className = "btn-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
+                tlBtn.className = "btn-outline btn-outline-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
             }
         })
         .withSuccessHandler(othersObj => {
@@ -207,7 +207,7 @@ function startPresencePing(projectId) {
                     tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#ef4444"; tlBtn.style.color = "#ef4444";
                 } else {
                     tlBtn.innerText = `OPEN TIMELINE`;
-                    tlBtn.className = "btn-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
+                    tlBtn.className = "btn-outline btn-outline-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
                 }
             }
         }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule);

@@ -1,21 +1,22 @@
 <div id="master-settings-overlay" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
   <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
 
-    <div style="height: 60px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 15px; gap: 10px;">
-      <div style="color:#fff; font-weight:900; font-size:16px; margin-right: 20px; letter-spacing: 1px;">🗂️ RESOURCES</div>
+    <div class="view-header">
+      <div class="view-header-title" style="margin-right: 8px;">🗂️ RESOURCES</div>
       
-      <button id="tab-btn-crew" class="req-root-only" style="background: #27272a; border: 1px solid #3f3f46; color: #fff; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('crew')">CREW</button>
-      <button id="tab-btn-assets" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('assets')">ASSETS</button>
-      <button id="tab-btn-vehicles" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('vehicles')">VEHICLES</button>
-      <button id="tab-btn-warehouse" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('warehouse')">WAREHOUSE</button>
-      <button id="tab-btn-clients" style="background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('clients')">CLIENTS</button>
-      <button id="tab-btn-database" class="req-root-only" style="margin-left: 200px; background: transparent; border: 1px solid transparent; color: #a1a1aa; padding: 8px 16px; border-radius: 4px; font-size: 12px; font-weight: bold; font-family: inherit; cursor: pointer; transition: all 0.2s;" onclick="switchResourceTab('database')">DATABASE</button>
+      <button id="tab-btn-crew" class="btn-tab active req-root-only" onclick="switchResourceTab('crew')">CREW</button>
+      <button id="tab-btn-assets" class="btn-tab" onclick="switchResourceTab('assets')">ASSETS</button>
+      <button id="tab-btn-vehicles" class="btn-tab" onclick="switchResourceTab('vehicles')">VEHICLES</button>
+      <button id="tab-btn-warehouse" class="btn-tab" onclick="switchResourceTab('warehouse')">WAREHOUSE</button>
+      <button id="tab-btn-clients" class="btn-tab" onclick="switchResourceTab('clients')">CLIENTS</button>
 
       <div style="flex:1;"></div>
+      <button id="tab-btn-database" class="btn-tab req-root-only" onclick="switchResourceTab('database')">DATABASE</button>
+
       <div style="display:flex; flex-direction:column; position:relative; justify-content:center;">
           <div style="display:flex; gap:10px; align-items:center;">
-             <input type="text" id="search-name" placeholder="Search Name..." style="width:150px; padding:6px 12px; background:#1a1a1e; border:1px solid #3f3f46; color:#fff; border-radius:4px; font-size:11px; margin:0; height:30px; box-sizing:border-box;" oninput="applyGlobalSearch()">
-             <input type="text" id="search-tag" placeholder="Search Tag..." style="width:150px; padding:6px 12px; background:#1a1a1e; border:1px solid #3f3f46; color:#fff; border-radius:4px; font-size:11px; margin:0; height:30px; box-sizing:border-box;" oninput="applyGlobalSearch()">
+             <input type="text" id="search-name" class="input-compact input-compact--narrow" placeholder="Search Name..." oninput="applyGlobalSearch()">
+             <input type="text" id="search-tag" class="input-compact input-compact--narrow" placeholder="Search Tag..." oninput="applyGlobalSearch()">
           </div>
           <div id="search-filter-warning" style="display:none; position:absolute; top:35px; right:0; color:#ef4444; font-size:10px; font-weight:bold; background:#1a1a1e; padding:4px 8px; border:1px solid #ef4444; border-radius:4px; z-index:100; box-shadow: 0 4px 12px rgba(0,0,0,0.5); pointer-events:none; white-space:nowrap;">⚠️ MATCHES FOUND IN OTHER TABS</div>
       </div>
