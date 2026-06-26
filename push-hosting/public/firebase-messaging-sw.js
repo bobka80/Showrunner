@@ -15,8 +15,8 @@ firebase.initializeApp({
   "authDomain": "sm-showrunner-97405.firebaseapp.com",
   "projectId": "sm-showrunner-97405",
   "storageBucket": "sm-showrunner-97405.firebasestorage.app",
-  "messagingSenderId": "",
-  "appId": ""
+  "messagingSenderId": "729666442966",
+  "appId": "1:729666442966:web:3481078f7d39b4e6701b77"
 });
 
 

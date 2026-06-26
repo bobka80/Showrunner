@@ -20,8 +20,28 @@ function renderPushAdminPanel(containerId) {
         'Then use this test button on the same device.' +
       '</div>' +
       '<button class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">SEND TEST PUSH TO ME</button>' +
-      '<div id="push-admin-status" style="color:#71717a; font-size:10px; margin-top:8px;"></div>' +
+      '<div id="push-admin-status" style="color:#71717a; font-size:10px; margin-top:8px;">Checking device registration…</div>' +
     '</div>';
+
+  refreshPushAdminStatus();
+}
+
+function refreshPushAdminStatus() {
+  const status = document.getElementById('push-admin-status');
+  if (!status) return;
+  google.script.run
+    .withFailureHandler(function(err) {
+      status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+    })
+    .withSuccessHandler(function(res) {
+      if (!res || !res.registered) {
+        status.innerHTML = '<span style="color:#f59e0b;">No device token yet. Open the Hosting URL, allow notifications, log in here, wait ~10s, then retry.</span>';
+        return;
+      }
+      var when = res.updatedAt ? (' · ' + res.updatedAt.slice(0, 16).replace('T', ' ')) : '';
+      status.innerHTML = '<span style="color:#10b981;">Device registered' + when + '</span>';
+    })
+    .getFcmRegistrationStatus(ACTIVE_USER_NAME);
 }
 
 function runShowrunnerTestPush() {
@@ -38,6 +58,7 @@ function runShowrunnerTestPush() {
       } else {
         status.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Failed') + '</span>';
       }
+      setTimeout(refreshPushAdminStatus, 500);
     })
     .sendTestPushNotification(ACTIVE_USER_NAME);
 }

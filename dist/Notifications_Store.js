@@ -25,6 +25,24 @@ function registerFcmToken(crewName, token, deviceLabel, actor) {
   return { success: true, uid: uid };
 }
 
+function getFcmRegistrationStatus(crewName) {
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) return { registered: false, message: 'Unknown user profile.' };
+  const raw = PropertiesService.getScriptProperties().getProperty('FCM_TOKEN_' + String(profile.uid).trim());
+  if (!raw) return { registered: false, message: 'No token saved yet.' };
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      registered: !!(parsed && parsed.token),
+      label: parsed.label || '',
+      updatedAt: parsed.updatedAt || '',
+      message: parsed.token ? 'Device registered for push.' : 'No token saved yet.'
+    };
+  } catch (e) {
+    return { registered: false, message: 'Token record unreadable.' };
+  }
+}
+
 function getFcmTokenForUser(crewName) {
   const profile = getUserSecurityProfile(crewName);
   if (!profile || !profile.uid) return null;

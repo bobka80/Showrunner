@@ -38,7 +38,7 @@
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
-    if (ev.data.type === 'SHOWRUNNER_APP_READY') {
+    if (ev.data.type === 'SHOWRUNNER_APP_READY' || ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN') {
       appReady = true;
       postTokenToApp();
     }
@@ -89,6 +89,11 @@
       }
       setStatus('token ready');
       postTokenToApp();
+      var postAttempts = 0;
+      var postRetry = setInterval(function() {
+        postTokenToApp();
+        if (++postAttempts >= 40) clearInterval(postRetry);
+      }, 3000);
 
       messaging.onMessage(function(payload) {
         const title = (payload.notification && payload.notification.title) || 'Showrunner';

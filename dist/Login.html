@@ -2,6 +2,9 @@
 <html>
 <head>
   <base target="_top">
+  <script>
+  (function(){ if (window.self !== window.top) { var b = document.querySelector('base'); if (b) b.target = '_self'; } })();
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root { --bg-dark: #0a0a0c; --bg-card: #1a1a1e; --accent: #698b99; --text-main: #f4f4f5; }

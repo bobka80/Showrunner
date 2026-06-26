@@ -8,37 +8,69 @@
   if (window.__srFcmBootInstalled) return;
   window.__srFcmBootInstalled = true;
 
-  window.addEventListener('message', function(ev) {
-    if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN') return;
-    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
-    const token = ev.data.token;
-    if (!token) return;
-
-    google.script.run
-      .withFailureHandler(function(err) {
-        console.warn('FCM token register failed:', err && err.message ? err.message : err);
-      })
-      .withSuccessHandler(function(res) {
-        console.log('FCM token registered for', ACTIVE_USER_NAME);
-        if (typeof window.onShowrunnerFcmRegistered === 'function') {
-          window.onShowrunnerFcmRegistered(res);
-        }
-      })
-      .registerFcmToken(ACTIVE_USER_NAME, token, ev.data.label || 'web', ACTIVE_USER_NAME);
-  });
+  var pendingToken = null;
+  var pendingLabel = 'web';
+  var registeredToken = null;
+  var registerAttempts = 0;
 
   function notifyParentReady() {
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type: 'SHOWRUNNER_APP_READY' }, '*');
+        window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' }, '*');
       }
     } catch (e) { /* ignore */ }
   }
 
+  function registerTokenWithBackend(token, label) {
+    if (!token) return;
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
+      pendingToken = token;
+      pendingLabel = label || 'web';
+      return;
+    }
+    if (registeredToken === token) return;
+
+    registerAttempts++;
+    google.script.run
+      .withFailureHandler(function(err) {
+        console.warn('FCM token register failed:', err && err.message ? err.message : err);
+        window.__srFcmLastError = (err && err.message) ? err.message : String(err);
+      })
+      .withSuccessHandler(function(res) {
+        registeredToken = token;
+        pendingToken = null;
+        window.__srFcmLastError = '';
+        console.log('FCM token registered for', ACTIVE_USER_NAME);
+        if (typeof window.onShowrunnerFcmRegistered === 'function') {
+          window.onShowrunnerFcmRegistered(res);
+        }
+        notifyParentReady();
+      })
+      .registerFcmToken(ACTIVE_USER_NAME, token, label || 'web', ACTIVE_USER_NAME);
+  }
+
+  window.addEventListener('message', function(ev) {
+    if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN') return;
+    registerTokenWithBackend(ev.data.token, ev.data.label || 'web-hosting');
+  });
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', notifyParentReady);
   } else {
-    setTimeout(notifyParentReady, 500);
+    setTimeout(notifyParentReady, 300);
   }
+
+  var retryTimer = setInterval(function() {
+    if (pendingToken && typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
+      registerTokenWithBackend(pendingToken, pendingLabel);
+    }
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' }, '*');
+    }
+    if (registerAttempts > 0 && registeredToken) clearInterval(retryTimer);
+  }, 3000);
+
+  setTimeout(function() { clearInterval(retryTimer); }, 120000);
 })();
 </script>
