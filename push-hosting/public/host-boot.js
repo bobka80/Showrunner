@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '316';
+  const SW_BUILD = '317';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -196,7 +196,6 @@
   function startShellOnce() {
     if (shellInitStarted) return;
     shellInitStarted = true;
-    hideInstallPanel();
     initShell();
   }
 
@@ -950,13 +949,13 @@
   }
 
   async function initShell() {
+    if (frame) frame.src = PROD_GAS_EXEC;
     try {
       firebaseConfig = await loadConfigJsonp();
       if (!firebaseConfig.apiKey || !firebaseConfig.vapidKey || firebaseConfig.vapidKeyValid === false) {
-        logPush('config incomplete');
+        logPush('config incomplete — app loaded, push setup skipped');
         return;
       }
-      if (frame) frame.src = PROD_GAS_EXEC;
       firebase.initializeApp({
         apiKey: firebaseConfig.apiKey,
         authDomain: firebaseConfig.authDomain,
@@ -1048,10 +1047,11 @@
   if (installSkipBtn) {
     installSkipBtn.addEventListener('click', function() {
       try { localStorage.setItem('sr_pwa_install_skip', '1'); } catch (err) { /* ignore */ }
+      hideInstallPanel();
       startShellOnce();
     });
   }
 
+  startShellOnce();
   if (shouldShowInstallPanel()) showInstallPanel();
-  else startShellOnce();
 })();

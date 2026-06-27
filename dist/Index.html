@@ -4423,11 +4423,25 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 </div>
 
 
-</body>
-</html>
+
 <script>
   console.log('Booting UI... Fetching App Logic...');
-  
+
+  function showBootFailure(msg) {
+    console.error('[Showrunner boot]', msg);
+    var el = document.getElementById('sr-boot-failure');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'sr-boot-failure';
+      el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#0a0a0c;color:#f4f4f5;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;font-family:Inter,system-ui,sans-serif;';
+      el.innerHTML = '<div style="max-width:420px;text-align:center;"><div style="font-size:40px;margin-bottom:12px;">⚠️</div><h2 style="margin:0 0 10px;font-size:18px;color:#ef4444;">Showrunner failed to start</h2><p id="sr-boot-failure-msg" style="margin:0 0 16px;color:#a1a1aa;font-size:13px;line-height:1.5;"></p><button type="button" onclick="location.reload()" style="background:#10b981;border:none;color:#fff;font-weight:800;padding:12px 18px;border-radius:6px;cursor:pointer;">Reload</button></div>';
+      document.body.appendChild(el);
+    }
+    var m = document.getElementById('sr-boot-failure-msg');
+    if (m) m.textContent = msg || 'Unknown boot error';
+    el.style.display = 'flex';
+  }
+
   // Polyfill for DOMContentLoaded because the JS is injected asynchronously AFTER the DOM is already ready!
   const originalAddEventListener = document.addEventListener;
   document.addEventListener = function(type, listener, options) {
@@ -4437,24 +4451,55 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
       originalAddEventListener.call(document, type, listener, options);
     }
   };
-  
-  google.script.run.withSuccessHandler(function(count) {
-     var chunks = [];
-     var fetched = 0;
-     for (var i=0; i<count; i++) {
-        (function(index) {
-          google.script.run.withSuccessHandler(function(chunkStr) {
-             chunks[index] = chunkStr;
-             fetched++;
-             if (fetched === count) {
-                console.log('App Logic received! Executing...');
-                var jsCode = chunks.join('');
-                var s = document.createElement('script');
-                s.text = jsCode;
-                document.body.appendChild(s);
-             }
-          }).getFrontendLogicChunk(index);
-        })(i);
-     }
-  }).getFrontendLogicChunkCount();
+
+  if (typeof google === 'undefined' || !google.script || !google.script.run) {
+    showBootFailure('Google Apps Script bridge missing. Open the Showrunner URL from script.google.com or web.app, not a saved offline copy.');
+  } else {
+    google.script.run
+      .withFailureHandler(function(err) {
+        showBootFailure('Could not load app logic: ' + ((err && err.message) ? err.message : String(err)));
+      })
+      .withSuccessHandler(function(count) {
+        if (!count || count < 1) {
+          showBootFailure('App logic unavailable (empty payload). Try again in a minute or contact support.');
+          return;
+        }
+        var chunks = [];
+        var fetched = 0;
+        var failed = false;
+        for (var i = 0; i < count; i++) {
+          (function(index) {
+            google.script.run
+              .withFailureHandler(function(err) {
+                if (failed) return;
+                failed = true;
+                showBootFailure('Chunk ' + index + ' failed: ' + ((err && err.message) ? err.message : String(err)));
+              })
+              .withSuccessHandler(function(chunkStr) {
+                if (failed) return;
+                chunks[index] = chunkStr || '';
+                fetched++;
+                if (fetched === count) {
+                  try {
+                    console.log('App Logic received! Executing...');
+                    var jsCode = chunks.join('');
+                    var s = document.createElement('script');
+                    s.text = jsCode;
+                    document.body.appendChild(s);
+                    var failEl = document.getElementById('sr-boot-failure');
+                    if (failEl) failEl.style.display = 'none';
+                  } catch (execErr) {
+                    showBootFailure('App logic error: ' + ((execErr && execErr.message) ? execErr.message : String(execErr)));
+                  }
+                }
+              })
+              .getFrontendLogicChunk(index);
+          })(i);
+        }
+      })
+      .getFrontendLogicChunkCount();
+  }
 </script>
+
+</body>
+</html>

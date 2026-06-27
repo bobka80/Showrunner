@@ -281,8 +281,8 @@
     return accessTierRank(USER_ACCESS) >= accessTierRank(minTier);
   };
 
-  const USER_ACCESS = normalizeAccessTier(document.querySelector('meta[name="user-access"]').content);
-  const ACTIVE_USER_NAME = document.querySelector('meta[name="user-name"]').content;
+  const USER_ACCESS = normalizeAccessTier((document.querySelector('meta[name="user-access"]') || {}).content || 'CREW');
+  const ACTIVE_USER_NAME = (document.querySelector('meta[name="user-name"]') || {}).content || '';
   const ACTIVE_USER_UID = (document.querySelector('meta[name="user-uid"]') || {}).content || '';
   const ACTIVE_USER_EMAIL = (document.querySelector('meta[name="user-email"]') || {}).content || '';
   window.ACTIVE_USER_UID = ACTIVE_USER_UID;
