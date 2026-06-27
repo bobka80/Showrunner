@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '303';
+  const SW_BUILD = '304';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -23,6 +23,7 @@
   let pendingFcmAuth = null;
   let regKeySaveInFlight = false;
   let registrationLoopTimer = null;
+  let tokenBroadcastTimer = null;
   let serverSaveConfirmed = false;
   let regKeyFailCount = 0;
   let pushResetAttempts = 0;
@@ -296,8 +297,10 @@
     } else if (recentSession) {
       setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
     } else if (elapsed >= 8000) {
-      setDockMessage('Waiting for Showrunner app to confirm your login…');
-      setDockStatus(['Step 1: token OK', 'Step 2: no app response', 'trying alternate path']);
+      setDockMessage('Saving alerts through the Showrunner app below…');
+      setDockStatus(['Step 1: token OK', 'Step 2: saving via app…', 'keep calendar visible']);
+    } else if (elapsed >= 3000) {
+      setDockStatus(['Step 1: token OK', 'Step 2: saving via app…']);
     } else {
       setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
     }
@@ -324,6 +327,37 @@
     }
   }
 
+  function stopTokenBroadcast() {
+    if (tokenBroadcastTimer) {
+      clearInterval(tokenBroadcastTimer);
+      tokenBroadcastTimer = null;
+    }
+  }
+
+  function broadcastTokenToIframe() {
+    if (!fcmToken || !frame || !frame.contentWindow) return;
+    try {
+      frame.contentWindow.postMessage({
+        type: 'SHOWRUNNER_FCM_TOKEN',
+        token: fcmToken,
+        label: deviceLabel()
+      }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  function startTokenBroadcastUntilAck() {
+    if (tokenBroadcastTimer || serverSaveConfirmed || !fcmToken) return;
+    broadcastTokenToIframe();
+    tokenBroadcastTimer = setInterval(function() {
+      if (serverSaveConfirmed) {
+        stopTokenBroadcast();
+        return;
+      }
+      broadcastTokenToIframe();
+    }, 3000);
+    setTimeout(function() { stopTokenBroadcast(); }, 300000);
+  }
+
   function startRegistrationLoop() {
     if (registrationLoopTimer || serverSaveConfirmed) return;
     var elapsed = 0;
@@ -334,6 +368,7 @@
       }
       if (!pendingFcmAuth || !pendingFcmAuth.regKey) {
         showStep2Status(elapsed);
+        broadcastTokenToIframe();
         requestFcmAuthFromIframe();
         if (elapsed >= 8000) {
           tryRefreshRegKeyFromParent();
@@ -362,6 +397,7 @@
         serverSaveConfirmed = true;
         regKeyFailCount = 0;
         stopRegistrationLoop();
+        stopTokenBroadcast();
         setDockStatus(['Step 3: SAVED', (res.deviceCount || 1) + ' device(s)', res.labels || '']);
         hidePushPrompt();
         notifyIframeRegistered(true, 'Alerts linked to your account.');
@@ -451,6 +487,7 @@
         serverSaveConfirmed = true;
         regKeyFailCount = 0;
         stopRegistrationLoop();
+        stopTokenBroadcast();
         logPush('token saved via bridge');
         setDockStatus(['Step 3: SAVED', 'alerts linked']);
         hidePushPrompt();
@@ -532,6 +569,8 @@
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
       serverSaveConfirmed = true;
       stopRegistrationLoop();
+      stopTokenBroadcast();
+      setDockStatus(['Step 3: SAVED', 'alerts linked to your account']);
       hidePushPrompt();
     }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_PUSH_PERMISSION') {
@@ -549,13 +588,17 @@
           label: deviceLabel()
         }, '*');
       } catch (e) { /* ignore */ }
+      return;
     }
   });
 
   if (frame) {
     frame.addEventListener('load', function() {
       burstRequestAuthFromIframe();
-      if (fcmToken) trySaveTokenViaRegKey();
+      if (fcmToken) {
+        broadcastTokenToIframe();
+        trySaveTokenViaRegKey();
+      }
     });
   }
 
@@ -635,9 +678,11 @@
     }
 
     logPush('token ready — auto-linking');
-    setDockMessage('Linking alerts to your account…');
-    setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
-    notifyIframePushState(true, 'Setting up alerts — allow notifications above if prompted.');
+    setDockMessage('Saving alerts through Showrunner…');
+    setDockStatus(['Step 1: token OK', 'Step 2: saving via app…']);
+    notifyIframePushState(true, 'Setting up alerts — keep the calendar visible below.');
+    broadcastTokenToIframe();
+    startTokenBroadcastUntilAck();
     requestFcmAuthFromIframe();
     trySaveTokenViaRegKey();
     startRegistrationLoop();

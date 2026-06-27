@@ -9,6 +9,7 @@
   window.__srFcmBootInstalled = true;
 
   var pushLinked = false;
+  var hostSaveInFlight = false;
   window.isShowrunnerHostingShell = (window.self !== window.top);
 
   function getFcmRegKey() {
@@ -33,27 +34,58 @@
     var crew = getCrewName();
     if (!regKey || !crew) return;
     try { localStorage.setItem('sr_fcm_reg_key', regKey); } catch (e) { /* ignore */ }
-    try {
-      var payload = { type: 'SHOWRUNNER_FCM_AUTH', regKey: regKey, crewName: crew };
-      window.parent.postMessage(payload, '*');
-      window.parent.postMessage({
-        type: 'SHOWRUNNER_SESSION',
-        regKey: regKey,
-        crewName: crew,
-        loggedIn: true
-      }, '*');
-    } catch (e) { /* ignore */ }
+    postToHosting({ type: 'SHOWRUNNER_FCM_AUTH', regKey: regKey, crewName: crew });
+    postToHosting({
+      type: 'SHOWRUNNER_SESSION',
+      regKey: regKey,
+      crewName: crew,
+      loggedIn: true
+    });
   }
 
   function notifyParentLinkError(step, message) {
     if (!window.isShowrunnerHostingShell) return;
-    try {
-      window.parent.postMessage({
-        type: 'SHOWRUNNER_FCM_LINK_ERROR',
-        step: step || 'bridge',
-        message: message || 'Could not reach Showrunner server from app.'
-      }, '*');
-    } catch (e) { /* ignore */ }
+    postToHosting({
+      type: 'SHOWRUNNER_FCM_LINK_ERROR',
+      step: step || 'bridge',
+      message: message || 'Could not reach Showrunner server from app.'
+    });
+  }
+
+  function postToHosting(payload) {
+    var targets = [];
+    try { if (window.parent && window.parent !== window) targets.push(window.parent); } catch (e) { /* ignore */ }
+    try { if (window.top && window.top !== window) targets.push(window.top); } catch (e) { /* ignore */ }
+    for (var i = 0; i < targets.length; i++) {
+      try { targets[i].postMessage(payload, '*'); } catch (e) { /* ignore */ }
+    }
+  }
+
+  function saveTokenFromHosting(data) {
+    if (pushLinked || !data || !data.token) return;
+    var crew = getCrewName();
+    if (!crew) return;
+    if (hostSaveInFlight) return;
+    hostSaveInFlight = true;
+    google.script.run
+      .withFailureHandler(function(err) {
+        hostSaveInFlight = false;
+        notifyParentLinkError('save', (err && err.message) ? err.message : 'Save failed');
+      })
+      .withSuccessHandler(function(res) {
+        hostSaveInFlight = false;
+        if (res && res.success) {
+          onHostRegistered(res);
+        } else {
+          notifyParentLinkError('save', (res && res.message) ? res.message : 'Save rejected');
+        }
+      })
+      .saveMyFcmDeviceToken(crew, data.token, data.label || 'pwa-mobile');
+  }
+
+  function requestTokenFromHosting() {
+    if (!window.isShowrunnerHostingShell || pushLinked) return;
+    postToHosting({ type: 'SHOWRUNNER_REQUEST_FCM_TOKEN' });
   }
 
   function pushSessionToParent() {
@@ -61,14 +93,12 @@
     var crew = getCrewName();
     if (!crew) return;
     var regKey = getFcmRegKey();
-    try {
-      window.parent.postMessage({
-        type: 'SHOWRUNNER_SESSION',
-        regKey: regKey || '',
-        crewName: crew,
-        loggedIn: true
-      }, '*');
-    } catch (e) { /* ignore */ }
+    postToHosting({
+      type: 'SHOWRUNNER_SESSION',
+      regKey: regKey || '',
+      crewName: crew,
+      loggedIn: true
+    });
     if (regKey) pushFcmAuthToParent(regKey);
   }
 
@@ -76,13 +106,11 @@
     if (!window.isShowrunnerHostingShell) return;
     var crew = getCrewName();
     var regKey = getFcmRegKey();
-    try {
-      window.parent.postMessage({
-        type: 'SHOWRUNNER_APP_READY',
-        crewName: crew,
-        regKey: regKey
-      }, '*');
-    } catch (e) { /* ignore */ }
+    postToHosting({
+      type: 'SHOWRUNNER_APP_READY',
+      crewName: crew,
+      regKey: regKey
+    });
     if (regKey && crew) pushFcmAuthToParent(regKey);
   }
 
@@ -98,13 +126,11 @@
           notifyParentLinkError('bridge', (res && res.message) ? res.message : 'Bridge rejected');
           return;
         }
-        try {
-          window.parent.postMessage({
-            type: 'SHOWRUNNER_FCM_BRIDGE',
-            nonce: res.nonce,
-            label: 'pwa-mobile'
-          }, '*');
-        } catch (e) { /* ignore */ }
+        postToHosting({
+          type: 'SHOWRUNNER_FCM_BRIDGE',
+          nonce: res.nonce,
+          label: 'pwa-mobile'
+        });
       })
       .prepareFcmRegistrationBridge(crew);
   }
@@ -137,9 +163,7 @@
     if (res && res.success) {
       pushLinked = true;
       updatePushStatusMirror(false, '');
-      try {
-        window.parent.postMessage({ type: 'SHOWRUNNER_FCM_SAVE_ACK' }, '*');
-      } catch (e) { /* ignore */ }
+      postToHosting({ type: 'SHOWRUNNER_FCM_SAVE_ACK', success: true });
     }
     if (typeof window.onShowrunnerFcmRegistered === 'function') {
       window.onShowrunnerFcmRegistered(res || { success: false });
@@ -169,6 +193,9 @@
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
+    if (ev.data.type === 'SHOWRUNNER_FCM_TOKEN') {
+      saveTokenFromHosting(ev.data);
+    }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_AUTH' ||
         ev.data.type === 'SHOWRUNNER_REQUEST_FCM_BRIDGE') {
       respondToParentPushRequest();
@@ -184,6 +211,7 @@
   function bootBridge() {
     if (!window.isShowrunnerHostingShell) return;
     respondToParentPushRequest();
+    requestTokenFromHosting();
   }
 
   if (document.readyState === 'loading') {
@@ -195,6 +223,7 @@
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible' && !pushLinked) {
       respondToParentPushRequest();
+      requestTokenFromHosting();
     }
   });
 
@@ -204,6 +233,7 @@
       return;
     }
     pushSessionToParent();
+    requestTokenFromHosting();
   }, 1500);
 
   setTimeout(function() { clearInterval(metaBroadcast); }, 600000);
