@@ -112,17 +112,29 @@ function sendFcmToTokens_(tokens, title, body, linkUrl, options) {
   const errors = [];
   const deadTokens = [];
   list.forEach(function(token) {
+    const safeTitle = String(title || 'Showrunner');
+    const safeBody = String(body || '');
     const payload = {
       message: {
         token: token,
         notification: {
-          title: title || 'Showrunner',
-          body: body || ''
+          title: safeTitle,
+          body: safeBody
+        },
+        data: {
+          title: safeTitle,
+          body: safeBody,
+          link: String(clickLink || '')
         },
         webpush: {
+          headers: {
+            Urgency: 'high',
+            TTL: '86400'
+          },
           notification: {
-            icon: iconUrl,
-            badge: iconUrl
+            title: safeTitle,
+            body: safeBody,
+            icon: iconUrl
           },
           fcmOptions: { link: clickLink }
         }
@@ -152,7 +164,6 @@ function sendTestPushNotification(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
   }
-  cleanupFcmDevicesForUser(crewName);
   const profile = getUserSecurityProfile(crewName);
   const tokens = getFcmTokensForUser(crewName);
   if (!tokens.length) {
@@ -171,7 +182,8 @@ function sendTestPushNotification(crewName) {
   if (result.sent > 0) {
     writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', crewName, 'Test Push',
       'Sent test FCM to ' + result.sent + '/' + tokens.length + ' device(s). Pruned=' + pruned);
-    var msg = 'Test push delivered to ' + result.sent + ' device(s).';
+    var msg = 'FCM accepted on ' + result.sent + ' device(s).';
+    msg += ' If nothing appears: put web.app in background or lock the phone, then retry.';
     if (pruned > 0) msg += ' Removed ' + pruned + ' dead token(s) from your account.';
     if (result.sent < tokens.length && result.errors.length) {
       msg += ' Some devices failed: ' + result.errors[0];
@@ -214,7 +226,7 @@ function sendTestPushToDevice(crewName, tokenKey) {
       writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', tokenKey, 'Test Push Device',
         'Sent test FCM to device key ' + tokenKey);
     } catch (e) { /* optional */ }
-    return { success: true, message: 'Test push delivered to this device.' };
+    return { success: true, message: 'FCM accepted for this device. If nothing appears, switch web.app to background and retry.' };
   }
   var failMsg = 'Send failed for this device.';
   if (result.errors.length) failMsg += ' ' + result.errors[0];

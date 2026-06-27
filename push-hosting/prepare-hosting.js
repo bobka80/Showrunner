@@ -124,15 +124,20 @@ firebase.initializeApp(${JSON.stringify({
 const messaging = firebase.messaging();
 const SR_PUSH_ICON = '/icon-192.png';
 messaging.onBackgroundMessage(function(payload) {
-  const title = (payload.notification && payload.notification.title) || 'Showrunner';
+  const d = payload.data || {};
   const n = payload.notification || {};
+  const title = n.title || d.title || 'Showrunner';
+  const body = n.body || d.body || '';
   const options = {
-    body: n.body || '',
+    body: body,
     icon: n.icon || SR_PUSH_ICON,
     badge: n.badge || SR_PUSH_ICON,
-    data: payload.data || {}
+    data: d,
+    tag: 'showrunner-push',
+    renotify: true,
+    vibrate: [180, 80, 180]
   };
-  self.registration.showNotification(title, options);
+  return self.registration.showNotification(title, options);
 });
 `;
   fs.writeFileSync(swPath, sw);

@@ -14,11 +14,39 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '305';
+  const SW_BUILD = '308';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
   let pushStarted = false;
+  let foregroundHandlerRegistered = false;
+
+  function showLocalPushNotification(payload) {
+    var n = (payload && payload.notification) || {};
+    var d = (payload && payload.data) || {};
+    var title = n.title || d.title || 'Showrunner';
+    var body = n.body || d.body || '';
+    if (Notification.permission !== 'granted') return;
+    try {
+      new Notification(title, {
+        body: body,
+        icon: '/icon-192.png',
+        tag: 'showrunner-' + Date.now()
+      });
+    } catch (e) {
+      logPush('foreground notification failed: ' + ((e && e.message) || e));
+    }
+  }
+
+  function registerForegroundPushHandler() {
+    if (foregroundHandlerRegistered || !firebase.apps.length) return;
+    if (!messaging) messaging = firebase.messaging();
+    messaging.onMessage(function(payload) {
+      logPush('foreground push received');
+      showLocalPushNotification(payload);
+    });
+    foregroundHandlerRegistered = true;
+  }
   let pendingBridge = null;
   let pendingFcmAuth = null;
   let regKeySaveInFlight = false;
@@ -655,6 +683,7 @@
       await navigator.serviceWorker.ready;
       await new Promise(function(r) { setTimeout(r, fromUserTap ? 400 : 800); });
       if (!messaging) messaging = firebase.messaging();
+      registerForegroundPushHandler();
 
       var lastErr = null;
       for (var i = 0; i < 3; i++) {
@@ -700,14 +729,6 @@
     requestFcmAuthFromIframe();
     trySaveTokenViaRegKey();
     startRegistrationLoop();
-
-    messaging.onMessage(function(payload) {
-      var title = (payload.notification && payload.notification.title) || 'Showrunner';
-      var body = (payload.notification && payload.notification.body) || '';
-      if (Notification.permission === 'granted') {
-        new Notification(title, { body: body, icon: '/icon-192.png', badge: '/icon-192.png' });
-      }
-    });
     return true;
   }
 
@@ -766,6 +787,7 @@
         messagingSenderId: firebaseConfig.messagingSenderId,
         appId: firebaseConfig.appId
       });
+      registerForegroundPushHandler();
       if (!('Notification' in window)) return;
 
       if (Notification.permission === 'granted') {
@@ -774,10 +796,12 @@
           return;
         }
         pushStarted = false;
-        showPushPrompt('retry');
-        setDockMessage('Log in below, then tap Set up shift alerts.');
-        setDockStatus(['Log in first', 'Then tap the green button']);
-        if (enableBtn) enableBtn.textContent = 'Set up shift alerts';
+        setDockMessage('Restoring shift alerts on this device…');
+        setDockStatus(['Checking alert token…']);
+        obtainFcmToken(false).catch(function(err) {
+          logPush('silent token restore failed: ' + formatPushError(err));
+          showPushPrompt('retry');
+        });
         return;
       }
       if (Notification.permission === 'denied') {
