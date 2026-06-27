@@ -34,10 +34,13 @@
     if (!regKey || !crew) return;
     try { localStorage.setItem('sr_fcm_reg_key', regKey); } catch (e) { /* ignore */ }
     try {
+      var payload = { type: 'SHOWRUNNER_FCM_AUTH', regKey: regKey, crewName: crew };
+      window.parent.postMessage(payload, '*');
       window.parent.postMessage({
-        type: 'SHOWRUNNER_FCM_AUTH',
+        type: 'SHOWRUNNER_SESSION',
         regKey: regKey,
-        crewName: crew
+        crewName: crew,
+        loggedIn: true
       }, '*');
     } catch (e) { /* ignore */ }
   }
@@ -166,7 +169,17 @@
     var k = getFcmRegKey();
     var crew = getCrewName();
     if (crew && k) pushFcmAuthToParent(k);
-  }, 2000);
+    else if (crew) {
+      try {
+        window.parent.postMessage({
+          type: 'SHOWRUNNER_SESSION',
+          crewName: crew,
+          regKey: k || '',
+          loggedIn: true
+        }, '*');
+      } catch (e) { /* ignore */ }
+    }
+  }, 1500);
 
   setTimeout(function() { clearInterval(metaBroadcast); }, 600000);
 

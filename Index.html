@@ -215,6 +215,12 @@
           crewName: crewName
         }, '*');
         window.parent.postMessage({
+          type: 'SHOWRUNNER_SESSION',
+          regKey: regKey,
+          crewName: crewName,
+          loggedIn: true
+        }, '*');
+        window.parent.postMessage({
           type: 'SHOWRUNNER_APP_READY',
           regKey: regKey,
           crewName: crewName
