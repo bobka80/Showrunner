@@ -66,9 +66,30 @@ function getFirebaseAccessToken_() {
   return data.access_token;
 }
 
-function sendFcmToTokens_(tokens, title, body, linkUrl) {
+function isFcmTokenDeadError_(errText) {
+  const t = String(errText || '').toUpperCase();
+  return t.indexOf('UNREGISTERED') !== -1 ||
+    t.indexOf('NOT_FOUND') !== -1 ||
+    t.indexOf('NOT_REGISTERED') !== -1 ||
+    t.indexOf('INVALID_ARGUMENT') !== -1 ||
+    t.indexOf('REQUESTED ENTITY WAS NOT FOUND') !== -1;
+}
+
+function summarizeFcmError_(errText) {
+  try {
+    const j = JSON.parse(errText);
+    const st = (j.error && j.error.status) ? String(j.error.status) : '';
+    const msg = (j.error && j.error.message) ? String(j.error.message) : String(errText);
+    return st ? (st + ': ' + msg) : msg.slice(0, 180);
+  } catch (e) {
+    return String(errText || 'unknown error').slice(0, 180);
+  }
+}
+
+function sendFcmToTokens_(tokens, title, body, linkUrl, options) {
+  const opts = options || {};
   const list = (tokens || []).filter(function(t) { return t && String(t).length > 20; });
-  if (!list.length) return { sent: 0, errors: ['No FCM tokens registered.'] };
+  if (!list.length) return { sent: 0, errors: ['No FCM tokens registered.'], deadTokens: [] };
 
   const sa = getFirebaseServiceAccount_();
   const projectId = sa.project_id || PropertiesService.getScriptProperties().getProperty('FIREBASE_PROJECT_ID');
@@ -82,6 +103,7 @@ function sendFcmToTokens_(tokens, title, body, linkUrl) {
 
   let sent = 0;
   const errors = [];
+  const deadTokens = [];
   list.forEach(function(token) {
     const payload = {
       message: {
@@ -105,16 +127,22 @@ function sendFcmToTokens_(tokens, title, body, linkUrl) {
     if (resp.getResponseCode() >= 200 && resp.getResponseCode() < 300) {
       sent++;
     } else {
-      errors.push(resp.getContentText());
+      const errText = resp.getContentText();
+      errors.push(summarizeFcmError_(errText));
+      if (opts.pruneInvalid !== false && isFcmTokenDeadError_(errText)) {
+        deadTokens.push(token);
+      }
     }
   });
-  return { sent: sent, errors: errors };
+  return { sent: sent, errors: errors, deadTokens: deadTokens };
 }
 
 function sendTestPushNotification(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
   }
+  cleanupFcmDevicesForUser(crewName);
+  const profile = getUserSecurityProfile(crewName);
   const tokens = getFcmTokensForUser(crewName);
   if (!tokens.length) {
     return { success: false, message: 'No FCM token for this user. Open ' + (getFirebasePublicConfig().hostingUrl || 'the Hosting URL') + ', allow notifications, and log in.' };
@@ -125,15 +153,30 @@ function sendTestPushNotification(crewName) {
     'Push notifications are working.',
     getFirebasePublicConfig().hostingUrl
   );
+  let pruned = 0;
+  if (profile && profile.uid && result.deadTokens && result.deadTokens.length) {
+    pruned = removeFcmTokensForUid_(profile.uid, result.deadTokens);
+  }
   if (result.sent > 0) {
     writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', crewName, 'Test Push',
-      'Sent test FCM to ' + result.sent + '/' + tokens.length + ' device(s).');
-    var msg = result.sent === tokens.length
-      ? ('Test push sent to ' + result.sent + ' registered device(s).')
-      : ('Test push sent to ' + result.sent + ' of ' + tokens.length + ' device(s).');
-    return { success: true, message: msg };
+      'Sent test FCM to ' + result.sent + '/' + tokens.length + ' device(s). Pruned=' + pruned);
+    var msg = 'Test push delivered to ' + result.sent + ' device(s).';
+    if (pruned > 0) msg += ' Removed ' + pruned + ' dead token(s) from your account.';
+    if (result.sent < tokens.length && result.errors.length) {
+      msg += ' Some devices failed: ' + result.errors[0];
+    }
+    return {
+      success: true,
+      partial: result.sent < tokens.length,
+      message: msg,
+      sent: result.sent,
+      pruned: pruned
+    };
   }
-  return { success: false, message: 'Send failed: ' + (result.errors[0] || 'unknown error') };
+  var failMsg = 'Send failed — no device accepted the push.';
+  if (result.errors.length) failMsg += ' ' + result.errors[0];
+  if (pruned > 0) failMsg += ' Removed ' + pruned + ' dead token(s). Re-register on your phone from web.app.';
+  return { success: false, message: failMsg, pruned: pruned };
 }
 
 /** Run once from Apps Script editor after deploy to grant UrlFetchApp (FCM) permission. */

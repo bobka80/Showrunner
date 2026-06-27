@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '304';
+  const SW_BUILD = '305';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -208,8 +208,25 @@
 
   function hidePushPrompt() {
     if (isMobileDevice() && !serverSaveConfirmed && fcmToken && pendingFcmAuth) return;
-    document.body.classList.remove('push-dock-open');
+    document.body.classList.remove('push-dock-open', 'push-dock-saved');
     if (bannerEl) bannerEl.classList.add('hidden');
+    notifyIframePushState(false, '');
+    syncDockLayout();
+  }
+
+  function showPushSavedCompact() {
+    serverSaveConfirmed = true;
+    stopRegistrationLoop();
+    stopTokenBroadcast();
+    document.body.classList.add('push-dock-open', 'push-dock-saved');
+    if (bannerEl) bannerEl.classList.add('hidden');
+    hideInstallPanel();
+    setDockMessage('');
+    setDockStatus(['✓ Shift alerts active on this device']);
+    if (enableBtn) {
+      enableBtn.textContent = 'Re-register alerts';
+      enableBtn.style.display = 'inline-block';
+    }
     notifyIframePushState(false, '');
     syncDockLayout();
   }
@@ -399,7 +416,7 @@
         stopRegistrationLoop();
         stopTokenBroadcast();
         setDockStatus(['Step 3: SAVED', (res.deviceCount || 1) + ' device(s)', res.labels || '']);
-        hidePushPrompt();
+        showPushSavedCompact();
         notifyIframeRegistered(true, 'Alerts linked to your account.');
       } else if (!regKeySaveInFlight) {
         setDockStatus(['Step 3: checking…', (res && res.message) ? res.message : 'Retrying']);
@@ -490,7 +507,7 @@
         stopTokenBroadcast();
         logPush('token saved via bridge');
         setDockStatus(['Step 3: SAVED', 'alerts linked']);
-        hidePushPrompt();
+        showPushSavedCompact();
         notifyIframeRegistered(true, 'Alerts linked to your account.');
       } else {
         logPush('bridge save failed: ' + ((res && res.message) || 'rejected'));
@@ -567,11 +584,8 @@
       }
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
-      serverSaveConfirmed = true;
-      stopRegistrationLoop();
-      stopTokenBroadcast();
       setDockStatus(['Step 3: SAVED', 'alerts linked to your account']);
-      hidePushPrompt();
+      showPushSavedCompact();
     }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_PUSH_PERMISSION') {
       pushStarted = false;

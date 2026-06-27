@@ -44,8 +44,9 @@ function renderPushAdminPanel(containerId) {
       '</div>' +
       '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="display:inline-block; margin:0 8px 8px 0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>' +
       '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981;" onclick="retryShowrunnerFcmRegistration()">RETRY DEVICE REGISTER</button>' +
+      '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#f59e0b; color:#f59e0b;" onclick="cleanupShowrunnerFcmDevices()">CLEAN STALE DEVICES</button>' +
       '<button class="btn-outline btn-sm" style="margin:0 0 8px 0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">SEND TEST PUSH TO ME</button>' +
-      '<div id="push-admin-status" style="color:#71717a; font-size:10px; margin-top:8px;">Checking push setup…</div>' +
+      '<div id="push-admin-status" style="color:#71717a; font-size:11px; margin-top:8px; line-height:1.5; word-break:break-word; min-height:2.5em;">Checking push setup…</div>' +
     '</div>';
 
   if (typeof window.onShowrunnerFcmRegistered !== 'function') {
@@ -176,9 +177,12 @@ function refreshPushAdminStatus() {
             var count = res.deviceCount > 1 ? (res.deviceCount + ' devices') : '1 device';
             var detail = '';
             if (res.devices && res.devices.length) {
-              detail = ' (' + res.devices.map(function(d) { return d.label; }).join(', ') + ')';
+              detail = '<br><span style="color:#888;">' + res.devices.map(function(d) {
+                var when = d.updatedAt ? d.updatedAt.slice(0, 16).replace('T', ' ') : '';
+                return (d.label || 'web') + (when ? (' · ' + when) : '');
+              }).join('<br>') + '</span>';
             }
-            status.innerHTML = '<span style="color:#10b981;">VAPID OK · ' + count + ' registered' + detail + when + '</span>';
+            status.innerHTML = '<span style="color:#10b981;">VAPID OK · ' + count + ' registered' + when + '</span>' + detail;
             if (res.deviceCount < 2) {
               status.innerHTML += '<br><span style="color:#71717a;">Phone: open web.app in Chrome → Allow notifications → log in. Expect web-mobile in list above.</span>';
             }
@@ -212,6 +216,25 @@ function retryShowrunnerFcmRegistration() {
   }
 }
 
+function cleanupShowrunnerFcmDevices() {
+  const status = document.getElementById('push-admin-status');
+  if (status) status.textContent = 'Cleaning stale devices…';
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (status) status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+    })
+    .withSuccessHandler(function(res) {
+      if (!status) return;
+      if (res && res.success) {
+        status.innerHTML = '<span style="color:#10b981;">' + res.message + '</span>';
+      } else {
+        status.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Cleanup failed') + '</span>';
+      }
+      setTimeout(refreshPushAdminStatus, 500);
+    })
+    .cleanupFcmDevicesForUser(ACTIVE_USER_NAME);
+}
+
 function runShowrunnerTestPush() {
   const status = document.getElementById('push-admin-status');
   if (status) status.textContent = 'Sending...';
@@ -222,7 +245,8 @@ function runShowrunnerTestPush() {
     .withSuccessHandler(function(res) {
       if (!status) return;
       if (res && res.success) {
-        status.innerHTML = '<span style="color:#10b981;">' + res.message + '</span>';
+        var color = res.partial ? '#f59e0b' : '#10b981';
+        status.innerHTML = '<span style="color:' + color + ';">' + res.message + '</span>';
       } else {
         status.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Failed') + '</span>';
       }

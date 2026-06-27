@@ -199,6 +199,13 @@ function registerFcmToken(crewName, token, deviceLabel, actor) {
     const devices = record.devices || [];
     const now = new Date().toISOString();
     const label = deviceLabel || 'web';
+
+    // One active token per label (phone resets mint new FCM tokens — replace, don't stack).
+    for (let i = devices.length - 1; i >= 0; i--) {
+      if (devices[i].label === label && devices[i].token !== cleanToken) {
+        devices.splice(i, 1);
+      }
+    }
     let found = false;
     for (let i = 0; i < devices.length; i++) {
       if (devices[i].token === cleanToken) {
@@ -211,7 +218,7 @@ function registerFcmToken(crewName, token, deviceLabel, actor) {
     if (!found) {
       devices.push({ token: cleanToken, label: label, updatedAt: now });
     }
-    const maxDevices = 5;
+    const maxDevices = 3;
     while (devices.length > maxDevices) {
       devices.sort(function(a, b) { return String(a.updatedAt).localeCompare(String(b.updatedAt)); });
       devices.shift();
@@ -309,4 +316,65 @@ function getFcmTokensForUids(uidList) {
     });
   });
   return tokens;
+}
+
+function removeFcmTokensForUid_(uid, tokensToRemove) {
+  const cleanUid = String(uid || '').trim();
+  if (!cleanUid) return 0;
+  const removeSet = {};
+  (tokensToRemove || []).forEach(function(t) {
+    const s = String(t || '').trim();
+    if (s) removeSet[s] = true;
+  });
+  if (!Object.keys(removeSet).length) return 0;
+
+  const props = PropertiesService.getScriptProperties();
+  const key = 'FCM_TOKEN_' + cleanUid;
+  const record = parseFcmTokenRecord_(props.getProperty(key));
+  const before = (record.devices || []).length;
+  record.devices = (record.devices || []).filter(function(d) {
+    return d && d.token && !removeSet[String(d.token)];
+  });
+  props.setProperty(key, JSON.stringify({
+    email: record.email || '',
+    devices: record.devices
+  }));
+  return before - record.devices.length;
+}
+
+/** Keep newest token per label; drop duplicates from registration retries. */
+function cleanupFcmDevicesForUser(crewName) {
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) return { success: false, message: 'Unknown user profile.' };
+  const uid = String(profile.uid).trim();
+  const props = PropertiesService.getScriptProperties();
+  const key = 'FCM_TOKEN_' + uid;
+  const record = parseFcmTokenRecord_(props.getProperty(key));
+  const before = (record.devices || []).length;
+  const byLabel = {};
+  (record.devices || []).forEach(function(d) {
+    if (!d || !d.token) return;
+    const lab = d.label || 'web';
+    if (!byLabel[lab] || String(d.updatedAt || '') > String(byLabel[lab].updatedAt || '')) {
+      byLabel[lab] = d;
+    }
+  });
+  record.devices = Object.keys(byLabel).map(function(k) { return byLabel[k]; });
+  record.devices.sort(function(a, b) {
+    return String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''));
+  });
+  props.setProperty(key, JSON.stringify({
+    email: record.email || '',
+    devices: record.devices
+  }));
+  const removed = before - record.devices.length;
+  return {
+    success: true,
+    removed: removed,
+    deviceCount: record.devices.length,
+    labels: record.devices.map(function(d) { return d.label || 'web'; }).join(', '),
+    message: removed > 0
+      ? ('Removed ' + removed + ' duplicate/stale device(s). ' + record.devices.length + ' remain.')
+      : (record.devices.length + ' device(s) — already clean.')
+  };
 }

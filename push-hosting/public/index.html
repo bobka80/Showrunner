@@ -124,6 +124,20 @@
 
     body.push-dock-open #push-mobile-dock { display: block; }
 
+    body.push-dock-saved #push-mobile-dock {
+      padding: 8px 12px calc(8px + env(safe-area-inset-top));
+      border-bottom-width: 1px;
+    }
+
+    body.push-dock-saved #push-dock-msg { display: none; }
+
+    body.push-dock-saved #push-enable-btn {
+      max-width: 220px; font-size: 11px; padding: 8px 12px;
+      background: transparent; border: 1px solid #444; color: #a1a1aa;
+    }
+
+    body.push-dock-saved .dock-title { margin-bottom: 4px; }
+
     body.install-panel-open #app-frame { visibility: hidden; }
 
     #push-mobile-dock p { margin: 0 0 8px 0; color: #a1a1aa; font-size: 11px; line-height: 1.4; }
@@ -252,7 +266,7 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js"></script>
 
-  <script src="/host-boot.js?v=304"></script>
+  <script src="/host-boot.js?v=305"></script>
 
 </body>
 
