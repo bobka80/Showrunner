@@ -990,11 +990,22 @@
         flex-direction: column;
         overflow: hidden;
         min-height: 0;
+        padding: 20px 30px 24px !important;
+        box-sizing: border-box;
+        gap: 10px !important;
+    }
+
+    #edit-modal-overlay .pe-editor-toolbar-row {
+        flex-shrink: 0;
+    }
+
+    #edit-modal-overlay #pe-checklist-status-bar {
+        flex-shrink: 0;
     }
 
     .pe-mini-cal-wrap {
         flex: 1 1 auto;
-        min-height: 280px;
+        min-height: 300px;
         display: flex;
         flex-direction: column;
         overflow: hidden;
@@ -1004,10 +1015,38 @@
         user-select: none !important;
         -webkit-user-select: none !important;
         flex: 1 1 auto;
-        min-height: 240px;
+        min-height: 280px;
+        width: 100%;
         background: #0a0a0c;
-        padding: 10px;
+        padding: 8px 10px 10px;
         box-sizing: border-box;
+    }
+
+    #mini-project-calendar .fc {
+        height: 100% !important;
+        min-height: 260px;
+    }
+
+    #mini-project-calendar .fc-view-harness {
+        min-height: 240px !important;
+    }
+
+    #mini-project-calendar .fc-daygrid-day-frame {
+        min-height: 64px !important;
+        height: auto !important;
+    }
+
+    #mini-project-calendar .fc-daygrid-day-number {
+        color: #a1a1aa !important;
+        font-size: 12px !important;
+        font-weight: 700 !important;
+        padding: 4px 6px !important;
+    }
+
+    #edit-modal-overlay .pe-editor-footer-row {
+        flex-shrink: 0;
+        margin-top: 0 !important;
+        padding-top: 12px !important;
     }
 
     /* ==========================================
@@ -4193,6 +4232,7 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 
 
 
+
 <!-- @INDEX: MOBILE -> Crew Hub Shell -->
 <div id="mobile-crew-hub-overlay">
     <div class="mch-header">
@@ -4364,7 +4404,7 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
         <div id="mini-project-calendar"></div>
     </div>
 
-    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
+    <div class="pe-editor-footer-row" style="padding-top: 12px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
       <div style="display:flex; gap:12px; align-items:center;">
          <button id="master-timeline-btn" class="btn-outline btn-outline-purple" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
          <button class="btn-outline btn-outline-orange" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>

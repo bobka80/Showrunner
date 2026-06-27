@@ -426,6 +426,9 @@ document.addEventListener('DOMContentLoaded', function() {
           if (typeof updateProjectChecklistBar === 'function') {
               updateProjectChecklistBar(pId, ev.extendedProps.rawDbData.checklistState || {});
           }
+          setTimeout(function() {
+              if (typeof ensureMiniCalendarSize === 'function') ensureMiniCalendarSize();
+          }, 200);
       }
   });
   calendar.render();

@@ -936,6 +936,9 @@ window.updateProjectChecklistBar = function(projectId, checklistState) {
     + '<div style="font-size:10px; color:#71717a; margin-top:4px;">' + info.checkedCount + ' / ' + info.totalRules + ' checklist items</div>'
     + '</div>'
     + (canOpen ? '<button type="button" class="btn-outline btn-sm" style="margin:0; flex-shrink:0; align-self:center;" onclick="openChecklistModal(\'' + String(projectId).replace(/'/g, "\\'") + '\', event)">OPEN</button>' : '');
+  if (typeof ensureMiniCalendarSize === 'function') {
+    setTimeout(ensureMiniCalendarSize, 50);
+  }
 };
 
 window.updateMobileChecklistBar = function(hostId, checklistState) {
