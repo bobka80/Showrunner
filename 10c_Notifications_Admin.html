@@ -36,7 +36,7 @@ function renderPushAdminPanel(containerId) {
 
     + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">'
     + '<div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">'
-    + '<div style="color:#10b981; font-size:11px; font-weight:800; letter-spacing:0.05em;">REGISTERED DEVICES</div>'
+    + '<div style="color:#10b981; font-size:11px; font-weight:800; letter-spacing:0.05em;">REGISTERED DEVICES (ALL CREW)</div>'
     + '<div style="display:flex; flex-wrap:wrap; gap:6px;">'
     + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openPushTokenModal()">SAVE TOKEN…</button>'
     + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="cleanupShowrunnerFcmDevices()">CLEAN STALE</button>'
@@ -104,6 +104,10 @@ function escapePushHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 }
 
+function escapePushJs(s) {
+  return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 function renderPushDeviceList(devices) {
   var list = document.getElementById('push-device-list');
   if (!list) return;
@@ -118,14 +122,15 @@ function renderPushDeviceList(devices) {
     var summary = escapePushHtml(d.displaySummary || d.label || 'Device');
     var hint = escapePushHtml(d.tokenHint || d.tokenKey || '');
     var key = escapePushHtml(d.tokenKey || '');
+    var owner = escapePushJs(d.ownerCrewName || d.crewName || '');
     html += '<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; min-height:44px; background:#1a1a1e; border:1px solid #333; border-radius:6px;">'
       + '<div style="flex:1; min-width:0; display:flex; align-items:center; gap:12px; overflow:hidden;">'
       + '<span style="flex:1; min-width:0; color:#fff; font-weight:800; ' + rowFont + ' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + summary + '">' + summary + '</span>'
       + '<span style="color:#71717a; ' + rowFont + ' white-space:nowrap; flex-shrink:0;">' + when + '</span>'
       + '<span style="color:#52525b; font-size:10px; font-family:monospace; white-space:nowrap; flex-shrink:0;">' + hint + '</span>'
       + '</div>'
-      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap; flex-shrink:0;" onclick="runShowrunnerTestPushDevice(\'' + key + '\')">TEST</button>'
-      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap; flex-shrink:0;" onclick="revokeShowrunnerDevice(\'' + key + '\')">REVOKE</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap; flex-shrink:0;" onclick="runShowrunnerTestPushDevice(\'' + key + '\', \'' + owner + '\')">TEST</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap; flex-shrink:0;" onclick="revokeShowrunnerDevice(\'' + key + '\', \'' + owner + '\')">REVOKE</button>'
       + '</div>';
   });
   list.innerHTML = html;
@@ -254,15 +259,16 @@ function refreshPushAdminStatus() {
           if (res && res.success) {
             renderPushDeviceList(res.devices || []);
             var n = (res.devices || []).length;
+            var crews = res.crewCount || 0;
             setPushAdminStatus(n
-              ? '<span style="color:#10b981;">' + n + ' device(s) ready · use TEST PUSH per row or TEST ALL</span>'
-              : '<span style="color:#f59e0b;">No devices — open web.app on phone and allow notifications</span>');
+              ? '<span style="color:#10b981;">' + n + ' fleet device(s) · ' + crews + ' crew with alerts · TEST per row or TEST ALL</span>'
+              : '<span style="color:#f59e0b;">No fleet devices yet — crew opens web.app, logs in, allows notifications</span>');
           } else {
             renderPushDeviceList([]);
             setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Could not load devices') + '</span>');
           }
         })
-        .getFcmDevicesAdminDetail(ACTIVE_USER_NAME);
+        .getFcmDevicesFleetAdminDetail(ACTIVE_USER_NAME);
     })
     .getFirebasePushSetupStatus(ACTIVE_USER_NAME);
 }
@@ -296,7 +302,7 @@ function cleanupShowrunnerFcmDevices() {
     .cleanupFcmDevicesForUser(ACTIVE_USER_NAME);
 }
 
-function runShowrunnerTestPushDevice(tokenKey) {
+function runShowrunnerTestPushDevice(tokenKey, deviceOwnerCrewName) {
   if (!tokenKey) return;
   setPushAdminStatus('<span style="color:#a1a1aa;">Sending test to device…</span>');
   google.script.run
@@ -311,12 +317,13 @@ function runShowrunnerTestPushDevice(tokenKey) {
       }
       setTimeout(refreshPushAdminStatus, 500);
     })
-    .sendTestPushToDevice(ACTIVE_USER_NAME, tokenKey);
+    .sendTestPushToDevice(ACTIVE_USER_NAME, tokenKey, deviceOwnerCrewName || ACTIVE_USER_NAME);
 }
 
-function revokeShowrunnerDevice(tokenKey) {
+function revokeShowrunnerDevice(tokenKey, deviceOwnerCrewName) {
   if (!tokenKey) return;
-  if (!confirm('Remove this device from push registry?\n\nIt will stop receiving alerts until re-registered from web.app.')) return;
+  var owner = deviceOwnerCrewName || ACTIVE_USER_NAME;
+  if (!confirm('Remove this device from push registry?\n\n' + owner + ' will stop receiving alerts until re-registered from web.app.')) return;
   setPushAdminStatus('<span style="color:#a1a1aa;">Revoking device…</span>');
   google.script.run
     .withFailureHandler(function(err) {
@@ -330,7 +337,7 @@ function revokeShowrunnerDevice(tokenKey) {
       }
       setTimeout(refreshPushAdminStatus, 400);
     })
-    .revokeFcmDeviceByTokenKey(ACTIVE_USER_NAME, tokenKey);
+    .revokeFcmDeviceByTokenKey(ACTIVE_USER_NAME, tokenKey, owner);
 }
 
 function runShowrunnerTestPush() {

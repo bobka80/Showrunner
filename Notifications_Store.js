@@ -413,7 +413,99 @@ function findFcmTokenByKey_(uid, tokenKey) {
   return '';
 }
 
-/** ROOT — device list with safe token hints for admin UI. */
+function buildUidToCrewNameMap_() {
+  const map = {};
+  try {
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+    for (let i = 1; i < crewData.length; i++) {
+      const uid = cMap['uid'] !== undefined ? String(crewData[i][cMap['uid']] || '').trim() : '';
+      const name = cMap['Name'] !== undefined ? String(crewData[i][cMap['Name']] || '').trim() : '';
+      if (uid && name) map[uid] = name;
+    }
+  } catch (e) { /* optional */ }
+  if (!map['UID_BOGDAN']) map['UID_BOGDAN'] = 'Bogdan';
+  return map;
+}
+
+function deviceRowForAdmin_(device, ownerCrewName) {
+  const d = device || {};
+  const owner = ownerCrewName || d.crewName || 'Unknown';
+  const displayName = d.crewName || owner;
+  return {
+    label: d.label || 'web',
+    ownerCrewName: owner,
+    crewName: displayName,
+    formFactor: d.formFactor || '',
+    platform: d.platform || '',
+    browser: d.browser || '',
+    delivery: d.delivery || '',
+    displaySummary: buildDeviceDisplaySummary_(d, displayName),
+    updatedAt: d.updatedAt || '',
+    tokenKey: getFcmTokenKey_(d.token),
+    tokenHint: getFcmTokenHint_(d.token)
+  };
+}
+
+/** ROOT — all crew devices across the fleet. */
+function getFcmDevicesFleetAdminDetail(actorCrewName) {
+  if (!verifyBackendPrivilege(actorCrewName, 'ROOT')) {
+    return { success: false, message: 'ROOT privileges required.' };
+  }
+  const uidToName = buildUidToCrewNameMap_();
+  const props = PropertiesService.getScriptProperties().getProperties();
+  const prefix = 'FCM_TOKEN_';
+  const rows = [];
+  const ownersSeen = {};
+
+  Object.keys(props).forEach(function(key) {
+    if (key.indexOf(prefix) !== 0) return;
+    const uid = key.slice(prefix.length);
+    const record = parseFcmTokenRecord_(props[key]);
+    const ownerName = uidToName[uid] || record.email || uid;
+    if (ownerName) ownersSeen[ownerName] = true;
+    (record.devices || []).forEach(function(d) {
+      if (!d || !d.token || String(d.token).length < 20) return;
+      rows.push(deviceRowForAdmin_(d, ownerName));
+    });
+  });
+
+  rows.sort(function(a, b) {
+    return String(b.updatedAt).localeCompare(String(a.updatedAt));
+  });
+
+  return {
+    success: true,
+    deviceCount: rows.length,
+    crewCount: Object.keys(ownersSeen).length,
+    devices: rows
+  };
+}
+
+function collectFleetFcmTokens_() {
+  const props = PropertiesService.getScriptProperties().getProperties();
+  const prefix = 'FCM_TOKEN_';
+  const tokens = [];
+  const tokenToUid = {};
+  const seen = {};
+  Object.keys(props).forEach(function(key) {
+    if (key.indexOf(prefix) !== 0) return;
+    const uid = key.slice(prefix.length);
+    const record = parseFcmTokenRecord_(props[key]);
+    (record.devices || []).forEach(function(d) {
+      const t = d && d.token ? String(d.token) : '';
+      if (t.length > 20 && !seen[t]) {
+        seen[t] = true;
+        tokens.push(t);
+        tokenToUid[t] = uid;
+      }
+    });
+  });
+  return { tokens: tokens, tokenToUid: tokenToUid };
+}
+
+/** ROOT — device list with safe token hints for admin UI (single user). */
 function getFcmDevicesAdminDetail(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
@@ -425,40 +517,29 @@ function getFcmDevicesAdminDetail(crewName) {
     success: true,
     crewName: crewName,
     devices: devices.map(function(d) {
-      const summary = buildDeviceDisplaySummary_(d, crewName);
-      return {
-        label: d.label || 'web',
-        crewName: d.crewName || crewName,
-        formFactor: d.formFactor || '',
-        platform: d.platform || '',
-        browser: d.browser || '',
-        delivery: d.delivery || '',
-        displaySummary: summary,
-        updatedAt: d.updatedAt || '',
-        tokenKey: getFcmTokenKey_(d.token),
-        tokenHint: getFcmTokenHint_(d.token)
-      };
+      return deviceRowForAdmin_(d, crewName);
     })
   };
 }
 
 /** ROOT — remove one registered device by token key prefix. */
-function revokeFcmDeviceByTokenKey(crewName, tokenKey) {
-  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+function revokeFcmDeviceByTokenKey(actorCrewName, tokenKey, deviceOwnerCrewName) {
+  if (!verifyBackendPrivilege(actorCrewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
   }
-  const profile = getUserSecurityProfile(crewName);
+  const owner = String(deviceOwnerCrewName || actorCrewName).trim();
+  const profile = getUserSecurityProfile(owner);
   if (!profile || !profile.uid) return { success: false, message: 'Unknown user profile.' };
   const full = findFcmTokenByKey_(profile.uid, tokenKey);
   if (!full) return { success: false, message: 'Device not found.' };
   const removed = removeFcmTokensForUid_(profile.uid, [full]);
   try {
-    writeToAuditLog(crewName, 'DELETE', 'NOTIFICATIONS', profile.uid, 'FCM Device',
-      'Revoked device key ' + tokenKey + ' (' + (removed > 0 ? 'ok' : 'miss') + ')');
+    writeToAuditLog(actorCrewName, 'DELETE', 'NOTIFICATIONS', profile.uid, 'FCM Device',
+      'Revoked ' + owner + ' device key ' + tokenKey + ' (' + (removed > 0 ? 'ok' : 'miss') + ')');
   } catch (e) { /* optional */ }
   return {
     success: removed > 0,
-    message: removed > 0 ? 'Device removed from push registry.' : 'Device not found.'
+    message: removed > 0 ? ('Device removed for ' + owner + '.') : 'Device not found.'
   };
 }
 

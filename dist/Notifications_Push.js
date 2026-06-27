@@ -164,10 +164,10 @@ function sendTestPushNotification(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
   }
-  const profile = getUserSecurityProfile(crewName);
-  const tokens = getFcmTokensForUser(crewName);
+  const fleet = collectFleetFcmTokens_();
+  const tokens = fleet.tokens || [];
   if (!tokens.length) {
-    return { success: false, message: 'No FCM token for this user. Open ' + (getFirebasePublicConfig().hostingUrl || 'the Hosting URL') + ', allow notifications, and log in.' };
+    return { success: false, message: 'No FCM devices in fleet. Crew must open ' + (getFirebasePublicConfig().hostingUrl || 'web.app') + ' and allow notifications.' };
   }
   const result = sendFcmToTokens_(
     tokens,
@@ -176,15 +176,24 @@ function sendTestPushNotification(crewName) {
     getFirebasePublicConfig().hostingUrl
   );
   let pruned = 0;
-  if (profile && profile.uid && result.deadTokens && result.deadTokens.length) {
-    pruned = removeFcmTokensForUid_(profile.uid, result.deadTokens);
+  if (result.deadTokens && result.deadTokens.length) {
+    const byUid = {};
+    result.deadTokens.forEach(function(t) {
+      const uid = fleet.tokenToUid[t];
+      if (!uid) return;
+      if (!byUid[uid]) byUid[uid] = [];
+      byUid[uid].push(t);
+    });
+    Object.keys(byUid).forEach(function(uid) {
+      pruned += removeFcmTokensForUid_(uid, byUid[uid]);
+    });
   }
   if (result.sent > 0) {
-    writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', crewName, 'Test Push',
-      'Sent test FCM to ' + result.sent + '/' + tokens.length + ' device(s). Pruned=' + pruned);
-    var msg = 'FCM accepted on ' + result.sent + ' device(s).';
+    writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', 'FLEET', 'Test Push',
+      'Sent test FCM to ' + result.sent + '/' + tokens.length + ' fleet device(s). Pruned=' + pruned);
+    var msg = 'FCM accepted on ' + result.sent + ' fleet device(s).';
     msg += ' If nothing appears: put web.app in background or lock the phone, then retry.';
-    if (pruned > 0) msg += ' Removed ' + pruned + ' dead token(s) from your account.';
+    if (pruned > 0) msg += ' Removed ' + pruned + ' dead token(s).';
     if (result.sent < tokens.length && result.errors.length) {
       msg += ' Some devices failed: ' + result.errors[0];
     }
@@ -196,17 +205,18 @@ function sendTestPushNotification(crewName) {
       pruned: pruned
     };
   }
-  var failMsg = 'Send failed — no device accepted the push.';
+  var failMsg = 'Send failed — no fleet device accepted the push.';
   if (result.errors.length) failMsg += ' ' + result.errors[0];
-  if (pruned > 0) failMsg += ' Removed ' + pruned + ' dead token(s). Re-register on your phone from web.app.';
+  if (pruned > 0) failMsg += ' Removed ' + pruned + ' dead token(s).';
   return { success: false, message: failMsg, pruned: pruned };
 }
 
-function sendTestPushToDevice(crewName, tokenKey) {
-  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+function sendTestPushToDevice(actorCrewName, tokenKey, deviceOwnerCrewName) {
+  if (!verifyBackendPrivilege(actorCrewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
   }
-  const profile = getUserSecurityProfile(crewName);
+  const owner = String(deviceOwnerCrewName || actorCrewName).trim();
+  const profile = getUserSecurityProfile(owner);
   if (!profile || !profile.uid) return { success: false, message: 'Unknown user profile.' };
   const token = findFcmTokenByKey_(profile.uid, tokenKey);
   if (!token) return { success: false, message: 'Device not found — refresh the list.' };
@@ -223,10 +233,10 @@ function sendTestPushToDevice(crewName, tokenKey) {
   }
   if (result.sent > 0) {
     try {
-      writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', tokenKey, 'Test Push Device',
-        'Sent test FCM to device key ' + tokenKey);
+      writeToAuditLog(actorCrewName, 'UPDATE', 'NOTIFICATIONS', owner, 'Test Push Device',
+        'Sent test FCM to ' + owner + ' device key ' + tokenKey);
     } catch (e) { /* optional */ }
-    return { success: true, message: 'FCM accepted for this device. If nothing appears, switch web.app to background and retry.' };
+    return { success: true, message: 'FCM accepted for ' + owner + '. If nothing appears, switch web.app to background and retry.' };
   }
   var failMsg = 'Send failed for this device.';
   if (result.errors.length) failMsg += ' ' + result.errors[0];
