@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '330';
+  const SW_BUILD = '331';
   const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
   let firebaseConfig = null;
   let fcmToken = null;

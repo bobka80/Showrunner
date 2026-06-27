@@ -565,7 +565,8 @@ function saveAndCloseShifts() {
              document.getElementById('edit-proj-version').value = finalRes.timestamp;
          }
          
-         if (typeof refreshData === 'function') refreshData(); 
-      }).saveTimelineData(targetFolderId, currentShiftMode, localShiftsToSave, crewUids, activePhases, localDeptOverrides, projVersion, ACTIVE_USER_NAME, timelines); 
+         if (typeof refreshData === 'function') refreshData();
+         if (typeof refreshNotifsFromServer === 'function') refreshNotifsFromServer();
+      }).saveTimelineData(targetFolderId, currentShiftMode, localShiftsToSave, crewUids, activePhases, localDeptOverrides, projVersion, ACTIVE_USER_NAME, timelines);
 }
 </script>

@@ -979,7 +979,26 @@
         border: none !important;
         display: flex;
         flex-direction: column;
-        overflow: visible;
+        overflow: hidden;
+        min-height: 0;
+    }
+
+    .pe-mini-cal-wrap {
+        flex: 1 1 auto;
+        min-height: 280px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    #mini-project-calendar {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+        flex: 1 1 auto;
+        min-height: 240px;
+        background: #0a0a0c;
+        padding: 10px;
+        box-sizing: border-box;
     }
 
     /* ==========================================
@@ -1046,11 +1065,6 @@
    /* ==========================================
        --- DIRECT MANIPULATION UI FIXES ---
        ========================================== */
-    
-    #mini-project-calendar {
-        user-select: none !important;
-        -webkit-user-select: none !important;
-    }
 
     #mini-project-calendar .fc-event-resizer {
         display: block !important;

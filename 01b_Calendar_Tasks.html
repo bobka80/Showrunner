@@ -111,6 +111,19 @@ window.prependForegroundNotification = function(title, body, link) {
     showNotifToast(title || 'Showrunner', body || msg);
 };
 
+function refreshNotifsFromServer() {
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    google.script.run
+        .withFailureHandler(function() {})
+        .withSuccessHandler(function(extras) {
+            if (!extras) return;
+            if (typeof renderTasksAndNotifs === 'function') {
+                renderTasksAndNotifs({ tasks: extras.tasks || globalTasks || [], notifs: extras.notifs || [] });
+            }
+        })
+        .getTasksAndNotifs(ACTIVE_USER_NAME);
+}
+
 function openNotifDrawer() {
     let wrapper = document.getElementById('notif-drawer-wrapper');
     if (wrapper) wrapper.style.display = 'flex';

@@ -126,6 +126,12 @@ function bootMiniCalendar(targetDateString, projectId) {
 
         miniCalendar.render();
         miniCalendar.updateSize();
+        requestAnimationFrame(function() {
+            if (miniCalendar) miniCalendar.updateSize();
+        });
+        setTimeout(function() {
+            if (miniCalendar) miniCalendar.updateSize();
+        }, 120);
 
         // ==========================================
         // SURGICAL FIX: MEMORY UNPACKER

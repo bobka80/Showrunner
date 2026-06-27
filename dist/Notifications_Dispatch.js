@@ -120,8 +120,34 @@ function uniqueNonEmpty_(list) {
   return out;
 }
 
-function appendInAppNotifications_(identifiers, message, sheets) {
-  const ids = uniqueNonEmpty_(identifiers);
+function resolveNotificationRecipientUid_(identifier) {
+  const uid = resolveVaultUidForPush_(identifier);
+  if (uid) return uid;
+  return identifier ? String(identifier).trim() : '';
+}
+
+function excludeActorFromNotifRecipients_(identifiers, actor) {
+  const actorProfile = actor ? getUserSecurityProfile(actor) : null;
+  if (actorProfile && actorProfile.sysAccess === 'ROOT') return identifiers;
+  const actorUid = actorProfile && actorProfile.uid ? String(actorProfile.uid).trim() : '';
+  const actorEmail = actorProfile && actorProfile.email ? String(actorProfile.email).trim().toLowerCase() : '';
+  const actorName = actor ? String(actor).trim().toLowerCase() : '';
+  if (!actorUid && !actorEmail && !actorName) return identifiers;
+  return (identifiers || []).filter(function(id) {
+    const val = String(id || '').trim();
+    const valLower = val.toLowerCase();
+    if (actorUid && val === actorUid) return false;
+    if (actorEmail && valLower === actorEmail) return false;
+    if (actorName && valLower === actorName) return false;
+    return true;
+  });
+}
+
+function appendInAppNotifications_(identifiers, message, sheets, actor) {
+  let ids = uniqueNonEmpty_(identifiers).map(function(id) {
+    return resolveNotificationRecipientUid_(id);
+  }).filter(function(id) { return id; });
+  ids = excludeActorFromNotifRecipients_(ids, actor);
   if (!ids.length || !sheets || !sheets.notifs) return;
   const nowIso = new Date().toISOString();
   ids.forEach(function(id) {
@@ -133,6 +159,67 @@ function appendInAppNotifications_(identifiers, message, sheets) {
     r[4] = nowIso;
     sheets.notifs.appendRow(r);
   });
+}
+
+function analyzeTimelineShiftChanges_(deletedRows, newShifts, sMap) {
+  const result = {
+    newlyAddedUids: [],
+    removedUids: [],
+    modifiedUids: [],
+    truckTimelineChanged: false
+  };
+  const oldUids = [];
+  const newUids = [];
+  const oldByUid = {};
+  const newByUid = {};
+  const oldTruckSigs = [];
+  const newTruckSigs = [];
+
+  function sig(start, dur, role) {
+    return Number(start) + '|' + Number(dur) + '|' + String(role || '');
+  }
+
+  (deletedRows || []).forEach(function(r) {
+    const uid = r[sMap['user_uid']];
+    if (!uid) return;
+    if (isTruckShiftUid_(uid)) {
+      oldTruckSigs.push(sig(r[sMap['Start']], r[sMap['Duration']], r[sMap['Role']]));
+      return;
+    }
+    if (oldUids.indexOf(uid) === -1) oldUids.push(uid);
+    if (!oldByUid[uid]) oldByUid[uid] = [];
+    oldByUid[uid].push(sig(r[sMap['Start']], r[sMap['Duration']], r[sMap['Role']]));
+  });
+
+  (newShifts || []).forEach(function(s) {
+    const uid = s.user_uid || s.email;
+    if (!uid) return;
+    if (isTruckShiftUid_(uid)) {
+      newTruckSigs.push(sig(s.start, s.duration, s.role));
+      return;
+    }
+    if (newUids.indexOf(uid) === -1) newUids.push(uid);
+    if (!newByUid[uid]) newByUid[uid] = [];
+    newByUid[uid].push(sig(s.start, s.duration, s.role));
+  });
+
+  result.newlyAddedUids = newUids.filter(function(uid) { return oldUids.indexOf(uid) === -1; });
+  result.removedUids = oldUids.filter(function(uid) { return newUids.indexOf(uid) === -1; });
+
+  newUids.forEach(function(uid) {
+    if (oldUids.indexOf(uid) === -1) return;
+    const oldSigs = (oldByUid[uid] || []).slice().sort().join(';');
+    const newSigs = (newByUid[uid] || []).slice().sort().join(';');
+    if (oldSigs !== newSigs) result.modifiedUids.push(uid);
+  });
+
+  oldTruckSigs.sort();
+  newTruckSigs.sort();
+  if (oldTruckSigs.join(';') !== newTruckSigs.join(';')) {
+    result.truckTimelineChanged = true;
+  }
+
+  return result;
 }
 
 function getProjectMeta_(projectId, sheets) {
@@ -165,7 +252,7 @@ function getProjectCrewIdentifiers_(projectId, sheets) {
     const key = String(uid).trim();
     if (!key || seen[key]) continue;
     seen[key] = true;
-    out.push(key);
+    out.push(resolveNotificationRecipientUid_(key) || key);
   }
   return out;
 }
@@ -190,7 +277,7 @@ function getManagerIdentifiers_() {
 function dispatchInAppAndPush_(identifiers, inAppMessage, pushTitle, pushBody, actor, sheets) {
   const ids = uniqueNonEmpty_(identifiers);
   if (!ids.length) return;
-  appendInAppNotifications_(ids, inAppMessage, sheets);
+  appendInAppNotifications_(ids, inAppMessage, sheets, actor);
   try {
     dispatchPushToIdentifiers(ids, pushTitle || 'Showrunner', pushBody || inAppMessage, getShowrunnerHostingLink_(), actor);
   } catch (e) { /* in-app rows saved */ }

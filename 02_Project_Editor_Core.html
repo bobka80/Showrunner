@@ -98,7 +98,7 @@
     </div>
 
     <div id="pe-checklist-status-bar" style="display:none; margin-top:10px; padding:12px 14px; background:#121214; border:1px solid #2a2a2e; border-radius:8px; align-items:center; gap:12px;"></div>
-    
+
     <div id="event-context-menu" style="display: none; position: fixed; background: #1a1a1e; border: 1px solid #444; border-radius: 6px; padding: 5px; z-index: 99999; box-shadow: 0 8px 16px rgba(0,0,0,0.8); width: 140px;">
             <div style="color: #a1a1aa; font-size: 9px; font-weight: bold; padding: 4px 8px; border-bottom: 1px solid #333; margin-bottom: 4px;">CHANGE TYPE</div>
             <button class="btn-outline mini-phase-btn" data-mini-phase="main" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #3b82f6; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('main')">MAIN EVENT</button>
@@ -109,9 +109,11 @@
             <div style="border-top: 1px solid #333; padding-top: 4px;">
                 <button class="btn-delete" style="width: 100%; text-align: left; padding: 6px 8px; margin: 0; font-size: 11px;" onclick="updateEventPhase('delete')">DELETE STRIP</button>
             </div>
-        </div>
+    </div>
 
-        <div id="mini-project-calendar" style="flex: 1; background: #0a0a0c; padding: 10px;"></div>
+    <div class="pe-mini-cal-wrap">
+        <div id="mini-project-calendar"></div>
+    </div>
 
     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
       <div style="display:flex; gap:12px; align-items:center;">
