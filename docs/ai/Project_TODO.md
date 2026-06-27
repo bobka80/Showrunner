@@ -10,10 +10,7 @@
 - [x] Timeline zoom (`03f`) — overview slider + MY ROW
 - [x] Docs: [MOBILE_CREW_UX.md](MOBILE_CREW_UX.md)
 
-**Next after mobile sign-off:** notifications matrix + Personal Hub on mobile (see Push Notifications + Phase 5 below). Foreground in-app toast + drawer sync still pending.
-
-- [ ] **Personal Hub on mobile** — entry from Command Center; crew v1: **theme only** (dark ↔ light, same as Manager Hub `changeUserTheme`); managers: agenda + asset reminders when built
-- [ ] **Mobile Personal Hub — theme** — ship before PIN/reminders on phone
+**Next after mobile sign-off:** real push notification delivery polish (see NOTIFICATIONS section below).
 
 ---
 
@@ -77,13 +74,7 @@
 - [ ] **Triangulation & Direct-to-Site:** Implement the UI for the `[TRANSFER_FROM]` tag. Allow gear to bypass the warehouse entirely, either jumping directly between venues, or arriving direct-to-site from an external vendor without triggering warehouse shortage conflicts.
 
 ## Phase 5: UX, External APIs & Operations
-- [ ] **Personal User Hub (desktop + mobile):** Restricted “My account” via left nav / mobile entry — **not** full Manager Hub automation for crew.
-  - [ ] **Crew v1 (now):** UI theme only — dark ↔ light (`changeUserTheme` / `sm_user_theme` in localStorage)
-  - [ ] **Crew v2 (later):** self-service **PIN change** (current PIN required; audit log; see IAM below) — **not in current sprint**
-  - [ ] **Managers — agenda reminders:** from Personal Hub + project **status/checklist** context — e.g. “crew list not built by date X”, “asset list incomplete before show”
-  - [ ] **Managers — asset-window reminders:** per-project checklist prompts in Project Assets (distro taken? named cables? open cables needed? rain plan?) — user-defined reminder lines with due dates → in-app row + FCM
-  - [ ] **Name changes:** **ROOT / admin only** — crew cannot rename themselves in Personal Hub (IAM policy)
-- [ ] **Desktop session lock:** When a manager leaves a shared PC (e.g. Financials open), **Lock screen** — black overlay + re-enter PIN (or passcode) to resume; no data visible until unlock. Distinct from 30-day stay-signed-in.
+- [ ] **Personal User Hub:** Build a restricted "My Profile" modal (accessible via the left nav bar) for standard crew members to update contact info, dietary preferences, and passwords.
 - [ ] **Freelancer Shift Placeholders & Bidding:** Allow creation of "TBD" shift placeholders (e.g., "Need 4 more riggers"). Build a future engine to broadcast these open shifts to a pool of freelancers, allowing them to accept/bid, and automatically choosing the best candidate based on internal ratings.
 
 ---
@@ -99,51 +90,17 @@
 - **Event-driven only** — when something saves → notify affected users. **Never** poll/scan the whole system on a timer for changes.
 - **One system action per event** — e.g. one truck shift save → collect 20 crew → **one batch FCM send** (20 phones buzz, but **one** backend job, not ×20 quota burn).
 
-### What already exists (partial — not “done”)
-- [x] **Notifications sheet** + in-app bell / mobile NOTIFICATIONS list
-- [x] **FCM infrastructure** — Hosting shell, device tokens, `dispatchPushToUsers`, data-only payloads (v303+)
-- [x] **Wired today:** global **task assigned** → sheet row + FCM (`Logistics_Tasks.js`); **master timeline** shift **added** / **time changed** → sheet row + FCM (`Logistics_Timeline.js`)
-- [ ] **Not wired yet:** event assign/remove/cancel, truck timeline changes, manager “event created/canceled”, self/agenda reminders, asset-window reminders, foreground toast → drawer
-
-### Notification matrix (director spec — v2 scope)
-
-**All crew on a project** (when affected):
-- [ ] **Assigned to an event** (roster / shift appears on that project)
-- [ ] **Dis-assigned** from an event
-- [ ] **Event canceled** (project status → Cancelled)
-- [ ] **Own shift changed** (time, role, day — extend existing timeline hook)
-- [ ] **Truck / logistics timeline changed** — notify **everyone assigned to that event** (not only truck dept)
-
-**Managers** (role-based; may also be on crew):
-- [ ] **Event created** — any type (normal event, cross-rent, meeting, etc.)
-- [ ] **Event canceled**
-- [ ] **Agenda / status reminders (Personal Hub):** manager creates dated reminders tied to project readiness — e.g. “crew list not done by Tuesday”, “asset list incomplete before load-in”
-- [ ] **Asset-window reminders (Project Assets):** per-project custom checklist the manager sets — e.g. “Did I take distro?”, “Named cables?”, “Open cables needed?”, “Rain plan?” — due date → notify manager (in-app + push)
-
-**Delivery rules (all scenarios):**
-- [ ] **In-app:** row in Notifications drawer + badge (foreground: toast when app open — see FRAGILE_ZONES session/boot work)
-- [ ] **Push:** FCM when app backgrounded (existing shell)
-- [ ] **One logical save → one notification batch** (debounce rapid timeline drags)
-- [ ] **Deep link** where possible (open project / timeline / assets)
-
-### Notification scenarios (v1 scope — legacy checklist; merge into matrix above)
+### Notification scenarios (v1 scope)
 **Crew & managers on a project** (when they are assigned / on that show):
-- [x] Shift added / shift time changed (master timeline — partial)
-- [x] Global task assigned (partial)
-- [ ] Assigned to a project / roster (explicit — beyond shift row)
-- [ ] Removed from project / event canceled
-- [ ] Master timeline changed (phases, show days — beyond single shift)
+- [ ] Assigned to a project
+- [ ] Master timeline changed (phases, show days)
 - [ ] Truck / logistics timeline changed
 - [ ] Another crew member flags a shift conflict (“I can’t work this day”)
 - [ ] Checklist / task milestone (e.g. “Lighting prep 100%”) → notify PM
 
 **Managers** (role-based, even if also on crew):
-- [ ] New event created (any type)
-- [ ] Event canceled
 - [ ] Overdue internal jobs: offer not created, invoice not created, asset list not built, crew not fully staffed
 - [ ] Weather alert for outdoor projects (wire existing `dispatchWeatherAlerts` to FCM, not sheet-only)
-- [ ] Personal agenda reminders (self-set, dated)
-- [ ] Asset-window per-project reminder lines
 
 **Rules:**
 - [ ] One push per **logical save** — debounce rapid edits (don’t spam on every drag pixel)
@@ -152,11 +109,9 @@
 - [ ] No aggressive client polling — push delivers; bell refreshes on app open + light refresh while open
 
 ### Implementation phases
-- [x] **P1 — Infrastructure:** Firebase project, Hosting URL, service worker, FCM subscribe flow in UI, store device tokens
-- [x] **P2 — Dispatch core (partial):** `dispatchPushToUsers` / FCM HTTP v1; log to Notifications sheet; ROOT test push
-- [ ] **P2b — Foreground UX:** shell `postMessage` → in-app toast + prepend drawer (no OS banner when app open)
-- [ ] **P3 — Wire saves (matrix):** event assign/remove/cancel; master + **truck** timeline; manager event create/cancel
-- [ ] **P3b — Manager reminders:** Personal Hub agenda + Project Assets reminder lines (storage + cron or due-date trigger)
+- [ ] **P1 — Infrastructure:** Firebase project, Hosting URL, service worker, FCM subscribe flow in UI, store device tokens in crew/system config
+- [ ] **P2 — Dispatch core:** `dispatchPushNotification(userUids[], message, deepLink)` from GAS; batch FCM HTTP v1; log to Notifications sheet
+- [ ] **P3 — Wire saves:** Project assign, timeline save, truck save, show-day save, crew conflict report
 - [ ] **P4 — Manager overdue cron:** Once-daily check for late offers/invoices/assets/crew (not per-minute scanning)
 - [ ] **P5 — Weather:** Connect existing weather engine to FCM batch send
 - [ ] **P6 — Admin UI:** Notification preferences per user; test push button for ROOT
@@ -197,8 +152,6 @@ FCM + batch sends are **not** the bottleneck at this scale. Risks are **email li
     - *Tier 4 (Artic Lorry / Trailer):* ~13.6m L x 2.4m W x 2.6m H (Arena Tours)
 - [ ] **Push Notifications (Option 1):** See dedicated section above — Firebase Hosting + FCM; do not duplicate here.
 - [ ] **Security & RBAC Beta Audit:** Final lockdown of Role-Permissions matrix and data tunneling before beta deployment.
-- [ ] **IAM — display names:** Only **ROOT** (director) may change crew **names** in Vault; no self-service rename in Personal Hub.
-- [ ] **IAM — PIN self-service (later):** `changeMyPasscode` in Personal Hub — current PIN required; audit log; not current sprint.
 
 ---
 

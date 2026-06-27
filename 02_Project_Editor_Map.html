@@ -76,19 +76,6 @@ window.getProjectRegionLabelText = function(zone) {
     return 'IN SOFIA';
 };
 
-window.applyProjectDistanceFieldVisibility = function() {
-    const inSofiaEl = document.getElementById('edit-proj-in-sofia');
-    const inSofia = inSofiaEl ? inSofiaEl.checked : true;
-    const distCont = document.getElementById('edit-proj-distance-container');
-    const locCol = document.querySelector('.pe-location-col');
-    if (distCont) {
-        distCont.style.display = inSofia ? 'none' : 'flex';
-    }
-    if (locCol) {
-        locCol.classList.toggle('pe-location-col--in-sofia', inSofia);
-    }
-};
-
 window.updateLocationRegionLabel = function() {
     const label = document.getElementById('pe-location-region-label');
     const zoneHidden = document.getElementById('edit-proj-region-zone');
@@ -109,7 +96,7 @@ window.updateLocationRegionLabel = function() {
     label.innerText = window.getProjectRegionLabelText(zone);
     label.className = 'pe-location-region-label pe-location-region-label--' + zone.replace(/_/g, '-');
     if (inSofiaCb) inSofiaCb.checked = (zone === 'sofia');
-    window.applyProjectDistanceFieldVisibility();
+    if (typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();
 };
 
 /** Short display name from Nominatim (avoids full Russian postal strings in the toolbar). */

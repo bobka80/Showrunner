@@ -988,65 +988,7 @@
         border: none !important;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
-        min-height: 0;
-        padding: 20px 30px 24px !important;
-        box-sizing: border-box;
-        gap: 10px !important;
-    }
-
-    #edit-modal-overlay .pe-editor-toolbar-row {
-        flex-shrink: 0;
-    }
-
-    #edit-modal-overlay #pe-checklist-status-bar {
-        flex-shrink: 0;
-    }
-
-    .pe-mini-cal-wrap {
-        flex: 1 1 auto;
-        min-height: 300px;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-
-    #mini-project-calendar {
-        user-select: none !important;
-        -webkit-user-select: none !important;
-        flex: 1 1 auto;
-        min-height: 280px;
-        width: 100%;
-        background: #0a0a0c;
-        padding: 8px 10px 10px;
-        box-sizing: border-box;
-    }
-
-    #mini-project-calendar .fc {
-        height: 100% !important;
-        min-height: 260px;
-    }
-
-    #mini-project-calendar .fc-view-harness {
-        min-height: 240px !important;
-    }
-
-    #mini-project-calendar .fc-daygrid-day-frame {
-        min-height: 64px !important;
-        height: auto !important;
-    }
-
-    #mini-project-calendar .fc-daygrid-day-number {
-        color: #a1a1aa !important;
-        font-size: 12px !important;
-        font-weight: 700 !important;
-        padding: 4px 6px !important;
-    }
-
-    #edit-modal-overlay .pe-editor-footer-row {
-        flex-shrink: 0;
-        margin-top: 0 !important;
-        padding-top: 12px !important;
+        overflow: visible;
     }
 
     /* ==========================================
@@ -1113,6 +1055,11 @@
    /* ==========================================
        --- DIRECT MANIPULATION UI FIXES ---
        ========================================== */
+    
+    #mini-project-calendar {
+        user-select: none !important;
+        -webkit-user-select: none !important;
+    }
 
     #mini-project-calendar .fc-event-resizer {
         display: block !important;
@@ -4232,7 +4179,6 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 
 
 
-
 <!-- @INDEX: MOBILE -> Crew Hub Shell -->
 <div id="mobile-crew-hub-overlay">
     <div class="mch-header">
@@ -4247,7 +4193,6 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
                 <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
                 <span class="mch-badge" id="mch-region-badge">IN SOFIA</span>
             </div>
-            <div id="mch-checklist-bar" style="display:none; margin-top:8px;"></div>
             <div class="mch-location" id="mch-location"></div>
         </div>
     </div>
@@ -4385,9 +4330,7 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
         </div>
       </div>
     </div>
-
-    <div id="pe-checklist-status-bar" style="display:none; margin-top:10px; padding:12px 14px; background:#121214; border:1px solid #2a2a2e; border-radius:8px; align-items:center; gap:12px;"></div>
-
+    
     <div id="event-context-menu" style="display: none; position: fixed; background: #1a1a1e; border: 1px solid #444; border-radius: 6px; padding: 5px; z-index: 99999; box-shadow: 0 8px 16px rgba(0,0,0,0.8); width: 140px;">
             <div style="color: #a1a1aa; font-size: 9px; font-weight: bold; padding: 4px 8px; border-bottom: 1px solid #333; margin-bottom: 4px;">CHANGE TYPE</div>
             <button class="btn-outline mini-phase-btn" data-mini-phase="main" style="width: 100%; text-align: left; border: none; padding: 6px 8px; margin: 0 0 2px 0; color: #3b82f6; font-size: 11px; font-weight: bold;" onclick="updateEventPhase('main')">MAIN EVENT</button>
@@ -4398,13 +4341,11 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
             <div style="border-top: 1px solid #333; padding-top: 4px;">
                 <button class="btn-delete" style="width: 100%; text-align: left; padding: 6px 8px; margin: 0; font-size: 11px;" onclick="updateEventPhase('delete')">DELETE STRIP</button>
             </div>
-    </div>
+        </div>
 
-    <div class="pe-mini-cal-wrap">
-        <div id="mini-project-calendar"></div>
-    </div>
+        <div id="mini-project-calendar" style="flex: 1; background: #0a0a0c; padding: 10px;"></div>
 
-    <div class="pe-editor-footer-row" style="padding-top: 12px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
+    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
       <div style="display:flex; gap:12px; align-items:center;">
          <button id="master-timeline-btn" class="btn-outline btn-outline-purple" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
          <button class="btn-outline btn-outline-orange" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>

@@ -423,12 +423,6 @@ document.addEventListener('DOMContentLoaded', function() {
           if (typeof applyProjectEditorMode === 'function') applyProjectEditorMode(pId);
           if (typeof startPresencePing === 'function') startPresencePing(pId);
           if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
-          if (typeof updateProjectChecklistBar === 'function') {
-              updateProjectChecklistBar(pId, ev.extendedProps.rawDbData.checklistState || {});
-          }
-          setTimeout(function() {
-              if (typeof ensureMiniCalendarSize === 'function') ensureMiniCalendarSize();
-          }, 200);
       }
   });
   calendar.render();
@@ -691,7 +685,6 @@ function refreshData() {
         try {
             let phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
             phantom.projects = payload.projects; phantom.monthData = payload.monthData; phantom.tasks = payload.tasks; phantom.notifs = payload.notifs;
-            if (payload.managerConfig) phantom.managerConfig = payload.managerConfig;
             localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
         } catch(e) {}
     }).getRefreshPayload(ACTIVE_USER_NAME);
@@ -700,7 +693,6 @@ function refreshData() {
 function applyRefreshPayload(payload) {
   try {
   if (!payload) return;
-  if (payload.managerConfig) globalManagerConfig = payload.managerConfig;
   if (payload.monthData && Array.isArray(payload.monthData.shifts)) {
     window.globalMonthShifts = payload.monthData.shifts;
   }

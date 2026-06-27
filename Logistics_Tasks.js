@@ -11,21 +11,8 @@
 function getTasksAndNotifs(crewName) {
   return executeWithRetry(() => {
     const profile = getUserSecurityProfile(crewName);
-    const userUid = profile.uid ? String(profile.uid).trim() : '';
-    const userEmail = profile.email ? String(profile.email).trim().toLowerCase() : '';
-    const userName = crewName ? String(crewName).trim().toLowerCase() : '';
+    const userUid = profile.uid || "unknown";
     const sheets = verifyDatabaseSchema(true);
-    
-    function notifBelongsToUser(rowUid) {
-      const val = String(rowUid || '').trim();
-      if (!val) return false;
-      const valLower = val.toLowerCase();
-      if (userUid && val === userUid) return true;
-      if (userEmail && valLower === userEmail) return true;
-      if (userName && valLower === userName) return true;
-      const resolved = resolveNotificationRecipientUid_(val);
-      return !!(userUid && resolved === userUid);
-    }
     
     let tasks = [];
     let tData = getSheetData(sheets.tasks);
@@ -59,7 +46,7 @@ function getTasksAndNotifs(crewName) {
     let nData = getSheetData(sheets.notifs);
     let now = new Date().getTime();
     for(let i=1; i<nData.length; i++) {
-        if(notifBelongsToUser(nData[i][nData.hMap['user_uid']])) {
+        if(nData[i][nData.hMap['user_uid']] === userUid) {
             let isRead = nData[i][nData.hMap['Is_Read']];
             let ts = new Date(nData[i][nData.hMap['Timestamp']]).getTime();
             

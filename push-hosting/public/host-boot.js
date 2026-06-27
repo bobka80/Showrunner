@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '331';
+  const SW_BUILD = '328';
   const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
   let firebaseConfig = null;
   let fcmToken = null;
@@ -25,24 +25,23 @@
   let lastAccountLinkAt = 0;
   const PUSH_OK_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-  function postForegroundPushToApp(payload) {
+  function showLocalPushNotification(payload) {
+    if (document.hidden) return;
     var n = (payload && payload.notification) || {};
     var d = (payload && payload.data) || {};
     var title = n.title || d.title || 'Showrunner';
     var body = n.body || d.body || '';
-    var link = d.link || '';
-    var targets = [];
-    try { if (frame && frame.contentWindow) targets.push(frame.contentWindow); } catch (e) { /* ignore */ }
-    targets.forEach(function(tw) {
-      try {
-        tw.postMessage({ type: 'SHOWRUNNER_FOREGROUND_PUSH', title: title, body: body, link: link }, '*');
-      } catch (e2) { /* ignore */ }
-    });
-  }
-
-  function showLocalPushNotification(payload) {
-    if (document.hidden) return;
-    postForegroundPushToApp(payload);
+    if (Notification.permission !== 'granted') return;
+    try {
+      new Notification(title, {
+        body: body,
+        icon: '/icon-192.png',
+        tag: 'showrunner-push',
+        renotify: true
+      });
+    } catch (e) {
+      logPush('foreground notification failed: ' + ((e && e.message) || e));
+    }
   }
 
   function registerForegroundPushHandler() {
@@ -50,7 +49,7 @@
     if (!messaging) messaging = firebase.messaging();
     messaging.onMessage(function(payload) {
       logPush('foreground push received');
-      postForegroundPushToApp(payload);
+      showLocalPushNotification(payload);
     });
     foregroundHandlerRegistered = true;
   }
