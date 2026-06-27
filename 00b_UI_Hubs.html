@@ -10,9 +10,9 @@
       <button id="tab-btn-warehouse" class="btn-tab" onclick="switchResourceTab('warehouse')">WAREHOUSE</button>
       <button id="tab-btn-clients" class="btn-tab" onclick="switchResourceTab('clients')">CLIENTS</button>
 
-      <div style="flex:1;"></div>
-      <button id="tab-btn-database" class="btn-tab req-root-only" onclick="switchResourceTab('database')">DATABASE</button>
+      <button id="tab-btn-database" class="btn-tab btn-tab-database req-root-only" style="margin-left: 200px;" onclick="switchResourceTab('database')">DATABASE</button>
 
+      <div style="flex:1;"></div>
       <div style="display:flex; flex-direction:column; position:relative; justify-content:center;">
           <div style="display:flex; gap:10px; align-items:center;">
              <input type="text" id="search-name" class="input-compact input-compact--narrow" placeholder="Search Name..." oninput="applyGlobalSearch()">
