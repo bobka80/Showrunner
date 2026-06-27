@@ -48,12 +48,19 @@ function loadDatabaseOpsPanel() {
       if (opsPanel) opsPanel.innerHTML = errHtml;
     })
     .withSuccessHandler(function(res) {
-      _dbLiveStatus = res;
-      _dbOpsCache = (res && res.operations) ? res.operations : [];
-      if (_dbActiveSubTab === 'backup') {
-        renderDatabaseBackupArchiveTab(res);
-      } else {
-        renderDatabaseOpsTab(res);
+      try {
+        _dbLiveStatus = res;
+        _dbOpsCache = (res && res.operations) ? res.operations : [];
+        if (_dbActiveSubTab === 'backup') {
+          renderDatabaseBackupArchiveTab(res);
+        } else {
+          renderDatabaseOpsTab(res);
+        }
+      } catch (err) {
+        const errHtml = '<div style="color:#ef4444; padding:40px; text-align:center;">'
+          + escapePushHtml((err && err.message) ? err.message : String(err)) + '</div>';
+        if (backupPanel) backupPanel.innerHTML = errHtml;
+        if (opsPanel) opsPanel.innerHTML = errHtml;
       }
     })
     .getLiveDatabaseStatus(ACTIVE_USER_NAME);
@@ -189,6 +196,10 @@ function renderDatabaseBackupArchiveTab(res) {
     + '</div>';
 }
 
+function escapePushHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+}
+
 function renderDatabaseOpsTab(res) {
   const panel = document.getElementById('db-ops-notifications-panel');
   if (!panel) return;
@@ -217,7 +228,12 @@ function renderDatabaseOpsTab(res) {
     + '</div>';
 
   if (typeof renderPushAdminPanel === 'function') {
-    renderPushAdminPanel('push-admin-panel');
+    try {
+      renderPushAdminPanel('push-admin-panel');
+    } catch (err) {
+      panel.innerHTML = '<div style="color:#ef4444; padding:20px; font-size:12px;">Push panel failed: '
+        + escapePushHtml((err && err.message) ? err.message : String(err)) + '</div>';
+    }
   }
 }
 

@@ -484,11 +484,15 @@ function getFcmDevicesFleetAdminDetail(actorCrewName) {
     return String(b.updatedAt).localeCompare(String(a.updatedAt));
   });
 
+  const total = rows.length;
+  const capped = rows.slice(0, 40);
+
   return {
     success: true,
-    deviceCount: rows.length,
+    deviceCount: total,
     crewCount: Object.keys(ownersSeen).length,
-    devices: rows
+    devices: capped,
+    truncated: total > capped.length
   };
 }
 
