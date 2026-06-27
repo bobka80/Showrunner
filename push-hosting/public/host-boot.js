@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '302';
+  const SW_BUILD = '303';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -31,6 +31,7 @@
   let lastSessionPing = 0;
   let lastLoginScreenAt = 0;
   let lastCrewName = '';
+  let iframeLinkError = '';
   let deferredInstallPrompt = null;
   let shellInitStarted = false;
 
@@ -277,16 +278,26 @@
     var crew = (pendingFcmAuth && pendingFcmAuth.crewName) || lastCrewName;
     var recentSession = (Date.now() - lastSessionPing) < 15000;
     var onLoginScreen = (Date.now() - lastLoginScreenAt) < 6000 && !recentSession;
+    if (iframeLinkError) {
+      setDockMessage('App could not reach Showrunner server to link alerts.');
+      setDockStatus(['Step 1: token OK', 'Step 2: server link failed', iframeLinkError]);
+      return;
+    }
     if (onLoginScreen) {
       setDockMessage('Log in to Showrunner below, then alerts link automatically.');
       setDockStatus(['Step 1: token OK', 'Step 2: log in below']);
     } else if (crew) {
       setDockMessage('Linking alerts to ' + crew + '…');
-      setDockStatus(['Step 1: token OK', 'Step 2: linking ' + crew + '…']);
+      if (pendingFcmAuth && pendingFcmAuth.regKey) {
+        setDockStatus(['Step 1: token OK', 'Step 2: saving ' + crew + '…']);
+      } else {
+        setDockStatus(['Step 1: token OK', 'Step 2: linking ' + crew + '…']);
+      }
     } else if (recentSession) {
       setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
     } else if (elapsed >= 8000) {
-      setDockStatus(['Step 1: token OK', 'Step 2: linking account…', 'trying alternate path']);
+      setDockMessage('Waiting for Showrunner app to confirm your login…');
+      setDockStatus(['Step 1: token OK', 'Step 2: no app response', 'trying alternate path']);
     } else {
       setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
     }
@@ -458,6 +469,7 @@
   function onAccountLink(auth) {
     if (!auth || !auth.crewName) return;
     iframeLoggedIn = true;
+    iframeLinkError = '';
     lastSessionPing = Date.now();
     lastCrewName = auth.crewName;
     if (auth.regKey) {
@@ -499,6 +511,11 @@
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
+    }
+    if (ev.data.type === 'SHOWRUNNER_FCM_LINK_ERROR') {
+      iframeLinkError = (ev.data.message || 'App server link failed').slice(0, 120);
+      logPush('iframe link error: ' + iframeLinkError);
+      if (fcmToken && !serverSaveConfirmed) showStep2Status(99999);
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION') {
       handleIframeSession(ev.data);

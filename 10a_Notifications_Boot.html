@@ -45,6 +45,33 @@
     } catch (e) { /* ignore */ }
   }
 
+  function notifyParentLinkError(step, message) {
+    if (!window.isShowrunnerHostingShell) return;
+    try {
+      window.parent.postMessage({
+        type: 'SHOWRUNNER_FCM_LINK_ERROR',
+        step: step || 'bridge',
+        message: message || 'Could not reach Showrunner server from app.'
+      }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  function pushSessionToParent() {
+    if (!window.isShowrunnerHostingShell) return;
+    var crew = getCrewName();
+    if (!crew) return;
+    var regKey = getFcmRegKey();
+    try {
+      window.parent.postMessage({
+        type: 'SHOWRUNNER_SESSION',
+        regKey: regKey || '',
+        crewName: crew,
+        loggedIn: true
+      }, '*');
+    } catch (e) { /* ignore */ }
+    if (regKey) pushFcmAuthToParent(regKey);
+  }
+
   function notifyParentReady() {
     if (!window.isShowrunnerHostingShell) return;
     var crew = getCrewName();
@@ -63,9 +90,14 @@
     var crew = getCrewName();
     if (!window.isShowrunnerHostingShell || pushLinked || !crew) return;
     google.script.run
-      .withFailureHandler(function() { /* reg-key path preferred */ })
+      .withFailureHandler(function(err) {
+        notifyParentLinkError('bridge', (err && err.message) ? err.message : 'Server bridge failed');
+      })
       .withSuccessHandler(function(res) {
-        if (!res || !res.success || !res.nonce) return;
+        if (!res || !res.success || !res.nonce) {
+          notifyParentLinkError('bridge', (res && res.message) ? res.message : 'Bridge rejected');
+          return;
+        }
         try {
           window.parent.postMessage({
             type: 'SHOWRUNNER_FCM_BRIDGE',
@@ -78,17 +110,22 @@
   }
 
   function respondToParentPushRequest() {
+    pushSessionToParent();
     notifyParentReady();
     var regKey = getFcmRegKey();
     if (regKey) {
       pushFcmAuthToParent(regKey);
     } else {
       google.script.run
-        .withFailureHandler(function() { pushBridgeToParent(); })
+        .withFailureHandler(function(err) {
+          notifyParentLinkError('issue-key', (err && err.message) ? err.message : 'Could not issue link key');
+          pushBridgeToParent();
+        })
         .withSuccessHandler(function(res) {
           if (res && res.success && res.regKey) {
             pushFcmAuthToParent(res.regKey);
           } else {
+            notifyParentLinkError('issue-key', (res && res.message) ? res.message : 'No link key returned');
             pushBridgeToParent();
           }
         })
@@ -166,19 +203,7 @@
       clearInterval(metaBroadcast);
       return;
     }
-    var k = getFcmRegKey();
-    var crew = getCrewName();
-    if (crew && k) pushFcmAuthToParent(k);
-    else if (crew) {
-      try {
-        window.parent.postMessage({
-          type: 'SHOWRUNNER_SESSION',
-          crewName: crew,
-          regKey: k || '',
-          loggedIn: true
-        }, '*');
-      } catch (e) { /* ignore */ }
-    }
+    pushSessionToParent();
   }, 1500);
 
   setTimeout(function() { clearInterval(metaBroadcast); }, 600000);

@@ -107,6 +107,20 @@
           localStorage.removeItem('sm_crew_pass');
           localStorage.removeItem('sm_crew_timestamp');
         }
+        if (window.parent && window.parent !== window) {
+          try {
+            var crew = String(nameInput.value || '').trim();
+            if (crew) {
+              window.parent.postMessage({
+                type: 'SHOWRUNNER_SESSION',
+                crewName: crew,
+                regKey: '',
+                loggedIn: true,
+                pendingLogin: true
+              }, '*');
+            }
+          } catch (e) { /* ignore */ }
+        }
         btn.innerText = 'VERIFYING...';
         btn.style.opacity = '0.7';
         btn.disabled = true;

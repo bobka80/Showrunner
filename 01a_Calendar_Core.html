@@ -613,10 +613,17 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch(e) {}
         if (payload.fcmRegKey && window.parent && window.parent !== window) {
             try {
+                var crew = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '';
                 window.parent.postMessage({
                     type: 'SHOWRUNNER_FCM_AUTH',
                     regKey: payload.fcmRegKey,
-                    crewName: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : ''
+                    crewName: crew
+                }, '*');
+                window.parent.postMessage({
+                    type: 'SHOWRUNNER_SESSION',
+                    regKey: payload.fcmRegKey,
+                    crewName: crew,
+                    loggedIn: true
                 }, '*');
             } catch (e) { /* ignore */ }
         }
