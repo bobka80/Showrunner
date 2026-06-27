@@ -245,6 +245,9 @@ function switchResourceTab(tabId) {
     } else if (tabId === 'vehicles') {
         loadVehicles();
     } else if (tabId === 'database') {
+        if (typeof switchDatabaseSubTab === 'function') {
+          switchDatabaseSubTab(typeof _dbActiveSubTab !== 'undefined' ? _dbActiveSubTab : 'backup');
+        }
         if (typeof loadDatabaseOpsPanel === 'function') loadDatabaseOpsPanel();
     }
 }

@@ -1733,12 +1733,19 @@
     </div>
 
     <div id="tab-content-database" class="req-root-only" style="display:none; flex-direction:column; flex:1; overflow:hidden; background: #0a0a0c;">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar);">
-            <div style="color:#f59e0b; font-weight:800; font-size:14px; letter-spacing:1px;">DATABASE OPERATIONS (ROOT)</div>
-            <button class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="loadDatabaseOpsPanel()">REFRESH</button>
+        <div style="display:flex; align-items:center; gap:12px; padding: 15px 25px; border-bottom:1px solid #3f3f46; background: var(--bg-sidebar); flex-shrink:0;">
+            <div style="color:#f59e0b; font-weight:800; font-size:14px; letter-spacing:1px; white-space:nowrap;">DATABASE OPERATIONS (ROOT)</div>
+            <button type="button" id="db-subtab-btn-backup" class="btn-tab active" style="margin:0;" onclick="switchDatabaseSubTab('backup')">BACKUP &amp; ARCHIVE</button>
+            <button type="button" id="db-subtab-btn-ops" class="btn-tab" style="margin:0;" onclick="switchDatabaseSubTab('ops')">OPS &amp; NOTIFICATIONS</button>
+            <div style="flex:1;"></div>
+            <button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="refreshDatabasePanel()">REFRESH</button>
         </div>
-        <div id="db-ops-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;"></div>
-        <div id="push-admin-panel"></div>
+        <div id="db-subtab-backup" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;">
+            <div id="db-ops-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;"></div>
+        </div>
+        <div id="db-subtab-ops" style="flex:1; overflow:hidden; display:none; flex-direction:column; background:#0a0a0c; min-height:0;">
+            <div id="db-ops-notifications-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;"></div>
+        </div>
     </div>
 
     <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
