@@ -58,6 +58,31 @@
 
       const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 
+      function sessionCheckJsonp(token) {
+        return new Promise(function(resolve) {
+          if (!token || !scriptUrl) return resolve({ valid: false });
+          var cb = '__srSessChk_' + Date.now();
+          window[cb] = function(res) {
+            delete window[cb];
+            resolve(res || { valid: false });
+          };
+          var s = document.createElement('script');
+          s.src = scriptUrl + '?action=sessioncheck&token=' + encodeURIComponent(token) + '&callback=' + encodeURIComponent(cb);
+          s.onerror = function() {
+            delete window[cb];
+            resolve({ valid: false });
+          };
+          document.head.appendChild(s);
+        });
+      }
+
+      function beginSessionBoot(token, crewName, expiresAt) {
+        if (form) form.style.display = 'none';
+        if (bootMsg) bootMsg.style.display = 'block';
+        notifyParentSessionToken(token, crewName, expiresAt);
+        window.location.replace(scriptUrl + '?action=sessionboot&token=' + encodeURIComponent(token));
+      }
+
       function clearStoredSession() {
         try {
           localStorage.removeItem('sm_session_token');
@@ -108,8 +133,22 @@
          if (token && exp > Date.now() && scriptUrl) {
            if (form) form.style.display = 'none';
            if (bootMsg) bootMsg.style.display = 'block';
-           notifyParentSessionToken(token, localStorage.getItem('sm_crew_name') || nameInput.value, exp);
-           window.location.replace(scriptUrl + '?action=sessionboot&token=' + encodeURIComponent(token));
+           sessionCheckJsonp(token).then(function(res) {
+             if (res && res.valid) {
+               var crew = res.crewName || localStorage.getItem('sm_crew_name') || nameInput.value;
+               var newExp = res.expiresAt || exp;
+               try {
+                 localStorage.setItem('sm_session_expires', String(newExp));
+                 if (crew) localStorage.setItem('sm_crew_name', crew);
+               } catch (e) { /* ignore */ }
+               beginSessionBoot(token, crew, newExp);
+               return;
+             }
+             clearStoredSession();
+             notifyParentSessionClear();
+             if (form) form.style.display = '';
+             if (bootMsg) bootMsg.style.display = 'none';
+           });
            return;
          }
          if (token && exp <= Date.now()) {

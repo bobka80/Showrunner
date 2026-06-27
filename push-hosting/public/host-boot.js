@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '323';
+  const SW_BUILD = '328';
   const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
   let firebaseConfig = null;
   let fcmToken = null;
@@ -236,6 +236,43 @@
     if (sess && sess.token) {
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
+    return base;
+  }
+
+  function sessionCheckJsonp(token) {
+    return new Promise(function(resolve) {
+      if (!token) return resolve({ valid: false });
+      var cb = '__srSessChk_' + Date.now();
+      window[cb] = function(res) {
+        delete window[cb];
+        resolve(res || { valid: false });
+      };
+      var base = PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
+      if (!base) return resolve({ valid: false });
+      var script = document.createElement('script');
+      script.src = base + '?action=sessioncheck&token=' + encodeURIComponent(token) + '&callback=' + encodeURIComponent(cb);
+      script.onerror = function() {
+        delete window[cb];
+        resolve({ valid: false });
+      };
+      document.head.appendChild(script);
+    });
+  }
+
+  async function resolveAppFrameUrl() {
+    var base = PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
+    var sess = readParentSession();
+    if (!sess || !sess.token) return base;
+    var check = await sessionCheckJsonp(sess.token);
+    if (check && check.valid) {
+      saveParentSession(
+        sess.token,
+        check.crewName || sess.crewName,
+        check.expiresAt || sess.expiresAt
+      );
+      return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
+    }
+    clearParentSession();
     return base;
   }
 
@@ -839,7 +876,7 @@
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
-      if (ev.data.clearSession) clearParentSession();
+      if (ev.data.clearSession === true) clearParentSession();
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_LINK_ERROR') {
       iframeLinkError = (ev.data.message || 'App server link failed').slice(0, 120);
@@ -1073,7 +1110,13 @@
   }
 
   async function initShell() {
-    if (frame) frame.src = buildAppFrameUrl();
+    if (frame) {
+      try {
+        frame.src = await resolveAppFrameUrl();
+      } catch (e) {
+        frame.src = buildAppFrameUrl();
+      }
+    }
     try {
       firebaseConfig = await loadConfigJsonp();
       if (!firebaseConfig.apiKey || !firebaseConfig.vapidKey || firebaseConfig.vapidKeyValid === false) {

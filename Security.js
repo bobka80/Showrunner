@@ -269,9 +269,51 @@ function authenticateUser(crewName, passcode) {
 const SHOWRUNNER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SHOWRUNNER_SESSION_PROP_PREFIX = 'SR_SESS_';
 const SHOWRUNNER_SESSION_USER_PREFIX = 'SR_SESS_USER_';
+const SHOWRUNNER_MAX_SESSIONS_PER_USER = 8;
 
 function sessionUserIndexKey_(crewName) {
   return SHOWRUNNER_SESSION_USER_PREFIX + String(crewName || '').toLowerCase().trim().replace(/\s+/g, '_');
+}
+
+/** @returns {string[]} Legacy single-token values are supported. */
+function parseUserSessionTokenList_(raw) {
+  if (!raw) return [];
+  const s = String(raw).trim();
+  if (!s) return [];
+  if (s.charAt(0) === '[') {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr)) {
+        return arr.map(function(t) { return String(t || '').trim(); }).filter(function(t) { return t.length >= 20; });
+      }
+    } catch (e) { return []; }
+  }
+  if (s.length >= 20) return [s];
+  return [];
+}
+
+function writeUserSessionTokenList_(props, userKey, tokens) {
+  const clean = (tokens || []).filter(function(t) { return t && String(t).length >= 20; });
+  if (!clean.length) props.deleteProperty(userKey);
+  else props.setProperty(userKey, JSON.stringify(clean));
+}
+
+function removeTokenFromUserIndex_(props, crewName, token) {
+  const userKey = sessionUserIndexKey_(crewName);
+  const tokens = parseUserSessionTokenList_(props.getProperty(userKey));
+  writeUserSessionTokenList_(props, userKey, tokens.filter(function(t) { return t !== token; }));
+}
+
+function addTokenToUserIndex_(props, crewName, token) {
+  const userKey = sessionUserIndexKey_(crewName);
+  let tokens = parseUserSessionTokenList_(props.getProperty(userKey));
+  tokens = tokens.filter(function(t) { return t !== token; });
+  tokens.push(token);
+  while (tokens.length > SHOWRUNNER_MAX_SESSIONS_PER_USER) {
+    const drop = tokens.shift();
+    props.deleteProperty(SHOWRUNNER_SESSION_PROP_PREFIX + drop);
+  }
+  writeUserSessionTokenList_(props, userKey, tokens);
 }
 
 function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
@@ -364,17 +406,13 @@ function createUserSession_(crewName) {
   const name = String(crewName || '').trim();
   if (!name) return '';
   const props = PropertiesService.getScriptProperties();
-  const userKey = sessionUserIndexKey_(name);
-  const oldToken = props.getProperty(userKey);
-  if (oldToken) props.deleteProperty(SHOWRUNNER_SESSION_PROP_PREFIX + oldToken);
-
   const token = Utilities.getUuid().replace(/-/g, '');
   const expiresAt = new Date(Date.now() + SHOWRUNNER_SESSION_TTL_MS).toISOString();
   props.setProperty(SHOWRUNNER_SESSION_PROP_PREFIX + token, JSON.stringify({
     crewName: name,
     expiresAt: expiresAt
   }));
-  props.setProperty(userKey, token);
+  addTokenToUserIndex_(props, name, token);
   return token;
 }
 
@@ -393,8 +431,7 @@ function validateUserSession_(token) {
     }
     if (new Date(data.expiresAt).getTime() < Date.now()) {
       props.deleteProperty(key);
-      const userKey = sessionUserIndexKey_(data.crewName);
-      if (props.getProperty(userKey) === clean) props.deleteProperty(userKey);
+      removeTokenFromUserIndex_(props, data.crewName, clean);
       return null;
     }
     data.expiresAt = new Date(Date.now() + SHOWRUNNER_SESSION_TTL_MS).toISOString();
@@ -417,16 +454,24 @@ function revokeUserSession_(token) {
   try {
     const data = JSON.parse(raw);
     if (data && data.crewName) {
-      const userKey = sessionUserIndexKey_(data.crewName);
-      if (props.getProperty(userKey) === clean) props.deleteProperty(userKey);
+      removeTokenFromUserIndex_(props, data.crewName, clean);
     }
   } catch (e) { /* cleared */ }
 }
 
 function checkUserSessionStatus_(token) {
-  const crewName = validateUserSession_(token);
+  const clean = String(token || '').trim();
+  const crewName = validateUserSession_(clean);
   if (!crewName) return { valid: false, message: 'Session expired or invalid.' };
-  return { valid: true, crewName: crewName };
+  let expiresAt = Date.now() + SHOWRUNNER_SESSION_TTL_MS;
+  try {
+    const raw = PropertiesService.getScriptProperties().getProperty(SHOWRUNNER_SESSION_PROP_PREFIX + clean);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data && data.expiresAt) expiresAt = new Date(data.expiresAt).getTime();
+    }
+  } catch (e) { /* ignore */ }
+  return { valid: true, crewName: crewName, expiresAt: expiresAt };
 }
 
 // ==========================================

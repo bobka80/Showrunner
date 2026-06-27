@@ -122,6 +122,8 @@ Users must open **Firebase Hosting** (`https://sm-showrunner-97405.web.app`) for
 | Action | Purpose |
 |--------|---------|
 | `fcfg` | Firebase public web config + VAPID + hosting URL |
+| `sessioncheck` | JSONP — validate `sm_session_token` before `sessionboot` (parent + Login) |
+| `sessionboot` | Serve `Index.html` for valid session token (stay signed in) |
 | `fcmreg` / `fcmregkey` | Token registration via reg key (hosting shell) |
 | `fcmcheck` / `fcmping` | Token prefix verify + last-seen touch |
 | `fcmrefreshkey` | Rotate registration key |
@@ -135,7 +137,7 @@ Deployed separately: `node deploy-hosting.js` (runs `push-hosting/prepare-hostin
 | Path | Role |
 |------|------|
 | `push-hosting/public/index.html` | Hosting shell page (iframe + push dock) |
-| `push-hosting/public/host-boot.js` | Parent: load GAS iframe **before** FCM config; `postMessage` token to iframe; foreground notification handler; PWA install panel; `SW_BUILD` cache-bust |
+| `push-hosting/public/host-boot.js` | Parent: **`sessioncheck` then `sessionboot`**; load GAS iframe **before** FCM; `SHOWRUNNER_SESSION_TOKEN` sync; foreground push handler; PWA install; `SW_BUILD` cache-bust |
 | `push-hosting/public/firebase-messaging-sw.js` | Service worker — background data messages |
 | `push-hosting/public/manifest.json` | PWA manifest |
 | `deploy-hosting.js` | Firebase deploy wrapper (repo root) |

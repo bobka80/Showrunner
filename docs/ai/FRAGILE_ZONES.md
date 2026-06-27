@@ -22,6 +22,8 @@ When the director reports a bug in these areas, state the risk in plain language
 | **Index.html wiring** | `Index.html` | Add HTML module without `<?!= include ?>` | Every production module must be included before build |
 | **Build pipeline** | `build.js`, root `.html`, `dist/` | Edit `dist/` manually; revert to inline `<?!= getFrontendLogic() ?>` | Edit source HTML → `node build.js` → `clasp push` |
 | **RBAC boot payload** | `Main.js`, `Index.html`, `Security.js` | Inject raw JSON permissions into HTML without Base64 | Keep `userPermissionsB64` + `atob()` pattern |
+| **PWA session + login boot** | `push-hosting/public/host-boot.js`, `Login.html`, `Index.html` (session `postMessage`), `Main.js` (`sessionboot`, `sessioncheck`), `Security.js` | Change iframe load order; skip `sessioncheck` before `sessionboot`; clear parent session on every login screen paint; single-token login that kicks other devices without director approval | Token sync only via `SHOWRUNNER_SESSION_TOKEN`; validate server-side before `sessionboot`; multi-device sessions in `Security.js` |
+| **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
 | **Warehouse ledger** | `Operations.js` | Mutate assignments directly during RFID chaos | Append to `Operations_Ledger` |
 
 ---
@@ -42,6 +44,38 @@ The formula system has **three corners** that must stay in harmony:
 **Why "Triangle":** All three corners must agree. Breaking the parser, render loop, or list mutations severs the link — users can no longer trust what they typed, what they see, or what is in the database.
 
 **AI rule:** Do not describe this as "the list reflects the formula" only. It is **mutual**. Never modify parser, renderer, or CRUD in one corner without verifying the other two still sync.
+
+---
+
+## PWA session bridge + login boot (Critical)
+
+Showrunner on crew phones is **two layers**:
+
+1. **Firebase hosting shell** (`web.app`) — `host-boot.js`, push dock, parent `localStorage` (`sm_session_token`, `sm_session_expires`)
+2. **GAS iframe** — `Login.html` / `Index.html`, same `localStorage` keys, `postMessage` to parent
+
+**Boot path after “stay signed in” (v310+):**
+
+- Parent may open: `GAS/exec?action=sessionboot&token=…`
+- Server validates token in `Security.js` → serves `Index.html` without passcode
+- Iframe must `postMessage` `SHOWRUNNER_SESSION_TOKEN` so parent stores the **same** token
+
+**Black screen ≠ always “session”.** Two failure modes:
+
+| Symptom | Likely layer | Check |
+|--------|----------------|-------|
+| “Session expired” loop | Session bridge | Stale parent token; server rejected `sessionboot`; `clearSession` wiped parent |
+| Black screen after auth | App boot | `LogicPayload_*` chunk load/eval failed; bootloader order wrong; JS syntax error in **any** included module |
+
+**AI rules:**
+
+1. **`sessioncheck` before `sessionboot`** — Parent (`host-boot.js`) and `Login.html` must confirm the token with `?action=sessioncheck` before redirecting. Never load `sessionboot` with a token the server will reject.
+2. **Do not clear parent session casually** — Only `clearParentSession()` when `SHOWRUNNER_LOGIN_STATE` has `clearSession === true` (server-invalid), or after failed `sessioncheck`.
+3. **Multi-device sessions** — `createUserSession_` adds a token; it must **not** revoke other devices’ tokens (cap: 8 per user). Logging in on phone must not kill desktop mid-shift.
+4. **Iframe loads first** — `initShell()` sets `frame.src` **before** awaiting Firebase/FCM. Push setup must never block the iframe (v317 lesson).
+5. **Every milestone smoke test** — After `node milestone.js`, director or AI verifies: open `web.app` (PWA path) **and** GAS URL on desktop → login or auto-boot → calendar/mobile home visible. Mobile-only notes still redeploy **the entire** `Index.html` payload.
+
+**Deploy pairing:** Session logic spans GAS **and** hosting. If you change `host-boot.js`, run `node deploy-hosting.js` as well as `milestone.js`. GAS-only mobile UI changes do not require hosting — unless you also touched `push-hosting/`.
 
 ---
 
@@ -81,6 +115,28 @@ LESSON (never do X again):
 ```
 
 ### Entries
+
+#### 2026-06-27 — Session expired loop + black screen after mobile milestones (fixed v328)
+
+```
+DATE: 2026-06-27
+SYMPTOM: After mobile UI milestones, login sometimes showed black screen (phone + desktop) and "Session expired" every open; felt like stay-signed-in broke again.
+CAUSE: (1) Parent shell opened sessionboot with stale localStorage token → server returned Login with clearSession → parent wiped good state. (2) createUserSession_ revoked previous device token on each login — phone/desktop kicked each other. (3) Any milestone rebuilds full LogicPayload — unrelated mobile JS can break boot for everyone. Correlation with mobile work was deploy pipeline, not weather/hub CSS.
+FRAGILE ZONE: PWA session + login boot; App boot pipeline
+FILES TOUCHED: Security.js (multi-device sessions), host-boot.js (sessioncheck before sessionboot), Login.html (sessioncheck), FRAGILE_ZONES.md
+LESSON: Never ship milestone without login smoke test on web.app + desktop. Always sessioncheck before sessionboot. Document in FRAGILE_ZONES before editing session or build.js.
+```
+
+#### 2026-06-27 — Blank screen after login v317 (fixed)
+
+```
+DATE: 2026-06-27 (GAS v317)
+SYMPTOM: Blank black screen after login on desktop and mobile app.
+CAUSE: (1) Hosting shell blocked iframe until Firebase config finished. (2) Bootloader appended after </body> in some builds — chunk loader failed silently.
+FRAGILE ZONE: App boot pipeline; PWA session + login boot
+FILES TOUCHED: build.js (bootloader before </body>, showBootFailure), host-boot.js (iframe loads immediately)
+LESSON: Iframe first, FCM second. Bootloader must inject before </body>. showBootFailure must remain for chunk errors.
+```
 
 #### 2026-06-24 — Print Studio unwired (fixed)
 
