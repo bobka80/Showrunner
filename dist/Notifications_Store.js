@@ -264,6 +264,70 @@ function getFcmDevicesForUid_(uid) {
   return parseFcmTokenRecord_(raw).devices || [];
 }
 
+function getFcmTokenKey_(token) {
+  const t = String(token || '').trim();
+  return t.length >= 12 ? t.slice(0, 12) : t;
+}
+
+function getFcmTokenHint_(token) {
+  const t = String(token || '').trim();
+  if (t.length <= 20) return t;
+  return t.slice(0, 8) + '…' + t.slice(-6);
+}
+
+function findFcmTokenByKey_(uid, tokenKey) {
+  const prefix = String(tokenKey || '').trim();
+  if (!prefix) return '';
+  const devices = getFcmDevicesForUid_(uid);
+  for (let i = 0; i < devices.length; i++) {
+    const t = devices[i] && devices[i].token ? String(devices[i].token) : '';
+    if (t && t.indexOf(prefix) === 0) return t;
+  }
+  return '';
+}
+
+/** ROOT — device list with safe token hints for admin UI. */
+function getFcmDevicesAdminDetail(crewName) {
+  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+    return { success: false, message: 'ROOT privileges required.' };
+  }
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) return { success: false, message: 'Unknown user profile.' };
+  const devices = getFcmDevicesForUid_(profile.uid);
+  return {
+    success: true,
+    crewName: crewName,
+    devices: devices.map(function(d) {
+      return {
+        label: d.label || 'web',
+        updatedAt: d.updatedAt || '',
+        tokenKey: getFcmTokenKey_(d.token),
+        tokenHint: getFcmTokenHint_(d.token)
+      };
+    })
+  };
+}
+
+/** ROOT — remove one registered device by token key prefix. */
+function revokeFcmDeviceByTokenKey(crewName, tokenKey) {
+  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+    return { success: false, message: 'ROOT privileges required.' };
+  }
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) return { success: false, message: 'Unknown user profile.' };
+  const full = findFcmTokenByKey_(profile.uid, tokenKey);
+  if (!full) return { success: false, message: 'Device not found.' };
+  const removed = removeFcmTokensForUid_(profile.uid, [full]);
+  try {
+    writeToAuditLog(crewName, 'DELETE', 'NOTIFICATIONS', profile.uid, 'FCM Device',
+      'Revoked device key ' + tokenKey + ' (' + (removed > 0 ? 'ok' : 'miss') + ')');
+  } catch (e) { /* optional */ }
+  return {
+    success: removed > 0,
+    message: removed > 0 ? 'Device removed from push registry.' : 'Device not found.'
+  };
+}
+
 function getFcmRegistrationStatus(crewName) {
   const profile = getUserSecurityProfile(crewName);
   if (!profile || !profile.uid) return { registered: false, message: 'Unknown user profile.' };

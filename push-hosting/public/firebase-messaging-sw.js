@@ -23,13 +23,21 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+const SR_PUSH_ICON = '/icon-192.png';
+
 messaging.onBackgroundMessage(function(payload) {
 
   const title = (payload.notification && payload.notification.title) || 'Showrunner';
 
+  const n = payload.notification || {};
+
   const options = {
 
-    body: (payload.notification && payload.notification.body) || '',
+    body: n.body || '',
+
+    icon: n.icon || SR_PUSH_ICON,
+
+    badge: n.badge || SR_PUSH_ICON,
 
     data: payload.data || {}
 

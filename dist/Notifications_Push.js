@@ -86,6 +86,12 @@ function summarizeFcmError_(errText) {
   }
 }
 
+function getShowrunnerPushIconUrl_() {
+  const hosting = PropertiesService.getScriptProperties().getProperty('FIREBASE_HOSTING_URL')
+    || 'https://sm-showrunner-97405.web.app';
+  return String(hosting).replace(/\/$/, '') + '/icon-192.png';
+}
+
 function sendFcmToTokens_(tokens, title, body, linkUrl, options) {
   const opts = options || {};
   const list = (tokens || []).filter(function(t) { return t && String(t).length > 20; });
@@ -100,6 +106,7 @@ function sendFcmToTokens_(tokens, title, body, linkUrl, options) {
   const hosting = PropertiesService.getScriptProperties().getProperty('FIREBASE_HOSTING_URL')
     || ('https://' + projectId + '.web.app');
   const clickLink = linkUrl || hosting;
+  const iconUrl = opts.iconUrl || getShowrunnerPushIconUrl_();
 
   let sent = 0;
   const errors = [];
@@ -113,6 +120,10 @@ function sendFcmToTokens_(tokens, title, body, linkUrl, options) {
           body: body || ''
         },
         webpush: {
+          notification: {
+            icon: iconUrl,
+            badge: iconUrl
+          },
           fcmOptions: { link: clickLink }
         }
       }
@@ -149,8 +160,8 @@ function sendTestPushNotification(crewName) {
   }
   const result = sendFcmToTokens_(
     tokens,
-    'Showrunner test',
-    'Push notifications are working.',
+    '📣 Showrunner test',
+    'Push notifications are working on this device.',
     getFirebasePublicConfig().hostingUrl
   );
   let pruned = 0;
@@ -176,6 +187,38 @@ function sendTestPushNotification(crewName) {
   var failMsg = 'Send failed — no device accepted the push.';
   if (result.errors.length) failMsg += ' ' + result.errors[0];
   if (pruned > 0) failMsg += ' Removed ' + pruned + ' dead token(s). Re-register on your phone from web.app.';
+  return { success: false, message: failMsg, pruned: pruned };
+}
+
+function sendTestPushToDevice(crewName, tokenKey) {
+  if (!verifyBackendPrivilege(crewName, 'ROOT')) {
+    return { success: false, message: 'ROOT privileges required.' };
+  }
+  const profile = getUserSecurityProfile(crewName);
+  if (!profile || !profile.uid) return { success: false, message: 'Unknown user profile.' };
+  const token = findFcmTokenByKey_(profile.uid, tokenKey);
+  if (!token) return { success: false, message: 'Device not found — refresh the list.' };
+
+  const result = sendFcmToTokens_(
+    [token],
+    '📣 Showrunner test',
+    'Test push to this device only.',
+    getFirebasePublicConfig().hostingUrl
+  );
+  let pruned = 0;
+  if (result.deadTokens && result.deadTokens.length) {
+    pruned = removeFcmTokensForUid_(profile.uid, result.deadTokens);
+  }
+  if (result.sent > 0) {
+    try {
+      writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', tokenKey, 'Test Push Device',
+        'Sent test FCM to device key ' + tokenKey);
+    } catch (e) { /* optional */ }
+    return { success: true, message: 'Test push delivered to this device.' };
+  }
+  var failMsg = 'Send failed for this device.';
+  if (result.errors.length) failMsg += ' ' + result.errors[0];
+  if (pruned > 0) failMsg += ' Dead token removed — re-register from web.app.';
   return { success: false, message: failMsg, pruned: pruned };
 }
 

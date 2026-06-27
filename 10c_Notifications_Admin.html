@@ -1,7 +1,7 @@
 <script>
 /**
  * 10c_Notifications_Admin.html
- * ROOT tools — test push notification (Phase 1).
+ * ROOT push console — VAPID, device list, per-device test, manual token modal.
  */
 
 var SHOWRUNNER_HOSTING_URL = 'https://sm-showrunner-97405.web.app';
@@ -16,38 +16,63 @@ function renderPushAdminPanel(containerId) {
   }
 
   el.innerHTML =
-    '<div style="background:#18181b; border:1px solid #333; border-radius:8px; padding:14px; margin-top:12px;">' +
-      '<div style="color:#f59e0b; font-size:11px; font-weight:900; letter-spacing:0.05em; margin-bottom:8px;">PUSH NOTIFICATIONS (PHASE 1)</div>' +
-      '<div style="color:#a1a1aa; font-size:11px; line-height:1.45; margin-bottom:10px;">' +
-        'Push only works from the <strong>Hosting URL</strong>. Android: Chrome OK. iPhone: <strong>Safari</strong> + Add to Home Screen.' +
-      '</div>' +
-      '<div style="margin-bottom:10px; padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">' +
-        '<div style="color:#888; font-size:10px; font-weight:800; margin-bottom:6px;">VAPID KEY (Web Push certificate)</div>' +
-        '<div style="color:#71717a; font-size:10px; line-height:1.4; margin-bottom:8px;">' +
-          'Firebase Console → Project settings → Cloud Messaging → <strong>Web Push certificates</strong> → copy the <strong>public key</strong> (~88 chars, starts with B). ' +
-          '<a href="' + FIREBASE_VAPID_CONSOLE_URL + '" target="_blank" style="color:#10b981;">Open Cloud Messaging settings</a>' +
-        '</div>' +
-        '<input id="push-vapid-input" type="text" placeholder="Paste Web Push public key here (not AIza API key)" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:11px; margin-bottom:8px;">' +
-        '<button class="btn-outline btn-sm" style="margin:0; border-color:#698b99; color:#698b99;" onclick="saveShowrunnerVapidKey()">SAVE VAPID KEY</button>' +
-        '<span id="push-vapid-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>' +
-        '<div id="push-vapid-active" style="color:#71717a; font-size:10px; margin-top:6px;"></div>' +
-      '</div>' +
-      '<div style="margin-bottom:10px; padding:10px; border:1px solid #333; border-radius:6px; background:#121214; position:relative; z-index:5;">' +
-        '<div style="color:#888; font-size:10px; font-weight:800; margin-bottom:6px;">DEVICE REGISTRATION</div>' +
-        '<div style="color:#71717a; font-size:10px; line-height:1.4; margin-bottom:8px;">' +
-          'Crew devices register automatically when they open the Hosting URL and allow notifications. Use the tools below only if auto-save fails.' +
-        '</div>' +
-        '<textarea id="push-device-token-input" rows="3" placeholder="Emergency: paste device token" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:10px; margin-bottom:8px; resize:vertical; display:none;"></textarea>' +
-        '<button type="button" class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981; position:relative; z-index:6; pointer-events:auto; display:none;" id="push-fetch-hosting-btn" onclick="fetchDeviceTokenFromHosting()">GET TOKEN FROM HOSTING</button>' +
-        '<button type="button" class="btn-outline btn-sm" style="margin:0 0 8px 0; border-color:#10b981; color:#10b981; position:relative; z-index:6; pointer-events:auto; display:none;" id="push-save-token-btn" onclick="saveShowrunnerDeviceToken()">SAVE DEVICE TOKEN</button>' +
-        '<span id="push-device-token-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>' +
-      '</div>' +
-      '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="display:inline-block; margin:0 8px 8px 0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>' +
-      '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#10b981; color:#10b981;" onclick="retryShowrunnerFcmRegistration()">RETRY DEVICE REGISTER</button>' +
-      '<button class="btn-outline btn-sm" style="margin:0 8px 8px 0; border-color:#f59e0b; color:#f59e0b;" onclick="cleanupShowrunnerFcmDevices()">CLEAN STALE DEVICES</button>' +
-      '<button class="btn-outline btn-sm" style="margin:0 0 8px 0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">SEND TEST PUSH TO ME</button>' +
-      '<div id="push-admin-status" style="color:#71717a; font-size:11px; margin-top:8px; line-height:1.5; word-break:break-word; min-height:2.5em;">Checking push setup…</div>' +
-    '</div>';
+    '<div style="display:flex; flex-direction:column; gap:12px;">'
+
+    + '<div style="padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">'
+    + '<div style="color:#f59e0b; font-size:10px; font-weight:800; margin-bottom:6px; letter-spacing:0.05em;">VAPID KEY (Web Push certificate)</div>'
+    + '<div style="color:#71717a; font-size:10px; line-height:1.4; margin-bottom:8px;">'
+    + 'Firebase Console → Cloud Messaging → <strong>Web Push certificates</strong> → public key (~88 chars, starts with B). '
+    + '<a href="' + FIREBASE_VAPID_CONSOLE_URL + '" target="_blank" rel="noopener" style="color:#10b981;">Open settings</a>'
+    + '</div>'
+    + '<input id="push-vapid-input" type="text" placeholder="Paste Web Push public key (not AIza API key)" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:11px; margin-bottom:8px;">'
+    + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#698b99; color:#698b99;" onclick="saveShowrunnerVapidKey()">SAVE VAPID KEY</button>'
+    + '<span id="push-vapid-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>'
+    + '<div id="push-vapid-active" style="color:#71717a; font-size:10px; margin-top:4px;"></div>'
+    + '</div>'
+
+    + '<div style="padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">'
+    + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">'
+    + '<div style="color:#10b981; font-size:10px; font-weight:800; letter-spacing:0.05em;">REGISTERED DEVICES</div>'
+    + '<div style="display:flex; flex-wrap:wrap; gap:6px;">'
+    + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openPushTokenModal()">SAVE TOKEN…</button>'
+    + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="cleanupShowrunnerFcmDevices()">CLEAN STALE</button>'
+    + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">TEST ALL</button>'
+    + '</div></div>'
+    + '<div id="push-device-list" style="display:flex; flex-direction:column; gap:6px; min-height:48px;">'
+    + '<div style="color:#52525b; font-size:10px;">Loading devices…</div>'
+    + '</div>'
+    + '</div>'
+
+    + '<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">'
+    + '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="margin:0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>'
+    + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="retryShowrunnerFcmRegistration()">RETRY AUTO-REGISTER</button>'
+    + '</div>'
+
+    + '<div id="push-admin-status" style="color:#71717a; font-size:11px; line-height:1.5; word-break:break-word; min-height:1.5em;"></div>'
+    + '</div>';
+
+  if (!document.getElementById('push-token-modal-overlay')) {
+    var modal = document.createElement('div');
+    modal.id = 'push-token-modal-overlay';
+    modal.className = 'modal-overlay';
+    modal.style.cssText = 'z-index:8000; display:none;';
+    modal.innerHTML =
+      '<div class="modal" style="max-width:520px; width:95%;">'
+      + '<h3 class="modal-title" style="color:#10b981;">Save device token</h3>'
+      + '<p style="color:#a1a1aa; font-size:11px; line-height:1.45; margin:0 0 12px 0;">'
+      + 'Use when auto-register fails. Open <strong>web.app</strong> on the device, allow notifications, then fetch the token from the hosting shell or paste it manually.'
+      + '</p>'
+      + '<textarea id="push-device-token-input" rows="4" placeholder="Paste FCM device token here…" style="width:100%; box-sizing:border-box; padding:10px; background:#27272a; border:1px solid #444; color:#fff; border-radius:6px; font-size:10px; margin-bottom:10px; resize:vertical; font-family:monospace;"></textarea>'
+      + '<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;">'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="fetchDeviceTokenFromHosting()">GET TOKEN FROM HOSTING</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="saveShowrunnerDeviceToken()">SAVE TO MY ACCOUNT</button>'
+      + '</div>'
+      + '<span id="push-device-token-status" style="display:block; color:#71717a; font-size:10px; margin-bottom:12px; line-height:1.4;"></span>'
+      + '<div style="display:flex; justify-content:flex-end; gap:8px;">'
+      + '<button type="button" class="btn-close" style="width:auto; margin:0;" onclick="closePushTokenModal()">CLOSE</button>'
+      + '</div></div>';
+    document.body.appendChild(modal);
+  }
 
   if (typeof window.onShowrunnerFcmRegistered !== 'function') {
     window.onShowrunnerFcmRegistered = function() {
@@ -56,6 +81,54 @@ function renderPushAdminPanel(containerId) {
   }
 
   refreshPushAdminStatus();
+}
+
+function openPushTokenModal() {
+  var modal = document.getElementById('push-token-modal-overlay');
+  var note = document.getElementById('push-device-token-status');
+  if (note) note.textContent = '';
+  if (modal) modal.style.display = 'flex';
+}
+
+function closePushTokenModal() {
+  var modal = document.getElementById('push-token-modal-overlay');
+  if (modal) modal.style.display = 'none';
+}
+
+function escapePushHtml(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+}
+
+function renderPushDeviceList(devices) {
+  var list = document.getElementById('push-device-list');
+  if (!list) return;
+  if (!devices || !devices.length) {
+    list.innerHTML = '<div style="color:#52525b; font-size:10px; line-height:1.45;">No devices registered. Open <strong>web.app</strong> on phone → allow notifications → log in.</div>';
+    return;
+  }
+  var html = '';
+  devices.forEach(function(d) {
+    var when = d.updatedAt ? d.updatedAt.slice(0, 16).replace('T', ' ') : '—';
+    var label = escapePushHtml(d.label || 'web');
+    var hint = escapePushHtml(d.tokenHint || d.tokenKey || '');
+    var key = escapePushHtml(d.tokenKey || '');
+    html += '<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#1a1a1e; border:1px solid #333; border-radius:6px; flex-wrap:wrap;">'
+      + '<div style="flex:1; min-width:140px;">'
+      + '<div style="color:#fff; font-weight:800; font-size:11px;">' + label + '</div>'
+      + '<div style="color:#71717a; font-size:9px; margin-top:2px;">' + when + '</div>'
+      + '<div style="color:#52525b; font-size:9px; font-family:monospace; margin-top:2px;">' + hint + '</div>'
+      + '</div>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap;" onclick="runShowrunnerTestPushDevice(\'' + key + '\')">TEST PUSH</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap;" onclick="revokeShowrunnerDevice(\'' + key + '\')">REVOKE</button>'
+      + '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function setPushAdminStatus(html, isError) {
+  var status = document.getElementById('push-admin-status');
+  if (!status) return;
+  status.innerHTML = html;
 }
 
 function saveShowrunnerVapidKey() {
@@ -68,15 +141,15 @@ function saveShowrunnerVapidKey() {
   if (note) note.textContent = 'Saving…';
   google.script.run
     .withFailureHandler(function(err) {
-      if (note) note.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+      if (note) note.innerHTML = '<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>';
     })
     .withSuccessHandler(function(res) {
       if (!note) return;
       if (res && res.success) {
-        note.innerHTML = '<span style="color:#10b981;">' + res.message + '</span>';
+        note.innerHTML = '<span style="color:#10b981;">' + escapePushHtml(res.message) + '</span>';
         input.value = '';
       } else {
-        note.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Save failed') + '</span>';
+        note.innerHTML = '<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Save failed') + '</span>';
       }
       refreshPushAdminStatus();
     })
@@ -86,11 +159,12 @@ function saveShowrunnerVapidKey() {
 function fetchDeviceTokenFromHosting() {
   var note = document.getElementById('push-device-token-status');
   var input = document.getElementById('push-device-token-input');
+  openPushTokenModal();
   if (window.self === window.top) {
-    if (note) note.innerHTML = '<span style="color:#ef4444;">Open ' + SHOWRUNNER_HOSTING_URL + ' first.</span>';
+    if (note) note.innerHTML = '<span style="color:#ef4444;">Open ' + SHOWRUNNER_HOSTING_URL + ' in this shell first.</span>';
     return;
   }
-  if (note) note.textContent = 'Fetching token from Hosting shell…';
+  if (note) note.textContent = 'Fetching token from hosting shell…';
   var done = false;
   function onMsg(ev) {
     if (!ev.data || ev.data.type !== 'SHOWRUNNER_FCM_TOKEN' || !ev.data.token) return;
@@ -98,7 +172,7 @@ function fetchDeviceTokenFromHosting() {
     if (done) return;
     done = true;
     if (input) input.value = ev.data.token;
-    saveShowrunnerDeviceToken();
+    if (note) note.innerHTML = '<span style="color:#10b981;">Token received — review and click SAVE TO MY ACCOUNT.</span>';
   }
   window.addEventListener('message', onMsg);
   try {
@@ -107,30 +181,32 @@ function fetchDeviceTokenFromHosting() {
   setTimeout(function() {
     window.removeEventListener('message', onMsg);
     if (!done && note) {
-      note.innerHTML = '<span style="color:#f59e0b;">No token yet — bottom-right must say “token ready”, or click Copy push token there.</span>';
+      note.innerHTML = '<span style="color:#f59e0b;">No token yet — on phone tap Set up shift alerts until Step 1 says token OK.</span>';
     }
-  }, 8000);
+  }, 10000);
 }
 
 function saveShowrunnerDeviceToken() {
   var input = document.getElementById('push-device-token-input');
   var note = document.getElementById('push-device-token-status');
+  openPushTokenModal();
   if (!input || !input.value.trim()) {
-    if (note) note.innerHTML = '<span style="color:#ef4444;">Paste the device token first (Copy push token on Hosting page).</span>';
+    if (note) note.innerHTML = '<span style="color:#ef4444;">Paste or fetch a device token first.</span>';
     return;
   }
   if (note) note.textContent = 'Saving…';
   google.script.run
     .withFailureHandler(function(err) {
-      if (note) note.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+      if (note) note.innerHTML = '<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>';
     })
     .withSuccessHandler(function(res) {
       if (!note) return;
       if (res && res.success) {
-        note.innerHTML = '<span style="color:#10b981;">Device token saved. Try SEND TEST PUSH TO ME.</span>';
+        note.innerHTML = '<span style="color:#10b981;">Device token saved.</span>';
         input.value = '';
+        setTimeout(closePushTokenModal, 1200);
       } else {
-        note.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Save failed') + '</span>';
+        note.innerHTML = '<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Save failed') + '</span>';
       }
       refreshPushAdminStatus();
     })
@@ -138,117 +214,131 @@ function saveShowrunnerDeviceToken() {
 }
 
 function refreshPushAdminStatus() {
-  const status = document.getElementById('push-admin-status');
-  if (!status) return;
-
   var inShell = (window.self !== window.top);
   if (!inShell) {
-    status.innerHTML = '<span style="color:#ef4444;">Wrong entry point — open <a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" style="color:#10b981;">' + SHOWRUNNER_HOSTING_URL + '</a> first.</span>';
+    setPushAdminStatus('<span style="color:#ef4444;">Open <a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" style="color:#10b981;">' + SHOWRUNNER_HOSTING_URL + '</a> for device registration.</span>');
     return;
   }
 
   google.script.run
     .withFailureHandler(function(err) {
-      status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+      setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>');
     })
     .withSuccessHandler(function(setup) {
       if (!setup || !setup.success) {
-        status.innerHTML = '<span style="color:#ef4444;">' + ((setup && setup.message) || 'Setup check failed') + '</span>';
-        return;
-      }
-
-      if (!setup.vapidKeyValid) {
-        var vapidHint = setup.vapidLooksLikeApiKey
-          ? 'VAPID key looks like an API key (AIza…). Paste the Web Push public key from Cloud Messaging instead.'
-          : 'VAPID key missing or invalid. Paste the Web Push public key above and click SAVE VAPID KEY.';
-        status.innerHTML = '<span style="color:#ef4444;">' + vapidHint + '</span>';
+        setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml((setup && setup.message) || 'Setup check failed') + '</span>');
         return;
       }
 
       var vapidActive = document.getElementById('push-vapid-active');
-      if (vapidActive && setup.vapidKeyPrefix) {
-        vapidActive.innerHTML = 'Server VAPID starts with <strong>' + setup.vapidKeyPrefix + '…</strong> (' + setup.vapidKeyLength + ' chars) — compare to Firebase <em>Current pair</em>.';
+      if (vapidActive) {
+        if (!setup.vapidKeyValid) {
+          vapidActive.innerHTML = '<span style="color:#ef4444;">VAPID missing or invalid — paste key above.</span>';
+        } else if (setup.vapidKeyPrefix) {
+          vapidActive.innerHTML = 'Server VAPID: <strong>' + escapePushHtml(setup.vapidKeyPrefix) + '…</strong> (' + setup.vapidKeyLength + ' chars)';
+        }
       }
 
       google.script.run
-        .withSuccessHandler(function(res) {
-          if (res && res.registered) {
-            var when = res.updatedAt ? (' · ' + res.updatedAt.slice(0, 16).replace('T', ' ')) : '';
-            var count = res.deviceCount > 1 ? (res.deviceCount + ' devices') : '1 device';
-            var detail = '';
-            if (res.devices && res.devices.length) {
-              detail = '<br><span style="color:#888;">' + res.devices.map(function(d) {
-                var when = d.updatedAt ? d.updatedAt.slice(0, 16).replace('T', ' ') : '';
-                return (d.label || 'web') + (when ? (' · ' + when) : '');
-              }).join('<br>') + '</span>';
-            }
-            status.innerHTML = '<span style="color:#10b981;">VAPID OK · ' + count + ' registered' + when + '</span>' + detail;
-            if (res.deviceCount < 2) {
-              status.innerHTML += '<br><span style="color:#71717a;">Phone: open web.app in Chrome → Allow notifications → log in. Expect web-mobile in list above.</span>';
-            }
-            return;
-          }
-          var regHint = window.__srFcmLastError
-            ? ('Save error: ' + window.__srFcmLastError)
-            : 'Registering this device automatically — allow notifications when prompted.';
-          status.innerHTML = '<span style="color:#f59e0b;">' + regHint + '</span>';
+        .withFailureHandler(function(err) {
+          renderPushDeviceList([]);
+          setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>');
         })
-        .getFcmRegistrationStatus(ACTIVE_USER_NAME);
+        .withSuccessHandler(function(res) {
+          if (res && res.success) {
+            renderPushDeviceList(res.devices || []);
+            var n = (res.devices || []).length;
+            setPushAdminStatus(n
+              ? '<span style="color:#10b981;">' + n + ' device(s) ready · use TEST PUSH per row or TEST ALL</span>'
+              : '<span style="color:#f59e0b;">No devices — open web.app on phone and allow notifications</span>');
+          } else {
+            renderPushDeviceList([]);
+            setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Could not load devices') + '</span>');
+          }
+        })
+        .getFcmDevicesAdminDetail(ACTIVE_USER_NAME);
     })
     .getFirebasePushSetupStatus(ACTIVE_USER_NAME);
 }
 
 function retryShowrunnerFcmRegistration() {
-  const status = document.getElementById('push-admin-status');
-  if (status) status.textContent = 'Saving device token…';
+  setPushAdminStatus('<span style="color:#a1a1aa;">Retrying auto-register…</span>');
   if (window.self === window.top) {
-    if (status) status.innerHTML = '<span style="color:#ef4444;">Open ' + SHOWRUNNER_HOSTING_URL + ' first.</span>';
+    setPushAdminStatus('<span style="color:#ef4444;">Open ' + SHOWRUNNER_HOSTING_URL + ' first.</span>');
     return;
   }
   if (typeof window.retryShowrunnerFcmBridge === 'function') {
     window.retryShowrunnerFcmBridge();
     setTimeout(refreshPushAdminStatus, 3000);
-    return;
-  }
-  if (typeof window.startFcmBridgeRegistration === 'function') {
-    window.startFcmBridgeRegistration();
-    setTimeout(refreshPushAdminStatus, 3000);
   }
 }
 
 function cleanupShowrunnerFcmDevices() {
-  const status = document.getElementById('push-admin-status');
-  if (status) status.textContent = 'Cleaning stale devices…';
+  setPushAdminStatus('<span style="color:#a1a1aa;">Cleaning stale devices…</span>');
   google.script.run
     .withFailureHandler(function(err) {
-      if (status) status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+      setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>');
     })
     .withSuccessHandler(function(res) {
-      if (!status) return;
       if (res && res.success) {
-        status.innerHTML = '<span style="color:#10b981;">' + res.message + '</span>';
+        setPushAdminStatus('<span style="color:#10b981;">' + escapePushHtml(res.message) + '</span>');
       } else {
-        status.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Cleanup failed') + '</span>';
+        setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Cleanup failed') + '</span>');
       }
-      setTimeout(refreshPushAdminStatus, 500);
+      setTimeout(refreshPushAdminStatus, 400);
     })
     .cleanupFcmDevicesForUser(ACTIVE_USER_NAME);
 }
 
-function runShowrunnerTestPush() {
-  const status = document.getElementById('push-admin-status');
-  if (status) status.textContent = 'Sending...';
+function runShowrunnerTestPushDevice(tokenKey) {
+  if (!tokenKey) return;
+  setPushAdminStatus('<span style="color:#a1a1aa;">Sending test to device…</span>');
   google.script.run
     .withFailureHandler(function(err) {
-      if (status) status.innerHTML = '<span style="color:#ef4444;">' + (err.message || err) + '</span>';
+      setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>');
     })
     .withSuccessHandler(function(res) {
-      if (!status) return;
+      if (res && res.success) {
+        setPushAdminStatus('<span style="color:#10b981;">' + escapePushHtml(res.message) + '</span>');
+      } else {
+        setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Failed') + '</span>');
+      }
+      setTimeout(refreshPushAdminStatus, 500);
+    })
+    .sendTestPushToDevice(ACTIVE_USER_NAME, tokenKey);
+}
+
+function revokeShowrunnerDevice(tokenKey) {
+  if (!tokenKey) return;
+  if (!confirm('Remove this device from push registry?\n\nIt will stop receiving alerts until re-registered from web.app.')) return;
+  setPushAdminStatus('<span style="color:#a1a1aa;">Revoking device…</span>');
+  google.script.run
+    .withFailureHandler(function(err) {
+      setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>');
+    })
+    .withSuccessHandler(function(res) {
+      if (res && res.success) {
+        setPushAdminStatus('<span style="color:#10b981;">' + escapePushHtml(res.message) + '</span>');
+      } else {
+        setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Revoke failed') + '</span>');
+      }
+      setTimeout(refreshPushAdminStatus, 400);
+    })
+    .revokeFcmDeviceByTokenKey(ACTIVE_USER_NAME, tokenKey);
+}
+
+function runShowrunnerTestPush() {
+  setPushAdminStatus('<span style="color:#a1a1aa;">Sending test to all devices…</span>');
+  google.script.run
+    .withFailureHandler(function(err) {
+      setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml(err.message || err) + '</span>');
+    })
+    .withSuccessHandler(function(res) {
       if (res && res.success) {
         var color = res.partial ? '#f59e0b' : '#10b981';
-        status.innerHTML = '<span style="color:' + color + ';">' + res.message + '</span>';
+        setPushAdminStatus('<span style="color:' + color + ';">' + escapePushHtml(res.message) + '</span>');
       } else {
-        status.innerHTML = '<span style="color:#ef4444;">' + ((res && res.message) || 'Failed') + '</span>';
+        setPushAdminStatus('<span style="color:#ef4444;">' + escapePushHtml((res && res.message) || 'Failed') + '</span>');
       }
       setTimeout(refreshPushAdminStatus, 500);
     })
