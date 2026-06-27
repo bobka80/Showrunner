@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '308';
+  const SW_BUILD = '309';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -86,6 +86,50 @@
   function deviceLabel() {
     if (isStandalonePwa() && isMobileDevice()) return 'pwa-mobile';
     return isMobileDevice() ? 'web-mobile' : 'web-desktop';
+  }
+
+  function detectBrowser() {
+    var ua = navigator.userAgent || '';
+    if (/SamsungBrowser/i.test(ua)) return 'Samsung Internet';
+    if (/Edg\//i.test(ua)) return 'Edge';
+    if (/OPR\//i.test(ua) || /Opera/i.test(ua)) return 'Opera';
+    if (/Firefox\//i.test(ua)) return 'Firefox';
+    if (/CriOS/i.test(ua)) return 'Chrome';
+    if (/Chrome\//i.test(ua) && !/Edg/i.test(ua)) return 'Chrome';
+    if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) return 'Safari';
+    return 'Browser';
+  }
+
+  function detectPlatform() {
+    var ua = navigator.userAgent || '';
+    var plat = navigator.platform || '';
+    if (/iPhone/i.test(ua)) return 'iPhone';
+    if (/iPad/i.test(ua) || (plat === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'iPad';
+    if (/Android/i.test(ua)) return 'Android';
+    if (/Mac/i.test(plat) || /Macintosh/i.test(ua)) return 'macOS';
+    if (/Win/i.test(plat)) return 'Windows';
+    if (/CrOS/i.test(ua)) return 'Chrome OS';
+    if (/Linux/i.test(plat)) return 'Linux';
+    return plat || 'Unknown';
+  }
+
+  function getDeviceMeta(crewName) {
+    var mobile = isMobileDevice();
+    return {
+      crewName: crewName || lastCrewName || '',
+      formFactor: mobile ? 'mobile' : 'desktop',
+      platform: detectPlatform(),
+      browser: detectBrowser(),
+      delivery: isStandalonePwa() ? 'PWA' : 'Browser'
+    };
+  }
+
+  function deviceMetaQueryParam(crewName) {
+    try {
+      return encodeURIComponent(JSON.stringify(getDeviceMeta(crewName)));
+    } catch (e) {
+      return '';
+    }
   }
 
   function logPush(msg) {
@@ -385,7 +429,8 @@
       frame.contentWindow.postMessage({
         type: 'SHOWRUNNER_FCM_TOKEN',
         token: fcmToken,
-        label: deviceLabel()
+        label: deviceLabel(),
+        meta: getDeviceMeta(lastCrewName)
       }, '*');
     } catch (e) { /* ignore */ }
   }
@@ -469,6 +514,7 @@
       + '&key=' + encodeURIComponent(regKey)
       + '&token=' + encodeURIComponent(fcmToken)
       + '&label=' + encodeURIComponent(deviceLabel())
+      + '&meta=' + deviceMetaQueryParam(lastCrewName)
       + '&callback=' + encodeURIComponent(cb);
 
     window[cb] = function(res) {
@@ -525,6 +571,7 @@
       + '&nonce=' + encodeURIComponent(data.nonce)
       + '&token=' + encodeURIComponent(fcmToken)
       + '&label=' + encodeURIComponent(data.label || deviceLabel())
+      + '&meta=' + deviceMetaQueryParam(lastCrewName)
       + '&callback=' + encodeURIComponent(cb);
     window[cb] = function(res) {
       delete window[cb];
@@ -627,7 +674,8 @@
         ev.source.postMessage({
           type: 'SHOWRUNNER_FCM_TOKEN',
           token: fcmToken,
-          label: deviceLabel()
+          label: deviceLabel(),
+          meta: getDeviceMeta(lastCrewName)
         }, '*');
       } catch (e) { /* ignore */ }
       return;

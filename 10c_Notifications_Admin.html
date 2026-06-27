@@ -10,45 +10,50 @@ var FIREBASE_VAPID_CONSOLE_URL = 'https://console.firebase.google.com/project/sm
 function renderPushAdminPanel(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
+  el.style.height = '100%';
+  el.style.minHeight = '0';
+  el.style.display = 'flex';
+  el.style.flexDirection = 'column';
   if (typeof accessTierAtLeast !== 'function' || !accessTierAtLeast('ROOT')) {
     el.innerHTML = '';
     return;
   }
 
   el.innerHTML =
-    '<div style="display:flex; flex-direction:column; gap:12px;">'
+    '<div id="push-admin-root" style="display:flex; flex-direction:column; height:100%; min-height:0; gap:10px;">'
 
-    + '<div style="padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">'
-    + '<div style="color:#f59e0b; font-size:10px; font-weight:800; margin-bottom:6px; letter-spacing:0.05em;">VAPID KEY (Web Push certificate)</div>'
-    + '<div style="color:#71717a; font-size:10px; line-height:1.4; margin-bottom:8px;">'
+    + '<div style="flex-shrink:0; padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">'
+    + '<div style="color:#f59e0b; font-size:11px; font-weight:800; margin-bottom:6px; letter-spacing:0.05em;">VAPID KEY (Web Push certificate)</div>'
+    + '<div style="color:#71717a; font-size:11px; line-height:1.4; margin-bottom:8px;">'
     + 'Firebase Console → Cloud Messaging → <strong>Web Push certificates</strong> → public key (~88 chars, starts with B). '
     + '<a href="' + FIREBASE_VAPID_CONSOLE_URL + '" target="_blank" rel="noopener" style="color:#10b981;">Open settings</a>'
     + '</div>'
     + '<input id="push-vapid-input" type="text" placeholder="Paste Web Push public key (not AIza API key)" style="width:100%; box-sizing:border-box; padding:8px; background:#27272a; border:1px solid #444; color:#fff; border-radius:4px; font-size:11px; margin-bottom:8px;">'
     + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#698b99; color:#698b99;" onclick="saveShowrunnerVapidKey()">SAVE VAPID KEY</button>'
-    + '<span id="push-vapid-status" style="display:block; color:#71717a; font-size:10px; margin-top:6px;"></span>'
-    + '<div id="push-vapid-active" style="color:#71717a; font-size:10px; margin-top:4px;"></div>'
+    + '<span id="push-vapid-status" style="display:block; color:#71717a; font-size:11px; margin-top:6px;"></span>'
+    + '<div id="push-vapid-active" style="color:#71717a; font-size:11px; margin-top:4px;"></div>'
     + '</div>'
 
-    + '<div style="padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">'
-    + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">'
-    + '<div style="color:#10b981; font-size:10px; font-weight:800; letter-spacing:0.05em;">REGISTERED DEVICES</div>'
+    + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; padding:10px; border:1px solid #333; border-radius:6px; background:#121214;">'
+    + '<div style="flex-shrink:0; display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">'
+    + '<div style="color:#10b981; font-size:11px; font-weight:800; letter-spacing:0.05em;">REGISTERED DEVICES</div>'
     + '<div style="display:flex; flex-wrap:wrap; gap:6px;">'
     + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openPushTokenModal()">SAVE TOKEN…</button>'
     + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="cleanupShowrunnerFcmDevices()">CLEAN STALE</button>'
     + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runShowrunnerTestPush()">TEST ALL</button>'
     + '</div></div>'
-    + '<div id="push-device-list" style="display:flex; flex-direction:column; gap:6px; min-height:48px;">'
-    + '<div style="color:#52525b; font-size:10px;">Loading devices…</div>'
+    + '<div id="push-device-list" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">'
+    + '<div style="color:#52525b; font-size:11px;">Loading devices…</div>'
     + '</div>'
     + '</div>'
 
+    + '<div id="push-admin-footer" style="flex-shrink:0; display:flex; flex-direction:column; gap:8px;">'
     + '<div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">'
     + '<a href="' + SHOWRUNNER_HOSTING_URL + '" target="_blank" rel="noopener" class="btn-outline btn-sm" style="margin:0; border-color:#698b99; color:#698b99; text-decoration:none;">OPEN HOSTING URL</a>'
     + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="retryShowrunnerFcmRegistration()">RETRY AUTO-REGISTER</button>'
     + '</div>'
-
-    + '<div id="push-admin-status" style="color:#71717a; font-size:11px; line-height:1.5; word-break:break-word; min-height:1.5em;"></div>'
+    + '<div id="push-admin-status" style="color:#71717a; font-size:11px; line-height:1.5; word-break:break-word;"></div>'
+    + '</div>'
     + '</div>';
 
   if (!document.getElementById('push-token-modal-overlay')) {
@@ -102,24 +107,25 @@ function escapePushHtml(s) {
 function renderPushDeviceList(devices) {
   var list = document.getElementById('push-device-list');
   if (!list) return;
+  var rowFont = 'font-size:11px; line-height:1.35;';
   if (!devices || !devices.length) {
-    list.innerHTML = '<div style="color:#52525b; font-size:10px; line-height:1.45;">No devices registered. Open <strong>web.app</strong> on phone → allow notifications → log in.</div>';
+    list.innerHTML = '<div style="color:#52525b; ' + rowFont + ' padding:8px 0;">No devices registered. Open <strong>web.app</strong> on phone → allow notifications → log in.</div>';
     return;
   }
   var html = '';
   devices.forEach(function(d) {
     var when = d.updatedAt ? d.updatedAt.slice(0, 16).replace('T', ' ') : '—';
-    var label = escapePushHtml(d.label || 'web');
+    var summary = escapePushHtml(d.displaySummary || d.label || 'Device');
     var hint = escapePushHtml(d.tokenHint || d.tokenKey || '');
     var key = escapePushHtml(d.tokenKey || '');
-    html += '<div style="display:flex; align-items:center; gap:8px; padding:8px 10px; background:#1a1a1e; border:1px solid #333; border-radius:6px; flex-wrap:wrap;">'
-      + '<div style="flex:1; min-width:140px;">'
-      + '<div style="color:#fff; font-weight:800; font-size:11px;">' + label + '</div>'
-      + '<div style="color:#71717a; font-size:9px; margin-top:2px;">' + when + '</div>'
-      + '<div style="color:#52525b; font-size:9px; font-family:monospace; margin-top:2px;">' + hint + '</div>'
+    html += '<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; min-height:44px; background:#1a1a1e; border:1px solid #333; border-radius:6px;">'
+      + '<div style="flex:1; min-width:0; display:flex; align-items:center; gap:12px; overflow:hidden;">'
+      + '<span style="flex:1; min-width:0; color:#fff; font-weight:800; ' + rowFont + ' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + summary + '">' + summary + '</span>'
+      + '<span style="color:#71717a; ' + rowFont + ' white-space:nowrap; flex-shrink:0;">' + when + '</span>'
+      + '<span style="color:#52525b; font-size:10px; font-family:monospace; white-space:nowrap; flex-shrink:0;">' + hint + '</span>'
       + '</div>'
-      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap;" onclick="runShowrunnerTestPushDevice(\'' + key + '\')">TEST PUSH</button>'
-      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap;" onclick="revokeShowrunnerDevice(\'' + key + '\')">REVOKE</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap; flex-shrink:0;" onclick="runShowrunnerTestPushDevice(\'' + key + '\')">TEST</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap; flex-shrink:0;" onclick="revokeShowrunnerDevice(\'' + key + '\')">REVOKE</button>'
       + '</div>';
   });
   list.innerHTML = html;

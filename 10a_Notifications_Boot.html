@@ -80,7 +80,7 @@
           notifyParentLinkError('save', (res && res.message) ? res.message : 'Save rejected');
         }
       })
-      .saveMyFcmDeviceToken(crew, data.token, data.label || 'pwa-mobile');
+      .saveMyFcmDeviceToken(crew, data.token, data.label || 'pwa-mobile', data.meta ? JSON.stringify(data.meta) : '');
   }
 
   function requestTokenFromHosting() {

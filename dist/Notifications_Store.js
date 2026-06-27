@@ -35,11 +35,12 @@ function saveFcmDeviceToken(crewName, tokenRaw) {
 }
 
 /** Logged-in user saves their own device token (iframe → google.script.run, no JSONP nonce). */
-function saveMyFcmDeviceToken(crewName, tokenRaw, deviceLabel) {
+function saveMyFcmDeviceToken(crewName, tokenRaw, deviceLabel, deviceMetaJson) {
   if (!crewName) return { success: false, message: 'Not logged in.' };
   const token = String(tokenRaw || '').trim();
   if (token.length < 20) return { success: false, message: 'Invalid FCM token.' };
-  return registerFcmToken(crewName, token, deviceLabel || 'web-hosting', crewName);
+  const meta = parseDeviceMetaJson_(deviceMetaJson);
+  return registerFcmToken(crewName, token, deviceLabel || 'web-hosting', crewName, meta);
 }
 
 function isFcmTokenRegistered(crewName, tokenRaw) {
@@ -98,14 +99,15 @@ function createFcmRegistrationKey_(crewName) {
   return key;
 }
 
-function completeFcmRegistrationViaKey_(regKey, token, label) {
+function completeFcmRegistrationViaKey_(regKey, token, label, deviceMetaJson) {
   const cleanKey = String(regKey || '').trim();
   if (!cleanKey) return { success: false, message: 'Missing registration key.' };
   const cache = CacheService.getScriptCache();
   const cacheKey = 'fcm_regkey_' + cleanKey;
   const crewName = cache.get(cacheKey);
   if (!crewName) return { success: false, message: 'Registration key expired — log in again.' };
-  const result = registerFcmToken(crewName, token, label || 'web-hosting', crewName);
+  const meta = parseDeviceMetaJson_(deviceMetaJson);
+  const result = registerFcmToken(crewName, token, label || 'web-hosting', crewName, meta);
   try {
     writeToAuditLog(crewName, 'UPDATE', 'NOTIFICATIONS', 'FCM_MOBILE', label || 'web',
       (result && result.success)
@@ -157,14 +159,15 @@ function prepareFcmRegistrationBridge(crewName) {
   };
 }
 
-function completeFcmRegistrationViaBridge_(nonce, token, label) {
+function completeFcmRegistrationViaBridge_(nonce, token, label, deviceMetaJson) {
   const cleanNonce = String(nonce || '').trim();
   if (!cleanNonce) return { success: false, message: 'Missing registration nonce.' };
   const cache = CacheService.getScriptCache();
   const cacheKey = 'fcm_bridge_' + cleanNonce;
   const crewName = cache.get(cacheKey);
   if (!crewName) return { success: false, message: 'Registration link expired — click RETRY DEVICE REGISTER.' };
-  const result = registerFcmToken(crewName, token, label || 'web-hosting', crewName);
+  const meta = parseDeviceMetaJson_(deviceMetaJson);
+  const result = registerFcmToken(crewName, token, label || 'web-hosting', crewName, meta);
   if (result && result.success) cache.remove(cacheKey);
   return result;
 }
@@ -184,7 +187,84 @@ function registerFcmTokenWithBridge(crewName, token, nonce, label) {
   return result;
 }
 
-function registerFcmToken(crewName, token, deviceLabel, actor) {
+function parseDeviceMetaJson_(raw) {
+  if (!raw) return null;
+  if (typeof raw === 'object') return raw;
+  try {
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function inferDeviceMetaFromLabel_(label, crewName) {
+  const lab = String(label || 'web').toLowerCase();
+  const mobile = lab.indexOf('mobile') !== -1;
+  const pwa = lab.indexOf('pwa') !== -1;
+  return {
+    crewName: crewName || '',
+    formFactor: mobile ? 'mobile' : 'desktop',
+    platform: mobile ? 'Mobile' : 'Desktop',
+    browser: '',
+    delivery: pwa ? 'PWA' : 'Browser'
+  };
+}
+
+function mergeDeviceMeta_(stored, incoming, crewName, label) {
+  const base = inferDeviceMetaFromLabel_(label, crewName);
+  const out = {
+    crewName: crewName || base.crewName || '',
+    formFactor: base.formFactor,
+    platform: base.platform,
+    browser: base.browser,
+    delivery: base.delivery
+  };
+  if (stored) {
+    if (stored.crewName) out.crewName = stored.crewName;
+    if (stored.formFactor) out.formFactor = stored.formFactor;
+    if (stored.platform) out.platform = stored.platform;
+    if (stored.browser) out.browser = stored.browser;
+    if (stored.delivery) out.delivery = stored.delivery;
+  }
+  if (incoming) {
+    if (incoming.crewName) out.crewName = String(incoming.crewName).trim();
+    if (incoming.formFactor) out.formFactor = String(incoming.formFactor).trim();
+    if (incoming.platform) out.platform = String(incoming.platform).trim();
+    if (incoming.browser) out.browser = String(incoming.browser).trim();
+    if (incoming.delivery) out.delivery = String(incoming.delivery).trim();
+  }
+  if (!out.crewName) out.crewName = crewName || '';
+  return out;
+}
+
+function applyDeviceMetaFields_(device, meta, crewName, label) {
+  const m = mergeDeviceMeta_(device, meta, crewName, label);
+  device.crewName = m.crewName;
+  device.formFactor = m.formFactor;
+  device.platform = m.platform;
+  device.browser = m.browser;
+  device.delivery = m.delivery;
+  return device;
+}
+
+function buildDeviceDisplaySummary_(device, crewName) {
+  const d = device || {};
+  const m = mergeDeviceMeta_(d, null, crewName || d.crewName, d.label);
+  const name = m.crewName || crewName || 'Unknown';
+  const factor = m.formFactor === 'mobile' ? 'Mobile' : 'Desktop';
+  const parts = [name, factor];
+  if (m.platform && m.platform !== factor && m.platform !== 'Mobile' && m.platform !== 'Desktop') {
+    parts.push(m.platform);
+  } else if (factor === 'Mobile' && (!m.platform || m.platform === 'Mobile')) {
+    parts.push('Phone');
+  }
+  if (m.browser) parts.push(m.browser);
+  if (m.delivery) parts.push(m.delivery);
+  return parts.join(' · ');
+}
+
+function registerFcmToken(crewName, token, deviceLabel, actor, deviceMeta) {
   try {
     if (!crewName || !token) return { success: false, message: 'Missing crew name or FCM token.' };
     const profile = getUserSecurityProfile(crewName);
@@ -211,12 +291,15 @@ function registerFcmToken(crewName, token, deviceLabel, actor) {
       if (devices[i].token === cleanToken) {
         devices[i].label = label;
         devices[i].updatedAt = now;
+        applyDeviceMetaFields_(devices[i], deviceMeta, crewName, label);
         found = true;
         break;
       }
     }
     if (!found) {
-      devices.push({ token: cleanToken, label: label, updatedAt: now });
+      const row = { token: cleanToken, label: label, updatedAt: now };
+      applyDeviceMetaFields_(row, deviceMeta, crewName, label);
+      devices.push(row);
     }
     const maxDevices = 3;
     while (devices.length > maxDevices) {
@@ -298,8 +381,15 @@ function getFcmDevicesAdminDetail(crewName) {
     success: true,
     crewName: crewName,
     devices: devices.map(function(d) {
+      const summary = buildDeviceDisplaySummary_(d, crewName);
       return {
         label: d.label || 'web',
+        crewName: d.crewName || crewName,
+        formFactor: d.formFactor || '',
+        platform: d.platform || '',
+        browser: d.browser || '',
+        delivery: d.delivery || '',
+        displaySummary: summary,
         updatedAt: d.updatedAt || '',
         tokenKey: getFcmTokenKey_(d.token),
         tokenHint: getFcmTokenHint_(d.token)

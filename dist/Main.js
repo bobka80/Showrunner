@@ -74,7 +74,7 @@ function doGet(e) {
     const nonce = e.parameter.nonce || '';
     const token = e.parameter.token || '';
     const label = e.parameter.label || 'web-hosting';
-    const result = completeFcmRegistrationViaBridge_(nonce, token, label);
+    const result = completeFcmRegistrationViaBridge_(nonce, token, label, e.parameter.meta || '');
     const json = JSON.stringify(result);
     const callback = e.parameter.callback;
     if (callback) {
@@ -88,7 +88,8 @@ function doGet(e) {
     const result = completeFcmRegistrationViaKey_(
       e.parameter.key || '',
       e.parameter.token || '',
-      e.parameter.label || 'web-hosting'
+      e.parameter.label || 'web-hosting',
+      e.parameter.meta || ''
     );
     const json = JSON.stringify(result);
     const callback = e.parameter.callback;
@@ -134,7 +135,8 @@ function doPost(e) {
     const result = completeFcmRegistrationViaBridge_(
       e.parameter.nonce || '',
       e.parameter.token || '',
-      e.parameter.label || 'web-hosting'
+      e.parameter.label || 'web-hosting',
+      e.parameter.meta || ''
     );
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
@@ -143,7 +145,8 @@ function doPost(e) {
     const result = completeFcmRegistrationViaKey_(
       e.parameter.key || '',
       e.parameter.token || '',
-      e.parameter.label || 'web-hosting'
+      e.parameter.label || 'web-hosting',
+      e.parameter.meta || ''
     );
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
