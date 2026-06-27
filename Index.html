@@ -17,6 +17,18 @@
   <meta name="user-email" content="<?= userEmail ?>">
   <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
   <meta name="fcm-reg-key" content="<?= fcmRegKey ?>">
+  <meta name="session-token" content="<?= typeof sessionToken !== 'undefined' ? sessionToken : '' ?>">
+  <script>
+  (function() {
+    var t = document.querySelector('meta[name="session-token"]');
+    if (t && t.content) {
+      try {
+        localStorage.setItem('sm_session_token', String(t.content).trim());
+        localStorage.setItem('sm_session_expires', String(Date.now() + (30 * 24 * 60 * 60 * 1000)));
+      } catch (e) { /* ignore */ }
+    }
+  })();
+  </script>
   <script>
   (function() {
     if (window.self === window.top) return;

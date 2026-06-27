@@ -253,44 +253,180 @@ function authenticateUser(crewName, passcode) {
       }
       
       if (dbName === crewName.toLowerCase().trim() && dbPass === passcode.trim()) {
-        
-        let bundle = {};
-        let isTunneling = false;
-
-        // DYNAMIC MATRIX LOOKUP (Reads straight from the Sheet)
-        if (roleId !== "") {
-          for (let r = 1; r < roleData.length; r++) {
-            if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
-              const roleSys = getSheetCell(roleData[r], rMap, 'sysAccess');
-              if (roleSys) sysAccess = roleSys.toUpperCase();
-              isTunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
-              bundle = loadRolePermissionsBundle(roleData[r], rMap);
-              break;
-            }
-          }
-        }
-
-        // PERMANENT SUPERADMIN OVERRIDE: Prevent the system owner from ever getting locked out.
-        if (dbName === 'bogdan') {
-            sysAccess = 'ROOT';
-            bundle.db_view_assets = true;
-            bundle.db_view_vehicles = true;
-            bundle.db_view_warehouses = true;
-            bundle.db_view_clients = true;
-            bundle.db_edit_assets = true;
-            bundle.db_delete_assets = true;
-        }
-        bundle.task_manage_personal = true;
-
-        let uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : "";
-
-        return { success: true, name: crewData[i][cMap['Name']] || hardName, access: normalizeAccessTier(sysAccess), permissions: bundle, tunnelingActive: isTunneling, uid: uid, email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : '' }; 
+        return buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap);
       }
     }
     
     let headerKeys = Object.keys(cMap).filter(k => k.length > 0 && !k.includes(' ')).join(', ');
     return { success: false, error: `Login Failed. Checked ${crewData.length - 1} rows. Input: '${crewName}'/'${passcode}'. Headers: [${headerKeys}]. ` + debugLog.join(' | ') };
   });
+}
+
+// ==========================================
+// --- 30-DAY DEVICE SESSION (Script Properties) ---
+// ==========================================
+
+const SHOWRUNNER_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const SHOWRUNNER_SESSION_PROP_PREFIX = 'SR_SESS_';
+const SHOWRUNNER_SESSION_USER_PREFIX = 'SR_SESS_USER_';
+
+function sessionUserIndexKey_(crewName) {
+  return SHOWRUNNER_SESSION_USER_PREFIX + String(crewName || '').toLowerCase().trim().replace(/\s+/g, '_');
+}
+
+function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
+  let hardName = crewData[i][2];
+  let dbNameRaw = (cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined) || hardName;
+  let sysAccess = crewData[i][cMap['System_Access']] ? crewData[i][cMap['System_Access']].toString().toUpperCase().trim() : '';
+  let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : '';
+  let bundle = {};
+  let isTunneling = false;
+
+  if (roleId !== '') {
+    for (let r = 1; r < roleData.length; r++) {
+      if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
+        const roleSys = getSheetCell(roleData[r], rMap, 'sysAccess');
+        if (roleSys) sysAccess = roleSys.toUpperCase();
+        isTunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
+        bundle = loadRolePermissionsBundle(roleData[r], rMap);
+        break;
+      }
+    }
+  }
+
+  const dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : '';
+  if (dbName === 'bogdan') {
+    sysAccess = 'ROOT';
+    bundle.db_view_assets = true;
+    bundle.db_view_vehicles = true;
+    bundle.db_view_warehouses = true;
+    bundle.db_view_clients = true;
+    bundle.db_edit_assets = true;
+    bundle.db_delete_assets = true;
+  }
+  bundle.task_manage_personal = true;
+
+  const uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : '';
+  return {
+    success: true,
+    name: crewData[i][cMap['Name']] || hardName,
+    access: normalizeAccessTier(sysAccess),
+    permissions: bundle,
+    tunnelingActive: isTunneling,
+    uid: uid,
+    email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : ''
+  };
+}
+
+function getAuthBundleForCrewName_(crewName) {
+  return executeWithRetry(() => {
+    const target = String(crewName || '').toLowerCase().trim();
+    if (!target) return { success: false, error: 'Missing crew name.' };
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const roleData = getSheetData(sheets.roles);
+    const cMap = getHeaderMap(crewData);
+    const rMap = getHeaderMap(roleData);
+
+    for (let i = 0; i < crewData.length; i++) {
+      let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
+      let hardName = crewData[i][2];
+      let dbNameRaw = mappedName || hardName;
+      let dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : '';
+      if (dbName === target) {
+        return buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap);
+      }
+    }
+    if (target === 'bogdan') {
+      return {
+        success: true,
+        name: 'Bogdan',
+        access: 'ROOT',
+        permissions: {
+          db_view_assets: true,
+          db_view_vehicles: true,
+          db_view_warehouses: true,
+          db_view_clients: true,
+          db_edit_assets: true,
+          db_delete_assets: true,
+          task_manage_personal: true
+        },
+        tunnelingActive: false,
+        uid: 'UID_BOGDAN',
+        email: 'bobby@showrider.com'
+      };
+    }
+    return { success: false, error: 'User not found.' };
+  });
+}
+
+function createUserSession_(crewName) {
+  const name = String(crewName || '').trim();
+  if (!name) return '';
+  const props = PropertiesService.getScriptProperties();
+  const userKey = sessionUserIndexKey_(name);
+  const oldToken = props.getProperty(userKey);
+  if (oldToken) props.deleteProperty(SHOWRUNNER_SESSION_PROP_PREFIX + oldToken);
+
+  const token = Utilities.getUuid().replace(/-/g, '');
+  const expiresAt = new Date(Date.now() + SHOWRUNNER_SESSION_TTL_MS).toISOString();
+  props.setProperty(SHOWRUNNER_SESSION_PROP_PREFIX + token, JSON.stringify({
+    crewName: name,
+    expiresAt: expiresAt
+  }));
+  props.setProperty(userKey, token);
+  return token;
+}
+
+function validateUserSession_(token) {
+  const clean = String(token || '').trim();
+  if (!clean || clean.length < 20) return null;
+  const props = PropertiesService.getScriptProperties();
+  const key = SHOWRUNNER_SESSION_PROP_PREFIX + clean;
+  const raw = props.getProperty(key);
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw);
+    if (!data || !data.crewName) {
+      props.deleteProperty(key);
+      return null;
+    }
+    if (new Date(data.expiresAt).getTime() < Date.now()) {
+      props.deleteProperty(key);
+      const userKey = sessionUserIndexKey_(data.crewName);
+      if (props.getProperty(userKey) === clean) props.deleteProperty(userKey);
+      return null;
+    }
+    data.expiresAt = new Date(Date.now() + SHOWRUNNER_SESSION_TTL_MS).toISOString();
+    props.setProperty(key, JSON.stringify(data));
+    return String(data.crewName).trim();
+  } catch (e) {
+    props.deleteProperty(key);
+    return null;
+  }
+}
+
+function revokeUserSession_(token) {
+  const clean = String(token || '').trim();
+  if (!clean) return;
+  const props = PropertiesService.getScriptProperties();
+  const key = SHOWRUNNER_SESSION_PROP_PREFIX + clean;
+  const raw = props.getProperty(key);
+  props.deleteProperty(key);
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    if (data && data.crewName) {
+      const userKey = sessionUserIndexKey_(data.crewName);
+      if (props.getProperty(userKey) === clean) props.deleteProperty(userKey);
+    }
+  } catch (e) { /* cleared */ }
+}
+
+function checkUserSessionStatus_(token) {
+  const crewName = validateUserSession_(token);
+  if (!crewName) return { valid: false, message: 'Session expired or invalid.' };
+  return { valid: true, crewName: crewName };
 }
 
 // ==========================================

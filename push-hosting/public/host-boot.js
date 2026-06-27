@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '309';
+  const SW_BUILD = '310';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -305,6 +305,81 @@
 
   function getRegisterBaseUrl() {
     return PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
+  }
+
+  function markPushOkLocal(crewName, token) {
+    try {
+      localStorage.setItem('sr_push_ok', JSON.stringify({
+        crew: crewName,
+        prefix: String(token || '').slice(0, 12),
+        verifiedAt: Date.now()
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  function checkPushRegisteredOnServer(crewName) {
+    return new Promise(function(resolve) {
+      if (!fcmToken || !crewName) return resolve(false);
+      var prefix = fcmToken.slice(0, 12);
+      try {
+        var cached = JSON.parse(localStorage.getItem('sr_push_ok') || 'null');
+        if (cached && cached.crew === crewName && cached.prefix === prefix && cached.verifiedAt) {
+          if ((Date.now() - cached.verifiedAt) < 86400000) return resolve(true);
+        }
+      } catch (e) { /* server check */ }
+      var cb = '__srFcmPing_' + Date.now();
+      var url = getRegisterBaseUrl()
+        + '?action=fcmping'
+        + '&crew=' + encodeURIComponent(crewName)
+        + '&tp=' + encodeURIComponent(prefix)
+        + '&callback=' + encodeURIComponent(cb);
+      var done = false;
+      window[cb] = function(res) {
+        if (done) return;
+        done = true;
+        delete window[cb];
+        var ok = !!(res && res.registered);
+        if (ok) markPushOkLocal(crewName, fcmToken);
+        resolve(ok);
+      };
+      var script = document.createElement('script');
+      script.src = url;
+      script.onerror = function() {
+        if (done) return;
+        done = true;
+        delete window[cb];
+        resolve(false);
+      };
+      document.head.appendChild(script);
+      setTimeout(function() {
+        if (done) return;
+        done = true;
+        delete window[cb];
+        resolve(false);
+      }, 8000);
+    });
+  }
+
+  async function linkPushToAccountOrSkip(crewName) {
+    if (!fcmToken || !crewName) return false;
+    if (await checkPushRegisteredOnServer(crewName)) {
+      logPush('push already registered — skip setup');
+      serverSaveConfirmed = true;
+      stopRegistrationLoop();
+      stopTokenBroadcast();
+      showPushSavedCompact();
+      return true;
+    }
+    logPush('token ready — auto-linking');
+    setDockMessage('Saving alerts through Showrunner…');
+    setDockStatus(['Step 1: token OK', 'Step 2: saving via app…']);
+    notifyIframePushState(true, 'Setting up alerts — keep the calendar visible below.');
+    broadcastTokenToIframe();
+    startTokenBroadcastUntilAck();
+    requestFcmAuthFromIframe();
+    trySaveTokenViaRegKey();
+    startRegistrationLoop();
+    return true;
   }
 
   function notifyIframeRegistered(success, message) {
@@ -610,15 +685,11 @@
     if (!fcmToken) {
       if (Notification.permission === 'granted') {
         pushStarted = false;
-        obtainFcmToken(true);
+        obtainFcmToken(false);
       }
       return;
     }
-    if (pendingFcmAuth && pendingFcmAuth.regKey) {
-      setDockStatus(['Step 1: token OK', 'Step 2: saving to server…']);
-      trySaveTokenViaRegKey();
-      startRegistrationLoop();
-    }
+    linkPushToAccountOrSkip(auth.crewName || lastCrewName);
   }
 
   function loadConfigJsonp() {
@@ -764,19 +835,23 @@
 
     if (!fcmToken) {
       setDockStatus(['Step 1: NO TOKEN', 'Check notification permission']);
-      showPushPrompt('retry');
+      if (fromUserTap) showPushPrompt('retry');
       return false;
     }
 
-    logPush('token ready — auto-linking');
-    setDockMessage('Saving alerts through Showrunner…');
-    setDockStatus(['Step 1: token OK', 'Step 2: saving via app…']);
-    notifyIframePushState(true, 'Setting up alerts — keep the calendar visible below.');
-    broadcastTokenToIframe();
-    startTokenBroadcastUntilAck();
-    requestFcmAuthFromIframe();
-    trySaveTokenViaRegKey();
-    startRegistrationLoop();
+    var crew = lastCrewName || (pendingFcmAuth && pendingFcmAuth.crewName) || '';
+    if (crew) {
+      return linkPushToAccountOrSkip(crew);
+    }
+
+    if (fromUserTap) {
+      logPush('token ready — waiting for login');
+      setDockStatus(['Step 1: token OK', 'Log in below to link alerts']);
+      notifyIframePushState(true, 'Log in below — alerts link automatically.');
+    } else {
+      hidePushPrompt();
+      logPush('token ready — silent until login');
+    }
     return true;
   }
 
@@ -844,11 +919,8 @@
           return;
         }
         pushStarted = false;
-        setDockMessage('Restoring shift alerts on this device…');
-        setDockStatus(['Checking alert token…']);
         obtainFcmToken(false).catch(function(err) {
           logPush('silent token restore failed: ' + formatPushError(err));
-          showPushPrompt('retry');
         });
         return;
       }

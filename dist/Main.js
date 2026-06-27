@@ -122,9 +122,60 @@ function doGet(e) {
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'sessioncheck') {
+    const result = checkUserSessionStatus_(e.parameter.token || '');
+    const json = JSON.stringify(result);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'fcmping') {
+    const result = pingFcmDeviceForCrew_(e.parameter.crew || '', e.parameter.tp || '');
+    const json = JSON.stringify(result);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (action === 'sessionboot') {
+    const sessionToken = e.parameter.token || '';
+    const crewName = validateUserSession_(sessionToken);
+    if (!crewName) {
+      let loginTemplate = HtmlService.createTemplateFromFile('Login');
+      loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+      loginTemplate.errorMsg = 'Session expired — please log in again.';
+      loginTemplate.clearSession = true;
+      return loginTemplate.evaluate()
+        .setTitle('System Login')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+    const authResult = getAuthBundleForCrewName_(crewName);
+    if (!authResult.success) {
+      revokeUserSession_(sessionToken);
+      let loginTemplate = HtmlService.createTemplateFromFile('Login');
+      loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+      loginTemplate.errorMsg = authResult.error || 'Account not found.';
+      loginTemplate.clearSession = true;
+      return loginTemplate.evaluate()
+        .setTitle('System Login')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+    return renderIndexForAuth_(authResult, sessionToken);
+  }
+
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
   loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
   loginTemplate.errorMsg = "none";
+  loginTemplate.clearSession = false;
   return loginTemplate.evaluate().setTitle('System Login').addMetaTag('viewport', 'width=device-width, initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
@@ -158,24 +209,15 @@ function doPost(e) {
   let authResult = authenticateUser(crewName, passcode); // Routed to Security.gs
   
   if (authResult.success) {
-    let template = HtmlService.createTemplateFromFile('Index');
-    template.userName = authResult.name;
-    template.userAccess = normalizeAccessTier(authResult.access);
-    template.userUid = authResult.uid || '';
-    template.userEmail = authResult.email || '';
-    template.showSettingsNav = accessTierAtLeastValue(template.userAccess, 'MANAGER');
-    template.userPermissionsB64 = Utilities.base64Encode(JSON.stringify(authResult.permissions || {}));
-    template.fcmRegKey = createFcmRegistrationKey_(authResult.name);
-    return template.evaluate()
-      .setTitle('SM Showrunner Command Center')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    const sessionToken = createUserSession_(authResult.name);
+    return renderIndexForAuth_(authResult, sessionToken);
   }
   
   // INCORRECT CREDENTIALS ROUTE
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
   loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
-  loginTemplate.errorMsg = authResult.error; 
+  loginTemplate.errorMsg = authResult.error;
+  loginTemplate.clearSession = true;
   
   return loginTemplate.evaluate()
     .setTitle('System Login')
@@ -185,6 +227,22 @@ function doPost(e) {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function renderIndexForAuth_(authResult, sessionToken) {
+  let template = HtmlService.createTemplateFromFile('Index');
+  template.userName = authResult.name;
+  template.userAccess = normalizeAccessTier(authResult.access);
+  template.userUid = authResult.uid || '';
+  template.userEmail = authResult.email || '';
+  template.showSettingsNav = accessTierAtLeastValue(template.userAccess, 'MANAGER');
+  template.userPermissionsB64 = Utilities.base64Encode(JSON.stringify(authResult.permissions || {}));
+  template.fcmRegKey = createFcmRegistrationKey_(authResult.name);
+  template.sessionToken = sessionToken || '';
+  return template.evaluate()
+    .setTitle('SM Showrunner Command Center')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 // ==========================================

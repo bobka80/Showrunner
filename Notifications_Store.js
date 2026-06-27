@@ -61,6 +61,50 @@ function isFcmTokenRegistered(crewName, tokenRaw) {
   };
 }
 
+/** JSONP — check token prefix for crew + refresh last-seen when found. */
+function pingFcmDeviceForCrew_(crewName, tokenPrefix) {
+  const name = String(crewName || '').trim();
+  const prefix = String(tokenPrefix || '').trim();
+  if (!name || prefix.length < 8) {
+    return { registered: false, message: 'Missing crew or token prefix.' };
+  }
+  const profile = getUserSecurityProfile(name);
+  if (!profile || !profile.uid) {
+    return { registered: false, message: 'Unknown user profile.' };
+  }
+  const touched = touchFcmTokenByPrefix_(profile.uid, prefix);
+  return {
+    registered: touched,
+    deviceCount: getFcmDevicesForUid_(profile.uid).length,
+    message: touched ? 'Device registered.' : 'Device not on server.'
+  };
+}
+
+function touchFcmTokenByPrefix_(uid, tokenPrefix) {
+  const cleanUid = String(uid || '').trim();
+  const prefix = String(tokenPrefix || '').trim();
+  if (!cleanUid || prefix.length < 8) return false;
+  const props = PropertiesService.getScriptProperties();
+  const key = 'FCM_TOKEN_' + cleanUid;
+  const record = parseFcmTokenRecord_(props.getProperty(key));
+  const devices = record.devices || [];
+  let found = false;
+  const now = new Date().toISOString();
+  devices.forEach(function(d) {
+    if (d && d.token && String(d.token).indexOf(prefix) === 0) {
+      d.updatedAt = now;
+      found = true;
+    }
+  });
+  if (found) {
+    props.setProperty(key, JSON.stringify({
+      email: record.email || '',
+      devices: devices
+    }));
+  }
+  return found;
+}
+
 function getFirebasePushSetupStatus(crewName) {
   if (!verifyBackendPrivilege(crewName, 'ROOT')) {
     return { success: false, message: 'ROOT privileges required.' };
