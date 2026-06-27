@@ -205,27 +205,20 @@ window.loadMobileCrewShiftSummary = function(pId) {
             el.innerHTML = '<span style="color:#71717a;">You are not on the crew list yet. Open Timeline to see all shifts.</span>';
             return;
         }
-        const proj = window.mobileCrewHubProject || {};
-        const baseStr = proj.start || '';
-        const base = baseStr ? new Date(baseStr + 'T00:00:00') : null;
-        const fmt = (typeof formatShiftTime === 'function') ? formatShiftTime : function(h) { return String(h); };
         let html = '';
+        const buildStrip = (typeof buildMobileShiftStripMarkup === 'function') ? buildMobileShiftStripMarkup : null;
         mine.slice(0, 6).forEach(function(s) {
-            let dayLabel = '';
-            if (base && typeof s.start === 'number') {
-                const dayOff = Math.floor(s.start / 24);
-                const d = new Date(base.getTime());
-                d.setDate(d.getDate() + dayOff);
-                dayLabel = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+            if (buildStrip) {
+                html += buildStrip(s, { showPerson: false });
             }
-            const t0 = fmt(s.start % 24);
-            const t1 = fmt((s.start + s.duration) % 24);
-            html += '<div style="margin-bottom:8px;"><strong>' + (dayLabel || 'Shift') + '</strong> ' + t0 + ' – ' + t1;
-            if (s.role) html += ' <span style="color:#a855f7;">(' + s.role + ')</span>';
-            html += '</div>';
         });
-        if (mine.length > 6) html += '<div style="font-size:11px;color:#71717a;">+' + (mine.length - 6) + ' more in Timeline</div>';
-        el.innerHTML = html;
+        if (mine.length > 6) {
+            html += '<div style="font-size:11px;color:#71717a;text-align:center;padding-top:4px;">+' + (mine.length - 6) + ' more in OPEN TIMELINE → MY SHIFTS</div>';
+        }
+        if (!html && !buildStrip) {
+            html = '<span style="color:#71717a;">Could not render shift strips.</span>';
+        }
+        el.innerHTML = html || '<span style="color:#71717a;">No shift details.</span>';
     }).withFailureHandler(function() {
         el.innerHTML = '<span style="color:#71717a;">Could not load shifts. Use OPEN TIMELINE.</span>';
     }).getTimelineData(pId, 'main');

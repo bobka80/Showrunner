@@ -1,98 +1,334 @@
 <script>
 /**
  * 03f_Timeline_Mobile.html
- * Mobile timeline zoom — bird's-eye overview, slider to detail.
- * @INDEX: MOBILE -> Timeline Zoom
+ * Mobile timeline — MY SHIFTS list + full crew grid with pinch zoom.
+ * @INDEX: MOBILE -> Timeline Mobile Views
  */
 
-window.mobileTimelineZoom = 0.38;
+window.mobileTimelineView = 'grid';
+var mobileTimelinePinch = { scale: 0.34, min: 0.22, max: 1.25 };
+var mobileTimelineUxReady = false;
 
-function ensureMobileTimelineZoomBar() {
-    if (document.getElementById('tt-mobile-zoom-bar')) return;
-    const layer = document.getElementById('shift-layer');
-    if (!layer) return;
-
-    const bar = document.createElement('div');
-    bar.id = 'tt-mobile-zoom-bar';
-    bar.innerHTML =
-        '<span style="font-size:10px;font-weight:900;color:#a855f7;white-space:nowrap;">ZOOM</span>' +
-        '<input type="range" id="tt-mobile-zoom-slider" min="25" max="100" value="38" oninput="setMobileTimelineZoom(this.value / 100)">' +
-        '<button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="setMobileTimelineZoom(0.38)">OVERVIEW</button>' +
-        '<button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="focusMobileMyShiftRow()">MY ROW</button>';
-    layer.insertBefore(bar, layer.firstChild);
+function getMobileTimelineBaseDate() {
+    var el = document.getElementById('edit-proj-start');
+    if (el && el.value) {
+        var pts = String(el.value).split('-');
+        if (pts.length >= 3) return new Date(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10));
+    }
+    var p = window.mobileCrewHubProject;
+    if (p && p.start) {
+        var d = new Date(p.start);
+        if (!isNaN(d.getTime())) return d;
+    }
+    return new Date();
 }
 
-window.setMobileTimelineZoom = function(scale) {
-    if (typeof isMobileViewport !== 'function' || !isMobileViewport()) return;
-    window.mobileTimelineZoom = Math.max(0.25, Math.min(1, scale));
-    const wrap = document.getElementById('tt-grid-wrap');
-    const axis = document.getElementById('tt-y-crew');
-    const layer = document.getElementById('shift-layer');
-    const z = window.mobileTimelineZoom;
-    if (wrap) {
-        wrap.style.transform = 'scale(' + z + ')';
-        wrap.style.transformOrigin = 'top left';
-        wrap.style.width = z < 1 ? (100 / z) + '%' : '';
-    }
-    if (axis) {
-        axis.style.transform = 'scale(' + z + ')';
-        axis.style.transformOrigin = 'top left';
-    }
-    if (layer) {
-        layer.classList.toggle('tt-zoom-overview', z < 0.55);
-        layer.classList.add('tt-mobile-zoom-active');
-    }
-    const slider = document.getElementById('tt-mobile-zoom-slider');
-    if (slider) slider.value = Math.round(z * 100);
+function shiftDayLabelForMobile(shift, baseDate) {
+    var dayOff = Math.floor(Number(shift.start) / 24);
+    var d = new Date(baseDate.getTime());
+    d.setDate(d.getDate() + dayOff);
+    return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function shiftEndDayLabelForMobile(shift, baseDate) {
+    var endHr = Number(shift.start) + Number(shift.duration);
+    var dayOff = Math.floor(endHr / 24);
+    var d = new Date(baseDate.getTime());
+    d.setDate(d.getDate() + dayOff);
+    return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function rosterNameForShift(shift) {
+    var uid = String(shift.user_uid || shift.email || '');
+    if (!uid || typeof activeRoster === 'undefined') return '';
+    var person = activeRoster.find(function(c) { return String(c.uid) === uid; });
+    return person ? (person.name || '') : '';
+}
+
+function isMyMobileShift(shift) {
+    var myUid = (typeof ACTIVE_USER_UID !== 'undefined' && ACTIVE_USER_UID) ? String(ACTIVE_USER_UID).trim() : '';
+    var myName = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? String(ACTIVE_USER_NAME).trim().toLowerCase() : '';
+    var uid = String(shift.user_uid || shift.email || '');
+    if (myUid && uid === myUid) return true;
+    var nm = rosterNameForShift(shift).toLowerCase();
+    return !!(myName && nm && nm === myName);
+}
+
+window.buildMobileShiftStripMarkup = function(shift, meta) {
+    meta = meta || {};
+    if (!shift) return '';
+    var fmt = (typeof formatShiftTime === 'function') ? formatShiftTime : function(h) { return String(h); };
+    var isArrow = (shift.hasArrow === true || shift.hasArrow === 'true');
+    var isOpen = (shift.hasArrow === 'open');
+    var displayTime = isOpen ? 'OPEN SHIFT' : (fmt(shift.start) + ' – ' + fmt(shift.start + Number(shift.duration)));
+    var arrowIcon = isOpen
+        ? '<span class="tt-mobile-strip-arrow">?</span>'
+        : ((Number(shift.duration) > 12 || isArrow) ? '<span class="tt-mobile-strip-arrow">▶</span>' : '');
+    var endHr = Number(shift.start) + Number(shift.duration);
+    var moonIcon = ((shift.start % 24) < 6 || (endHr % 24) > 23.5 || endHr % 24 === 0)
+        ? '<span class="tt-mobile-strip-moon">🌙</span>' : '';
+    var bg = shift.color || '#86efac';
+    var txt = shift.textCol || '#064e3b';
+    var whStyle = shift.isWh ? ' tt-mobile-strip--wh' : '';
+    var base = getMobileTimelineBaseDate();
+    var dayStart = meta.dayLabel || shiftDayLabelForMobile(shift, base);
+    var dayEnd = shiftEndDayLabelForMobile(shift, base);
+    var dayLine = (dayStart === dayEnd) ? dayStart : (dayStart + ' → ' + dayEnd);
+    var person = meta.personName != null ? meta.personName : rosterNameForShift(shift);
+    var role = shift.role || 'Technician';
+    var note = shift.note ? '<div class="tt-mobile-strip-note">' + String(shift.note).replace(/</g, '&lt;') + '</div>' : '';
+    var personLine = (meta.showPerson !== false && person)
+        ? '<div class="tt-mobile-strip-person">' + String(person).replace(/</g, '&lt;') + '</div>' : '';
+
+    return ''
+        + '<div class="tt-mobile-shift-strip' + whStyle + '" style="--strip-bg:' + bg + ';--strip-fg:' + txt + ';">'
+        + '<div class="tt-mobile-strip-top">'
+        + '<div class="tt-mobile-strip-day">' + dayLine + '</div>'
+        + '<div class="tt-mobile-strip-icons">' + moonIcon + arrowIcon + '</div>'
+        + '</div>'
+        + '<div class="tt-mobile-strip-time">' + displayTime + '</div>'
+        + '<div class="tt-mobile-strip-role">' + String(role).replace(/</g, '&lt;') + '</div>'
+        + personLine
+        + note
+        + '</div>';
 };
 
-window.focusMobileMyShiftRow = function() {
-    const myName = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? String(ACTIVE_USER_NAME).toLowerCase().trim() : '';
-    let target = null;
-    document.querySelectorAll('#tt-y-crew .tt-crew-row').forEach(function(row) {
-        const txt = (row.innerText || '').toLowerCase();
-        if (myName && txt.indexOf(myName) !== -1) target = row;
+function ensureMobileTimelineChrome() {
+    var layer = document.getElementById('shift-layer');
+    if (!layer || document.getElementById('tt-mobile-chrome')) return;
+
+    var chrome = document.createElement('div');
+    chrome.id = 'tt-mobile-chrome';
+    chrome.innerHTML =
+        '<div id="tt-mobile-view-bar">'
+        + '<button type="button" class="btn-tab" data-view="list" onclick="setMobileTimelineView(\'list\')">MY SHIFTS</button>'
+        + '<button type="button" class="btn-tab active" data-view="grid" onclick="setMobileTimelineView(\'grid\')">TIMELINE</button>'
+        + '</div>';
+
+    var listPane = document.createElement('div');
+    listPane.id = 'tt-mobile-list-pane';
+    listPane.innerHTML = '<div id="tt-mobile-list-scroll"></div>';
+
+    var sheet = document.createElement('div');
+    sheet.id = 'tt-mobile-shift-sheet';
+    sheet.innerHTML =
+        '<div class="tt-mobile-shift-sheet-backdrop" onclick="closeMobileShiftDetailSheet()"></div>'
+        + '<div class="tt-mobile-shift-sheet-panel">'
+        + '<button type="button" class="tt-mobile-shift-sheet-close" onclick="closeMobileShiftDetailSheet()">✕</button>'
+        + '<div id="tt-mobile-shift-sheet-body"></div>'
+        + '</div>';
+
+    layer.insertBefore(chrome, layer.firstChild);
+    layer.insertBefore(listPane, layer.querySelector('.tt-workspace'));
+    layer.appendChild(sheet);
+}
+
+window.setMobileTimelineView = function(view) {
+    if (typeof isMobileViewport !== 'function' || !isMobileViewport()) return;
+    window.mobileTimelineView = view === 'list' ? 'list' : 'grid';
+    var layer = document.getElementById('shift-layer');
+    if (!layer) return;
+    layer.classList.toggle('tt-mobile-list-view', window.mobileTimelineView === 'list');
+    layer.classList.toggle('tt-mobile-grid-view', window.mobileTimelineView === 'grid');
+    var bar = document.getElementById('tt-mobile-view-bar');
+    if (bar) {
+        bar.querySelectorAll('button[data-view]').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-view') === window.mobileTimelineView);
+        });
+    }
+    if (window.mobileTimelineView === 'list') {
+        renderMobileTimelineList();
+    } else {
+        applyMobileTimelineGridDefaults();
+    }
+};
+
+window.renderMobileTimelineList = function() {
+    var host = document.getElementById('tt-mobile-list-scroll');
+    if (!host) return;
+    if (typeof shifts === 'undefined' || !Array.isArray(shifts)) {
+        host.innerHTML = '<div class="tt-mobile-list-empty">No shift data loaded.</div>';
+        return;
+    }
+    var mine = shifts.filter(isMyMobileShift).sort(function(a, b) {
+        return Number(a.start) - Number(b.start);
     });
-    setMobileTimelineZoom(0.9);
-    if (target && target.scrollIntoView) {
-        setTimeout(function() { target.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 250);
+    if (!mine.length) {
+        host.innerHTML = '<div class="tt-mobile-list-empty">You have no shifts on this project yet.</div>';
+        return;
     }
+    var html = '';
+    mine.forEach(function(s) {
+        html += buildMobileShiftStripMarkup(s, { showPerson: false });
+    });
+    host.innerHTML = html;
 };
 
-window.initMobileTimelineZoom = function() {
+function collapseAllTimelineDeptsMobile() {
+    document.querySelectorAll('[id^="icon-tt-"]').forEach(function(icon) {
+        if ((icon.innerText || '').trim() === '▼' && typeof toggleDept === 'function') {
+            toggleDept(icon.id.replace('icon-tt-', ''), 'tt');
+        }
+    });
+}
+
+function applyMobileTimelineGridDefaults() {
+    collapseAllTimelineDeptsMobile();
+    mobileTimelinePinch.scale = 0.34;
+    applyMobilePinchTransform();
+}
+
+function applyMobilePinchTransform() {
+    var canvas = document.querySelector('#shift-layer .tt-canvas');
+    if (!canvas) return;
+    var z = mobileTimelinePinch.scale;
+    canvas.style.transform = 'scale(' + z + ')';
+    canvas.style.transformOrigin = 'top left';
+}
+
+function pinchDistance(touches) {
+    var dx = touches[0].clientX - touches[1].clientX;
+    var dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+}
+
+function initMobileTimelinePinchZoom() {
+    var workspace = document.querySelector('#shift-layer .tt-workspace');
+    if (!workspace || workspace._mobilePinchBound) return;
+    workspace._mobilePinchBound = true;
+    var lastDist = 0;
+
+    workspace.addEventListener('touchstart', function(e) {
+        if (window.mobileTimelineView !== 'grid') return;
+        if (e.touches.length === 2) {
+            lastDist = pinchDistance(e.touches);
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    workspace.addEventListener('touchmove', function(e) {
+        if (window.mobileTimelineView !== 'grid' || e.touches.length !== 2) return;
+        var dist = pinchDistance(e.touches);
+        if (!lastDist) lastDist = dist;
+        var ratio = dist / lastDist;
+        lastDist = dist;
+        mobileTimelinePinch.scale = Math.max(
+            mobileTimelinePinch.min,
+            Math.min(mobileTimelinePinch.max, mobileTimelinePinch.scale * ratio)
+        );
+        applyMobilePinchTransform();
+        e.preventDefault();
+    }, { passive: false });
+
+    workspace.addEventListener('touchend', function() {
+        lastDist = 0;
+    });
+}
+
+function attachMobileShiftTapHandlers() {
     if (typeof isMobileViewport !== 'function' || !isMobileViewport()) return;
-    ensureMobileTimelineZoomBar();
-    setMobileTimelineZoom(window.mobileTimelineZoom || 0.38);
+    document.querySelectorAll('#shift-layer .shift-block').forEach(function(block) {
+        if (block._mobileTapBound || !block.dataset.id) return;
+        block._mobileTapBound = true;
+        block.addEventListener('click', function(e) {
+            if (window.mobileTimelineView !== 'grid') return;
+            if (e.target.closest('.shift-handle') || e.target.closest('.shift-arrow-btn') || e.target.closest('.action-zone')) return;
+            var id = block.dataset.id;
+            if (!id || typeof shifts === 'undefined') return;
+            var shift = shifts.find(function(s) { return s.id === id; });
+            if (shift) openMobileShiftDetailSheet(shift);
+        });
+    });
+}
+
+window.openMobileShiftDetailSheet = function(shift) {
+    var sheet = document.getElementById('tt-mobile-shift-sheet');
+    var body = document.getElementById('tt-mobile-shift-sheet-body');
+    if (!sheet || !body || !shift) return;
+    body.innerHTML = buildMobileShiftStripMarkup(shift, { showPerson: true });
+    sheet.classList.add('open');
+};
+
+window.closeMobileShiftDetailSheet = function() {
+    var sheet = document.getElementById('tt-mobile-shift-sheet');
+    if (sheet) sheet.classList.remove('open');
+};
+
+function syncMobileTimelineChromeVisibility() {
+    var mobile = typeof isMobileViewport === 'function' && isMobileViewport();
+    var layer = document.getElementById('shift-layer');
+    var chrome = document.getElementById('tt-mobile-chrome');
+    var listPane = document.getElementById('tt-mobile-list-pane');
+    if (layer) layer.classList.toggle('tt-mobile-mode', mobile);
+    if (chrome) chrome.style.display = mobile ? 'block' : 'none';
+    if (listPane) listPane.style.display = mobile ? '' : 'none';
+    if (!mobile) teardownMobileTimelineUX();
+}
+
+function teardownMobileTimelineUX() {
+    closeMobileShiftDetailSheet();
+    var layer = document.getElementById('shift-layer');
+    if (layer) {
+        layer.classList.remove('tt-mobile-mode', 'tt-mobile-list-view', 'tt-mobile-grid-view');
+    }
+    var canvas = document.querySelector('#shift-layer .tt-canvas');
+    if (canvas) canvas.style.transform = '';
+    mobileTimelinePinch.scale = 0.34;
+    var oldBar = document.getElementById('tt-mobile-zoom-bar');
+    if (oldBar) oldBar.remove();
+}
+
+window.initMobileTimelineUX = function() {
+    if (typeof isMobileViewport !== 'function' || !isMobileViewport()) {
+        syncMobileTimelineChromeVisibility();
+        return;
+    }
+    ensureMobileTimelineChrome();
+    syncMobileTimelineChromeVisibility();
+    initMobileTimelinePinchZoom();
+    setMobileTimelineView(window.mobileTimelineView || 'grid');
+    attachMobileShiftTapHandlers();
+    mobileTimelineUxReady = true;
 };
 
 (function hookTimelineGrid() {
-    const orig = window.rebuildTimelineGrid;
+    var orig = window.rebuildTimelineGrid;
     if (typeof orig !== 'function') return;
     window.rebuildTimelineGrid = function() {
         orig.apply(this, arguments);
         setTimeout(function() {
             if (document.getElementById('shift-layer') && document.getElementById('shift-layer').style.display !== 'none') {
-                initMobileTimelineZoom();
+                initMobileTimelineUX();
             }
         }, 80);
     };
 })();
 
+(function hookDrawShifts() {
+    var orig = window.drawShifts;
+    if (typeof orig !== 'function') return;
+    window.drawShifts = function() {
+        orig.apply(this, arguments);
+        if (typeof isMobileViewport === 'function' && isMobileViewport()) {
+            attachMobileShiftTapHandlers();
+        }
+    };
+})();
+
 (function hookTimelineClose() {
-    const orig = window.cancelShifts;
+    var orig = window.cancelShifts;
     if (typeof orig !== 'function') return;
     window.cancelShifts = function() {
-        const wrap = document.getElementById('tt-grid-wrap');
-        const axis = document.getElementById('tt-y-crew');
-        if (wrap) { wrap.style.transform = ''; wrap.style.width = ''; }
-        if (axis) axis.style.transform = '';
-        const layer = document.getElementById('shift-layer');
-        if (layer) layer.classList.remove('tt-zoom-overview', 'tt-mobile-zoom-active');
+        teardownMobileTimelineUX();
         orig.apply(this, arguments);
         if (window.mobileCrewHubProjectId && typeof isMobileViewport === 'function' && isMobileViewport()) {
             document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
         }
     };
 })();
+
+window.addEventListener('resize', function() {
+    syncMobileTimelineChromeVisibility();
+});
 
 </script>

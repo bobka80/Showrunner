@@ -1639,7 +1639,11 @@
 .mch-phase-legend-dates { font-size: 11px; color: #71717a; font-weight: 600; }
 
 /* --- Mobile weather strip --- */
-.mch-weather-strip {
+.mch-shift-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
     display: flex;
     gap: 8px;
     overflow-x: auto;
@@ -1662,47 +1666,212 @@
 .mch-weather-day__emoji { font-size: 20px; line-height: 1.2; margin: 4px 0; }
 .mch-weather-day__temp { font-size: 11px; font-weight: 700; color: #fff; }
 
-/* --- Mobile timeline zoom --- */
-#tt-mobile-zoom-bar {
+/* --- Mobile timeline: MY SHIFTS list + pinch-zoom grid --- */
+#tt-mobile-chrome {
     display: none;
     flex-shrink: 0;
-    padding: 8px 12px;
-    background: #111114;
     border-bottom: 1px solid #333;
+    background: #111114;
+}
+
+#tt-mobile-view-bar {
+    display: flex;
     gap: 8px;
+    padding: 10px 12px;
     align-items: center;
-    flex-wrap: wrap;
 }
 
-@media (max-width: 768px) {
-    #tt-mobile-zoom-bar { display: flex; }
-}
-
-#tt-mobile-zoom-bar input[type="range"] {
+#tt-mobile-view-bar .btn-tab {
     flex: 1;
-    min-width: 120px;
-    accent-color: #a855f7;
+    margin: 0 !important;
+    font-size: 11px !important;
+    padding: 10px 8px !important;
 }
 
-#shift-layer.tt-zoom-overview .shift-label-container,
-#shift-layer.tt-zoom-overview .shift-arrow-indicator,
-#shift-layer.tt-zoom-overview .phase-block {
-    opacity: 0 !important;
-    pointer-events: none;
+#tt-mobile-list-pane {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    background: #0a0a0c;
 }
 
-#shift-layer.tt-zoom-overview .shift-block {
-    min-height: 8px;
-    height: 12px !important;
-    top: 18px !important;
+#shift-layer.tt-mobile-mode.tt-mobile-list-view #tt-mobile-list-pane {
+    display: flex;
+    flex-direction: column;
 }
 
-#shift-layer.tt-mobile-zoom-active .tt-canvas {
+#shift-layer.tt-mobile-mode.tt-mobile-list-view .tt-workspace {
+    display: none !important;
+}
+
+#shift-layer.tt-mobile-mode.tt-mobile-grid-view #tt-mobile-list-pane {
+    display: none !important;
+}
+
+#tt-mobile-list-scroll {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tt-mobile-list-empty {
+    color: #71717a;
+    text-align: center;
+    padding: 32px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.tt-mobile-shift-strip {
+    background: var(--strip-bg, #86efac);
+    color: var(--strip-fg, #064e3b);
+    border-radius: 8px;
+    padding: 12px 14px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    box-sizing: border-box;
+}
+
+.tt-mobile-shift-strip.tt-mobile-strip--wh {
+    border: 2px solid #fff;
+}
+
+.tt-mobile-strip-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.tt-mobile-strip-day {
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.92;
+}
+
+.tt-mobile-strip-icons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.tt-mobile-strip-arrow {
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.tt-mobile-strip-moon {
+    font-size: 13px;
+    line-height: 1;
+    filter: grayscale(100%) brightness(0%);
+}
+
+.tt-mobile-strip-time {
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.tt-mobile-strip-role {
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.tt-mobile-strip-person {
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 6px;
+    opacity: 0.85;
+}
+
+.tt-mobile-strip-note {
+    font-size: 11px;
+    margin-top: 6px;
+    opacity: 0.9;
+    line-height: 1.4;
+}
+
+#shift-layer.tt-mobile-mode {
+    flex-direction: column;
+}
+
+#shift-layer.tt-mobile-mode .tt-workspace {
+    flex: 1;
+    min-height: 0;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
 }
 
-/* zoom transform applied inline on #tt-grid-wrap and #tt-y-crew via 03f */
+#shift-layer.tt-mobile-mode .tt-canvas {
+    min-width: 100%;
+}
+
+#shift-layer.tt-mobile-mode .tt-bottom-actions {
+    flex-shrink: 0;
+}
+
+#shift-layer.tt-mobile-mode .tt-bottom-actions .btn-blue,
+#shift-layer.tt-mobile-mode .tt-bottom-actions #tt-crew-finished-wrap {
+    display: none !important;
+}
+
+#tt-mobile-shift-sheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 8000;
+}
+
+#tt-mobile-shift-sheet.open {
+    display: block;
+}
+
+.tt-mobile-shift-sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.tt-mobile-shift-sheet-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #18181b;
+    border-top: 2px solid #a855f7;
+    border-radius: 14px 14px 0 0;
+    padding: 16px 14px calc(20px + env(safe-area-inset-bottom));
+    max-height: 70vh;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.tt-mobile-shift-sheet-close {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: #a1a1aa;
+    font-size: 18px;
+    padding: 6px;
+    cursor: pointer;
+}
+
+#tt-mobile-shift-sheet-body .tt-mobile-shift-strip {
+    margin-top: 8px;
+}
 
 /* --- Mobile Project Assets compact --- */
 body.mobile-pa-compact #pa-left-panel { display: none !important; }
