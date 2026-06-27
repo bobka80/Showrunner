@@ -96,7 +96,7 @@ window.updateLocationRegionLabel = function() {
     label.innerText = window.getProjectRegionLabelText(zone);
     label.className = 'pe-location-region-label pe-location-region-label--' + zone.replace(/_/g, '-');
     if (inSofiaCb) inSofiaCb.checked = (zone === 'sofia');
-    if (typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();
+    if (typeof window.applyProjectDistanceFieldVisibility === 'function') window.applyProjectDistanceFieldVisibility();
 };
 
 /** Short display name from Nominatim (avoids full Russian postal strings in the toolbar). */
