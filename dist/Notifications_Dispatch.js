@@ -23,6 +23,19 @@ function resolveVaultUidForPush_(identifier) {
       if (rowName && rowName === id.toLowerCase()) return rowUid || null;
     }
   } catch (e) { /* skip */ }
+
+  // Bootstrap / ROOT accounts may not appear in Vault crew sheet — still eligible for push.
+  try {
+    const byName = getUserSecurityProfile(id);
+    if (byName && byName.uid) return byName.uid;
+    const idLower = id.toLowerCase();
+    if (idLower.indexOf('@') > 0) {
+      const bogdan = getUserSecurityProfile('bogdan');
+      if (bogdan && bogdan.email && bogdan.email.toLowerCase() === idLower && bogdan.uid) {
+        return bogdan.uid;
+      }
+    }
+  } catch (e2) { /* skip */ }
   return null;
 }
 
@@ -43,6 +56,8 @@ function excludeActorUid_(uids, actor) {
   const actorProfile = actor ? getUserSecurityProfile(actor) : null;
   const actorUid = actorProfile && actorProfile.uid ? String(actorProfile.uid).trim() : '';
   if (!actorUid) return uids;
+  // ROOT stays in the push pool so the admin can self-test on registered devices.
+  if (actorProfile.sysAccess === 'ROOT') return uids;
   return (uids || []).filter(function(uid) { return uid !== actorUid; });
 }
 
