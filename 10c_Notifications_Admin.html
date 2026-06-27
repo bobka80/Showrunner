@@ -8,21 +8,30 @@ var SHOWRUNNER_HOSTING_URL = 'https://sm-showrunner-97405.web.app';
 var FIREBASE_VAPID_CONSOLE_URL = 'https://console.firebase.google.com/project/sm-showrunner-97405/settings/cloudmessaging';
 
 function ensurePushDeviceListStyles() {
-  if (document.getElementById('push-device-list-styles')) return;
-  var style = document.createElement('style');
-  style.id = 'push-device-list-styles';
+  var style = document.getElementById('push-device-list-styles');
+  if (!style) {
+    style = document.createElement('style');
+    style.id = 'push-device-list-styles';
+    document.head.appendChild(style);
+  }
   style.textContent = ''
     + '#push-device-list .push-dev-table { width:100%; min-width:0; }'
-    + '#push-device-list .push-dev-grid { display:grid; grid-template-columns:140px 72px 92px 92px 72px 124px minmax(200px,1.4fr) minmax(120px,auto); gap:6px 8px; align-items:start; width:100%; box-sizing:border-box; padding-left:12px; padding-right:12px; }'
+    + '#push-device-list .push-dev-grid { display:grid; grid-template-columns:140px 72px 92px 92px 72px 124px 88px minmax(120px,auto); gap:6px 8px; align-items:center; width:100%; box-sizing:border-box; padding-left:12px; padding-right:12px; }'
     + '#push-device-list .push-dev-head { padding-top:8px; padding-bottom:6px; border-bottom:1px solid #333; color:#71717a; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; }'
     + '#push-device-list .push-dev-head span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
-    + '#push-device-list .push-dev-row { padding-top:10px; padding-bottom:10px; min-height:48px; background:#1a1a1e; border:1px solid #333; border-radius:6px; font-size:15px; line-height:1.35; margin-bottom:4px; }'
+    + '#push-device-list .push-dev-row { padding-top:8px; padding-bottom:8px; min-height:44px; max-height:44px; background:#1a1a1e; border:1px solid #333; border-radius:6px; font-size:15px; line-height:1.35; margin-bottom:4px; }'
     + '#push-device-list .push-dev-row > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }'
-    + '#push-device-list .push-dev-row > span.push-dev-token { overflow:visible; white-space:normal; word-break:break-all; text-overflow:clip; color:#fff; font-size:11px; font-family:monospace; font-weight:600; line-height:1.4; }'
+    + '#push-device-list .push-dev-token-wrap { display:block; min-width:0; cursor:default; }'
+    + '#push-device-list .push-dev-token-hint { color:#52525b; font-size:11px; font-family:monospace; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }'
+    + '#push-device-list .push-dev-token-wrap:hover .push-dev-token-hint { color:#a1a1aa; }'
     + '#push-device-list .push-dev-actions { display:flex; gap:6px; justify-content:flex-end; flex-wrap:nowrap; }'
     + '#push-device-list .push-dev-actions .btn-sm { font-size:11px !important; padding:6px 10px !important; }'
-    + '@media (max-width:900px) { #push-device-list .push-dev-grid { grid-template-columns:120px 64px 80px 80px 64px 108px minmax(160px,1fr) minmax(100px,auto); font-size:14px; } }';
-  document.head.appendChild(style);
+    + '.push-token-peek-pop { display:none; position:fixed; z-index:20000; width:min(360px,calc(100vw - 24px)); background:#18181b; border:1px solid #10b981; border-radius:8px; padding:10px 12px; box-shadow:0 12px 40px rgba(0,0,0,0.75); box-sizing:border-box; }'
+    + '.push-token-peek-pop.visible { display:block; }'
+    + '.push-token-peek-pop .push-token-peek-label { color:#71717a; font-size:9px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:6px; }'
+    + '.push-token-peek-pop .push-token-peek-text { color:#fff; font-size:10px; font-family:monospace; line-height:1.45; word-break:break-all; max-height:120px; overflow-y:auto; margin-bottom:8px; }'
+    + '.push-token-peek-pop .push-token-peek-copy { background:#10b981; border:none; color:#fff; font-weight:800; font-size:10px; padding:6px 12px; border-radius:4px; cursor:pointer; }'
+    + '@media (max-width:900px) { #push-device-list .push-dev-grid { grid-template-columns:120px 64px 80px 80px 64px 108px 72px minmax(100px,auto); font-size:14px; } }';
 }
 
 function renderPushAdminPanel(containerId) {
@@ -225,6 +234,82 @@ function renderDeviceInfoColumns(d) {
   };
 }
 
+function formatPushTokenHint(d) {
+  if (d && d.tokenHint) return String(d.tokenHint);
+  var t = String((d && d.token) || '').trim();
+  if (t.length > 20) return t.slice(0, 8) + '…' + t.slice(-6);
+  if (t) return t;
+  return String((d && d.tokenKey) || '—');
+}
+
+var _pushTokenPeekTimer = null;
+
+function ensurePushTokenPeekPopover() {
+  var pop = document.getElementById('push-token-peek-pop');
+  if (pop) return pop;
+  pop = document.createElement('div');
+  pop.id = 'push-token-peek-pop';
+  pop.className = 'push-token-peek-pop';
+  pop.innerHTML = ''
+    + '<div class="push-token-peek-label">FCM device token</div>'
+    + '<div class="push-token-peek-text"></div>'
+    + '<button type="button" class="push-token-peek-copy" onclick="copyPeekPushToken()">COPY</button>';
+  pop.addEventListener('mouseenter', function() {
+    if (_pushTokenPeekTimer) clearTimeout(_pushTokenPeekTimer);
+  });
+  pop.addEventListener('mouseleave', function() {
+    scheduleClosePushTokenPeek();
+  });
+  document.body.appendChild(pop);
+  return pop;
+}
+
+function openPushTokenPeek(ev, tokenKey) {
+  if (_pushTokenPeekTimer) clearTimeout(_pushTokenPeekTimer);
+  var full = (window.__srPushTokenPeek || {})[tokenKey] || '';
+  if (!full) return;
+  var pop = ensurePushTokenPeekPopover();
+  var textEl = pop.querySelector('.push-token-peek-text');
+  if (textEl) textEl.textContent = full;
+  pop.dataset.tokenKey = tokenKey;
+  var copyBtn = pop.querySelector('.push-token-peek-copy');
+  if (copyBtn) copyBtn.textContent = 'COPY';
+  var r = (ev.currentTarget || ev.target).getBoundingClientRect();
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 372)) + 'px';
+  pop.style.top = (r.bottom + 6) + 'px';
+  pop.classList.add('visible');
+}
+
+function scheduleClosePushTokenPeek() {
+  if (_pushTokenPeekTimer) clearTimeout(_pushTokenPeekTimer);
+  _pushTokenPeekTimer = setTimeout(function() {
+    var pop = document.getElementById('push-token-peek-pop');
+    if (pop) pop.classList.remove('visible');
+  }, 180);
+}
+
+function copyPeekPushToken() {
+  var pop = document.getElementById('push-token-peek-pop');
+  if (!pop) return;
+  var key = pop.dataset.tokenKey || '';
+  var full = (window.__srPushTokenPeek || {})[key] || '';
+  if (!full) return;
+  var btn = pop.querySelector('.push-token-peek-copy');
+  function doneOk() {
+    if (btn) {
+      btn.textContent = 'Copied!';
+      setTimeout(function() { if (btn) btn.textContent = 'COPY'; }, 1200);
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(full).then(doneOk).catch(function() {
+      window.prompt('Copy token:', full);
+    });
+  } else {
+    window.prompt('Copy token:', full);
+  }
+}
+
 function renderPushDeviceList(devices) {
   var list = document.getElementById('push-device-list');
   if (!list) return;
@@ -237,12 +322,19 @@ function renderPushDeviceList(devices) {
     + '<div class="push-dev-grid push-dev-head">'
     + '<span>Name</span><span>Type</span><span>OS</span><span>Browser</span><span>Delivery</span><span>Last seen</span><span>Token</span><span></span>'
     + '</div>';
+  window.__srPushTokenPeek = {};
   devices.forEach(function(d) {
     var when = d.updatedAt ? d.updatedAt.slice(0, 16).replace('T', ' ') : '—';
     var cols = renderDeviceInfoColumns(d);
-    var tokenFull = escapePushHtml(d.token || d.tokenHint || d.tokenKey || '');
-    var key = escapePushHtml(d.tokenKey || '');
+    var key = String(d.tokenKey || '');
+    var tokenFull = String(d.token || '').trim();
+    if (key && tokenFull) window.__srPushTokenPeek[key] = tokenFull;
+    var hint = escapePushHtml(formatPushTokenHint(d));
+    var keyEsc = escapePushHtml(key);
     var owner = escapePushJs(d.ownerCrewName || d.crewName || '');
+    var peekAttrs = key && tokenFull
+      ? ' onmouseenter="openPushTokenPeek(event, \'' + escapePushJs(key) + '\')" onmouseleave="scheduleClosePushTokenPeek()"'
+      : '';
     html += '<div class="push-dev-grid push-dev-row">'
       + '<span>' + cols.name + '</span>'
       + '<span>' + cols.factor + '</span>'
@@ -250,10 +342,10 @@ function renderPushDeviceList(devices) {
       + '<span>' + cols.browser + '</span>'
       + '<span>' + cols.delivery + '</span>'
       + '<span style="color:#71717a; font-size:13px;">' + escapePushHtml(when) + '</span>'
-      + '<span class="push-dev-token">' + tokenFull + '</span>'
+      + '<span class="push-dev-token-wrap"' + peekAttrs + '><span class="push-dev-token-hint">' + hint + '</span></span>'
       + '<span class="push-dev-actions">'
-      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap;" onclick="runShowrunnerTestPushDevice(\'' + key + '\', \'' + owner + '\')">TEST</button>'
-      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap;" onclick="revokeShowrunnerDevice(\'' + key + '\', \'' + owner + '\')">REVOKE</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap;" onclick="runShowrunnerTestPushDevice(\'' + keyEsc + '\', \'' + owner + '\')">TEST</button>'
+      + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap;" onclick="revokeShowrunnerDevice(\'' + keyEsc + '\', \'' + owner + '\')">REVOKE</button>'
       + '</span>'
       + '</div>';
   });
