@@ -201,7 +201,7 @@ window.applyProjectEditorMode = function(projectId) {
     titleEl.style.pointerEvents = (briefing || !canTitle) ? 'none' : '';
   }
 
-  const lockIds = ['edit-proj-location', 'edit-proj-distance', 'edit-proj-outdoor', 'edit-proj-in-sofia'];
+  const lockIds = ['edit-proj-location', 'edit-proj-distance', 'edit-proj-outdoor'];
   lockIds.forEach(function(id) {
     const el = document.getElementById(id);
     if (!el) return;

@@ -6,6 +6,7 @@
         <div class="mch-meta-row">
             <span class="mch-badge mch-badge--type" id="mch-type-badge">EVENT</span>
             <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
+            <span class="mch-badge" id="mch-region-badge" style="border-color:#10b981;color:#10b981;">IN SOFIA</span>
         </div>
         <div class="mch-location" id="mch-location"></div>
     </div>
@@ -104,10 +105,22 @@ window.openMobileCrewHub = function(pId) {
 
     const loc = (p.locationUrl || '').trim();
     const locEl = document.getElementById('mch-location');
+    const regionBadge = document.getElementById('mch-region-badge');
+    if (regionBadge) {
+        let zone = (p.readinessState && p.readinessState.regionZone) ? p.readinessState.regionZone : (p.readinessState && p.readinessState.inSofia === false ? 'outside_sofia' : 'sofia');
+        const lat = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lat : p.lat;
+        const lng = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lng : p.lng;
+        if (lat && lng && typeof resolveProjectRegionZone === 'function') zone = resolveProjectRegionZone(lat, lng);
+        const label = (typeof getProjectRegionLabelText === 'function') ? getProjectRegionLabelText(zone) : 'IN SOFIA';
+        regionBadge.innerText = label;
+        regionBadge.style.borderColor = zone === 'outside_bulgaria' ? '#ef4444' : (zone === 'outside_sofia' ? '#f59e0b' : '#10b981');
+        regionBadge.style.color = regionBadge.style.borderColor;
+    }
     if (loc) {
+        const displayLoc = loc.length > 80 ? loc.split(',').slice(0, 3).join(',').trim() + '…' : loc;
         const isUrl = /^https?:\/\//i.test(loc) || loc.indexOf('maps') !== -1 || loc.indexOf('goo.gl') !== -1;
         const mapsHref = isUrl ? loc : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(loc);
-        locEl.innerHTML = '📍 <a href="' + mapsHref.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">' + (typeof escapeHTML === 'function' ? escapeHTML(loc) : loc) + '</a>';
+        locEl.innerHTML = '📍 <a href="' + mapsHref.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">' + (typeof escapeHTML === 'function' ? escapeHTML(displayLoc) : displayLoc) + '</a>';
     } else {
         locEl.innerHTML = '<span style="color:#52525b;">No location set</span>';
     }

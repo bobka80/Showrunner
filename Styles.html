@@ -486,11 +486,123 @@
       gap: 10px;
       margin-top: 8px;
       position: relative;
-      align-items: center;
+      align-items: flex-end;
       flex-wrap: wrap;
       min-height: 42px;
       overflow: visible;
       padding-right: 140px;
+    }
+    .pe-location-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1 1 320px;
+      min-width: 220px;
+      max-width: 520px;
+    }
+    .pe-location-region-label {
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #10b981;
+      line-height: 1.2;
+      padding-left: 2px;
+    }
+    .pe-location-region-label--outside-sofia { color: #f59e0b; }
+    .pe-location-region-label--outside-bulgaria { color: #ef4444; }
+    .pe-location-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      min-height: 42px;
+    }
+    #edit-proj-location {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+      padding: 12px;
+      background: #1a1a1e;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 6px 0 0 6px;
+      box-sizing: border-box;
+      border-right: none;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .pe-location-col--in-sofia #edit-proj-location {
+      border-radius: 6px 0 0 6px;
+    }
+    .pe-location-col:not(.pe-location-col--in-sofia) #edit-proj-location {
+      border-radius: 6px 0 0 6px;
+    }
+    .pe-location-pin-btn {
+      margin: 0 !important;
+      padding: 0 12px !important;
+      height: 42px !important;
+      box-sizing: border-box !important;
+      flex-shrink: 0;
+      border-radius: 0 !important;
+      border-left: none !important;
+    }
+    .pe-location-col--in-sofia .pe-location-pin-btn {
+      border-radius: 0 6px 6px 0 !important;
+    }
+    .pe-location-col:not(.pe-location-col--in-sofia) .pe-location-pin-btn {
+      border-right: none !important;
+    }
+    .pe-distance-inline {
+      display: none;
+      flex-shrink: 0;
+      width: 64px;
+      align-items: stretch;
+    }
+    .pe-distance-inline input {
+      width: 100%;
+      height: 42px;
+      margin: 0;
+      padding: 10px 6px;
+      text-align: center;
+      background: #18181b;
+      color: #fff;
+      border: 1px solid #333;
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+      box-sizing: border-box;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pe-multiplier-col {
+      position: relative;
+      width: 70px;
+      height: 42px;
+      flex-shrink: 0;
+    }
+    .pe-multiplier-label {
+      position: absolute;
+      top: -16px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      margin: 0;
+      font-size: 9px;
+      white-space: nowrap;
+      color: #f59e0b;
+    }
+    .pe-multiplier-col input {
+      width: 100%;
+      height: 42px;
+      padding: 10px;
+      margin: 0;
+      text-align: center;
+      background: #18181b;
+      color: #f59e0b;
+      font-weight: bold;
+      border: 1px solid #f59e0b;
+      border-radius: 6px;
+      box-sizing: border-box;
     }
     .weather-outdoor-col {
       position: relative;
@@ -999,9 +1111,9 @@
     .editor-briefing-mode #edit-proj-name,
     .editor-briefing-mode #edit-proj-location,
     .editor-briefing-mode #edit-proj-distance { pointer-events: none; opacity: 0.9; }
-    .editor-briefing-mode #edit-proj-location { border-radius: 6px; border-right: 1px solid #333; }
-    .editor-briefing-mode #edit-proj-outdoor,
-    .editor-briefing-mode #edit-proj-in-sofia { pointer-events: none; }
+    .editor-briefing-mode #edit-proj-location { border-radius: 6px; }
+    .editor-briefing-mode #edit-proj-outdoor { pointer-events: none; }
+    .editor-briefing-mode .pe-location-pin-btn { display: none !important; }
     .editor-briefing-mode button[onclick="toggleStatusMenu()"] { pointer-events: none !important; cursor: default !important; }
     .pa-readonly-mode #btn-save-pa,
     .pa-readonly-mode #pa-search-cli,

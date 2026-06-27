@@ -55,24 +55,92 @@ window.isPointInPolygon = function(lat, lng, polygon) {
     return inside;
 };
 
+/** Approximate Bulgaria bounds for zone label (warehouse ops). */
+window.isPointInBulgaria = function(lat, lng) {
+    return lat >= 41.235 && lat <= 44.22 && lng >= 22.35 && lng <= 28.62;
+};
+
+window.resolveProjectRegionZone = function(lat, lng) {
+    if (lat == null || lng == null || lat === '' || lng === '') return 'sofia';
+    const la = parseFloat(lat);
+    const ln = parseFloat(lng);
+    if (isNaN(la) || isNaN(ln)) return 'sofia';
+    if (window.isPointInPolygon(la, ln, window.SOFIA_RING_ROAD_POLYGON)) return 'sofia';
+    if (window.isPointInBulgaria(la, ln)) return 'outside_sofia';
+    return 'outside_bulgaria';
+};
+
+window.getProjectRegionLabelText = function(zone) {
+    if (zone === 'outside_bulgaria') return 'OUTSIDE BULGARIA';
+    if (zone === 'outside_sofia') return 'OUTSIDE SOFIA';
+    return 'IN SOFIA';
+};
+
+window.updateLocationRegionLabel = function() {
+    const label = document.getElementById('pe-location-region-label');
+    const zoneHidden = document.getElementById('edit-proj-region-zone');
+    const inSofiaCb = document.getElementById('edit-proj-in-sofia');
+    if (!label) return;
+
+    let zone = zoneHidden && zoneHidden.value ? zoneHidden.value : 'sofia';
+    const lat = document.getElementById('edit-proj-lat') ? document.getElementById('edit-proj-lat').value : '';
+    const lng = document.getElementById('edit-proj-lng') ? document.getElementById('edit-proj-lng').value : '';
+    if (lat && lng) {
+        zone = window.resolveProjectRegionZone(lat, lng);
+        if (zoneHidden) zoneHidden.value = zone;
+    } else if (inSofiaCb) {
+        zone = inSofiaCb.checked ? 'sofia' : 'outside_sofia';
+        if (zoneHidden) zoneHidden.value = zone;
+    }
+
+    label.innerText = window.getProjectRegionLabelText(zone);
+    label.className = 'pe-location-region-label pe-location-region-label--' + zone.replace(/_/g, '-');
+    if (inSofiaCb) inSofiaCb.checked = (zone === 'sofia');
+    if (typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();
+};
+
+/** Short display name from Nominatim (avoids full Russian postal strings in the toolbar). */
+window.formatShortLocationName = function(nominatimData) {
+    if (!nominatimData) return '';
+    const a = nominatimData.address || {};
+    const parts = [];
+    const venue = a.amenity || a.building || a.tourism || a.leisure || a.shop || a.house || '';
+    const street = a.road || a.pedestrian || a.footway || '';
+    const city = a.city || a.town || a.village || a.municipality || a.hamlet || a.suburb || '';
+    const region = a.state || a.region || a.county || '';
+    const country = a.country || '';
+    if (venue) parts.push(venue);
+    else if (street) parts.push(street);
+    if (city && parts.indexOf(city) === -1) parts.push(city);
+    else if (region && !city) parts.push(region);
+    if (country) parts.push(country);
+    if (parts.length) return parts.join(', ');
+    const dn = String(nominatimData.display_name || '');
+    if (dn.length > 72) {
+        return dn.split(',').slice(0, 3).map(function(s) { return s.trim(); }).filter(Boolean).join(', ');
+    }
+    return dn;
+};
+
 window.calculateDistanceAndZone = async function(lat, lng) {
     let inSofiaCheckbox = document.getElementById('edit-proj-in-sofia');
     let distanceInput = document.getElementById('edit-proj-distance');
+    let zoneHidden = document.getElementById('edit-proj-region-zone');
     if (!inSofiaCheckbox || !distanceInput) return;
 
-    let inSofia = window.isPointInPolygon(lat, lng, window.SOFIA_RING_ROAD_POLYGON);
-    
+    const zone = window.resolveProjectRegionZone(lat, lng);
+    const inSofia = (zone === 'sofia');
     inSofiaCheckbox.checked = inSofia;
+    if (zoneHidden) zoneHidden.value = zone;
     window.isProjectDirty = true;
     
     if (inSofia) {
         distanceInput.value = '';
-        distanceInput.placeholder = '0';
+        distanceInput.placeholder = 'km';
     } else {
         distanceInput.value = '';
-        distanceInput.placeholder = '...';
+        distanceInput.placeholder = '…';
         try {
-            // OSRM expects coordinates in lon,lat
             let osrmUrl = `https://router.project-osrm.org/route/v1/driving/${window.WAREHOUSE_ORIGIN.lng},${window.WAREHOUSE_ORIGIN.lat};${lng},${lat}?overview=false`;
             let res = await fetch(osrmUrl);
             let data = await res.json();
@@ -81,16 +149,16 @@ window.calculateDistanceAndZone = async function(lat, lng) {
                 distanceInput.value = (distanceMeters / 1000).toFixed(1);
             } else {
                 distanceInput.value = '';
-                distanceInput.placeholder = '0';
+                distanceInput.placeholder = 'km';
             }
         } catch (e) {
             console.error("OSRM Routing failed:", e);
             distanceInput.value = '';
-            distanceInput.placeholder = '0';
+            distanceInput.placeholder = 'km';
         }
     }
     
-    if (typeof toggleDistanceInput === 'function') toggleDistanceInput();
+    if (typeof updateLocationRegionLabel === 'function') updateLocationRegionLabel();
 };
 
 window.updateMapPreview = async function() {
@@ -114,7 +182,7 @@ window.updateMapPreview = async function() {
             } else {
                 window.leafletMarker = L.marker([lat, lon]).addTo(window.leafletMap);
             }
-                
+            document.getElementById('modal-location-input').value = window.formatShortLocationName(data[0]) || data[0].display_name;
             window.calculateDistanceAndZone(lat, lon);
         } else {
             alert("Location not found. Try a different search term.");
@@ -147,8 +215,9 @@ window.openLocationMap = function() {
                 try {
                     let res = await fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + lat + "&lon=" + lng);
                     let data = await res.json();
-                    if (data && data.display_name) document.getElementById('modal-location-input').value = data.display_name;
-                    else document.getElementById('modal-location-input').value = lat.toFixed(5) + ", " + lng.toFixed(5);
+                    if (data && data.display_name) {
+                        document.getElementById('modal-location-input').value = window.formatShortLocationName(data) || data.display_name;
+                    } else document.getElementById('modal-location-input').value = lat.toFixed(5) + ", " + lng.toFixed(5);
                 } catch(err) { document.getElementById('modal-location-input').value = lat.toFixed(5) + ", " + lng.toFixed(5); }
             });
             
@@ -177,9 +246,11 @@ window.saveLocationModal = function() {
     }
     if (mainInput.value !== val) {
         mainInput.value = val;
+        mainInput.title = val;
         window.isProjectDirty = true;
     }
     window.closeLocationModal();
+    if (typeof updateLocationRegionLabel === 'function') updateLocationRegionLabel();
     if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
 };
 

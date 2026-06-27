@@ -412,7 +412,10 @@ document.addEventListener('DOMContentLoaded', function() {
           
           if (document.getElementById('edit-proj-in-sofia')) document.getElementById('edit-proj-in-sofia').checked = cState.inSofia !== false;
           if (document.getElementById('edit-proj-distance')) document.getElementById('edit-proj-distance').value = cState.distanceKm || "";
+          const zoneEl = document.getElementById('edit-proj-region-zone');
+          if (zoneEl) zoneEl.value = cState.regionZone || (cState.inSofia !== false ? 'sofia' : 'outside_sofia');
           if(typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();
+          if (typeof window.updateLocationRegionLabel === 'function') window.updateLocationRegionLabel();
           
           if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
 

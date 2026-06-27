@@ -495,11 +495,123 @@
       gap: 10px;
       margin-top: 8px;
       position: relative;
-      align-items: center;
+      align-items: flex-end;
       flex-wrap: wrap;
       min-height: 42px;
       overflow: visible;
       padding-right: 140px;
+    }
+    .pe-location-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1 1 320px;
+      min-width: 220px;
+      max-width: 520px;
+    }
+    .pe-location-region-label {
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #10b981;
+      line-height: 1.2;
+      padding-left: 2px;
+    }
+    .pe-location-region-label--outside-sofia { color: #f59e0b; }
+    .pe-location-region-label--outside-bulgaria { color: #ef4444; }
+    .pe-location-row {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      min-height: 42px;
+    }
+    #edit-proj-location {
+      flex: 1;
+      min-width: 0;
+      margin: 0;
+      padding: 12px;
+      background: #1a1a1e;
+      color: #fff;
+      border: 1px solid #333;
+      border-radius: 6px 0 0 6px;
+      box-sizing: border-box;
+      border-right: none;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .pe-location-col--in-sofia #edit-proj-location {
+      border-radius: 6px 0 0 6px;
+    }
+    .pe-location-col:not(.pe-location-col--in-sofia) #edit-proj-location {
+      border-radius: 6px 0 0 6px;
+    }
+    .pe-location-pin-btn {
+      margin: 0 !important;
+      padding: 0 12px !important;
+      height: 42px !important;
+      box-sizing: border-box !important;
+      flex-shrink: 0;
+      border-radius: 0 !important;
+      border-left: none !important;
+    }
+    .pe-location-col--in-sofia .pe-location-pin-btn {
+      border-radius: 0 6px 6px 0 !important;
+    }
+    .pe-location-col:not(.pe-location-col--in-sofia) .pe-location-pin-btn {
+      border-right: none !important;
+    }
+    .pe-distance-inline {
+      display: none;
+      flex-shrink: 0;
+      width: 64px;
+      align-items: stretch;
+    }
+    .pe-distance-inline input {
+      width: 100%;
+      height: 42px;
+      margin: 0;
+      padding: 10px 6px;
+      text-align: center;
+      background: #18181b;
+      color: #fff;
+      border: 1px solid #333;
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+      box-sizing: border-box;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pe-multiplier-col {
+      position: relative;
+      width: 70px;
+      height: 42px;
+      flex-shrink: 0;
+    }
+    .pe-multiplier-label {
+      position: absolute;
+      top: -16px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      margin: 0;
+      font-size: 9px;
+      white-space: nowrap;
+      color: #f59e0b;
+    }
+    .pe-multiplier-col input {
+      width: 100%;
+      height: 42px;
+      padding: 10px;
+      margin: 0;
+      text-align: center;
+      background: #18181b;
+      color: #f59e0b;
+      font-weight: bold;
+      border: 1px solid #f59e0b;
+      border-radius: 6px;
+      box-sizing: border-box;
     }
     .weather-outdoor-col {
       position: relative;
@@ -1008,9 +1120,9 @@
     .editor-briefing-mode #edit-proj-name,
     .editor-briefing-mode #edit-proj-location,
     .editor-briefing-mode #edit-proj-distance { pointer-events: none; opacity: 0.9; }
-    .editor-briefing-mode #edit-proj-location { border-radius: 6px; border-right: 1px solid #333; }
-    .editor-briefing-mode #edit-proj-outdoor,
-    .editor-briefing-mode #edit-proj-in-sofia { pointer-events: none; }
+    .editor-briefing-mode #edit-proj-location { border-radius: 6px; }
+    .editor-briefing-mode #edit-proj-outdoor { pointer-events: none; }
+    .editor-briefing-mode .pe-location-pin-btn { display: none !important; }
     .editor-briefing-mode button[onclick="toggleStatusMenu()"] { pointer-events: none !important; cursor: default !important; }
     .pa-readonly-mode #btn-save-pa,
     .pa-readonly-mode #pa-search-cli,
@@ -3495,6 +3607,7 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
         <div class="mch-meta-row">
             <span class="mch-badge mch-badge--type" id="mch-type-badge">EVENT</span>
             <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
+            <span class="mch-badge" id="mch-region-badge" style="border-color:#10b981;color:#10b981;">IN SOFIA</span>
         </div>
         <div class="mch-location" id="mch-location"></div>
     </div>
@@ -3577,13 +3690,22 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
           <button class="btn-outline" style="width:auto; margin:0; padding: 0 10px; height: 42px; box-sizing: border-box; flex-shrink: 0;" onclick="openClientModal()" title="New Client">+ NEW CLIENT</button>
       </div>
       
-      <div style="display:flex; gap:0; align-items:center; flex: 1 1 320px; min-width: 220px; max-width: 520px;">
-          <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="window.isProjectDirty=true" style="width: 100%; flex: 1; min-width: 0; margin:0; padding:12px; background:#1a1a1e; color:#fff; border:1px solid #333; border-radius:6px 0 0 6px; box-sizing: border-box; border-right:none;">
-          <button class="btn-outline pe-mgr-only" style="margin:0; padding: 0 12px; height: 42px; box-sizing: border-box; flex-shrink: 0; border-radius: 0 6px 6px 0;" onclick="window.openLocationMap()" title="Set Location Map">📍</button>
+      <div class="pe-location-col">
+          <div id="pe-location-region-label" class="pe-location-region-label">IN SOFIA</div>
+          <div class="pe-location-row">
+              <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="window.isProjectDirty=true" title="">
+              <button type="button" class="btn-outline pe-mgr-only pe-location-pin-btn" onclick="window.openLocationMap()" title="Set location on map">📍</button>
+              <div id="edit-proj-distance-container" class="pe-distance-inline">
+                  <input type="number" id="edit-proj-distance" placeholder="km" title="Driving distance from warehouse (km)" oninput="window.isProjectDirty=true">
+              </div>
+          </div>
       </div>
       
       <input type="hidden" id="edit-proj-lat">
       <input type="hidden" id="edit-proj-lng">
+      <input type="checkbox" id="edit-proj-in-sofia" checked style="display:none;" aria-hidden="true">
+      <input type="hidden" id="edit-proj-region-zone" value="sofia">
+      
       <div class="weather-outdoor-col">
           <div id="weather-widget-wrap" class="weather-widget-wrap" style="display:none;">
               <div id="weather-widget-summary" class="weather-widget-summary"></div>
@@ -3595,18 +3717,9 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
           </label>
       </div>
       
-      <div class="pe-mgr-only" style="position: relative; width: 70px; height: 42px; flex-shrink: 0;">
-          <div class="input-label" style="position:absolute; top:-16px; left:0; width:100%; text-align:center; margin:0; font-size:9px; white-space:nowrap; color:#f59e0b;">DIFF. MULT</div>
-          <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="window.isProjectDirty=true" style="width: 100%; height: 42px; padding: 10px; margin: 0; text-align: center; background:#18181b; color:#f59e0b; font-weight:bold; border:1px solid #f59e0b; border-radius:6px; box-sizing: border-box;">
-      </div>
-      
-      <label class="crew-cb-container" style="padding: 0; border: none; margin: 0; display: flex; align-items: center; justify-content: center; background: #27272a; padding: 10px 15px; border-radius: 6px; border: 1px solid #333; cursor: pointer; height: 42px; box-sizing: border-box;">
-         <input type="checkbox" id="edit-proj-in-sofia" class="crew-cb" onchange="window.isProjectDirty=true; if(typeof window.toggleDistanceInput === 'function') window.toggleDistanceInput();" style="margin-right: 8px;" checked>
-         <span style="color:#fff; font-size:11px; font-weight:bold; white-space:nowrap; margin-top: 1px;">IN SOFIA</span>
-      </label>
-      <div id="edit-proj-distance-container" style="position: relative; width: 70px; height: 42px; flex-shrink: 0; opacity:0.3; pointer-events:none;">
-          <div class="input-label" style="position:absolute; top:-16px; left:0; width:100%; text-align:center; margin:0; font-size:9px; white-space:nowrap;">DIST (KM)</div>
-          <input type="number" id="edit-proj-distance" placeholder="0" oninput="window.isProjectDirty=true" style="width: 100%; height: 42px; padding: 10px; margin: 0; text-align: center; background:#18181b; color:#fff; border:1px solid #333; border-radius:6px; box-sizing: border-box;">
+      <div class="pe-mgr-only pe-multiplier-col">
+          <div class="input-label pe-multiplier-label">DIFF. MULT</div>
+          <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="window.isProjectDirty=true">
       </div>
       
       <div id="pe-event-meta-right" style="position:absolute; right:0; top:0; display:flex; gap:5px; align-items:center; flex-shrink:0; height:42px;">
