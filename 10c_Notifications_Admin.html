@@ -46,14 +46,15 @@ function renderPushAdminPanel(containerId) {
     + '<div style="color:#52525b; font-size:11px;">Loading devices…</div>'
     + '</div>'
     + '<style id="push-device-list-styles">'
-    + '#push-device-list .push-dev-grid { display:grid; grid-template-columns:minmax(100px,1.4fr) 72px 88px 100px 72px 118px 72px auto; gap:8px 10px; align-items:center; width:100%; min-width:720px; box-sizing:border-box; }'
-    + '#push-device-list .push-dev-head { padding:8px 12px 6px; border-bottom:1px solid #333; color:#71717a; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; }'
+    + '#push-device-list .push-dev-table { width:100%; min-width:0; }'
+    + '#push-device-list .push-dev-grid { display:grid; grid-template-columns:140px 72px 92px 92px 72px 124px 64px minmax(120px,auto); gap:6px 8px; align-items:center; width:100%; box-sizing:border-box; padding-left:12px; padding-right:12px; }'
+    + '#push-device-list .push-dev-head { padding-top:8px; padding-bottom:6px; border-bottom:1px solid #333; color:#71717a; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; }'
     + '#push-device-list .push-dev-head span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
-    + '#push-device-list .push-dev-row { padding:12px; min-height:52px; background:#1a1a1e; border:1px solid #333; border-radius:6px; font-size:15px; line-height:1.35; }'
+    + '#push-device-list .push-dev-row { padding-top:10px; padding-bottom:10px; min-height:48px; background:#1a1a1e; border:1px solid #333; border-radius:6px; font-size:15px; line-height:1.35; margin-bottom:4px; }'
     + '#push-device-list .push-dev-row > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }'
     + '#push-device-list .push-dev-actions { display:flex; gap:6px; justify-content:flex-end; flex-wrap:nowrap; }'
     + '#push-device-list .push-dev-actions .btn-sm { font-size:11px !important; padding:6px 10px !important; }'
-    + '@media (max-width:900px) { #push-device-list .push-dev-grid { min-width:640px; font-size:14px; } }'
+    + '@media (max-width:900px) { #push-device-list .push-dev-grid { grid-template-columns:120px 64px 80px 80px 64px 108px 56px minmax(100px,auto); font-size:14px; } }'
     + '</style>'
     + '</div>'
 
@@ -122,23 +123,50 @@ function pushColorTag(label, color) {
   return '<span style="color:' + color + '; font-weight:800;">' + escapePushHtml(label) + '</span>';
 }
 
+var PUSH_COLOR_DESKTOP = '#c084fc';
+var PUSH_COLOR_MOBILE = '#38bdf8';
+var PUSH_COLOR_OS_APPLE = '#fb923c';
+var PUSH_COLOR_OS_CHROME = '#4ade80';
+var PUSH_COLOR_MUTED = '#52525b';
+
 function colorForFormFactor(d) {
   var ff = String(d.formFactor || '').toLowerCase();
-  if (ff === 'mobile') return '#38bdf8';
-  if (ff === 'desktop') return '#c084fc';
+  if (ff === 'mobile') return PUSH_COLOR_MOBILE;
+  if (ff === 'desktop') return PUSH_COLOR_DESKTOP;
   var lab = String(d.label || '').toLowerCase();
-  if (lab.indexOf('mobile') !== -1 || lab.indexOf('pwa-mobile') !== -1) return '#38bdf8';
-  return '#c084fc';
+  if (lab.indexOf('mobile') !== -1 || lab.indexOf('pwa-mobile') !== -1) return PUSH_COLOR_MOBILE;
+  return PUSH_COLOR_DESKTOP;
 }
 
-function colorForBrowser(browser) {
-  var b = String(browser || '');
-  if (b === 'Chrome') return '#4ade80';
-  if (b === 'Safari') return '#fb923c';
-  if (b === 'Edge') return '#60a5fa';
-  if (b === 'Firefox') return '#f87171';
-  if (b === 'Samsung Internet') return '#818cf8';
+function colorForPlatform(platform) {
+  var p = String(platform || '').toLowerCase();
+  if (!p || p === 'mobile' || p === 'desktop' || p === 'phone' || p === 'unknown') return '';
+  if (p.indexOf('iphone') !== -1 || p.indexOf('ipad') !== -1 || p.indexOf('mac') !== -1 || p.indexOf('ios') !== -1) {
+    return PUSH_COLOR_OS_APPLE;
+  }
+  if (p.indexOf('android') !== -1 || p.indexOf('windows') !== -1 || p.indexOf('win') !== -1) {
+    return PUSH_COLOR_OS_CHROME;
+  }
+  if (p.indexOf('chrome os') !== -1 || p.indexOf('cros') !== -1) return PUSH_COLOR_OS_CHROME;
   return '#a1a1aa';
+}
+
+function colorForBrowser() {
+  return PUSH_COLOR_DESKTOP;
+}
+
+function colorForDelivery(delivery) {
+  var d = String(delivery || '').toLowerCase();
+  if (d === 'pwa') return PUSH_COLOR_MOBILE;
+  if (d === 'browser') return PUSH_COLOR_DESKTOP;
+  return '#a1a1aa';
+}
+
+function resolveDevicePlatformLabel(d, factor) {
+  var platform = String(d.platform || '').trim();
+  if (platform && platform !== 'Mobile' && platform !== 'Desktop') return platform;
+  if (factor === 'Mobile') return 'Phone';
+  return platform || '—';
 }
 
 function renderDeviceInfoColumns(d) {
@@ -154,34 +182,29 @@ function renderDeviceInfoColumns(d) {
   }
   var factorHtml = factor
     ? pushColorTag(factor, colorForFormFactor(d))
-    : '<span style="color:#52525b;">—</span>';
+    : '<span style="color:' + PUSH_COLOR_MUTED + ';">—</span>';
 
-  var platform = String(d.platform || '');
-  if (platform && platform !== 'Mobile' && platform !== 'Desktop' && platform !== 'Phone') {
-    platform = escapePushHtml(platform);
-  } else if (factor === 'Mobile') {
-    platform = 'Phone';
+  var platformLabel = resolveDevicePlatformLabel(d, factor);
+  var platformHtml;
+  if (platformLabel === '—') {
+    platformHtml = '<span style="color:' + PUSH_COLOR_MUTED + ';">—</span>';
   } else {
-    platform = platform ? escapePushHtml(platform) : '—';
-  }
-  if (platform === '—') {
-    platform = '<span style="color:#52525b;">—</span>';
-  } else {
-    platform = '<span style="color:#a1a1aa; font-weight:700;">' + platform + '</span>';
+    var platformColor = colorForPlatform(platformLabel) || '#a1a1aa';
+    platformHtml = pushColorTag(platformLabel, platformColor);
   }
 
   var browser = d.browser
     ? pushColorTag(d.browser, colorForBrowser(d.browser))
-    : '<span style="color:#52525b;">—</span>';
+    : '<span style="color:' + PUSH_COLOR_MUTED + ';">—</span>';
 
   var delivery = d.delivery
-    ? '<span style="color:#71717a; font-weight:700;">' + escapePushHtml(d.delivery) + '</span>'
-    : '<span style="color:#52525b;">—</span>';
+    ? pushColorTag(d.delivery, colorForDelivery(d.delivery))
+    : '<span style="color:' + PUSH_COLOR_MUTED + ';">—</span>';
 
   return {
     name: '<span style="color:#fff; font-weight:800;" title="' + name + '">' + name + '</span>',
     factor: factorHtml,
-    platform: platform,
+    platform: platformHtml,
     browser: browser,
     delivery: delivery
   };
@@ -194,7 +217,7 @@ function renderPushDeviceList(devices) {
     list.innerHTML = '<div style="color:#52525b; font-size:14px; line-height:1.45; padding:8px 0;">No devices registered. Open <strong>web.app</strong> on phone → allow notifications → log in.</div>';
     return;
   }
-  var html = ''
+  var html = '<div class="push-dev-table">'
     + '<div class="push-dev-grid push-dev-head">'
     + '<span>Name</span><span>Type</span><span>OS</span><span>Browser</span><span>Delivery</span><span>Last seen</span><span>Token</span><span></span>'
     + '</div>';
@@ -218,6 +241,7 @@ function renderPushDeviceList(devices) {
       + '</span>'
       + '</div>';
   });
+  html += '</div>';
   list.innerHTML = html;
 }
 
