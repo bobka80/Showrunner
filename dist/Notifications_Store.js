@@ -452,7 +452,8 @@ function deviceRowForAdmin_(device, ownerCrewName) {
     displaySummary: buildDeviceDisplaySummary_(d, displayName),
     updatedAt: d.updatedAt || '',
     tokenKey: getFcmTokenKey_(d.token),
-    tokenHint: getFcmTokenHint_(d.token)
+    tokenHint: getFcmTokenHint_(d.token),
+    token: String(d.token || '').trim()
   };
 }
 

@@ -47,11 +47,12 @@ function renderPushAdminPanel(containerId) {
     + '</div>'
     + '<style id="push-device-list-styles">'
     + '#push-device-list .push-dev-table { width:100%; min-width:0; }'
-    + '#push-device-list .push-dev-grid { display:grid; grid-template-columns:140px 72px 92px 92px 72px 124px 64px minmax(120px,auto); gap:6px 8px; align-items:center; width:100%; box-sizing:border-box; padding-left:12px; padding-right:12px; }'
+    + '#push-device-list .push-dev-grid { display:grid; grid-template-columns:140px 72px 92px 92px 72px 124px minmax(200px,1.4fr) minmax(120px,auto); gap:6px 8px; align-items:start; width:100%; box-sizing:border-box; padding-left:12px; padding-right:12px; }'
     + '#push-device-list .push-dev-head { padding-top:8px; padding-bottom:6px; border-bottom:1px solid #333; color:#71717a; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; }'
     + '#push-device-list .push-dev-head span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }'
     + '#push-device-list .push-dev-row { padding-top:10px; padding-bottom:10px; min-height:48px; background:#1a1a1e; border:1px solid #333; border-radius:6px; font-size:15px; line-height:1.35; margin-bottom:4px; }'
     + '#push-device-list .push-dev-row > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }'
+    + '#push-device-list .push-dev-row > span.push-dev-token { overflow:visible; white-space:normal; word-break:break-all; text-overflow:clip; color:#fff; font-size:11px; font-family:monospace; font-weight:600; line-height:1.4; }'
     + '#push-device-list .push-dev-actions { display:flex; gap:6px; justify-content:flex-end; flex-wrap:nowrap; }'
     + '#push-device-list .push-dev-actions .btn-sm { font-size:11px !important; padding:6px 10px !important; }'
     + '@media (max-width:900px) { #push-device-list .push-dev-grid { grid-template-columns:120px 64px 80px 80px 64px 108px 56px minmax(100px,auto); font-size:14px; } }'
@@ -151,7 +152,14 @@ function colorForPlatform(platform) {
   return '#a1a1aa';
 }
 
-function colorForBrowser() {
+function colorForBrowser(browser) {
+  var b = String(browser || '').toLowerCase();
+  if (b.indexOf('chrome') !== -1 || b === 'crios') return PUSH_COLOR_OS_CHROME;
+  if (b.indexOf('safari') !== -1) return PUSH_COLOR_OS_APPLE;
+  if (b.indexOf('edge') !== -1 || b.indexOf('samsung') !== -1 || b.indexOf('opera') !== -1) {
+    return PUSH_COLOR_OS_CHROME;
+  }
+  if (b.indexOf('firefox') !== -1) return '#f87171';
   return PUSH_COLOR_DESKTOP;
 }
 
@@ -224,7 +232,7 @@ function renderPushDeviceList(devices) {
   devices.forEach(function(d) {
     var when = d.updatedAt ? d.updatedAt.slice(0, 16).replace('T', ' ') : '—';
     var cols = renderDeviceInfoColumns(d);
-    var hint = escapePushHtml(d.tokenHint || d.tokenKey || '');
+    var tokenFull = escapePushHtml(d.token || d.tokenHint || d.tokenKey || '');
     var key = escapePushHtml(d.tokenKey || '');
     var owner = escapePushJs(d.ownerCrewName || d.crewName || '');
     html += '<div class="push-dev-grid push-dev-row">'
@@ -234,7 +242,7 @@ function renderPushDeviceList(devices) {
       + '<span>' + cols.browser + '</span>'
       + '<span>' + cols.delivery + '</span>'
       + '<span style="color:#71717a; font-size:13px;">' + escapePushHtml(when) + '</span>'
-      + '<span style="color:#52525b; font-size:12px; font-family:monospace;" title="' + hint + '">' + hint + '</span>'
+      + '<span class="push-dev-token">' + tokenFull + '</span>'
       + '<span class="push-dev-actions">'
       + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981; white-space:nowrap;" onclick="runShowrunnerTestPushDevice(\'' + key + '\', \'' + owner + '\')">TEST</button>'
       + '<button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444; white-space:nowrap;" onclick="revokeShowrunnerDevice(\'' + key + '\', \'' + owner + '\')">REVOKE</button>'
