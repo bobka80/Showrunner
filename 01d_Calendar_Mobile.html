@@ -9,19 +9,38 @@
 // ==========================================
 // @INDEX: MOBILE -> Dashboard & Views
 
+function setMobileHeaderHome() {
+    var brand = document.getElementById('mobile-header-brand');
+    var title = document.getElementById('mobile-title');
+    var back = document.getElementById('mobile-back-btn');
+    if (brand) brand.style.display = 'flex';
+    if (title) title.style.display = 'none';
+    if (back) back.style.display = 'none';
+}
+
+function setMobileHeaderSub(titleText) {
+    var brand = document.getElementById('mobile-header-brand');
+    var title = document.getElementById('mobile-title');
+    var back = document.getElementById('mobile-back-btn');
+    if (brand) brand.style.display = 'none';
+    if (title) {
+        title.style.display = 'block';
+        title.innerText = titleText || '';
+    }
+    if (back) back.style.display = 'block';
+}
+
 function goMobileHome() {
     if (typeof closeMobileCrewHub === 'function') closeMobileCrewHub();
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-home').style.display = 'flex';
-    document.getElementById('mobile-back-btn').style.display = 'none';
-    document.getElementById('mobile-title').innerText = 'COMMAND CENTER';
+    setMobileHeaderHome();
 }
 
 function openMobileEvents() {
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-events').style.display = 'flex';
-    document.getElementById('mobile-back-btn').style.display = 'block';
-    document.getElementById('mobile-title').innerText = 'EVENTS DIRECTORY';
+    setMobileHeaderSub('EVENTS');
 }
 
 function openMobileRFID() {
@@ -32,8 +51,7 @@ function openMobileRFID() {
 
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-rfid').style.display = 'flex';
-    document.getElementById('mobile-back-btn').style.display = 'block';
-    document.getElementById('mobile-title').innerText = 'RFID MAPPING';
+    setMobileHeaderSub('MAP RFID');
 
     document.getElementById('mobile-search-name').value = '';
     document.getElementById('mobile-search-tag').value = '';
@@ -179,9 +197,7 @@ function clearMobileRFIDInline(assetId) {
 function openMobileNotifs() {
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-notifs').style.display = 'flex';
-    document.getElementById('mobile-back-btn').style.display = 'block';
-    document.getElementById('mobile-title').innerText = 'NOTIFICATIONS';
-
+    setMobileHeaderSub('NOTIFICATIONS');
 }
 
 function renderMobileDashboard(payload) {
@@ -270,7 +286,14 @@ function renderMobileDashboard(payload) {
     document.getElementById('mobile-notifs-container').innerHTML = nHtml;
 
     let badge = document.getElementById('mobile-notif-badge');
-    if(badge) { if(unreadCount > 0) { badge.innerText = unreadCount; badge.style.display = 'inline-block'; } else badge.style.display = 'none'; }
+    if (badge) {
+        if (unreadCount > 0) {
+            badge.innerText = unreadCount;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
 
     if (typeof renderMobileTasksList === 'function') renderMobileTasksList();
 }
@@ -279,4 +302,10 @@ function renderMobileDashboard(payload) {
 function triggerMobileEventClick(pId) {
     if (typeof openMobileCrewHub === 'function') openMobileCrewHub(pId);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.innerWidth <= 768 && typeof setMobileHeaderHome === 'function') {
+        setMobileHeaderHome();
+    }
+});
 </script>

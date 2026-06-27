@@ -113,22 +113,35 @@
 <!-- @INDEX: SHELL -> Mobile Dashboard -->
 <!-- MOBILE DASHBOARD SHELL (Takes over on phones) -->
 <div id="mobile-dashboard" style="display:none;">
-    <div id="mobile-header" style="height:60px; background:var(--bg-sidebar); border-bottom:1px solid #333; display:flex; align-items:center; padding:0 15px; flex-shrink:0;">
-        <button id="mobile-back-btn" class="btn-outline" onclick="goMobileHome()" style="border:none; color:var(--accent); font-weight:bold; font-size:12px; display:none; background:transparent !important;">⬅ BACK</button>
-        <div id="mobile-title" style="flex:1; text-align:center; font-weight:900; font-size:16px; color:#fff;">COMMAND CENTER</div>
-        <div style="width:60px;"></div> 
+    <div id="mobile-header" class="mobile-header">
+        <button type="button" id="mobile-back-btn" class="mobile-header-back" onclick="goMobileHome()">⬅ BACK</button>
+        <div id="mobile-header-brand" class="mobile-header-brand">
+            <svg class="mobile-header-logo" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
+            <span class="mobile-header-wordmark">SHOWRUNNER</span>
+        </div>
+        <div id="mobile-title" class="mobile-header-title">HOME</div>
+        <button type="button" id="mobile-header-notif-btn" class="nav-icon-btn mobile-header-notif-btn" onclick="openMobileNotifs()" title="Notifications">
+            <span class="mobile-header-notif-wrap">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                <span id="mobile-notif-badge" class="mobile-header-notif-badge">0</span>
+            </span>
+        </button>
     </div>
 
-    <div id="mobile-view-home" class="mobile-view" style="display:flex; flex-direction:column; gap:15px; padding: 20px; flex:1; overflow-y:auto;">
-       <div style="text-align:center; padding:20px 0;">
-           <div style="font-size: 40px; margin-bottom: 10px;">⚡</div>
-           <h1 style="color:var(--text-main); margin:0;">SHOWRUNNER</h1>
-           <p style="color:var(--text-muted); font-size:12px; margin-top:5px;">Mobile Command</p>
-       </div>
-       <button class="btn-outline btn-mobile-nav" onclick="openMobileEvents()">📅 EVENTS DIRECTORY</button>
-       <button class="btn-outline btn-mobile-nav" onclick="openMobileTasks()">✅ MY TASKS <span id="mobile-tasks-badge" style="background:#3b82f6; color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; margin-left:auto; display:none;"></span></button>
-       <button class="btn-outline btn-mobile-nav" onclick="openMobileRFID()">📡 MAP RFID TAGS</button>
-       <button class="btn-outline btn-mobile-nav" onclick="openMobileNotifs()">🔔 NOTIFICATIONS <span id="mobile-notif-badge" style="background:#ef4444; color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; margin-left:auto; display:none;"></span></button>
+    <div id="mobile-view-home" class="mobile-view mobile-view-home">
+       <button type="button" class="mobile-nav-row" onclick="openMobileTasks()">
+           <span class="mobile-nav-row__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span>
+           <span class="mobile-nav-row__label">TASKS</span>
+           <span id="mobile-tasks-badge" class="mobile-nav-row__badge" style="display:none;">0</span>
+       </button>
+       <button type="button" class="mobile-nav-row" onclick="openMobileEvents()">
+           <span class="mobile-nav-row__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg></span>
+           <span class="mobile-nav-row__label">EVENTS</span>
+       </button>
+       <button type="button" class="mobile-nav-row" onclick="openMobileRFID()">
+           <span class="mobile-nav-row__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"></path><path d="M7 10h.01"></path><path d="M11 10h6"></path><path d="M7 14h.01"></path><path d="M11 14h6"></path></svg></span>
+           <span class="mobile-nav-row__label">MAP RFID</span>
+       </button>
     </div>
 
     <div id="mobile-view-events" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">

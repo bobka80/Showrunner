@@ -8,8 +8,11 @@
 function openMobileTasks() {
     document.querySelectorAll('.mobile-view').forEach(function(el) { el.style.display = 'none'; });
     document.getElementById('mobile-view-tasks').style.display = 'flex';
-    document.getElementById('mobile-back-btn').style.display = 'block';
-    document.getElementById('mobile-title').innerText = 'MY TASKS';
+    if (typeof setMobileHeaderSub === 'function') setMobileHeaderSub('TASKS');
+    else {
+        document.getElementById('mobile-back-btn').style.display = 'block';
+        document.getElementById('mobile-title').innerText = 'TASKS';
+    }
     renderMobileTasksList();
 }
 
@@ -44,7 +47,7 @@ function renderMobileTasksList() {
     if (badge) {
         if (openCount > 0) {
             badge.innerText = openCount;
-            badge.style.display = 'inline-block';
+            badge.style.display = 'block';
         } else {
             badge.style.display = 'none';
         }

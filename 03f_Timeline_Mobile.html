@@ -111,13 +111,6 @@ function ensureMobileTimelineChrome() {
 
     layer.insertBefore(chrome, layer.firstChild);
     layer.insertBefore(listPane, layer.querySelector('.tt-workspace'));
-
-    var actions = layer.querySelector('.tt-bottom-actions');
-    if (actions && !document.getElementById('tt-mobile-footer-strip')) {
-        var stripSlot = document.createElement('div');
-        stripSlot.id = 'tt-mobile-footer-strip';
-        actions.insertBefore(stripSlot, actions.firstChild);
-    }
 }
 
 function ensureMobilePinchHost() {
@@ -161,7 +154,6 @@ window.setMobileTimelineView = function(view) {
     }
     if (window.mobileTimelineView === 'list') {
         renderMobileTimelineList();
-        clearMobileTimelineFooterStrip();
     } else {
         applyMobileTimelineGridDefaults();
     }
@@ -254,42 +246,13 @@ function initMobileTimelinePinchZoom() {
 }
 
 function attachMobileShiftTapHandlers() {
-    if (typeof isMobileViewport !== 'function' || !isMobileViewport()) return;
-    document.querySelectorAll('#shift-layer .shift-block').forEach(function(block) {
-        if (block._mobileTapBound || !block.dataset.id) return;
-        block._mobileTapBound = true;
-        block.addEventListener('click', function(e) {
-            if (window.mobileTimelineView !== 'grid') return;
-            if (e.target.closest('.shift-handle') || e.target.closest('.shift-arrow-btn') || e.target.closest('.action-zone')) return;
-            var id = block.dataset.id;
-            if (!id || typeof shifts === 'undefined') return;
-            var shift = shifts.find(function(s) { return s.id === id; });
-            if (shift) showMobileTimelineFooterStrip(shift);
-        });
-    });
+    /* Mobile timeline grid: read-only — no shift detail popup on tap */
 }
 
-window.showMobileTimelineFooterStrip = function(shift) {
-    var slot = document.getElementById('tt-mobile-footer-strip');
-    if (!slot || !shift) return;
-    slot.innerHTML = buildMobileShiftStripMarkup(shift, { showPerson: true });
-    slot.classList.add('visible');
-};
-
-window.clearMobileTimelineFooterStrip = function() {
-    var slot = document.getElementById('tt-mobile-footer-strip');
-    if (!slot) return;
-    slot.innerHTML = '';
-    slot.classList.remove('visible');
-};
-
-window.openMobileShiftDetailSheet = function(shift) {
-    showMobileTimelineFooterStrip(shift);
-};
-
-window.closeMobileShiftDetailSheet = function() {
-    clearMobileTimelineFooterStrip();
-};
+window.showMobileTimelineFooterStrip = function() {};
+window.clearMobileTimelineFooterStrip = function() {};
+window.openMobileShiftDetailSheet = function() {};
+window.closeMobileShiftDetailSheet = function() {};
 
 function syncMobileTimelineChromeVisibility() {
     var mobile = typeof isMobileViewport === 'function' && isMobileViewport();
@@ -303,7 +266,6 @@ function syncMobileTimelineChromeVisibility() {
 }
 
 function teardownMobileTimelineUX() {
-    clearMobileTimelineFooterStrip();
     var layer = document.getElementById('shift-layer');
     if (layer) {
         layer.classList.remove('tt-mobile-mode', 'tt-mobile-list-view', 'tt-mobile-grid-view');
@@ -332,7 +294,6 @@ window.initMobileTimelineUX = function() {
     syncMobileTimelineChromeVisibility();
     initMobileTimelinePinchZoom();
     setMobileTimelineView(window.mobileTimelineView || 'grid');
-    attachMobileShiftTapHandlers();
     mobileTimelineUxReady = true;
 };
 
@@ -355,7 +316,6 @@ window.initMobileTimelineUX = function() {
     window.drawShifts = function() {
         orig.apply(this, arguments);
         if (typeof isMobileViewport === 'function' && isMobileViewport()) {
-            attachMobileShiftTapHandlers();
             if (window.mobileTimelineView === 'grid') {
                 requestAnimationFrame(function() { applyMobilePinchTransform(); });
             }

@@ -147,8 +147,12 @@ function updateBadgeLocally() {
         }
     }
     if (mBadge) {
-        if (unreadCount > 0) { mBadge.innerText = unreadCount; mBadge.style.display = 'inline-block'; }
-        else mBadge.style.display = 'none';
+        if (unreadCount > 0) {
+            mBadge.innerText = unreadCount;
+            mBadge.style.display = 'block';
+        } else {
+            mBadge.style.display = 'none';
+        }
     }
 }
 
