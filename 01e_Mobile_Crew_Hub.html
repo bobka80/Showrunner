@@ -70,7 +70,9 @@ window.resolveMobileProject = function(pId) {
 };
 
 window.projectIsOutdoorMobile = function(p) {
-    return !!(p && (p.outdoor || (p.readinessState && p.readinessState.outdoor)));
+    if (!p) return false;
+    const rs = p.readinessState || {};
+    return !!(rs.isOutdoor || rs.outdoor || p.outdoor);
 };
 
 window.mobileWeatherCondFromCode = function(code) {

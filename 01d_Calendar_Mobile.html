@@ -217,7 +217,9 @@ function renderMobileDashboard(payload) {
                 pbHtml = `<div style="width: 100%; height: 4px; background: rgba(0,0,0,0.5); border-radius: 2px; overflow: hidden; margin-top: 10px;"><div style="height: 100%; width: ${pct}%; background: ${pbColor};"></div></div>`;
             }
 
-            const isOutdoor = !!(p.outdoor || (p.readinessState && p.readinessState.outdoor));
+            const isOutdoor = typeof projectIsOutdoorMobile === 'function'
+                ? projectIsOutdoorMobile(p)
+                : !!(p.readinessState && (p.readinessState.isOutdoor || p.readinessState.outdoor));
             const weatherSlot = isOutdoor
                 ? '<div id="mob-weather-' + p.id + '" class="mob-event-weather-badge"></div>'
                 : '';
@@ -242,7 +244,7 @@ function renderMobileDashboard(payload) {
 
     if (typeof renderMobileWeatherSummaryBadge === 'function') {
         sorted.forEach(function(p) {
-            if (!(p.outdoor || (p.readinessState && p.readinessState.outdoor))) return;
+            if (typeof projectIsOutdoorMobile === 'function' ? !projectIsOutdoorMobile(p) : !(p.readinessState && p.readinessState.isOutdoor)) return;
             const host = document.getElementById('mob-weather-' + p.id);
             if (host) renderMobileWeatherSummaryBadge(host, p, { interactive: false });
         });
