@@ -189,7 +189,7 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
     let deltaPayload = changeMsgs.join(' | ');
     if (deltaPayload === "") deltaPayload = "Saved timeline with no modifications.";
 
-    // Generate UI Notifications for NEWLY ASSIGNED CREW and SHIFT CHANGES
+    // Generate UI Notifications for crew / truck timeline changes
     let oldUids = [];
     let oldShiftsMap = {};
     if (sInfo.deletedRows.length > 0) {
@@ -198,71 +198,107 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
             oldShiftsMap[r[sMap['uid']]] = {
                 start: Number(r[sMap['Start']]),
                 duration: Number(r[sMap['Duration']]),
+                role: r[sMap['Role']] || '',
+                user_uid: r[sMap['user_uid']],
                 payment_status: r[sMap['payment_status']] || 'Pending',
                 paid_amount: r[sMap['paid_amount']] || ''
             };
         });
     }
     let newUids = shifts ? [...new Set(shifts.map(s => s.user_uid || s.email))] : [];
-    let newlyAddedUids = newUids.filter(e => !oldUids.includes(e) && e && !e.includes('truck'));
+    let newlyAddedUids = newUids.filter(e => !oldUids.includes(e) && e && !isTruckShiftUid_(e));
 
     let modifiedUids = new Set();
+    let truckTimelineChanged = false;
     if (shifts) {
         shifts.forEach(s => {
             let uid = s.user_uid || s.email;
-            if (uid && !uid.includes('truck') && oldShiftsMap[s.id]) {
+            if (uid && isTruckShiftUid_(uid)) {
+                if (!oldShiftsMap[s.id]) truckTimelineChanged = true;
+                else {
+                    let oldS = oldShiftsMap[s.id];
+                    if (oldS.start !== Number(s.start) || oldS.duration !== Number(s.duration) || String(oldS.role || '') !== String(s.role || '')) {
+                        truckTimelineChanged = true;
+                    }
+                }
+            }
+            if (uid && !isTruckShiftUid_(uid) && oldShiftsMap[s.id]) {
                 let oldS = oldShiftsMap[s.id];
-                if (oldS.start !== Number(s.start) || oldS.duration !== Number(s.duration)) {
+                if (oldS.start !== Number(s.start) || oldS.duration !== Number(s.duration) || String(oldS.role || '') !== String(s.role || '')) {
                     modifiedUids.add(uid);
                 }
-                    s.payment_status = oldS.payment_status;
-                    s.paid_amount = oldS.paid_amount;
+                s.payment_status = oldS.payment_status;
+                s.paid_amount = oldS.paid_amount;
             }
         });
     }
+    if (!truckTimelineChanged) {
+        sInfo.deletedRows.forEach(r => {
+            if (isTruckShiftUid_(r[sMap['user_uid']])) truckTimelineChanged = true;
+        });
+    }
 
-    if (newlyAddedUids.length > 0 || modifiedUids.size > 0) {
-        let pName = "an event";
-        let indexData = sheets.index.getDataRange().getValues();
-        let iMap = {}; if(indexData.length > 0) indexData[0].forEach((h,i)=>iMap[h.toString().trim()]=i);
-        for(let i=1; i<indexData.length; i++) { if(indexData[i][iMap['uid']] === folderId) { pName = indexData[i][iMap['Project_Name']]; break; } }
-        
-        let nowIso = new Date().toISOString();
-        
-        newlyAddedUids.forEach(uid => {
+    let removedUids = oldUids.filter(e => e && !newUids.includes(e) && !isTruckShiftUid_(e));
+
+    let pMeta = getProjectMeta_(folderId, sheets);
+    let pName = pMeta.name || 'an event';
+    let nowIso = new Date().toISOString();
+    let notifBatch = false;
+
+    newlyAddedUids.forEach(uid => {
+        notifBatch = true;
+        let r = new Array(5).fill("");
+        r[0] = Utilities.getUuid(); r[1] = uid;
+        r[2] = `📅 You were assigned to: ${pName}`;
+        r[3] = false; r[4] = nowIso;
+        sheets.notifs.appendRow(r);
+    });
+
+    removedUids.forEach(uid => {
+        notifBatch = true;
+        let r = new Array(5).fill("");
+        r[0] = Utilities.getUuid(); r[1] = uid;
+        r[2] = `📤 You were removed from: ${pName}`;
+        r[3] = false; r[4] = nowIso;
+        sheets.notifs.appendRow(r);
+    });
+
+    modifiedUids.forEach(uid => {
+        notifBatch = true;
+        let r = new Array(5).fill("");
+        r[0] = Utilities.getUuid(); r[1] = uid;
+        r[2] = `⏰ Your shift changed for: ${pName}`;
+        r[3] = false; r[4] = nowIso;
+        sheets.notifs.appendRow(r);
+    });
+
+    if (truckTimelineChanged) {
+        const crewOnEvent = getProjectCrewIdentifiers_(folderId, sheets);
+        const truckMsg = `🚚 Truck schedule updated for: ${pName}`;
+        crewOnEvent.forEach(function(uid) {
+            notifBatch = true;
             let r = new Array(5).fill("");
             r[0] = Utilities.getUuid(); r[1] = uid;
-            r[2] = `📅 You were added to the schedule for: ${pName}`;
+            r[2] = truckMsg;
             r[3] = false; r[4] = nowIso;
             sheets.notifs.appendRow(r);
         });
-        
-        modifiedUids.forEach(uid => {
-            let r = new Array(5).fill("");
-            r[0] = Utilities.getUuid(); r[1] = uid;
-            r[2] = `⏰ Your shift time was changed for: ${pName}`;
-            r[3] = false; r[4] = nowIso;
-            sheets.notifs.appendRow(r);
-        });
+    }
 
+    if (notifBatch) {
         try {
             if (newlyAddedUids.length > 0) {
-                dispatchPushToIdentifiers(
-                    newlyAddedUids,
-                    'Schedule update',
-                    'You were added to: ' + pName,
-                    getShowrunnerHostingLink_(),
-                    actor
-                );
+                dispatchPushToIdentifiers(newlyAddedUids, 'Assigned to event', 'You were assigned to: ' + pName, getShowrunnerHostingLink_(), actor);
+            }
+            if (removedUids.length > 0) {
+                dispatchPushToIdentifiers(removedUids, 'Removed from event', 'You were removed from: ' + pName, getShowrunnerHostingLink_(), actor);
             }
             if (modifiedUids.size > 0) {
-                dispatchPushToIdentifiers(
-                    Array.from(modifiedUids),
-                    'Shift time changed',
-                    'Your shift was updated for: ' + pName,
-                    getShowrunnerHostingLink_(),
-                    actor
-                );
+                dispatchPushToIdentifiers(Array.from(modifiedUids), 'Shift changed', 'Your shift was updated for: ' + pName, getShowrunnerHostingLink_(), actor);
+            }
+            if (truckTimelineChanged) {
+                const crewOnEvent = getProjectCrewIdentifiers_(folderId, sheets);
+                dispatchPushToIdentifiers(crewOnEvent, 'Truck schedule', 'Truck timeline updated for: ' + pName, getShowrunnerHostingLink_(), actor);
             }
         } catch (pushErr) { /* in-app notifs saved */ }
     }

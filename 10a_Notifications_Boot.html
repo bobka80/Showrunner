@@ -206,6 +206,11 @@
     if (ev.data.type === 'SHOWRUNNER_PUSH_STATE') {
       updatePushStatusMirror(ev.data.needsAttention, ev.data.message);
     }
+    if (ev.data.type === 'SHOWRUNNER_FOREGROUND_PUSH') {
+      if (typeof window.prependForegroundNotification === 'function') {
+        window.prependForegroundNotification(ev.data.title, ev.data.body, ev.data.link);
+      }
+    }
   });
 
   function bootBridge() {

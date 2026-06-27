@@ -201,6 +201,7 @@ function openMobileNotifs() {
 }
 
 function renderMobileDashboard(payload) {
+    if (payload && payload.managerConfig) globalManagerConfig = payload.managerConfig;
     let html = '';
     let sorted = [];
     if (payload.projects && payload.projects.length > 0) {
@@ -219,14 +220,16 @@ function renderMobileDashboard(payload) {
             let dateStr = p.start ? new Date(p.start).toLocaleDateString() : 'No Date';
             
             let rules = (typeof globalManagerConfig !== 'undefined' && globalManagerConfig.rules) ? globalManagerConfig.rules : [];
-            let totalRules = rules.length;
             let pbHtml = '';
-            if (totalRules > 0) {
+            const pctInfo = (typeof calcProjectChecklistPct === 'function') ? calcProjectChecklistPct(p.checklistState || {}) : null;
+            if (pctInfo) {
+                pbHtml = `<div style="width: 100%; height: 4px; background: rgba(0,0,0,0.5); border-radius: 2px; overflow: hidden; margin-top: 10px;"><div style="height: 100%; width: ${Math.round(pctInfo.pct)}%; background: ${pctInfo.pbColor};"></div></div>`;
+            } else if (rules.length > 0) {
                 let state = p.checklistState || {};
                 if (typeof state === 'string') { try { state = JSON.parse(state); } catch(e) { state = {}; } }
                 let checkedCount = 0;
                 rules.forEach(r => { if(state[r.taskName] && state[r.taskName].checked) checkedCount++; });
-                let pct = (checkedCount / totalRules) * 100;
+                let pct = (checkedCount / rules.length) * 100;
                 let pbColor = '#52525b';
                 if (pct > 0 && pct < 100) pbColor = '#3b82f6';
                 if (pct === 100) pbColor = '#10b981';

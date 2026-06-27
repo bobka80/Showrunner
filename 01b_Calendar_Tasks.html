@@ -70,6 +70,47 @@ function renderTasksAndNotifs(payload) {
 }
 
 // Notification Interaction Controls
+function showNotifToast(title, body) {
+    var existing = document.getElementById('sr-notif-toast');
+    if (existing) existing.remove();
+    var el = document.createElement('div');
+    el.id = 'sr-notif-toast';
+    el.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:999999;max-width:92vw;width:360px;background:#18181b;border:1px solid #10b981;border-radius:8px;padding:12px 16px;box-shadow:0 12px 40px rgba(0,0,0,0.75);transition:opacity 0.25s;';
+    var safeTitle = typeof escapeHTML === 'function' ? escapeHTML(title || 'Showrunner') : String(title || 'Showrunner');
+    var safeBody = typeof escapeHTML === 'function' ? escapeHTML(body || '') : String(body || '');
+    el.innerHTML = '<div style="color:#10b981;font-size:10px;font-weight:900;letter-spacing:0.5px;margin-bottom:4px;">NOTIFICATION</div>'
+        + '<div style="color:#fff;font-size:14px;font-weight:800;margin-bottom:4px;">' + safeTitle + '</div>'
+        + (safeBody ? '<div style="color:#a1a1aa;font-size:12px;line-height:1.4;">' + safeBody + '</div>' : '');
+    document.body.appendChild(el);
+    setTimeout(function() {
+        el.style.opacity = '0';
+        setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+    }, 4500);
+}
+
+window.prependForegroundNotification = function(title, body, link) {
+    var msg = body || title || 'New notification';
+    var fakeId = 'fg-' + Date.now();
+    var dateStr = new Date().toLocaleDateString();
+    var safeMsg = typeof escapeHTML === 'function' ? escapeHTML(msg) : String(msg).replace(/</g, '&lt;');
+    var cardHtml = '<div id="notif-card-' + fakeId + '" data-read="false" onclick="markNotifReadLocally(\'' + fakeId + '\')" style="background:rgba(244, 63, 94, 0.1); border:1px solid #f43f5e; padding:10px; border-radius:6px; position:relative; cursor:pointer; margin-bottom:8px;">'
+        + '<div style="font-size:13px; color:#fff; margin-bottom:6px; pointer-events:none;">' + safeMsg + '</div>'
+        + '<div style="font-size:11px; color:#888; pointer-events:none;">' + dateStr + ' · just now</div></div>';
+
+    var list = document.getElementById('notif-dropdown-list');
+    if (list) {
+        if (list.children.length === 1 && list.textContent.indexOf('All caught up') !== -1) list.innerHTML = '';
+        list.insertAdjacentHTML('afterbegin', cardHtml);
+    }
+    var mList = document.getElementById('mobile-notifs-container');
+    if (mList) {
+        if (mList.children.length === 1 && mList.textContent.indexOf('All caught up') !== -1) mList.innerHTML = '';
+        mList.insertAdjacentHTML('afterbegin', cardHtml.replace(/padding:10px/g, 'padding:15px').replace(/font-size:13px/g, 'font-size:14px'));
+    }
+    updateBadgeLocally();
+    showNotifToast(title || 'Showrunner', body || msg);
+};
+
 function openNotifDrawer() {
     let wrapper = document.getElementById('notif-drawer-wrapper');
     if (wrapper) wrapper.style.display = 'flex';

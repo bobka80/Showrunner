@@ -898,4 +898,61 @@ if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('ROOT')) {
     .withSuccessHandler(showGlobalBackupHealthBanner)
     .getDatabaseBackupHealth(ACTIVE_USER_NAME);
 }
+
+window.calcProjectChecklistPct = function(checklistState) {
+  const rules = (typeof globalManagerConfig !== 'undefined' && globalManagerConfig.rules) ? globalManagerConfig.rules : [];
+  if (!rules.length) return null;
+  let state = checklistState || {};
+  if (typeof state === 'string') { try { state = JSON.parse(state); } catch (e) { state = {}; } }
+  let checkedCount = 0;
+  rules.forEach(function(r) { if (state[r.taskName] && state[r.taskName].checked) checkedCount++; });
+  const pct = (checkedCount / rules.length) * 100;
+  let pbColor = '#52525b';
+  if (pct > 0 && pct < 100) pbColor = '#3b82f6';
+  if (pct === 100) pbColor = '#10b981';
+  return { pct: pct, checkedCount: checkedCount, totalRules: rules.length, pbColor: pbColor };
+};
+
+window.updateProjectChecklistBar = function(projectId, checklistState) {
+  const host = document.getElementById('pe-checklist-status-bar');
+  if (!host) return;
+  const info = window.calcProjectChecklistPct(checklistState);
+  if (!info) {
+    host.style.display = 'none';
+    host.innerHTML = '';
+    return;
+  }
+  host.style.display = 'flex';
+  const canOpen = projectId && projectId !== 'NEW' && typeof openChecklistModal === 'function';
+  const pctRound = Math.round(info.pct);
+  host.innerHTML = '<div style="flex:1; min-width:0;">'
+    + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">'
+    + '<span style="color:#a1a1aa; font-size:10px; font-weight:900; letter-spacing:0.5px;">PROJECT STATUS</span>'
+    + '<span style="color:#fff; font-size:11px; font-weight:900;">' + pctRound + '%</span>'
+    + '</div>'
+    + '<div style="width:100%; height:8px; background:rgba(0,0,0,0.5); border:1px solid #333; border-radius:4px; overflow:hidden;">'
+    + '<div style="height:100%; width:' + pctRound + '%; background:' + info.pbColor + '; transition:width 0.3s;"></div>'
+    + '</div>'
+    + '<div style="font-size:10px; color:#71717a; margin-top:4px;">' + info.checkedCount + ' / ' + info.totalRules + ' checklist items</div>'
+    + '</div>'
+    + (canOpen ? '<button type="button" class="btn-outline btn-sm" style="margin:0; flex-shrink:0; align-self:center;" onclick="openChecklistModal(\'' + String(projectId).replace(/'/g, "\\'") + '\', event)">OPEN</button>' : '');
+};
+
+window.updateMobileChecklistBar = function(hostId, checklistState) {
+  const host = document.getElementById(hostId);
+  if (!host) return;
+  const info = window.calcProjectChecklistPct(checklistState);
+  if (!info) {
+    host.style.display = 'none';
+    host.innerHTML = '';
+    return;
+  }
+  host.style.display = 'block';
+  const pctRound = Math.round(info.pct);
+  host.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">'
+    + '<span style="color:#71717a; font-size:10px; font-weight:800;">STATUS</span>'
+    + '<span style="color:#fff; font-size:10px; font-weight:900;">' + pctRound + '%</span></div>'
+    + '<div style="width:100%; height:4px; background:rgba(0,0,0,0.5); border-radius:2px; overflow:hidden;">'
+    + '<div style="height:100%; width:' + pctRound + '%; background:' + info.pbColor + ';"></div></div>';
+};
 </script>

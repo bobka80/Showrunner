@@ -752,10 +752,15 @@ function toggleChecklistItem(projectId, ruleIdx, isChecked) {
       chk.disabled = false;
       
       let ev = calendar.getEventById(projectId);
+      let parsedState = JSON.parse(newStateStr);
       if (ev) {
           let raw = ev.extendedProps.rawDbData;
-          raw.checklistState = JSON.parse(newStateStr);
-          ev.setExtendedProp('rawDbData', raw); 
+          raw.checklistState = parsedState;
+          ev.setExtendedProp('rawDbData', raw);
+      }
+      if (typeof updateProjectChecklistBar === 'function') updateProjectChecklistBar(projectId, parsedState);
+      if (typeof updateMobileChecklistBar === 'function' && window.mobileCrewHubProjectId === projectId) {
+          updateMobileChecklistBar('mch-checklist-bar', parsedState);
       }
   })
   .processChecklistAction(projectId, rule.taskName, rule.srcFolderName, rule.searchString, rule.suffix, rule.destFolderName, isChecked, ACTIVE_USER_NAME);

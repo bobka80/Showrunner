@@ -12,6 +12,7 @@
                 <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
                 <span class="mch-badge" id="mch-region-badge">IN SOFIA</span>
             </div>
+            <div id="mch-checklist-bar" style="display:none; margin-top:8px;"></div>
             <div class="mch-location" id="mch-location"></div>
         </div>
     </div>
@@ -299,6 +300,7 @@ window.openMobileCrewHub = function(pId) {
     document.getElementById('mch-title').innerText = p.title || p.fullTitle || 'Project';
     document.getElementById('mch-type-badge').innerText = String(p.type || 'Event').toUpperCase();
     applyMobileHubStatusStyle(p.status);
+    if (typeof updateMobileChecklistBar === 'function') updateMobileChecklistBar('mch-checklist-bar', p.checklistState || {});
 
     const loc = (p.locationUrl || '').trim();
     const locEl = document.getElementById('mch-location');

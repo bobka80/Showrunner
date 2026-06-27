@@ -123,6 +123,13 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     if (typeof flushCache !== 'undefined') flushCache();
     SpreadsheetApp.flush();
     writeToAuditLog(actor, isNewProject ? "CREATE" : "UPDATE", "PROJECTS", projectId, projectId, `Saved project data & ${timelinesArray ? timelinesArray.length : 0} timeline fragment(s).`);
+
+    if (isNewProject) {
+      try {
+        notifyNewEventCreated_(projectId, projectData.Project_Name || 'Unnamed Event', projectData.Type || 'Event', actor, sheets);
+      } catch (nErr) { /* project saved */ }
+    }
+
     return JSON.stringify({ id: projectId, timestamp: newTimestamp });
   });
 }
@@ -274,9 +281,15 @@ function setProjectStatus(projectId, status, actor = "System UI") {
     if(indexData.length > 0) indexData[0].forEach((h,i)=>map[h.toString().trim()]=i);
     for (let i = 1; i < indexData.length; i++) {
       if (indexData[i][map['uid']] === projectId) {
+        const pName = indexData[i][map['Project_Name']] || 'an event';
         sheets.index.getRange(i + 1, map['Status'] + 1).setValue(status);
         if (typeof flushCache !== 'undefined') flushCache();
         writeToAuditLog(actor, "UPDATE", "PROJECTS", projectId, projectId, `Changed status to: ${status}`);
+        if (String(status).toUpperCase() === 'CANCELLED') {
+          try {
+            notifyEventCancelled_(projectId, pName, actor, sheets);
+          } catch (nErr) { /* status saved */ }
+        }
         return "Success";
       }
     }
