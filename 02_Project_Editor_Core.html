@@ -240,17 +240,7 @@ function triggerPrint() {
 }
 
 window.toggleDistanceInput = function() {
-    const inSofiaEl = document.getElementById('edit-proj-in-sofia');
-    const inSofia = inSofiaEl ? inSofiaEl.checked : true;
-    const distCont = document.getElementById('edit-proj-distance-container');
-    const locCol = document.querySelector('.pe-location-col');
-    if (distCont) {
-        distCont.style.display = inSofia ? 'none' : 'flex';
-    }
-    if (locCol) {
-        locCol.classList.toggle('pe-location-col--in-sofia', inSofia);
-    }
-    if (typeof window.updateLocationRegionLabel === 'function') window.updateLocationRegionLabel();
+    window.applyProjectDistanceFieldVisibility();
 };
 
 // @INDEX: PROJECT_CRUD -> Schedule Save & Sync
