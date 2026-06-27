@@ -14,14 +14,18 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '310';
+  const SW_BUILD = '316';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
   let pushStarted = false;
   let foregroundHandlerRegistered = false;
+  let pushLinkInFlight = false;
+  let lastAccountLinkAt = 0;
+  const PUSH_OK_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
   function showLocalPushNotification(payload) {
+    if (document.hidden) return;
     var n = (payload && payload.notification) || {};
     var d = (payload && payload.data) || {};
     var title = n.title || d.title || 'Showrunner';
@@ -31,7 +35,8 @@
       new Notification(title, {
         body: body,
         icon: '/icon-192.png',
-        tag: 'showrunner-' + Date.now()
+        tag: 'showrunner-push',
+        renotify: true
       });
     } catch (e) {
       logPush('foreground notification failed: ' + ((e && e.message) || e));
@@ -317,16 +322,33 @@
     } catch (e) { /* ignore */ }
   }
 
+  function readPushOkLocal(crewName, token) {
+    try {
+      var cached = JSON.parse(localStorage.getItem('sr_push_ok') || 'null');
+      if (!cached || cached.crew !== crewName) return null;
+      if (token && cached.prefix && cached.prefix !== String(token).slice(0, 12)) return null;
+      if (!cached.verifiedAt || (Date.now() - cached.verifiedAt) > PUSH_OK_MAX_AGE_MS) return null;
+      return cached;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function restorePushStateFromLocal(crewName) {
+    if (!crewName || !fcmToken) return false;
+    var cached = readPushOkLocal(crewName, fcmToken);
+    if (!cached) return false;
+    serverSaveConfirmed = true;
+    showPushSavedCompact();
+    return true;
+  }
+
   function checkPushRegisteredOnServer(crewName) {
     return new Promise(function(resolve) {
       if (!fcmToken || !crewName) return resolve(false);
       var prefix = fcmToken.slice(0, 12);
-      try {
-        var cached = JSON.parse(localStorage.getItem('sr_push_ok') || 'null');
-        if (cached && cached.crew === crewName && cached.prefix === prefix && cached.verifiedAt) {
-          if ((Date.now() - cached.verifiedAt) < 86400000) return resolve(true);
-        }
-      } catch (e) { /* server check */ }
+      var cached = readPushOkLocal(crewName, fcmToken);
+      if (cached) return resolve(true);
       var cb = '__srFcmPing_' + Date.now();
       var url = getRegisterBaseUrl()
         + '?action=fcmping'
@@ -348,38 +370,49 @@
         if (done) return;
         done = true;
         delete window[cb];
-        resolve(false);
+        resolve(!!readPushOkLocal(crewName, fcmToken));
       };
       document.head.appendChild(script);
       setTimeout(function() {
         if (done) return;
         done = true;
         delete window[cb];
-        resolve(false);
+        resolve(!!readPushOkLocal(crewName, fcmToken));
       }, 8000);
     });
   }
 
   async function linkPushToAccountOrSkip(crewName) {
     if (!fcmToken || !crewName) return false;
-    if (await checkPushRegisteredOnServer(crewName)) {
-      logPush('push already registered — skip setup');
-      serverSaveConfirmed = true;
-      stopRegistrationLoop();
-      stopTokenBroadcast();
+    if (serverSaveConfirmed) {
       showPushSavedCompact();
       return true;
     }
-    logPush('token ready — auto-linking');
-    setDockMessage('Saving alerts through Showrunner…');
-    setDockStatus(['Step 1: token OK', 'Step 2: saving via app…']);
-    notifyIframePushState(true, 'Setting up alerts — keep the calendar visible below.');
-    broadcastTokenToIframe();
-    startTokenBroadcastUntilAck();
-    requestFcmAuthFromIframe();
-    trySaveTokenViaRegKey();
-    startRegistrationLoop();
-    return true;
+    if (restorePushStateFromLocal(crewName)) return true;
+    if (pushLinkInFlight) return true;
+    pushLinkInFlight = true;
+    try {
+      if (await checkPushRegisteredOnServer(crewName)) {
+        logPush('push already registered — skip setup');
+        serverSaveConfirmed = true;
+        stopRegistrationLoop();
+        stopTokenBroadcast();
+        showPushSavedCompact();
+        return true;
+      }
+      logPush('token ready — auto-linking');
+      setDockMessage('Saving alerts through Showrunner…');
+      setDockStatus(['Step 1: token OK', 'Step 2: saving via app…']);
+      notifyIframePushState(true, 'Setting up alerts — keep the calendar visible below.');
+      broadcastTokenToIframe();
+      startTokenBroadcastUntilAck();
+      requestFcmAuthFromIframe();
+      trySaveTokenViaRegKey();
+      startRegistrationLoop();
+      return true;
+    } finally {
+      pushLinkInFlight = false;
+    }
   }
 
   function notifyIframeRegistered(success, message) {
@@ -519,8 +552,8 @@
         return;
       }
       broadcastTokenToIframe();
-    }, 3000);
-    setTimeout(function() { stopTokenBroadcast(); }, 300000);
+    }, 5000);
+    setTimeout(function() { stopTokenBroadcast(); }, 120000);
   }
 
   function startRegistrationLoop() {
@@ -563,6 +596,7 @@
         regKeyFailCount = 0;
         stopRegistrationLoop();
         stopTokenBroadcast();
+        markPushOkLocal(lastCrewName, fcmToken);
         setDockStatus(['Step 3: SAVED', (res.deviceCount || 1) + ' device(s)', res.labels || '']);
         showPushSavedCompact();
         notifyIframeRegistered(true, 'Alerts linked to your account.');
@@ -598,6 +632,7 @@
       if (res && res.success) {
         regKeyFailCount = 0;
         logPush('server accepted token');
+        markPushOkLocal(lastCrewName, fcmToken);
         setDockStatus(['Step 2: server accepted', 'Step 3: verifying…']);
         verifySaveOnServer(regKey);
       } else {
@@ -655,6 +690,7 @@
         regKeyFailCount = 0;
         stopRegistrationLoop();
         stopTokenBroadcast();
+        markPushOkLocal(lastCrewName, fcmToken);
         logPush('token saved via bridge');
         setDockStatus(['Step 3: SAVED', 'alerts linked']);
         showPushSavedCompact();
@@ -672,9 +708,13 @@
 
   function onAccountLink(auth) {
     if (!auth || !auth.crewName) return;
+    var now = Date.now();
+    if (serverSaveConfirmed && auth.crewName === lastCrewName) return;
+    if (now - lastAccountLinkAt < 2000 && auth.crewName === lastCrewName) return;
+    lastAccountLinkAt = now;
     iframeLoggedIn = true;
     iframeLinkError = '';
-    lastSessionPing = Date.now();
+    lastSessionPing = now;
     lastCrewName = auth.crewName;
     if (auth.regKey) {
       storeParentAuth(auth);
@@ -689,6 +729,7 @@
       }
       return;
     }
+    if (restorePushStateFromLocal(auth.crewName || lastCrewName)) return;
     linkPushToAccountOrSkip(auth.crewName || lastCrewName);
   }
 
@@ -730,6 +771,7 @@
       }
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
+      if (lastCrewName && fcmToken) markPushOkLocal(lastCrewName, fcmToken);
       setDockStatus(['Step 3: SAVED', 'alerts linked to your account']);
       showPushSavedCompact();
     }
@@ -756,12 +798,25 @@
   if (frame) {
     frame.addEventListener('load', function() {
       burstRequestAuthFromIframe();
+      if (serverSaveConfirmed) return;
       if (fcmToken) {
         broadcastTokenToIframe();
-        trySaveTokenViaRegKey();
+        if (!readPushOkLocal(lastCrewName, fcmToken)) trySaveTokenViaRegKey();
       }
     });
   }
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    if (!fcmToken || !lastCrewName) return;
+    if (serverSaveConfirmed || restorePushStateFromLocal(lastCrewName)) return;
+    checkPushRegisteredOnServer(lastCrewName).then(function(ok) {
+      if (ok) {
+        serverSaveConfirmed = true;
+        showPushSavedCompact();
+      }
+    });
+  });
 
   async function deepResetPush() {
     if (messaging) {

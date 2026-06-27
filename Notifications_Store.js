@@ -324,9 +324,17 @@ function registerFcmToken(crewName, token, deviceLabel, actor, deviceMeta) {
     const now = new Date().toISOString();
     const label = deviceLabel || 'web';
 
-    // One active token per label (phone resets mint new FCM tokens — replace, don't stack).
+    // One active token per label; also collapse other mobile/PWA slots (prevents duplicate pushes).
+    const mobileLabels = { 'pwa-mobile': 1, 'web-mobile': 1, 'web-hosting': 1 };
+    const isMobileLabel = !!mobileLabels[label];
     for (let i = devices.length - 1; i >= 0; i--) {
-      if (devices[i].label === label && devices[i].token !== cleanToken) {
+      const d = devices[i];
+      if (!d) continue;
+      if (d.label === label && d.token !== cleanToken) {
+        devices.splice(i, 1);
+        continue;
+      }
+      if (isMobileLabel && mobileLabels[d.label] && d.token !== cleanToken) {
         devices.splice(i, 1);
       }
     }

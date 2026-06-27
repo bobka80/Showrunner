@@ -114,13 +114,10 @@ function sendFcmToTokens_(tokens, title, body, linkUrl, options) {
   list.forEach(function(token) {
     const safeTitle = String(title || 'Showrunner');
     const safeBody = String(body || '');
+    // Data-only web push — avoids browser auto-display + SW/handler double notification.
     const payload = {
       message: {
         token: token,
-        notification: {
-          title: safeTitle,
-          body: safeBody
-        },
         data: {
           title: safeTitle,
           body: safeBody,
@@ -130,11 +127,6 @@ function sendFcmToTokens_(tokens, title, body, linkUrl, options) {
           headers: {
             Urgency: 'high',
             TTL: '86400'
-          },
-          notification: {
-            title: safeTitle,
-            body: safeBody,
-            icon: iconUrl
           },
           fcmOptions: { link: clickLink }
         }

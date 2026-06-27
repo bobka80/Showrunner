@@ -221,10 +221,9 @@
   }
 
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible' && !pushLinked) {
-      respondToParentPushRequest();
-      requestTokenFromHosting();
-    }
+    if (document.visibilityState !== 'visible' || pushLinked) return;
+    respondToParentPushRequest();
+    requestTokenFromHosting();
   });
 
   var metaBroadcast = setInterval(function() {
@@ -233,8 +232,7 @@
       return;
     }
     pushSessionToParent();
-    requestTokenFromHosting();
-  }, 1500);
+  }, 8000);
 
   setTimeout(function() { clearInterval(metaBroadcast); }, 600000);
 
