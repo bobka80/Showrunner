@@ -108,6 +108,61 @@ function escapePushJs(s) {
   return String(s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
+function pushColorTag(label, color) {
+  return '<span style="color:' + color + '; font-weight:800;">' + escapePushHtml(label) + '</span>';
+}
+
+function colorForFormFactor(d) {
+  var ff = String(d.formFactor || '').toLowerCase();
+  if (ff === 'mobile') return '#38bdf8';
+  if (ff === 'desktop') return '#c084fc';
+  var lab = String(d.label || '').toLowerCase();
+  if (lab.indexOf('mobile') !== -1 || lab.indexOf('pwa-mobile') !== -1) return '#38bdf8';
+  return '#c084fc';
+}
+
+function colorForBrowser(browser) {
+  var b = String(browser || '');
+  if (b === 'Chrome') return '#4ade80';
+  if (b === 'Safari') return '#fb923c';
+  if (b === 'Edge') return '#60a5fa';
+  if (b === 'Firefox') return '#f87171';
+  if (b === 'Samsung Internet') return '#818cf8';
+  return '#a1a1aa';
+}
+
+function renderDeviceInfoHtml(d) {
+  var parts = [];
+  var name = escapePushHtml(d.ownerCrewName || d.crewName || 'Unknown');
+  parts.push('<span style="color:#fff; font-weight:800;">' + name + '</span>');
+
+  var factor = '';
+  if (d.formFactor === 'mobile') factor = 'Mobile';
+  else if (d.formFactor === 'desktop') factor = 'Desktop';
+  else {
+    var lab = String(d.label || '').toLowerCase();
+    if (lab.indexOf('mobile') !== -1) factor = 'Mobile';
+    else if (lab.indexOf('desktop') !== -1) factor = 'Desktop';
+  }
+  if (factor) parts.push(pushColorTag(factor, colorForFormFactor(d)));
+
+  var platform = String(d.platform || '');
+  if (platform && platform !== 'Mobile' && platform !== 'Desktop' && platform !== 'Phone') {
+    parts.push('<span style="color:#a1a1aa; font-weight:700;">' + escapePushHtml(platform) + '</span>');
+  } else if (factor === 'Mobile' && (!platform || platform === 'Mobile' || platform === 'Phone')) {
+    parts.push('<span style="color:#a1a1aa; font-weight:700;">Phone</span>');
+  }
+
+  if (d.browser) parts.push(pushColorTag(d.browser, colorForBrowser(d.browser)));
+
+  if (d.delivery) {
+    parts.push('<span style="color:#71717a; font-weight:700;">' + escapePushHtml(d.delivery) + '</span>');
+  }
+
+  var dot = '<span style="color:#52525b; font-weight:400; padding:0 3px;">·</span>';
+  return parts.join(dot);
+}
+
 function renderPushDeviceList(devices) {
   var list = document.getElementById('push-device-list');
   if (!list) return;
@@ -119,13 +174,14 @@ function renderPushDeviceList(devices) {
   var html = '';
   devices.forEach(function(d) {
     var when = d.updatedAt ? d.updatedAt.slice(0, 16).replace('T', ' ') : '—';
-    var summary = escapePushHtml(d.displaySummary || d.label || 'Device');
+    var infoHtml = renderDeviceInfoHtml(d);
+    var plainTitle = escapePushHtml(d.displaySummary || d.label || 'Device');
     var hint = escapePushHtml(d.tokenHint || d.tokenKey || '');
     var key = escapePushHtml(d.tokenKey || '');
     var owner = escapePushJs(d.ownerCrewName || d.crewName || '');
     html += '<div style="display:flex; align-items:center; gap:10px; padding:10px 12px; min-height:44px; background:#1a1a1e; border:1px solid #333; border-radius:6px;">'
       + '<div style="flex:1; min-width:0; display:flex; align-items:center; gap:12px; overflow:hidden;">'
-      + '<span style="flex:1; min-width:0; color:#fff; font-weight:800; ' + rowFont + ' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + summary + '">' + summary + '</span>'
+      + '<span style="flex:1; min-width:0; font-weight:800; ' + rowFont + ' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + plainTitle + '">' + infoHtml + '</span>'
       + '<span style="color:#71717a; ' + rowFont + ' white-space:nowrap; flex-shrink:0;">' + when + '</span>'
       + '<span style="color:#52525b; font-size:10px; font-family:monospace; white-space:nowrap; flex-shrink:0;">' + hint + '</span>'
       + '</div>'
