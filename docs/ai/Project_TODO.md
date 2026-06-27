@@ -1,5 +1,19 @@
 # SM Showrunner - Master Feature Roadmap
 
+## Mobile Crew Field UX (v314 — 2026-06-26) ✅
+
+- [x] `Styles_Mobile.html` — extracted `@media 768px` rules from `Styles.html`
+- [x] Crew Hub (`01e`) — phase rail, weather, my shift, timeline/assets/cancel
+- [x] Phase Rail (`01f`) — deconstructed mini calendar from `fragments`
+- [x] Mobile Tasks (`01g`) — MY TASKS in Command Center
+- [x] Compact Project Assets (`01h`) — assigned-only + detail sheet
+- [x] Timeline zoom (`03f`) — overview slider + MY ROW
+- [x] Docs: [MOBILE_CREW_UX.md](MOBILE_CREW_UX.md)
+
+**Next after mobile sign-off:** real push notification delivery polish (see NOTIFICATIONS section below).
+
+---
+
 ## Phase 1: Financials Engine & Quoting (Offer Window)
 - [ ] **Equipment Price Editing:** Render assigned assets (hiding zero-price and consumable items) with editable line-item rental prices in the `[OFFER]` tab.
 - [ ] **Labor & Fleet Integration:** Wire the newly added `Day_Rate` and `Hourly_Rate` columns from the Timeline database directly into the financial quote.
@@ -106,8 +120,6 @@
 FCM + batch sends are **not** the bottleneck at this scale. Risks are **email limits**, **polling**, and **alert spam** — avoided by event-driven batch design above.
 
 *(Consolidates earlier scattered notification bullets in Phases 2 and 5.)*
-
----
 
 ## Database Operations (Root Settings Tab)
 

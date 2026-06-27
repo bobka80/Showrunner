@@ -53,6 +53,7 @@ Structural UI (buttons, modals, hubs — not Visual Settings): **[UI Doctrine](d
 | [GLOSSARY.md](docs/ai/GLOSSARY.md) | Magic strings (`Standalone`, `[SHORT]`, `Auto-Container`, CLI patterns) |
 | [ARCHITECTURE.md](docs/ai/ARCHITECTURE.md) | Optimistic healing, formula engine, build pipeline, Drive sync, RBAC |
 | [FILE_MAP.md](docs/ai/FILE_MAP.md) | Index of all `0X_...html` components and `@INDEX:` markers |
+| [MOBILE_CREW_UX.md](docs/ai/MOBILE_CREW_UX.md) | **Mobile crew field UX** — Crew Hub, phase rail, compact assets, timeline zoom |
 | [File_Splitting_Guide.md](docs/ai/File_Splitting_Guide.md) | Protocol for chopping large UI files safely |
 | [Project_TODO.md](docs/ai/Project_TODO.md) | Master feature roadmap — maintain per Doctrine rules 2 and 3 |
 | [ENGINEERING_RULES.md](docs/ai/ENGINEERING_RULES.md) | Deep engineering mandates (UID, audit, financials prep) |

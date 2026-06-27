@@ -1,0 +1,98 @@
+<script>
+/**
+ * 03f_Timeline_Mobile.html
+ * Mobile timeline zoom — bird's-eye overview, slider to detail.
+ * @INDEX: MOBILE -> Timeline Zoom
+ */
+
+window.mobileTimelineZoom = 0.38;
+
+function ensureMobileTimelineZoomBar() {
+    if (document.getElementById('tt-mobile-zoom-bar')) return;
+    const layer = document.getElementById('shift-layer');
+    if (!layer) return;
+
+    const bar = document.createElement('div');
+    bar.id = 'tt-mobile-zoom-bar';
+    bar.innerHTML =
+        '<span style="font-size:10px;font-weight:900;color:#a855f7;white-space:nowrap;">ZOOM</span>' +
+        '<input type="range" id="tt-mobile-zoom-slider" min="25" max="100" value="38" oninput="setMobileTimelineZoom(this.value / 100)">' +
+        '<button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="setMobileTimelineZoom(0.38)">OVERVIEW</button>' +
+        '<button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="focusMobileMyShiftRow()">MY ROW</button>';
+    layer.insertBefore(bar, layer.firstChild);
+}
+
+window.setMobileTimelineZoom = function(scale) {
+    if (typeof isMobileViewport !== 'function' || !isMobileViewport()) return;
+    window.mobileTimelineZoom = Math.max(0.25, Math.min(1, scale));
+    const wrap = document.getElementById('tt-grid-wrap');
+    const axis = document.getElementById('tt-y-crew');
+    const layer = document.getElementById('shift-layer');
+    const z = window.mobileTimelineZoom;
+    if (wrap) {
+        wrap.style.transform = 'scale(' + z + ')';
+        wrap.style.transformOrigin = 'top left';
+        wrap.style.width = z < 1 ? (100 / z) + '%' : '';
+    }
+    if (axis) {
+        axis.style.transform = 'scale(' + z + ')';
+        axis.style.transformOrigin = 'top left';
+    }
+    if (layer) {
+        layer.classList.toggle('tt-zoom-overview', z < 0.55);
+        layer.classList.add('tt-mobile-zoom-active');
+    }
+    const slider = document.getElementById('tt-mobile-zoom-slider');
+    if (slider) slider.value = Math.round(z * 100);
+};
+
+window.focusMobileMyShiftRow = function() {
+    const myName = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? String(ACTIVE_USER_NAME).toLowerCase().trim() : '';
+    let target = null;
+    document.querySelectorAll('#tt-y-crew .tt-crew-row').forEach(function(row) {
+        const txt = (row.innerText || '').toLowerCase();
+        if (myName && txt.indexOf(myName) !== -1) target = row;
+    });
+    setMobileTimelineZoom(0.9);
+    if (target && target.scrollIntoView) {
+        setTimeout(function() { target.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 250);
+    }
+};
+
+window.initMobileTimelineZoom = function() {
+    if (typeof isMobileViewport !== 'function' || !isMobileViewport()) return;
+    ensureMobileTimelineZoomBar();
+    setMobileTimelineZoom(window.mobileTimelineZoom || 0.38);
+};
+
+(function hookTimelineGrid() {
+    const orig = window.rebuildTimelineGrid;
+    if (typeof orig !== 'function') return;
+    window.rebuildTimelineGrid = function() {
+        orig.apply(this, arguments);
+        setTimeout(function() {
+            if (document.getElementById('shift-layer') && document.getElementById('shift-layer').style.display !== 'none') {
+                initMobileTimelineZoom();
+            }
+        }, 80);
+    };
+})();
+
+(function hookTimelineClose() {
+    const orig = window.cancelShifts;
+    if (typeof orig !== 'function') return;
+    window.cancelShifts = function() {
+        const wrap = document.getElementById('tt-grid-wrap');
+        const axis = document.getElementById('tt-y-crew');
+        if (wrap) { wrap.style.transform = ''; wrap.style.width = ''; }
+        if (axis) axis.style.transform = '';
+        const layer = document.getElementById('shift-layer');
+        if (layer) layer.classList.remove('tt-zoom-overview', 'tt-mobile-zoom-active');
+        orig.apply(this, arguments);
+        if (window.mobileCrewHubProjectId && typeof isMobileViewport === 'function' && isMobileViewport()) {
+            document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
+        }
+    };
+})();
+
+</script>

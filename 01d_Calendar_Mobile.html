@@ -10,6 +10,7 @@
 // @INDEX: MOBILE -> Dashboard & Views
 
 function goMobileHome() {
+    if (typeof closeMobileCrewHub === 'function') closeMobileCrewHub();
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-home').style.display = 'flex';
     document.getElementById('mobile-back-btn').style.display = 'none';
@@ -216,7 +217,7 @@ function renderMobileDashboard(payload) {
             }
 
             html += `
-            <div class="project-card" style="border-left: 4px solid ${statusColor}; padding: 15px; margin-bottom: 10px;" onclick="triggerMobileEventClick('${p.id}')">
+            <div class="project-card" style="border-left: 4px solid ${statusColor}; padding: 15px; margin-bottom: 10px;" onclick="openMobileCrewHub('${p.id}')">
                 <div style="font-weight:900; font-size:16px; color:#fff; margin-bottom:4px;">${p.title}</div>
                 <div style="display:flex; justify-content:space-between; font-size:12px; color:#a1a1aa;">
                     <span>📅 ${dateStr}</span><span style="color:${statusColor}; font-weight:bold;">${p.status.toUpperCase()}</span>
@@ -249,56 +250,12 @@ function renderMobileDashboard(payload) {
 
     let badge = document.getElementById('mobile-notif-badge');
     if(badge) { if(unreadCount > 0) { badge.innerText = unreadCount; badge.style.display = 'inline-block'; } else badge.style.display = 'none'; }
+
+    if (typeof renderMobileTasksList === 'function') renderMobileTasksList();
 }
 
+/** @deprecated Use openMobileCrewHub — kept for any legacy callers */
 function triggerMobileEventClick(pId) {
-    let p;
-    try {
-        let phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
-        if (phantom && phantom.projects) p = phantom.projects.find(x => x.id === pId);
-    } catch(e) {}
-    
-    if (!p && calendar) {
-        let ev = calendar.getEventById(pId);
-        if (ev && ev.extendedProps) p = ev.extendedProps.rawDbData;
-    }
-
-    if (!p) return alert("Could not load event details.");
-
-    window.isProjectDirty = false;
-    window.activeProjectContext = pId;
-    if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
-
-    document.getElementById('edit-modal-overlay').style.display = 'flex';
-    document.getElementById('edit-folder-id').value = pId; 
-    document.getElementById('edit-proj-version').value = p.lastUpdated || '';
-    document.getElementById('edit-proj-name').value = p.title || p.fullTitle; 
-    
-    if (document.getElementById('edit-proj-date')) document.getElementById('edit-proj-date').value = p.start || '';
-    if (document.getElementById('edit-proj-end-date')) document.getElementById('edit-proj-end-date').value = p.end || p.start || '';
-    
-    let status = p.status || 'DRAFT';
-    document.getElementById('display-event-status').innerText = status.toUpperCase();
-    
-    let pType = p.type || 'Event';
-    document.getElementById('edit-proj-type').value = pType;
-    document.getElementById('display-event-type').innerText = pType.toUpperCase();
-    
-    if(document.getElementById('edit-proj-client')) document.getElementById('edit-proj-client').value = p.client || '';
-    if(document.getElementById('edit-proj-location')) document.getElementById('edit-proj-location').value = p.locationUrl || '';
-    
-    let rawStatus = String(status).toUpperCase();
-    if (rawStatus === 'CANCELLED' || rawStatus === 'TRASHED') document.getElementById('restore-project-btn').style.display = 'block';
-    else document.getElementById('restore-project-btn').style.display = 'none';
-    
-    if(document.getElementById('trash-dropdown')) document.getElementById('trash-dropdown').style.display = 'none';
-    if(document.getElementById('status-dropdown')) document.getElementById('status-dropdown').style.display = 'none';
-    if(document.getElementById('type-dropdown')) document.getElementById('type-dropdown').style.display = 'none';
-    
-    document.getElementById('edit-orig-title').innerText = "Project: " + (p.fullTitle || p.title);
-    
-    bootMiniCalendar(p.start, pId);
-    if (typeof startPresencePing === 'function') startPresencePing(pId);
-    if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
+    if (typeof openMobileCrewHub === 'function') openMobileCrewHub(pId);
 }
 </script>

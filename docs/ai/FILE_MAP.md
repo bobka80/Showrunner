@@ -26,6 +26,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits.
 - **`Security.js`**: Manages user authentication and extracts security profiles.
 - **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.
+- **`Styles_Mobile.html`**: Mobile-only CSS (`≤768px`) + crew hub / phase rail / timeline zoom / compact PA. Included after `Styles.html`.
 - **`07_Core_Globals.html`**: Centralized utility functions, live tag parsers, and the CSS theme engine initialization.
 - **`07b_Grid_Engine.html`**: The interactive Drag & Drop data grid core.
 - **`07c_Generalization_Engine.html`**: The Blueprint template engine.
@@ -47,7 +48,13 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`01a_Calendar_Core.html`**: Main dashboard boot sequence and FullCalendar configurations.
 - **`01b_Calendar_Tasks.html`**: Task rendering and notification engines.
 - **`01c_Calendar_Mini.html`**: The scoped Mini Calendar editor boot sequence.
-- **`01d_Calendar_Mobile.html`**: Mobile-specific calendar views and dashboards.
+- **`01d_Calendar_Mobile.html`**: Mobile Command Center (home, events, RFID, notifs).
+- **`01e_Mobile_Crew_Hub.html`**: Crew briefing screen on phone — replaces opening full project editor from events.
+- **`01f_Mobile_Phase_Rail.html`**: Deconstructed mini calendar (phase segments from `fragments`).
+- **`01g_Mobile_Tasks.html`**: MY TASKS view in Mobile Command Center.
+- **`01h_Mobile_Assets.html`**: Compact Project Assets on phone (`mobile-pa-compact`).
+
+**Mobile handoff doc:** [MOBILE_CREW_UX.md](MOBILE_CREW_UX.md)
 
 ## 5. The 02 Series: Project Editor & Logistics Hub
 - **`02_Project_Editor_Core.html`**: The presence engine heartbeat and core project schedule sync operations.
@@ -72,6 +79,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 
 ## 6. The 03 & 04 Series: Timelines & Crew
 - **`03a_Timeline_Boot.html`** to **`03e_Timeline_UX.html`**: The shift and phase drag-and-drop timeline builder.
+- **`03f_Timeline_Mobile.html`**: Mobile timeline zoom bar (overview / my row).
 - **`04_Month_Roster.html`**: The Master Month Roster matrix render loop.
 - **`04b_Equipment_Tracker.html`**: Global equipment timeline tracking and state fetching.
 

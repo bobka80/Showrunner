@@ -2,7 +2,7 @@
 
 **Authority:** All new structural UI in Showrunner MUST follow this document.  
 **Entry point:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md)  
-**Implementation:** `Styles.html` (compiled into `Index.html` via `build.js`)
+**Implementation:** `Styles.html` + `Styles_Mobile.html` (compiled into `Index.html` via `build.js`)
 
 ---
 
@@ -14,7 +14,7 @@
 | **Module Visual Settings** | Grid row height, font size, column widths, calendar event height, phase colors, timeline shift geometry | `06c_Admin_Visuals.html`, `getModuleVisualSettings` / `saveModuleVisualSettings`, `GridEngine` | **Do not hardcode or “normalize away”** — users tune per module |
 
 **Modules with visual settings (hands off):** `timeline`, `cal`, `mini`, `mr`, `asset`, `projectAsset`, `tracker`  
-**Also hands off:** mobile touch scale (`01d_Calendar_Mobile.html`), matrix micro-type inside data grids (10–11px in cells).
+**Mobile crew field UX:** `Styles_Mobile.html`, `01d`–`01h`, `03f` — see [MOBILE_CREW_UX.md](MOBILE_CREW_UX.md). Command Center touch scale stays in `01d`.
 
 ---
 

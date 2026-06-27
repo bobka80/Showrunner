@@ -1,0 +1,83 @@
+<!-- @INDEX: MOBILE -> Assets Detail Sheet -->
+<div id="mobile-pa-detail-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-weight:900;color:#fff;font-size:14px;" id="mobile-pa-detail-title">DETAIL</div>
+        <button class="btn-close" style="width:auto;margin:0;padding:8px 14px !important;" onclick="closeMobilePaDetail()">CLOSE</button>
+    </div>
+    <div id="mobile-pa-detail-body" style="font-size:13px;color:#d4d4d8;line-height:1.5;"></div>
+</div>
+
+<script>
+/**
+ * 01h_Mobile_Assets.html
+ * Compact Project Assets on phone — assigned list only, pack/checkout actions preserved.
+ * @INDEX: MOBILE -> Project Assets
+ */
+
+window.mobilePaCompactActive = false;
+
+window.openMobileProjectAssets = function(projectId) {
+    const pId = projectId || window.mobileCrewHubProjectId;
+    const p = resolveMobileProject(pId) || window.mobileCrewHubProject;
+    if (!pId || !p) return alert('Could not open equipment for this project.');
+
+    syncProjectEditorHiddenFields(p, pId);
+    document.body.classList.add('mobile-pa-compact');
+    window.mobilePaCompactActive = true;
+
+    document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
+
+    if (typeof openProjectAssetsModal === 'function') {
+        openProjectAssetsModal();
+    }
+};
+
+window.exitMobilePaCompactMode = function() {
+    document.body.classList.remove('mobile-pa-compact');
+    window.mobilePaCompactActive = false;
+    closeMobilePaDetail();
+};
+
+window.closeMobilePaDetail = function() {
+    const sheet = document.getElementById('mobile-pa-detail-sheet');
+    if (sheet) sheet.classList.remove('open');
+};
+
+window.showMobilePaDetail = function(title, bodyHtml) {
+    const sheet = document.getElementById('mobile-pa-detail-sheet');
+    const t = document.getElementById('mobile-pa-detail-title');
+    const b = document.getElementById('mobile-pa-detail-body');
+    if (!sheet || !t || !b) return;
+    t.innerText = title || 'DETAIL';
+    b.innerHTML = bodyHtml || '';
+    sheet.classList.add('open');
+};
+
+(function patchMobilePaCancel() {
+    const orig = window.cancelProjectAssetsModal;
+    if (typeof orig !== 'function') return;
+    window.cancelProjectAssetsModal = function() {
+        const wasMobile = window.mobilePaCompactActive;
+        orig.apply(this, arguments);
+        if (wasMobile) {
+            exitMobilePaCompactMode();
+            if (window.mobileCrewHubProjectId) {
+                document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
+            }
+        }
+    };
+})();
+
+document.addEventListener('click', function(e) {
+    if (!window.mobilePaCompactActive) return;
+    const row = e.target.closest('#pa-assigned-list [id^="fg_"] > div:first-child');
+    if (!row || e.target.closest('button')) return;
+    const formulaDiv = row.querySelector('div[title="Formula String"]');
+    const locInput = row.querySelector('input[type="text"]');
+    const loc = locInput ? locInput.value : (row.querySelector('span') ? row.querySelector('span').innerText : '');
+    let formula = 'Standalone gear';
+    if (formulaDiv) formula = formulaDiv.innerText || formulaDiv.innerHTML;
+    showMobilePaDetail(loc || 'Equipment group', '<div style="font-family:monospace;color:#d8b4fe;word-break:break-word;">' + formula + '</div>');
+}, true);
+
+</script>

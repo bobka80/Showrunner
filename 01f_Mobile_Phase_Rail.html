@@ -1,0 +1,123 @@
+<script>
+/**
+ * 01f_Mobile_Phase_Rail.html
+ * Deconstructed mini calendar — phase segments from project.fragments (read-only).
+ * @INDEX: MOBILE -> Phase Rail
+ */
+
+window.MOBILE_PHASE_BACKEND_MAP = {
+    'WAREHOUSE': 'wh',
+    'MAIN_EVENT': 'main',
+    'SHOW_DAY': 'show',
+    'RECOVERY': 'recovery',
+    'TRANSIT': 'transit'
+};
+
+window.MOBILE_PHASE_LABELS = {
+    wh: 'WAREHOUSE',
+    main: 'MAIN EVENT',
+    show: 'SHOW DAY',
+    recovery: 'RECOVERY',
+    transit: 'TRANSIT'
+};
+
+/**
+ * Merge consecutive fragment days into contiguous blocks (same logic as mini calendar unpacker).
+ * @param {Array} fragments - raw project.fragments
+ * @returns {Array<{type, startStr, endStr, note, startTime, endTime}>}
+ */
+window.buildPhaseSegmentsFromFragments = function(fragments) {
+    if (!fragments || !fragments.length) return [];
+    const typeMap = window.MOBILE_PHASE_BACKEND_MAP;
+    const sorted = [...fragments].sort(function(a, b) {
+        return String(a.date || '').localeCompare(String(b.date || ''));
+    });
+    const blocks = [];
+
+    sorted.forEach(function(f) {
+        if (!f.date) return;
+        const uiType = typeMap[f.type] || 'main';
+        const startStr = f.date;
+        const dEnd = new Date(f.date + 'T00:00:00');
+        dEnd.setDate(dEnd.getDate() + 1);
+        const endStr = dEnd.getFullYear() + '-' + String(dEnd.getMonth() + 1).padStart(2, '0') + '-' + String(dEnd.getDate()).padStart(2, '0');
+        const note = f.note || '';
+        const lastBlock = blocks.find(function(b) {
+            return b.type === uiType && b.endStr === startStr && b.note === note;
+        });
+        if (lastBlock) {
+            lastBlock.endStr = endStr;
+        } else {
+            blocks.push({
+                type: uiType,
+                startStr: startStr,
+                endStr: endStr,
+                note: note,
+                startTime: f.startTime || '00:00',
+                endTime: f.endTime || '23:59'
+            });
+        }
+    });
+    return blocks;
+};
+
+function formatPhaseDateRange(startStr, endStr) {
+    const s = new Date(startStr + 'T12:00:00');
+    const endExclusive = new Date(endStr + 'T12:00:00');
+    endExclusive.setDate(endExclusive.getDate() - 1);
+    const e = endExclusive;
+    const opts = { day: 'numeric', month: 'short' };
+    if (s.getTime() === e.getTime()) return s.toLocaleDateString(undefined, opts);
+    return s.toLocaleDateString(undefined, opts) + ' – ' + e.toLocaleDateString(undefined, opts);
+}
+
+/**
+ * Render phase rail + legend into container element.
+ */
+window.renderMobilePhaseRail = function(containerEl, fragments) {
+    if (!containerEl) return;
+    const blocks = buildPhaseSegmentsFromFragments(fragments);
+    if (!blocks.length) {
+        containerEl.innerHTML = '<div style="color:#71717a; font-size:12px; text-align:center; padding:12px;">No phase dates defined yet.</div>';
+        return;
+    }
+
+    let minT = Infinity;
+    let maxT = -Infinity;
+    blocks.forEach(function(b) {
+        const s = new Date(b.startStr + 'T00:00:00').getTime();
+        const e = new Date(b.endStr + 'T00:00:00').getTime();
+        if (s < minT) minT = s;
+        if (e > maxT) maxT = e;
+    });
+    const spanMs = Math.max(maxT - minT, 86400000);
+
+    let railSegs = '';
+    blocks.forEach(function(b) {
+        const s = new Date(b.startStr + 'T00:00:00').getTime();
+        const e = new Date(b.endStr + 'T00:00:00').getTime();
+        const leftPct = ((s - minT) / spanMs) * 100;
+        const widthPct = Math.max(((e - s) / spanMs) * 100, 2);
+        const label = (MOBILE_PHASE_LABELS[b.type] || b.type).split(' ')[0];
+        railSegs += '<div class="mch-phase-segment mch-phase-segment--' + b.type + '" style="left:' + leftPct + '%; width:' + widthPct + '%;" title="' + label + '">' + label + '</div>';
+    });
+
+    let legend = '';
+    blocks.forEach(function(b) {
+        const endExclusive = new Date(b.endStr + 'T12:00:00');
+        endExclusive.setDate(endExclusive.getDate() - 1);
+        const range = formatPhaseDateRange(b.startStr, b.endStr);
+        const title = MOBILE_PHASE_LABELS[b.type] || b.type;
+        legend += '<div class="mch-phase-legend-row mch-phase-legend-row--' + b.type + '">' +
+            '<span>' + title + '</span>' +
+            '<span class="mch-phase-legend-dates">' + range + '</span></div>';
+    });
+
+    containerEl.innerHTML =
+        '<div class="mch-phase-rail-wrap">' +
+        '<div class="mch-section-label">PROJECT PHASES</div>' +
+        '<div class="mch-phase-rail">' + railSegs + '</div>' +
+        '<div class="mch-phase-legend">' + legend + '</div>' +
+        '</div>';
+};
+</script>

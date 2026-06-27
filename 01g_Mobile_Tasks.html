@@ -1,0 +1,54 @@
+<script>
+/**
+ * 01g_Mobile_Tasks.html
+ * Tasks list in Mobile Command Center.
+ * @INDEX: MOBILE -> Tasks
+ */
+
+function openMobileTasks() {
+    document.querySelectorAll('.mobile-view').forEach(function(el) { el.style.display = 'none'; });
+    document.getElementById('mobile-view-tasks').style.display = 'flex';
+    document.getElementById('mobile-back-btn').style.display = 'block';
+    document.getElementById('mobile-title').innerText = 'MY TASKS';
+    renderMobileTasksList();
+}
+
+function renderMobileTasksList() {
+    const container = document.getElementById('mobile-tasks-list');
+    if (!container) return;
+
+    const tasks = (typeof globalTasks !== 'undefined' && globalTasks) ? globalTasks : [];
+    const canGlobal = (typeof canManageGlobalTasks === 'function') && canManageGlobalTasks();
+    let html = '';
+    let openCount = 0;
+
+    tasks.forEach(function(t) {
+        if (!canGlobal && typeof isTaskAssignedToMe === 'function' && !isTaskAssignedToMe(t)) return;
+        if (t.status === 'Finished') return;
+        openCount++;
+        const priority = t.priority || 'Medium';
+        const color = priority === 'High' ? '#ef4444' : (priority === 'Low' ? '#3b82f6' : '#f59e0b');
+        const safeTitle = typeof escapeHTML === 'function' ? escapeHTML(t.title) : t.title;
+        const safeStatus = typeof escapeHTML === 'function' ? escapeHTML(t.status) : t.status;
+        html += '<div class="mobile-task-card" onclick="openTaskModal(\'' + t.id + '\')" style="border-left:4px solid ' + color + ';">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+            '<b style="font-size:15px;color:#fff;">' + safeTitle + '</b>' +
+            '<span style="font-size:9px;font-weight:900;color:' + color + ';border:1px solid ' + color + ';padding:3px 6px;border-radius:4px;">' + priority.toUpperCase() + '</span></div>' +
+            '<div style="font-size:12px;color:#71717a;">Status: ' + safeStatus + '</div></div>';
+    });
+
+    if (!html) html = '<div style="color:#888;text-align:center;padding:24px;">No open tasks assigned to you.</div>';
+    container.innerHTML = html;
+
+    const badge = document.getElementById('mobile-tasks-badge');
+    if (badge) {
+        if (openCount > 0) {
+            badge.innerText = openCount;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+</script>

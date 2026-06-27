@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   
   <?!= include('Styles'); ?>
+  <?!= include('Styles_Mobile'); ?>
 
   <meta name="user-access" content="<?= userAccess ?>">
   <meta name="user-name" content="<?= userName ?>">
@@ -101,6 +102,7 @@
            <p style="color:var(--text-muted); font-size:12px; margin-top:5px;">Mobile Command</p>
        </div>
        <button class="btn-outline btn-mobile-nav" onclick="openMobileEvents()">📅 EVENTS DIRECTORY</button>
+       <button class="btn-outline btn-mobile-nav" onclick="openMobileTasks()">✅ MY TASKS <span id="mobile-tasks-badge" style="background:#3b82f6; color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; margin-left:auto; display:none;"></span></button>
        <button class="btn-outline btn-mobile-nav" onclick="openMobileRFID()">📡 MAP RFID TAGS</button>
        <button class="btn-outline btn-mobile-nav" onclick="openMobileNotifs()">🔔 NOTIFICATIONS <span id="mobile-notif-badge" style="background:#ef4444; color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; margin-left:auto; display:none;"></span></button>
     </div>
@@ -121,6 +123,10 @@
        </div>
        <!-- Infinite Mobile Asset List -->
        <div id="mobile-rfid-list" style="flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+
+    <div id="mobile-view-tasks" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+       <div id="mobile-tasks-list" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 
     <div id="mobile-view-notifs" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
@@ -367,6 +373,10 @@
 <?!= include('10c_Notifications_Admin'); ?>
 <?!= include('01c_Calendar_Mini'); ?>
 <?!= include('01d_Calendar_Mobile'); ?>
+<?!= include('01f_Mobile_Phase_Rail'); ?>
+<?!= include('01e_Mobile_Crew_Hub'); ?>
+<?!= include('01g_Mobile_Tasks'); ?>
+<?!= include('01h_Mobile_Assets'); ?>
 <?!= include('02_Project_Editor_Core'); ?>
 <?!= include('02_Project_Editor_Map'); ?>
 <?!= include('02_Project_Editor_Logistics'); ?>
@@ -385,6 +395,7 @@
 <?!= include('03c_Timeline_Phases'); ?>
 <?!= include('03d_Timeline_Crew'); ?>
 <?!= include('03e_Timeline_UX'); ?>
+<?!= include('03f_Timeline_Mobile'); ?>
 <?!= include('04_Month_Roster'); ?>
 <?!= include('04b_Equipment_Tracker'); ?>
 <?!= include('05_Warehouse_Engine'); ?>

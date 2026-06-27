@@ -64,15 +64,7 @@
         padding: 8px 12px !important;
     }
 
-    /* --- MOBILE NAV BUTTONS --- */
-    .btn-mobile-nav {
-        padding: 25px !important;
-        font-size: 16px !important;
-        justify-content: flex-start !important;
-        color: #fff !important;
-        border-color: #333 !important;
-        background: #1a1a1e !important;
-    }
+    /* Mobile nav + responsive rules → Styles_Mobile.html */
 
     /* --- SQUARE TOGGLE BUTTON --- */
     .fc-toolbar-chunk { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 4px; }
@@ -342,8 +334,6 @@
     .show-strips .event-custom-frame .hover-bg, .show-strips .event-custom-frame .bars-wrapper { opacity: 1 !important; }
     .show-strips .event-custom-frame .solid-bg { opacity: 0 !important; }
     .show-strips .event-custom-frame .event-custom-title { color: var(--text-col) !important; }
-
-    #mobile-dashboard { display: none; }
 
     .dashboard { display: flex; height: 100vh; }
     #calendar-container { flex: 1; padding: 25px; overflow-y: auto; display: flex; flex-direction: column; }
@@ -802,70 +792,7 @@
     }
     .wh-spot-block:hover .wh-spot-del { display: flex; }
 
-    @media (max-width: 768px) {
-      /* 0. Launch Native Mobile Dashboard */
-      .dashboard { display: none !important; }
-      #floating-bell-container { display: none !important; }
-      #mobile-dashboard { display: flex !important; flex-direction: column; height: 100vh; width: 100vw; background: var(--bg-dark); overflow: hidden; position: fixed; top: 0; left: 0; z-index: 10; }
-
-      /* 1. Dashboard Layout - Restored Explicit Heights for FullCalendar Canvas */
-      #calendar-container { padding: 10px; height: 55vh; min-height: 450px; display: block; }
-      .sidebar { width: 100%; height: auto; min-height: 45vh; border-left: none; border-top: 1px solid #1a1a1f; padding: 15px; box-sizing: border-box; }
-      
-      /* 2. Calendar Compression */
-      .fc-header-toolbar { flex-direction: column; gap: 8px; }
-      .fc-toolbar-title { font-size: 1.1em !important; }
-      .fc-daygrid-day-frame { min-height: 70px !important; } 
-      .fc-daygrid-day-events { margin-top: 2px !important; }
-      
-      /* Fixed Event Rectangles: Forced nowrap and proper flex scaling */
-      .event-card-inner { padding: 6px; min-height: 24px; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; }
-      .event-title { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-bottom: 0;}
-      .indicator-row { display: flex; gap: 4px; margin: 0; flex-shrink: 0; }
-      .indicator-item { font-size: 0px; } /* Hides "P E C" text, keeps only the dots */
-      .light { width: 8px; height: 8px; margin: 0; }
-      
-      /* 3. Modals - Fit on screen & ensure scrolling */
-      .modal { padding: 15px; max-height: 85vh; overflow-y: auto; }
-      #create-modal-overlay .modal { width: 95vw !important; height: 85vh !important; }
-      
-      /* 4. Timeline (Shift Engine) Compression */
-      .tt-toolbar { flex-direction: column; gap: 8px; padding: 10px; height: auto; }
-      #tt-title { font-size: 14px !important; text-align: center; }
-      #tt-subtitle { display: none; } 
-      .tt-workspace { flex-direction: column; }
-      
-      .tt-sidebar { width: 100%; height: auto; min-height: 50px; border-right: none; border-bottom: 1px solid #333; flex-direction: row; align-items: center; flex: none;}
-      .tt-sidebar-header { display: none; } 
-      .tt-sidebar-list { display: flex; flex-direction: row; overflow-x: auto; padding: 5px; gap: 10px; white-space: nowrap; align-items: center; width: 100%;}
-      .crew-cb-container { width: auto; padding: 5px 10px; min-height: 20px; border-bottom: none; border-right: 1px solid #2a2a2f; }
-      
-      .tt-canvas { flex: 1; flex-direction: row; min-height: 50vh; } 
-      .tt-axis-y { width: 70px !important; min-width: 70px !important; }
-      .tt-crew-row { padding: 0 4px; font-size: 9px; line-height: 1.1; text-align: right; justify-content: flex-end; word-wrap: break-word; }
-      
-      .tt-header-corner { height: 50px; }
-      
-      .modal-overlay, #shift-layer, #crew-manager-modal { left: 0 !important; width: 100vw !important; }
-      
-      .tt-header-x-container { height: 50px; }
-      .tt-header-days { height: 25px; }
-      .tt-day-mark { font-size: 12px; }
-      .tt-header-hours { height: 25px; }
-      .tt-hour-mark { font-size: 10px; padding-left: 2px; }
-      
-      /* NEW MOBILE SHIFT BLOCK CSS */
-      .shift-block { height: 38px; top: 11px; }
-      .shift-label-container { bottom: 2px; left: 4px; right: 14px; }
-      .shift-arrow-indicator { font-size: 14px; right: 12px; top: 11px; }
-      
-      /* 5. Master Month Roster Compression */
-      .mr-corner, .mr-crew-row { width: 70px !important; min-width: 70px !important; padding: 0 4px !important; font-size: 9px; white-space: normal; line-height: 1.1;}
-
-      /* 6. Vertical Stacking for Project Asset Modal */
-      #pa-split-pane { flex-direction: column !important; overflow-y: auto !important; }
-      #pa-split-pane > div { border-right: none !important; border-bottom: 2px solid #333 !important; flex: none !important; height: auto !important; min-height: 400px !important; }
-    }
+    /* @media mobile rules → Styles_Mobile.html */
 
     /* --- NEW PHASE LANE & PICKER CSS --- */
     .tt-header-phases { display: block; height: 30px; position: relative; background-color: #111114; border-bottom: 1px solid #333; flex: none; width: 100%; box-sizing: border-box; overflow: hidden; }
@@ -1337,6 +1264,396 @@
     .theme-light #zone-inner-map-container { background: #f3f4f6 !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05) !important; }
     .theme-light .inline-note-input { background: #ffffff !important; color: var(--text-main) !important; box-shadow: var(--shadow-modal) !important; }
 </style>
+  <style>
+/**
+ * Styles_Mobile.html — Mobile-only CSS (≤768px + crew field modules).
+ * Included after Styles.html in Index.html. Desktop layout stays in Styles.html.
+ * @INDEX: MOBILE -> Styles
+ */
+
+/* --- Mobile shell base (hidden on desktop) --- */
+#mobile-dashboard { display: none; }
+
+.btn-mobile-nav {
+    padding: 25px !important;
+    font-size: 16px !important;
+    justify-content: flex-start !important;
+    color: #fff !important;
+    border-color: #333 !important;
+    background: #1a1a1e !important;
+}
+
+@media (max-width: 768px) {
+    .dashboard { display: none !important; }
+    #floating-bell-container { display: none !important; }
+    #mobile-dashboard {
+        display: flex !important;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        background: var(--bg-dark);
+        overflow: hidden;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 10;
+    }
+
+    #calendar-container { padding: 10px; height: 55vh; min-height: 450px; display: block; }
+    .sidebar { width: 100%; height: auto; min-height: 45vh; border-left: none; border-top: 1px solid #1a1a1f; padding: 15px; box-sizing: border-box; }
+
+    .fc-header-toolbar { flex-direction: column; gap: 8px; }
+    .fc-toolbar-title { font-size: 1.1em !important; }
+    .fc-daygrid-day-frame { min-height: 70px !important; }
+    .fc-daygrid-day-events { margin-top: 2px !important; }
+
+    .event-card-inner { padding: 6px; min-height: 24px; flex-direction: row; flex-wrap: nowrap; align-items: center; justify-content: space-between; }
+    .event-title { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; margin-bottom: 0; }
+    .indicator-row { display: flex; gap: 4px; margin: 0; flex-shrink: 0; }
+    .indicator-item { font-size: 0px; }
+    .light { width: 8px; height: 8px; margin: 0; }
+
+    .modal { padding: 15px; max-height: 85vh; overflow-y: auto; }
+    #create-modal-overlay .modal { width: 95vw !important; height: 85vh !important; }
+
+    .tt-toolbar { flex-direction: column; gap: 8px; padding: 10px; height: auto; }
+    #tt-title { font-size: 14px !important; text-align: center; }
+    #tt-subtitle { display: none; }
+    .tt-workspace { flex-direction: column; }
+
+    .tt-sidebar { width: 100%; height: auto; min-height: 50px; border-right: none; border-bottom: 1px solid #333; flex-direction: row; align-items: center; flex: none; }
+    .tt-sidebar-header { display: none; }
+    .tt-sidebar-list { display: flex; flex-direction: row; overflow-x: auto; padding: 5px; gap: 10px; white-space: nowrap; align-items: center; width: 100%; }
+    .crew-cb-container { width: auto; padding: 5px 10px; min-height: 20px; border-bottom: none; border-right: 1px solid #2a2a2f; }
+
+    .tt-canvas { flex: 1; flex-direction: row; min-height: 50vh; }
+    .tt-axis-y { width: 70px !important; min-width: 70px !important; }
+    .tt-crew-row { padding: 0 4px; font-size: 9px; line-height: 1.1; text-align: right; justify-content: flex-end; word-wrap: break-word; }
+
+    .tt-header-corner { height: 50px; }
+
+    .modal-overlay, #shift-layer, #crew-manager-modal { left: 0 !important; width: 100vw !important; }
+
+    .tt-header-x-container { height: 50px; }
+    .tt-header-days { height: 25px; }
+    .tt-day-mark { font-size: 12px; }
+    .tt-header-hours { height: 25px; }
+    .tt-hour-mark { font-size: 10px; padding-left: 2px; }
+
+    .shift-block { height: 38px; top: 11px; }
+    .shift-label-container { bottom: 2px; left: 4px; right: 14px; }
+    .shift-arrow-indicator { font-size: 14px; right: 12px; top: 11px; }
+
+    .mr-corner, .mr-crew-row { width: 70px !important; min-width: 70px !important; padding: 0 4px !important; font-size: 9px; white-space: normal; line-height: 1.1; }
+
+    #pa-split-pane { flex-direction: column !important; overflow-y: auto !important; }
+    #pa-split-pane > div { border-right: none !important; border-bottom: 2px solid #333 !important; flex: none !important; height: auto !important; min-height: 400px !important; }
+
+    /* Crew hub overlay */
+    #mobile-crew-hub-overlay { left: 0 !important; width: 100vw !important; }
+}
+
+/* --- Crew Hub --- */
+#mobile-crew-hub-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 15;
+    background: var(--bg-dark);
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.mch-header {
+    padding: 16px 18px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+
+.mch-title {
+    font-size: 18px;
+    font-weight: 900;
+    color: #fff;
+    margin: 0 0 8px 0;
+    line-height: 1.2;
+}
+
+.mch-meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.mch-badge {
+    font-size: 10px;
+    font-weight: 900;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mch-badge--type { border-color: #3b82f6; color: #3b82f6; }
+.mch-badge--status { border-color: #10b981; color: #10b981; }
+
+.mch-location {
+    font-size: 13px;
+    color: #a1a1aa;
+    word-break: break-word;
+}
+
+.mch-location a { color: #10b981; text-decoration: none; font-weight: 700; }
+
+.mch-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 18px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.mch-section-label {
+    font-size: 10px;
+    font-weight: 900;
+    color: #71717a;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.mch-shift-card {
+    background: #1a1a1e;
+    border: 1px solid #333;
+    border-left: 3px solid #a855f7;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 13px;
+    color: #e4e4e7;
+}
+
+.mch-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #333;
+    margin-top: auto;
+}
+
+.mch-actions .btn-outline,
+.mch-actions .btn-main {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 18px !important;
+    font-size: 14px !important;
+    justify-content: center !important;
+}
+
+/* --- Phase Rail (deconstructed mini calendar) --- */
+.mch-phase-rail-wrap {
+    background: #111114;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.mch-phase-rail {
+    position: relative;
+    height: 36px;
+    background: #0a0a0c;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.mch-phase-segment {
+    position: absolute;
+    top: 4px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 900;
+    color: #fff;
+    text-transform: uppercase;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255,255,255,0.15);
+}
+
+.mch-phase-segment--wh { background: var(--color-paint-wh, #f97316); }
+.mch-phase-segment--main { background: var(--color-paint-main, #3b82f6); }
+.mch-phase-segment--show { background: var(--color-paint-show, #10b981); }
+.mch-phase-segment--recovery { background: var(--color-paint-recovery, #a855f7); }
+.mch-phase-segment--transit { background: var(--color-paint-transit, #06b6d4); }
+
+.mch-phase-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.mch-phase-legend-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: #d4d4d8;
+    padding: 6px 8px;
+    background: #1a1a1e;
+    border-radius: 4px;
+    border-left: 3px solid #555;
+}
+
+.mch-phase-legend-row--wh { border-left-color: var(--color-paint-wh, #f97316); }
+.mch-phase-legend-row--main { border-left-color: var(--color-paint-main, #3b82f6); }
+.mch-phase-legend-row--show { border-left-color: var(--color-paint-show, #10b981); }
+.mch-phase-legend-row--recovery { border-left-color: var(--color-paint-recovery, #a855f7); }
+.mch-phase-legend-row--transit { border-left-color: var(--color-paint-transit, #06b6d4); }
+
+.mch-phase-legend-dates { font-size: 11px; color: #71717a; font-weight: 600; }
+
+/* --- Mobile weather strip --- */
+.mch-weather-strip {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mch-weather-day {
+    flex: 0 0 auto;
+    min-width: 72px;
+    background: #1a1a1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+}
+
+.mch-weather-day--alert { border-top: 2px solid #f97316; }
+.mch-weather-day__date { font-size: 9px; font-weight: 800; color: #71717a; text-transform: uppercase; }
+.mch-weather-day__emoji { font-size: 20px; line-height: 1.2; margin: 4px 0; }
+.mch-weather-day__temp { font-size: 11px; font-weight: 700; color: #fff; }
+
+/* --- Mobile timeline zoom --- */
+#tt-mobile-zoom-bar {
+    display: none;
+    flex-shrink: 0;
+    padding: 8px 12px;
+    background: #111114;
+    border-bottom: 1px solid #333;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    #tt-mobile-zoom-bar { display: flex; }
+}
+
+#tt-mobile-zoom-bar input[type="range"] {
+    flex: 1;
+    min-width: 120px;
+    accent-color: #a855f7;
+}
+
+#shift-layer.tt-zoom-overview .shift-label-container,
+#shift-layer.tt-zoom-overview .shift-arrow-indicator,
+#shift-layer.tt-zoom-overview .phase-block {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
+#shift-layer.tt-zoom-overview .shift-block {
+    min-height: 8px;
+    height: 12px !important;
+    top: 18px !important;
+}
+
+#shift-layer.tt-mobile-zoom-active .tt-canvas {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* zoom transform applied inline on #tt-grid-wrap and #tt-y-crew via 03f */
+
+/* --- Mobile Project Assets compact --- */
+body.mobile-pa-compact #pa-left-panel { display: none !important; }
+body.mobile-pa-compact #pa-right-panel { width: 100% !important; flex: 1 !important; }
+body.mobile-pa-compact #pa-split-pane > div { min-height: auto !important; border-bottom: none !important; }
+body.mobile-pa-compact #pa-search-cli,
+body.mobile-pa-compact #pa-search-ghost,
+body.mobile-pa-compact #syntax-help-btn,
+body.mobile-pa-compact #pa-view-offer-btn { display: none !important; }
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child {
+    flex-wrap: wrap !important;
+    height: auto !important;
+    min-height: 60px;
+    padding: 10px 12px !important;
+    gap: 8px;
+}
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {
+    margin-right: 0 !important;
+    flex: 1 1 100%;
+}
+
+body.mobile-pa-compact #pa-assigned-list div[title="Formula String"],
+body.mobile-pa-compact #pa-assigned-list div[title="Standalone Items"] {
+    display: none !important;
+}
+
+body.mobile-pa-compact #pa-assigned-list .btn-blue.btn-sm,
+body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
+    display: none !important;
+}
+
+#mobile-pa-detail-sheet {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 6000;
+    background: #18181b;
+    border-top: 2px solid #a855f7;
+    border-radius: 12px 12px 0 0;
+    padding: 20px;
+    max-height: 50vh;
+    overflow-y: auto;
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
+}
+
+#mobile-pa-detail-sheet.open { display: block; }
+
+/* --- Mobile tasks --- */
+.mobile-task-card {
+    background: #1a1a1e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 14px;
+    cursor: pointer;
+}
+
+.mobile-task-card:active { background: #222; }
+</style>
+
 
   <meta name="user-access" content="<?= userAccess ?>">
   <meta name="user-name" content="<?= userName ?>">
@@ -1373,6 +1690,7 @@
            <p style="color:var(--text-muted); font-size:12px; margin-top:5px;">Mobile Command</p>
        </div>
        <button class="btn-outline btn-mobile-nav" onclick="openMobileEvents()">📅 EVENTS DIRECTORY</button>
+       <button class="btn-outline btn-mobile-nav" onclick="openMobileTasks()">✅ MY TASKS <span id="mobile-tasks-badge" style="background:#3b82f6; color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; margin-left:auto; display:none;"></span></button>
        <button class="btn-outline btn-mobile-nav" onclick="openMobileRFID()">📡 MAP RFID TAGS</button>
        <button class="btn-outline btn-mobile-nav" onclick="openMobileNotifs()">🔔 NOTIFICATIONS <span id="mobile-notif-badge" style="background:#ef4444; color:#fff; padding:4px 10px; border-radius:12px; font-size:12px; margin-left:auto; display:none;"></span></button>
     </div>
@@ -1393,6 +1711,10 @@
        </div>
        <!-- Infinite Mobile Asset List -->
        <div id="mobile-rfid-list" style="flex:1; display:flex; flex-direction:column; gap:10px;"></div>
+    </div>
+
+    <div id="mobile-view-tasks" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
+       <div id="mobile-tasks-list" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:10px;"></div>
     </div>
 
     <div id="mobile-view-notifs" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
@@ -3163,6 +3485,53 @@
 
 
 
+
+
+<!-- @INDEX: MOBILE -> Crew Hub Shell -->
+<div id="mobile-crew-hub-overlay">
+    <div class="mch-header">
+        <button class="btn-outline" onclick="closeMobileCrewHub()" style="border:none; color:var(--accent); font-weight:bold; font-size:12px; margin:0 0 10px 0; padding:0; background:transparent !important;">⬅ BACK</button>
+        <h2 class="mch-title" id="mch-title">Project</h2>
+        <div class="mch-meta-row">
+            <span class="mch-badge mch-badge--type" id="mch-type-badge">EVENT</span>
+            <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
+        </div>
+        <div class="mch-location" id="mch-location"></div>
+    </div>
+    <div class="mch-body">
+        <div id="mch-phase-rail-host"></div>
+        <div id="mch-weather-section" style="display:none;">
+            <div class="mch-section-label">WEATHER</div>
+            <div class="mch-weather-strip" id="mch-weather-strip"></div>
+        </div>
+        <div>
+            <div class="mch-section-label">MY SHIFT</div>
+            <div class="mch-shift-card" id="mch-shift-summary">Loading shift info…</div>
+        </div>
+        <div class="mch-actions">
+            <button class="btn-outline btn-outline-purple" onclick="mobileCrewOpenTimeline()">OPEN TIMELINE</button>
+            <button class="btn-outline btn-outline-orange req-event_assets_window" onclick="mobileCrewOpenAssets()">PROJECT ASSETS</button>
+            <button class="btn-close" onclick="closeMobileCrewHub()">CANCEL</button>
+            <button class="btn-outline pe-manager-only" id="mch-full-editor-btn" style="display:none; font-size:11px !important; padding:12px !important;" onclick="mobileCrewOpenFullEditor()">MANAGER: FULL EDITOR</button>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<!-- @INDEX: MOBILE -> Assets Detail Sheet -->
+<div id="mobile-pa-detail-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="font-weight:900;color:#fff;font-size:14px;" id="mobile-pa-detail-title">DETAIL</div>
+        <button class="btn-close" style="width:auto;margin:0;padding:8px 14px !important;" onclick="closeMobilePaDetail()">CLOSE</button>
+    </div>
+    <div id="mobile-pa-detail-body" style="font-size:13px;color:#d4d4d8;line-height:1.5;"></div>
+</div>
+
+
+
 <div id="edit-modal-overlay" class="modal-overlay">
   <div class="modal">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
@@ -3523,6 +3892,8 @@
       </div>
   </div>
 </div>
+
+
 
 
 

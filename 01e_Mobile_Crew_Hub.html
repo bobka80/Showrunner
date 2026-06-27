@@ -1,0 +1,301 @@
+<!-- @INDEX: MOBILE -> Crew Hub Shell -->
+<div id="mobile-crew-hub-overlay">
+    <div class="mch-header">
+        <button class="btn-outline" onclick="closeMobileCrewHub()" style="border:none; color:var(--accent); font-weight:bold; font-size:12px; margin:0 0 10px 0; padding:0; background:transparent !important;">⬅ BACK</button>
+        <h2 class="mch-title" id="mch-title">Project</h2>
+        <div class="mch-meta-row">
+            <span class="mch-badge mch-badge--type" id="mch-type-badge">EVENT</span>
+            <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
+        </div>
+        <div class="mch-location" id="mch-location"></div>
+    </div>
+    <div class="mch-body">
+        <div id="mch-phase-rail-host"></div>
+        <div id="mch-weather-section" style="display:none;">
+            <div class="mch-section-label">WEATHER</div>
+            <div class="mch-weather-strip" id="mch-weather-strip"></div>
+        </div>
+        <div>
+            <div class="mch-section-label">MY SHIFT</div>
+            <div class="mch-shift-card" id="mch-shift-summary">Loading shift info…</div>
+        </div>
+        <div class="mch-actions">
+            <button class="btn-outline btn-outline-purple" onclick="mobileCrewOpenTimeline()">OPEN TIMELINE</button>
+            <button class="btn-outline btn-outline-orange req-event_assets_window" onclick="mobileCrewOpenAssets()">PROJECT ASSETS</button>
+            <button class="btn-close" onclick="closeMobileCrewHub()">CANCEL</button>
+            <button class="btn-outline pe-manager-only" id="mch-full-editor-btn" style="display:none; font-size:11px !important; padding:12px !important;" onclick="mobileCrewOpenFullEditor()">MANAGER: FULL EDITOR</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 01e_Mobile_Crew_Hub.html
+ * Mobile crew briefing screen — replaces full project editor on phone.
+ * @INDEX: MOBILE -> Crew Hub Logic
+ */
+
+window.mobileCrewHubProjectId = null;
+window.mobileCrewHubProject = null;
+
+window.isMobileViewport = function() {
+    return window.innerWidth <= 768;
+};
+
+window.resolveMobileProject = function(pId) {
+    let p = null;
+    try {
+        const phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+        if (phantom && phantom.projects) p = phantom.projects.find(function(x) { return x.id === pId; });
+    } catch (e) { /* ignore */ }
+    if (!p && typeof calendar !== 'undefined' && calendar) {
+        let ev = calendar.getEventById(pId);
+        if (!ev) {
+            ev = calendar.getEvents().find(function(e) {
+                return e.id === pId || (e.extendedProps && e.extendedProps.rawDbData && e.extendedProps.rawDbData.id === String(pId));
+            });
+        }
+        if (ev && ev.extendedProps && ev.extendedProps.rawDbData) p = ev.extendedProps.rawDbData;
+    }
+    return p;
+};
+
+window.syncProjectEditorHiddenFields = function(p, pId) {
+    if (!p) return;
+    const setVal = function(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.value = val != null ? val : '';
+    };
+    setVal('edit-folder-id', pId);
+    setVal('edit-proj-version', p.lastUpdated || '');
+    setVal('edit-proj-name', p.title || p.fullTitle || '');
+    setVal('edit-proj-date', p.start || '');
+    setVal('edit-proj-end-date', p.end || p.start || '');
+    setVal('edit-proj-type', p.type || 'Event');
+    setVal('edit-proj-client', p.client || '');
+    setVal('edit-proj-location', p.locationUrl || '');
+    setVal('edit-proj-lat', (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lat : (p.lat || ''));
+    setVal('edit-proj-lng', (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lng : (p.lng || ''));
+    const outdoor = document.getElementById('edit-proj-outdoor');
+    if (outdoor) outdoor.checked = !!(p.outdoor || (p.readinessState && p.readinessState.outdoor));
+    const statusEl = document.getElementById('display-event-status');
+    if (statusEl) statusEl.innerText = String(p.status || 'Draft').toUpperCase();
+    const typeEl = document.getElementById('display-event-type');
+    if (typeEl) typeEl.innerText = String(p.type || 'Event').toUpperCase();
+    if (typeof applyProjectEditorMode === 'function') applyProjectEditorMode(pId);
+};
+
+window.openMobileCrewHub = function(pId) {
+    const p = resolveMobileProject(pId);
+    if (!p) return alert('Could not load event details.');
+
+    window.mobileCrewHubProjectId = pId;
+    window.mobileCrewHubProject = p;
+    window.isProjectDirty = false;
+    window.activeProjectContext = pId;
+    if (typeof setDashboardIcon === 'function') setDashboardIcon('project');
+
+    syncProjectEditorHiddenFields(p, pId);
+    if (typeof startPresencePing === 'function') startPresencePing(pId);
+
+    document.getElementById('mch-title').innerText = p.title || p.fullTitle || 'Project';
+    document.getElementById('mch-type-badge').innerText = String(p.type || 'Event').toUpperCase();
+    document.getElementById('mch-status-badge').innerText = String(p.status || 'Draft').toUpperCase();
+
+    const loc = (p.locationUrl || '').trim();
+    const locEl = document.getElementById('mch-location');
+    if (loc) {
+        const isUrl = /^https?:\/\//i.test(loc) || loc.indexOf('maps') !== -1 || loc.indexOf('goo.gl') !== -1;
+        const mapsHref = isUrl ? loc : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(loc);
+        locEl.innerHTML = '📍 <a href="' + mapsHref.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener">' + (typeof escapeHTML === 'function' ? escapeHTML(loc) : loc) + '</a>';
+    } else {
+        locEl.innerHTML = '<span style="color:#52525b;">No location set</span>';
+    }
+
+    if (typeof renderMobilePhaseRail === 'function') {
+        renderMobilePhaseRail(document.getElementById('mch-phase-rail-host'), p.fragments || []);
+    }
+
+    loadMobileCrewShiftSummary(pId);
+    fetchMobileCrewWeather(p);
+
+    const mgrBtn = document.getElementById('mch-full-editor-btn');
+    if (mgrBtn) {
+        const show = (typeof canFullEditProject === 'function') && canFullEditProject(pId);
+        mgrBtn.style.display = show ? 'block' : 'none';
+    }
+
+    document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
+};
+
+window.closeMobileCrewHub = function() {
+    document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
+    window.mobileCrewHubProjectId = null;
+    window.mobileCrewHubProject = null;
+    if (typeof stopPresencePing === 'function') stopPresencePing();
+};
+
+window.mobileCrewOpenTimeline = function() {
+    const pId = window.mobileCrewHubProjectId;
+    if (!pId) return;
+    syncProjectEditorHiddenFields(window.mobileCrewHubProject, pId);
+    document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
+    if (typeof launchMasterTimeline === 'function') launchMasterTimeline();
+};
+
+window.mobileCrewOpenAssets = function() {
+    const pId = window.mobileCrewHubProjectId;
+    if (!pId) return;
+    if (typeof openMobileProjectAssets === 'function') {
+        openMobileProjectAssets(pId);
+    } else if (typeof openProjectAssetsModal === 'function') {
+        syncProjectEditorHiddenFields(window.mobileCrewHubProject, pId);
+        openProjectAssetsModal();
+    }
+};
+
+window.mobileCrewOpenFullEditor = function() {
+    const p = window.mobileCrewHubProject;
+    const pId = window.mobileCrewHubProjectId;
+    if (!p || !pId) return;
+    document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
+    document.getElementById('edit-modal-overlay').style.display = 'flex';
+    document.getElementById('edit-orig-title').innerText = 'Project: ' + (p.fullTitle || p.title);
+    if (typeof bootMiniCalendar === 'function') bootMiniCalendar(p.start, pId);
+};
+
+window.loadMobileCrewShiftSummary = function(pId) {
+    const el = document.getElementById('mch-shift-summary');
+    if (!el) return;
+    el.innerText = 'Loading…';
+    const myUid = (typeof ACTIVE_USER_UID !== 'undefined' && ACTIVE_USER_UID) ? String(ACTIVE_USER_UID).trim() : '';
+    const myName = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? String(ACTIVE_USER_NAME).trim() : '';
+
+    google.script.run.withSuccessHandler(function(data) {
+        if (!data || !data.shifts || !data.shifts.length) {
+            el.innerHTML = '<span style="color:#71717a;">No shifts on this project yet. Open Timeline for the full schedule.</span>';
+            return;
+        }
+        const roster = data.roster || [];
+        const nameByUid = {};
+        roster.forEach(function(c) {
+            if (c.uid) nameByUid[c.uid] = c.name || c.uid;
+        });
+        const mine = data.shifts.filter(function(s) {
+            const uid = String(s.user_uid || s.uid || '');
+            if (myUid && uid === myUid) return true;
+            const nm = nameByUid[uid] || '';
+            if (myName && nm.toLowerCase() === myName.toLowerCase()) return true;
+            return false;
+        });
+        if (!mine.length) {
+            el.innerHTML = '<span style="color:#71717a;">You are not on the crew list yet. Open Timeline to see all shifts.</span>';
+            return;
+        }
+        const proj = window.mobileCrewHubProject || {};
+        const baseStr = proj.start || '';
+        const base = baseStr ? new Date(baseStr + 'T00:00:00') : null;
+        const fmt = (typeof formatShiftTime === 'function') ? formatShiftTime : function(h) { return String(h); };
+        let html = '';
+        mine.slice(0, 6).forEach(function(s) {
+            let dayLabel = '';
+            if (base && typeof s.start === 'number') {
+                const dayOff = Math.floor(s.start / 24);
+                const d = new Date(base.getTime());
+                d.setDate(d.getDate() + dayOff);
+                dayLabel = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+            }
+            const t0 = fmt(s.start % 24);
+            const t1 = fmt((s.start + s.duration) % 24);
+            html += '<div style="margin-bottom:8px;"><strong>' + (dayLabel || 'Shift') + '</strong> ' + t0 + ' – ' + t1;
+            if (s.role) html += ' <span style="color:#a855f7;">(' + s.role + ')</span>';
+            html += '</div>';
+        });
+        if (mine.length > 6) html += '<div style="font-size:11px;color:#71717a;">+' + (mine.length - 6) + ' more in Timeline</div>';
+        el.innerHTML = html;
+    }).withFailureHandler(function() {
+        el.innerHTML = '<span style="color:#71717a;">Could not load shifts. Use OPEN TIMELINE.</span>';
+    }).getTimelineData(pId, 'main');
+};
+
+window.fetchMobileCrewWeather = async function(p) {
+    const section = document.getElementById('mch-weather-section');
+    const strip = document.getElementById('mch-weather-strip');
+    if (!section || !strip) return;
+
+    const isOutdoor = !!(p.outdoor || (p.readinessState && p.readinessState.outdoor));
+    if (!isOutdoor) {
+        section.style.display = 'none';
+        return;
+    }
+
+    let lat = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lat : (p.lat || '');
+    let lng = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lng : (p.lng || '');
+    const locText = (p.locationUrl || '').trim();
+    const sDateStr = p.start || '';
+    const eDateStr = p.end || p.start || '';
+
+    if ((!lat || !lng) && locText) {
+        try {
+            const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(locText) + '&limit=1');
+            const data = await res.json();
+            if (data && data.length > 0) {
+                lat = parseFloat(data[0].lat);
+                lng = parseFloat(data[0].lon);
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    if (!lat || !lng || !sDateStr) {
+        section.style.display = 'none';
+        return;
+    }
+
+    section.style.display = 'block';
+    strip.innerHTML = '<div style="color:#71717a;font-size:12px;padding:8px;">Fetching weather…</div>';
+
+    try {
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lng +
+            '&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=14';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data || !data.daily) throw new Error('no data');
+
+        const daily = data.daily;
+        const sDate = new Date(sDateStr + 'T00:00:00Z');
+        const eDate = new Date(eDateStr + 'T23:59:59Z');
+        let html = '';
+
+        const emojiMap = { CLR: '☀️', CLOUD: '⛅', FOG: '🌫️', RAIN: '🌧️', SNOW: '❄️', STORM: '⛈️' };
+
+        for (let i = 0; i < daily.time.length; i++) {
+            const dStr = daily.time[i];
+            const dObj = new Date(dStr + 'T12:00:00Z');
+            if (dObj < sDate || dObj > eDate) continue;
+
+            const code = daily.weathercode[i];
+            let cond = 'CLR';
+            if (code >= 1 && code <= 3) cond = 'CLOUD';
+            else if (code >= 45 && code <= 48) cond = 'FOG';
+            else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) cond = 'RAIN';
+            else if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) cond = 'SNOW';
+            else if (code >= 95) cond = 'STORM';
+
+            const rainProb = daily.precipitation_probability_max[i] || 0;
+            const alert = rainProb > 50 || cond === 'STORM';
+            const dayName = dObj.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+            const maxT = Math.round(daily.temperature_2m_max[i]);
+            const minT = Math.round(daily.temperature_2m_min[i]);
+
+            html += '<div class="mch-weather-day' + (alert ? ' mch-weather-day--alert' : '') + '">' +
+                '<div class="mch-weather-day__date">' + dayName + '</div>' +
+                '<div class="mch-weather-day__emoji">' + (emojiMap[cond] || '☀️') + '</div>' +
+                '<div class="mch-weather-day__temp">' + maxT + '° / ' + minT + '°</div></div>';
+        }
+
+        strip.innerHTML = html || '<div style="color:#71717a;font-size:12px;">No forecast for project dates.</div>';
+    } catch (e) {
+        strip.innerHTML = '<div style="color:#71717a;font-size:12px;">Weather unavailable.</div>';
+    }
+};
+</script>
