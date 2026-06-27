@@ -13,6 +13,36 @@
 - [ ] **Handover Protocols:** Generate clean delivery lists with signature lines. Include options to isolate and print specific lists for Subrent Vendors (Cross-Hires).
 - [ ] **Warehouse Pull Sheets:** Generate logistics-heavy views (cases, barcodes, weights) optimized for tablets.
 
+### Warehouse RFID & Scan Operations (confirmed workflow)
+
+**Decision:** TSL + Chainway UHF guns, shared devices, personal staff badges. Guns speak to Showrunner via keyboard wedge; software hides input fields and owns scan capture. This is how warehouse check-in/out and packing will work.
+
+**Hardware**
+- [ ] **Standardize both gun brands** (TSL + Chainway): UHF EPC output, plain text + Enter, no prefix junk — same string format for all asset tags
+- [ ] **Document pairing** per device type (Chainway Android handheld, phone + TSL sled, tablet, desktop USB wedge)
+- [ ] **Asset tags:** UHF EPC Gen2 on equipment → stored in vault `rfidTag`
+- [ ] **Staff badges:** separate HF/NFC (or barcode) personal tags — not the same as case UHF tags
+
+**Software — scan experience (no finger on fields)**
+- [ ] **Scan home / modes:** dedicated entry — Check Out, Check In, Tag/Map, (later: Status)
+- [ ] **Full-screen scan mode:** invisible always-focused capture; gun trigger = instant action; beep/vibrate + green/red feedback
+- [ ] **Checkout vs output list:** scan only marks lines on the active job list; unknown / not-on-job tags flagged clearly
+- [ ] **Resume sessions:** continue active checkout/check-in (`startEventOperation` / ledger) without losing counts
+- [ ] **Wire to existing ops backend:** `processRfidScan`, `batchProcessOperations`, project `scannedQty` UI
+
+**Software — shared device + personal badge login (supermarket / kiosk model)**
+- [ ] **Kiosk / shell session** on shared phone, tablet, or scan station (one device, many operators)
+- [ ] **Badge scan = log in as operator:** scan personal RFID/NFC badge → set `currentOperator` for session
+- [ ] **All check-in, check-out, packing** recorded with that crew member as `actor` until badge-out, another badge, or timeout
+- [ ] **Badge-out / timeout / switch operator** flows on shared hardware
+- [ ] **Optional later:** badge + short PIN for sensitive actions
+
+**Phase order (when building)**
+- [ ] **A:** Gun output standard + scan capture shell (wedge, no tap-to-focus)
+- [ ] **B:** Checkout mode wired to project output list
+- [ ] **C:** Kiosk device + staff badge operator session
+- [ ] **D:** Tablet-optimized pull sheets + truck payload assignment from scanner
+
 - [ ] **Fleet Payload Assignment:** Link the Check-Out scanner so that sealed flight cases (and their nested contents) can be directly assigned as payloads to specific Truck timelines.
 - [ ] **The "Truck Arrangement Brain" (Algorithmic Load Planner):** Isolate truck packing logic into a dedicated rules engine. This "Brain" will blend basic Tetris logic with weighted human heuristics (e.g., LED walls stack 3-high at the front, Line arrays follow). It will autonomously score and prioritize conflicting constraints like weight distribution (center of gravity), stackability limits, and operational presets to emulate human decision-making.
 

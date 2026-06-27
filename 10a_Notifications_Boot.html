@@ -1,7 +1,7 @@
 <script>
 /**
  * 10a_Notifications_Boot.html
- * Hosting shell bridge — sends login key + bridge nonce to parent (parent saves token).
+ * Sends login reg key to hosting parent (meta tags — no google.script.run required).
  */
 
 (function() {
@@ -21,28 +21,46 @@
     } catch (e) { return ''; }
   }
 
-  function storeRegKey(regKey) {
-    if (!regKey) return;
-    try { localStorage.setItem('sr_fcm_reg_key', String(regKey).trim()); } catch (e) { /* ignore */ }
+  function getCrewName() {
+    if (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
+      return String(ACTIVE_USER_NAME).trim();
+    }
+    var el = document.querySelector('meta[name="user-name"]');
+    return (el && el.content) ? String(el.content).trim() : '';
   }
 
   function pushFcmAuthToParent(regKey) {
-    if (!regKey || typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
-    storeRegKey(regKey);
+    var crew = getCrewName();
+    if (!regKey || !crew) return;
+    try { localStorage.setItem('sr_fcm_reg_key', regKey); } catch (e) { /* ignore */ }
     try {
       window.parent.postMessage({
         type: 'SHOWRUNNER_FCM_AUTH',
         regKey: regKey,
-        crewName: ACTIVE_USER_NAME
+        crewName: crew
       }, '*');
     } catch (e) { /* ignore */ }
   }
 
+  function notifyParentReady() {
+    if (!window.isShowrunnerHostingShell) return;
+    var crew = getCrewName();
+    var regKey = getFcmRegKey();
+    try {
+      window.parent.postMessage({
+        type: 'SHOWRUNNER_APP_READY',
+        crewName: crew,
+        regKey: regKey
+      }, '*');
+    } catch (e) { /* ignore */ }
+    if (regKey && crew) pushFcmAuthToParent(regKey);
+  }
+
   function pushBridgeToParent() {
-    if (!window.isShowrunnerHostingShell || pushLinked) return;
-    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    var crew = getCrewName();
+    if (!window.isShowrunnerHostingShell || pushLinked || !crew) return;
     google.script.run
-      .withFailureHandler(function() { /* reg-key path may still work */ })
+      .withFailureHandler(function() { /* reg-key path preferred */ })
       .withSuccessHandler(function(res) {
         if (!res || !res.success || !res.nonce) return;
         try {
@@ -53,40 +71,26 @@
           }, '*');
         } catch (e) { /* ignore */ }
       })
-      .prepareFcmRegistrationBridge(ACTIVE_USER_NAME);
+      .prepareFcmRegistrationBridge(crew);
   }
 
-  function refreshFcmRegKeyAndNotifyParent() {
-    if (!window.isShowrunnerHostingShell || pushLinked) return;
-    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
-    var metaKey = getFcmRegKey();
-    if (metaKey) pushFcmAuthToParent(metaKey);
-    google.script.run
-      .withFailureHandler(function() {
-        pushBridgeToParent();
-      })
-      .withSuccessHandler(function(res) {
-        if (res && res.success && res.regKey) {
-          pushFcmAuthToParent(res.regKey);
-        } else {
-          pushBridgeToParent();
-        }
-      })
-      .issueFcmRegistrationKey(ACTIVE_USER_NAME);
-  }
-
-  function notifyParentReady() {
-    if (!window.isShowrunnerHostingShell) return;
-    try {
-      var regKey = getFcmRegKey();
-      var crew = (typeof ACTIVE_USER_NAME !== 'undefined') ? ACTIVE_USER_NAME : '';
-      window.parent.postMessage({
-        type: 'SHOWRUNNER_APP_READY',
-        crewName: crew,
-        regKey: regKey
-      }, '*');
-      if (regKey && crew) pushFcmAuthToParent(regKey);
-    } catch (e) { /* ignore */ }
+  function respondToParentPushRequest() {
+    notifyParentReady();
+    var regKey = getFcmRegKey();
+    if (regKey) {
+      pushFcmAuthToParent(regKey);
+    } else {
+      google.script.run
+        .withFailureHandler(function() { pushBridgeToParent(); })
+        .withSuccessHandler(function(res) {
+          if (res && res.success && res.regKey) {
+            pushFcmAuthToParent(res.regKey);
+          } else {
+            pushBridgeToParent();
+          }
+        })
+        .issueFcmRegistrationKey(getCrewName());
+    }
   }
 
   function onHostRegistered(res) {
@@ -120,13 +124,7 @@
       bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999998;background:#0f172a;border-bottom:1px solid #10b981;color:#a1a1aa;padding:8px 12px;font-size:11px;line-height:1.4;text-align:center;';
       document.body.appendChild(bar);
     }
-    bar.textContent = message || 'Finish logging in below if needed — alerts link automatically.';
-  }
-
-  function respondToParentPushRequest() {
-    notifyParentReady();
-    refreshFcmRegKeyAndNotifyParent();
-    pushBridgeToParent();
+    bar.textContent = message || 'Log in below if needed — alerts link automatically after login.';
   }
 
   window.addEventListener('message', function(ev) {
@@ -151,7 +149,7 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bootBridge);
   } else {
-    setTimeout(bootBridge, 300);
+    setTimeout(bootBridge, 100);
   }
 
   document.addEventListener('visibilitychange', function() {
@@ -160,17 +158,17 @@
     }
   });
 
-  var linkRetryTimer = setInterval(function() {
+  var metaBroadcast = setInterval(function() {
     if (pushLinked || !window.isShowrunnerHostingShell) {
-      clearInterval(linkRetryTimer);
+      clearInterval(metaBroadcast);
       return;
     }
-    if (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
-      respondToParentPushRequest();
-    }
-  }, 6000);
+    var k = getFcmRegKey();
+    var crew = getCrewName();
+    if (crew && k) pushFcmAuthToParent(k);
+  }, 2000);
 
-  setTimeout(function() { clearInterval(linkRetryTimer); }, 600000);
+  setTimeout(function() { clearInterval(metaBroadcast); }, 600000);
 
   window.retryShowrunnerFcmBridge = function() {
     pushLinked = false;

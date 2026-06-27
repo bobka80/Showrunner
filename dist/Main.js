@@ -110,6 +110,17 @@ function doGet(e) {
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'fcmrefreshkey') {
+    const result = refreshFcmRegistrationKeyFromOld_(e.parameter.oldkey || '');
+    const json = JSON.stringify(result);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
   loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
   loginTemplate.errorMsg = "none";

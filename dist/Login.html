@@ -111,6 +111,11 @@
         btn.style.opacity = '0.7';
         btn.disabled = true;
       });
+      if (window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage({ type: 'SHOWRUNNER_LOGIN_STATE', loggedIn: false }, '*');
+        } catch (e) { /* ignore */ }
+      }
     });
   </script>
 </body>

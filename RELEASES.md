@@ -4,37 +4,38 @@ Created only on **Milestone** / **OK ship** / **Milestone now** — not on every
 
 | # | Date | GAS version | Deployment | Note |
 |---|------|-------------|------------|------|
-| 1 | 2026-06-26 | 297 | `AKfycbxy…` | Push v300 — account link bridge fallback |
-| 2 | 2026-06-26 | 296 | `AKfycbxy…` | Phase 2+3 — host-only push save, slim iframe bridge |
-| 3 | 2026-06-26 | 295 | `AKfycbxy…` | Phase 1 PWA — Stage Masters A icon, install panel, standalone |
-| 4 | 2026-06-26 | 294 | `AKfycbxy…` | Pre Phase 1 PWA — snapshot before home screen icon + standalone install |
-| 5 | 2026-06-26 | 293 | `AKfycbxy…` | Push v295 — parent-side save on Save tap |
-| 6 | 2026-06-26 | 292 | `AKfycbxy…` | Push v294 — dock layout fix + in-app Save button |
-| 7 | 2026-06-26 | 291 | `AKfycbxy…` | Push link fix — reg key on APP_READY + Link button |
-| 8 | 2026-06-26 | 290 | `AKfycbxy…` | Fix push save when already logged in — request FCM auth loop |
-| 9 | 2026-06-26 | 289 | `AKfycbxy…` | Mobile push diagnostics — step status + boot reg key |
-| 10 | 2026-06-26 | 288 | `AKfycbxy…` | Mobile push dock UI + in-app notification hint |
-| 11 | 2026-06-26 | 287 | `AKfycbxy…` | Android push retries — fresh reg key every 12s |
-| 12 | 2026-06-26 | 286 | `AKfycbxy…` | Android push — parent JSONP save via login key |
-| 13 | 2026-06-26 | 285 | `AKfycbxy…` | Fix phone push — per-device registration check (not fooled by desktop) |
-| 14 | 2026-06-26 | 284 | `AKfycbxy…` | Multi-device FCM tokens — push to phone and desktop |
-| 15 | 2026-06-26 | 283 | `AKfycbxy…` | Silent push registration — remove copy/paste UI (hosting v285) |
-| 16 | 2026-06-26 | 281 | `AKfycbxy…` | Add UrlFetchApp oauth scope for FCM push |
-| 17 | 2026-06-26 | 280 | `AKfycbxy…` | Fix push button pointer-events |
-| 18 | 2026-06-26 | 279 | `AKfycbxy…` | GET TOKEN FROM HOSTING button in DATABASE |
-| 19 | 2026-06-26 | 278 | `AKfycbxy…` | Manual device token save + registration poll |
-| 20 | 2026-06-26 | 277 | `AKfycbxy…` | Fix FCM token save JSONP bridge wait |
-| 21 | 2026-06-26 | 276 | `AKfycbxy…` | FCM save via iframe google.script.run bridge |
-| 22 | 2026-06-26 | 275 | `AKfycbxy…` | FCM token bridge — Hosting saves token to server |
-| 23 | 2026-06-26 | 274 | `AKfycbxy…` | VAPID key validation and ROOT save UI |
-| 24 | 2026-06-26 | 273 | `AKfycbxy…` | Push registration diagnostics and wrong-URL detection |
-| 25 | 2026-06-26 | 272 | `AKfycbxy…` | Fix push token registration in Hosting iframe |
-| 26 | 2026-06-26 | 271 | `AKfycbxy…` | FCM web app IDs fallback for push config |
-| 27 | 2026-06-26 | 270 | `AKfycbxy…` | Fix fcfg endpoint — Firebase Hosting deploy |
-| 28 | 2026-06-26 | 269 | `AKfycbxy…` | Push notifications Phase 1 — FCM plumbing + Firebase Hosting shell |
-| 29 | 2026-06-26 | 268 | `AKfycbxy…` | Outdoor weather widget — compact chip, hover day strip, UI doctrine |
-| 30 | 2026-06-26 | 267 | `AKfycbxy…` | RBAC sidebar permissions — view_logistics tracker gate, view_month_roster explicit grants |
-| 31 | 2026-06-26 | 266 | `AKfycbx…` | Pre database operations panel — IAM and manager settings baseline |
+| 1 | 2026-06-27 | 298 | `AKfycbxy…` | Push v301 — account link via meta postMessage + fcmrefreshkey |
+| 2 | 2026-06-26 | 297 | `AKfycbxy…` | Push v300 — account link bridge fallback |
+| 3 | 2026-06-26 | 296 | `AKfycbxy…` | Phase 2+3 — host-only push save, slim iframe bridge |
+| 4 | 2026-06-26 | 295 | `AKfycbxy…` | Phase 1 PWA — Stage Masters A icon, install panel, standalone |
+| 5 | 2026-06-26 | 294 | `AKfycbxy…` | Pre Phase 1 PWA — snapshot before home screen icon + standalone install |
+| 6 | 2026-06-26 | 293 | `AKfycbxy…` | Push v295 — parent-side save on Save tap |
+| 7 | 2026-06-26 | 292 | `AKfycbxy…` | Push v294 — dock layout fix + in-app Save button |
+| 8 | 2026-06-26 | 291 | `AKfycbxy…` | Push link fix — reg key on APP_READY + Link button |
+| 9 | 2026-06-26 | 290 | `AKfycbxy…` | Fix push save when already logged in — request FCM auth loop |
+| 10 | 2026-06-26 | 289 | `AKfycbxy…` | Mobile push diagnostics — step status + boot reg key |
+| 11 | 2026-06-26 | 288 | `AKfycbxy…` | Mobile push dock UI + in-app notification hint |
+| 12 | 2026-06-26 | 287 | `AKfycbxy…` | Android push retries — fresh reg key every 12s |
+| 13 | 2026-06-26 | 286 | `AKfycbxy…` | Android push — parent JSONP save via login key |
+| 14 | 2026-06-26 | 285 | `AKfycbxy…` | Fix phone push — per-device registration check (not fooled by desktop) |
+| 15 | 2026-06-26 | 284 | `AKfycbxy…` | Multi-device FCM tokens — push to phone and desktop |
+| 16 | 2026-06-26 | 283 | `AKfycbxy…` | Silent push registration — remove copy/paste UI (hosting v285) |
+| 17 | 2026-06-26 | 281 | `AKfycbxy…` | Add UrlFetchApp oauth scope for FCM push |
+| 18 | 2026-06-26 | 280 | `AKfycbxy…` | Fix push button pointer-events |
+| 19 | 2026-06-26 | 279 | `AKfycbxy…` | GET TOKEN FROM HOSTING button in DATABASE |
+| 20 | 2026-06-26 | 278 | `AKfycbxy…` | Manual device token save + registration poll |
+| 21 | 2026-06-26 | 277 | `AKfycbxy…` | Fix FCM token save JSONP bridge wait |
+| 22 | 2026-06-26 | 276 | `AKfycbxy…` | FCM save via iframe google.script.run bridge |
+| 23 | 2026-06-26 | 275 | `AKfycbxy…` | FCM token bridge — Hosting saves token to server |
+| 24 | 2026-06-26 | 274 | `AKfycbxy…` | VAPID key validation and ROOT save UI |
+| 25 | 2026-06-26 | 273 | `AKfycbxy…` | Push registration diagnostics and wrong-URL detection |
+| 26 | 2026-06-26 | 272 | `AKfycbxy…` | Fix push token registration in Hosting iframe |
+| 27 | 2026-06-26 | 271 | `AKfycbxy…` | FCM web app IDs fallback for push config |
+| 28 | 2026-06-26 | 270 | `AKfycbxy…` | Fix fcfg endpoint — Firebase Hosting deploy |
+| 29 | 2026-06-26 | 269 | `AKfycbxy…` | Push notifications Phase 1 — FCM plumbing + Firebase Hosting shell |
+| 30 | 2026-06-26 | 268 | `AKfycbxy…` | Outdoor weather widget — compact chip, hover day strip, UI doctrine |
+| 31 | 2026-06-26 | 267 | `AKfycbxy…` | RBAC sidebar permissions — view_logistics tracker gate, view_month_roster explicit grants |
+| 32 | 2026-06-26 | 266 | `AKfycbx…` | Pre database operations panel — IAM and manager settings baseline |
 
 ---
 

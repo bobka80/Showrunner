@@ -81,6 +81,15 @@ function issueFcmRegistrationKey(crewName) {
   return { success: true, regKey: createFcmRegistrationKey_(crewName) };
 }
 
+function refreshFcmRegistrationKeyFromOld_(oldKey) {
+  const cleanOld = String(oldKey || '').trim();
+  if (!cleanOld) return { success: false, message: 'Missing key.' };
+  const cache = CacheService.getScriptCache();
+  const crewName = cache.get('fcm_regkey_' + cleanOld);
+  if (!crewName) return { success: false, message: 'Key expired — log in again.' };
+  return { success: true, regKey: createFcmRegistrationKey_(crewName), crewName: crewName };
+}
+
 function createFcmRegistrationKey_(crewName) {
   const cleanName = String(crewName || '').trim();
   if (!cleanName) return '';

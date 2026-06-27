@@ -14,7 +14,7 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '300';
+  const SW_BUILD = '301';
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -27,6 +27,7 @@
   let regKeyFailCount = 0;
   let pushResetAttempts = 0;
   let lastPushError = '';
+  let iframeLoggedIn = false;
   let deferredInstallPrompt = null;
   let shellInitStarted = false;
 
@@ -223,6 +224,36 @@
     } catch (e) { /* ignore */ }
   }
 
+  function storeParentAuth(auth) {
+    if (!auth || !auth.regKey || !auth.crewName) return;
+    try {
+      localStorage.setItem('sr_parent_fcm_reg_key', auth.regKey);
+      localStorage.setItem('sr_parent_fcm_crew', auth.crewName);
+    } catch (e) { /* ignore */ }
+  }
+
+  function tryRefreshRegKeyFromParent() {
+    var oldKey = '';
+    try { oldKey = localStorage.getItem('sr_parent_fcm_reg_key') || ''; } catch (e) { /* ignore */ }
+    if (!oldKey) return;
+    const cb = '__srFcmRef_' + Date.now();
+    const url = getRegisterBaseUrl()
+      + '?action=fcmrefreshkey'
+      + '&oldkey=' + encodeURIComponent(oldKey)
+      + '&callback=' + encodeURIComponent(cb);
+    window[cb] = function(res) {
+      delete window[cb];
+      if (res && res.success && res.regKey) {
+        logPush('refreshed reg key from parent cache');
+        onAccountLink({ regKey: res.regKey, crewName: res.crewName || '' });
+      }
+    };
+    const script = document.createElement('script');
+    script.src = url;
+    script.onerror = function() { delete window[cb]; };
+    document.head.appendChild(script);
+  }
+
   function requestFcmAuthFromIframe() {
     if (!frame || !frame.contentWindow) return;
     try {
@@ -253,9 +284,13 @@
         return;
       }
       if (!pendingFcmAuth || !pendingFcmAuth.regKey) {
-        if (elapsed >= 8000) {
-          setDockMessage('Still linking — finish logging in below if you see the login screen.');
+        if (!iframeLoggedIn) {
+          setDockMessage('Log in to Showrunner below first — then alerts link automatically.');
+          setDockStatus(['Step 1: token OK', 'Step 2: log in below']);
+        } else if (elapsed >= 8000) {
+          setDockMessage('Linking your account…');
           setDockStatus(['Step 1: token OK', 'Step 2: linking account…', 'trying alternate path']);
+          tryRefreshRegKeyFromParent();
           requestFcmBridgeFromIframe();
         } else {
           setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
@@ -389,11 +424,26 @@
   }
 
   function onAccountLink(auth) {
-    pendingFcmAuth = auth;
-    if (!fcmToken) return;
-    setDockStatus(['Step 1: token OK', 'Step 2: linking account…']);
-    trySaveTokenViaRegKey();
-    startRegistrationLoop();
+    if (!auth || !auth.crewName) return;
+    iframeLoggedIn = true;
+    if (auth.regKey) {
+      storeParentAuth(auth);
+      pendingFcmAuth = { regKey: auth.regKey, crewName: auth.crewName };
+    } else {
+      tryRefreshRegKeyFromParent();
+    }
+    if (!fcmToken) {
+      if (Notification.permission === 'granted' && iframeLoggedIn) {
+        pushStarted = false;
+        obtainFcmToken(true);
+      }
+      return;
+    }
+    if (pendingFcmAuth && pendingFcmAuth.regKey) {
+      setDockStatus(['Step 1: token OK', 'Step 2: saving to server…']);
+      trySaveTokenViaRegKey();
+      startRegistrationLoop();
+    }
   }
 
   function loadConfigJsonp() {
@@ -412,12 +462,20 @@
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
-    if (ev.data.type === 'SHOWRUNNER_APP_READY' && ev.data.regKey) {
-      onAccountLink({ regKey: ev.data.regKey, crewName: ev.data.crewName || '' });
+    if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
+      iframeLoggedIn = false;
+      pendingFcmAuth = null;
+      if (fcmToken && !serverSaveConfirmed) {
+        setDockMessage('Log in below to link alerts to your account.');
+        setDockStatus(['Step 1: token OK', 'Step 2: log in below']);
+      }
+    }
+    if (ev.data.type === 'SHOWRUNNER_APP_READY') {
+      onAccountLink({ regKey: ev.data.regKey || '', crewName: ev.data.crewName || '' });
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
       onAccountLink(ev.data);
-      if (isMobileDevice() && Notification.permission !== 'granted') {
+      if (!fcmToken && Notification.permission !== 'granted') {
         showPushPrompt('allow');
       }
     }
@@ -606,20 +664,11 @@
           showInstallPanel();
           return;
         }
-        if (isMobileDevice()) {
-          pushStarted = false;
-          showPushPrompt('retry');
-          setDockMessage('Tap below to connect shift alerts to this phone.');
-          setDockStatus(['Step 1: ready', 'Tap the button — required on Android']);
-          if (enableBtn) enableBtn.textContent = 'Set up shift alerts';
-          return;
-        }
-        pushStarted = true;
-        var gotToken = await obtainFcmToken(false);
-        if (!gotToken) {
-          pushStarted = false;
-          showPushPrompt('retry');
-        }
+        pushStarted = false;
+        showPushPrompt('retry');
+        setDockMessage('Log in below, then tap Set up shift alerts.');
+        setDockStatus(['Log in first', 'Then tap the green button']);
+        if (enableBtn) enableBtn.textContent = 'Set up shift alerts';
         return;
       }
       if (Notification.permission === 'denied') {

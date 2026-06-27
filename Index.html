@@ -201,8 +201,25 @@
 <script>
   (function() {
     var k = document.querySelector('meta[name="fcm-reg-key"]');
-    if (k && k.content) {
-      try { localStorage.setItem('sr_fcm_reg_key', String(k.content).trim()); } catch (e) { /* ignore */ }
+    var n = document.querySelector('meta[name="user-name"]');
+    var regKey = (k && k.content) ? String(k.content).trim() : '';
+    var crewName = (n && n.content) ? String(n.content).trim() : '';
+    if (regKey) {
+      try { localStorage.setItem('sr_fcm_reg_key', regKey); } catch (e) { /* ignore */ }
+    }
+    if (window.parent && window.parent !== window && crewName && regKey) {
+      try {
+        window.parent.postMessage({
+          type: 'SHOWRUNNER_FCM_AUTH',
+          regKey: regKey,
+          crewName: crewName
+        }, '*');
+        window.parent.postMessage({
+          type: 'SHOWRUNNER_APP_READY',
+          regKey: regKey,
+          crewName: crewName
+        }, '*');
+      } catch (e) { /* ignore */ }
     }
   })();
 </script>
