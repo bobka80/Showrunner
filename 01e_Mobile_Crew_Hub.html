@@ -1,43 +1,51 @@
 <!-- @INDEX: MOBILE -> Crew Hub Shell -->
 <div id="mobile-crew-hub-overlay">
     <div class="mch-header">
-        <button class="btn-outline" onclick="closeMobileCrewHub()" style="border:none; color:var(--accent); font-weight:bold; font-size:12px; margin:0 0 10px 0; padding:0; background:transparent !important;">⬅ BACK</button>
-        <h2 class="mch-title" id="mch-title">Project</h2>
-        <div class="mch-meta-row">
-            <span class="mch-badge mch-badge--type" id="mch-type-badge">EVENT</span>
-            <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
-            <span class="mch-badge" id="mch-region-badge" style="border-color:#10b981;color:#10b981;">IN SOFIA</span>
+        <button type="button" class="mch-back-btn" onclick="closeMobileCrewHub()">⬅ BACK</button>
+        <div class="mch-header-main">
+            <div class="mch-title-row">
+                <h2 class="mch-title" id="mch-title">Project</h2>
+                <div id="mch-weather-widget-host" class="mch-weather-widget-host" style="display:none;"></div>
+            </div>
+            <div class="mch-meta-row">
+                <span class="mch-badge mch-badge--type" id="mch-type-badge">EVENT</span>
+                <span class="mch-badge mch-badge--status" id="mch-status-badge">DRAFT</span>
+                <span class="mch-badge" id="mch-region-badge">IN SOFIA</span>
+            </div>
+            <div class="mch-location" id="mch-location"></div>
         </div>
-        <div class="mch-location" id="mch-location"></div>
     </div>
     <div class="mch-body">
-        <div id="mch-phase-rail-host"></div>
-        <div id="mch-weather-section" style="display:none;">
-            <div class="mch-section-label">WEATHER</div>
-            <div class="mch-weather-strip" id="mch-weather-strip"></div>
+        <div id="mch-subevents-host"></div>
+    </div>
+    <div class="mch-footer">
+        <button type="button" class="btn-outline btn-outline-purple mch-footer-btn" onclick="mobileCrewOpenTimeline()">TIMELINE</button>
+        <button type="button" class="btn-outline btn-outline-orange mch-footer-btn req-event_assets_window" onclick="mobileCrewOpenAssets()">ASSETS</button>
+        <button type="button" class="btn-close mch-footer-btn" onclick="closeMobileCrewHub()">CANCEL</button>
+    </div>
+</div>
+
+<div id="mobile-weather-popup" class="mobile-weather-popup" aria-hidden="true">
+    <div class="mobile-weather-popup__backdrop" onclick="closeMobileWeatherPopup()"></div>
+    <div class="mobile-weather-popup__panel">
+        <div class="mobile-weather-popup__head">
+            <span>WEATHER FORECAST</span>
+            <button type="button" class="mobile-weather-popup__close" onclick="closeMobileWeatherPopup()">✕</button>
         </div>
-        <div>
-            <div class="mch-section-label">MY SHIFT</div>
-            <div class="mch-shift-card" id="mch-shift-summary">Loading shift info…</div>
-        </div>
-        <div class="mch-actions">
-            <button class="btn-outline btn-outline-purple" onclick="mobileCrewOpenTimeline()">OPEN TIMELINE</button>
-            <button class="btn-outline btn-outline-orange req-event_assets_window" onclick="mobileCrewOpenAssets()">PROJECT ASSETS</button>
-            <button class="btn-close" onclick="closeMobileCrewHub()">CANCEL</button>
-            <button class="btn-outline pe-manager-only" id="mch-full-editor-btn" style="display:none; font-size:11px !important; padding:12px !important;" onclick="mobileCrewOpenFullEditor()">MANAGER: FULL EDITOR</button>
-        </div>
+        <div id="mobile-weather-popup-detail" class="mobile-weather-popup__detail"></div>
     </div>
 </div>
 
 <script>
 /**
  * 01e_Mobile_Crew_Hub.html
- * Mobile crew briefing screen — replaces full project editor on phone.
+ * Mobile crew briefing — read-only event hub (no mini calendar on phone).
  * @INDEX: MOBILE -> Crew Hub Logic
  */
 
 window.mobileCrewHubProjectId = null;
 window.mobileCrewHubProject = null;
+window._mobileWeatherDetailCache = window._mobileWeatherDetailCache || {};
 
 window.isMobileViewport = function() {
     return window.innerWidth <= 768;
@@ -61,6 +69,193 @@ window.resolveMobileProject = function(pId) {
     return p;
 };
 
+window.projectIsOutdoorMobile = function(p) {
+    return !!(p && (p.outdoor || (p.readinessState && p.readinessState.outdoor)));
+};
+
+window.mobileWeatherCondFromCode = function(code) {
+    if (code == null) return 'CLR';
+    if (code >= 1 && code <= 3) return 'CLOUD';
+    if (code >= 45 && code <= 48) return 'FOG';
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'RAIN';
+    if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) return 'SNOW';
+    if (code >= 95) return 'STORM';
+    return 'CLR';
+};
+
+window.fetchMobileWeatherDaysForProject = async function(p) {
+    if (!p) return { days: [], error: 'no project' };
+    const cacheKey = String(p.id || '') + '|' + (p.start || '') + '|' + (p.end || '');
+    if (window._mobileWeatherDetailCache[cacheKey]) return window._mobileWeatherDetailCache[cacheKey];
+
+    let lat = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lat : (p.lat || '');
+    let lng = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lng : (p.lng || '');
+    const locText = (p.locationUrl || '').trim();
+    const sDateStr = p.start || '';
+    const eDateStr = p.end || p.start || '';
+
+    if ((!lat || !lng) && locText) {
+        try {
+            const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(locText) + '&limit=1');
+            const data = await res.json();
+            if (data && data.length > 0) {
+                lat = parseFloat(data[0].lat);
+                lng = parseFloat(data[0].lon);
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    if (!lat || !lng || !sDateStr) {
+        return { days: [], error: 'missing loc/date' };
+    }
+
+    try {
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lng +
+            '&daily=weathercode,temperature_2m_max,temperature_2m_min,windspeed_10m_max,precipitation_probability_max&timezone=auto&forecast_days=14';
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!data || !data.daily) throw new Error('no data');
+
+        const daily = data.daily;
+        const sDate = new Date(sDateStr + 'T00:00:00Z');
+        const eDate = new Date(eDateStr + 'T23:59:59Z');
+        const days = [];
+
+        for (let i = 0; i < daily.time.length; i++) {
+            const dObj = new Date(daily.time[i] + 'T12:00:00Z');
+            if (dObj < sDate || dObj > eDate) continue;
+            days.push({
+                dObj: dObj,
+                maxT: daily.temperature_2m_max[i],
+                minT: daily.temperature_2m_min[i],
+                wind: daily.windspeed_10m_max[i],
+                rainProb: daily.precipitation_probability_max[i] || 0,
+                cond: window.mobileWeatherCondFromCode(daily.weathercode[i])
+            });
+        }
+
+        const out = { days: days, error: days.length ? null : 'outside' };
+        window._mobileWeatherDetailCache[cacheKey] = out;
+        return out;
+    } catch (e) {
+        return { days: [], error: 'fetch failed' };
+    }
+};
+
+window.buildMobileWeatherSummaryInnerHtml = function(days) {
+    if (!days || !days.length) {
+        return '<div class="ww-line ww-line--muted">N/A</div>';
+    }
+    const worstFn = window.weatherWorstCond || function(ds) {
+        return ds[0] ? ds[0].cond : 'CLR';
+    };
+    const labelFn = window.weatherCondLabel || function(c) { return c; };
+    const eventMin = Math.min.apply(null, days.map(function(d) { return d.minT; }));
+    const eventMax = Math.max.apply(null, days.map(function(d) { return d.maxT; }));
+    const peakWind = Math.max.apply(null, days.map(function(d) { return d.wind; }));
+    const worstCond = worstFn(days);
+    const condLabel = labelFn(worstCond);
+    const condAlert = worstCond === 'RAIN' || worstCond === 'SNOW' || worstCond === 'STORM' || worstCond === 'FOG';
+    const tempAlert = eventMin < 5 || eventMax > 35;
+    const windAlert = peakWind > 40;
+    return ''
+        + '<div class="ww-line ww-line--cond' + (condAlert ? ' ww-line--alert' : '') + '">' + condLabel + '</div>'
+        + '<div class="ww-line' + (tempAlert ? ' ww-line--alert' : '') + '">' + Math.round(eventMin) + '° – ' + Math.round(eventMax) + '°C</div>'
+        + '<div class="ww-line' + (windAlert ? ' ww-line--alert' : '') + '">' + Math.round(peakWind) + ' km/h</div>';
+};
+
+window.buildMobileWeatherDetailHtml = function(days) {
+    if (!days || !days.length) return '<div class="ww-line ww-line--muted">No forecast for project dates.</div>';
+    const emojiFn = window.weatherCondEmoji || function() { return '☀️'; };
+    let html = '';
+    days.forEach(function(d) {
+        const dayAlert = d.maxT > 35 || d.minT < 5 || d.wind > 40 || d.rainProb > 50;
+        const dayName = d.dObj.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', timeZone: 'UTC' });
+        const emoji = emojiFn(d.cond);
+        html += '<div class="weather-widget-day' + (dayAlert ? ' weather-widget-day--alert' : '') + '">'
+            + '<div class="weather-widget-day__date">' + dayName + '</div>'
+            + '<div class="weather-widget-day__cond" title="' + d.cond + '">' + emoji + '</div>'
+            + '<div class="weather-widget-day__stats">'
+            + '<div class="ww-temp">' + Math.round(d.maxT) + '° <span style="color:#888;font-weight:600;">' + Math.round(d.minT) + '°</span></div>'
+            + '<div class="ww-wind">' + Math.round(d.wind) + ' km/h</div>'
+            + '<div class="ww-rain">' + d.rainProb + '%</div>'
+            + '</div></div>';
+    });
+    return html;
+};
+
+window.renderMobileWeatherSummaryBadge = function(hostEl, p, opts) {
+    opts = opts || {};
+    if (!hostEl) return;
+    if (!projectIsOutdoorMobile(p)) {
+        hostEl.style.display = 'none';
+        hostEl.innerHTML = '';
+        return;
+    }
+    hostEl.style.display = 'block';
+    hostEl.innerHTML = '<div class="weather-widget-summary mch-weather-summary-badge"><div class="ww-line ww-line--muted">…</div></div>';
+    if (opts.interactive) {
+        hostEl.classList.add('mch-weather-widget-host--tap');
+        hostEl.onclick = function() { openMobileWeatherPopupForProject(p); };
+    } else {
+        hostEl.classList.remove('mch-weather-widget-host--tap');
+        hostEl.onclick = null;
+        hostEl.style.pointerEvents = 'none';
+    }
+    fetchMobileWeatherDaysForProject(p).then(function(result) {
+        const inner = hostEl.querySelector('.weather-widget-summary') || hostEl;
+        if (result.error && !result.days.length) {
+            inner.innerHTML = '<div class="ww-line ww-line--muted">WEATHER</div>';
+            return;
+        }
+        inner.innerHTML = buildMobileWeatherSummaryInnerHtml(result.days);
+        if (opts.interactive) {
+            window._mobileWeatherDetailCache['_popup_' + p.id] = result.days;
+        }
+    });
+};
+
+window.openMobileWeatherPopupForProject = function(p) {
+    const popup = document.getElementById('mobile-weather-popup');
+    const detail = document.getElementById('mobile-weather-popup-detail');
+    if (!popup || !detail || !p) return;
+    popup.classList.add('open');
+    popup.setAttribute('aria-hidden', 'false');
+    detail.innerHTML = '<div class="ww-line ww-line--muted">Loading…</div>';
+    const cached = window._mobileWeatherDetailCache['_popup_' + p.id];
+    if (cached && cached.length) {
+        detail.innerHTML = buildMobileWeatherDetailHtml(cached);
+        return;
+    }
+    fetchMobileWeatherDaysForProject(p).then(function(result) {
+        window._mobileWeatherDetailCache['_popup_' + p.id] = result.days;
+        detail.innerHTML = buildMobileWeatherDetailHtml(result.days);
+    });
+};
+
+window.closeMobileWeatherPopup = function() {
+    const popup = document.getElementById('mobile-weather-popup');
+    if (popup) {
+        popup.classList.remove('open');
+        popup.setAttribute('aria-hidden', 'true');
+    }
+};
+
+function applyMobileHubStatusStyle(statusRaw) {
+    const el = document.getElementById('mch-status-badge');
+    if (!el) return;
+    const s = String(statusRaw || 'Draft').toUpperCase();
+    el.innerText = s;
+    let border = '#10b981';
+    let color = '#10b981';
+    if (s === 'DRAFT') { border = '#a1a1aa'; color = '#a1a1aa'; }
+    else if (s.indexOf('NOT') >= 0) { border = '#f97316'; color = '#f97316'; }
+    else if (s === 'APPROVED') { border = '#10b981'; color = '#10b981'; }
+    else if (s === 'CANCELLED') { border = '#ef4444'; color = '#ef4444'; }
+    el.style.borderColor = border;
+    el.style.color = color;
+}
+
 window.syncProjectEditorHiddenFields = function(p, pId) {
     if (!p) return;
     const setVal = function(id, val) {
@@ -78,7 +273,7 @@ window.syncProjectEditorHiddenFields = function(p, pId) {
     setVal('edit-proj-lat', (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lat : (p.lat || ''));
     setVal('edit-proj-lng', (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lng : (p.lng || ''));
     const outdoor = document.getElementById('edit-proj-outdoor');
-    if (outdoor) outdoor.checked = !!(p.outdoor || (p.readinessState && p.readinessState.outdoor));
+    if (outdoor) outdoor.checked = projectIsOutdoorMobile(p);
     const statusEl = document.getElementById('display-event-status');
     if (statusEl) statusEl.innerText = String(p.status || 'Draft').toUpperCase();
     const typeEl = document.getElementById('display-event-type');
@@ -101,7 +296,7 @@ window.openMobileCrewHub = function(pId) {
 
     document.getElementById('mch-title').innerText = p.title || p.fullTitle || 'Project';
     document.getElementById('mch-type-badge').innerText = String(p.type || 'Event').toUpperCase();
-    document.getElementById('mch-status-badge').innerText = String(p.status || 'Draft').toUpperCase();
+    applyMobileHubStatusStyle(p.status);
 
     const loc = (p.locationUrl || '').trim();
     const locEl = document.getElementById('mch-location');
@@ -125,23 +320,17 @@ window.openMobileCrewHub = function(pId) {
         locEl.innerHTML = '<span style="color:#52525b;">No location set</span>';
     }
 
-    if (typeof renderMobilePhaseRail === 'function') {
-        renderMobilePhaseRail(document.getElementById('mch-phase-rail-host'), p.fragments || []);
+    if (typeof renderMobilePhaseList === 'function') {
+        renderMobilePhaseList(document.getElementById('mch-subevents-host'), p.fragments || []);
     }
 
-    loadMobileCrewShiftSummary(pId);
-    fetchMobileCrewWeather(p);
-
-    const mgrBtn = document.getElementById('mch-full-editor-btn');
-    if (mgrBtn) {
-        const show = (typeof canFullEditProject === 'function') && canFullEditProject(pId);
-        mgrBtn.style.display = show ? 'block' : 'none';
-    }
+    renderMobileWeatherSummaryBadge(document.getElementById('mch-weather-widget-host'), p, { interactive: true });
 
     document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
 };
 
 window.closeMobileCrewHub = function() {
+    closeMobileWeatherPopup();
     document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
     window.mobileCrewHubProjectId = null;
     window.mobileCrewHubProject = null;
@@ -164,144 +353,6 @@ window.mobileCrewOpenAssets = function() {
     } else if (typeof openProjectAssetsModal === 'function') {
         syncProjectEditorHiddenFields(window.mobileCrewHubProject, pId);
         openProjectAssetsModal();
-    }
-};
-
-window.mobileCrewOpenFullEditor = function() {
-    const p = window.mobileCrewHubProject;
-    const pId = window.mobileCrewHubProjectId;
-    if (!p || !pId) return;
-    document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
-    document.getElementById('edit-modal-overlay').style.display = 'flex';
-    document.getElementById('edit-orig-title').innerText = 'Project: ' + (p.fullTitle || p.title);
-    if (typeof bootMiniCalendar === 'function') bootMiniCalendar(p.start, pId);
-};
-
-window.loadMobileCrewShiftSummary = function(pId) {
-    const el = document.getElementById('mch-shift-summary');
-    if (!el) return;
-    el.innerText = 'Loading…';
-    const myUid = (typeof ACTIVE_USER_UID !== 'undefined' && ACTIVE_USER_UID) ? String(ACTIVE_USER_UID).trim() : '';
-    const myName = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? String(ACTIVE_USER_NAME).trim() : '';
-
-    google.script.run.withSuccessHandler(function(data) {
-        if (!data || !data.shifts || !data.shifts.length) {
-            el.innerHTML = '<span style="color:#71717a;">No shifts on this project yet. Open Timeline for the full schedule.</span>';
-            return;
-        }
-        const roster = data.roster || [];
-        const nameByUid = {};
-        roster.forEach(function(c) {
-            if (c.uid) nameByUid[c.uid] = c.name || c.uid;
-        });
-        const mine = data.shifts.filter(function(s) {
-            const uid = String(s.user_uid || s.uid || '');
-            if (myUid && uid === myUid) return true;
-            const nm = nameByUid[uid] || '';
-            if (myName && nm.toLowerCase() === myName.toLowerCase()) return true;
-            return false;
-        });
-        if (!mine.length) {
-            el.innerHTML = '<span style="color:#71717a;">You are not on the crew list yet. Open Timeline to see all shifts.</span>';
-            return;
-        }
-        let html = '';
-        const buildStrip = (typeof buildMobileShiftStripMarkup === 'function') ? buildMobileShiftStripMarkup : null;
-        mine.slice(0, 6).forEach(function(s) {
-            if (buildStrip) {
-                html += buildStrip(s, { showPerson: false });
-            }
-        });
-        if (mine.length > 6) {
-            html += '<div style="font-size:11px;color:#71717a;text-align:center;padding-top:4px;">+' + (mine.length - 6) + ' more in OPEN TIMELINE → MY SHIFTS</div>';
-        }
-        if (!html && !buildStrip) {
-            html = '<span style="color:#71717a;">Could not render shift strips.</span>';
-        }
-        el.innerHTML = html || '<span style="color:#71717a;">No shift details.</span>';
-    }).withFailureHandler(function() {
-        el.innerHTML = '<span style="color:#71717a;">Could not load shifts. Use OPEN TIMELINE.</span>';
-    }).getTimelineData(pId, 'main');
-};
-
-window.fetchMobileCrewWeather = async function(p) {
-    const section = document.getElementById('mch-weather-section');
-    const strip = document.getElementById('mch-weather-strip');
-    if (!section || !strip) return;
-
-    const isOutdoor = !!(p.outdoor || (p.readinessState && p.readinessState.outdoor));
-    if (!isOutdoor) {
-        section.style.display = 'none';
-        return;
-    }
-
-    let lat = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lat : (p.lat || '');
-    let lng = (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lng : (p.lng || '');
-    const locText = (p.locationUrl || '').trim();
-    const sDateStr = p.start || '';
-    const eDateStr = p.end || p.start || '';
-
-    if ((!lat || !lng) && locText) {
-        try {
-            const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(locText) + '&limit=1');
-            const data = await res.json();
-            if (data && data.length > 0) {
-                lat = parseFloat(data[0].lat);
-                lng = parseFloat(data[0].lon);
-            }
-        } catch (e) { /* ignore */ }
-    }
-
-    if (!lat || !lng || !sDateStr) {
-        section.style.display = 'none';
-        return;
-    }
-
-    section.style.display = 'block';
-    strip.innerHTML = '<div style="color:#71717a;font-size:12px;padding:8px;">Fetching weather…</div>';
-
-    try {
-        const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lng +
-            '&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=14';
-        const res = await fetch(url);
-        const data = await res.json();
-        if (!data || !data.daily) throw new Error('no data');
-
-        const daily = data.daily;
-        const sDate = new Date(sDateStr + 'T00:00:00Z');
-        const eDate = new Date(eDateStr + 'T23:59:59Z');
-        let html = '';
-
-        const emojiMap = { CLR: '☀️', CLOUD: '⛅', FOG: '🌫️', RAIN: '🌧️', SNOW: '❄️', STORM: '⛈️' };
-
-        for (let i = 0; i < daily.time.length; i++) {
-            const dStr = daily.time[i];
-            const dObj = new Date(dStr + 'T12:00:00Z');
-            if (dObj < sDate || dObj > eDate) continue;
-
-            const code = daily.weathercode[i];
-            let cond = 'CLR';
-            if (code >= 1 && code <= 3) cond = 'CLOUD';
-            else if (code >= 45 && code <= 48) cond = 'FOG';
-            else if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) cond = 'RAIN';
-            else if ((code >= 71 && code <= 77) || (code >= 85 && code <= 86)) cond = 'SNOW';
-            else if (code >= 95) cond = 'STORM';
-
-            const rainProb = daily.precipitation_probability_max[i] || 0;
-            const alert = rainProb > 50 || cond === 'STORM';
-            const dayName = dObj.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
-            const maxT = Math.round(daily.temperature_2m_max[i]);
-            const minT = Math.round(daily.temperature_2m_min[i]);
-
-            html += '<div class="mch-weather-day' + (alert ? ' mch-weather-day--alert' : '') + '">' +
-                '<div class="mch-weather-day__date">' + dayName + '</div>' +
-                '<div class="mch-weather-day__emoji">' + (emojiMap[cond] || '☀️') + '</div>' +
-                '<div class="mch-weather-day__temp">' + maxT + '° / ' + minT + '°</div></div>';
-        }
-
-        strip.innerHTML = html || '<div style="color:#71717a;font-size:12px;">No forecast for project dates.</div>';
-    } catch (e) {
-        strip.innerHTML = '<div style="color:#71717a;font-size:12px;">Weather unavailable.</div>';
     }
 };
 </script>

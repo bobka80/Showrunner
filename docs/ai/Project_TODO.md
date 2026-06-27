@@ -153,3 +153,34 @@ FCM + batch sends are **not** the bottleneck at this scale. Risks are **email li
 - [ ] **Push Notifications (Option 1):** See dedicated section above — Firebase Hosting + FCM; do not duplicate here.
 - [ ] **Security & RBAC Beta Audit:** Final lockdown of Role-Permissions matrix and data tunneling before beta deployment.
 
+---
+
+## Operation manuals & training assets (end of project — keep this section last)
+
+> **Placement rule:** This block stays at the **bottom** of `Project_TODO.md`. Do not add new roadmap items below it — it is work for **after** core product milestones are stable.
+
+**Goal:** Crew and managers can onboard **without your help** — install the PWA, log in, navigate, and use their role-appropriate features.
+
+**Approach:** Build a **screenshot source pack** (real UI captures + short step captions), then feed it into **Google NotebookLM** to generate:
+- Crew manual vs manager manual (split by role)
+- PDFs, slide decks, FAQs, optional audio overview
+
+**What to capture (when ready — after mobile + notifications sign-off):**
+- [ ] **PWA install** — iPhone (Add to Home Screen), Android Chrome; open from icon (`web.app`, not `script.google.com`)
+- [ ] **Login & stay signed in** — crew name, passcode, session on parent shell
+- [ ] **Mobile Command Center** — Events, Tasks, Notifications
+- [ ] **Crew Hub → Timeline** — MY SHIFTS list vs full TIMELINE (all crew); pinch zoom; shift detail sheet
+- [ ] **Push alerts** — first-time setup, when the bar appears / disappears, blocked notifications
+- [ ] **Manager-only flows** — project editor, save/sync, timeline editing, admin surfaces (as applicable)
+
+**Deliverables (agent + director):**
+- [ ] Numbered step folders or one master doc: **one screenshot per step**, caption = exact on-screen label
+- [ ] Role tags `[CREW]` / `[MANAGER]` on sections for NotebookLM prompts
+- [ ] Version stamp on the pack (e.g. manual source — GAS v325) when refreshed
+- [ ] Redacted/demo data only in captures; no real passwords in repo
+- [ ] Export to PDF or Google Doc for NotebookLM ingestion
+
+**NotebookLM prompts (examples for later):** “Write a 2-page crew quick start”, “FAQ for iPhone install”, “Manager checklist before opening a project.”
+
+**Not in scope for v0:** Marketing polish, legal copy — product screenshots + factual steps only.
+

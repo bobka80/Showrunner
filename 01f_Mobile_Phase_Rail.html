@@ -120,4 +120,42 @@ window.renderMobilePhaseRail = function(containerEl, fragments) {
         '<div class="mch-phase-legend">' + legend + '</div>' +
         '</div>';
 };
+
+function formatPhaseTimeRange(startTime, endTime) {
+    var s = String(startTime || '00:00').slice(0, 5);
+    var e = String(endTime || '23:59').slice(0, 5);
+    if (s === '00:00' && e === '23:59') return 'All day';
+    return s + ' – ' + e;
+}
+
+/**
+ * Mobile Crew Hub — chronological sub-event list (replaces mini calendar on phone).
+ */
+window.renderMobilePhaseList = function(containerEl, fragments) {
+    if (!containerEl) return;
+    const blocks = buildPhaseSegmentsFromFragments(fragments);
+    if (!blocks.length) {
+        containerEl.innerHTML = '<div class="mch-section-label">SCHEDULE</div>'
+            + '<div class="tt-mobile-list-empty">No sub-events defined yet.</div>';
+        return;
+    }
+
+    let html = '<div class="mch-section-label">SCHEDULE</div><div class="mch-subevents-list">';
+    blocks.forEach(function(b) {
+        const title = MOBILE_PHASE_LABELS[b.type] || b.type;
+        const range = formatPhaseDateRange(b.startStr, b.endStr);
+        const times = formatPhaseTimeRange(b.startTime, b.endTime);
+        const note = b.note ? '<div class="mch-subevent-strip__note">' + String(b.note).replace(/</g, '&lt;') + '</div>' : '';
+        html += '<div class="mch-subevent-strip mch-subevent-strip--' + b.type + '">'
+            + '<div class="mch-subevent-strip__top">'
+            + '<div class="mch-subevent-strip__type">' + title + '</div>'
+            + '<div class="mch-subevent-strip__dates">' + range + '</div>'
+            + '</div>'
+            + '<div class="mch-subevent-strip__times">' + times + '</div>'
+            + note
+            + '</div>';
+    });
+    html += '</div>';
+    containerEl.innerHTML = html;
+};
 </script>

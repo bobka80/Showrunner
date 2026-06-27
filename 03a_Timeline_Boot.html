@@ -373,7 +373,8 @@ function launchMasterTimeline() {
         return; 
     }
 
-    const forceReadOnly = (typeof isTimelineReadOnly === 'function' && isTimelineReadOnly(folderId));
+    const forceReadOnly = (typeof isTimelineReadOnly === 'function' && isTimelineReadOnly(folderId))
+        || (typeof isMobileViewport === 'function' && isMobileViewport());
 
     if (window.isProjectDirty && !forceReadOnly) {
         if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {

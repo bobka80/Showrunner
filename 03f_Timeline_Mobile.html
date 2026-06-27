@@ -109,18 +109,41 @@ function ensureMobileTimelineChrome() {
     listPane.id = 'tt-mobile-list-pane';
     listPane.innerHTML = '<div id="tt-mobile-list-scroll"></div>';
 
-    var sheet = document.createElement('div');
-    sheet.id = 'tt-mobile-shift-sheet';
-    sheet.innerHTML =
-        '<div class="tt-mobile-shift-sheet-backdrop" onclick="closeMobileShiftDetailSheet()"></div>'
-        + '<div class="tt-mobile-shift-sheet-panel">'
-        + '<button type="button" class="tt-mobile-shift-sheet-close" onclick="closeMobileShiftDetailSheet()">✕</button>'
-        + '<div id="tt-mobile-shift-sheet-body"></div>'
-        + '</div>';
-
     layer.insertBefore(chrome, layer.firstChild);
     layer.insertBefore(listPane, layer.querySelector('.tt-workspace'));
-    layer.appendChild(sheet);
+
+    var actions = layer.querySelector('.tt-bottom-actions');
+    if (actions && !document.getElementById('tt-mobile-footer-strip')) {
+        var stripSlot = document.createElement('div');
+        stripSlot.id = 'tt-mobile-footer-strip';
+        actions.insertBefore(stripSlot, actions.firstChild);
+    }
+}
+
+function ensureMobilePinchHost() {
+    var workspace = document.querySelector('#shift-layer .tt-workspace');
+    var canvas = document.querySelector('#shift-layer .tt-canvas');
+    if (!workspace || !canvas) return null;
+    var host = document.getElementById('tt-mobile-pinch-host');
+    if (!host) {
+        host = document.createElement('div');
+        host.id = 'tt-mobile-pinch-host';
+        host.className = 'tt-mobile-pinch-host';
+        workspace.insertBefore(host, canvas);
+        host.appendChild(canvas);
+    }
+    return host;
+}
+
+function measureCanvasNaturalSize(canvas) {
+    var prevTransform = canvas.style.transform;
+    var prevZoom = canvas.style.zoom;
+    canvas.style.transform = '';
+    canvas.style.zoom = '';
+    var size = { w: canvas.scrollWidth, h: canvas.scrollHeight };
+    canvas.style.transform = prevTransform;
+    canvas.style.zoom = prevZoom;
+    return size;
 }
 
 window.setMobileTimelineView = function(view) {
@@ -138,6 +161,7 @@ window.setMobileTimelineView = function(view) {
     }
     if (window.mobileTimelineView === 'list') {
         renderMobileTimelineList();
+        clearMobileTimelineFooterStrip();
     } else {
         applyMobileTimelineGridDefaults();
     }
@@ -180,10 +204,14 @@ function applyMobileTimelineGridDefaults() {
 
 function applyMobilePinchTransform() {
     var canvas = document.querySelector('#shift-layer .tt-canvas');
-    if (!canvas) return;
+    var host = ensureMobilePinchHost();
+    if (!canvas || !host) return;
     var z = mobileTimelinePinch.scale;
-    canvas.style.transform = 'scale(' + z + ')';
-    canvas.style.transformOrigin = 'top left';
+    var natural = measureCanvasNaturalSize(canvas);
+    canvas.style.zoom = z;
+    canvas.style.transform = '';
+    host.style.width = Math.max(Math.ceil(natural.w * z), 1) + 'px';
+    host.style.height = Math.max(Math.ceil(natural.h * z), 1) + 'px';
 }
 
 function pinchDistance(touches) {
@@ -236,22 +264,31 @@ function attachMobileShiftTapHandlers() {
             var id = block.dataset.id;
             if (!id || typeof shifts === 'undefined') return;
             var shift = shifts.find(function(s) { return s.id === id; });
-            if (shift) openMobileShiftDetailSheet(shift);
+            if (shift) showMobileTimelineFooterStrip(shift);
         });
     });
 }
 
+window.showMobileTimelineFooterStrip = function(shift) {
+    var slot = document.getElementById('tt-mobile-footer-strip');
+    if (!slot || !shift) return;
+    slot.innerHTML = buildMobileShiftStripMarkup(shift, { showPerson: true });
+    slot.classList.add('visible');
+};
+
+window.clearMobileTimelineFooterStrip = function() {
+    var slot = document.getElementById('tt-mobile-footer-strip');
+    if (!slot) return;
+    slot.innerHTML = '';
+    slot.classList.remove('visible');
+};
+
 window.openMobileShiftDetailSheet = function(shift) {
-    var sheet = document.getElementById('tt-mobile-shift-sheet');
-    var body = document.getElementById('tt-mobile-shift-sheet-body');
-    if (!sheet || !body || !shift) return;
-    body.innerHTML = buildMobileShiftStripMarkup(shift, { showPerson: true });
-    sheet.classList.add('open');
+    showMobileTimelineFooterStrip(shift);
 };
 
 window.closeMobileShiftDetailSheet = function() {
-    var sheet = document.getElementById('tt-mobile-shift-sheet');
-    if (sheet) sheet.classList.remove('open');
+    clearMobileTimelineFooterStrip();
 };
 
 function syncMobileTimelineChromeVisibility() {
@@ -266,13 +303,21 @@ function syncMobileTimelineChromeVisibility() {
 }
 
 function teardownMobileTimelineUX() {
-    closeMobileShiftDetailSheet();
+    clearMobileTimelineFooterStrip();
     var layer = document.getElementById('shift-layer');
     if (layer) {
         layer.classList.remove('tt-mobile-mode', 'tt-mobile-list-view', 'tt-mobile-grid-view');
     }
     var canvas = document.querySelector('#shift-layer .tt-canvas');
-    if (canvas) canvas.style.transform = '';
+    if (canvas) {
+        canvas.style.transform = '';
+        canvas.style.zoom = '';
+    }
+    var host = document.getElementById('tt-mobile-pinch-host');
+    if (host) {
+        host.style.width = '';
+        host.style.height = '';
+    }
     mobileTimelinePinch.scale = 0.34;
     var oldBar = document.getElementById('tt-mobile-zoom-bar');
     if (oldBar) oldBar.remove();
@@ -311,6 +356,9 @@ window.initMobileTimelineUX = function() {
         orig.apply(this, arguments);
         if (typeof isMobileViewport === 'function' && isMobileViewport()) {
             attachMobileShiftTapHandlers();
+            if (window.mobileTimelineView === 'grid') {
+                requestAnimationFrame(function() { applyMobilePinchTransform(); });
+            }
         }
     };
 })();
