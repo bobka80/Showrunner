@@ -14,7 +14,8 @@
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
 
-  const SW_BUILD = '317';
+  const SW_BUILD = '323';
+  const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
   let firebaseConfig = null;
   let fcmToken = null;
   let messaging = null;
@@ -193,9 +194,55 @@
     document.body.classList.remove('install-panel-open');
   }
 
+  function readParentSession() {
+    try {
+      var token = localStorage.getItem('sm_session_token');
+      var exp = parseInt(localStorage.getItem('sm_session_expires') || '0', 10);
+      var crewName = localStorage.getItem('sm_crew_name') || '';
+      if (!token || token.length < 20 || !exp || exp <= Date.now()) return null;
+      return { token: token, expiresAt: exp, crewName: crewName };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveParentSession(token, crewName, expiresAt) {
+    if (!token) return;
+    try {
+      localStorage.setItem('sm_session_token', String(token).trim());
+      localStorage.setItem('sm_session_expires', String(expiresAt || (Date.now() + SESSION_MS)));
+      if (crewName) localStorage.setItem('sm_crew_name', String(crewName).trim());
+    } catch (e) { /* ignore */ }
+  }
+
+  function clearParentSession() {
+    try {
+      localStorage.removeItem('sm_session_token');
+      localStorage.removeItem('sm_session_expires');
+    } catch (e) { /* ignore */ }
+  }
+
+  function bootstrapCrewFromParentStorage() {
+    var ps = readParentSession();
+    if (ps && ps.crewName) lastCrewName = ps.crewName;
+    if (!lastCrewName) {
+      try { lastCrewName = localStorage.getItem('sr_parent_fcm_crew') || ''; } catch (e) { /* ignore */ }
+    }
+  }
+
+  function buildAppFrameUrl() {
+    var base = PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
+    var sess = readParentSession();
+    if (sess && sess.token) {
+      return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
+    }
+    return base;
+  }
+
   function startShellOnce() {
     if (shellInitStarted) return;
     shellInitStarted = true;
+    bootstrapCrewFromParentStorage();
     initShell();
   }
 
@@ -283,28 +330,36 @@
   }
 
   function hidePushPrompt() {
-    if (isMobileDevice() && !serverSaveConfirmed && fcmToken && pendingFcmAuth) return;
     document.body.classList.remove('push-dock-open', 'push-dock-saved');
     if (bannerEl) bannerEl.classList.add('hidden');
     notifyIframePushState(false, '');
     syncDockLayout();
   }
 
-  function showPushSavedCompact() {
+  function showPushDockLinking() {
+    if (!isMobileDevice() || serverSaveConfirmed) return;
+    document.body.classList.add('push-dock-open');
+    document.body.classList.remove('push-dock-saved');
+    if (bannerEl) bannerEl.classList.add('hidden');
+    syncDockLayout();
+  }
+
+  function hidePushDockFully() {
     serverSaveConfirmed = true;
     stopRegistrationLoop();
     stopTokenBroadcast();
-    document.body.classList.add('push-dock-open', 'push-dock-saved');
-    if (bannerEl) bannerEl.classList.add('hidden');
+    hidePushPrompt();
     hideInstallPanel();
     setDockMessage('');
-    setDockStatus(['✓ Shift alerts active on this device']);
+    if (dockStatusEl) dockStatusEl.textContent = '';
     if (enableBtn) {
-      enableBtn.textContent = 'Re-register alerts';
-      enableBtn.style.display = 'inline-block';
+      enableBtn.textContent = 'Allow notifications';
+      enableBtn.style.display = '';
     }
-    notifyIframePushState(false, '');
-    syncDockLayout();
+  }
+
+  function showPushSavedCompact() {
+    hidePushDockFully();
   }
 
   function getRegisterBaseUrl() {
@@ -337,8 +392,7 @@
     if (!crewName || !fcmToken) return false;
     var cached = readPushOkLocal(crewName, fcmToken);
     if (!cached) return false;
-    serverSaveConfirmed = true;
-    showPushSavedCompact();
+    hidePushDockFully();
     return true;
   }
 
@@ -393,12 +447,10 @@
     try {
       if (await checkPushRegisteredOnServer(crewName)) {
         logPush('push already registered — skip setup');
-        serverSaveConfirmed = true;
-        stopRegistrationLoop();
-        stopTokenBroadcast();
-        showPushSavedCompact();
+        hidePushDockFully();
         return true;
       }
+      showPushDockLinking();
       logPush('token ready — auto-linking');
       setDockMessage('Saving alerts through Showrunner…');
       setDockStatus(['Step 1: token OK', 'Step 2: saving via app…']);
@@ -463,12 +515,39 @@
     });
   }
 
+  function maybePromptForPushIfNeeded(crewName) {
+    if (!crewName || serverSaveConfirmed) return;
+    if (Notification.permission === 'denied') {
+      if (!readPushOkLocal(crewName, fcmToken)) showPushPrompt('denied');
+      return;
+    }
+    if (fcmToken && readPushOkLocal(crewName, fcmToken)) {
+      hidePushDockFully();
+      return;
+    }
+    if (fcmToken) {
+      checkPushRegisteredOnServer(crewName).then(function(ok) {
+        if (ok) hidePushDockFully();
+        else if (Notification.permission === 'default') showPushPrompt('allow');
+        else linkPushToAccountOrSkip(crewName);
+      });
+      return;
+    }
+    if (Notification.permission === 'default' && !readPushOkLocal(crewName, null)) {
+      showPushPrompt('allow');
+    }
+  }
+
   function handleIframeSession(data) {
     if (!data || !data.crewName) return;
     lastSessionPing = Date.now();
     iframeLoggedIn = true;
     lastCrewName = data.crewName;
+    if (data.sessionToken) {
+      saveParentSession(data.sessionToken, data.crewName, data.expiresAt);
+    }
     onAccountLink({ regKey: data.regKey || '', crewName: data.crewName });
+    maybePromptForPushIfNeeded(data.crewName);
   }
 
   function showStep2Status(elapsed) {
@@ -748,9 +827,19 @@
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
+    if (ev.data.type === 'SHOWRUNNER_SESSION_TOKEN') {
+      saveParentSession(ev.data.token, ev.data.crewName, ev.data.expiresAt);
+      if (ev.data.crewName) lastCrewName = ev.data.crewName;
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_SESSION_CLEAR') {
+      clearParentSession();
+      return;
+    }
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
+      if (ev.data.clearSession) clearParentSession();
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_LINK_ERROR') {
       iframeLinkError = (ev.data.message || 'App server link failed').slice(0, 120);
@@ -765,8 +854,8 @@
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
       handleIframeSession(ev.data);
-      if (!fcmToken && Notification.permission !== 'granted') {
-        showPushPrompt('allow');
+      if (!serverSaveConfirmed && !fcmToken && Notification.permission !== 'granted') {
+        maybePromptForPushIfNeeded(ev.data.crewName || lastCrewName);
       }
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_SAVE_ACK') {
@@ -810,10 +899,7 @@
     if (!fcmToken || !lastCrewName) return;
     if (serverSaveConfirmed || restorePushStateFromLocal(lastCrewName)) return;
     checkPushRegisteredOnServer(lastCrewName).then(function(ok) {
-      if (ok) {
-        serverSaveConfirmed = true;
-        showPushSavedCompact();
-      }
+      if (ok) hidePushDockFully();
     });
   });
 
@@ -948,8 +1034,46 @@
     }
   }
 
+  async function evaluatePushStateOnStartup() {
+    if (!('Notification' in window)) return;
+    if (isIosInBrowserTab()) {
+      showInstallPanel();
+      return;
+    }
+
+    bootstrapCrewFromParentStorage();
+    var cachedCrew = lastCrewName;
+
+    if (Notification.permission === 'denied') {
+      if (!cachedCrew || !readPushOkLocal(cachedCrew, fcmToken)) showPushPrompt('denied');
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      pushStarted = false;
+      try {
+        await obtainFcmToken(false);
+      } catch (err) {
+        logPush('silent token restore failed: ' + formatPushError(err));
+        return;
+      }
+      if (fcmToken && cachedCrew) {
+        if (restorePushStateFromLocal(cachedCrew)) return;
+        var ok = await checkPushRegisteredOnServer(cachedCrew);
+        if (ok) {
+          hidePushDockFully();
+          return;
+        }
+      }
+      hidePushPrompt();
+      return;
+    }
+
+    hidePushPrompt();
+  }
+
   async function initShell() {
-    if (frame) frame.src = PROD_GAS_EXEC;
+    if (frame) frame.src = buildAppFrameUrl();
     try {
       firebaseConfig = await loadConfigJsonp();
       if (!firebaseConfig.apiKey || !firebaseConfig.vapidKey || firebaseConfig.vapidKeyValid === false) {
@@ -965,27 +1089,10 @@
         appId: firebaseConfig.appId
       });
       registerForegroundPushHandler();
-      if (!('Notification' in window)) return;
-
-      if (Notification.permission === 'granted') {
-        if (isIosInBrowserTab()) {
-          showInstallPanel();
-          return;
-        }
-        pushStarted = false;
-        obtainFcmToken(false).catch(function(err) {
-          logPush('silent token restore failed: ' + formatPushError(err));
-        });
-        return;
-      }
-      if (Notification.permission === 'denied') {
-        showPushPrompt('denied');
-        return;
-      }
-      showPushPrompt('allow');
+      await evaluatePushStateOnStartup();
     } catch (err) {
       console.error(err);
-      if (!isIosInBrowserTab()) showPushPrompt('allow');
+      if (!isIosInBrowserTab() && !serverSaveConfirmed) hidePushPrompt();
     }
   }
 

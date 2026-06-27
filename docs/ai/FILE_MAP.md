@@ -12,7 +12,7 @@ Only modules listed in root **`Index.html`** via `<?!= include('...'); ?>` are c
 
 | Status | Modules |
 |--------|---------|
-| **Wired (production)** | All entries in sections 1–9 below |
+| **Wired (production)** | All entries in sections 1–10 below |
 | **Re-wired 2026-06-24** | `02g_Project_Reports` (Print Studio), `06f_Admin_Audit` (Audit Studio) |
 | **Dev / not in Index** | `temp_script_0.js`, `test.js`, `test_db.js`, `run_test.js`, `watch.js`, `Logistics_Debug.js` |
 
@@ -23,7 +23,8 @@ When adding a new `.html` module: update this file **and** add the include to `I
 ## 1. System Core & Globals
 - **`Index.html`**: The main application shell and entry point. Injects all other HTML templates. Contains the mobile dashboard and global left navigation.
 - **`Main.js`**: GAS backend entry point. Handles HTTP GET/POST routing and the high-speed boot payload.
-- **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits.
+- **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits. Copies backend `.js` + `Login.html` to `dist/`; excludes Node tooling (`milestone.js`, `deploy-hosting.js`, etc.).
+- **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md`.
 - **`Security.js`**: Manages user authentication and extracts security profiles.
 - **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.
 - **`Styles_Mobile.html`**: Mobile-only CSS (`≤768px`) + crew hub / phase rail / timeline zoom / compact PA. Included after `Styles.html`.
@@ -35,7 +36,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 
 ## 2. Shared UI Components
 - **`00a_UI_Layers.html`**: Z-index layer stack and overlay foundations for modals/drawers.
-- **`00b_UI_Hubs.html`**: Hub shells and navigation containers for major UI regions.
+- **`00b_UI_Hubs.html`**: Hub shells and navigation containers for major UI regions. Includes ROOT **DATABASE OPERATIONS** tab shell (`tab-content-database`, sub-tab panes for `06g_Admin_Database.html`).
 - **`00c_UI_Forms.html`**: Universal form renderers (Provisioning, Warehouse Roots, Clients, Vehicles).
 - **`00d_UI_Visuals.html`**: Settings drawers and data manager modals (Colors, Depts, Meals, Tags).
 - **`00e_UI_Modals.html`**: Universal popups (Global Tasks, Pickers, Checklists, Backup).
@@ -96,10 +97,48 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`06d_Admin_Fleet.html`**: Vehicle database CRUD.
 - **`06e_Admin_Automation.html`**: Database archivers and manager rules.
 - **`06f_Admin_Audit.html`**: Database Audit Studio (duplicate merge + item-by-item review). **Wired** in `Index.html`. Entry: `openAuditStudio()` when linked from admin UI.
+- **`06g_Admin_Database.html`**: ROOT-only **Database Operations** — sub-tabs **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS**. Shell markup in `00b_UI_Hubs.html` (`tab-content-database`). Entry: Admin hub → DATABASE tab → `loadDatabaseOpsPanel()` (called from `06_System_Admin.html`). Backup pane: live file tickets, quick backup/restore, ops log. Ops pane: placeholder Software Log Hub (left) + **Push Notifications** (right) via `renderPushAdminPanel('push-admin-panel')`. *Quirk: push list styles inject into `document.head` (`ensurePushDeviceListStyles` in `10c`); device fetch is deferred inside try/catch.*
 - **`Resources_Core.js`**, **`Resources_Audit.js`**, **`Resources_Migrations.js`**, **`Resources_System.js`**, **`Resources_Vault.js`**, **`Resources_Warehouse.js`**: The backend CRUD and schema engines for global resources.
 
 ## 9. The 09 Series: Financials
 - **`09_Financials_Hub.html`**: The main hub for payroll, labor costs, and interactive ledgers.
+
+## 10. Notifications & Push (10 Series + backend)
+
+**Handoff doc:** [NOTIFICATIONS_PROJECT_STATUS.md](NOTIFICATIONS_PROJECT_STATUS.md) · **Production log:** root `RELEASES.md` (updated by `milestone.js` on each GAS deploy).
+
+Users must open **Firebase Hosting** (`https://sm-showrunner-97405.web.app`) for FCM registration; raw `script.google.com` bookmarks do not receive push.
+
+### GAS frontend (wired in `Index.html`)
+- **`10a_Notifications_Boot.html`**: Iframe ↔ hosting `postMessage` bridge. Reads `meta[name="fcm-reg-key"]` / `localStorage`; sends `SHOWRUNNER_FCM_AUTH`, `SHOWRUNNER_SESSION`, token ACK to parent. Calls `saveMyFcmDeviceToken` when hosting delivers `SHOWRUNNER_FCM_TOKEN`. Re-registers on visibility resume.
+- **`10c_Notifications_Admin.html`**: ROOT **push console** — VAPID save, fleet device grid, manual token modal, test/revoke/cleanup. Key UI: `renderPushAdminPanel`, `renderPushDeviceList`, `openPushTokenPeek` (hover popover + copy). Device row colors: Mobile=blue, Desktop=purple; Apple OS=orange; Android/Windows/Chrome=green; Safari=orange; PWA=blue, Browser=purple. Compact token hints (`abc…xyz`); full token in `window.__srPushTokenPeek`.
+
+### GAS backend (copied to `dist/` by `build.js`)
+- **`Notifications_Store.js`**: FCM device token storage (Script Properties `FCM_TOKEN_{uid}` JSON arrays). VAPID save, bridge/`fcmreg` registration, `saveMyFcmDeviceToken`, fleet admin `getFcmDevicesFleetAdminDetail` (cap 40 devices), revoke/cleanup, device metadata (platform, browser, delivery).
+- **`Notifications_Push.js`**: FCM HTTP v1 send via service account OAuth. **Data-only** payloads (no top-level `notification` — avoids duplicate alerts with foreground handler). `sendTestPushNotification`, `sendTestPushToDevice`, `authorizeShowrunnerExternalRequests`.
+- **`Notifications_Dispatch.js`**: Event-driven push — `dispatchPushToUsers` / `dispatchPushToCrewNames` (timeline crew changes, task assignees, etc.).
+
+### `Main.js` JSONP / config endpoints
+| Action | Purpose |
+|--------|---------|
+| `fcfg` | Firebase public web config + VAPID + hosting URL |
+| `fcmreg` / `fcmregkey` | Token registration via reg key (hosting shell) |
+| `fcmcheck` / `fcmping` | Token prefix verify + last-seen touch |
+| `fcmrefreshkey` | Rotate registration key |
+
+Boot payload also embeds `fcmRegKey` for logged-in users.
+
+## 11. Push Hosting (Firebase — not GAS-compiled)
+
+Deployed separately: `node deploy-hosting.js` (runs `push-hosting/prepare-hosting.js` to sync SW config from live `?action=fcfg`).
+
+| Path | Role |
+|------|------|
+| `push-hosting/public/index.html` | Hosting shell page (iframe + push dock) |
+| `push-hosting/public/host-boot.js` | Parent: load GAS iframe **before** FCM config; `postMessage` token to iframe; foreground notification handler; PWA install panel; `SW_BUILD` cache-bust |
+| `push-hosting/public/firebase-messaging-sw.js` | Service worker — background data messages |
+| `push-hosting/public/manifest.json` | PWA manifest |
+| `deploy-hosting.js` | Firebase deploy wrapper (repo root) |
 
 ---
 
@@ -222,6 +261,11 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 ### 06e_Admin_Automation.html
 - `AUTOMATION -> Save Manager Rules`
 - `AUTOMATION -> Database Archivers`
+### 06g_Admin_Database.html
+- `DATABASE_OPS -> Sub-tab Router (backup | ops)`
+- `DATABASE_OPS -> Live Status Load`
+- `DATABASE_OPS -> Backup & Archive Pane`
+- `DATABASE_OPS -> Ops & Notifications Pane (push admin host)`
 ### 06_System_Admin.html
 - `ADMIN -> Resource Hub Tab Router`
 ### 07b_Grid_Engine.html
@@ -247,6 +291,21 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 - `FINANCIALS -> Interactive Ledger & Payments`
 - `FINANCIALS -> Global Unpaid Viewer`
 - `FINANCIALS -> Settings & Overheads`
+### 10a_Notifications_Boot.html
+- `PUSH_BOOT -> Hosting postMessage Bridge`
+- `PUSH_BOOT -> saveMyFcmDeviceToken from Parent Token`
+- `PUSH_BOOT -> Reg Key & Session Sync`
+### 10c_Notifications_Admin.html
+- `PUSH_ADMIN -> VAPID & Fleet Device Grid`
+- `PUSH_ADMIN -> Device List Render & Color Tags`
+- `PUSH_ADMIN -> Token Peek Popover`
+- `PUSH_ADMIN -> Test / Revoke / Cleanup Actions`
+### Notifications_Dispatch.js
+- `NOTIFICATIONS -> Push Dispatch`
+### Notifications_Push.js
+- `NOTIFICATIONS -> FCM Push Send`
+### Notifications_Store.js
+- `NOTIFICATIONS -> FCM Token Store`
 ### build.js
 - `PAYLOAD -> Dynamic Frontend Logic Injection`
 ### Conflicts.js
@@ -281,6 +340,7 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 - `CRUD_ENGINE -> Project Timeline Data`
 ### Main.js
 - `ROUTING -> Web App Get/Post`
+- `ROUTING -> Firebase public config (fcfg endpoint)`
 - `PAYLOAD -> High Speed Boot Payload`
 ### Operations.js
 - `OPS_BACKEND -> Start Session`

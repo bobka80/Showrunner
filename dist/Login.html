@@ -68,8 +68,29 @@
         } catch (e) { /* ignore */ }
       }
 
+      function notifyParentSessionClear() {
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage({ type: 'SHOWRUNNER_SESSION_CLEAR' }, '*');
+          } catch (e) { /* ignore */ }
+        }
+      }
+
+      function notifyParentSessionToken(token, crewName, expiresAt) {
+        if (!token || window.parent === window) return;
+        try {
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_SESSION_TOKEN',
+            token: token,
+            crewName: crewName || '',
+            expiresAt: expiresAt || (Date.now() + SESSION_MS)
+          }, '*');
+        } catch (e) { /* ignore */ }
+      }
+
       if (clearSession) {
         clearStoredSession();
+        notifyParentSessionClear();
       }
 
       if (isError) {
@@ -87,6 +108,7 @@
          if (token && exp > Date.now() && scriptUrl) {
            if (form) form.style.display = 'none';
            if (bootMsg) bootMsg.style.display = 'block';
+           notifyParentSessionToken(token, localStorage.getItem('sm_crew_name') || nameInput.value, exp);
            window.location.replace(scriptUrl + '?action=sessionboot&token=' + encodeURIComponent(token));
            return;
          }
@@ -129,7 +151,11 @@
 
       if (window.parent && window.parent !== window) {
         try {
-          window.parent.postMessage({ type: 'SHOWRUNNER_LOGIN_STATE', loggedIn: false }, '*');
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_LOGIN_STATE',
+            loggedIn: false,
+            clearSession: !!clearSession
+          }, '*');
         } catch (e) { /* ignore */ }
       }
     });

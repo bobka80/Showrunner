@@ -21,11 +21,12 @@
   <meta name="session-token" content="<?= typeof sessionToken !== 'undefined' ? sessionToken : '' ?>">
   <script>
   (function() {
+    var SESSION_MS = 30 * 24 * 60 * 60 * 1000;
     var t = document.querySelector('meta[name="session-token"]');
     if (t && t.content) {
       try {
         localStorage.setItem('sm_session_token', String(t.content).trim());
-        localStorage.setItem('sm_session_expires', String(Date.now() + (30 * 24 * 60 * 60 * 1000)));
+        localStorage.setItem('sm_session_expires', String(Date.now() + SESSION_MS));
       } catch (e) { /* ignore */ }
     }
   })();
@@ -33,12 +34,35 @@
   <script>
   (function() {
     if (window.self === window.top) return;
+    var SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+    function postSessionToParent() {
+      var n = document.querySelector('meta[name="user-name"]');
+      var t = document.querySelector('meta[name="session-token"]');
+      var crew = (n && n.content) ? String(n.content).trim() : '';
+      var token = (t && t.content) ? String(t.content).trim() : '';
+      var exp = 0;
+      if (!token) {
+        try { token = localStorage.getItem('sm_session_token') || ''; } catch (e) { /* ignore */ }
+      }
+      try { exp = parseInt(localStorage.getItem('sm_session_expires') || '0', 10); } catch (e) { /* ignore */ }
+      if (!exp) exp = Date.now() + SESSION_MS;
+      if (!token || token.length < 20 || !crew) return;
+      try {
+        window.parent.postMessage({
+          type: 'SHOWRUNNER_SESSION_TOKEN',
+          token: token,
+          crewName: crew,
+          expiresAt: exp
+        }, '*');
+      } catch (e) { /* ignore */ }
+    }
     function pingHostingParent() {
       var n = document.querySelector('meta[name="user-name"]');
       var k = document.querySelector('meta[name="fcm-reg-key"]');
       var crew = (n && n.content) ? String(n.content).trim() : '';
       var regKey = (k && k.content) ? String(k.content).trim() : '';
       if (!crew) return;
+      postSessionToParent();
       if (regKey) {
         try { localStorage.setItem('sr_fcm_reg_key', regKey); } catch (e) { /* ignore */ }
       }
