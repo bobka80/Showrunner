@@ -49,10 +49,14 @@ function dbOpsTimestampSlug() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
-function getDatabaseBackupFolder() {
-  const liveFolder = getLiveDatabaseFolder();
-  const folders = liveFolder.getFoldersByName(DB_BACKUP_FOLDER_NAME);
-  return folders.hasNext() ? folders.next() : liveFolder.createFolder(DB_BACKUP_FOLDER_NAME);
+
+function describeDriveFolder_(folderId, label) {
+  try {
+    const f = DriveApp.getFolderById(folderId);
+    return { label: label, name: f.getName(), id: f.getId(), url: f.getUrl() };
+  } catch (e) {
+    return { label: label, name: '(missing)', id: folderId, url: '' };
+  }
 }
 
 function liveDbFolderLabel_() {
@@ -185,7 +189,7 @@ function computeBackupHealthReport_() {
 
   let warning = null;
   if (!lastPairedDate) {
-    warning = 'No paired Engine+Vault backups found in 05_DATABASE_BACKUPS.';
+    warning = 'No paired Engine+Vault backups found in BACKUPS.';
   } else if (!healthy) {
     warning = 'Last successful paired backup is ' + lastPairedDate + ' (' + daysSincePaired + ' day(s) ago). Expected ' + yesterdayLocal + ' or ' + todayLocal + '.';
   } else if (inv.engineOnlyDates.length || inv.vaultOnlyDates.length) {
@@ -523,6 +527,12 @@ function getLiveDatabaseStatus(actor) {
         id: canonicalFolder.getId(),
         url: canonicalFolder.getUrl()
       },
+      driveFolders: {
+        database: describeDriveFolder_(LIVE_DATABASE_FOLDER_ID, '05_DATABASE'),
+        backups: describeDriveFolder_(DB_BACKUP_FOLDER_ID, 'BACKUPS'),
+        replaced: describeDriveFolder_(REPLACED_DB_FOLDER_ID, 'REPLACED'),
+        archives: describeDriveFolder_(ARCHIVE_FOLDER_ID, 'ARCHIVES')
+      },
       backups: {
         engine: listBackupFiles_('ENGINE').slice(0, 50),
         vault: listBackupFiles_('VAULT').slice(0, 50)
@@ -570,7 +580,7 @@ function repairLiveDatabaseLayout(actor) {
       results.map((r) => r.fileType + ': ' + r.beforeName + ' @ ' + r.beforeParent + ' → ' + r.afterFolder + '/' + r.afterName).join(' | '));
     return {
       results: results,
-      message: 'Live files moved to ' + liveDbFolderLabel_() + '/ENGINE and /VAULT. Hard-refresh the app.'
+      message: 'Live files moved to ' + liveDbFolderLabel_() + '/' + LIVE_ENGINE_FILE_NAME + ' and ' + LIVE_VAULT_FILE_NAME + '. Hard-refresh the app.'
     };
   });
 }

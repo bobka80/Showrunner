@@ -69,6 +69,9 @@ Google Apps Script (GAS) has a hard file size limit of ~1MB for HTML templates, 
 ---
 
 ## 9. Google Drive Synchronization System
+
+> **Full host folder map** (`STAGE_MASTERS_SYSTEM_ROOT`, `05_DATABASE`, backups/replaced/archives, Showrunner Sync): [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md). Do not duplicate that tree here.
+
 The backend (primarily within `Integrations.js`) drives an intelligent, customized Google Drive sharing and syncing system, comprising the following mechanics:
 - **Dynamic Hierarchy & Template Cloning**: Creates a structured `Year -> Month -> Event Name` folder hierarchy. It clones master template folders separately for Operations and Financials.
 - **Smart Renaming Rules**: Evaluates `config.renameRules` when generating new folders to seamlessly append or prepend the project's name to the cloned template files.

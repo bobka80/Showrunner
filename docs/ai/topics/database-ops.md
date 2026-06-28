@@ -2,7 +2,9 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-28 · **Status:** Partial — backup/restore + push admin shipped; archive column placeholder
+**Last swept:** 2026-06-28 · **Status:** Partial — backup/restore + push admin; **Drive layout documented** — code alignment pending
+
+**Canonical Drive map:** [DRIVE_LAYOUT.md](../DRIVE_LAYOUT.md) (`STAGE_MASTERS_SYSTEM_ROOT` → `05_DATABASE`).
 
 ---
 
@@ -20,6 +22,7 @@
 
 ## Remaining
 
+- [ ] **Paired restore UI** — single date dropdown + restore Engine+Vault together
 - [ ] **Archive column tools** — UI placeholder only (“Log archiver, engine cold-archive…” in `06g_Admin_Database.html`)
 - [ ] **Software Log Hub** — placeholder in Ops tab
 - [ ] **Test drill** on HEAD — director sign-off

@@ -45,7 +45,7 @@ function getOrCreateFolder(parent, name) {
 // @INDEX: DRIVE_API -> Dumb Vault Deployment
 function deployDumbFolder(projectId, projectName, selectedItems) {
   try {
-    const SYSTEM_ROOT_ID = '1MDjRCK5RyILVly1Rv7J9yxjr2BLDrFYl';
+    const SYSTEM_ROOT_ID = WORKSPACE_FOLDER_ID;
     let managerEmail = "";
     let crewName = "default";
     const sheets = verifyDatabaseSchema(true);
@@ -226,8 +226,6 @@ function moveDriveFolderIfNeeded_(folder, targetParent) {
 
 // @INDEX: DRIVE_API -> Generate Project Folders
 function generateProjectFolders(crewName, projectId, projectName, timelinesOverride) {
-    const OPS_ROOT_ID = '1MDjRCK5RyILVly1Rv7J9yxjr2BLDrFYl';
-    const FIN_ROOT_ID = '1oGZS3yvrZXebYBlwE0eNq0JMPKbR48y6';
     const OPS_TEMPLATE_ID = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
     const FIN_TEMPLATE_ID = '1qmchnnh21Lp3iPR73B_LV6oihbiTJSwW';
     
@@ -463,7 +461,7 @@ function generateProjectFolders(crewName, projectId, projectName, timelinesOverr
 // @INDEX: DRIVE_API -> Retroactive Drive Sync
 function runRetroactiveDriveSync(crewName) {
   return executeWithRetry(() => {
-      const OPS_ROOT_ID = '1MDjRCK5RyILVly1Rv7J9yxjr2BLDrFYl';
+      const OPS_ROOT_ID = WORKSPACE_FOLDER_ID;
       let config = getManagerConfig(crewName);
       if (!config.syncSelection || config.syncSelection.length === 0) return "No sync items selected.";
 
@@ -845,8 +843,7 @@ function runNightlyBackup(forceManual = false, actor) {
 // ==========================================
 function runMonthlyLogArchive(actor = "System UI") {
   return executeWithRetry(() => {
-    const ARCHIVE_FOLDER_ID = '1KFhrzhwxuMocMQzW9DfWc5QcO-_Pg81z';
-    const archiveFolder = DriveApp.getFolderById(ARCHIVE_FOLDER_ID);
+    const archiveFolder = getArchiveDatabaseFolder();
     
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -902,8 +899,7 @@ function runMonthlyLogArchive(actor = "System UI") {
 
 function runYearlyEngineArchive(actor = "System UI") {
   return executeWithRetry(() => {
-    const ARCHIVE_FOLDER_ID = '1KFhrzhwxuMocMQzW9DfWc5QcO-_Pg81z';
-    const archiveFolder = DriveApp.getFolderById(ARCHIVE_FOLDER_ID);
+    const archiveFolder = getArchiveDatabaseFolder();
     
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -979,13 +975,8 @@ function runYearlyEngineArchive(actor = "System UI") {
 // ==========================================
 function generateSoftwareSummaryFile() {
   try {
-    // Uses the new Corporate Architecture Root
-    const SYSTEM_ROOT_ID = '1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre';
-    const baseFolder = DriveApp.getFolderById(SYSTEM_ROOT_ID);
-    
-    // Locates or builds 04_SYSTEM_ASSETS automatically
-    let assetFolders = baseFolder.searchFolders("title = '04_SYSTEM_ASSETS'");
-    let targetFolder = assetFolders.hasNext() ? assetFolders.next() : baseFolder.createFolder("04_SYSTEM_ASSETS");
+    const baseFolder = DriveApp.getFolderById(SYSTEM_ASSETS_FOLDER_ID);
+    let targetFolder = baseFolder;
     
     const docName = "SM_Showrunner_Modular_Summary.txt";
     

@@ -186,13 +186,64 @@ When timeline is locked by another user: `btn-outline` with red border (presence
 - Solid `.btn-purple` for OPEN TIMELINE
 - Native `scale(1.3)` IAM checkboxes (use `.crew-cb`)
 - 9px form labels (minimum `.input-label` at 11px)
+- **8–9px body copy on desktop admin panels** — use `.admin-panel-body` (12px min); see §11
 - Mixing 60px and 70px hub headers (standard is **70px** via `.view-header`)
 - Forcing 14px padding inputs into tracker grid cells
 - Editing `dist/` directly
 
 ---
 
-## 11. File map (structural UI)
+## 11. Wide admin panels — responsive 4-column grid
+
+Use on ROOT hubs with lots of horizontal space (DATABASE tab, future admin consoles). **Mobile crew views** keep their own density rules in `Styles_Mobile.html` — this section is **desktop-first**.
+
+### When to apply
+
+- Container width **≥ 1100px** → default **4 equal columns** per row.
+- **900–1099px** → 2 columns (pairs wrap).
+- **&lt; 900px** → 1 column stack (rare for ROOT-only tools).
+
+Evaluate with CSS grid + `minmax` — do not hardcode width in JS unless necessary.
+
+### Layout rule
+
+1. Place information blocks in a **`.admin-grid-4`** row (up to 4 cards).
+2. When you have a 5th block, **start a new row** — never squeeze into a vertical micro-stack in one column while the panel is wide.
+3. Full-width sections (e.g. operations log) use **`.admin-grid-span-all`** (`grid-column: 1 / -1`).
+
+### Typography on admin cards (desktop)
+
+| Element | Minimum size | Class |
+|---------|--------------|--------|
+| Section title | 14px 800 | `.section-title` |
+| Card headline / file name | 13px 700 | `.admin-card-title` |
+| Body, paths, status | **12px** | `.admin-panel-body` |
+| Secondary hint | 11px | `.admin-panel-muted` — **floor for readable hints** |
+| Links (Open in Drive, etc.) | **12px** | `.admin-panel-link` — never 9px |
+
+**Forbidden on desktop:** 8–9px for primary content, folder paths, factory-file status, or “live in canonical folder” messages.
+
+### Markup pattern
+
+```html
+<div class="admin-grid-4">
+  <div class="admin-card">…</div>
+  <div class="admin-card">…</div>
+  <div class="admin-card">…</div>
+  <div class="admin-card">…</div>
+</div>
+<div class="admin-grid-4">
+  <div class="admin-card admin-grid-span-all">…full width log…</div>
+</div>
+```
+
+### Pairing rule
+
+Related twins (Engine + Vault live, restore dropdown + button) belong in **adjacent columns on the same row**, not stacked in one narrow column.
+
+---
+
+## 12. File map (structural UI)
 
 | File | Role |
 |------|------|
@@ -206,6 +257,7 @@ When timeline is locked by another user: `btn-outline` with red border (presence
 | `02_Project_Editor_Core.html` | Project editor chrome + footer buttons |
 | `09_Financials_Hub.html` | Financials hub |
 | `06f_Admin_Audit.html` | Audit studio |
+| `06g_Admin_Database.html` | ROOT database ops — uses `.admin-grid-4` (§11) |
 | `Login.html` | Login (uses same `.btn-main` green semantics) |
 | `06c_Admin_Visuals.html` | Visual settings **logic** (not structural doctrine) |
 

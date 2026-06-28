@@ -77,60 +77,74 @@ function toggleDbOpsLogRow(stepId) {
 
 function buildOpsLogListHtml(ops) {
   if (!ops || !ops.length) {
-    return '<div style="color:#52525b; font-size:11px; padding:8px 4px;">No operations logged yet.</div>';
+    return '<div class="admin-panel-muted" style="padding:8px 4px;">No operations logged yet.</div>';
   }
   let html = '';
   ops.forEach(function(op) {
     const canRevert = op.operation === 'RESTORE' && op.status === 'ACTIVE';
     const badge = op.status === 'ACTIVE' ? '#10b981' : (op.status === 'REVERTED' ? '#6b7280' : '#a855f7');
-    html += '<div style="border:1px solid #333; border-radius:6px; margin-bottom:6px; background:#1a1a1e; overflow:hidden;">'
-      + '<div onclick="toggleDbOpsLogRow(\'' + op.step_id + '\')" style="display:flex; align-items:center; gap:8px; padding:8px 10px; cursor:pointer; user-select:none;" onmouseover="this.style.background=\'#222\'" onmouseout="this.style.background=\'transparent\'">'
-      + '<span id="db-ops-chev-' + op.step_id + '" style="color:#71717a; font-size:10px; width:12px;">▸</span>'
-      + '<span style="color:#fff; font-weight:800; font-size:11px; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
+    html += '<div class="admin-card" style="margin-bottom:8px; padding:10px 12px;">'
+      + '<div onclick="toggleDbOpsLogRow(\'' + op.step_id + '\')" style="display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;">'
+      + '<span id="db-ops-chev-' + op.step_id + '" class="admin-panel-muted" style="width:14px;">▸</span>'
+      + '<span class="admin-card-title" style="flex:1; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
       + '#' + op.step_id + ' ' + op.file_type + ' ' + op.operation
       + '</span>'
-      + '<span style="color:' + badge + '; font-size:9px; font-weight:bold;">' + op.status + '</span>'
+      + '<span style="color:' + badge + '; font-size:11px; font-weight:800;">' + op.status + '</span>'
       + '</div>'
-      + '<div id="db-ops-body-' + op.step_id + '" style="display:none; padding:0 10px 10px 30px; border-top:1px solid #2a2a2e;">'
-      + '<div style="color:#71717a; font-size:9px; margin-top:6px;">' + op.timestamp + '</div>'
-      + '<div style="color:#a1a1aa; font-size:10px; margin-top:4px; line-height:1.4;">' + (op.notes || '—') + '</div>';
+      + '<div id="db-ops-body-' + op.step_id + '" style="display:none; padding:8px 0 0 22px; border-top:1px solid #333; margin-top:8px;">'
+      + '<div class="admin-panel-muted">' + op.timestamp + '</div>'
+      + '<div class="admin-panel-body" style="margin-top:6px;">' + (op.notes || '—') + '</div>';
     if (canRevert) {
-      html += '<button class="btn-outline btn-sm" style="margin:8px 0 0 0; border-color:#3b82f6; color:#3b82f6;" onclick="event.stopPropagation(); revertDatabaseStep(\'' + op.step_id + '\')">REVERT</button>';
+      html += '<button class="btn-outline btn-sm" style="margin-top:10px; border-color:#3b82f6; color:#3b82f6;" onclick="event.stopPropagation(); revertDatabaseStep(\'' + op.step_id + '\')">REVERT</button>';
     }
     html += '</div></div>';
   });
   return html;
 }
 
-function renderLiveFileTicket(label, file, accent) {
-  const layoutBadge = file.layoutOk
-    ? '<span style="color:#10b981; font-size:9px; font-weight:bold;">✓ ' + file.expectedPath + '</span>'
-    : '<span style="color:#f59e0b; font-size:9px; font-weight:bold;">⚠ Expected: ' + file.expectedPath + '</span>';
+function renderFolderLinksHtml(driveFolders) {
+  if (!driveFolders) return '';
+  const keys = ['backups', 'replaced', 'archives'];
+  let html = '<div class="admin-folder-links">';
+  keys.forEach(function(k) {
+    const f = driveFolders[k];
+    if (!f || !f.url) return;
+    html += '<a class="admin-panel-link" href="' + f.url + '" target="_blank" style="margin-top:0;">' + f.label + ' ↗</a>';
+  });
+  html += '</div>';
+  return html;
+}
+
+function renderLiveFileTicket(label, file, accentClass) {
+  if (!file) return '';
+  const layoutText = file.layoutOk
+    ? '<span class="admin-status-ok">✓ ' + file.expectedPath + '</span>'
+    : '<span class="admin-status-warn">⚠ Expected: ' + file.expectedPath + '</span>';
   const locationLine = file.parentFolderName
-    ? '<div style="color:#71717a; font-size:9px; margin-top:2px;">Now: <strong style="color:#a1a1aa;">' + file.parentFolderName + '/' + file.name + '</strong></div>'
+    ? '<div class="admin-panel-muted" style="margin-top:6px;">Now: <strong style="color:#e4e4e7;">' + file.parentFolderName + '/' + file.name + '</strong></div>'
     : '';
   const factoryLine = file.isOriginalFactoryFile
-    ? '<div style="color:#52525b; font-size:8px; margin-top:2px;">Factory original file (never restored)</div>'
-    : '<div style="color:#52525b; font-size:8px; margin-top:2px;">Active ID differs from factory original</div>';
-  return '<div style="background:#111; border:1px solid #333; border-left:3px solid ' + accent + '; border-radius:6px; padding:8px 10px; margin-bottom:8px;">'
-    + '<div style="color:#888; font-size:9px; font-weight:bold; letter-spacing:0.5px;">' + label + '</div>'
-    + '<div style="color:#fff; font-weight:bold; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + file.name + '">' + file.name + '</div>'
-    + '<div style="margin-top:3px;">' + layoutBadge + '</div>'
+    ? '<div class="admin-panel-muted" style="margin-top:6px;">Factory original — never restored</div>'
+    : '<div class="admin-panel-muted" style="margin-top:6px;">Active file differs from factory original</div>';
+  return '<div class="admin-card ' + accentClass + '">'
+    + '<div class="admin-panel-kicker">' + label + '</div>'
+    + '<div class="admin-card-title" title="' + escapePushHtml(file.name) + '">' + escapePushHtml(file.name) + '</div>'
+    + '<div class="admin-panel-body" style="margin-top:6px;">' + layoutText + '</div>'
     + locationLine
-    + '<div style="color:#71717a; font-size:9px; margin-top:2px;">' + file.modifiedLabel + '</div>'
+    + '<div class="admin-panel-muted" style="margin-top:6px;">' + (file.modifiedLabel || '') + '</div>'
     + factoryLine
-    + (file.url ? '<a href="' + file.url + '" target="_blank" style="color:#3b82f6; font-size:9px; display:inline-block; margin-top:4px;">Open live file ↗</a>' : '')
+    + (file.url ? '<a class="admin-panel-link" href="' + file.url + '" target="_blank">Open live file ↗</a>' : '')
     + '</div>';
 }
 
 function buildBackupHealthBannerHtml(health) {
-  if (!health) return '';
+  if (!health) return '<div class="admin-card admin-grid-span-all admin-panel-muted">No backup health data.</div>';
   if (health.healthy) {
-    return '<div style="background:#052e16; border:1px solid #10b981; border-radius:6px; padding:8px 10px; margin-bottom:10px; font-size:10px; color:#6ee7b7; line-height:1.4;">'
+    return '<div class="admin-banner-ok admin-grid-span-all">'
       + '✓ Backup OK — last Engine+Vault pair: <strong>' + (health.lastPairedDate || '—') + '</strong>'
-      + ' · ' + health.fileCount + ' files in folder (verified in Drive)</div>';
+      + ' · ' + health.fileCount + ' files in BACKUPS</div>';
   }
-  return '<div style="background:#450a0a; border:1px solid #ef4444; border-radius:6px; padding:8px 10px; margin-bottom:10px; font-size:10px; color:#fca5a5; line-height:1.4;">'
+  return '<div class="admin-banner-warn admin-grid-span-all">'
     + '⚠️ <strong>BACKUP FAILSAFE:</strong> ' + (health.warning || 'Backup unhealthy') + '</div>';
 }
 
@@ -146,74 +160,79 @@ function renderDatabaseBackupArchiveTab(res) {
     return '<option value="' + b.id + '">' + b.name + ' — ' + b.modifiedLabel + '</option>';
   }).join('') || '<option value="">No vault backups</option>';
 
-  const colStyle = 'flex:1; min-width:0; display:flex; flex-direction:column; border-right:1px solid #333; min-height:0;';
-  const colLast = 'flex:1; min-width:0; display:flex; flex-direction:column; min-height:0;';
+  const dbName = res.canonicalFolder ? res.canonicalFolder.name : '05_DATABASE';
+  const layoutOk = res.engine && res.engine.layoutOk && res.vault && res.vault.layoutOk;
+  const repairBtn = layoutOk
+    ? '<div class="admin-panel-body admin-status-ok" style="margin-top:10px;">✓ Live files are in the canonical folder.</div>'
+    : '<button class="btn-outline" style="margin-top:12px; width:100%; border-color:#f59e0b; color:#f59e0b; justify-content:center;" onclick="runDbRepairLayout()">REPAIR LAYOUT</button>';
 
   panel.innerHTML = ''
-    + '<div style="display:flex; flex:1; min-height:0; width:100%;">'
+    + '<div style="flex:1; min-height:0; overflow:auto; padding:14px 16px; box-sizing:border-box;">'
 
-    + '<div style="' + colStyle + '">'
-    + '<div style="padding:12px 14px 8px; border-bottom:1px solid #333; flex-shrink:0;">'
-    + '<div style="color:#f59e0b; font-weight:900; font-size:11px; letter-spacing:1px;">BACKUP COLUMN</div>'
-    + '</div>'
-    + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; padding:10px 14px; overflow:hidden;">'
+    + '<div class="admin-grid-4" style="margin-bottom:12px;">'
     + buildBackupHealthBannerHtml(res.health)
-    + '<div style="flex-shrink:0; margin-bottom:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; padding:8px 10px;">'
-    + '<div style="color:#94a3b8; font-size:9px; font-weight:bold; letter-spacing:0.5px; margin-bottom:4px;">CANONICAL LIVE FOLDER</div>'
-    + '<div style="color:#fff; font-size:10px; font-weight:bold;">' + (res.canonicalFolder ? res.canonicalFolder.name : 'Database') + '/ENGINE + VAULT</div>'
-    + (res.canonicalFolder && res.canonicalFolder.url
-      ? '<a href="' + res.canonicalFolder.url + '" target="_blank" style="color:#3b82f6; font-size:9px;">Open folder in Drive ↗</a>'
-      : '')
-    + ((res.engine && !res.engine.layoutOk) || (res.vault && !res.vault.layoutOk)
-      ? '<button class="btn-outline btn-sm" style="margin:8px 0 0 0; width:100%; border-color:#f59e0b; color:#f59e0b; justify-content:center;" onclick="runDbRepairLayout()">REPAIR LAYOUT — move &amp; rename live files (no data copy)</button>'
-      : '<div style="color:#10b981; font-size:9px; margin-top:6px;">✓ Live files are in the canonical folder.</div>')
     + '</div>'
-    + '<div style="flex-shrink:0;">'
-    + '<div style="color:#888; font-size:9px; font-weight:bold; margin-bottom:6px; letter-spacing:0.5px;">LIVE FILES</div>'
-    + renderLiveFileTicket('ENGINE', res.engine, '#f59e0b')
-    + renderLiveFileTicket('VAULT', res.vault, '#10b981')
-    + '</div>'
-    + '<div style="flex-shrink:0; margin-top:4px;">'
-    + '<div style="color:#ef4444; font-weight:900; font-size:9px; letter-spacing:0.5px; margin-bottom:6px;">RESTORE FROM BACKUP</div>'
-    + '<div style="background:#111; border:1px solid #333; border-radius:6px; padding:8px 10px; margin-bottom:8px;">'
-    + '<div class="input-label" style="margin:0 0 4px 0; font-size:9px;">Engine</div>'
-    + '<div style="display:flex; gap:8px; align-items:center;">'
-    + '<select id="db-restore-engine-select" style="flex:1; min-width:0; padding:6px 8px; background:#1a1a1e; color:#fff; border:1px solid #444; border-radius:4px; font-size:10px; box-sizing:border-box;">' + engOpts + '</select>'
-    + '<button class="btn-outline btn-sm" style="margin:0; flex-shrink:0; white-space:nowrap; border-color:#ef4444; color:#ef4444;" onclick="runDbRestore(\'ENGINE\')">RESTORE ENGINE</button>'
-    + '</div></div>'
-    + '<div style="background:#111; border:1px solid #333; border-radius:6px; padding:8px 10px;">'
-    + '<div class="input-label" style="margin:0 0 4px 0; font-size:9px;">Vault</div>'
-    + '<div style="display:flex; gap:8px; align-items:center;">'
-    + '<select id="db-restore-vault-select" style="flex:1; min-width:0; padding:6px 8px; background:#1a1a1e; color:#fff; border:1px solid #444; border-radius:4px; font-size:10px; box-sizing:border-box;">' + vaultOpts + '</select>'
-    + '<button class="btn-outline btn-sm" style="margin:0; flex-shrink:0; white-space:nowrap; border-color:#ef4444; color:#ef4444;" onclick="runDbRestore(\'VAULT\')">RESTORE VAULT</button>'
-    + '</div></div>'
-    + '</div>'
-    + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; margin-top:10px; overflow:hidden;">'
-    + '<div style="color:#3b82f6; font-weight:900; font-size:9px; letter-spacing:0.5px; margin-bottom:6px; flex-shrink:0;">OPERATIONS LOG</div>'
-    + '<div style="flex:1; min-height:0; overflow-y:auto; padding-right:4px;">'
-    + buildOpsLogListHtml(_dbOpsCache)
-    + '</div>'
-    + '</div>'
-    + '<div style="flex-shrink:0; margin-top:10px; padding-top:10px; border-top:1px solid #333;">'
-    + '<div style="color:#10b981; font-weight:900; font-size:9px; letter-spacing:0.5px; margin-bottom:6px;">CREATE BACKUP</div>'
-    + '<div style="display:flex; gap:6px; align-items:stretch;">'
-    + '<button id="db-backup-btn-engine" class="btn-outline btn-sm" style="margin:0; flex:1; min-width:0; padding:6px 4px !important; font-size:9px; border-color:#10b981; color:#10b981; justify-content:center;" onclick="runDbBackupQuick(\'ENGINE\')">ENGINE</button>'
-    + '<button id="db-backup-btn-vault" class="btn-outline btn-sm" style="margin:0; flex:1; min-width:0; padding:6px 4px !important; font-size:9px; border-color:#10b981; color:#10b981; justify-content:center;" onclick="runDbBackupQuick(\'VAULT\')">VAULT</button>'
-    + '<button id="db-backup-btn-both" class="btn-outline btn-sm" style="margin:0; flex:1; min-width:0; padding:6px 4px !important; font-size:9px; border:2px solid #f59e0b; color:#f59e0b; box-shadow:0 0 0 1px #f59e0b; justify-content:center;" title="Full backup with countdown + UI lock" onclick="runDbBackupBoth()">BOTH</button>'
-    + '</div>'
-    + '<div style="color:#52525b; font-size:9px; margin-top:6px; text-align:center;">05_DATABASE_BACKUPS · BOTH = countdown + lock</div>'
-    + '</div>'
-    + '</div></div>'
 
-    + '<div style="' + colLast + '">'
-    + '<div style="padding:12px 14px 8px; border-bottom:1px solid #333; flex-shrink:0;">'
-    + '<div style="color:#a855f7; font-weight:900; font-size:11px; letter-spacing:1px;">ARCHIVE COLUMN</div>'
+    + '<div class="admin-grid-4" style="margin-bottom:12px;">'
+    + '<div class="admin-card admin-card--accent-blue">'
+    + '<div class="admin-panel-kicker">Live database folder</div>'
+    + '<div class="admin-card-title">' + escapePushHtml(dbName) + '</div>'
+    + '<div class="admin-panel-body" style="margin-top:6px;">SM_Showrunner_ENGINE + SM_Showrunner_VAULT</div>'
+    + (res.canonicalFolder && res.canonicalFolder.url
+      ? '<a class="admin-panel-link" href="' + res.canonicalFolder.url + '" target="_blank">Open ' + escapePushHtml(dbName) + ' ↗</a>'
+      : '')
+    + renderFolderLinksHtml(res.driveFolders)
+    + repairBtn
     + '</div>'
-    + '<div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">'
-    + '<div style="font-size:28px; margin-bottom:12px; opacity:0.4;">📦</div>'
-    + '<div style="color:#a855f7; font-weight:800; font-size:12px; margin-bottom:8px;">Archive Testing &amp; Edits</div>'
-    + '<p style="color:#52525b; font-size:11px; line-height:1.5; max-width:220px; margin:0;">Log archiver, engine cold-archive, and related maintenance tools will live here.</p>'
+    + renderLiveFileTicket('Engine', res.engine, 'admin-card--accent-amber')
+    + renderLiveFileTicket('Vault', res.vault, 'admin-card--accent-green')
+    + '<div class="admin-card admin-card--accent-purple">'
+    + '<div class="admin-panel-kicker">Archives</div>'
+    + '<div class="admin-panel-body">Engine cold-archive and audit log archives.</div>'
+    + (res.driveFolders && res.driveFolders.archives && res.driveFolders.archives.url
+      ? '<a class="admin-panel-link" href="' + res.driveFolders.archives.url + '" target="_blank">Open ARCHIVES ↗</a>'
+      : '')
+    + '<div class="admin-panel-muted" style="margin-top:10px;">Maintenance tools coming in this column.</div>'
+    + '</div>'
+    + '</div>'
+
+    + '<div class="admin-grid-4" style="margin-bottom:12px;">'
+    + '<div class="admin-card admin-card--accent-red">'
+    + '<div class="admin-panel-kicker">Restore engine</div>'
+    + '<div class="admin-restore-row">'
+    + '<select id="db-restore-engine-select">' + engOpts + '</select>'
+    + '<button class="btn-outline btn-sm" style="margin:0; flex-shrink:0; border-color:#ef4444; color:#ef4444;" onclick="runDbRestore(\'ENGINE\')">RESTORE</button>'
     + '</div></div>'
+    + '<div class="admin-card admin-card--accent-red">'
+    + '<div class="admin-panel-kicker">Restore vault</div>'
+    + '<div class="admin-restore-row">'
+    + '<select id="db-restore-vault-select">' + vaultOpts + '</select>'
+    + '<button class="btn-outline btn-sm" style="margin:0; flex-shrink:0; border-color:#ef4444; color:#ef4444;" onclick="runDbRestore(\'VAULT\')">RESTORE</button>'
+    + '</div></div>'
+    + '<div class="admin-card admin-card--accent-green">'
+    + '<div class="admin-panel-kicker">Create backup</div>'
+    + '<div class="admin-panel-muted">Copies to 05_DATABASE/BACKUPS</div>'
+    + '<div class="admin-backup-actions">'
+    + '<button id="db-backup-btn-engine" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runDbBackupQuick(\'ENGINE\')">ENGINE</button>'
+    + '<button id="db-backup-btn-vault" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runDbBackupQuick(\'VAULT\')">VAULT</button>'
+    + '<button id="db-backup-btn-both" class="btn-outline btn-sm" style="margin:0; border:2px solid #f59e0b; color:#f59e0b;" title="Countdown + UI lock" onclick="runDbBackupBoth()">BOTH</button>'
+    + '</div></div>'
+    + '<div class="admin-card">'
+    + '<div class="admin-panel-kicker">Replaced folder</div>'
+    + '<div class="admin-panel-body">Previous live files moved aside on restore.</div>'
+    + (res.driveFolders && res.driveFolders.replaced && res.driveFolders.replaced.url
+      ? '<a class="admin-panel-link" href="' + res.driveFolders.replaced.url + '" target="_blank">Open REPLACED ↗</a>'
+      : '')
+    + '</div>'
+    + '</div>'
+
+    + '<div class="admin-grid-4">'
+    + '<div class="admin-card admin-grid-span-all" style="max-height:280px; display:flex; flex-direction:column; min-height:0;">'
+    + '<div class="section-title" style="margin:0 0 10px 0; color:#3b82f6;">Operations log</div>'
+    + '<div style="flex:1; min-height:0; overflow-y:auto;">'
+    + buildOpsLogListHtml(_dbOpsCache)
+    + '</div></div>'
+    + '</div>'
 
     + '</div>';
 }
@@ -333,8 +352,8 @@ function revertDatabaseStep(stepId) {
 
 function runDbRepairLayout() {
   const folderLabel = (_dbLiveStatus && _dbLiveStatus.canonicalFolder && _dbLiveStatus.canonicalFolder.name)
-    ? _dbLiveStatus.canonicalFolder.name : 'the database folder';
-  if (!confirm('Move the current live ENGINE and VAULT into ' + folderLabel + ' and rename them to ENGINE / VAULT?\n\nThis only changes folder location and file names — no spreadsheet data is copied or modified.')) return;
+    ? _dbLiveStatus.canonicalFolder.name : '05_DATABASE';
+  if (!confirm('Move live Engine and Vault into ' + folderLabel + ' and rename to SM_Showrunner_ENGINE / SM_Showrunner_VAULT?\n\nOnly folder location and file names change — no spreadsheet data is copied.')) return;
 
   google.script.run
     .withFailureHandler(function(err) { alert('Repair failed: ' + err.message); })

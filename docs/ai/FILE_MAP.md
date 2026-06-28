@@ -43,7 +43,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 
 ## 3. Operations & Integrations
 - **`Operations.js`**: Core backend execution (RFID processing, ledger commits, starting sessions).
-- **`Integrations.js`**: External APIs. Handles Google Drive folder generation, dumb vault deployment, and cron triggers (e.g., weather automations).
+- **`Integrations.js`**: External APIs. Google Drive project folders, template clone, **Showrunner Sync** shortcuts, archivers. **Drive folder IDs & layout:** [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md).
 
 ## 4. The 01 Series: Calendar & Dashboard
 - **`01a_Calendar_Core.html`**: Main dashboard boot sequence and FullCalendar configurations.
@@ -98,7 +98,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`06e_Admin_Automation.html`**: Database archivers and manager rules.
 - **`06f_Admin_Audit.html`**: Database Audit Studio (duplicate merge + item-by-item review). **Wired** in `Index.html`. Entry: `openAuditStudio()` when linked from admin UI.
 - **`06g_Admin_Database.html`**: ROOT-only **Database Operations** — sub-tabs **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS**. Shell markup in `00b_UI_Hubs.html` (`tab-content-database`). Entry: Admin hub → DATABASE tab → `loadDatabaseOpsPanel()` (called from `06_System_Admin.html`). Backup pane: live file tickets, quick backup/restore, ops log. Ops pane: placeholder Software Log Hub (left) + **Push Notifications** (right) via `renderPushAdminPanel('push-admin-panel')`. *Quirk: push list styles inject into `document.head` (`ensurePushDeviceListStyles` in `10c`); device fetch is deferred inside try/catch.*
-- **`Resources_Core.js`**, **`Resources_Audit.js`**, **`Resources_Migrations.js`**, **`Resources_System.js`**, **`Resources_Vault.js`**, **`Resources_Warehouse.js`**: The backend CRUD and schema engines for global resources.
+- **`Resources_Core.js`**, **`Resources_Database.js`**, **`Resources_Audit.js`**, **`Resources_Migrations.js`**, **`Resources_System.js`**, **`Resources_Vault.js`**, **`Resources_Warehouse.js`**: Backend CRUD and schema engines. **Live DB registry & folder IDs:** [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) + `Resources_Core.js` constants.
 
 ## 9. The 09 Series: Financials
 - **`09_Financials_Hub.html`**: The main hub for payroll, labor costs, and interactive ledgers.

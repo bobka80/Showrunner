@@ -23,7 +23,7 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 
 ## The AI Doctrine (Mandatory Execution Rules)
 
-1. **Autonomously Maintain the Knowledge Base:** If you change JSON shape, architecture, or magic strings, update the matching file in `docs/ai/` (`SCHEMA.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `FRAGILE_ZONES.md`) in the same session.
+1. **Autonomously Maintain the Knowledge Base:** If you change JSON shape, architecture, magic strings, or **Drive folder IDs / live file names**, update the matching file in `docs/ai/` (`SCHEMA.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `FRAGILE_ZONES.md`, **`DRIVE_LAYOUT.md`**) in the same session.
 
 2. **Autonomously Maintain Work Drawers:** When you complete a task, update the **topic** or **active** file and the one-line status in [Project_TODO.md](docs/ai/Project_TODO.md). Do not duplicate checklists in the index.
 
@@ -80,6 +80,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 | [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) | Two-layer versioning |
 | [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md) | Milestone-now protocol |
 | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) | Dangerous areas |
+| [DRIVE_LAYOUT.md](docs/ai/DRIVE_LAYOUT.md) | `STAGE_MASTERS_SYSTEM_ROOT` — folder IDs, live DB names, sync vs backup |
 | [DIRECTOR_WORKFLOW.md](docs/ai/DIRECTOR_WORKFLOW.md) | How to work with the director |
 
 **Situational:** read [docs/ai/active/](docs/ai/active/) and the relevant [docs/ai/topics/](docs/ai/topics/) file — not the whole TODO.

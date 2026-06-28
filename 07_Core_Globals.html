@@ -1175,7 +1175,7 @@ function triggerDatabaseBackup(onComplete) {
         clearInterval(window._dbBackupCountdownTimer);
         window._dbBackupCountdownTimer = null;
         mainText.innerHTML = '<span style="font-size: 24px; font-weight: 900; color: #10b981;">BACKING UP NOW...</span>';
-        subText.innerText = 'Copying Engine + Vault to 05_DATABASE_BACKUPS. Please wait.';
+        subText.innerText = 'Copying Engine + Vault to 05_DATABASE/BACKUPS. Please wait.';
         waitForPendingSavesBeforeBackup_(function() {
           runDatabaseBackupJob_(mainText, subText, onComplete);
         });

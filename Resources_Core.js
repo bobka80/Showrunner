@@ -9,15 +9,36 @@ const ENGINE_SHEET_ID = '1AIa5GuEq4J4mDUqfI2Sp5RkAt6RW-aUd3VG0anB-PFk';
 const AUDIT_LOG_SHEET_ID = '1gR70dun6Xc4Q_njxd2PXrT9rty_1X_4qiZby8V4RyOA';
 const AUDIT_DB_SHEET_ID = '1UdEONWScrTQSoa_spIEjfN3lJdMcxu9zLCXVZZcJbG8';
 
-const SYSTEM_ROOT_ID = '1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre';
-const DB_BACKUP_FOLDER_NAME = '05_DATABASE_BACKUPS';
+const SYSTEM_ROOT_ID = '1YVNMQRIq7FrRSeD2MuQO0zNSXR0XeTsc';
+const WORKSPACE_FOLDER_ID = '1MDjRCK5RyILVly1Rv7J9yxjr2BLDrFYl';
+const FINANCE_FOLDER_ID = '1oGZS3yvrZXebYBlwE0eNq0JMPKbR48y6';
+const SYSTEM_ASSETS_FOLDER_ID = '1PL16v5ZbyX5KzxqGEnaDpp1fVmcp5ecl';
+const OPS_TEMPLATE_ID = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
+const FIN_TEMPLATE_ID = '1qmchnnh21Lp3iPR73B_LV6oihbiTJSwW';
 const LIVE_DATABASE_FOLDER_ID = '1EAgUzjbwq5CootjKmZhQP3Mfm2VYsZox';
-const LIVE_ENGINE_FILE_NAME = 'ENGINE';
-const LIVE_VAULT_FILE_NAME = 'VAULT';
+const DB_BACKUP_FOLDER_ID = '1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre';
 const REPLACED_DB_FOLDER_ID = '1aZSru-d8OryHpNCooPm78oWdFjSauTPN';
+const ARCHIVE_FOLDER_ID = '1KFhrzhwxuMocMQzW9DfWc5QcO-_Pg81z';
+const LIVE_ENGINE_FILE_NAME = 'SM_Showrunner_ENGINE';
+const LIVE_VAULT_FILE_NAME = 'SM_Showrunner_VAULT';
+const LIVE_LOGS_FILE_NAME = 'SM_Showrunner_LOGS';
+const LIVE_AUDIT_FILE_NAME = 'SM_Showrunner_AUDIT';
+
+/** @deprecated use WORKSPACE_FOLDER_ID */
+const OPS_ROOT_ID = WORKSPACE_FOLDER_ID;
+/** @deprecated use FINANCE_FOLDER_ID */
+const FIN_ROOT_ID = FINANCE_FOLDER_ID;
 
 function getLiveDatabaseFolder() {
   return DriveApp.getFolderById(LIVE_DATABASE_FOLDER_ID);
+}
+
+function getDatabaseBackupFolder() {
+  return DriveApp.getFolderById(DB_BACKUP_FOLDER_ID);
+}
+
+function getArchiveDatabaseFolder() {
+  return DriveApp.getFolderById(ARCHIVE_FOLDER_ID);
 }
 
 function getActiveSheetId(propKey, fallbackId) {

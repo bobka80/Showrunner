@@ -32,6 +32,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [UI_DOCTRINE.md](UI_DOCTRINE.md) | Structural UI rules |
 | [File_Splitting_Guide.md](File_Splitting_Guide.md) | Safe file splits |
 | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) | This works / milestone / rollback |
+| [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) | Google Drive — `STAGE_MASTERS_SYSTEM_ROOT`, `05_DATABASE`, Showrunner Sync |
 | [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now protocol |
 
 **Intentional pairs (same truth, different job):** `FRAGILE_ZONES` = checklist; `ARCHITECTURE` = explanation. Link, do not copy.
