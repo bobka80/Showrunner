@@ -103,3 +103,49 @@ function getShowrunnerHostingLink_() {
     return 'https://sm-showrunner-97405.web.app';
   }
 }
+
+/** Canonical vault UID for Notifications sheet rows (falls back to trimmed identifier). */
+function resolveNotifUserUid_(identifier) {
+  const uid = resolveVaultUidForPush_(identifier);
+  if (uid) return uid;
+  return String(identifier || '').trim();
+}
+
+function notifBelongsToProfile_(notifUserUid, profile, crewName) {
+  const rowVal = String(notifUserUid || '').trim();
+  if (!rowVal) return false;
+  const rowLower = rowVal.toLowerCase();
+  if (profile && profile.uid && rowVal === String(profile.uid).trim()) return true;
+  if (profile && profile.email && rowLower === String(profile.email).toLowerCase().trim()) return true;
+  if (crewName && rowLower === String(crewName).toLowerCase().trim()) return true;
+  return false;
+}
+
+function appendInAppNotification_(notifsSheet, recipientId, message) {
+  if (!notifsSheet || !recipientId || !message) return;
+  const userUid = resolveNotifUserUid_(recipientId);
+  if (!userUid) return;
+  const data = notifsSheet.getDataRange().getValues();
+  const nMap = {};
+  if (data.length > 0) data[0].forEach(function(h, i) { nMap[h.toString().trim()] = i; });
+  const colCount = data.length > 0 ? data[0].length : 5;
+  const r = new Array(colCount).fill('');
+  const nowIso = new Date().toISOString();
+  if (nMap['uid'] !== undefined) r[nMap['uid']] = Utilities.getUuid();
+  if (nMap['user_uid'] !== undefined) r[nMap['user_uid']] = userUid;
+  if (nMap['Message'] !== undefined) r[nMap['Message']] = message;
+  if (nMap['Is_Read'] !== undefined) r[nMap['Is_Read']] = false;
+  if (nMap['Timestamp'] !== undefined) r[nMap['Timestamp']] = nowIso;
+  else if (colCount >= 5) {
+    r[0] = Utilities.getUuid();
+    r[1] = userUid;
+    r[2] = message;
+    r[3] = false;
+    r[4] = nowIso;
+  }
+  notifsSheet.appendRow(r);
+}
+
+function isTruckShiftIdentifier_(id) {
+  return id && String(id).toLowerCase().indexOf('truck') >= 0;
+}

@@ -11,7 +11,6 @@
 function getTasksAndNotifs(crewName) {
   return executeWithRetry(() => {
     const profile = getUserSecurityProfile(crewName);
-    const userUid = profile.uid || "unknown";
     const sheets = verifyDatabaseSchema(true);
     
     let tasks = [];
@@ -46,7 +45,8 @@ function getTasksAndNotifs(crewName) {
     let nData = getSheetData(sheets.notifs);
     let now = new Date().getTime();
     for(let i=1; i<nData.length; i++) {
-        if(nData[i][nData.hMap['user_uid']] === userUid) {
+        let rowUser = nData[i][nData.hMap['user_uid']];
+        if (!notifBelongsToProfile_(rowUser, profile, crewName)) continue;
             let isRead = nData[i][nData.hMap['Is_Read']];
             let ts = new Date(nData[i][nData.hMap['Timestamp']]).getTime();
             
@@ -56,7 +56,6 @@ function getTasksAndNotifs(crewName) {
             notifs.push({
                 id: nData[i][nData.hMap['uid']], message: nData[i][nData.hMap['Message']], isRead: isRead, timestamp: nData[i][nData.hMap['Timestamp']]
             });
-        }
     }
     
     notifs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -227,15 +226,8 @@ function saveTaskData(taskObj, crewName) {
     }
     
     if (isNew && taskObj.assignees && taskObj.assignees.length > 0) {
-        let nSheet = getMap(sheets.notifs);
-        taskObj.assignees.forEach(email => {
-            let r = new Array(Object.keys(nSheet.map).length).fill("");
-            if(nSheet.map['uid'] !== undefined) r[nSheet.map['uid']] = Utilities.getUuid();
-            if(nSheet.map['user_uid'] !== undefined) r[nSheet.map['user_uid']] = email;
-            if(nSheet.map['Message'] !== undefined) r[nSheet.map['Message']] = `You were assigned to task: ${taskObj.title}`;
-            if(nSheet.map['Is_Read'] !== undefined) r[nSheet.map['Is_Read']] = false;
-            if(nSheet.map['Timestamp'] !== undefined) r[nSheet.map['Timestamp']] = new Date().toISOString();
-            sheets.notifs.appendRow(r);
+        taskObj.assignees.forEach(function(assignee) {
+            appendInAppNotification_(sheets.notifs, assignee, 'You were assigned to task: ' + taskObj.title);
         });
         try {
             dispatchPushToIdentifiers(
@@ -296,18 +288,18 @@ function deleteTaskData(taskId, actor = "System UI") {
     wipeFromSheet(sheets.taskAssets, 'task_uid');
     
     if (oldAssignees.length > 0) {
-        let nData = sheets.notifs.getDataRange().getValues();
-        let nMap = {}; if(nData.length>0) nData[0].forEach((h,i)=>nMap[h.toString().trim()]=i);
-        let nowIso = new Date().toISOString();
-        oldAssignees.forEach(email => {
-            let r = new Array(nData[0].length).fill("");
-            if(nMap['uid'] !== undefined) r[nMap['uid']] = Utilities.getUuid();
-            if(nMap['user_uid'] !== undefined) r[nMap['user_uid']] = email;
-            if(nMap['Message'] !== undefined) r[nMap['Message']] = `🗑️ Task deleted: ${taskTitle}`;
-            if(nMap['Is_Read'] !== undefined) r[nMap['Is_Read']] = false;
-            if(nMap['Timestamp'] !== undefined) r[nMap['Timestamp']] = nowIso;
-            sheets.notifs.appendRow(r);
+        oldAssignees.forEach(function(assignee) {
+            appendInAppNotification_(sheets.notifs, assignee, '🗑️ Task deleted: ' + taskTitle);
         });
+        try {
+            dispatchPushToIdentifiers(
+                oldAssignees,
+                'Task removed',
+                'Task deleted: ' + taskTitle,
+                getShowrunnerHostingLink_(),
+                actor
+            );
+        } catch (pushErr) { /* in-app notifs saved */ }
     }
 
     flushCache();
@@ -354,7 +346,9 @@ function clearAllNotifications(crewName) {
     const sheets = verifyDatabaseSchema();
     let data = sheets.notifs.getDataRange().getValues();
     let kept = [data[0]];
-    for(let i=1; i<data.length; i++) { if(data[i][1] !== profile.uid) kept.push(data[i]); }
+    for(let i=1; i<data.length; i++) {
+      if (!notifBelongsToProfile_(data[i][1], profile, crewName)) kept.push(data[i]);
+    }
     sheets.notifs.clearContents();
     if(kept.length > 0) sheets.notifs.getRange(1, 1, kept.length, kept[0].length).setValues(kept);
     flushCache();
@@ -382,7 +376,7 @@ function markNotificationsRead(crewName) {
                    continue;
                }
                
-       if (data[i][1] === profile.uid && data[i][3] === false) {
+       if (notifBelongsToProfile_(data[i][1], profile, crewName) && data[i][3] === false) {
            data[i][3] = true;
            updated = true;
        }
@@ -426,54 +420,57 @@ function dispatchWeatherAlerts(projectId, projectName, warningsArray) {
     let shiftData = sheets.shifts.getDataRange().getValues();
     let sMap = {}; if(shiftData.length > 0) shiftData[0].forEach((h,i)=>sMap[h.toString().trim()]=i);
     
-    let assignedEmails = new Set();
+    let assignedIds = new Set();
     for (let i = 1; i < shiftData.length; i++) {
         if (shiftData[i][sMap['project_uid']] === projectId) {
-            let status = String(shiftData[i][sMap['status']] || '').toUpperCase();
-            if (status !== 'CANCELLED' && status !== 'TRASHED') {
-                assignedEmails.add(shiftData[i][sMap['email']]);
-            }
+            let crewId = shiftData[i][sMap['user_uid']];
+            if (crewId && !isTruckShiftIdentifier_(crewId)) assignedIds.add(crewId);
         }
     }
-    if (assignedEmails.size === 0) return "No crew assigned";
-    
+    if (assignedIds.size === 0) return "No crew assigned";
+
     let warningText = warningsArray.join(" | ");
-    let msg = `🌦️ WEATHER ALERT for ${projectName}: ${warningText}`;
-    
+    let msg = '🌦️ WEATHER ALERT for ' + projectName + ': ' + warningText;
+
     let notifData = sheets.notifs.getDataRange().getValues();
-    let nMap = {}; if(notifData.length>0) notifData[0].forEach((h,i)=>nMap[h.toString().trim()]=i);
-    
+    let nMap = {};
+    if (notifData.length > 0) notifData[0].forEach(function(h, i) { nMap[h.toString().trim()] = i; });
+
     let nowIso = new Date().toISOString();
-    let alreadySentEmails = new Set();
+    let alreadySentUids = new Set();
     let todayStr = nowIso.split('T')[0];
-    
-    // Anti-spam: prevent sending the exact same warning to the same user on the same day
+
     for (let i = Math.max(1, notifData.length - 500); i < notifData.length; i++) {
         let ts = String(notifData[i][nMap['Timestamp']] || '');
         if (ts.startsWith(todayStr)) {
             let dbMsg = String(notifData[i][nMap['Message']] || '');
-            if (dbMsg === msg) alreadySentEmails.add(notifData[i][nMap['user_uid']]);
+            if (dbMsg === msg) {
+                alreadySentUids.add(resolveNotifUserUid_(notifData[i][nMap['user_uid']]));
+            }
         }
     }
-    
-    let newRows = [];
-    assignedEmails.forEach(email => {
-        if (!alreadySentEmails.has(email)) {
-            let r = new Array(notifData[0].length).fill("");
-            if(nMap['uid'] !== undefined) r[nMap['uid']] = Utilities.getUuid();
-            if(nMap['user_uid'] !== undefined) r[nMap['user_uid']] = email;
-            if(nMap['Message'] !== undefined) r[nMap['Message']] = msg;
-            if(nMap['Is_Read'] !== undefined) r[nMap['Is_Read']] = false;
-            if(nMap['Timestamp'] !== undefined) r[nMap['Timestamp']] = nowIso;
-            newRows.push(r);
-        }
+
+    let pushRecipients = [];
+    assignedIds.forEach(function(crewId) {
+        let normUid = resolveNotifUserUid_(crewId);
+        if (alreadySentUids.has(normUid)) return;
+        appendInAppNotification_(sheets.notifs, crewId, msg);
+        pushRecipients.push(crewId);
     });
-    
-    if (newRows.length > 0) {
-        sheets.notifs.getRange(notifData.length + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+
+    if (pushRecipients.length > 0) {
         flushCache();
-        writeToAuditLog("System Engine", "UPDATE", "NOTIFICATIONS", projectId, "Weather Engine", `Dispatched ${newRows.length} weather alerts.`);
+        writeToAuditLog("System Engine", "UPDATE", "NOTIFICATIONS", projectId, "Weather Engine", 'Dispatched ' + pushRecipients.length + ' weather alerts.');
+        try {
+            dispatchPushToIdentifiers(
+                pushRecipients,
+                'Weather alert',
+                projectName + ': ' + warningText,
+                getShowrunnerHostingLink_(),
+                'System Engine'
+            );
+        } catch (pushErr) { /* in-app notifs saved */ }
     }
-    return `Alerts sent to ${newRows.length} crew members.`;
+    return 'Alerts sent to ' + pushRecipients.length + ' crew members.';
   });
 }

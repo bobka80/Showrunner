@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Drawer:** `docs/ai/active/`
 
-**Status:** Personal Hub **shipped** (GAS **v336**). Step A **shipped** (GAS **v335**). Next: director confirms Personal Hub on web.app, then Step B.  
+**Status:** Step C **shipped** (GAS **v342**). Next: Step D (foreground UX), then B, then Personal Hub polish.  
 **Rollback baseline:** GAS **v329** — *Mobile home — brand header, sidebar nav icons; remove timeline shift popup*  
 **Rolled back from:** v330–v333 (notifications phase 1–2, checklist status bar, mini-calendar CSS/boot changes, bad recursion “hotfix”)
 
@@ -61,11 +61,12 @@ After **v330**, the director reported:
 - [ ] Repair any broken CSS selectors (e.g. `fc-event-resizer` block from v330)
 - [ ] Milestone + verify
 
-### Step C — Notifications backend
+### Step C — Notifications backend ✅ (GAS v342)
 
-- [ ] Re-merge dispatch hooks carefully (see [topics/notifications.md](../topics/notifications.md))
-- [ ] UID normalization for in-app notification rows
-- [ ] Test matrix: assign, remove, shift change (other user), truck, cancel, new event → managers
+- [x] UID normalization on notif writes + widened read filter
+- [x] Removed-from-schedule in-app + FCM
+- [x] Task deleted FCM; weather FCM + shift `user_uid` fix
+- [ ] Director test matrix on web.app
 
 ### Step D — Foreground UX
 

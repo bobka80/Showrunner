@@ -204,13 +204,14 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
         });
     }
     let newUids = shifts ? [...new Set(shifts.map(s => s.user_uid || s.email))] : [];
-    let newlyAddedUids = newUids.filter(e => !oldUids.includes(e) && e && !e.includes('truck'));
+    let newlyAddedUids = newUids.filter(e => !oldUids.includes(e) && e && !isTruckShiftIdentifier_(e));
+    let removedUids = oldUids.filter(e => e && !isTruckShiftIdentifier_(e) && !newUids.includes(e));
 
     let modifiedUids = new Set();
     if (shifts) {
         shifts.forEach(s => {
             let uid = s.user_uid || s.email;
-            if (uid && !uid.includes('truck') && oldShiftsMap[s.id]) {
+            if (uid && !isTruckShiftIdentifier_(uid) && oldShiftsMap[s.id]) {
                 let oldS = oldShiftsMap[s.id];
                 if (oldS.start !== Number(s.start) || oldS.duration !== Number(s.duration)) {
                     modifiedUids.add(uid);
@@ -221,28 +222,22 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
         });
     }
 
-    if (newlyAddedUids.length > 0 || modifiedUids.size > 0) {
+    if (newlyAddedUids.length > 0 || modifiedUids.size > 0 || removedUids.length > 0) {
         let pName = "an event";
         let indexData = sheets.index.getDataRange().getValues();
         let iMap = {}; if(indexData.length > 0) indexData[0].forEach((h,i)=>iMap[h.toString().trim()]=i);
         for(let i=1; i<indexData.length; i++) { if(indexData[i][iMap['uid']] === folderId) { pName = indexData[i][iMap['Project_Name']]; break; } }
-        
-        let nowIso = new Date().toISOString();
-        
-        newlyAddedUids.forEach(uid => {
-            let r = new Array(5).fill("");
-            r[0] = Utilities.getUuid(); r[1] = uid;
-            r[2] = `📅 You were added to the schedule for: ${pName}`;
-            r[3] = false; r[4] = nowIso;
-            sheets.notifs.appendRow(r);
+
+        newlyAddedUids.forEach(function(uid) {
+            appendInAppNotification_(sheets.notifs, uid, '📅 You were added to the schedule for: ' + pName);
         });
-        
-        modifiedUids.forEach(uid => {
-            let r = new Array(5).fill("");
-            r[0] = Utilities.getUuid(); r[1] = uid;
-            r[2] = `⏰ Your shift time was changed for: ${pName}`;
-            r[3] = false; r[4] = nowIso;
-            sheets.notifs.appendRow(r);
+
+        modifiedUids.forEach(function(uid) {
+            appendInAppNotification_(sheets.notifs, uid, '⏰ Your shift time was changed for: ' + pName);
+        });
+
+        removedUids.forEach(function(uid) {
+            appendInAppNotification_(sheets.notifs, uid, '📅 You were removed from the schedule for: ' + pName);
         });
 
         try {
@@ -260,6 +255,15 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
                     Array.from(modifiedUids),
                     'Shift time changed',
                     'Your shift was updated for: ' + pName,
+                    getShowrunnerHostingLink_(),
+                    actor
+                );
+            }
+            if (removedUids.length > 0) {
+                dispatchPushToIdentifiers(
+                    removedUids,
+                    'Schedule update',
+                    'You were removed from: ' + pName,
                     getShowrunnerHostingLink_(),
                     actor
                 );
