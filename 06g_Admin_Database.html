@@ -75,6 +75,18 @@ function toggleDbOpsLogRow(stepId) {
   if (chev) chev.textContent = open ? '▸' : '▾';
 }
 
+function buildInfoCell(label, valueHtml, valueClass) {
+  const cls = 'info-cell-value' + (valueClass ? ' ' + valueClass : '');
+  return '<div class="info-cell">'
+    + '<div class="info-cell-label">' + label + '</div>'
+    + '<div class="' + cls + '">' + valueHtml + '</div>'
+    + '</div>';
+}
+
+function buildInfoGridRow(cellsHtml) {
+  return '<div class="pill-info-grid">' + cellsHtml + '</div>';
+}
+
 function buildOpsLogListHtml(ops) {
   if (!ops || !ops.length) {
     return '<div class="admin-panel-muted" style="padding:8px 4px;">No operations logged yet.</div>';
@@ -102,49 +114,91 @@ function buildOpsLogListHtml(ops) {
   return html;
 }
 
-function renderFolderLinksHtml(driveFolders) {
+function renderFolderLinksCells(driveFolders) {
   if (!driveFolders) return '';
   const keys = ['backups', 'replaced', 'archives'];
-  let html = '<div class="admin-folder-links">';
+  let html = '';
   keys.forEach(function(k) {
     const f = driveFolders[k];
     if (!f || !f.url) return;
-    html += '<a class="admin-panel-link" href="' + f.url + '" target="_blank" style="margin-top:0;">' + f.label + ' ↗</a>';
+    html += buildInfoCell(f.label, '<a class="admin-panel-link" href="' + f.url + '" target="_blank" style="margin-top:0;">Open ↗</a>');
   });
-  html += '</div>';
   return html;
 }
 
 function renderLiveFileTicket(label, file, accentClass) {
   if (!file) return '';
-  const layoutText = file.layoutOk
-    ? '<span class="admin-status-ok">✓ ' + file.expectedPath + '</span>'
-    : '<span class="admin-status-warn">⚠ Expected: ' + file.expectedPath + '</span>';
-  const locationLine = file.parentFolderName
-    ? '<div class="admin-panel-muted" style="margin-top:6px;">Now: <strong style="color:#e4e4e7;">' + file.parentFolderName + '/' + file.name + '</strong></div>'
-    : '';
-  const factoryLine = file.isOriginalFactoryFile
-    ? '<div class="admin-panel-muted" style="margin-top:6px;">Factory original — never restored</div>'
-    : '<div class="admin-panel-muted" style="margin-top:6px;">Active file differs from factory original</div>';
-  return '<div class="admin-card ' + accentClass + '">'
-    + '<div class="admin-panel-kicker">' + label + '</div>'
-    + '<div class="admin-card-title" title="' + escapePushHtml(file.name) + '">' + escapePushHtml(file.name) + '</div>'
-    + '<div class="admin-panel-body" style="margin-top:6px;">' + layoutText + '</div>'
-    + locationLine
-    + '<div class="admin-panel-muted" style="margin-top:6px;">' + (file.modifiedLabel || '') + '</div>'
-    + factoryLine
-    + (file.url ? '<a class="admin-panel-link" href="' + file.url + '" target="_blank">Open live file ↗</a>' : '')
+  const layoutHtml = file.layoutOk
+    ? '<span class="admin-status-ok">✓ ' + escapePushHtml(file.expectedPath) + '</span>'
+    : '<span class="admin-status-warn">⚠ ' + escapePushHtml(file.expectedPath) + '</span>';
+  const locationHtml = file.parentFolderName
+    ? '<strong style="color:#e4e4e7;">' + escapePushHtml(file.parentFolderName + '/' + file.name) + '</strong>'
+    : '—';
+  const factoryHtml = file.isOriginalFactoryFile
+    ? 'Factory original — never restored'
+    : 'Active file differs from factory original';
+  const linkHtml = file.url
+    ? '<a class="admin-panel-link" href="' + file.url + '" target="_blank" style="margin-top:0;">Open live file ↗</a>'
+    : '—';
+
+  return '<div class="info-pill ' + accentClass + '">'
+    + buildInfoGridRow(
+      buildInfoCell(label, escapePushHtml(file.name), 'info-cell-value--title')
+      + buildInfoCell('Expected', layoutHtml)
+      + buildInfoCell('Now', locationHtml)
+      + buildInfoCell('Modified', escapePushHtml(file.modifiedLabel || '—'))
+    )
+    + buildInfoGridRow(
+      buildInfoCell('Factory', factoryHtml)
+      + buildInfoCell('Drive', linkHtml)
+    )
+    + '</div>';
+}
+
+function buildCanonicalFolderPill(res, repairBtnHtml) {
+  const dbName = res.canonicalFolder ? res.canonicalFolder.name : '05_DATABASE';
+  const folderLink = (res.canonicalFolder && res.canonicalFolder.url)
+    ? '<a class="admin-panel-link" href="' + res.canonicalFolder.url + '" target="_blank" style="margin-top:0;">Open folder ↗</a>'
+    : '—';
+  const folderLinks = renderFolderLinksCells(res.driveFolders);
+  let html = '<div class="info-pill info-pill--slate">'
+    + buildInfoGridRow(
+      buildInfoCell('Live folder', escapePushHtml(dbName), 'info-cell-value--title')
+      + buildInfoCell('Live files', 'SM_Showrunner_ENGINE + SM_Showrunner_VAULT')
+      + buildInfoCell('Drive', folderLink)
+      + (repairBtnHtml ? buildInfoCell('Layout', repairBtnHtml) : '')
+    );
+  if (folderLinks) {
+    html += buildInfoGridRow(folderLinks);
+  }
+  html += '</div>';
+  return html;
+}
+
+function buildRestorePill(label, selectId, fileType, optionsHtml) {
+  return '<div class="info-pill" style="border-left:3px solid #ef4444;">'
+    + buildInfoGridRow(
+      buildInfoCell('Restore', label, 'info-cell-value--title')
+      + '<div class="info-cell" style="grid-column: span 2;">'
+      + '<div class="info-cell-label">Backup</div>'
+      + '<select id="' + selectId + '" style="width:100%; padding:8px 10px; font-size:12px; background:#1a1a1e; color:#fff; border:1px solid #444; border-radius:4px; box-sizing:border-box;">' + optionsHtml + '</select>'
+      + '</div>'
+      + '<div class="info-cell">'
+      + '<div class="info-cell-label">&nbsp;</div>'
+      + '<button class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#ef4444; color:#ef4444; justify-content:center;" onclick="runDbRestore(\'' + fileType + '\')">RESTORE</button>'
+      + '</div>'
+    )
     + '</div>';
 }
 
 function buildBackupHealthBannerHtml(health) {
-  if (!health) return '<div class="admin-card admin-grid-span-all admin-panel-muted">No backup health data.</div>';
+  if (!health) return '';
   if (health.healthy) {
-    return '<div class="admin-banner-ok admin-grid-span-all">'
+    return '<div class="admin-banner-ok" style="margin-bottom:10px;">'
       + '✓ Backup OK — last Engine+Vault pair: <strong>' + (health.lastPairedDate || '—') + '</strong>'
       + ' · ' + health.fileCount + ' files in BACKUPS</div>';
   }
-  return '<div class="admin-banner-warn admin-grid-span-all">'
+  return '<div class="admin-banner-warn" style="margin-bottom:10px;">'
     + '⚠️ <strong>BACKUP FAILSAFE:</strong> ' + (health.warning || 'Backup unhealthy') + '</div>';
 }
 
@@ -160,79 +214,66 @@ function renderDatabaseBackupArchiveTab(res) {
     return '<option value="' + b.id + '">' + b.name + ' — ' + b.modifiedLabel + '</option>';
   }).join('') || '<option value="">No vault backups</option>';
 
-  const dbName = res.canonicalFolder ? res.canonicalFolder.name : '05_DATABASE';
   const layoutOk = res.engine && res.engine.layoutOk && res.vault && res.vault.layoutOk;
-  const repairBtn = layoutOk
-    ? '<div class="admin-panel-body admin-status-ok" style="margin-top:10px;">✓ Live files are in the canonical folder.</div>'
-    : '<button class="btn-outline" style="margin-top:12px; width:100%; border-color:#f59e0b; color:#f59e0b; justify-content:center;" onclick="runDbRepairLayout()">REPAIR LAYOUT</button>';
+  const repairBtnHtml = layoutOk
+    ? '<span class="admin-status-ok">✓ In canonical folder</span>'
+    : '<button class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f59e0b; color:#f59e0b; justify-content:center;" onclick="runDbRepairLayout()">REPAIR LAYOUT</button>';
+
+  const colStyle = 'flex:1; min-width:0; display:flex; flex-direction:column; border-right:1px solid #333; min-height:0;';
+  const colLast = 'flex:1; min-width:0; display:flex; flex-direction:column; min-height:0;';
 
   panel.innerHTML = ''
-    + '<div style="flex:1; min-height:0; overflow:auto; padding:14px 16px; box-sizing:border-box;">'
+    + '<div style="display:flex; flex:1; min-height:0; width:100%;">'
 
-    + '<div class="admin-grid-4" style="margin-bottom:12px;">'
+    + '<div style="' + colStyle + '">'
+    + '<div style="padding:12px 14px 8px; border-bottom:1px solid #333; flex-shrink:0;">'
+    + '<div style="color:#f59e0b; font-weight:900; font-size:11px; letter-spacing:1px;">BACKUP COLUMN</div>'
+    + '</div>'
+    + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; padding:10px 14px; overflow:hidden;">'
     + buildBackupHealthBannerHtml(res.health)
+    + buildCanonicalFolderPill(res, repairBtnHtml)
+    + '<div style="flex-shrink:0;">'
+    + '<div class="info-cell-label" style="margin-bottom:6px;">LIVE FILES</div>'
+    + renderLiveFileTicket('Engine', res.engine, 'info-pill--amber')
+    + renderLiveFileTicket('Vault', res.vault, 'info-pill--green')
     + '</div>'
-
-    + '<div class="admin-grid-4" style="margin-bottom:12px;">'
-    + '<div class="admin-card admin-card--accent-blue">'
-    + '<div class="admin-panel-kicker">Live database folder</div>'
-    + '<div class="admin-card-title">' + escapePushHtml(dbName) + '</div>'
-    + '<div class="admin-panel-body" style="margin-top:6px;">SM_Showrunner_ENGINE + SM_Showrunner_VAULT</div>'
-    + (res.canonicalFolder && res.canonicalFolder.url
-      ? '<a class="admin-panel-link" href="' + res.canonicalFolder.url + '" target="_blank">Open ' + escapePushHtml(dbName) + ' ↗</a>'
-      : '')
-    + renderFolderLinksHtml(res.driveFolders)
-    + repairBtn
+    + '<div style="flex-shrink:0; margin-top:4px;">'
+    + '<div class="info-cell-label" style="margin-bottom:6px; color:#ef4444;">RESTORE FROM BACKUP</div>'
+    + buildRestorePill('Engine', 'db-restore-engine-select', 'ENGINE', engOpts)
+    + buildRestorePill('Vault', 'db-restore-vault-select', 'VAULT', vaultOpts)
     + '</div>'
-    + renderLiveFileTicket('Engine', res.engine, 'admin-card--accent-amber')
-    + renderLiveFileTicket('Vault', res.vault, 'admin-card--accent-green')
-    + '<div class="admin-card admin-card--accent-purple">'
-    + '<div class="admin-panel-kicker">Archives</div>'
-    + '<div class="admin-panel-body">Engine cold-archive and audit log archives.</div>'
-    + (res.driveFolders && res.driveFolders.archives && res.driveFolders.archives.url
-      ? '<a class="admin-panel-link" href="' + res.driveFolders.archives.url + '" target="_blank">Open ARCHIVES ↗</a>'
-      : '')
-    + '<div class="admin-panel-muted" style="margin-top:10px;">Maintenance tools coming in this column.</div>'
+    + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; margin-top:10px; overflow:hidden;">'
+    + '<div class="info-cell-label" style="margin-bottom:6px; color:#3b82f6;">OPERATIONS LOG</div>'
+    + '<div style="flex:1; min-height:0; overflow-y:auto; padding-right:4px;">'
+    + buildOpsLogListHtml(_dbOpsCache)
     + '</div>'
     + '</div>'
-
-    + '<div class="admin-grid-4" style="margin-bottom:12px;">'
-    + '<div class="admin-card admin-card--accent-red">'
-    + '<div class="admin-panel-kicker">Restore engine</div>'
-    + '<div class="admin-restore-row">'
-    + '<select id="db-restore-engine-select">' + engOpts + '</select>'
-    + '<button class="btn-outline btn-sm" style="margin:0; flex-shrink:0; border-color:#ef4444; color:#ef4444;" onclick="runDbRestore(\'ENGINE\')">RESTORE</button>'
-    + '</div></div>'
-    + '<div class="admin-card admin-card--accent-red">'
-    + '<div class="admin-panel-kicker">Restore vault</div>'
-    + '<div class="admin-restore-row">'
-    + '<select id="db-restore-vault-select">' + vaultOpts + '</select>'
-    + '<button class="btn-outline btn-sm" style="margin:0; flex-shrink:0; border-color:#ef4444; color:#ef4444;" onclick="runDbRestore(\'VAULT\')">RESTORE</button>'
-    + '</div></div>'
-    + '<div class="admin-card admin-card--accent-green">'
-    + '<div class="admin-panel-kicker">Create backup</div>'
-    + '<div class="admin-panel-muted">Copies to 05_DATABASE/BACKUPS</div>'
+    + '<div style="flex-shrink:0; margin-top:10px; padding-top:10px; border-top:1px solid #333;">'
+    + '<div class="info-cell-label" style="margin-bottom:6px; color:#10b981;">CREATE BACKUP</div>'
     + '<div class="admin-backup-actions">'
     + '<button id="db-backup-btn-engine" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runDbBackupQuick(\'ENGINE\')">ENGINE</button>'
     + '<button id="db-backup-btn-vault" class="btn-outline btn-sm" style="margin:0; border-color:#10b981; color:#10b981;" onclick="runDbBackupQuick(\'VAULT\')">VAULT</button>'
     + '<button id="db-backup-btn-both" class="btn-outline btn-sm" style="margin:0; border:2px solid #f59e0b; color:#f59e0b;" title="Countdown + UI lock" onclick="runDbBackupBoth()">BOTH</button>'
+    + '</div>'
+    + '<div class="admin-panel-muted" style="margin-top:6px; text-align:center;">05_DATABASE/BACKUPS · BOTH = countdown + lock</div>'
+    + '</div>'
     + '</div></div>'
-    + '<div class="admin-card">'
-    + '<div class="admin-panel-kicker">Replaced folder</div>'
-    + '<div class="admin-panel-body">Previous live files moved aside on restore.</div>'
-    + (res.driveFolders && res.driveFolders.replaced && res.driveFolders.replaced.url
-      ? '<a class="admin-panel-link" href="' + res.driveFolders.replaced.url + '" target="_blank">Open REPLACED ↗</a>'
-      : '')
-    + '</div>'
-    + '</div>'
 
-    + '<div class="admin-grid-4">'
-    + '<div class="admin-card admin-grid-span-all" style="max-height:280px; display:flex; flex-direction:column; min-height:0;">'
-    + '<div class="section-title" style="margin:0 0 10px 0; color:#3b82f6;">Operations log</div>'
-    + '<div style="flex:1; min-height:0; overflow-y:auto;">'
-    + buildOpsLogListHtml(_dbOpsCache)
-    + '</div></div>'
+    + '<div style="' + colLast + '">'
+    + '<div style="padding:12px 14px 8px; border-bottom:1px solid #333; flex-shrink:0;">'
+    + '<div style="color:#a855f7; font-weight:900; font-size:11px; letter-spacing:1px;">ARCHIVE COLUMN</div>'
     + '</div>'
+    + '<div style="flex:1; display:flex; flex-direction:column; padding:14px; min-height:0; overflow:auto;">'
+    + '<div class="info-pill" style="border-left:3px solid #a855f7;">'
+    + buildInfoGridRow(
+      buildInfoCell('Archives', 'Engine cold-archive and audit log archives.')
+      + (res.driveFolders && res.driveFolders.archives && res.driveFolders.archives.url
+        ? buildInfoCell('Drive', '<a class="admin-panel-link" href="' + res.driveFolders.archives.url + '" target="_blank" style="margin-top:0;">Open ARCHIVES ↗</a>')
+        : '')
+      + buildInfoCell('Status', 'Maintenance tools coming soon.')
+    )
+    + '</div>'
+    + '</div></div>'
 
     + '</div>';
 }
