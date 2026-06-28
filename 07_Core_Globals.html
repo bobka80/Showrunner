@@ -120,9 +120,11 @@ window.isTaskAssignedToMe = function(task) {
   if (!task || !Array.isArray(task.assignees)) return false;
   const email = (typeof ACTIVE_USER_EMAIL !== 'undefined' && ACTIVE_USER_EMAIL) ? String(ACTIVE_USER_EMAIL).toLowerCase().trim() : '';
   const uid = (typeof ACTIVE_USER_UID !== 'undefined' && ACTIVE_USER_UID) ? String(ACTIVE_USER_UID).trim() : '';
+  const name = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? String(ACTIVE_USER_NAME).toLowerCase().trim() : '';
   return task.assignees.some(function(a) {
-    const val = String(a || '').toLowerCase().trim();
-    return (email && val === email) || (uid && val === uid);
+    const val = String(a || '').trim();
+    const valLower = val.toLowerCase();
+    return (email && valLower === email) || (uid && val === uid) || (name && valLower === name);
   });
 };
 

@@ -38,7 +38,7 @@ function renderTasksAndNotifs(payload) {
         let ts = new Date(n.timestamp).getTime();
         if (ts > nowTime) return;
         
-        if(!n.isRead) unreadCount++;
+        if(!isSheetTruthy_(n.isRead)) unreadCount++;
         let bg = n.isRead ? 'transparent' : 'rgba(244, 63, 94, 0.1)';
         let border = n.isRead ? '#333' : '#f43f5e';
         let dateStr = new Date(n.timestamp).toLocaleDateString();

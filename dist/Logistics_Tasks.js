@@ -27,7 +27,7 @@ function getTasksAndNotifs(crewName) {
         let assignees = [];
         for(let a=1; a<aData.length; a++) { if(aData[a][aData.hMap['task_uid']] === taskId) assignees.push(aData[a][aData.hMap['user_uid']]); }
 
-        if (!canGlobalTasks && !actorIsAssignedToTask(profile, assignees)) continue;
+        if (!canGlobalTasks && !actorIsAssignedToTask(profile, assignees, crewName)) continue;
         
         let todos = [];
         for(let t=1; t<tdData.length; t++) { if(tdData[t][tdData.hMap['task_uid']] === taskId) todos.push({ text: tdData[t][tdData.hMap['description']], done: tdData[t][tdData.hMap['is_done']] }); }
@@ -47,15 +47,14 @@ function getTasksAndNotifs(crewName) {
     for(let i=1; i<nData.length; i++) {
         let rowUser = nData[i][nData.hMap['user_uid']];
         if (!notifBelongsToProfile_(rowUser, profile, crewName)) continue;
-            let isRead = nData[i][nData.hMap['Is_Read']];
-            let ts = new Date(nData[i][nData.hMap['Timestamp']]).getTime();
-            
-            // Hide instantly if read and older than 24 hours (86400000ms)
-            if (isRead && (now - ts > 86400000)) continue; 
-            
-            notifs.push({
-                id: nData[i][nData.hMap['uid']], message: nData[i][nData.hMap['Message']], isRead: isRead, timestamp: nData[i][nData.hMap['Timestamp']]
-            });
+        let isRead = isSheetTruthy_(nData[i][nData.hMap['Is_Read']]);
+        let ts = new Date(nData[i][nData.hMap['Timestamp']]).getTime();
+
+        if (isRead && (now - ts > 86400000)) continue;
+
+        notifs.push({
+            id: nData[i][nData.hMap['uid']], message: nData[i][nData.hMap['Message']], isRead: isRead, timestamp: nData[i][nData.hMap['Timestamp']]
+        });
     }
     
     notifs.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -63,13 +62,10 @@ function getTasksAndNotifs(crewName) {
   });
 }
 
-function actorIsAssignedToTask(profile, assignees) {
+function actorIsAssignedToTask(profile, assignees, crewName) {
   if (!profile || !assignees || !assignees.length) return false;
-  const email = profile.email ? String(profile.email).toLowerCase().trim() : '';
-  const uid = profile.uid ? String(profile.uid).trim() : '';
   return assignees.some(function(a) {
-    const val = String(a || '').toLowerCase().trim();
-    return (email && val === email) || (uid && val === uid);
+    return identifierMatchesProfile_(a, profile, crewName);
   });
 }
 
@@ -94,7 +90,7 @@ function savePersonalTaskData(taskObj, crewName) {
     const profile = getUserSecurityProfile(crewName);
     const sheets = verifyDatabaseSchema();
     const assignees = getTaskAssignees_(sheets, taskObj.id);
-    if (!actorIsAssignedToTask(profile, assignees)) {
+    if (!actorIsAssignedToTask(profile, assignees, crewName)) {
       throw new Error('🛑 PERMISSION DENIED: You are not assigned to this task.');
     }
 
@@ -184,7 +180,7 @@ function saveTaskData(taskObj, crewName) {
             let r = new Array(Object.keys(aSheet.map).length).fill("");
             if(aSheet.map['uid'] !== undefined) r[aSheet.map['uid']] = Utilities.getUuid();
             if(aSheet.map['task_uid'] !== undefined) r[aSheet.map['task_uid']] = taskObj.id;
-            if(aSheet.map['user_uid'] !== undefined) r[aSheet.map['user_uid']] = u;
+            if(aSheet.map['user_uid'] !== undefined) r[aSheet.map['user_uid']] = normalizeTaskAssigneeId_(u);
             return r;
         });
         sheets.taskAssignees.getRange(sheets.taskAssignees.getLastRow() + 1, 1, newA.length, Object.keys(aSheet.map).length).setValues(newA);
@@ -367,16 +363,15 @@ function markNotificationsRead(crewName) {
             let now = new Date().getTime();
             
     for (let i=1; i<data.length; i++) {
-               let isRead = data[i][3];
+               let isRead = isSheetTruthy_(data[i][3]);
                let ts = new Date(data[i][4]).getTime();
                
-               // Prune old read notifications from the Database entirely to keep it clean
                if (isRead && (now - ts > 86400000)) {
                    updated = true;
                    continue;
                }
                
-       if (notifBelongsToProfile_(data[i][1], profile, crewName) && data[i][3] === false) {
+       if (notifBelongsToProfile_(data[i][1], profile, crewName) && !isSheetTruthy_(data[i][3])) {
            data[i][3] = true;
            updated = true;
        }

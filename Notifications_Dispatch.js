@@ -111,16 +111,6 @@ function resolveNotifUserUid_(identifier) {
   return String(identifier || '').trim();
 }
 
-function notifBelongsToProfile_(notifUserUid, profile, crewName) {
-  const rowVal = String(notifUserUid || '').trim();
-  if (!rowVal) return false;
-  const rowLower = rowVal.toLowerCase();
-  if (profile && profile.uid && rowVal === String(profile.uid).trim()) return true;
-  if (profile && profile.email && rowLower === String(profile.email).toLowerCase().trim()) return true;
-  if (crewName && rowLower === String(crewName).toLowerCase().trim()) return true;
-  return false;
-}
-
 function appendInAppNotification_(notifsSheet, recipientId, message) {
   if (!notifsSheet || !recipientId || !message) return;
   const userUid = resolveNotifUserUid_(recipientId);
@@ -148,4 +138,44 @@ function appendInAppNotification_(notifsSheet, recipientId, message) {
 
 function isTruckShiftIdentifier_(id) {
   return id && String(id).toLowerCase().indexOf('truck') >= 0;
+}
+
+/** True when a stored identifier (uid, email, or crew name) belongs to this user. */
+function identifierMatchesProfile_(identifier, profile, crewName) {
+  const id = String(identifier || '').trim();
+  if (!id) return false;
+  const idLower = id.toLowerCase();
+  const profUid = profile && profile.uid ? String(profile.uid).trim() : '';
+  const profEmail = profile && profile.email ? String(profile.email).toLowerCase().trim() : '';
+  const profName = crewName ? String(crewName).toLowerCase().trim() : '';
+
+  if (profUid && id === profUid) return true;
+  if (profEmail && idLower === profEmail) return true;
+  if (profName && idLower === profName) return true;
+
+  const resolvedId = resolveVaultUidForPush_(id);
+  if (resolvedId && profUid && resolvedId === profUid) return true;
+
+  if (profEmail) {
+    const uidFromEmail = resolveVaultUidForPush_(profEmail);
+    if (uidFromEmail && id === uidFromEmail) return true;
+  }
+  if (profName) {
+    const uidFromName = resolveVaultUidForPush_(profName);
+    if (uidFromName && id === uidFromName) return true;
+  }
+
+  return false;
+}
+
+function notifBelongsToProfile_(notifUserUid, profile, crewName) {
+  return identifierMatchesProfile_(notifUserUid, profile, crewName);
+}
+
+function normalizeTaskAssigneeId_(identifier) {
+  return resolveNotifUserUid_(identifier);
+}
+
+function isSheetTruthy_(val) {
+  return val === true || String(val || '').toUpperCase() === 'TRUE';
 }
