@@ -88,6 +88,16 @@
     border-left: none !important;
 }
 
+.mobile-header-person-btn {
+    flex-shrink: 0;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-left: none !important;
+}
+
 .mobile-header-notif-wrap {
     position: relative;
     display: inline-flex;
@@ -950,7 +960,7 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     }
 }
 
-.personal-hub-top-row {
+.personal-hub-user-cluster {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -964,12 +974,18 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     padding: 18px;
 }
 
-.mobile-account-top-row {
+.mobile-theme-select-full {
     width: 100%;
+    max-width: 220px;
 }
 
-.mobile-account-top-row .personal-hub-name {
+.mobile-account-user-cluster {
+    margin-top: 16px;
+}
+
+.mobile-account-user-cluster .personal-hub-name {
     font-size: 16px;
+    max-width: none;
 }
 
 .mobile-task-card {

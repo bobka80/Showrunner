@@ -29,6 +29,17 @@ This document describes how the **Software Director** (project owner) collaborat
 
 **Cost note:** Brainstorm sessions are cheap (mostly conversation). They save money by preventing bad implementation attempts.
 
+### Mode 1b: Summarize
+
+**Trigger:** Director says **"summarize"** (or asks you to summarize your understanding and wait).
+
+**AI behavior:**
+- Restate requirements in plain language (bullets or short sections).
+- **Do not** edit code, run milestones, or change documentation.
+- End with an explicit wait: director must approve before work starts (**OK go**, **yes**, **go**, etc.).
+
+---
+
 ### Mode 2: Build
 
 **Triggers:** "OK go", "OK do it", "OK do the code", "fix this now", or a clear bug report expecting a fix.

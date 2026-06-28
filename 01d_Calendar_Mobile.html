@@ -40,7 +40,7 @@ function goMobileHome() {
 function openMobilePersonalHub() {
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-account').style.display = 'flex';
-    setMobileHeaderSub('ACCOUNT');
+    setMobileHeaderSub('PERSONAL HUB');
     if (typeof refreshPersonalHubUI === 'function') refreshPersonalHubUI();
 }
 

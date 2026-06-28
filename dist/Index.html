@@ -1125,7 +1125,17 @@
         padding: 0 25px;
         gap: 14px;
         flex-shrink: 0;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+    }
+    .personal-hub-bar-spacer {
+        flex: 1;
+        min-width: 12px;
+    }
+    .personal-hub-user-cluster {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
     }
     .personal-hub-theme-select {
         width: 108px;
@@ -1140,14 +1150,13 @@
         flex-shrink: 0;
     }
     .personal-hub-name {
-        flex: 1;
         font-weight: 800;
         color: #fff;
         font-size: 15px;
-        min-width: 80px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        max-width: 220px;
     }
     .personal-hub-logout-btn {
         margin: 0 !important;
@@ -1510,6 +1519,16 @@
 }
 
 .mobile-header-notif-btn {
+    flex-shrink: 0;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-left: none !important;
+}
+
+.mobile-header-person-btn {
     flex-shrink: 0;
     width: 44px !important;
     height: 44px !important;
@@ -2381,7 +2400,7 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     }
 }
 
-.personal-hub-top-row {
+.personal-hub-user-cluster {
     display: flex;
     align-items: center;
     gap: 12px;
@@ -2395,12 +2414,18 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     padding: 18px;
 }
 
-.mobile-account-top-row {
+.mobile-theme-select-full {
     width: 100%;
+    max-width: 220px;
 }
 
-.mobile-account-top-row .personal-hub-name {
+.mobile-account-user-cluster {
+    margin-top: 16px;
+}
+
+.mobile-account-user-cluster .personal-hub-name {
     font-size: 16px;
+    max-width: none;
 }
 
 .mobile-task-card {
@@ -2444,6 +2469,9 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
             <span class="mobile-header-wordmark">SHOWRUNNER</span>
         </div>
         <div id="mobile-title" class="mobile-header-title">HOME</div>
+        <button type="button" id="mobile-header-person-btn" class="nav-icon-btn mobile-header-person-btn" onclick="openMobilePersonalHub()" title="Personal Hub">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </button>
         <button type="button" id="mobile-header-notif-btn" class="nav-icon-btn mobile-header-notif-btn" onclick="openMobileNotifs()" title="Notifications">
             <span class="mobile-header-notif-wrap">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
@@ -2465,10 +2493,6 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
        <button type="button" class="mobile-nav-row" onclick="openMobileRFID()">
            <span class="mobile-nav-row__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2z"></path><path d="M7 10h.01"></path><path d="M11 10h6"></path><path d="M7 14h.01"></path><path d="M11 14h6"></path></svg></span>
            <span class="mobile-nav-row__label">MAP RFID</span>
-       </button>
-       <button type="button" class="mobile-nav-row" onclick="openMobilePersonalHub()">
-           <span class="mobile-nav-row__icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></span>
-           <span class="mobile-nav-row__label">ACCOUNT</span>
        </button>
     </div>
 
@@ -2501,11 +2525,12 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 
     <div id="mobile-view-account" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow-y:auto; padding:20px; gap:16px;">
        <div class="mobile-account-card">
-         <div class="personal-hub-top-row mobile-account-top-row">
-           <select id="mobile-user-theme-select" class="personal-hub-theme-select" onchange="changeUserTheme(this.value)" title="UI Theme">
-             <option value="dark">🌙 Dark</option>
-             <option value="light">☀️ Light</option>
-           </select>
+         <div class="input-label" style="margin-bottom: 8px;">UI Theme</div>
+         <select id="mobile-user-theme-select" class="personal-hub-theme-select mobile-theme-select-full" onchange="changeUserTheme(this.value)" title="UI Theme">
+           <option value="dark">🌙 Dark</option>
+           <option value="light">☀️ Light</option>
+         </select>
+         <div class="personal-hub-user-cluster mobile-account-user-cluster">
            <span id="mobile-personal-hub-name" class="personal-hub-name">—</span>
            <button id="mobile-btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
          </div>
@@ -2904,19 +2929,20 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 <div id="manager-settings-overlay" class="personal-hub-desktop-view" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
   <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
     <div class="personal-hub-account-bar">
-      <div class="view-header-title" style="margin-right: 16px;">👤 PERSONAL HUB</div>
+      <div class="view-header-title" style="margin-right: 8px;">👤 PERSONAL HUB</div>
       <select id="user-theme-select" class="personal-hub-theme-select" onchange="changeUserTheme(this.value)" title="UI Theme">
         <option value="dark">🌙 Dark</option>
         <option value="light">☀️ Light</option>
       </select>
-      <span id="personal-hub-name" class="personal-hub-name">—</span>
-      <button id="btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
+      <div class="personal-hub-bar-spacer"></div>
+      <div class="personal-hub-user-cluster">
+        <span id="personal-hub-name" class="personal-hub-name">—</span>
+        <button id="btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
+      </div>
       <button type="button" class="btn-outline personal-hub-pin-btn" onclick="openPersonalPinModal()">CHANGE PIN</button>
     </div>
 
-    <div id="personal-hub-manager-tools" class="hub-manager-only" style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
-       <h3 style="width: 100%; color:#a855f7; margin: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;">Manager Tools</h3>
-
+    <div id="personal-hub-manager-tools" class="hub-manager-only personal-hub-mgr-body" style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
            <h3 style="color:#a855f7; margin-top:0; font-size: 20px;">Drive Folder Automation</h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 20px;">Define where your project folders are created and which template folder is copied.</p>

@@ -76,6 +76,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 | Phrase | Layer | Script |
 |--------|-------|--------|
 | **OK go** (completed implementation) | Production milestone | `build.js` → `milestone.js` (automatic) |
+| **Summarize** | Understanding only — no code until approved | Wait for **OK go** / **go** |
 | **This works** | Git save only (optional mid-session) | `works-save.js` |
 | **Milestone** / **OK ship** | Apps Script production | `milestone.js` |
 | **Milestone now** (+ optional follow-up) | Apps Script production **first**, then dev/build | `milestone.js` → then other work |

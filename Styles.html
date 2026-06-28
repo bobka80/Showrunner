@@ -1116,7 +1116,17 @@
         padding: 0 25px;
         gap: 14px;
         flex-shrink: 0;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
+    }
+    .personal-hub-bar-spacer {
+        flex: 1;
+        min-width: 12px;
+    }
+    .personal-hub-user-cluster {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-shrink: 0;
     }
     .personal-hub-theme-select {
         width: 108px;
@@ -1131,14 +1141,13 @@
         flex-shrink: 0;
     }
     .personal-hub-name {
-        flex: 1;
         font-weight: 800;
         color: #fff;
         font-size: 15px;
-        min-width: 80px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        max-width: 220px;
     }
     .personal-hub-logout-btn {
         margin: 0 !important;

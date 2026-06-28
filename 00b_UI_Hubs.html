@@ -176,19 +176,20 @@
 <div id="manager-settings-overlay" class="personal-hub-desktop-view" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
   <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
     <div class="personal-hub-account-bar">
-      <div class="view-header-title" style="margin-right: 16px;">👤 PERSONAL HUB</div>
+      <div class="view-header-title" style="margin-right: 8px;">👤 PERSONAL HUB</div>
       <select id="user-theme-select" class="personal-hub-theme-select" onchange="changeUserTheme(this.value)" title="UI Theme">
         <option value="dark">🌙 Dark</option>
         <option value="light">☀️ Light</option>
       </select>
-      <span id="personal-hub-name" class="personal-hub-name">—</span>
-      <button id="btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
+      <div class="personal-hub-bar-spacer"></div>
+      <div class="personal-hub-user-cluster">
+        <span id="personal-hub-name" class="personal-hub-name">—</span>
+        <button id="btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
+      </div>
       <button type="button" class="btn-outline personal-hub-pin-btn" onclick="openPersonalPinModal()">CHANGE PIN</button>
     </div>
 
-    <div id="personal-hub-manager-tools" class="hub-manager-only" style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
-       <h3 style="width: 100%; color:#a855f7; margin: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;">Manager Tools</h3>
-
+    <div id="personal-hub-manager-tools" class="hub-manager-only personal-hub-mgr-body" style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
            <h3 style="color:#a855f7; margin-top:0; font-size: 20px;">Drive Folder Automation</h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 20px;">Define where your project folders are created and which template folder is copied.</p>

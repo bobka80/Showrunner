@@ -31,6 +31,8 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 
 4. **Brainstorming Phase Lockout:** Triggers: "brainstorm", "planning mode", "don't code", etc. No code until **"OK go"**, **"OK do it"**, or **"OK do the code"**.
 
+4b. **Summarize (understanding only):** When the director says **"summarize"**, restate what you understood in plain language and **wait for explicit approval** before editing code or docs. Do **not** implement, deploy, or update doctrine unless the director approves (e.g. **OK go**, **yes to everything**, **go**). If the director also asks to record a workflow rule, update doctrine **after** that approval.
+
 5. **Structural UI Compliance:** Follow **[UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md)**. Reuse `Styles.html` classes.
 
 6. **Plain-Language Handoff After Fixes:** What was wrong, what changed, how to test, what to report if it fails. Ask before adding to FRAGILE_ZONES incident log.
