@@ -52,7 +52,7 @@ function deployDumbFolder(projectId, projectName, selectedItems) {
     const indexData = getSheetData(sheets.index);
     let iMap = indexData.hMap;
     for (let i = 1; i < indexData.length; i++) {
-       if (indexData[i][iMap['Project_ID']] === projectId) {
+       if (indexData[i][iMap['uid']] === projectId) {
            managerEmail = indexData[i][iMap['Manager_Email']]; 
            break;
        }
@@ -76,7 +76,7 @@ function deployDumbFolder(projectId, projectName, selectedItems) {
     let fallbackDate = null;
     
     for (let i = 1; i < timelines.length; i++) {
-       if (timelines[i][tMap['Project_ID']] === projectId && timelines[i][tMap['Event_Date']]) {
+       if (timelines[i][tMap['project_uid']] === projectId && timelines[i][tMap['Event_Date']]) {
            let dateStr = timelines[i][tMap['Event_Date']].toString().split('T')[0];
            let parsedD = new Date(Date.UTC(dateStr.split('-')[0], dateStr.split('-')[1]-1, dateStr.split('-')[2]));
            
@@ -170,7 +170,7 @@ function generateProjectFolders(crewName, projectId, projectName) {
     let mainEventDates = [];
     
     for (let i = 1; i < timelines.length; i++) {
-       if (timelines[i][tMap['Project_ID']] === projectId && timelines[i][tMap['Event_Date']]) {
+       if (timelines[i][tMap['project_uid']] === projectId && timelines[i][tMap['Event_Date']]) {
            let rawDate = timelines[i][tMap['Event_Date']];
            let d = null;
            
@@ -314,19 +314,28 @@ function generateProjectFolders(crewName, projectId, projectName) {
         roster.forEach(user => {
             if (user.email) {
                 try {
-                    let userCfg = executeWithRetry(() => getManagerConfig(user.name));
-                    if (userCfg.syncSelection && userCfg.syncSelection.length > 0) {
-                        let userHub = getOrCreateFolder(syncHubRoot, user.name);
-                        driveRetry(() => { try { userHub.addEditor(user.email); } catch(e){} });
+                    let userKey = 'manager_config_' + user.name.replace(/\s+/g, '_').toLowerCase();
+                    let raw = getVaultAsset(userKey, {});
+                    let syncSelection = Array.isArray(raw.syncSelection) ? raw.syncSelection : [];
+                    if (!syncSelection.length) return;
 
-                        let uYear = getOrCreateFolder(userHub, yStart.toString());
-                        let uMonth = getOrCreateFolder(uYear, monthFolderName);
-                        let uProj = getOrCreateFolder(uMonth, formattedProjName);
+                    let renameRules = Array.isArray(raw.renameRules) ? raw.renameRules : [];
+                    if (!renameRules.length) {
+                        let globalCfg = getVaultAsset('manager_config_global', {});
+                        renameRules = Array.isArray(globalCfg.renameRules) ? globalCfg.renameRules : [];
+                    }
 
-                        userCfg.syncSelection.forEach(itemName => {
-                            let targetName = itemName.replace(/&quot;/g, '"');
+                    let userHub = getOrCreateFolder(syncHubRoot, user.name);
+                    driveRetry(() => { try { userHub.addEditor(user.email); } catch(e){} });
 
-                            let matchedRule = (userCfg.renameRules || []).find(r => r.originalName === itemName);
+                    let uYear = getOrCreateFolder(userHub, yStart.toString());
+                    let uMonth = getOrCreateFolder(uYear, monthFolderName);
+                    let uProj = getOrCreateFolder(uMonth, formattedProjName);
+
+                    syncSelection.forEach(itemName => {
+                        let targetName = itemName.replace(/&quot;/g, '"');
+
+                        let matchedRule = renameRules.find(r => r.originalName === itemName);
                             if (matchedRule) {
                                 let newBase = formattedProjName;
                                 if (matchedRule.prefix) newBase = matchedRule.prefix + " - " + newBase;
@@ -372,7 +381,6 @@ function generateProjectFolders(crewName, projectId, projectName) {
                                 }
                             }
                         });
-                    }
                 } catch(e) {}
             }
         });

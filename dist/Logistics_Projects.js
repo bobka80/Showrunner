@@ -14,6 +14,8 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     const projectId = projectData.Project_ID || Utilities.getUuid();
     const isNewProject = !projectData.Project_ID;
     let newTimestamp = new Date().toISOString();
+    let resolvedProjectId = projectId;
+    let mergedFromDuplicate = false;
     
     // 1. UPSERT PARENT (Projects_Index)
     let indexData = sheets.index.getDataRange().getValues();
@@ -25,6 +27,7 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     let existingReadiness = "{}";
     
     // --- ANTI-DUPLICATION ENGINE (NEW PROJECTS) ---
+    // Double-submit guard: reuse the row created in the last 60s, but still save timelines.
     if (isNewProject) {
         let targetName = String(projectData.Project_Name || "Unnamed Event").toLowerCase().trim();
         let nowEpoch = new Date().getTime();
@@ -32,8 +35,10 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
             let dbName = String(indexData[i][iMap['Project_Name']] || "").toLowerCase().trim();
             if (dbName === targetName) {
                 let dbTime = new Date(indexData[i][iMap['Last_Updated']]).getTime();
-                if (nowEpoch - dbTime < 60000) { // If exact name was created in the last 60 seconds
-                    return JSON.stringify({ id: indexData[i][iMap['uid']], timestamp: indexData[i][iMap['Last_Updated']] });
+                if (nowEpoch - dbTime < 60000) {
+                    resolvedProjectId = indexData[i][iMap['uid']];
+                    mergedFromDuplicate = true;
+                    break;
                 }
             }
         }
@@ -44,8 +49,8 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     let existingDbName = "";
     let existingDbStatus = "";
     for (let i = 1; i < indexData.length; i++) {
-      if (indexData[i][iMap['uid']] === projectId) {
-          if (!isNewProject && iMap['Last_Updated'] !== undefined) {
+      if (indexData[i][iMap['uid']] === resolvedProjectId) {
+          if (!isNewProject && !mergedFromDuplicate && iMap['Last_Updated'] !== undefined) {
               let dbTimestamp = indexData[i][iMap['Last_Updated']];
               let clientTimestamp = projectData.Last_Updated;
               if (dbTimestamp && clientTimestamp) {
@@ -71,7 +76,7 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     }
     
     let rowContent = new Array(iCols).fill("");
-    if(iMap['uid'] !== undefined) rowContent[iMap['uid']] = projectId;
+    if(iMap['uid'] !== undefined) rowContent[iMap['uid']] = resolvedProjectId;
     if(iMap['Project_Name'] !== undefined) rowContent[iMap['Project_Name']] = projectData.Project_Name || "Unnamed Event";
     if(iMap['Client'] !== undefined) rowContent[iMap['Client']] = projectData.Client || "";
     if(iMap['Status'] !== undefined) rowContent[iMap['Status']] = projectData.Status || "Draft";
@@ -95,11 +100,13 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     let tCols = timelineData.length > 0 ? timelineData[0].length : 7;
     let tMap = {};
     if(timelineData.length > 0) timelineData[0].forEach((h,i)=>tMap[h.toString().trim()]=i);
+    let tPidCol = tMap['project_uid'] !== undefined ? tMap['project_uid'] : tMap['Project_ID'];
     let keptRows = [timelineData[0]];
     
     // Identify existing rows for this project to wipe them (Swiss Cheese Sync)
     for (let i = 1; i < timelineData.length; i++) {
-      if (timelineData[i][tMap['project_uid']] !== projectId) keptRows.push(timelineData[i]);
+      let rowPid = (tPidCol !== undefined) ? timelineData[i][tPidCol] : timelineData[i][1];
+      if (rowPid !== resolvedProjectId) keptRows.push(timelineData[i]);
     }
     sheets.timelines.clearContents();
     if (keptRows.length > 0) sheets.timelines.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
@@ -109,7 +116,8 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
       let newRows = timelinesArray.map(t => {
         let r = new Array(tCols).fill("");
         if(tMap['uid'] !== undefined) r[tMap['uid']] = Utilities.getUuid();
-        if(tMap['project_uid'] !== undefined) r[tMap['project_uid']] = projectId;
+        if(tPidCol !== undefined) r[tPidCol] = resolvedProjectId;
+        else if (r.length > 1) r[1] = resolvedProjectId;
         if(tMap['Sub_Event_Type'] !== undefined) r[tMap['Sub_Event_Type']] = t.Sub_Event_Type || "MAIN";
         if(tMap['Event_Date'] !== undefined) r[tMap['Event_Date']] = t.Event_Date || "";
         if(tMap['Start_Time'] !== undefined) r[tMap['Start_Time']] = t.Start_Time ? `'${t.Start_Time}` : "";
@@ -122,8 +130,9 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     
     if (typeof flushCache !== 'undefined') flushCache();
     SpreadsheetApp.flush();
-    writeToAuditLog(actor, isNewProject ? "CREATE" : "UPDATE", "PROJECTS", projectId, projectId, `Saved project data & ${timelinesArray ? timelinesArray.length : 0} timeline fragment(s).`);
-    return JSON.stringify({ id: projectId, timestamp: newTimestamp });
+    let actionLabel = (isNewProject && !mergedFromDuplicate) ? "CREATE" : "UPDATE";
+    writeToAuditLog(actor, actionLabel, "PROJECTS", resolvedProjectId, resolvedProjectId, `Saved project data & ${timelinesArray ? timelinesArray.length : 0} timeline fragment(s).`);
+    return JSON.stringify({ id: resolvedProjectId, timestamp: newTimestamp });
   });
 }
 

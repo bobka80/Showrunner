@@ -344,12 +344,16 @@ function runSchedule() {
         .withSuccessHandler(res => { 
             clearTimeout(safetyTimer);
             btn.disabled = false; 
-            
+
+            if (res && res.toString().startsWith("Error")) {
+                alert(res);
+                btn.innerText = "SAVE & SYNC CALENDAR";
+                return;
+            }
+
             btn.innerText = "SAVED";
             window.isProjectDirty = false;
             setTimeout(() => { btn.innerText = "SAVE & SYNC CALENDAR"; }, 2000);
-            
-            if (res && res.toString().startsWith("Error")) { alert(res); return; }
             
             let resObj = { id: res };
             try { if (typeof res === 'string' && res.startsWith('{')) resObj = JSON.parse(res); } catch(e){}
@@ -360,7 +364,13 @@ function runSchedule() {
                 document.getElementById('edit-folder-id').value = finalId;
                 
                 google.script.run
-                    .withFailureHandler(err => console.error("Folder generation failed:", err))
+                    .withFailureHandler(err => {
+                        console.error("Folder generation failed:", err);
+                        alert("Project saved, but Drive folder creation failed: " + err.message);
+                    })
+                    .withSuccessHandler(folderUrl => {
+                        if (folderUrl && typeof refreshData === 'function') refreshData();
+                    })
                     .generateProjectFolders(ACTIVE_USER_NAME, finalId, newT);
                 
                 if (typeof startPresencePing === 'function') startPresencePing(finalId);
