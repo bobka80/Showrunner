@@ -169,4 +169,4 @@ NEVER mix these engines. See [FRAGILE_ZONES.md](FRAGILE_ZONES.md).
 
 ---
 
-*Migrated from `.agents/rules/Gemini.md` — agent-neutral, June 2026*
+*Agent-neutral engineering rules — June 2026*

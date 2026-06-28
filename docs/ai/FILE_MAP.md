@@ -105,7 +105,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 
 ## 10. Notifications & Push (10 Series + backend)
 
-**Handoff doc:** [NOTIFICATIONS_PROJECT_STATUS.md](NOTIFICATIONS_PROJECT_STATUS.md) · **Production log:** root `RELEASES.md` (updated by `milestone.js` on each GAS deploy).
+**Push notifications:** [topics/notifications.md](topics/notifications.md) · **Production log:** root `RELEASES.md` (updated by `milestone.js` on each GAS deploy).
 
 Users must open **Firebase Hosting** (`https://sm-showrunner-97405.web.app`) for FCM registration; raw `script.google.com` bookmarks do not receive push.
 

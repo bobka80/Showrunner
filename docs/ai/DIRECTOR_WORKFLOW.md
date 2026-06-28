@@ -1,5 +1,7 @@
 # Director Workflow — How the Project Owner Works With AI
 
+**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Map:** [README.md](README.md)
+
 This document describes how the **Software Director** (project owner) collaborates with AI agents. The director is **not a developer**. They do not read code, open files, or apply surgical fixes. AI agents own implementation, diagnosis, and documentation updates.
 
 ---
@@ -32,7 +34,7 @@ This document describes how the **Software Director** (project owner) collaborat
 **Triggers:** "OK go", "OK do it", "OK do the code", "fix this now", or a clear bug report expecting a fix.
 
 **AI behavior:**
-1. Read `AI_DOCTRINE.md`, relevant `docs/ai/` files, and `FRAGILE_ZONES.md` if the task touches equipment, formulas, sync, containers, or build pipeline
+1. Read `AI_DOCTRINE.md`, then the relevant **drawer** (`docs/ai/active/` or `docs/ai/topics/<name>.md`), and `FRAGILE_ZONES.md` if the task touches equipment, formulas, sync, containers, or build pipeline
 2. State which fragile zones apply (plain language)
 3. Make the smallest correct change
 4. Update docs if behavior or schema changed
@@ -141,7 +143,7 @@ You do not pick models — but you can say:
 At the end of a good brainstorm, the AI should leave:
 
 - A short **agreed plan** (bullets)
-- Any new items added to `Project_TODO.md`
+- Any new items → add to the relevant **topic file** under `docs/ai/topics/` and one index row in `Project_TODO.md`
 - Explicit wait: **"Say OK go to start implementation."**
 
 The director approves by saying **OK go**. Only then does coding begin.

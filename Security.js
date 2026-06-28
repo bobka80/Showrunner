@@ -474,6 +474,74 @@ function checkUserSessionStatus_(token) {
   return { valid: true, crewName: crewName, expiresAt: expiresAt };
 }
 
+function assertSessionMatchesCrew_(crewName, sessionToken) {
+  const cleanName = String(crewName || '').toLowerCase().trim();
+  const cleanToken = String(sessionToken || '').trim();
+  if (!cleanName || cleanToken.length < 20) {
+    return { ok: false, message: 'Session expired. Please log in again.' };
+  }
+  const validated = validateUserSession_(cleanToken);
+  if (!validated || validated.toLowerCase().trim() !== cleanName) {
+    return { ok: false, message: 'Session expired. Please log in again.' };
+  }
+  return { ok: true, token: cleanToken, crewName: validated };
+}
+
+function apiLogoutSession(crewName, sessionToken) {
+  const gate = assertSessionMatchesCrew_(crewName, sessionToken);
+  if (!gate.ok) return { success: false, message: gate.message };
+  revokeUserSession_(gate.token);
+  return { success: true, message: 'Logged out.' };
+}
+
+function changeMyPasscode(crewName, sessionToken, currentPasscode, newPasscode) {
+  const gate = assertSessionMatchesCrew_(crewName, sessionToken);
+  if (!gate.ok) return { success: false, message: gate.message };
+
+  const current = String(currentPasscode || '').trim();
+  const next = String(newPasscode || '').trim();
+  if (!/^[a-zA-Z0-9]{6}$/.test(current)) {
+    return { success: false, message: 'Current PIN must be exactly 6 letters or numbers.' };
+  }
+  if (!/^[a-zA-Z0-9]{6}$/.test(next)) {
+    return { success: false, message: 'New PIN must be exactly 6 letters or numbers.' };
+  }
+  if (current === next) {
+    return { success: false, message: 'New PIN must be different from your current PIN.' };
+  }
+
+  const auth = authenticateUser(gate.crewName, current);
+  if (!auth || !auth.success) {
+    return { success: false, message: 'Current PIN is incorrect.' };
+  }
+
+  return executeWithRetry(() => {
+    const sheets = verifyVaultSchema();
+    const crewSheet = sheets.crew;
+    const data = crewSheet.getDataRange().getValues();
+    const cMap = getHeaderMap(data);
+    const targetName = gate.crewName.toLowerCase().trim();
+    let updated = false;
+
+    for (let i = 1; i < data.length; i++) {
+      const rowName = data[i][cMap['Name']] ? data[i][cMap['Name']].toString().toLowerCase().trim() : '';
+      const hardName = data[i][2] ? data[i][2].toString().toLowerCase().trim() : '';
+      if (rowName === targetName || hardName === targetName) {
+        if (cMap['Passcode'] !== undefined) data[i][cMap['Passcode']] = next;
+        updated = true;
+        break;
+      }
+    }
+
+    if (!updated) return { success: false, message: 'Account not found.' };
+
+    crewSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
+    if (typeof flushCache !== 'undefined') flushCache();
+    writeToAuditLog(gate.crewName, 'UPDATE', 'IAM', 'SELF', gate.crewName, 'Self-service passcode change.');
+    return { success: true, message: 'PIN updated successfully.' };
+  });
+}
+
 // ==========================================
 // --- BACKEND RBAC GATEWAY VERIFIER ---
 // ==========================================

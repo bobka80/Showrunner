@@ -1113,6 +1113,8 @@
     /* Project editor — crew briefing (read-only) mode */
     .editor-briefing-mode .pe-mgr-only { display: none !important; }
     body:not(.perm-manager-tier):not(.perm-root) .pe-manager-only { display: none !important; }
+    body:not(.perm-manager-tier):not(.perm-root) .hub-manager-only { display: none !important; }
+    body:not(.perm-manager-tier):not(.perm-root) #personal-hub-account { border-bottom: none !important; padding-bottom: 0 !important; }
     #btn-display-event-type.pe-type-readonly { cursor: default !important; }
     .editor-crossrent-only #type-dropdown { display: none !important; }
     .editor-crossrent-only #btn-display-event-type { display: none !important; }
@@ -2502,6 +2504,10 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
       <!-- Bottom Section (Settings) -->
       <div style="display: flex; flex-direction: column; gap: 5px; width: 100%; align-items: center;">
 
+          <button id="nav-btn-manager" class="nav-icon-btn" onclick="openManagerSettings()" title="Personal Hub">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </button>
+
           <? if (showSettingsNav) { ?>
           
           <div id="nav-settings-container" class="nav-gated" style="position: relative; width: 100%; display: flex; justify-content: center;">
@@ -2518,10 +2524,6 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
                   </div>
               </div>
           </div>
-
-          <button id="nav-btn-manager" class="nav-icon-btn nav-gated" onclick="openManagerSettings()" title="User Profile / Manager Hub">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          </button>
           
           <button id="nav-btn-master" class="nav-icon-btn nav-gated" onclick="openMasterSettings()" title="Master Settings">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -2798,16 +2800,42 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 <div id="manager-settings-overlay" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
   <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
     <div style="height: 70px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; padding: 0 25px; justify-content: space-between; flex-shrink: 0;">
-      <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing: 1px;">👔 MANAGER HUB</div>
-      <div style="display:flex; align-items:center; gap: 15px;">
-         <div class="input-label" style="margin:0; color:#888;">UI Theme</div>
-         <select id="user-theme-select" onchange="changeUserTheme(this.value)" style="width: 140px; padding: 6px; margin: 0; height: 32px; font-size: 11px; background:#1a1a1e; color:#fff; border:1px solid #333;">
+      <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing: 1px;">👤 PERSONAL HUB</div>
+      <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('manager-settings-overlay').style.display='none'">✖</button>
+    </div>
+    <div style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 30px; align-items: stretch;">
+
+       <!-- ACCOUNT (everyone) -->
+       <div id="personal-hub-account" style="display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start; padding-bottom: 25px; border-bottom: 1px solid #333;">
+         <div style="flex: 1; min-width: 260px; max-width: 360px;">
+           <h3 style="color:#10b981; margin-top:0; font-size: 18px;">Account</h3>
+           <p style="color:#a1a1aa; font-size: 13px; margin: 0 0 8px 0;">Signed in as</p>
+           <div id="personal-hub-name" style="color:#fff; font-weight:800; font-size: 20px; margin-bottom: 18px;">—</div>
+           <div class="input-label" style="margin-bottom: 8px;">UI Theme</div>
+           <select id="user-theme-select" onchange="changeUserTheme(this.value)" style="width: 100%; max-width: 220px; padding: 8px; margin: 0 0 18px 0; height: 36px; font-size: 12px; background:#1a1a1e; color:#fff; border:1px solid #333; border-radius: 6px;">
              <option value="dark">🌙 Dark Theme</option>
              <option value="light">☀️ Light Theme</option>
-         </select>
-      </div>
-    </div>
-    <div style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
+           </select>
+           <button id="btn-personal-logout" class="btn-outline" style="width: 100%; max-width: 220px; border-color:#ef4444; color:#ef4444;" onclick="performUserLogout()">LOG OUT</button>
+           <p style="color:#71717a; font-size: 11px; margin: 10px 0 0 0; max-width: 280px; line-height: 1.45;">Stay signed in for 30 days after login. Log out here to switch accounts on this device.</p>
+         </div>
+         <div style="flex: 1; min-width: 260px; max-width: 400px;">
+           <h3 style="color:#698b99; margin-top:0; font-size: 18px;">Change PIN</h3>
+           <p style="color:#a1a1aa; font-size: 13px; margin: 0 0 15px 0;">Your 6-character command passcode.</p>
+           <div class="input-label">Current PIN</div>
+           <input type="password" id="personal-pin-current" maxlength="6" placeholder="••••••" autocomplete="off" style="width: 100%; max-width: 220px; padding: 10px; margin: 4px 0 12px 0; background:#27272a; border:1px solid #333; color:#fff; border-radius: 6px; letter-spacing: 4px; text-align: center; box-sizing: border-box;">
+           <div class="input-label">New PIN</div>
+           <input type="password" id="personal-pin-new" maxlength="6" placeholder="••••••" autocomplete="new-password" style="width: 100%; max-width: 220px; padding: 10px; margin: 4px 0 12px 0; background:#27272a; border:1px solid #333; color:#fff; border-radius: 6px; letter-spacing: 4px; text-align: center; box-sizing: border-box;">
+           <div class="input-label">Confirm New PIN</div>
+           <input type="password" id="personal-pin-confirm" maxlength="6" placeholder="••••••" autocomplete="new-password" style="width: 100%; max-width: 220px; padding: 10px; margin: 4px 0 12px 0; background:#27272a; border:1px solid #333; color:#fff; border-radius: 6px; letter-spacing: 4px; text-align: center; box-sizing: border-box;">
+           <div id="personal-pin-msg" style="font-size: 12px; font-weight: 700; margin-bottom: 10px; min-height: 16px;"></div>
+           <button id="btn-personal-pin-save" class="btn-main" style="width: auto; margin: 0;" onclick="submitPasscodeChange()">UPDATE PIN</button>
+         </div>
+       </div>
+
+       <!-- MANAGER TOOLS (manager tier only) -->
+       <div id="personal-hub-manager-tools" class="hub-manager-only" style="display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
+       <h3 style="width: 100%; color:#a855f7; margin: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;">Manager Tools</h3>
        
        <!-- COLUMN 1: DRIVE AUTOMATION -->
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
@@ -2847,9 +2875,11 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
                <div id="rule-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
            </div>
        </div>
+
+       </div>
        
     </div>
-    <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+    <div class="hub-manager-only" style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
         <button id="btn-save-mgr" class="btn-main" style="width:auto; margin:0;" onclick="submitManagerConfig()">SAVE CONFIGURATION</button>
     </div>
   </div>

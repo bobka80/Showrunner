@@ -1,83 +1,104 @@
 # AI Knowledge Base & Doctrine
 
-Welcome to the ShowRider / SM Showrunner AI Knowledge Base. Before performing any code adjustments or bug hunting, **you must read the documents linked below** to understand the system architecture, state management, and terminology.
+Welcome to the ShowRider / SM Showrunner AI Knowledge Base. Before performing any code adjustments or bug hunting, **read this file**, then open the **drawer** for your task (see [docs/ai/README.md](docs/ai/README.md)).
 
-This doctrine applies to **any AI agent** working in this repository (Cursor, Claude, Gemini, etc.).
+This doctrine applies to **any AI agent** in this repository (Cursor, Claude, etc.). Start at root **[AGENTS.md](AGENTS.md)** if your tool loads that automatically.
+
+---
+
+## One door, many drawers
+
+| Drawer | Path | Director says |
+|--------|------|---------------|
+| **Map** | [docs/ai/README.md](docs/ai/README.md) | "Where is X?" |
+| **Active work** | [docs/ai/active/](docs/ai/active/) | "Active drawer" / current recovery |
+| **Topic backlog** | [docs/ai/topics/](docs/ai/topics/) | "Notifications topic" — read **one** file |
+| **Roadmap index** | [docs/ai/Project_TODO.md](docs/ai/Project_TODO.md) | Status table only — not full checklists |
+| **Archive** | [docs/ai/archive/](docs/ai/archive/) | Historical plans |
+| **Stable reference** | See [docs/ai/README.md](docs/ai/README.md) | Architecture, schema, file map |
+
+**Operational logs (machine-written):** root **`RELEASES.md`**, **`WORKS_LOG.md`**.
 
 ---
 
 ## The AI Doctrine (Mandatory Execution Rules)
 
-1. **Autonomously Maintain the Knowledge Base:** If you change the structure of a JSON object, alter an architectural pipeline, or introduce a new magic string/system flag, you MUST proactively update the corresponding file in `docs/ai/` (e.g., `SCHEMA.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `FRAGILE_ZONES.md`) during that same session. Do not wait for the user to ask.
+1. **Autonomously Maintain the Knowledge Base:** If you change JSON shape, architecture, or magic strings, update the matching file in `docs/ai/` (`SCHEMA.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `FRAGILE_ZONES.md`) in the same session.
 
-2. **Autonomously Maintain the To-Do List:** When you complete a task listed in `docs/ai/Project_TODO.md`, you MUST remove or check off that task in the same session.
+2. **Autonomously Maintain Work Drawers:** When you complete a task, update the **topic** or **active** file and the one-line status in [Project_TODO.md](docs/ai/Project_TODO.md). Do not duplicate checklists in the index.
 
-3. **Document Brainstorming:** If you agree on a new feature or architectural direction during a brainstorming session, you MUST add it as an action item in `docs/ai/Project_TODO.md` before the session ends.
+3. **Document Brainstorming:** New features → add a topic file (or section) + one index row in `Project_TODO.md` before the session ends.
 
-4. **The Brainstorming Phase Lockout:** If the user mentions **"brainstorm"**, **"brainstorming"**, **"planning mode"**, **"we're planning"**, **"don't code"**, or similar phrasing, you enter a strict **No-Code Lockout**. You must stop writing and editing code entirely. You are restricted to chatting and planning ONLY. You cannot write or edit code until the user explicitly commands **"OK go"**, **"OK do it"**, or **"OK do the code"**. If you believe a code edit is necessary during this phase, you MUST ask for explicit approval first. During brainstorm, do NOT treat casual ideas as implementation requests.
+4. **Brainstorming Phase Lockout:** Triggers: "brainstorm", "planning mode", "don't code", etc. No code until **"OK go"**, **"OK do it"**, or **"OK do the code"**.
 
-5. **Structural UI Compliance:** Any new buttons, modals, hub headers, form labels, or tabs MUST follow **[UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md)**. Reuse existing CSS classes from `Styles.html` before adding inline styles. Do not override Module Visual Settings (calendar/timeline/grid density) when “fixing consistency.”
+5. **Structural UI Compliance:** Follow **[UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md)**. Reuse `Styles.html` classes.
 
-6. **Plain-Language Handoff After Fixes:** After any bug fix or feature change, you MUST tell the director (in plain language, no jargon required):
-   - What was wrong
-   - What you changed (conceptually, not file-by-file unless helpful)
-   - **How to test it** — numbered steps they can follow in the UI
-   - What to report back if it still fails
-   - **Ask to document:** *"Do you want me to add this to the Incident Log in FRAGILE_ZONES.md so we don't hit the same break again?"* — write only if they say yes
+6. **Plain-Language Handoff After Fixes:** What was wrong, what changed, how to test, what to report if it fails. Ask before adding to FRAGILE_ZONES incident log.
 
-7. **Fragile-Zone Disclosure Before Edits:** Before editing any area listed in `docs/ai/FRAGILE_ZONES.md`, you MUST state in plain language which zone you are touching and what could break if the change goes wrong. Wait for approval if the user is in a cautious or brainstorm-adjacent mode.
+7. **Fragile-Zone Disclosure:** Before editing [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) areas, state risk in plain language.
 
-Failure to read the documents below or adhere to this Doctrine will result in broken logic. This application uses an advanced distributed state machine, optimistic healing engines, and a specific compiler strategy for Google Apps Script.
+8. **Single Source of Truth & Fail-Safes:**
+   - Each fact has **one canonical file**. Other docs **link**; they do not re-copy checklists or status.
+   - **Same fact, two places, same meaning:** consolidate to canonical home; leave a one-line stub at the old path if needed.
+   - **Contradiction** (opposite instructions, conflicting status): **stop and ask the director** which wins before editing or deleting.
+   - **Unambiguous stale doc** (e.g. shipped step still unchecked): fix to match production/`RELEASES.md`.
 
----
-
-## Director Context (Read First for Workflow)
-
-The project owner is a **Software Director**, not a developer. They do not write or surgically edit code. They provide observations, console errors, and product direction. **You** own diagnosis, implementation, and documentation.
-
-Full workflow: **[Director Workflow](docs/ai/DIRECTOR_WORKFLOW.md)**
-
-Pre-change checklist for dangerous areas: **[Fragile Zones](docs/ai/FRAGILE_ZONES.md)**
-
-Deep engineering rules (30-table model, audit, financials prep): **[Engineering Rules](docs/ai/ENGINEERING_RULES.md)**
-
-Structural UI (buttons, modals, hubs — not Visual Settings): **[UI Doctrine](docs/ai/UI_DOCTRINE.md)**
+9. **Doc Hygiene (autonomous):**
+   - **Every build session:** update relevant active/topic file + index row when you finish work.
+   - **Trigger "doc hygiene":** full pass on `active/`, `topics/`, `Project_TODO.md` index, and hub links; move finished campaigns to `archive/`.
+   - **Close campaign:** when director confirms done, move `active/*.md` → `archive/` and update index.
 
 ---
 
-## Required Reading
+## Director Context
+
+The project owner is a **Software Director**, not a developer. **You** own diagnosis, implementation, and documentation.
+
+| Doc | Purpose |
+|-----|---------|
+| [Director Workflow](docs/ai/DIRECTOR_WORKFLOW.md) | Brainstorm vs build |
+| [Fragile Zones](docs/ai/FRAGILE_ZONES.md) | Pre-change checklist |
+| [Engineering Rules](docs/ai/ENGINEERING_RULES.md) | Deep mandates |
+| [UI Doctrine](docs/ai/UI_DOCTRINE.md) | Structural UI |
+
+---
+
+## Required Reading (stable reference)
 
 | Document | Purpose |
 |----------|---------|
-| [SCHEMA.md](docs/ai/SCHEMA.md) | JSON shapes: Vault Assets, Project Assets, Readiness State, roles |
-| [GLOSSARY.md](docs/ai/GLOSSARY.md) | Magic strings (`Standalone`, `[SHORT]`, `Auto-Container`, CLI patterns) |
-| [ARCHITECTURE.md](docs/ai/ARCHITECTURE.md) | Optimistic healing, formula engine, build pipeline, Drive sync, RBAC |
-| [FILE_MAP.md](docs/ai/FILE_MAP.md) | Index of all `0X_...html` components and `@INDEX:` markers |
-| [MOBILE_CREW_UX.md](docs/ai/MOBILE_CREW_UX.md) | **Mobile crew field UX** — Crew Hub, phase rail, compact assets, timeline zoom |
-| [File_Splitting_Guide.md](docs/ai/File_Splitting_Guide.md) | Protocol for chopping large UI files safely |
-| [Project_TODO.md](docs/ai/Project_TODO.md) | Master feature roadmap — maintain per Doctrine rules 2 and 3 |
-| [ENGINEERING_RULES.md](docs/ai/ENGINEERING_RULES.md) | Deep engineering mandates (UID, audit, financials prep) |
-| [UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md) | **Structural UI** — buttons, modals, hubs, tabs (not Visual Settings) |
-| [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) | Two-layer saves: Git "This works" vs Apps Script milestones |
-| [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md) | **Milestone now** — production snapshot before new work |
+| [SCHEMA.md](docs/ai/SCHEMA.md) | JSON shapes |
+| [GLOSSARY.md](docs/ai/GLOSSARY.md) | Magic strings |
+| [ARCHITECTURE.md](docs/ai/ARCHITECTURE.md) | Traps, build pipeline, RBAC |
+| [FILE_MAP.md](docs/ai/FILE_MAP.md) | Module index, `@INDEX:` |
+| [MOBILE_CREW_UX.md](docs/ai/MOBILE_CREW_UX.md) | Mobile crew reference |
+| [File_Splitting_Guide.md](docs/ai/File_Splitting_Guide.md) | Safe file splits |
+| [ENGINEERING_RULES.md](docs/ai/ENGINEERING_RULES.md) | 30-table model, audit |
+| [UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md) | Buttons, modals, hubs |
+| [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) | Two-layer versioning |
+| [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md) | Milestone-now protocol |
+| [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) | Dangerous areas |
+| [DIRECTOR_WORKFLOW.md](docs/ai/DIRECTOR_WORKFLOW.md) | How to work with the director |
+
+**Situational:** read [docs/ai/active/](docs/ai/active/) and the relevant [docs/ai/topics/](docs/ai/topics/) file — not the whole TODO.
 
 ---
 
 ## Key System Rules
 
-1. **The 1MB HTML Workaround:** All frontend JavaScript must live inside inline `<script>` tags within root `.html` files. The `build.js` compiler extracts them into `dist/` to bypass Google Apps Script's 1MB limit. **Do not create separate frontend `.js` files.**
+1. **1MB HTML workaround:** Frontend JS in inline `<script>` in root `.html` → `node build.js` → `dist/`. No separate frontend `.js` files.
 
-2. **State Mutability:** The global `currentProjectAssets` array is the ultimate source of truth for project equipment. UI state is driven by this array.
+2. **State:** `currentProjectAssets` is equipment source of truth.
 
-3. **No UID Duplication:** If an asset is logically exploded (burst into multiple units), the `uid` MUST be deleted on clones so the sync engine does not squash them back together.
+3. **No UID duplication** on burst clones.
 
-4. **Deploy Pipeline:** After editing root `.html` files, run `node build.js`, then deploy with `clasp push` (see ARCHITECTURE.md §11). Never edit `dist/` source of truth manually except via the build.
+4. **Deploy:** Edit source → `node build.js` → deploy. Never hand-edit `dist/` as source of truth.
 
-5. **Two-Layer Versioning:** See **[DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md)** and root **`WORKS_LOG.md`** / **`RELEASES.md`**.
-   - **"This works"** → `node works-save.js` (Git save, last 50 — **not** production).
-   - **"Milestone" / "OK ship"** → `node milestone.js` (Apps Script version + production).
-   - **"Milestone now"** → **`milestone.js` FIRST**, then continue with any other instructions in the same message. See **[MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md)**.
-   - **"OK go"** only → `node dev-push.js` (dev test, no save).
+5. **Two-layer versioning:** [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md), **`RELEASES.md`**, **`WORKS_LOG.md`**.
+   - **"This works"** → `works-save.js`
+   - **"Milestone" / "OK ship"** → `milestone.js`
+   - **"Milestone now"** → `milestone.js` **first**, then other work — [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md)
+   - **"OK go"** → dev push only
 
 ---
 

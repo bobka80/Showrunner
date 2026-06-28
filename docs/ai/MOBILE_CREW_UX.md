@@ -100,7 +100,7 @@ Colors use existing `--color-paint-*` CSS variables.
 
 ## Next work (after mobile sign-off)
 
-- Real push notification wiring (see `NOTIFICATIONS_PROJECT_STATUS.md`)
+- Real push notification wiring (see [topics/notifications.md](topics/notifications.md))
 - Optional: `saveAndCloseShifts()` return path to Crew Hub
 - Optional: share `buildPhaseSegmentsFromFragments` with `01c` to dedupe
 

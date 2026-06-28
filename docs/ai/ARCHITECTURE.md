@@ -1,5 +1,7 @@
 # Architecture & Known Traps
 
+**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Map:** [README.md](README.md)
+
 This document explains the advanced architectural concepts running in the ShowRider application and maps out the **Fragile Mechanics** that AIs and developers must preserve.
 
 > **Pre-change checklist:** See [FRAGILE_ZONES.md](FRAGILE_ZONES.md) before editing dangerous areas.  

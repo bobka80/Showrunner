@@ -38,4 +38,4 @@ This concept refers to the core formula mechanism — **three corners that must 
 See [FRAGILE_ZONES.md](FRAGILE_ZONES.md) and [ARCHITECTURE.md](ARCHITECTURE.md) before modifying parser or render logic.
 
 ## Transfer Tags (Planned)
-- `[TRANSFER_FROM]`: Tag for gear that bypasses the warehouse (direct venue-to-venue or vendor-to-site). See `Project_TODO.md` Phase 4.
+- `[TRANSFER_FROM]`: Tag for gear that bypasses the warehouse (direct venue-to-venue or vendor-to-site). See [topics/availability-fleet.md](topics/availability-fleet.md).

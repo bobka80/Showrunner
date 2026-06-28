@@ -307,6 +307,160 @@ function applyTheme(theme) {
 }
 
 // ==========================================
+// --- PERSONAL HUB (ACCOUNT / LOGOUT / PIN) ---
+// ==========================================
+function getActiveSessionToken() {
+    try {
+        let t = localStorage.getItem('sm_session_token');
+        if (t && String(t).trim().length >= 20) return String(t).trim();
+    } catch (e) { /* ignore */ }
+    let meta = document.querySelector('meta[name="session-token"]');
+    if (meta && meta.content && String(meta.content).trim().length >= 20) return String(meta.content).trim();
+    return '';
+}
+
+function getScriptLoginUrl() {
+    try {
+        return window.location.href.split('?')[0];
+    } catch (e) {
+        return '';
+    }
+}
+
+function refreshPersonalHubUI() {
+    let nameEl = document.getElementById('personal-hub-name');
+    if (nameEl) nameEl.textContent = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : '—';
+
+    let savedTheme = 'dark';
+    try { savedTheme = localStorage.getItem('sm_user_theme') || 'dark'; } catch (e) { /* ignore */ }
+    applyTheme(savedTheme);
+
+    ['personal-pin-current', 'personal-pin-new', 'personal-pin-confirm'].forEach(function(id) {
+        let el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    let msgEl = document.getElementById('personal-pin-msg');
+    if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; }
+
+    let logoutBtn = document.getElementById('btn-personal-logout');
+    if (logoutBtn) { logoutBtn.disabled = false; logoutBtn.innerText = 'LOG OUT'; }
+
+    let pinBtn = document.getElementById('btn-personal-pin-save');
+    if (pinBtn) { pinBtn.disabled = false; pinBtn.innerText = 'UPDATE PIN'; }
+}
+
+function performUserLogout() {
+    if (!confirm('Log out of Showrunner on this device? You can stay signed in for 30 days after your next login.')) return;
+
+    let btn = document.getElementById('btn-personal-logout');
+    if (btn) { btn.disabled = true; btn.innerText = 'LOGGING OUT…'; }
+
+    let token = getActiveSessionToken();
+    let crew = (typeof ACTIVE_USER_NAME !== 'undefined') ? ACTIVE_USER_NAME : '';
+
+    function finishLocalLogout() {
+        try {
+            localStorage.removeItem('sm_session_token');
+            localStorage.removeItem('sm_session_expires');
+            localStorage.removeItem('sm_crew_pass');
+            localStorage.removeItem('sm_crew_timestamp');
+        } catch (e) { /* ignore */ }
+
+        if (window.parent && window.parent !== window) {
+            try {
+                window.parent.postMessage({ type: 'SHOWRUNNER_SESSION_CLEAR' }, '*');
+                window.parent.postMessage({ type: 'SHOWRUNNER_LOGIN_STATE', loggedIn: false, clearSession: true }, '*');
+            } catch (e) { /* ignore */ }
+        }
+
+        let url = getScriptLoginUrl();
+        if (url) window.location.replace(url);
+        else window.location.reload();
+    }
+
+    if (!token || !crew) {
+        finishLocalLogout();
+        return;
+    }
+
+    google.script.run
+        .withSuccessHandler(function() { finishLocalLogout(); })
+        .withFailureHandler(function() { finishLocalLogout(); })
+        .apiLogoutSession(crew, token);
+}
+
+function sanitizePinInput(el) {
+    if (!el) return;
+    el.value = String(el.value || '').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6);
+}
+
+function submitPasscodeChange() {
+    let currentEl = document.getElementById('personal-pin-current');
+    let newEl = document.getElementById('personal-pin-new');
+    let confirmEl = document.getElementById('personal-pin-confirm');
+    let msgEl = document.getElementById('personal-pin-msg');
+    let btn = document.getElementById('btn-personal-pin-save');
+
+    let current = currentEl ? String(currentEl.value || '').trim() : '';
+    let next = newEl ? String(newEl.value || '').trim() : '';
+    let confirmPin = confirmEl ? String(confirmEl.value || '').trim() : '';
+
+    function showPinMsg(text, ok) {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.color = ok ? '#10b981' : '#ef4444';
+    }
+
+    if (!/^[a-zA-Z0-9]{6}$/.test(current)) {
+        showPinMsg('Enter your current 6-character PIN.', false);
+        return;
+    }
+    if (!/^[a-zA-Z0-9]{6}$/.test(next)) {
+        showPinMsg('New PIN must be exactly 6 letters or numbers.', false);
+        return;
+    }
+    if (next !== confirmPin) {
+        showPinMsg('New PIN and confirmation do not match.', false);
+        return;
+    }
+
+    let token = getActiveSessionToken();
+    let crew = (typeof ACTIVE_USER_NAME !== 'undefined') ? ACTIVE_USER_NAME : '';
+    if (!token || !crew) {
+        showPinMsg('Session expired. Please log in again.', false);
+        return;
+    }
+
+    if (btn) { btn.disabled = true; btn.innerText = 'SAVING…'; }
+
+    google.script.run
+        .withSuccessHandler(function(res) {
+            if (btn) { btn.disabled = false; btn.innerText = 'UPDATE PIN'; }
+            if (!res || !res.success) {
+                showPinMsg((res && res.message) ? res.message : 'Could not update PIN.', false);
+                return;
+            }
+            showPinMsg(res.message || 'PIN updated.', true);
+            if (currentEl) currentEl.value = '';
+            if (newEl) newEl.value = '';
+            if (confirmEl) confirmEl.value = '';
+        })
+        .withFailureHandler(function(err) {
+            if (btn) { btn.disabled = false; btn.innerText = 'UPDATE PIN'; }
+            showPinMsg('Error: ' + (err && err.message ? err.message : String(err)), false);
+        })
+        .changeMyPasscode(crew, token, current, next);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    ['personal-pin-current', 'personal-pin-new', 'personal-pin-confirm'].forEach(function(id) {
+        let el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', function() { sanitizePinInput(el); });
+    });
+});
+
+// ==========================================
 // --- PAINTBRUSH STATE ENGINE ---
 // ==========================================
 let currentPaintTool = 'main'; // System strictly defaults to MAIN EVENT

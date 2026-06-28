@@ -1,5 +1,7 @@
 # Data Dictionary (Schemas)
 
+**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md)
+
 This document maps out the core data objects that flow through the ShowRider Logistics system.
 
 > **Full 30-table relational model** (Vault vs Engine split): see [ENGINEERING_RULES.md](ENGINEERING_RULES.md) §6.  
@@ -97,6 +99,6 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 
 **THE ENGINE (Transactional):** `Projects_Index`, `Project_Timelines`, `Shift_Assignments`, `Phase_Blocks`, `Dept_Overrides`, `Leave_Tracker`, `Global_Tasks`, `Task_Assignees`, `Task_Todos`, `Task_Assets`, `Project_Checklists`, `Notifications`, `Project_Assets`, `Conflict_Overrides`, `Operations_Ledger`
 
-**Planned financial columns (Phase 1 — not in schema builder yet):** `Projects_Index.rental_days`, `Projects_Index.global_discount` — see `Project_TODO.md`.
+**Planned financial columns (Phase 1 — not in schema builder yet):** `Projects_Index.rental_days`, `Projects_Index.global_discount` — see [topics/financials.md](topics/financials.md).
 
 Backend modules: `Resources_*.js` (Vault), `Logistics_*.js` (Engine). Full rules in [ENGINEERING_RULES.md](ENGINEERING_RULES.md).

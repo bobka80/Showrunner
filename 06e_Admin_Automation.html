@@ -136,7 +136,11 @@ function openManagerSettings() {
   }
   document.getElementById('manager-settings-overlay').style.display = 'flex';
   if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-manager');
-  
+  if (typeof refreshPersonalHubUI === 'function') refreshPersonalHubUI();
+
+  const isManager = (typeof accessTierAtLeast === 'function') && accessTierAtLeast('MANAGER');
+  if (!isManager) return;
+
   let templateEl = document.getElementById('mgr-template-name');
   if (templateEl) templateEl.value = "Loading...";
 

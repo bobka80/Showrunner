@@ -1,5 +1,7 @@
 # Deploy & Rollback — Two-Layer Versioning
 
+**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Map:** [README.md](README.md)
+
 ShowRider uses **two separate buffers**. The director does not run Git or clasp manually — the AI runs scripts when trigger phrases are used.
 
 ---

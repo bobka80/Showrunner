@@ -1,5 +1,7 @@
 # Milestone Now — AI Protocol
 
+**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Map:** [README.md](README.md)
+
 When the director says **"Milestone now"** (with or without extra instructions in the same message), the AI **must run a production milestone first**, then continue with anything else they asked for.
 
 ---
@@ -76,5 +78,6 @@ OK go          →  Build/fix in dev only (no save unless you also say "This wor
 
 - [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) — full two-layer versioning  
 - [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md) — brainstorm vs build  
+- [Project_TODO.md](Project_TODO.md) — roadmap index  
 - Root **`RELEASES.md`** — milestone history  
 - Root **`deploy-config.json`** — production deployment ID (local, not in Git)
