@@ -222,6 +222,22 @@
     } catch (e) { /* ignore */ }
   }
 
+  function getGasBaseUrl() {
+    return PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
+  }
+
+  function navigateHostingToLoginGate() {
+    clearParentSession();
+    iframeLoggedIn = false;
+    lastLoginScreenAt = Date.now();
+    if (!frame) return;
+    var base = getGasBaseUrl();
+    if (!base) return;
+    try {
+      frame.src = base;
+    } catch (e) { /* ignore */ }
+  }
+
   function bootstrapCrewFromParentStorage() {
     var ps = readParentSession();
     if (ps && ps.crewName) lastCrewName = ps.crewName;
@@ -869,14 +885,18 @@
       if (ev.data.crewName) lastCrewName = ev.data.crewName;
       return;
     }
+    if (ev.data.type === 'SHOWRUNNER_NAVIGATE_LOGIN_GATE') {
+      navigateHostingToLoginGate();
+      return;
+    }
     if (ev.data.type === 'SHOWRUNNER_SESSION_CLEAR') {
-      clearParentSession();
+      navigateHostingToLoginGate();
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
-      if (ev.data.clearSession === true) clearParentSession();
+      if (ev.data.clearSession === true) navigateHostingToLoginGate();
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_LINK_ERROR') {
       iframeLinkError = (ev.data.message || 'App server link failed').slice(0, 120);

@@ -248,6 +248,35 @@
         margin-bottom: 0;
     }
     .modal-title--green { color: #10b981; }
+
+    .logout-confirm-overlay { left: 0; width: 100vw; }
+    .logout-confirm-modal { padding: 24px 22px 20px; }
+    .logout-confirm-brand {
+        font-size: 28px;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        color: #fff;
+        margin: 0 0 16px 0;
+    }
+    .logout-confirm-message {
+        color: #a1a1aa;
+        font-size: 13px;
+        line-height: 1.45;
+        margin: 0 0 22px 0;
+    }
+    .logout-confirm-actions {
+        display: flex;
+        justify-content: center;
+        gap: 12px;
+    }
+    .logout-confirm-cancel,
+    .logout-confirm-logout {
+        width: auto !important;
+        min-width: 110px;
+        margin: 0 !important;
+    }
+
     .section-title {
         margin: 0 0 15px 0;
         color: #fff;
@@ -4267,6 +4296,18 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
             <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('logistics-hub-modal-overlay').style.display='none'">CANCEL</button>
             <button id="btn-generate-logistics" class="btn-main" style="width:auto; margin:0; background:#10b981; border-color:#10b981;" onclick="if(typeof executeLogisticsHub === 'function') executeLogisticsHub()">GENERATE LOGISTICS</button>
         </div>
+    </div>
+  </div>
+</div>
+
+<!-- @INDEX: MODALS -> Logout confirm -->
+<div id="logout-confirm-modal-overlay" class="modal-overlay logout-confirm-overlay" style="z-index: 2700; display: none;">
+  <div class="modal logout-confirm-modal" style="max-width: 360px; text-align: center;">
+    <div class="logout-confirm-brand">SHOWRUNNER</div>
+    <p class="logout-confirm-message">Log out of Showrunner on this device? You can stay signed in for 30 days after your next login.</p>
+    <div class="logout-confirm-actions">
+      <button type="button" class="btn-close logout-confirm-cancel" onclick="closeLogoutConfirmModal()">CANCEL</button>
+      <button type="button" class="btn-outline logout-confirm-logout" onclick="confirmUserLogout()">LOG OUT</button>
     </div>
   </div>
 </div>

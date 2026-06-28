@@ -379,8 +379,25 @@ function closePersonalPinModal() {
     if (modal) modal.style.display = 'none';
 }
 
+function openLogoutConfirmModal() {
+    let modal = document.getElementById('logout-confirm-modal-overlay');
+    if (!modal) return;
+    modal.style.display = 'flex';
+}
+
+function closeLogoutConfirmModal() {
+    let modal = document.getElementById('logout-confirm-modal-overlay');
+    if (modal) modal.style.display = 'none';
+}
+
 function performUserLogout() {
-    if (!confirm('Log out of Showrunner on this device? You can stay signed in for 30 days after your next login.')) return;
+    openLogoutConfirmModal();
+}
+
+function confirmUserLogout() {
+    closeLogoutConfirmModal();
+    if (typeof closePersonalHub === 'function') closePersonalHub();
+    if (typeof closePersonalPinModal === 'function') closePersonalPinModal();
 
     let btn = document.getElementById('btn-personal-logout') || document.getElementById('mobile-btn-personal-logout');
     if (btn) { btn.disabled = true; btn.innerText = 'LOGGING OUT…'; }
@@ -396,11 +413,14 @@ function performUserLogout() {
             localStorage.removeItem('sm_crew_timestamp');
         } catch (e) { /* ignore */ }
 
-        if (window.parent && window.parent !== window) {
+        let inHostedShell = window.parent && window.parent !== window;
+        if (inHostedShell) {
             try {
+                window.parent.postMessage({ type: 'SHOWRUNNER_NAVIGATE_LOGIN_GATE' }, '*');
                 window.parent.postMessage({ type: 'SHOWRUNNER_SESSION_CLEAR' }, '*');
                 window.parent.postMessage({ type: 'SHOWRUNNER_LOGIN_STATE', loggedIn: false, clearSession: true }, '*');
             } catch (e) { /* ignore */ }
+            return;
         }
 
         let url = getScriptLoginUrl();

@@ -265,6 +265,18 @@
   </div>
 </div>
 
+<!-- @INDEX: MODALS -> Logout confirm -->
+<div id="logout-confirm-modal-overlay" class="modal-overlay logout-confirm-overlay" style="z-index: 2700; display: none;">
+  <div class="modal logout-confirm-modal" style="max-width: 360px; text-align: center;">
+    <div class="logout-confirm-brand">SHOWRUNNER</div>
+    <p class="logout-confirm-message">Log out of Showrunner on this device? You can stay signed in for 30 days after your next login.</p>
+    <div class="logout-confirm-actions">
+      <button type="button" class="btn-close logout-confirm-cancel" onclick="closeLogoutConfirmModal()">CANCEL</button>
+      <button type="button" class="btn-outline logout-confirm-logout" onclick="confirmUserLogout()">LOG OUT</button>
+    </div>
+  </div>
+</div>
+
 <!-- @INDEX: MODALS -> Personal Hub PIN -->
 <div id="personal-pin-modal-overlay" class="modal-overlay" style="z-index: 2600; display: none;">
   <div class="modal" style="max-width: 360px;">
