@@ -301,3 +301,9 @@ function getRefreshPayload(crewName) {
 
   return { projects: projects, monthData: monthData, managerConfig: getManagerConfig(crewName), tasks: extras.tasks, notifs: extras.notifs, conflicts: conflicts };
 }
+
+/** Fast path for task drawer + notification list only (avoids full calendar payload). */
+function getTasksNotifsPayload(crewName) {
+  IS_READ_ONLY_EXECUTION = true;
+  return getTasksAndNotifs(crewName);
+}

@@ -520,12 +520,20 @@ document.addEventListener('DOMContentLoaded', function() {
           }
           if (p.directory) globalRoles = p.directory.roles || [];
           if (p.managerConfig) globalManagerConfig = p.managerConfig;
-          
-          applyRefreshPayload(p);
+
+          // Calendar-only phantom — tasks/notifs use fast server path (stale local cache caused multi-minute lag)
+          applyRefreshPayload({
+              projects: p.projects,
+              monthData: p.monthData,
+              conflicts: p.conflicts,
+              managerConfig: p.managerConfig
+          });
           document.getElementById('calendar-container').style.opacity = '1';
           document.getElementById('calendar-container').style.pointerEvents = 'auto';
       }
   } catch (e) { console.warn("Phantom boot bypassed."); }
+
+  if (typeof refreshTasksAndNotifs === 'function') refreshTasksAndNotifs();
 
   google.script.run
     .withFailureHandler(err => alert("Boot Error: " + err.message))
@@ -831,7 +839,9 @@ function applyRefreshPayload(payload) {
   calendar.addEventSource(events);
   }
   
-  try { renderTasksAndNotifs(payload); } catch(e) { console.error(e); }
+  if (payload.tasks !== undefined || payload.notifs !== undefined) {
+    try { renderTasksAndNotifs(payload); } catch(e) { console.error(e); }
+  }
   try { if (payload.conflicts && typeof renderConflicts === 'function') renderConflicts(payload.conflicts); } catch(e) { console.error(e); }
   
   let data = payload.monthData;

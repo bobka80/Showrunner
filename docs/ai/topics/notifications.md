@@ -26,7 +26,8 @@ Firebase Hosting + FCM + Apps Script backend. Event-driven batch sends. No secre
 - [x] **Multi-device tokens** per user (`getFcmDevicesForUid_` / device list in DATABASE)
 - [x] ROOT **test push** + per-device test (`sendTestPushNotification`, `sendTestPushToDevice`)
 - [x] PWA session hardening (v328+) — see `RELEASES.md`
-- [x] Foreground: host toast over iframe + SW → client bridge + iframe `refreshData()` (v344–v345)
+- [x] Fast `getTasksNotifsPayload` + `refreshTasksAndNotifs()` (v346 — no full calendar reload)
+- [x] Phantom boot skips stale tasks/notifs; local cache synced on clear/dismiss
 - [x] FCM **data-only** payload (avoids double system notification in background)
 
 ### Dispatch core

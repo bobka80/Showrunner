@@ -308,12 +308,19 @@ function deleteNotification(id, actor = "System UI") {
   return executeWithRetry(() => {
     const sheets = verifyDatabaseSchema();
     let data = sheets.notifs.getDataRange().getValues();
+    if (data.length <= 1) return 'Deleted';
+    const nMap = getHeaderMap(data);
+    const idCol = nMap['uid'] !== undefined ? nMap['uid'] : 0;
     let kept = [data[0]];
-    for(let i=1; i<data.length; i++) { if(data[i][0] !== id) kept.push(data[i]); }
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]) !== String(id)) kept.push(data[i]);
+    }
     sheets.notifs.clearContents();
-    if(kept.length > 0) sheets.notifs.getRange(1, 1, kept.length, kept[0].length).setValues(kept);
+    if (kept.length > 0) sheets.notifs.getRange(1, 1, kept.length, kept[0].length).setValues(kept);
+    try { SpreadsheetApp.flush(); } catch (e) { /* ignore */ }
     flushCache();
     writeToAuditLog(actor, "DELETE", "NOTIFICATIONS", "GLOBAL", id, "Deleted individual notification.");
+    return 'Deleted';
   });
 }
 
@@ -321,66 +328,80 @@ function postponeNotification(id, actor = "System UI") {
   return executeWithRetry(() => {
     const sheets = verifyDatabaseSchema();
     let data = sheets.notifs.getDataRange().getValues();
-    for(let i=1; i<data.length; i++) {
-      if(data[i][0] === id) {
-         data[i][3] = false; // Mark Unread
-         let future = new Date(Date.now() + 86400000); // 24 hours into the future
-         data[i][4] = future.toISOString();
-         sheets.notifs.getRange(i+1, 1, 1, data[i].length).setValues([data[i]]);
-         break;
+    const nMap = getHeaderMap(data);
+    const idCol = nMap['uid'] !== undefined ? nMap['uid'] : 0;
+    const readCol = nMap['Is_Read'] !== undefined ? nMap['Is_Read'] : 3;
+    const tsCol = nMap['Timestamp'] !== undefined ? nMap['Timestamp'] : 4;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]) === String(id)) {
+        data[i][readCol] = false;
+        data[i][tsCol] = new Date(Date.now() + 86400000).toISOString();
+        sheets.notifs.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+        try { SpreadsheetApp.flush(); } catch (e) { /* ignore */ }
+        break;
       }
     }
     flushCache();
     writeToAuditLog(actor, "UPDATE", "NOTIFICATIONS", "GLOBAL", id, "Postponed notification by 24 hours.");
+    return 'Postponed';
   });
 }
 
 function clearAllNotifications(crewName) {
   return executeWithRetry(() => {
     const profile = getUserSecurityProfile(crewName);
-    if(!profile.uid) return;
     const sheets = verifyDatabaseSchema();
     let data = sheets.notifs.getDataRange().getValues();
+    if (data.length <= 1) return 'Cleared';
+    const nMap = getHeaderMap(data);
+    const userCol = nMap['user_uid'] !== undefined ? nMap['user_uid'] : 1;
     let kept = [data[0]];
-    for(let i=1; i<data.length; i++) {
-      if (!notifBelongsToProfile_(data[i][1], profile, crewName)) kept.push(data[i]);
+    for (let i = 1; i < data.length; i++) {
+      if (!notifBelongsToProfile_(data[i][userCol], profile, crewName)) kept.push(data[i]);
     }
     sheets.notifs.clearContents();
-    if(kept.length > 0) sheets.notifs.getRange(1, 1, kept.length, kept[0].length).setValues(kept);
+    if (kept.length > 0) sheets.notifs.getRange(1, 1, kept.length, kept[0].length).setValues(kept);
+    try { SpreadsheetApp.flush(); } catch (e) { /* ignore */ }
     flushCache();
     writeToAuditLog(crewName || "System UI", "DELETE", "NOTIFICATIONS", "GLOBAL", "ALL", "Cleared all notifications for user.");
+    return 'Cleared';
   });
 }
 
 function markNotificationsRead(crewName) {
   return executeWithRetry(() => {
     const profile = getUserSecurityProfile(crewName);
-    if(!profile.uid) return "No UID";
     const sheets = verifyDatabaseSchema();
     let data = sheets.notifs.getDataRange().getValues();
+    if (data.length <= 1) return 'Cleared';
+    const nMap = getHeaderMap(data);
+    const userCol = nMap['user_uid'] !== undefined ? nMap['user_uid'] : 1;
+    const readCol = nMap['Is_Read'] !== undefined ? nMap['Is_Read'] : 3;
+    const tsCol = nMap['Timestamp'] !== undefined ? nMap['Timestamp'] : 4;
     let updated = false;
-            let keptRows = [data[0]];
-            let now = new Date().getTime();
-            
-    for (let i=1; i<data.length; i++) {
-               let isRead = isSheetTruthy_(data[i][3]);
-               let ts = new Date(data[i][4]).getTime();
-               
-               if (isRead && (now - ts > 86400000)) {
-                   updated = true;
-                   continue;
-               }
-               
-       if (notifBelongsToProfile_(data[i][1], profile, crewName) && !isSheetTruthy_(data[i][3])) {
-           data[i][3] = true;
-           updated = true;
-       }
-               keptRows.push(data[i]);
+    let keptRows = [data[0]];
+    let now = new Date().getTime();
+
+    for (let i = 1; i < data.length; i++) {
+      let isRead = isSheetTruthy_(data[i][readCol]);
+      let ts = new Date(data[i][tsCol]).getTime();
+
+      if (isRead && (now - ts > 86400000)) {
+        updated = true;
+        continue;
+      }
+
+      if (notifBelongsToProfile_(data[i][userCol], profile, crewName) && !isSheetTruthy_(data[i][readCol])) {
+        data[i][readCol] = true;
+        updated = true;
+      }
+      keptRows.push(data[i]);
     }
-            if(updated) {
-                sheets.notifs.clearContents();
-                if (keptRows.length > 0) sheets.notifs.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
-            }
+    if (updated) {
+      sheets.notifs.clearContents();
+      if (keptRows.length > 0) sheets.notifs.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
+      try { SpreadsheetApp.flush(); } catch (e) { /* ignore */ }
+    }
     flushCache();
     writeToAuditLog(crewName || "System UI", "UPDATE", "NOTIFICATIONS", "GLOBAL", "ALL", "Marked all active notifications as read.");
     return "Cleared";
@@ -391,15 +412,18 @@ function markSingleNotifRead(id) {
   return executeWithRetry(() => {
     const sheets = verifyDatabaseSchema();
     let data = sheets.notifs.getDataRange().getValues();
+    const nMap = getHeaderMap(data);
+    const idCol = nMap['uid'] !== undefined ? nMap['uid'] : 0;
+    const readCol = nMap['Is_Read'] !== undefined ? nMap['Is_Read'] : 3;
     for (let i = 1; i < data.length; i++) {
-       if (data[i][0] === id) {
-           data[i][3] = true;
-           sheets.notifs.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
-           break;
-       }
+      if (String(data[i][idCol]) === String(id)) {
+        data[i][readCol] = true;
+        sheets.notifs.getRange(i + 1, 1, 1, data[i].length).setValues([data[i]]);
+        try { SpreadsheetApp.flush(); } catch (e) { /* ignore */ }
+        break;
+      }
     }
-    if (typeof flushCache !== 'undefined') flushCache();
-    // Purposely not logging every single read action to audit log to prevent spam
+    flushCache();
     return "Read";
   });
 }
