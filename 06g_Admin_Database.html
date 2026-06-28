@@ -116,7 +116,7 @@ function buildOpsLogListHtml(ops) {
 
 function renderFolderLinksCells(driveFolders) {
   if (!driveFolders) return '';
-  const keys = ['backups', 'replaced', 'archives'];
+  const keys = ['database', 'replaced', 'archives'];
   let html = '';
   keys.forEach(function(k) {
     const f = driveFolders[k];
@@ -160,14 +160,22 @@ function buildCanonicalFolderPill(res, repairBtnHtml) {
   const folderLink = (res.canonicalFolder && res.canonicalFolder.url)
     ? '<a class="admin-panel-link" href="' + res.canonicalFolder.url + '" target="_blank" style="margin-top:0;">Open folder ↗</a>'
     : '—';
+  const backups = res.driveFolders && res.driveFolders.backups;
+  const backupPath = backups && backups.path ? backups.path : '05_DATABASE/BACKUPS';
+  const backupLink = backups && backups.url
+    ? '<a class="admin-panel-link" href="' + backups.url + '" target="_blank" style="margin-top:0;">Open BACKUPS ↗</a>'
+    : (backups && backups.error ? escapePushHtml(backups.error) : '—');
   const folderLinks = renderFolderLinksCells(res.driveFolders);
   let html = '<div class="info-pill info-pill--slate">'
     + buildInfoGridRow(
       buildInfoCell('Live folder', escapePushHtml(dbName), 'info-cell-value--title')
       + buildInfoCell('Live files', 'SM_Showrunner_ENGINE + SM_Showrunner_VAULT')
-      + buildInfoCell('Drive', folderLink)
-      + (repairBtnHtml ? buildInfoCell('Layout', repairBtnHtml) : '')
+      + buildInfoCell('Backups', escapePushHtml(backupPath))
+      + buildInfoCell('Backup drive', backupLink)
     );
+  if (repairBtnHtml) {
+    html += buildInfoGridRow(buildInfoCell('Layout', repairBtnHtml));
+  }
   if (folderLinks) {
     html += buildInfoGridRow(folderLinks);
   }
@@ -191,16 +199,24 @@ function buildRestorePill(label, selectId, fileType, optionsHtml) {
     + '</div>';
 }
 
-function buildBackupHealthBannerHtml(health) {
+function buildBackupHealthBannerHtml(health, backupFolders) {
   if (!health) return '';
-  const folderLabel = health.backupFolderPath || '05_DATABASE/BACKUPS';
+  const writePath = (backupFolders && backupFolders.writeFolder && backupFolders.writeFolder.path)
+    ? backupFolders.writeFolder.path
+    : (health.backupFolderPath || '05_DATABASE/BACKUPS');
   if (health.healthy) {
     return '<div class="admin-banner-ok" style="margin-bottom:10px;">'
       + '✓ Backup OK — last Engine+Vault pair: <strong>' + (health.lastPairedDate || '—') + '</strong>'
-      + ' · ' + health.fileCount + ' files in ' + escapePushHtml(folderLabel) + '</div>';
+      + ' · ' + health.fileCount + ' backup files · write folder: <strong>' + escapePushHtml(writePath) + '</strong></div>';
+  }
+  let extra = '';
+  if (backupFolders && backupFolders.writeError) {
+    extra = ' Write folder error: ' + escapePushHtml(backupFolders.writeError);
+  } else if (backupFolders && backupFolders.scannedFolders && backupFolders.scannedFolders.length) {
+    extra = ' Scanned: ' + backupFolders.scannedFolders.map(function(f) { return f.path; }).join(', ') + '.';
   }
   return '<div class="admin-banner-warn" style="margin-bottom:10px;">'
-    + '⚠️ <strong>BACKUP FAILSAFE:</strong> ' + (health.warning || 'Backup unhealthy') + '</div>';
+    + '⚠️ <strong>BACKUP FAILSAFE:</strong> ' + (health.warning || 'Backup unhealthy') + extra + '</div>';
 }
 
 function renderDatabaseBackupArchiveTab(res) {
@@ -231,7 +247,7 @@ function renderDatabaseBackupArchiveTab(res) {
     + '<div style="color:#f59e0b; font-weight:900; font-size:11px; letter-spacing:1px;">BACKUP COLUMN</div>'
     + '</div>'
     + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; padding:10px 14px; overflow:hidden;">'
-    + buildBackupHealthBannerHtml(res.health)
+    + buildBackupHealthBannerHtml(res.health, res.backupFolders)
     + buildCanonicalFolderPill(res, repairBtnHtml)
     + '<div style="flex-shrink:0;">'
     + '<div class="info-cell-label" style="margin-bottom:6px;">LIVE FILES</div>'

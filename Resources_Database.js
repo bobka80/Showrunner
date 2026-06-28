@@ -62,19 +62,54 @@ function describeDriveFolder_(folderId, label) {
 function describeResolvedBackupFolder_() {
   try {
     const f = getDatabaseBackupFolder();
-    let path = f.getName();
     const parents = f.getParents();
-    if (parents.hasNext()) path = parents.next().getName() + '/' + f.getName();
+    const path = parents.hasNext()
+      ? parents.next().getName() + '/' + f.getName()
+      : f.getName();
     return {
       label: 'BACKUPS',
       name: f.getName(),
       id: f.getId(),
       url: f.getUrl(),
-      path: path
+      path: path,
+      constantId: DB_BACKUP_FOLDER_ID,
+      constantMatches: f.getId() === DB_BACKUP_FOLDER_ID
     };
   } catch (e) {
-    return Object.assign(describeDriveFolder_(DB_BACKUP_FOLDER_ID, 'BACKUPS'), { path: 'BACKUPS (unresolved)' });
+    return {
+      label: 'BACKUPS',
+      name: '(not found)',
+      id: '',
+      url: '',
+      path: '05_DATABASE/BACKUPS (missing)',
+      error: e.message,
+      constantId: DB_BACKUP_FOLDER_ID,
+      constantMatches: false
+    };
   }
+}
+
+function buildBackupFolderDiagnostics_() {
+  let writeFolder = null;
+  let writeError = null;
+  try {
+    writeFolder = getDatabaseBackupFolder();
+  } catch (e) {
+    writeError = e.message;
+  }
+  const dbFolder = getLiveDatabaseFolder();
+  const scanFolders = getBackupScanFolders_();
+  return {
+    writeFolder: writeFolder ? folderInventorySummary_(writeFolder) : null,
+    writeError: writeError,
+    constantFolderId: DB_BACKUP_FOLDER_ID,
+    constantMatchesWrite: writeFolder ? writeFolder.getId() === DB_BACKUP_FOLDER_ID : false,
+    scannedFolders: scanFolders.map(function(f) {
+      const summary = folderInventorySummary_(f);
+      if (f.getId() === dbFolder.getId()) summary.path += ' (root backup files)';
+      return summary;
+    })
+  };
 }
 
 function folderInventorySummary_(folder) {
@@ -146,13 +181,17 @@ function scanBackupFolderInventory_() {
 
   scanFolders.forEach(function(folder) {
     const summary = folderInventorySummary_(folder);
-    if (summary) scannedPaths.push(summary.path);
+    const isDbRoot = folder.getId() === getLiveDatabaseFolder().getId();
+    if (summary) {
+      scannedPaths.push(isDbRoot ? summary.path + ' (root)' : summary.path);
+    }
 
     const files = folder.getFiles();
     while (files.hasNext()) {
       const f = files.next();
-      fileCount++;
       const name = f.getName();
+      if (!isBackupDataFileName_(name)) continue;
+      fileCount++;
       const date = parseBackupDateFromFilename_(name);
       if (!date) continue;
       const entry = {
@@ -200,7 +239,9 @@ function scanBackupFolderInventory_() {
     engineOnlyDates: engineOnly,
     vaultOnlyDates: vaultOnly,
     scannedPaths: scannedPaths,
-    canonicalPath: folderInventorySummary_(getDatabaseBackupFolder()),
+    canonicalPath: (function() {
+      try { return folderInventorySummary_(getDatabaseBackupFolder()); } catch (e) { return null; }
+    })(),
     legacyPath: folderInventorySummary_(getLegacyDatabaseBackupFolder_())
   };
 }
@@ -227,7 +268,7 @@ function computeBackupHealthReport_() {
   let warning = null;
   const scanLabel = inv.scannedPaths.length ? inv.scannedPaths.join(' + ') : '05_DATABASE/BACKUPS';
   if (!lastPairedDate) {
-    warning = 'No paired Engine+Vault backups found in ' + scanLabel + '.';
+    warning = 'No paired Engine+Vault backups found. Scanned: ' + scanLabel + '.';
   } else if (!healthy) {
     warning = 'Last successful paired backup is ' + lastPairedDate + ' (' + daysSincePaired + ' day(s) ago). Expected ' + yesterdayLocal + ' or ' + todayLocal + '. Scanned: ' + scanLabel + '.';
   } else if (inv.engineOnlyDates.length || inv.vaultOnlyDates.length) {
@@ -508,11 +549,13 @@ function listBackupFiles_(fileType) {
       const id = f.getId();
       if (seen[id]) continue;
       seen[id] = true;
+      const parentPath = folderInventorySummary_(folder);
       out.push({
         id: id,
         name: name,
         modified: f.getLastUpdated().getTime(),
-        modifiedLabel: f.getLastUpdated().toISOString()
+        modifiedLabel: f.getLastUpdated().toISOString(),
+        folderPath: parentPath ? parentPath.path : folder.getName()
       });
     }
   });
@@ -587,6 +630,7 @@ function getLiveDatabaseStatus(actor) {
         vault: listBackupFiles_('VAULT').slice(0, 50)
       },
       health: computeBackupHealthReport_(),
+      backupFolders: buildBackupFolderDiagnostics_(),
       operations: readDbOperationsLog()
         .filter((r) => r.status === 'ACTIVE' || r.status === 'REVERTED')
         .sort((a, b) => parseInt(b.step_id, 10) - parseInt(a.step_id, 10))

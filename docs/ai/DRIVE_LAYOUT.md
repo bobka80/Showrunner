@@ -16,7 +16,7 @@ Canonical map of host Drive layout, **live database file names**, backup/archive
 | **`05_DATABASE`** | `1EAgUzjbwq5CootjKmZhQP3Mfm2VYsZox` | `LIVE_DATABASE_FOLDER_ID` | Live spreadsheets + lifecycle subfolders |
 | **`05_DATABASE/REPLACED`** | `1aZSru-d8OryHpNCooPm78oWdFjSauTPN` | `REPLACED_DB_FOLDER_ID` | Confirmed |
 | **`05_DATABASE/ARCHIVES`** | `1KFhrzhwxuMocMQzW9DfWc5QcO-_Pg81z` | `ARCHIVE_FOLDER_ID` | Confirmed |
-| **`05_DATABASE/BACKUPS`** | `1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre` | `DB_BACKUP_FOLDER_ID` | **Confirmed by director** — was wrongly reused as `SYSTEM_ROOT_ID` in old code |
+| **`05_DATABASE/BACKUPS`** | `1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre` | `DB_BACKUP_FOLDER_ID` | **Resolve by name** inside `05_DATABASE` first; constant is reference only |
 | **`01_WORKSPACE`** | `1MDjRCK5RyILVly1Rv7J9yxjr2BLDrFYl` | `WORKSPACE_FOLDER_ID` / `OPS_ROOT_ID` | Event trees + `Showrunner Syncs` |
 | **`02_FINANCE`** | `1oGZS3yvrZXebYBlwE0eNq0JMPKbR48y6` | `FINANCE_FOLDER_ID` / `FIN_ROOT_ID` in `Integrations.js` | Finance year/event mirrors — **confirmed** |
 | **`03_SAFETY_VAULT`** | — | — | Empty — reserved |

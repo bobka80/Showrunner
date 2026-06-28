@@ -37,21 +37,26 @@ function getLiveDatabaseFolder() {
 }
 
 function getDatabaseBackupFolder() {
-  try {
-    const folder = DriveApp.getFolderById(DB_BACKUP_FOLDER_ID);
-    const parents = folder.getParents();
-    if (parents.hasNext() && parents.next().getId() !== LIVE_DATABASE_FOLDER_ID) {
-      console.warn('DB_BACKUP_FOLDER_ID parent is not 05_DATABASE — still using confirmed BACKUPS folder ID.');
-    }
-    return folder;
-  } catch (e) { /* fall through to name resolve */ }
-
   const dbFolder = getLiveDatabaseFolder();
-  const byName = dbFolder.getFoldersByName(DB_BACKUP_FOLDER_NAME);
-  if (byName.hasNext()) return byName.next();
+  const it = dbFolder.getFoldersByName(DB_BACKUP_FOLDER_NAME);
+  if (!it.hasNext()) {
+    throw new Error(
+      '"' + DB_BACKUP_FOLDER_NAME + '" subfolder not found inside ' +
+      dbFolder.getName() + ' (id ' + LIVE_DATABASE_FOLDER_ID + ').'
+    );
+  }
+  const folder = it.next();
+  if (folder.getId() !== DB_BACKUP_FOLDER_ID) {
+    console.warn(
+      'BACKUPS folder ID drift: Drive=' + folder.getId() +
+      ' constant=' + DB_BACKUP_FOLDER_ID + ' — using BACKUPS inside ' + dbFolder.getName()
+    );
+  }
+  return folder;
+}
 
-  throw new Error('BACKUPS folder not found — expected ID ' + DB_BACKUP_FOLDER_ID + ' or '
-    + dbFolder.getName() + '/' + DB_BACKUP_FOLDER_NAME);
+function isBackupDataFileName_(name) {
+  return /^ENGINE_BACKUP_/i.test(name) || /^VAULT_BACKUP_/i.test(name);
 }
 
 function getLegacyDatabaseBackupFolder_() {
@@ -67,15 +72,41 @@ function getLegacyDatabaseBackupFolder_() {
 function getBackupScanFolders_() {
   const folders = [];
   const seen = {};
+  const dbFolder = getLiveDatabaseFolder();
+
   function add(folder) {
-    if (!folder) return;
-    const id = folder.getId();
-    if (seen[id]) return;
-    seen[id] = true;
+    if (!folder || seen[folder.getId()]) return;
+    seen[folder.getId()] = true;
     folders.push(folder);
   }
-  add(getDatabaseBackupFolder());
+
+  try {
+    add(getDatabaseBackupFolder());
+  } catch (e) { /* missing BACKUPS subfolder */ }
+
   add(getLegacyDatabaseBackupFolder_());
+
+  const children = dbFolder.getFolders();
+  while (children.hasNext()) {
+    const child = children.next();
+    if (seen[child.getId()]) continue;
+    const files = child.getFiles();
+    while (files.hasNext()) {
+      if (isBackupDataFileName_(files.next().getName())) {
+        add(child);
+        break;
+      }
+    }
+  }
+
+  const rootFiles = dbFolder.getFiles();
+  while (rootFiles.hasNext()) {
+    if (isBackupDataFileName_(rootFiles.next().getName())) {
+      add(dbFolder);
+      break;
+    }
+  }
+
   return folders;
 }
 
