@@ -95,10 +95,10 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 4. **Deploy:** Edit source → `node build.js` → deploy. Never hand-edit `dist/` as source of truth.
 
 5. **Two-layer versioning:** [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md), **`RELEASES.md`**, **`WORKS_LOG.md`**.
-   - **"This works"** → `works-save.js`
-   - **"Milestone" / "OK ship"** → `milestone.js`
-   - **"Milestone now"** → `milestone.js` **first**, then other work — [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md)
-   - **"OK go"** → dev push only
+   - **After every completed implementation** (any build session after **"OK go"** / fix / feature): AI runs **`node build.js`** (if needed) then **`node milestone.js "<note>"`** — **automatically**. Do **not** tell the director to deploy. Production **GAS version** (e.g. v336) is required for **web.app** and mobile field testing.
+   - **"This works"** → `works-save.js` (extra Git checkpoint during long dev — optional, does not replace milestone)
+   - **"Milestone" / "OK ship" / "Milestone now"** → `milestone.js` (same script; director may say these explicitly before or instead of other work)
+   - **Brainstorming / docs-only** → no milestone unless code shipped
 
 ---
 

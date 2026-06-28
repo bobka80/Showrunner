@@ -574,7 +574,10 @@ function closeModals() {
     
     ['shift-layer', 'master-settings-overlay', 'manager-settings-overlay', 'month-roster-layer', 'availability-modal-overlay', 'audit-studio-overlay', 'crew-manager-modal', 'financials-hub-overlay'].forEach(id => {
         let el = document.getElementById(id);
-        if (el) el.style.display = 'none';
+        if (el) {
+            el.style.display = 'none';
+            if (id === 'manager-settings-overlay') el.classList.remove('personal-hub-open');
+        }
     });
     
     if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-dashboard');

@@ -38,7 +38,8 @@ This document describes how the **Software Director** (project owner) collaborat
 2. State which fragile zones apply (plain language)
 3. Make the smallest correct change
 4. Update docs if behavior or schema changed
-5. Give the director a **test checklist** (below)
+5. **`node build.js`** then **`node milestone.js "<note>"`** — ship to production automatically (see [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md)). Report the new **GAS version** (e.g. v336). Do **not** ask the director to deploy.
+6. Give the director a **test checklist** on **web.app** (below)
 
 ---
 

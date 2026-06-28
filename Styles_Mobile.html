@@ -943,7 +943,36 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 
 #mobile-pa-detail-sheet.open { display: block; }
 
-/* --- Mobile tasks --- */
+/* --- Mobile Personal Hub --- */
+@media (max-width: 900px) {
+    .personal-hub-overlay {
+        left: 0 !important;
+        right: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        padding: 0 !important;
+        align-items: center !important;
+        justify-content: center !important;
+        background: rgba(0, 0, 0, 0.82);
+        backdrop-filter: blur(4px);
+    }
+    .personal-hub-panel {
+        width: calc(100% - 32px);
+        max-width: 360px;
+        margin: 0 16px;
+    }
+    .personal-hub-close-mobile {
+        display: block !important;
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        z-index: 2;
+    }
+    .personal-hub-top-row {
+        padding-right: 28px;
+    }
+}
+
 .mobile-task-card {
     background: #1a1a1e;
     border: 1px solid #333;

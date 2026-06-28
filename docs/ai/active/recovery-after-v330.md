@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Drawer:** `docs/ai/active/`
 
-**Status:** Step A **shipped** (GAS **v335**). Awaiting director confirmation on web.app before Step B.  
+**Status:** Personal Hub **shipped** (GAS **v336**). Step A **shipped** (GAS **v335**). Next: director confirms Personal Hub on web.app, then Step B.  
 **Rollback baseline:** GAS **v329** — *Mobile home — brand header, sidebar nav icons; remove timeline shift popup*  
 **Rolled back from:** v330–v333 (notifications phase 1–2, checklist status bar, mini-calendar CSS/boot changes, bad recursion “hotfix”)
 
@@ -73,11 +73,12 @@ After **v330**, the director reported:
 - [ ] Toast + drawer in `01b_Calendar_Tasks.html`
 - [ ] Hosting deploy if shell changes
 
-### Step E — Deferred
+### Step E — Deferred (partial)
 
-- Personal Hub on mobile (theme only)
-- PIN change, desktop lock screen
-- Manager agenda reminders
+- [x] Personal Hub — unified panel for all users (theme, logout, change PIN); manager tools inside same hub (GAS **v336**)
+- [ ] Personal Hub on mobile (theme only)
+- [ ] Desktop lock screen
+- [ ] Manager agenda reminders
 
 ---
 

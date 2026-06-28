@@ -349,6 +349,32 @@ function refreshPersonalHubUI() {
     if (pinBtn) { pinBtn.disabled = false; pinBtn.innerText = 'UPDATE PIN'; }
 }
 
+function closePersonalHub() {
+    let overlay = document.getElementById('manager-settings-overlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+        overlay.classList.remove('personal-hub-open');
+    }
+    if (typeof closePersonalPinModal === 'function') closePersonalPinModal();
+}
+
+function openPersonalPinModal() {
+    let modal = document.getElementById('personal-pin-modal-overlay');
+    if (!modal) return;
+    ['personal-pin-current', 'personal-pin-new', 'personal-pin-confirm'].forEach(function(id) {
+        let el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    let msgEl = document.getElementById('personal-pin-msg');
+    if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; }
+    modal.style.display = 'flex';
+}
+
+function closePersonalPinModal() {
+    let modal = document.getElementById('personal-pin-modal-overlay');
+    if (modal) modal.style.display = 'none';
+}
+
 function performUserLogout() {
     if (!confirm('Log out of Showrunner on this device? You can stay signed in for 30 days after your next login.')) return;
 
@@ -444,6 +470,7 @@ function submitPasscodeChange() {
             if (currentEl) currentEl.value = '';
             if (newEl) newEl.value = '';
             if (confirmEl) confirmEl.value = '';
+            setTimeout(function() { closePersonalPinModal(); }, 800);
         })
         .withFailureHandler(function(err) {
             if (btn) { btn.disabled = false; btn.innerText = 'UPDATE PIN'; }

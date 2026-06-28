@@ -12,3 +12,5 @@ Do not begin implementation until you have read the doctrine and opened the draw
 | **Archive** | [docs/ai/archive/](docs/ai/archive/) | Finished plans — reference only |
 
 Operational logs (not doctrine): root **`RELEASES.md`**, **`WORKS_LOG.md`**.
+
+**Ship rule:** After every completed implementation, the AI runs **`node milestone.js`** and reports the GAS version — the director does not deploy manually. See [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md).

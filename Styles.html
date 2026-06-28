@@ -1104,8 +1104,79 @@
     /* Project editor — crew briefing (read-only) mode */
     .editor-briefing-mode .pe-mgr-only { display: none !important; }
     body:not(.perm-manager-tier):not(.perm-root) .pe-manager-only { display: none !important; }
-    body:not(.perm-manager-tier):not(.perm-root) .hub-manager-only { display: none !important; }
-    body:not(.perm-manager-tier):not(.perm-root) #personal-hub-account { border-bottom: none !important; padding-bottom: 0 !important; }
+    .hub-manager-parked { display: none !important; }
+
+    /* Personal Hub — compact panel (desktop) / centered card (mobile) */
+    .personal-hub-overlay {
+        position: fixed;
+        bottom: 0;
+        left: 60px;
+        z-index: 2500;
+        display: none;
+        align-items: flex-end;
+        padding: 0 0 12px 12px;
+        pointer-events: none;
+    }
+    .personal-hub-overlay.personal-hub-open {
+        display: flex !important;
+        pointer-events: auto;
+    }
+    .personal-hub-panel {
+        position: relative;
+        background: var(--bg-sidebar);
+        border: 1px solid #333;
+        border-radius: 10px;
+        padding: 14px 16px;
+        min-width: 300px;
+        max-width: 520px;
+        box-shadow: 0 -8px 28px rgba(0,0,0,0.65);
+    }
+    .personal-hub-top-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .personal-hub-theme-select {
+        width: 108px;
+        padding: 6px 8px;
+        margin: 0;
+        height: 32px;
+        font-size: 11px;
+        background: #1a1a1e;
+        color: #fff;
+        border: 1px solid #333;
+        border-radius: 6px;
+        flex-shrink: 0;
+    }
+    .personal-hub-name {
+        flex: 1;
+        font-weight: 800;
+        color: #fff;
+        font-size: 14px;
+        min-width: 80px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .personal-hub-logout-btn {
+        margin: 0 !important;
+        width: auto !important;
+        padding: 8px 14px !important;
+        border-color: #ef4444 !important;
+        color: #ef4444 !important;
+        flex-shrink: 0;
+    }
+    .personal-hub-pin-btn {
+        margin: 12px 0 0 0 !important;
+        width: auto;
+        max-width: 160px;
+        padding: 8px 14px !important;
+        font-size: 11px !important;
+    }
+    .personal-hub-close-mobile {
+        display: none !important;
+    }
     #btn-display-event-type.pe-type-readonly { cursor: default !important; }
     .editor-crossrent-only #type-dropdown { display: none !important; }
     .editor-crossrent-only #btn-display-event-type { display: none !important; }

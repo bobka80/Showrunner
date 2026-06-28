@@ -24,12 +24,14 @@ When the director says **"Milestone now"** (with or without extra instructions i
 
 ## AI execution order (mandatory)
 
-1. **Do not** edit application code or start the new feature until the milestone step completes (or fails with a clear blocker).
+1. **Do not** edit application code or start the new feature until the milestone step completes (or fails with a clear blocker) — when director said **Milestone now** before new work.
 2. Run:  
    `node milestone.js "<note>"`  
-   Use the director’s note (this becomes the **Apps Script version name**), e.g. `Pre database operations panel — IAM baseline`.
-3. On **success**: report the **new GAS version number** (e.g. “was 265 → now 266”) and deployment result; then proceed with remaining instructions.
+   Use a short note (this becomes the **Apps Script version name**), e.g. `Personal Hub — theme, logout, PIN`.
+3. On **success**: report the **new GAS version number** (e.g. “was 335 → now 336”) and deployment result; then proceed with remaining instructions or hand off to director for web.app testing.
 4. On **failure**: report the error; **do not** start risky work until milestone is unblocked or the director explicitly says to skip (rare).
+
+**Also mandatory:** At the end of **every completed implementation** (after **OK go**), run the same `milestone.js` step even if the director did not say “milestone”. Never tell the director to deploy manually.
 
 **`deploy-config.json` is optional.** If `productionDeploymentId` is set, the same production URL is updated. If not, milestone creates a new deployment and saves the ID automatically.
 
@@ -63,11 +65,13 @@ Use before **starting a new major update** when the current production state is 
 ## Director cheat sheet
 
 ```
-This works     →  Git save on your PC (tested in dev)
+This works     →  Optional Git checkpoint during long dev (not a production ship)
 Milestone now  →  Production snapshot FIRST, then AI continues your other ask
 Milestone      →  Production snapshot only
-OK go          →  Build/fix in dev only (no save unless you also say "This works")
+OK go          →  AI implements, then milestones automatically (web.app test)
 ```
+
+**Default after any build:** AI runs `milestone.js` and tells you the version (e.g. **v336**). You test on web.app — you do not run clasp or deploy yourself.
 
 **Rollback production:** *"Rollback production to last milestone"*  
 **Rollback dev:** *"Rollback to last this works"*

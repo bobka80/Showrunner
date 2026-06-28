@@ -42,25 +42,41 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 ---
 
-## Layer 0 — Dev iteration (no save)
+## Layer 0 — Dev iteration (build sessions)
 
-**Trigger:** **"OK go"** (fix/build session).
+**Trigger:** **"OK go"** (fix/build session) or any completed implementation the director approved.
 
-**What happens (`node dev-push.js` optional):**
-1. AI edits code
+**What happens (automatic — AI runs this; director does not):**
+1. AI edits source code
 2. `node build.js`
-3. `clasp push` (HEAD / dev — director tests in developer mode)
+3. **`node milestone.js "<note>"`** — production Apps Script version + deploy to web.app
+4. AI reports the new **GAS version number** (e.g. **v336**) in the handoff
 
-**No Git commit, no Apps Script version** unless director also says **"This works"**.
+**Director tests on:** `https://sm-showrunner-97405.web.app` (production), not developer mode, unless the task explicitly says otherwise.
+
+**Do NOT** end a build session with *"you should push the milestone"* — **you** push it.
+
+**Optional mid-session checkpoint:** **"This works"** → `works-save.js` (Git only, no new GAS version). Does not replace the milestone at end of implementation.
 
 ---
+
+## Automatic milestone (mandatory)
+
+| When | AI must |
+|------|---------|
+| Completed implementation (code shipped) | `node build.js` → `node milestone.js "<note>"` |
+| Director says **Milestone** / **OK ship** / **Milestone now** | `milestone.js` (now may be first step if starting new work on tested prod) |
+| Brainstorming / docs-only | No milestone |
+| Milestone command fails | Stop; report blocker — do not pretend work is live |
+
+**Why:** The mobile PWA and field crew test against **production** web.app. Each ship needs a **point GAS version** in `RELEASES.md` for rollback and director communication ("test v336").
 
 ## Trigger phrase summary
 
 | Phrase | Layer | Script |
 |--------|-------|--------|
-| **OK go** | Dev push only | `dev-push.js` (or manual build + push) |
-| **This works** | Git save | `works-save.js` |
+| **OK go** (completed implementation) | Production milestone | `build.js` → `milestone.js` (automatic) |
+| **This works** | Git save only (optional mid-session) | `works-save.js` |
 | **Milestone** / **OK ship** | Apps Script production | `milestone.js` |
 | **Milestone now** (+ optional follow-up) | Apps Script production **first**, then dev/build | `milestone.js` → then other work |
 | **Rollback to last this works** | Git | `rollback-works.js` |

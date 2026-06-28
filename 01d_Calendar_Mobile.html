@@ -32,9 +32,15 @@ function setMobileHeaderSub(titleText) {
 
 function goMobileHome() {
     if (typeof closeMobileCrewHub === 'function') closeMobileCrewHub();
+    if (typeof closePersonalHub === 'function') closePersonalHub();
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-home').style.display = 'flex';
     setMobileHeaderHome();
+}
+
+function openMobilePersonalHub() {
+    if (typeof refreshPersonalHubUI === 'function') refreshPersonalHubUI();
+    if (typeof openManagerSettings === 'function') openManagerSettings();
 }
 
 function openMobileEvents() {

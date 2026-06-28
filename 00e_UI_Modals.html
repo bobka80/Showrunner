@@ -265,6 +265,25 @@
   </div>
 </div>
 
+<!-- @INDEX: MODALS -> Personal Hub PIN -->
+<div id="personal-pin-modal-overlay" class="modal-overlay" style="z-index: 2600; display: none;">
+  <div class="modal" style="max-width: 360px;">
+    <h3 class="modal-title">Change PIN</h3>
+    <p style="color:#a1a1aa; font-size: 12px; margin: 0 0 15px 0;">Your 6-character command passcode.</p>
+    <div class="input-label">Current PIN</div>
+    <input type="password" id="personal-pin-current" maxlength="6" placeholder="••••••" autocomplete="off" style="width: 100%; padding: 10px; margin: 4px 0 12px 0; background:#27272a; border:1px solid #333; color:#fff; border-radius: 6px; letter-spacing: 4px; text-align: center; box-sizing: border-box;">
+    <div class="input-label">New PIN</div>
+    <input type="password" id="personal-pin-new" maxlength="6" placeholder="••••••" autocomplete="new-password" style="width: 100%; padding: 10px; margin: 4px 0 12px 0; background:#27272a; border:1px solid #333; color:#fff; border-radius: 6px; letter-spacing: 4px; text-align: center; box-sizing: border-box;">
+    <div class="input-label">Confirm New PIN</div>
+    <input type="password" id="personal-pin-confirm" maxlength="6" placeholder="••••••" autocomplete="new-password" style="width: 100%; padding: 10px; margin: 4px 0 12px 0; background:#27272a; border:1px solid #333; color:#fff; border-radius: 6px; letter-spacing: 4px; text-align: center; box-sizing: border-box;">
+    <div id="personal-pin-msg" style="font-size: 12px; font-weight: 700; margin-bottom: 12px; min-height: 16px;"></div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top: 8px;">
+      <button type="button" class="btn-close" style="width:auto; margin:0;" onclick="closePersonalPinModal()">CANCEL</button>
+      <button type="button" id="btn-personal-pin-save" class="btn-main" style="width:auto; margin:0;" onclick="submitPasscodeChange()">UPDATE PIN</button>
+    </div>
+  </div>
+</div>
+
 <!-- @INDEX: MODALS -> Database Backup -->
 <div id="backup-modal-overlay" class="modal-overlay" style="z-index: 2147483647; display: none; backdrop-filter: blur(8px);">
   <div class="modal" style="text-align: center; max-width: 400px; border: 2px solid #f59e0b; pointer-events: none;">
