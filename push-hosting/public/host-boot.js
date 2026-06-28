@@ -25,6 +25,19 @@
   let lastAccountLinkAt = 0;
   const PUSH_OK_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+  function relayForegroundPushToIframe(payload) {
+    if (!frame || !frame.contentWindow) return;
+    var n = (payload && payload.notification) || {};
+    var d = (payload && payload.data) || {};
+    try {
+      frame.contentWindow.postMessage({
+        type: 'SHOWRUNNER_FOREGROUND_PUSH',
+        title: n.title || d.title || 'Showrunner',
+        body: n.body || d.body || ''
+      }, '*');
+    } catch (e) { /* ignore */ }
+  }
+
   function showLocalPushNotification(payload) {
     if (document.hidden) return;
     var n = (payload && payload.notification) || {};
@@ -50,6 +63,7 @@
     messaging.onMessage(function(payload) {
       logPush('foreground push received');
       showLocalPushNotification(payload);
+      relayForegroundPushToIframe(payload);
     });
     foregroundHandlerRegistered = true;
   }

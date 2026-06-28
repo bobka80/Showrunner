@@ -34,16 +34,16 @@ function renderTasksAndNotifs(payload) {
     let nowTime = new Date().getTime();
     
     globalNotifs.forEach(n => {
-        // Hide snoozed notifications until their timestamp comes back from the future
         let ts = new Date(n.timestamp).getTime();
         if (ts > nowTime) return;
-        
-        if(!isSheetTruthy_(n.isRead)) unreadCount++;
-        let bg = n.isRead ? 'transparent' : 'rgba(244, 63, 94, 0.1)';
-        let border = n.isRead ? '#333' : '#f43f5e';
+
+        let read = (typeof isNotifRead === 'function') ? isNotifRead(n.isRead) : !!n.isRead;
+        if (!read) unreadCount++;
+        let bg = read ? 'transparent' : 'rgba(244, 63, 94, 0.1)';
+        let border = read ? '#333' : '#f43f5e';
         let dateStr = new Date(n.timestamp).toLocaleDateString();
         nHtml += `
-        <div id="notif-card-${n.id}" data-read="${n.isRead}" onclick="markNotifReadLocally('${n.id}')" style="background:${bg}; border:1px solid ${border}; padding:10px; border-radius:6px; position:relative; cursor:pointer; transition: background 0.2s, border-color 0.2s;">
+        <div id="notif-card-${n.id}" data-read="${read}" onclick="markNotifReadLocally('${n.id}')" style="background:${bg}; border:1px solid ${border}; padding:10px; border-radius:6px; position:relative; cursor:pointer; transition: background 0.2s, border-color 0.2s;">
             <button onclick="event.stopPropagation(); dismissNotif('${n.id}')" title="Dismiss" style="position:absolute; top:4px; right:4px; background:none; border:none; color:#888; cursor:pointer; font-size:12px; line-height:1; padding:4px;">✖</button>
             <div style="font-size:13px; color:#fff; padding-right:15px; margin-bottom:6px; pointer-events:none;">${escapeHTML(n.message)}</div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -67,7 +67,49 @@ function renderTasksAndNotifs(payload) {
             if(lip) lip.style.background = '#3f3f46';
         }
     }
+
+    let mBadge = document.getElementById('mobile-notif-badge');
+    if (mBadge) {
+        if (unreadCount > 0) {
+            mBadge.innerText = unreadCount;
+            mBadge.style.display = 'block';
+        } else {
+            mBadge.style.display = 'none';
+        }
+    }
+    if (typeof renderMobileTasksList === 'function') renderMobileTasksList();
 }
+
+let foregroundPushRefreshTimer = null;
+
+function showPushToast(title, body) {
+    let container = document.getElementById('push-toast-container');
+    if (!container) return;
+    let toast = document.createElement('div');
+    toast.className = 'push-toast';
+    let safeTitle = typeof escapeHTML === 'function' ? escapeHTML(title || 'Showrunner') : (title || 'Showrunner');
+    let safeBody = typeof escapeHTML === 'function' ? escapeHTML(body || '') : (body || '');
+    toast.innerHTML = '<div class="push-toast-brand">SHOWRUNNER</div><div class="push-toast-title">' + safeTitle + '</div>' +
+        (safeBody ? '<div class="push-toast-body">' + safeBody + '</div>' : '');
+    container.appendChild(toast);
+    setTimeout(function() {
+        toast.classList.add('push-toast--out');
+        setTimeout(function() {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 280);
+    }, 5000);
+}
+
+function handleForegroundPush(data) {
+    showPushToast(data && data.title, data && data.body);
+    if (foregroundPushRefreshTimer) clearTimeout(foregroundPushRefreshTimer);
+    foregroundPushRefreshTimer = setTimeout(function() {
+        foregroundPushRefreshTimer = null;
+        if (typeof refreshData === 'function') refreshData();
+    }, 350);
+}
+
+window.handleForegroundPush = handleForegroundPush;
 
 // Notification Interaction Controls
 function openNotifDrawer() {

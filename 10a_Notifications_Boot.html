@@ -206,6 +206,9 @@
     if (ev.data.type === 'SHOWRUNNER_PUSH_STATE') {
       updatePushStatusMirror(ev.data.needsAttention, ev.data.message);
     }
+    if (ev.data.type === 'SHOWRUNNER_FOREGROUND_PUSH') {
+      if (typeof handleForegroundPush === 'function') handleForegroundPush(ev.data);
+    }
   });
 
   function bootBridge() {

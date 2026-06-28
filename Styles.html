@@ -268,6 +268,57 @@
         margin: 0 !important;
     }
 
+    #push-toast-container {
+        position: fixed;
+        top: 14px;
+        left: 70px;
+        right: 14px;
+        z-index: 2800;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        pointer-events: none;
+    }
+    .push-toast {
+        pointer-events: auto;
+        background: #18181b;
+        border: 1px solid #f43f5e;
+        border-radius: 10px;
+        padding: 12px 14px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+        animation: pushToastIn 0.28s ease-out;
+        max-width: 360px;
+        margin-left: auto;
+    }
+    .push-toast--out {
+        opacity: 0;
+        transform: translateY(-8px);
+        transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    .push-toast-brand {
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.08em;
+        color: #f43f5e;
+        margin-bottom: 4px;
+    }
+    .push-toast-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+        line-height: 1.3;
+    }
+    .push-toast-body {
+        font-size: 12px;
+        color: #a1a1aa;
+        margin-top: 4px;
+        line-height: 1.4;
+    }
+    @keyframes pushToastIn {
+        from { opacity: 0; transform: translateY(-12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
     .section-title {
         margin: 0 0 15px 0;
         color: #fff;

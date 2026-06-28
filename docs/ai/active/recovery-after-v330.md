@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Drawer:** `docs/ai/active/`
 
-**Status:** Step C **shipped** (GAS **v342**). Next: Step D (foreground UX), then B, then Personal Hub polish.  
+**Status:** Step D **shipped** (GAS **v344** + hosting). Next: Step B (checklist bar), then Personal Hub polish.  
 **Rollback baseline:** GAS **v329** — *Mobile home — brand header, sidebar nav icons; remove timeline shift popup*  
 **Rolled back from:** v330–v333 (notifications phase 1–2, checklist status bar, mini-calendar CSS/boot changes, bad recursion “hotfix”)
 

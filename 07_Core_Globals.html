@@ -116,6 +116,15 @@ window.canManagePersonalTasks = function() {
   return effectiveHasPerm('task_manage_personal');
 };
 
+/** Sheet/API may return boolean or "TRUE"/"FALSE" string. */
+window.isNotifRead = function(val) {
+  return val === true || String(val || '').toUpperCase() === 'TRUE';
+};
+
+window.isNotifUnread = function(val) {
+  return !window.isNotifRead(val);
+};
+
 window.isTaskAssignedToMe = function(task) {
   if (!task || !Array.isArray(task.assignees)) return false;
   const email = (typeof ACTIVE_USER_EMAIL !== 'undefined' && ACTIVE_USER_EMAIL) ? String(ACTIVE_USER_EMAIL).toLowerCase().trim() : '';
