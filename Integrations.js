@@ -65,8 +65,7 @@ function deployDumbFolder(projectId, projectName, selectedItems) {
             if(crewData[i][cMap['Email']] === managerEmail) { crewName = crewData[i][cMap['Name']]; break; }
         }
     }
-    let key = 'manager_config_global';
-    let config = getVaultAsset(key, { templateFolder: '1R17lG8NnWRW3u6wFeQgjvwpJcEFFrZcW' });
+    let config = getManagerConfig(crewName || 'default');
 
     const baseFolder = DriveApp.getFolderById(SYSTEM_ROOT_ID);
     
@@ -148,8 +147,7 @@ function generateProjectFolders(crewName, projectId, projectName) {
     const OPS_TEMPLATE_ID = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
     const FIN_TEMPLATE_ID = '1qmchnnh21Lp3iPR73B_LV6oihbiTJSwW';
     
-    let key = 'manager_config_global';
-    let config = executeWithRetry(() => getVaultAsset(key, {}));
+    let config = executeWithRetry(() => getManagerConfig(crewName));
 
     const opsBaseFolder = driveRetry(() => DriveApp.getFolderById(OPS_ROOT_ID));
     const finBaseFolder = driveRetry(() => DriveApp.getFolderById(FIN_ROOT_ID));
@@ -309,89 +307,73 @@ function generateProjectFolders(crewName, projectId, projectName) {
     // 5. Mirrored Sync Trees (Filtered Custom Structures via Shortcuts)
     // Builds a parallel Year->Month->Event structure for users, containing ONLY shortcuts to their selected master files/folders.
     try {
-        let allConfigs = executeWithRetry(() => getSheetData(verifyVaultSchema(true).config));
-        let cMap = allConfigs.hMap;
-        
-        let keyIdx = cMap['Asset_Key'] !== undefined ? cMap['Asset_Key'] : 1;
-        let valIdx = cMap['Asset_Payload'] !== undefined ? cMap['Asset_Payload'] : 2;
-        
         const roster = executeWithRetry(() => getCrewSettings());
         let systemRoot = driveRetry(() => DriveApp.getFolderById(OPS_ROOT_ID));
         let syncHubRoot = getOrCreateFolder(systemRoot, "Showrunner Syncs");
         
         roster.forEach(user => {
             if (user.email) {
-                let expectedKey = 'manager_config_' + user.name.replace(/\s+/g, '_').toLowerCase();
-                for (let i = 1; i < allConfigs.length; i++) {
-                    if (allConfigs[i][keyIdx] === expectedKey) {
-                        try {
-                            let payload = JSON.parse(allConfigs[i][valIdx]);
-                            if (payload.syncSelection && payload.syncSelection.length > 0) {
-                                // 1. Create User's Personal Sync Hierarchy
-                                let userHub = getOrCreateFolder(syncHubRoot, user.name);
-                                driveRetry(() => { try { userHub.addEditor(user.email); } catch(e){} });
-                                
-                                let uYear = getOrCreateFolder(userHub, yStart.toString());
-                                let uMonth = getOrCreateFolder(uYear, monthFolderName);
-                                let uProj = getOrCreateFolder(uMonth, formattedProjName);
-                                
-                                // 2. Drop Shortcuts to Selected Items (Folders & Files)
-                                payload.syncSelection.forEach(itemName => {
-                                    let targetName = itemName.replace(/&quot;/g, '"');
-                                    
-                                    // Calculate if the file was renamed by the Manager's rules during generation
-                                    let matchedRule = (config.renameRules || []).find(r => r.originalName === itemName);
-                                    if (matchedRule) {
-                                        let newBase = formattedProjName;
-                                        if (matchedRule.prefix) newBase = matchedRule.prefix + " - " + newBase;
-                                        if (matchedRule.suffix) newBase = newBase + " - " + matchedRule.suffix;
-                                        let dotIndex = itemName.lastIndexOf('.');
-                                        let ext = dotIndex > -1 ? itemName.substring(dotIndex) : "";
-                                        targetName = newBase + ext;
-                                    }
-                                    
-                                    let targetObj = null;
-                                    let attempts = 0;
-                                    
-                                    // Hunt for the item with retries to defeat Drive Index Lag
-                                    while (!targetObj && attempts < 3) {
-                                        let subfolders = driveRetry(() => opsProjectFolder.getFolders());
-                                        while (subfolders.hasNext()) {
-                                            let sf = subfolders.next();
-                                            if (sf.getName() === targetName) { targetObj = sf; break; }
-                                        }
-                                        
-                                        if (!targetObj) {
-                                            let subfiles = driveRetry(() => opsProjectFolder.getFiles());
-                                            while (subfiles.hasNext()) {
-                                                let sf = subfiles.next();
-                                                if (sf.getName() === targetName) { targetObj = sf; break; }
-                                            }
-                                        }
-                                        
-                                        if (targetObj) break;
-                                        attempts++;
-                                        Utilities.sleep(2000); 
-                                    }
-                                    
-                                    if (targetObj) {
-                                        try {
-                                            driveRetry(() => {
-                                                let shortcut = DriveApp.createShortcut(targetObj.getId());
-                                                shortcut.moveTo(uProj);
-                                                shortcut.setName(targetName);
-                                            });
-                                            try { targetObj.addEditor(user.email); } catch(ex){} // Guarantee access to the real item
-                                        } catch (shortcutErr) {
-                                            console.error("Failed to deploy shortcut: " + targetName, shortcutErr);
-                                        }
-                                    }
-                                });
+                try {
+                    let userCfg = executeWithRetry(() => getManagerConfig(user.name));
+                    if (userCfg.syncSelection && userCfg.syncSelection.length > 0) {
+                        let userHub = getOrCreateFolder(syncHubRoot, user.name);
+                        driveRetry(() => { try { userHub.addEditor(user.email); } catch(e){} });
+
+                        let uYear = getOrCreateFolder(userHub, yStart.toString());
+                        let uMonth = getOrCreateFolder(uYear, monthFolderName);
+                        let uProj = getOrCreateFolder(uMonth, formattedProjName);
+
+                        userCfg.syncSelection.forEach(itemName => {
+                            let targetName = itemName.replace(/&quot;/g, '"');
+
+                            let matchedRule = (userCfg.renameRules || []).find(r => r.originalName === itemName);
+                            if (matchedRule) {
+                                let newBase = formattedProjName;
+                                if (matchedRule.prefix) newBase = matchedRule.prefix + " - " + newBase;
+                                if (matchedRule.suffix) newBase = newBase + " - " + matchedRule.suffix;
+                                let dotIndex = itemName.lastIndexOf('.');
+                                let ext = dotIndex > -1 ? itemName.substring(dotIndex) : "";
+                                targetName = newBase + ext;
                             }
-                        } catch(e) {}
-                        break;
+
+                            let targetObj = null;
+                            let attempts = 0;
+
+                            while (!targetObj && attempts < 3) {
+                                let subfolders = driveRetry(() => opsProjectFolder.getFolders());
+                                while (subfolders.hasNext()) {
+                                    let sf = subfolders.next();
+                                    if (sf.getName() === targetName) { targetObj = sf; break; }
+                                }
+
+                                if (!targetObj) {
+                                    let subfiles = driveRetry(() => opsProjectFolder.getFiles());
+                                    while (subfiles.hasNext()) {
+                                        let sf = subfiles.next();
+                                        if (sf.getName() === targetName) { targetObj = sf; break; }
+                                    }
+                                }
+
+                                if (targetObj) break;
+                                attempts++;
+                                Utilities.sleep(2000);
+                            }
+
+                            if (targetObj) {
+                                try {
+                                    driveRetry(() => {
+                                        let shortcut = DriveApp.createShortcut(targetObj.getId());
+                                        shortcut.moveTo(uProj);
+                                        shortcut.setName(targetName);
+                                    });
+                                    try { targetObj.addEditor(user.email); } catch(ex){}
+                                } catch (shortcutErr) {
+                                    console.error("Failed to deploy shortcut: " + targetName, shortcutErr);
+                                }
+                            }
+                        });
                     }
-                }
+                } catch(e) {}
             }
         });
     } catch(e) { console.error("Mirrored Sync Error: ", e); }
@@ -408,8 +390,7 @@ function generateProjectFolders(crewName, projectId, projectName) {
 function runRetroactiveDriveSync(crewName) {
   return executeWithRetry(() => {
       const OPS_ROOT_ID = '1MDjRCK5RyILVly1Rv7J9yxjr2BLDrFYl';
-      let key = 'manager_config_' + (crewName || '').replace(/\s+/g, '_').toLowerCase();
-      let config = getVaultAsset(key, {});
+      let config = getManagerConfig(crewName);
       if (!config.syncSelection || config.syncSelection.length === 0) return "No sync items selected.";
 
       const profile = getUserSecurityProfile(crewName);

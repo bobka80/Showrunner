@@ -232,53 +232,121 @@ function saveModuleVisualSettings(module, settingsData, presetNum = 'current') {
   return saveVaultAsset(module + '_visual_settings_' + presetNum, settingsData);
 }
 
+function managerConfigUserKey_(crewName) {
+  return 'manager_config_' + (crewName || '').replace(/\s+/g, '_').toLowerCase();
+}
+
+function defaultUserManagerPayload_() {
+  return {
+    syncSelection: [],
+    rules: [],
+    renameRules: [],
+    assetChecklistItems: [],
+    lastUpdated: 0,
+    migratedFromGlobal: false
+  };
+}
+
+function readUserManagerVault_(crewName) {
+  let userKey = managerConfigUserKey_(crewName);
+  let raw = getVaultAsset(userKey, null);
+  if (!raw || typeof raw !== 'object') return defaultUserManagerPayload_();
+  return {
+    syncSelection: Array.isArray(raw.syncSelection) ? raw.syncSelection : [],
+    rules: Array.isArray(raw.rules) ? raw.rules : [],
+    renameRules: Array.isArray(raw.renameRules) ? raw.renameRules : [],
+    assetChecklistItems: Array.isArray(raw.assetChecklistItems) ? raw.assetChecklistItems : [],
+    lastUpdated: raw.lastUpdated || 0,
+    migratedFromGlobal: raw.migratedFromGlobal === true
+  };
+}
+
+/** Lazy one-time copy of legacy global rules into a manager's personal config on first hub load. */
+function ensureUserManagerConfig_(crewName, globalConfig) {
+  let userConfig = readUserManagerVault_(crewName);
+  let globalRules = (globalConfig && Array.isArray(globalConfig.rules)) ? globalConfig.rules : [];
+  let globalRename = (globalConfig && Array.isArray(globalConfig.renameRules)) ? globalConfig.renameRules : [];
+  let shouldMigrate = !userConfig.migratedFromGlobal
+      && userConfig.rules.length === 0
+      && userConfig.renameRules.length === 0
+      && (globalRules.length > 0 || globalRename.length > 0);
+
+  if (shouldMigrate) {
+    userConfig.rules = JSON.parse(JSON.stringify(globalRules));
+    userConfig.renameRules = JSON.parse(JSON.stringify(globalRename));
+    userConfig.migratedFromGlobal = true;
+    userConfig.lastUpdated = (globalConfig && globalConfig.lastUpdated) ? globalConfig.lastUpdated : new Date().getTime();
+    saveVaultAsset(managerConfigUserKey_(crewName), userConfig);
+  }
+  return userConfig;
+}
+
 function getManagerConfig(crewName) {
   return executeWithRetry(() => {
-    let key = 'manager_config_global';
-    let config = getVaultAsset(key, { templateFolder: '', lastUpdated: 0 });
-    
-    let userKey = 'manager_config_' + (crewName || '').replace(/\s+/g, '_').toLowerCase();
-    let userConfig = getVaultAsset(userKey, { syncSelection: [] });
-    config.syncSelection = userConfig.syncSelection || [];
-    
-    try { if (config.templateFolder) config.templateName = DriveApp.getFolderById(config.templateFolder).getName(); } catch(e) { config.templateName = "Access Restricted / Unknown"; }
+    let globalConfig = getVaultAsset('manager_config_global', { templateFolder: '', lastUpdated: 0 });
+    let userConfig = ensureUserManagerConfig_(crewName, globalConfig);
+
+    let config = {
+      templateFolder: globalConfig.templateFolder || '',
+      lastUpdated: userConfig.lastUpdated || 0,
+      syncSelection: userConfig.syncSelection || [],
+      rules: userConfig.rules || [],
+      renameRules: userConfig.renameRules || [],
+      assetChecklistItems: userConfig.assetChecklistItems || []
+    };
+
+    try {
+      if (config.templateFolder) config.templateName = DriveApp.getFolderById(config.templateFolder).getName();
+    } catch (e) {
+      config.templateName = "Access Restricted / Unknown";
+    }
     return config;
   });
 }
 
 function saveManagerConfig(crewName, payload) {
   return executeWithRetry(() => {
-      let key = 'manager_config_global';
-      
+      let userKey = managerConfigUserKey_(crewName);
+      let existingUser = ensureUserManagerConfig_(crewName, getVaultAsset('manager_config_global', {}));
+
       const sheets = verifyVaultSchema();
       const data = sheets.config.getDataRange().getValues();
       let keyIdx = data[0].indexOf("Asset_Key") > -1 ? data[0].indexOf("Asset_Key") : 1;
       let valIdx = data[0].indexOf("Asset_Payload") > -1 ? data[0].indexOf("Asset_Payload") : 2;
-      
-      let existingPayload = null;
+
+      let existingUserPayload = null;
       for (let i = 1; i < data.length; i++) {
-          if (data[i][keyIdx] === key) {
-              try { existingPayload = JSON.parse(data[i][valIdx]); } catch(e) {}
+          if (data[i][keyIdx] === userKey) {
+              try { existingUserPayload = JSON.parse(data[i][valIdx]); } catch (e) {}
               break;
           }
       }
-      
-      if (existingPayload && existingPayload.lastUpdated && payload.lastUpdated && existingPayload.lastUpdated.toString() !== payload.lastUpdated.toString()) {
-          throw new Error("COLLISION_DETECTED: Another manager has modified the global rules while you were editing. Please refresh the page to see their changes before saving.");
+
+      if (existingUserPayload && existingUserPayload.lastUpdated && payload.lastUpdated
+          && existingUserPayload.lastUpdated.toString() !== payload.lastUpdated.toString()) {
+          throw new Error("COLLISION_DETECTED: Your manager settings were modified elsewhere. Please refresh the page before saving.");
       }
-      
-      let userKey = 'manager_config_' + (crewName || '').replace(/\s+/g, '_').toLowerCase();
-      saveVaultAsset(userKey, { syncSelection: payload.syncSelection || [] });
-      
-      let globalPayload = {
-          templateFolder: payload.templateFolder,
+
+      let userPayload = {
+          syncSelection: payload.syncSelection !== undefined ? (payload.syncSelection || []) : existingUser.syncSelection,
+          rules: payload.rules !== undefined ? (payload.rules || []) : existingUser.rules,
+          renameRules: payload.renameRules !== undefined ? (payload.renameRules || []) : existingUser.renameRules,
+          assetChecklistItems: payload.assetChecklistItems !== undefined
+              ? (payload.assetChecklistItems || [])
+              : (existingUser.assetChecklistItems || []),
           lastUpdated: new Date().getTime(),
-          rules: payload.rules || [],
-          renameRules: payload.renameRules || []
+          migratedFromGlobal: true
       };
-      
-      saveVaultAsset(key, globalPayload);
-      writeToAuditLog(crewName, "UPDATE", "SYSTEM_CONFIG", "GLOBAL", "Manager Rules", "Updated global automation rules.");
-      return "Global Configuration Saved Successfully.";
+      saveVaultAsset(userKey, userPayload);
+
+      if (payload.templateFolder !== undefined && payload.templateFolder !== null && payload.templateFolder !== '') {
+          saveVaultAsset('manager_config_global', {
+              templateFolder: payload.templateFolder,
+              lastUpdated: new Date().getTime()
+          });
+      }
+
+      writeToAuditLog(crewName, "UPDATE", "SYSTEM_CONFIG", userKey, "Manager Config", "Updated per-manager automation settings.");
+      return "Configuration saved successfully.";
   });
 }
