@@ -160,7 +160,7 @@ function renderDatabaseBackupArchiveTab(res) {
     + buildBackupHealthBannerHtml(res.health)
     + '<div style="flex-shrink:0; margin-bottom:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; padding:8px 10px;">'
     + '<div style="color:#94a3b8; font-size:9px; font-weight:bold; letter-spacing:0.5px; margin-bottom:4px;">CANONICAL LIVE FOLDER</div>'
-    + '<div style="color:#fff; font-size:10px; font-weight:bold;">' + (res.canonicalFolder ? res.canonicalFolder.name : '01_DATABASE') + '/ENGINE + VAULT</div>'
+    + '<div style="color:#fff; font-size:10px; font-weight:bold;">' + (res.canonicalFolder ? res.canonicalFolder.name : 'Database') + '/ENGINE + VAULT</div>'
     + (res.canonicalFolder && res.canonicalFolder.url
       ? '<a href="' + res.canonicalFolder.url + '" target="_blank" style="color:#3b82f6; font-size:9px;">Open folder in Drive ↗</a>'
       : '')
@@ -332,7 +332,9 @@ function revertDatabaseStep(stepId) {
 }
 
 function runDbRepairLayout() {
-  if (!confirm('Move the current live ENGINE and VAULT into 01_DATABASE and rename them to ENGINE / VAULT?\n\nThis only changes folder location and file names — no spreadsheet data is copied or modified.')) return;
+  const folderLabel = (_dbLiveStatus && _dbLiveStatus.canonicalFolder && _dbLiveStatus.canonicalFolder.name)
+    ? _dbLiveStatus.canonicalFolder.name : 'the database folder';
+  if (!confirm('Move the current live ENGINE and VAULT into ' + folderLabel + ' and rename them to ENGINE / VAULT?\n\nThis only changes folder location and file names — no spreadsheet data is copied or modified.')) return;
 
   google.script.run
     .withFailureHandler(function(err) { alert('Repair failed: ' + err.message); })

@@ -50,9 +50,13 @@ function dbOpsTimestampSlug() {
 }
 
 function getDatabaseBackupFolder() {
-  const rootDrive = DriveApp.getFolderById(SYSTEM_ROOT_ID);
-  const folders = rootDrive.getFoldersByName(DB_BACKUP_FOLDER_NAME);
-  return folders.hasNext() ? folders.next() : rootDrive.createFolder(DB_BACKUP_FOLDER_NAME);
+  const liveFolder = getLiveDatabaseFolder();
+  const folders = liveFolder.getFoldersByName(DB_BACKUP_FOLDER_NAME);
+  return folders.hasNext() ? folders.next() : liveFolder.createFolder(DB_BACKUP_FOLDER_NAME);
+}
+
+function liveDbFolderLabel_() {
+  return getLiveDatabaseFolder().getName();
 }
 
 function getReplacedDatabaseFolder() {
@@ -499,9 +503,9 @@ function describeLiveFileDetail_(fileId, fileType) {
     inCanonicalFolder: inCanonicalFolder,
     hasCanonicalName: hasCanonicalName,
     layoutOk: inCanonicalFolder && hasCanonicalName,
-    canonicalFolderName: LIVE_DATABASE_FOLDER_NAME,
+    canonicalFolderName: canonicalFolder.getName(),
     canonicalFolderUrl: canonicalFolder.getUrl(),
-    expectedPath: LIVE_DATABASE_FOLDER_NAME + '/' + meta.liveName,
+    expectedPath: canonicalFolder.getName() + '/' + meta.liveName,
     originalFactoryId: meta.fallbackId,
     isOriginalFactoryFile: fileId === meta.fallbackId
   });
@@ -515,7 +519,7 @@ function getLiveDatabaseStatus(actor) {
       engine: describeLiveFileDetail_(getEngineSheetId(), 'ENGINE'),
       vault: describeLiveFileDetail_(getVaultSheetId(), 'VAULT'),
       canonicalFolder: {
-        name: LIVE_DATABASE_FOLDER_NAME,
+        name: canonicalFolder.getName(),
         id: canonicalFolder.getId(),
         url: canonicalFolder.getUrl()
       },
@@ -550,7 +554,7 @@ function repairOneCanonicalLive_(fileType) {
     beforeName: beforeName,
     beforeParent: beforeParent,
     afterName: meta.liveName,
-    afterFolder: LIVE_DATABASE_FOLDER_NAME,
+    afterFolder: liveDbFolderLabel_(),
     layoutOk: true
   };
 }
@@ -566,7 +570,7 @@ function repairLiveDatabaseLayout(actor) {
       results.map((r) => r.fileType + ': ' + r.beforeName + ' @ ' + r.beforeParent + ' → ' + r.afterFolder + '/' + r.afterName).join(' | '));
     return {
       results: results,
-      message: 'Live files moved to ' + LIVE_DATABASE_FOLDER_NAME + '/ENGINE and /VAULT. Hard-refresh the app.'
+      message: 'Live files moved to ' + liveDbFolderLabel_() + '/ENGINE and /VAULT. Hard-refresh the app.'
     };
   });
 }
@@ -641,13 +645,13 @@ function restoreDatabaseFromBackup(actor, fileType, backupFileId) {
       new_live_id: newLiveId,
       backup_source_id: backupFileId,
       status: 'ACTIVE',
-      notes: `Restored from ${backupName} → ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}`
+      notes: `Restored from ${backupName} → ${liveDbFolderLabel_()}/${meta.liveName}`
     });
 
     writeToAuditLog(actor, 'RESTORE', 'DATABASE', 'GLOBAL', meta.type,
-      `Live ${prev.prevName} (${prevLiveId}) → Replaced; backup ${backupName} → ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName} (${newLiveId})`);
+      `Live ${prev.prevName} (${prevLiveId}) → Replaced; backup ${backupName} → ${liveDbFolderLabel_()}/${meta.liveName} (${newLiveId})`);
 
-    return `RESTORE complete for ${meta.type}. Live file: ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}. Previous live moved to Replaced folder. Hard-refresh the app.`;
+    return `RESTORE complete for ${meta.type}. Live file: ${liveDbFolderLabel_()}/${meta.liveName}. Previous live moved to Replaced folder. Hard-refresh the app.`;
   });
 }
 
@@ -707,13 +711,13 @@ function revertDatabaseOperation(actor, stepId) {
       new_live_id: restoredLiveId,
       backup_source_id: row.step_id,
       status: 'ACTIVE',
-      notes: `Reverted restore step #${row.step_id} → ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}`
+      notes: `Reverted restore step #${row.step_id} → ${liveDbFolderLabel_()}/${meta.liveName}`
     });
 
     writeToAuditLog(actor, 'REVERT', 'DATABASE', 'GLOBAL', meta.type,
-      `Reverted step ${row.step_id}; live is ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName} (${restoredLiveId})`);
+      `Reverted step ${row.step_id}; live is ${liveDbFolderLabel_()}/${meta.liveName} (${restoredLiveId})`);
 
-    return `REVERT complete for ${meta.type}. Live file: ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}. Hard-refresh the app.`;
+    return `REVERT complete for ${meta.type}. Live file: ${liveDbFolderLabel_()}/${meta.liveName}. Hard-refresh the app.`;
   });
 }
 
