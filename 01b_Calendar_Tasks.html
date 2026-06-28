@@ -123,7 +123,7 @@ function renderTasksAndNotifs(payload) {
     let tHtml = '';
     const canGlobal = (typeof canViewAllGlobalTasks === 'function') && canViewAllGlobalTasks();
     globalTasks.forEach(t => {
-        if (!canGlobal && typeof isTaskAssignedToMe === 'function' && !isTaskAssignedToMe(t)) return;
+        // Server already filters tasks per user; trust payload (avoids hiding UID-assigned tasks).
         let priority = t.priority || 'Medium';
         let color = priority === 'High' ? '#ef4444' : (priority === 'Low' ? '#3b82f6' : '#f59e0b');
         let statusBadge = t.status === 'Finished' ? '<span style="color:#10b981; font-weight:900; margin-left:5px;">✓</span>' : '';
@@ -137,7 +137,11 @@ function renderTasksAndNotifs(payload) {
             <div style="font-size:10px; color:#888;">${numAssignees} Assignees • Status: ${escapeHTML(t.status)}</div>
         </div>`;
     });
-    if (tHtml === '') tHtml = '<div style="color:#888; font-size:12px; text-align:center; padding:16px;">No tasks assigned to you.</div>';
+    if (tHtml === '' && tasksNotifsLoading) {
+        tHtml = '<div style="color:#888; font-size:12px; text-align:center; padding:16px;">Loading tasks…</div>';
+    } else if (tHtml === '') {
+        tHtml = '<div style="color:#888; font-size:12px; text-align:center; padding:16px;">No tasks assigned to you.</div>';
+    }
     document.getElementById('tasks-list').innerHTML = tHtml;
 
     const notifRender = renderNotifCardsHtml(globalNotifs, { mobile: window.innerWidth <= 768 });
@@ -182,15 +186,80 @@ function syncPhantomTasksNotifs(tasks, notifs) {
     } catch (e) { /* ignore */ }
 }
 
+const TASKS_NOTIFS_CACHE_MS = 30 * 60 * 1000;
+let tasksNotifsLoading = false;
+
+function loadTasksNotifsCache() {
+    try {
+        const raw = localStorage.getItem('sm_tasks_notifs_cache');
+        if (!raw) return null;
+        const c = JSON.parse(raw);
+        if (!c || c.crew !== ACTIVE_USER_NAME) return null;
+        if (Date.now() - (c.fetchedAt || 0) > TASKS_NOTIFS_CACHE_MS) return null;
+        return c;
+    } catch (e) { return null; }
+}
+
+function saveTasksNotifsCache(tasks, notifs) {
+    try {
+        localStorage.setItem('sm_tasks_notifs_cache', JSON.stringify({
+            crew: ACTIVE_USER_NAME,
+            fetchedAt: Date.now(),
+            tasks: tasks || [],
+            notifs: notifs || []
+        }));
+    } catch (e) { /* ignore */ }
+}
+
+function setTasksListLoading(loading) {
+    tasksNotifsLoading = !!loading;
+    const el = document.getElementById('tasks-list');
+    if (!el || !loading) return;
+  if (!globalTasks || globalTasks.length === 0) {
+        el.innerHTML = '<div style="color:#888; font-size:12px; text-align:center; padding:16px;">Loading tasks…</div>';
+    }
+    const mobileEl = document.getElementById('mobile-tasks-list');
+    if (mobileEl && loading && (!globalTasks || globalTasks.length === 0)) {
+        mobileEl.innerHTML = '<div style="color:#888; text-align:center; padding:24px;">Loading tasks…</div>';
+    }
+}
+
+function bootTasksAndNotifs() {
+    const cached = loadTasksNotifsCache();
+    if (cached && ((cached.tasks && cached.tasks.length) || (cached.notifs && cached.notifs.length))) {
+        renderTasksAndNotifs({ tasks: cached.tasks || [], notifs: cached.notifs || [] });
+    } else {
+        setTasksListLoading(true);
+    }
+    refreshTasksAndNotifs({ retriesLeft: 2 });
+}
+
+window.bootTasksAndNotifs = bootTasksAndNotifs;
+
 /** Fast refresh — tasks + notification list only (not full calendar payload). */
-function refreshTasksAndNotifs() {
+function refreshTasksAndNotifs(opts) {
+    opts = opts || {};
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+    const hadCache = (globalTasks && globalTasks.length > 0) || !!(loadTasksNotifsCache() && loadTasksNotifsCache().tasks && loadTasksNotifsCache().tasks.length);
     google.script.run
-        .withFailureHandler(function(err) { console.warn('Tasks/notifs refresh:', err && err.message); })
+        .withFailureHandler(function(err) {
+            console.warn('Tasks/notifs refresh:', err && err.message);
+            setTasksListLoading(false);
+        })
         .withSuccessHandler(function(extras) {
             if (!extras) return;
-            renderTasksAndNotifs({ tasks: extras.tasks, notifs: extras.notifs });
-            syncPhantomTasksNotifs(extras.tasks, extras.notifs);
+            const tasks = extras.tasks || [];
+            const notifs = extras.notifs || [];
+            if (tasks.length === 0 && hadCache && opts.retriesLeft > 0) {
+                setTimeout(function() {
+                    refreshTasksAndNotifs({ retriesLeft: opts.retriesLeft - 1 });
+                }, 2000);
+                return;
+            }
+            setTasksListLoading(false);
+            renderTasksAndNotifs({ tasks: tasks, notifs: notifs });
+            saveTasksNotifsCache(tasks, notifs);
+            syncPhantomTasksNotifs(tasks, notifs);
         })
         .getTasksNotifsPayload(ACTIVE_USER_NAME);
 }
@@ -417,16 +486,21 @@ function removeTaskTodo(index) {
 }
 
 function openTaskCrewModal() {
-    let rosterToUse = (globalRosterData && globalRosterData.roster) ? globalRosterData.roster : activeRoster;
+    let rosterToUse = (typeof getTaskCrewRoster === 'function') ? getTaskCrewRoster() : ((globalRosterData && globalRosterData.roster) ? globalRosterData.roster : activeRoster);
     let currentStr = document.getElementById('task-assignees-hidden').value;
     let assignees = currentStr ? JSON.parse(currentStr) : [];
     
-    let html = rosterToUse.map(c => `
-       <label style="display:flex; align-items:center; gap:8px; padding:6px 10px; color:#fff; font-size:12px; cursor:pointer; border-bottom: 1px solid #222;">
-          <input type="checkbox" class="task-crew-cb" value="${c.email}" ${assignees.includes(c.email) ? 'checked' : ''} style="margin:0; width:16px; height:16px;">
-          ${c.name}
-       </label>
-    `).join('');
+    let html = rosterToUse.map(c => {
+        const checked = (typeof isAssigneeSelected === 'function')
+            ? (isAssigneeSelected(c.email, assignees) || isAssigneeSelected(c.uid, assignees))
+            : assignees.includes(c.email);
+        const safeEmail = typeof escapeHTML === 'function' ? escapeHTML(c.email) : c.email;
+        const safeName = typeof escapeHTML === 'function' ? escapeHTML(c.name) : c.name;
+        return `<label style="display:flex; align-items:center; gap:8px; padding:6px 10px; color:#fff; font-size:12px; cursor:pointer; border-bottom: 1px solid #222;">
+          <input type="checkbox" class="task-crew-cb" value="${safeEmail}" ${checked ? 'checked' : ''} style="margin:0; width:16px; height:16px;">
+          ${safeName}
+       </label>`;
+    }).join('');
     
     document.getElementById('task-crew-checkboxes').innerHTML = html;
     document.getElementById('task-crew-modal-overlay').style.display = 'flex';
@@ -440,20 +514,18 @@ function confirmTaskCrew() {
 }
 
 function renderTaskCrewPills(assignees) {
-    let rosterToUse = (globalRosterData && globalRosterData.roster) ? globalRosterData.roster : activeRoster;
-    let html = assignees.map(email => {
-        let c = rosterToUse.find(x => x.email === email);
-        let name = c ? c.name : email;
-        let safeName = typeof escapeHTML === 'function' ? escapeHTML(name) : name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        return `<div style="background:#27272a; border:1px solid #3f3f46; color:#e4e4e7; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; display:flex; align-items:center; gap:6px;">${safeName} <span style="cursor:pointer; color:#ef4444;" onclick="removeTaskCrew('${email}')">✖</span></div>`;
+    let html = assignees.map(function(id, idx) {
+        let name = (typeof resolveCrewDisplayLabel === 'function') ? resolveCrewDisplayLabel(id) : id;
+        let safeName = typeof escapeHTML === 'function' ? escapeHTML(name) : String(name).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return `<div style="background:#27272a; border:1px solid #3f3f46; color:#e4e4e7; padding:4px 8px; border-radius:4px; font-size:10px; font-weight:bold; display:flex; align-items:center; gap:6px;">${safeName} <span style="cursor:pointer; color:#ef4444;" onclick="removeTaskCrewAt(${idx})">✖</span></div>`;
     }).join('');
     if(html === '') html = '<div style="color:#888; font-size:10px; font-style:italic; padding-top:4px;">No crew assigned.</div>';
     document.getElementById('task-assigned-crew-list').innerHTML = html;
 }
 
-function removeTaskCrew(email) {
-    let assignees = JSON.parse(document.getElementById('task-assignees-hidden').value);
-    assignees = assignees.filter(e => e !== email);
+function removeTaskCrewAt(index) {
+    let assignees = JSON.parse(document.getElementById('task-assignees-hidden').value || '[]');
+    assignees.splice(index, 1);
     document.getElementById('task-assignees-hidden').value = JSON.stringify(assignees);
     renderTaskCrewPills(assignees);
 }

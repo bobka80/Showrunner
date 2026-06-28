@@ -518,7 +518,10 @@ document.addEventListener('DOMContentLoaded', function() {
               initMiniVisualsCSS();
               initMrVisualsCSS();
           }
-          if (p.directory) globalRoles = p.directory.roles || [];
+          if (p.directory) {
+            globalRoles = p.directory.roles || [];
+            globalDirectoryCrew = p.directory.crew || [];
+          }
           if (p.managerConfig) globalManagerConfig = p.managerConfig;
 
           // Calendar-only phantom — tasks/notifs use fast server path (stale local cache caused multi-minute lag)
@@ -533,7 +536,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   } catch (e) { console.warn("Phantom boot bypassed."); }
 
-  if (typeof refreshTasksAndNotifs === 'function') refreshTasksAndNotifs();
+  if (typeof bootTasksAndNotifs === 'function') bootTasksAndNotifs();
+  else if (typeof refreshTasksAndNotifs === 'function') refreshTasksAndNotifs();
 
   google.script.run
     .withFailureHandler(err => alert("Boot Error: " + err.message))
@@ -611,6 +615,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (payload.directory) {
             globalRoles = payload.directory.roles || [];
+            globalDirectoryCrew = payload.directory.crew || [];
         }
         if (payload.managerConfig) globalManagerConfig = payload.managerConfig;
         applyRefreshPayload(payload);

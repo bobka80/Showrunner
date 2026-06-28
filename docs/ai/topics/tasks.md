@@ -49,5 +49,6 @@
 
 ## Open
 
-- [ ] Optional IAM checkbox in crew role editor UI for `task_view_all` (key exists; auto-grant for managers today)
+- [x] Assignee pills show crew **names** (resolve uid/email via directory roster) v348
+- [x] Tasks stale-while-revalidate cache (30 min) + server-trusted list filter v348
 - [ ] Debounce task-assign push when bulk-editing assignees

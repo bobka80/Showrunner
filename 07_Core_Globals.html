@@ -5,6 +5,7 @@
  */
 let calendar = null, miniCalendar = null, templates = [], activeRoster = [];
 let globalTasks = [], globalNotifs = [];
+let globalDirectoryCrew = [];
 let SYSTEM_TAGS = [];
 let globalRosterData = null;
 let globalAssets = [];
@@ -154,7 +155,76 @@ window.isTaskAssignedToMe = function(task) {
   return task.assignees.some(function(a) {
     const val = String(a || '').trim();
     const valLower = val.toLowerCase();
-    return (email && valLower === email) || (uid && val === uid) || (name && valLower === name);
+    if ((email && valLower === email) || (uid && val === uid) || (name && valLower === name)) return true;
+    const crew = typeof findCrewMemberByIdentifier === 'function' ? findCrewMemberByIdentifier(val) : null;
+    if (!crew) return false;
+    if (uid && crew.uid && crew.uid === uid) return true;
+    if (email && crew.email && crew.email.toLowerCase() === email) return true;
+    if (name && crew.name && crew.name.toLowerCase().trim() === name) return true;
+    return false;
+  });
+};
+
+/** Crew pools for task assignee labels (uid / email / name). */
+window.getTaskCrewRoster = function() {
+  const seen = {};
+  const out = [];
+  const pools = [];
+  if (typeof globalDirectoryCrew !== 'undefined' && globalDirectoryCrew && globalDirectoryCrew.length) pools.push(globalDirectoryCrew);
+  if (typeof globalRosterData !== 'undefined' && globalRosterData && globalRosterData.roster) pools.push(globalRosterData.roster);
+  if (typeof activeRoster !== 'undefined' && activeRoster && activeRoster.length) pools.push(activeRoster);
+  for (let p = 0; p < pools.length; p++) {
+    for (let i = 0; i < pools[p].length; i++) {
+      const c = pools[p][i];
+      const key = (c.uid || c.email || c.name || '').toString().toLowerCase();
+      if (!key || seen[key]) continue;
+      seen[key] = true;
+      out.push(c);
+    }
+  }
+  return out;
+};
+
+window.findCrewMemberByIdentifier = function(identifier) {
+  const id = String(identifier || '').trim();
+  if (!id) return null;
+  const idLower = id.toLowerCase();
+  const roster = getTaskCrewRoster();
+  for (let i = 0; i < roster.length; i++) {
+    const c = roster[i];
+    if (c.uid && String(c.uid).trim() === id) return c;
+    if (c.email && String(c.email).toLowerCase().trim() === idLower) return c;
+    if (c.name && String(c.name).toLowerCase().trim() === idLower) return c;
+  }
+  return null;
+};
+
+window.resolveCrewDisplayLabel = function(identifier) {
+  const crew = findCrewMemberByIdentifier(identifier);
+  if (crew && crew.name) return crew.name;
+  const id = String(identifier || '').trim();
+  if (id.indexOf('UID_') === 0) return 'Crew member';
+  if (id.indexOf('@') > 0) return id.split('@')[0];
+  return id || 'Unknown';
+};
+
+window.crewIdentifiersMatch = function(a, b) {
+  const sa = String(a || '').trim();
+  const sb = String(b || '').trim();
+  if (!sa || !sb) return false;
+  if (sa === sb || sa.toLowerCase() === sb.toLowerCase()) return true;
+  const ca = findCrewMemberByIdentifier(sa);
+  const cb = findCrewMemberByIdentifier(sb);
+  if (ca && cb) {
+    if (ca.uid && cb.uid && ca.uid === cb.uid) return true;
+    if (ca.email && cb.email && ca.email.toLowerCase() === cb.email.toLowerCase()) return true;
+  }
+  return false;
+};
+
+window.isAssigneeSelected = function(assigneeId, selectedList) {
+  return (selectedList || []).some(function(sel) {
+    return crewIdentifiersMatch(sel, assigneeId);
   });
 };
 
