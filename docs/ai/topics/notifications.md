@@ -60,7 +60,7 @@ Firebase Hosting + FCM + Apps Script backend. Event-driven batch sends. No secre
 ### Product rules
 - [ ] Per-user notification preferences (type toggles)
 - [ ] Explicit **debounce/coalesce** for rapid timeline edits
-- [ ] In-app **drawer/toast sync** polish — verify shift-assign path on web.app (Step D follow-up)
+- [x] Notification click → open event (project) or task; snooze removed; larger dismiss (v347)
 
 ### Recovery Step C (re-merge after rollback)
 - [ ] Re-verify expanded v330 dispatch hooks if re-applied

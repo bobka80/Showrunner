@@ -229,15 +229,15 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
         for(let i=1; i<indexData.length; i++) { if(indexData[i][iMap['uid']] === folderId) { pName = indexData[i][iMap['Project_Name']]; break; } }
 
         newlyAddedUids.forEach(function(uid) {
-            appendInAppNotification_(sheets.notifs, uid, '📅 You were added to the schedule for: ' + pName);
+            appendInAppNotification_(sheets.notifs, uid, '📅 You were added to the schedule for: ' + pName, 'project', folderId);
         });
 
         modifiedUids.forEach(function(uid) {
-            appendInAppNotification_(sheets.notifs, uid, '⏰ Your shift time was changed for: ' + pName);
+            appendInAppNotification_(sheets.notifs, uid, '⏰ Your shift time was changed for: ' + pName, 'project', folderId);
         });
 
         removedUids.forEach(function(uid) {
-            appendInAppNotification_(sheets.notifs, uid, '📅 You were removed from the schedule for: ' + pName);
+            appendInAppNotification_(sheets.notifs, uid, '📅 You were removed from the schedule for: ' + pName, 'project', folderId);
         });
 
         try {

@@ -273,22 +273,22 @@ function renderMobileDashboard(payload) {
         });
     }
 
-    let nHtml = ''; let unreadCount = 0; let nowTime = new Date().getTime();
+    let nHtml = '';
+    let unreadCount = 0;
     if (payload.notifs) {
-        payload.notifs.forEach(n => {
-            let ts = new Date(n.timestamp).getTime();
-            if (ts > nowTime) return;
-            let read = (typeof isNotifRead === 'function') ? isNotifRead(n.isRead) : !!n.isRead;
-            if (!read) unreadCount++;
-            let bg = read ? 'transparent' : 'rgba(244, 63, 94, 0.1)';
-            let border = read ? '#333' : '#f43f5e';
-            let dateStr = new Date(n.timestamp).toLocaleDateString();
-            nHtml += `<div id="notif-card-${n.id}" data-read="${read}" onclick="markNotifReadLocally('${n.id}')" style="background:${bg}; border:1px solid ${border}; padding:15px; border-radius:6px; margin-bottom:10px; cursor:pointer; transition: background 0.2s, border-color 0.2s;">
-                         <button onclick="event.stopPropagation(); dismissNotif('${n.id}')" title="Dismiss" style="float:right; background:none; border:none; color:#888; cursor:pointer; font-size:14px; padding:4px;">✖</button>
-                         <div style="font-size:14px; color:#fff; margin-bottom:8px; pointer-events:none;">${escapeHTML(n.message)}</div>
-                         <div style="font-size:11px; color:#888; pointer-events:none;">${dateStr}</div>
-                      </div>`;
-        });
+        if (typeof renderNotifCardsHtml === 'function') {
+            const notifRender = renderNotifCardsHtml(payload.notifs, { mobile: true });
+            nHtml = notifRender.html;
+            unreadCount = notifRender.unreadCount;
+        } else {
+            let nowTime = new Date().getTime();
+            payload.notifs.forEach(n => {
+                let ts = new Date(n.timestamp).getTime();
+                if (ts > nowTime) return;
+                let read = (typeof isNotifRead === 'function') ? isNotifRead(n.isRead) : !!n.isRead;
+                if (!read) unreadCount++;
+            });
+        }
     }
     if (nHtml === '') nHtml = '<div style="color:#888; text-align:center; padding:20px;">All caught up!</div>';
     document.getElementById('mobile-notifs-container').innerHTML = nHtml;

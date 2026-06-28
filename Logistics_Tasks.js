@@ -53,7 +53,12 @@ function getTasksAndNotifs(crewName) {
         if (isRead && (now - ts > 86400000)) continue;
 
         notifs.push({
-            id: nData[i][nData.hMap['uid']], message: nData[i][nData.hMap['Message']], isRead: isRead, timestamp: nData[i][nData.hMap['Timestamp']]
+            id: nData[i][nData.hMap['uid']],
+            message: nData[i][nData.hMap['Message']],
+            isRead: isRead,
+            timestamp: nData[i][nData.hMap['Timestamp']],
+            linkType: nData.hMap['Link_Type'] !== undefined ? String(nData[i][nData.hMap['Link_Type']] || '').trim() : '',
+            linkId: nData.hMap['Link_Id'] !== undefined ? String(nData[i][nData.hMap['Link_Id']] || '').trim() : ''
         });
     }
     
@@ -223,7 +228,7 @@ function saveTaskData(taskObj, crewName) {
     
     if (isNew && taskObj.assignees && taskObj.assignees.length > 0) {
         taskObj.assignees.forEach(function(assignee) {
-            appendInAppNotification_(sheets.notifs, assignee, 'You were assigned to task: ' + taskObj.title);
+            appendInAppNotification_(sheets.notifs, assignee, 'You were assigned to task: ' + taskObj.title, 'task', taskObj.id);
         });
         try {
             dispatchPushToIdentifiers(
@@ -473,7 +478,7 @@ function dispatchWeatherAlerts(projectId, projectName, warningsArray) {
     assignedIds.forEach(function(crewId) {
         let normUid = resolveNotifUserUid_(crewId);
         if (alreadySentUids.has(normUid)) return;
-        appendInAppNotification_(sheets.notifs, crewId, msg);
+        appendInAppNotification_(sheets.notifs, crewId, msg, 'project', projectId);
         pushRecipients.push(crewId);
     });
 

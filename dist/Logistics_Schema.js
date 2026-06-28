@@ -98,7 +98,7 @@ function verifyDatabaseSchema(readOnly = false) {
   }
   
   let notifSheet = sm["Notifications"];
-  const notifHeaders = ["uid", "user_uid", "Message", "Is_Read", "Timestamp"];
+  const notifHeaders = ["uid", "user_uid", "Message", "Is_Read", "Timestamp", "Link_Type", "Link_Id"];
   if (!notifSheet) { 
       notifSheet = ss.insertSheet("Notifications"); 
       notifSheet.appendRow(notifHeaders); 

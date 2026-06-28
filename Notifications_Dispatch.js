@@ -111,14 +111,14 @@ function resolveNotifUserUid_(identifier) {
   return String(identifier || '').trim();
 }
 
-function appendInAppNotification_(notifsSheet, recipientId, message) {
+function appendInAppNotification_(notifsSheet, recipientId, message, linkType, linkId) {
   if (!notifsSheet || !recipientId || !message) return;
   const userUid = resolveNotifUserUid_(recipientId);
   if (!userUid) return;
   const data = notifsSheet.getDataRange().getValues();
   const nMap = {};
   if (data.length > 0) data[0].forEach(function(h, i) { nMap[h.toString().trim()] = i; });
-  const colCount = data.length > 0 ? data[0].length : 5;
+  const colCount = data.length > 0 ? data[0].length : 7;
   const r = new Array(colCount).fill('');
   const nowIso = new Date().toISOString();
   if (nMap['uid'] !== undefined) r[nMap['uid']] = Utilities.getUuid();
@@ -126,12 +126,16 @@ function appendInAppNotification_(notifsSheet, recipientId, message) {
   if (nMap['Message'] !== undefined) r[nMap['Message']] = message;
   if (nMap['Is_Read'] !== undefined) r[nMap['Is_Read']] = false;
   if (nMap['Timestamp'] !== undefined) r[nMap['Timestamp']] = nowIso;
+  if (nMap['Link_Type'] !== undefined && linkType) r[nMap['Link_Type']] = String(linkType);
+  if (nMap['Link_Id'] !== undefined && linkId) r[nMap['Link_Id']] = String(linkId);
   else if (colCount >= 5) {
     r[0] = Utilities.getUuid();
     r[1] = userUid;
     r[2] = message;
     r[3] = false;
     r[4] = nowIso;
+    if (colCount >= 7 && linkType) r[5] = String(linkType);
+    if (colCount >= 7 && linkId) r[6] = String(linkId);
   }
   notifsSheet.appendRow(r);
 }
