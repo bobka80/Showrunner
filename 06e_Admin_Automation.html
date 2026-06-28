@@ -136,14 +136,36 @@ function openManagerSettings() {
   }
   let overlay = document.getElementById('manager-settings-overlay');
   if (!overlay) return;
-  if (overlay.classList.contains('personal-hub-open')) {
-      closePersonalHub();
-      return;
-  }
   overlay.style.display = 'flex';
-  overlay.classList.add('personal-hub-open');
   if (typeof updateActiveNav === 'function') updateActiveNav('nav-btn-manager');
   if (typeof refreshPersonalHubUI === 'function') refreshPersonalHubUI();
+
+  const isManager = (typeof accessTierAtLeast === 'function') && accessTierAtLeast('MANAGER');
+  if (!isManager) return;
+
+  const addBtn = document.getElementById('add-rule-btn');
+  const addRenameBtn = document.getElementById('add-rename-rule-btn');
+  if (addBtn) {
+      addBtn.disabled = true;
+      addBtn.style.opacity = 0.5;
+      addBtn.style.cursor = 'wait';
+      if (addRenameBtn) { addRenameBtn.disabled = true; addRenameBtn.style.opacity = 0.5; addRenameBtn.style.cursor = 'wait'; }
+  }
+  
+  google.script.run.withSuccessHandler(config => {
+      globalManagerConfig = config || { rules: [], renameRules: [], syncSelection: [] };
+      renderRuleRows(globalManagerConfig.rules || []);
+      renderRenameRuleRows(globalManagerConfig.renameRules || []);
+      let syncInput = document.getElementById('mgr-sync-selection');
+      if (syncInput) syncInput.value = JSON.stringify(globalManagerConfig.syncSelection || []);
+
+      if (addBtn) {
+          addBtn.disabled = false;
+          addBtn.style.opacity = 1;
+          addBtn.style.cursor = 'pointer';
+          if (addRenameBtn) { addRenameBtn.disabled = false; addRenameBtn.style.opacity = 1; addRenameBtn.style.cursor = 'pointer'; }
+      }
+  }).getManagerConfig(ACTIVE_USER_NAME);
 }
 
 function renderRuleRows(rulesArray) {

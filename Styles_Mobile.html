@@ -943,34 +943,33 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 
 #mobile-pa-detail-sheet.open { display: block; }
 
-/* --- Mobile Personal Hub --- */
+/* --- Mobile Personal Hub (full view) --- */
 @media (max-width: 900px) {
-    .personal-hub-overlay {
-        left: 0 !important;
-        right: 0 !important;
-        top: 0 !important;
-        bottom: 0 !important;
-        padding: 0 !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: rgba(0, 0, 0, 0.82);
-        backdrop-filter: blur(4px);
+    #manager-settings-overlay.personal-hub-desktop-view {
+        display: none !important;
     }
-    .personal-hub-panel {
-        width: calc(100% - 32px);
-        max-width: 360px;
-        margin: 0 16px;
-    }
-    .personal-hub-close-mobile {
-        display: block !important;
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        z-index: 2;
-    }
-    .personal-hub-top-row {
-        padding-right: 28px;
-    }
+}
+
+.personal-hub-top-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.mobile-account-card {
+    background: #1a1a1e;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 18px;
+}
+
+.mobile-account-top-row {
+    width: 100%;
+}
+
+.mobile-account-top-row .personal-hub-name {
+    font-size: 16px;
 }
 
 .mobile-task-card {

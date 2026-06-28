@@ -169,29 +169,29 @@
         <button id="btn-save-warehouse" class="btn-main" style="margin:0; display:none;" onclick="saveZone()">SAVE ZONE</button>
       </div>
     </div>
+
   </div>
 </div>
 
-<div id="manager-settings-overlay" class="personal-hub-overlay" style="display:none;">
-  <div id="personal-hub-panel" class="personal-hub-panel">
-    <button type="button" class="btn-close personal-hub-close-mobile" style="width:auto; margin:0;" onclick="closePersonalHub()" title="Close">✖</button>
-    <div class="personal-hub-top-row">
+<div id="manager-settings-overlay" class="personal-hub-desktop-view" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
+  <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
+    <div class="personal-hub-account-bar">
+      <div class="view-header-title" style="margin-right: 16px;">👤 PERSONAL HUB</div>
       <select id="user-theme-select" class="personal-hub-theme-select" onchange="changeUserTheme(this.value)" title="UI Theme">
         <option value="dark">🌙 Dark</option>
         <option value="light">☀️ Light</option>
       </select>
       <span id="personal-hub-name" class="personal-hub-name">—</span>
       <button id="btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
+      <button type="button" class="btn-outline personal-hub-pin-btn" onclick="openPersonalPinModal()">CHANGE PIN</button>
     </div>
-    <button type="button" class="btn-outline personal-hub-pin-btn" onclick="openPersonalPinModal()">CHANGE PIN</button>
-  </div>
 
-  <!-- Manager automation parked — re-enable when manager tools return to Personal Hub -->
-  <div id="personal-hub-manager-tools" class="hub-manager-parked" style="display:none;">
+    <div id="personal-hub-manager-tools" class="hub-manager-only" style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
+       <h3 style="width: 100%; color:#a855f7; margin: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;">Manager Tools</h3>
+
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
            <h3 style="color:#a855f7; margin-top:0; font-size: 20px;">Drive Folder Automation</h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 20px;">Define where your project folders are created and which template folder is copied.</p>
-
            <div style="margin-bottom: 25px; width: 100%;">
              <div class="input-label">Selective Native Sync (Physical Sharing)</div>
              <p style="color:#a1a1aa; font-size: 13px; margin-top: 0; margin-bottom: 10px;">Select which sub-folders or files from the template should be automatically shared with your Google Drive Desktop.</p>
@@ -199,34 +199,31 @@
              <button class="btn-outline" style="width: 100%; border-color:#a855f7; color:#a855f7;" onclick="openSyncPickerModal()">CONFIGURE SYNC LIST</button>
            </div>
        </div>
-       
-       <!-- COLUMN 2: TEMPLATE FILE RENAMING -->
+
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; border-left: 1px solid #333; padding-left: 30px;">
            <h3 onclick="toggleMgrAccordion('rename-accordion')" style="color:#10b981; margin-top:0; font-size: 20px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
                <span>Template File Renaming</span> <span id="rename-accordion-icon" style="font-size:12px; color:#555;">▼</span>
            </h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 15px;">Auto-rename specific files when the template is duplicated.</p>
-           
            <div id="rename-accordion" style="display:none; flex-direction:column; width:100%;">
                <button id="add-rename-rule-btn" class="btn-outline" style="width: 100%; margin-bottom: 15px; border-color:#10b981; color:#10b981;" onclick="addRenameRuleRow()">+ ADD RENAME RULE</button>
                <div id="rename-rule-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
            </div>
        </div>
 
-       <!-- COLUMN 3: RULE EDITOR -->
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; border-left: 1px solid #333; padding-left: 30px;">
            <h3 onclick="toggleMgrAccordion('rule-accordion')" style="color:#f97316; margin-top:0; font-size: 20px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
                <span>Rule Editor (Automation Tasks)</span> <span id="rule-accordion-icon" style="font-size:12px; color:#555;">▼</span>
            </h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 15px;">Define keywords to search inside an Event Folder, and where to automatically publish them.</p>
-           
            <div id="rule-accordion" style="display:none; flex-direction:column; width:100%;">
                <button id="add-rule-btn" class="btn-outline" style="width: 100%; margin-bottom: 15px; border-color:#f97316; color:#f97316;" onclick="addRuleRow()">+ ADD TASK RULE</button>
                <div id="rule-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
            </div>
        </div>
+    </div>
 
-    <div class="hub-manager-parked" style="display:none;">
+    <div class="hub-manager-only" style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
         <button id="btn-save-mgr" class="btn-main" style="width:auto; margin:0;" onclick="submitManagerConfig()">SAVE CONFIGURATION</button>
     </div>
   </div>

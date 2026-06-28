@@ -302,8 +302,10 @@ function applyTheme(theme) {
         document.body.classList.remove('theme-light');
     }
     
-    let select = document.getElementById('user-theme-select');
-    if (select) select.value = theme;
+    ['user-theme-select', 'mobile-user-theme-select'].forEach(function(id) {
+        let select = document.getElementById(id);
+        if (select) select.value = theme;
+    });
 }
 
 // ==========================================
@@ -328,8 +330,11 @@ function getScriptLoginUrl() {
 }
 
 function refreshPersonalHubUI() {
+    let displayName = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : '—';
     let nameEl = document.getElementById('personal-hub-name');
-    if (nameEl) nameEl.textContent = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : '—';
+    if (nameEl) nameEl.textContent = displayName;
+    let mobileNameEl = document.getElementById('mobile-personal-hub-name');
+    if (mobileNameEl) mobileNameEl.textContent = displayName;
 
     let savedTheme = 'dark';
     try { savedTheme = localStorage.getItem('sm_user_theme') || 'dark'; } catch (e) { /* ignore */ }
@@ -342,8 +347,10 @@ function refreshPersonalHubUI() {
     let msgEl = document.getElementById('personal-pin-msg');
     if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; }
 
-    let logoutBtn = document.getElementById('btn-personal-logout');
-    if (logoutBtn) { logoutBtn.disabled = false; logoutBtn.innerText = 'LOG OUT'; }
+    ['btn-personal-logout', 'mobile-btn-personal-logout'].forEach(function(id) {
+        let logoutBtn = document.getElementById(id);
+        if (logoutBtn) { logoutBtn.disabled = false; logoutBtn.innerText = 'LOG OUT'; }
+    });
 
     let pinBtn = document.getElementById('btn-personal-pin-save');
     if (pinBtn) { pinBtn.disabled = false; pinBtn.innerText = 'UPDATE PIN'; }
@@ -351,10 +358,7 @@ function refreshPersonalHubUI() {
 
 function closePersonalHub() {
     let overlay = document.getElementById('manager-settings-overlay');
-    if (overlay) {
-        overlay.style.display = 'none';
-        overlay.classList.remove('personal-hub-open');
-    }
+    if (overlay) overlay.style.display = 'none';
     if (typeof closePersonalPinModal === 'function') closePersonalPinModal();
 }
 
@@ -378,7 +382,7 @@ function closePersonalPinModal() {
 function performUserLogout() {
     if (!confirm('Log out of Showrunner on this device? You can stay signed in for 30 days after your next login.')) return;
 
-    let btn = document.getElementById('btn-personal-logout');
+    let btn = document.getElementById('btn-personal-logout') || document.getElementById('mobile-btn-personal-logout');
     if (btn) { btn.disabled = true; btn.innerText = 'LOGGING OUT…'; }
 
     let token = getActiveSessionToken();

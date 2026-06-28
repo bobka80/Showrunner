@@ -32,15 +32,16 @@ function setMobileHeaderSub(titleText) {
 
 function goMobileHome() {
     if (typeof closeMobileCrewHub === 'function') closeMobileCrewHub();
-    if (typeof closePersonalHub === 'function') closePersonalHub();
     document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
     document.getElementById('mobile-view-home').style.display = 'flex';
     setMobileHeaderHome();
 }
 
 function openMobilePersonalHub() {
+    document.querySelectorAll('.mobile-view').forEach(el => el.style.display = 'none');
+    document.getElementById('mobile-view-account').style.display = 'flex';
+    setMobileHeaderSub('ACCOUNT');
     if (typeof refreshPersonalHubUI === 'function') refreshPersonalHubUI();
-    if (typeof openManagerSettings === 'function') openManagerSettings();
 }
 
 function openMobileEvents() {

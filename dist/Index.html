@@ -1113,37 +1113,18 @@
     /* Project editor — crew briefing (read-only) mode */
     .editor-briefing-mode .pe-mgr-only { display: none !important; }
     body:not(.perm-manager-tier):not(.perm-root) .pe-manager-only { display: none !important; }
-    .hub-manager-parked { display: none !important; }
+    body:not(.perm-manager-tier):not(.perm-root) .hub-manager-only { display: none !important; }
 
-    /* Personal Hub — compact panel (desktop) / centered card (mobile) */
-    .personal-hub-overlay {
-        position: fixed;
-        bottom: 0;
-        left: 60px;
-        z-index: 2500;
-        display: none;
-        align-items: flex-end;
-        padding: 0 0 12px 12px;
-        pointer-events: none;
-    }
-    .personal-hub-overlay.personal-hub-open {
-        display: flex !important;
-        pointer-events: auto;
-    }
-    .personal-hub-panel {
-        position: relative;
+    /* Personal Hub — desktop full view */
+    .personal-hub-account-bar {
+        height: 70px;
         background: var(--bg-sidebar);
-        border: 1px solid #333;
-        border-radius: 10px;
-        padding: 14px 16px;
-        min-width: 300px;
-        max-width: 520px;
-        box-shadow: 0 -8px 28px rgba(0,0,0,0.65);
-    }
-    .personal-hub-top-row {
+        border-bottom: 1px solid #333;
         display: flex;
         align-items: center;
-        gap: 12px;
+        padding: 0 25px;
+        gap: 14px;
+        flex-shrink: 0;
         flex-wrap: wrap;
     }
     .personal-hub-theme-select {
@@ -1162,7 +1143,7 @@
         flex: 1;
         font-weight: 800;
         color: #fff;
-        font-size: 14px;
+        font-size: 15px;
         min-width: 80px;
         white-space: nowrap;
         overflow: hidden;
@@ -1177,15 +1158,14 @@
         flex-shrink: 0;
     }
     .personal-hub-pin-btn {
-        margin: 12px 0 0 0 !important;
-        width: auto;
-        max-width: 160px;
+        margin: 0 !important;
+        width: auto !important;
         padding: 8px 14px !important;
         font-size: 11px !important;
+        flex-shrink: 0;
     }
-    .personal-hub-close-mobile {
-        display: none !important;
-    }
+    body:not(.perm-manager-tier):not(.perm-root) #personal-hub-manager-tools,
+    body:not(.perm-manager-tier):not(.perm-root) #manager-settings-overlay .hub-manager-only { display: none !important; }
     #btn-display-event-type.pe-type-readonly { cursor: default !important; }
     .editor-crossrent-only #type-dropdown { display: none !important; }
     .editor-crossrent-only #btn-display-event-type { display: none !important; }
@@ -2394,34 +2374,33 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
 
 #mobile-pa-detail-sheet.open { display: block; }
 
-/* --- Mobile Personal Hub --- */
+/* --- Mobile Personal Hub (full view) --- */
 @media (max-width: 900px) {
-    .personal-hub-overlay {
-        left: 0 !important;
-        right: 0 !important;
-        top: 0 !important;
-        bottom: 0 !important;
-        padding: 0 !important;
-        align-items: center !important;
-        justify-content: center !important;
-        background: rgba(0, 0, 0, 0.82);
-        backdrop-filter: blur(4px);
+    #manager-settings-overlay.personal-hub-desktop-view {
+        display: none !important;
     }
-    .personal-hub-panel {
-        width: calc(100% - 32px);
-        max-width: 360px;
-        margin: 0 16px;
-    }
-    .personal-hub-close-mobile {
-        display: block !important;
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        z-index: 2;
-    }
-    .personal-hub-top-row {
-        padding-right: 28px;
-    }
+}
+
+.personal-hub-top-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.mobile-account-card {
+    background: #1a1a1e;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 18px;
+}
+
+.mobile-account-top-row {
+    width: 100%;
+}
+
+.mobile-account-top-row .personal-hub-name {
+    font-size: 16px;
 }
 
 .mobile-task-card {
@@ -2518,6 +2497,20 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     <div id="mobile-view-notifs" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow:hidden;">
        <div id="mobile-notifs-container" style="flex:1; overflow-y:auto; padding:15px; display:flex; flex-direction:column; gap:10px;"></div>
        <div style="padding:15px; background:var(--bg-sidebar); border-top:1px solid #333;"><button class="btn-delete" style="width:100%; font-size:14px!important;" onclick="clearAllNotifs(); goMobileHome();">CLEAR ALL</button></div>
+    </div>
+
+    <div id="mobile-view-account" class="mobile-view" style="display:none; flex-direction:column; flex:1; overflow-y:auto; padding:20px; gap:16px;">
+       <div class="mobile-account-card">
+         <div class="personal-hub-top-row mobile-account-top-row">
+           <select id="mobile-user-theme-select" class="personal-hub-theme-select" onchange="changeUserTheme(this.value)" title="UI Theme">
+             <option value="dark">🌙 Dark</option>
+             <option value="light">☀️ Light</option>
+           </select>
+           <span id="mobile-personal-hub-name" class="personal-hub-name">—</span>
+           <button id="mobile-btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
+         </div>
+         <button type="button" class="btn-outline personal-hub-pin-btn" style="margin-top:14px;" onclick="openPersonalPinModal()">CHANGE PIN</button>
+       </div>
     </div>
 </div>
 
@@ -2904,29 +2897,29 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
         <button id="btn-save-warehouse" class="btn-main" style="margin:0; display:none;" onclick="saveZone()">SAVE ZONE</button>
       </div>
     </div>
+
   </div>
 </div>
 
-<div id="manager-settings-overlay" class="personal-hub-overlay" style="display:none;">
-  <div id="personal-hub-panel" class="personal-hub-panel">
-    <button type="button" class="btn-close personal-hub-close-mobile" style="width:auto; margin:0;" onclick="closePersonalHub()" title="Close">✖</button>
-    <div class="personal-hub-top-row">
+<div id="manager-settings-overlay" class="personal-hub-desktop-view" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
+  <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
+    <div class="personal-hub-account-bar">
+      <div class="view-header-title" style="margin-right: 16px;">👤 PERSONAL HUB</div>
       <select id="user-theme-select" class="personal-hub-theme-select" onchange="changeUserTheme(this.value)" title="UI Theme">
         <option value="dark">🌙 Dark</option>
         <option value="light">☀️ Light</option>
       </select>
       <span id="personal-hub-name" class="personal-hub-name">—</span>
       <button id="btn-personal-logout" type="button" class="btn-outline personal-hub-logout-btn" onclick="performUserLogout()">LOG OUT</button>
+      <button type="button" class="btn-outline personal-hub-pin-btn" onclick="openPersonalPinModal()">CHANGE PIN</button>
     </div>
-    <button type="button" class="btn-outline personal-hub-pin-btn" onclick="openPersonalPinModal()">CHANGE PIN</button>
-  </div>
 
-  <!-- Manager automation parked — re-enable when manager tools return to Personal Hub -->
-  <div id="personal-hub-manager-tools" class="hub-manager-parked" style="display:none;">
+    <div id="personal-hub-manager-tools" class="hub-manager-only" style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
+       <h3 style="width: 100%; color:#a855f7; margin: 0; font-size: 14px; letter-spacing: 1px; text-transform: uppercase;">Manager Tools</h3>
+
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
            <h3 style="color:#a855f7; margin-top:0; font-size: 20px;">Drive Folder Automation</h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 20px;">Define where your project folders are created and which template folder is copied.</p>
-
            <div style="margin-bottom: 25px; width: 100%;">
              <div class="input-label">Selective Native Sync (Physical Sharing)</div>
              <p style="color:#a1a1aa; font-size: 13px; margin-top: 0; margin-bottom: 10px;">Select which sub-folders or files from the template should be automatically shared with your Google Drive Desktop.</p>
@@ -2934,38 +2927,36 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
              <button class="btn-outline" style="width: 100%; border-color:#a855f7; color:#a855f7;" onclick="openSyncPickerModal()">CONFIGURE SYNC LIST</button>
            </div>
        </div>
-       
-       <!-- COLUMN 2: TEMPLATE FILE RENAMING -->
+
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; border-left: 1px solid #333; padding-left: 30px;">
            <h3 onclick="toggleMgrAccordion('rename-accordion')" style="color:#10b981; margin-top:0; font-size: 20px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
                <span>Template File Renaming</span> <span id="rename-accordion-icon" style="font-size:12px; color:#555;">▼</span>
            </h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 15px;">Auto-rename specific files when the template is duplicated.</p>
-           
            <div id="rename-accordion" style="display:none; flex-direction:column; width:100%;">
                <button id="add-rename-rule-btn" class="btn-outline" style="width: 100%; margin-bottom: 15px; border-color:#10b981; color:#10b981;" onclick="addRenameRuleRow()">+ ADD RENAME RULE</button>
                <div id="rename-rule-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
            </div>
        </div>
 
-       <!-- COLUMN 3: RULE EDITOR -->
        <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; border-left: 1px solid #333; padding-left: 30px;">
            <h3 onclick="toggleMgrAccordion('rule-accordion')" style="color:#f97316; margin-top:0; font-size: 20px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
                <span>Rule Editor (Automation Tasks)</span> <span id="rule-accordion-icon" style="font-size:12px; color:#555;">▼</span>
            </h3>
            <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 15px;">Define keywords to search inside an Event Folder, and where to automatically publish them.</p>
-           
            <div id="rule-accordion" style="display:none; flex-direction:column; width:100%;">
                <button id="add-rule-btn" class="btn-outline" style="width: 100%; margin-bottom: 15px; border-color:#f97316; color:#f97316;" onclick="addRuleRow()">+ ADD TASK RULE</button>
                <div id="rule-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
            </div>
        </div>
+    </div>
 
-    <div class="hub-manager-parked" style="display:none;">
+    <div class="hub-manager-only" style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
         <button id="btn-save-mgr" class="btn-main" style="width:auto; margin:0;" onclick="submitManagerConfig()">SAVE CONFIGURATION</button>
     </div>
   </div>
 </div>
+
 <!-- @INDEX: FORMS -> Crew & IAM Provisioning -->
 <div id="add-member-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
   <div class="modal" style="max-width: 600px; width: 95%;">
