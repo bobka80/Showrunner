@@ -140,8 +140,92 @@ function copyRecursiveExact(src, dest) {
   }
 }
 
+function parseTimelineEventDate_(rawDate) {
+  if (!rawDate) return null;
+  if (rawDate instanceof Date) {
+    return new Date(rawDate.getFullYear(), rawDate.getMonth(), rawDate.getDate());
+  }
+  if (typeof rawDate === 'string' || typeof rawDate === 'number') {
+    let dateStr = String(rawDate).split('T')[0].trim();
+    if (dateStr.includes('-')) {
+      let pts = dateStr.split('-');
+      let d = new Date(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10));
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+}
+
+function collectProjectPhaseDates_(projectId, timelinesOverride) {
+  let showDayDates = [];
+  let mainEventDates = [];
+  if (timelinesOverride && timelinesOverride.length) {
+    timelinesOverride.forEach(t => {
+      let d = parseTimelineEventDate_(t.Event_Date);
+      if (!d) return;
+      let type = String(t.Sub_Event_Type || '').toUpperCase();
+      if (type === 'SHOW_DAY') showDayDates.push(d);
+      else if (type === 'MAIN_EVENT') mainEventDates.push(d);
+    });
+    return { showDayDates: showDayDates, mainEventDates: mainEventDates };
+  }
+  const timelines = executeWithRetry(() => getSheetData(verifyDatabaseSchema(true).timelines));
+  let tMap = timelines.hMap;
+  let tPidCol = tMap['project_uid'] !== undefined ? tMap['project_uid'] : tMap['Project_ID'];
+  for (let i = 1; i < timelines.length; i++) {
+    let rowPid = (tPidCol !== undefined) ? timelines[i][tPidCol] : timelines[i][1];
+    if (rowPid !== projectId) continue;
+    let d = parseTimelineEventDate_(timelines[i][tMap['Event_Date']]);
+    if (!d) continue;
+    let type = String(timelines[i][tMap['Sub_Event_Type']] || '').toUpperCase();
+    if (type === 'SHOW_DAY') showDayDates.push(d);
+    else if (type === 'MAIN_EVENT') mainEventDates.push(d);
+  }
+  return { showDayDates: showDayDates, mainEventDates: mainEventDates };
+}
+
+function buildProjectFolderDateLabel_(showDayDates, mainEventDates) {
+  let targetDates = showDayDates.concat(mainEventDates);
+  if (targetDates.length === 0) targetDates = [new Date()];
+  let minEpoch = Math.min(...targetDates.map(d => d.getTime()));
+  let maxEpoch = Math.max(...targetDates.map(d => d.getTime()));
+  let minDate = new Date(minEpoch);
+  let maxDate = new Date(maxEpoch);
+  let yStart = minDate.getFullYear();
+  let mStart = minDate.getMonth() + 1;
+  let dStart = minDate.getDate();
+  let yEnd = maxDate.getFullYear();
+  let mEnd = maxDate.getMonth() + 1;
+  let dEnd = maxDate.getDate();
+  let dateRangeStr = "";
+  if (yStart === yEnd && mStart === mEnd && dStart === dEnd) {
+    dateRangeStr = `${dStart}.${mStart}.${yStart}`;
+  } else if (yStart === yEnd && mStart === mEnd) {
+    dateRangeStr = `${dStart}-${dEnd}.${mStart}.${yStart}`;
+  } else if (yStart === yEnd) {
+    dateRangeStr = `${dStart}.${mStart}-${dEnd}.${mEnd}.${yStart}`;
+  } else {
+    dateRangeStr = `${dStart}.${mStart}.${yStart}-${dEnd}.${mEnd}.${yEnd}`;
+  }
+  return {
+    dateRangeStr: dateRangeStr,
+    yStart: yStart,
+    monthFolderName: String(mStart).padStart(2, '0')
+  };
+}
+
+function moveDriveFolderIfNeeded_(folder, targetParent) {
+  let parents = folder.getParents();
+  if (parents.hasNext()) {
+    let parent = parents.next();
+    if (parent.getId() !== targetParent.getId()) {
+      driveRetry(() => folder.moveTo(targetParent));
+    }
+  }
+}
+
 // @INDEX: DRIVE_API -> Generate Project Folders
-function generateProjectFolders(crewName, projectId, projectName) {
+function generateProjectFolders(crewName, projectId, projectName, timelinesOverride) {
     const OPS_ROOT_ID = '1MDjRCK5RyILVly1Rv7J9yxjr2BLDrFYl';
     const FIN_ROOT_ID = '1oGZS3yvrZXebYBlwE0eNq0JMPKbR48y6';
     const OPS_TEMPLATE_ID = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
@@ -162,84 +246,66 @@ function generateProjectFolders(crewName, projectId, projectName) {
     // Evaluate the Financial Access
     let hasFinAccess = (profile.fin_view_internal === true || profile.fin_view_internal === 'true');
     
-    // 1. Fetch fragments to determine exact dates
-    const timelines = executeWithRetry(() => getSheetData(verifyDatabaseSchema(true).timelines));
-    let tMap = timelines.hMap;
-    
-    let showDayDates = [];
-    let mainEventDates = [];
-    
-    for (let i = 1; i < timelines.length; i++) {
-       if (timelines[i][tMap['project_uid']] === projectId && timelines[i][tMap['Event_Date']]) {
-           let rawDate = timelines[i][tMap['Event_Date']];
-           let d = null;
-           
-           // Robust Parser: Handle both Google Sheets Date Objects and text strings
-           if (rawDate instanceof Date) {
-               d = new Date(rawDate.getFullYear(), rawDate.getMonth(), rawDate.getDate());
-           } else if (typeof rawDate === 'string' || typeof rawDate === 'number') {
-               let dateStr = String(rawDate).split('T')[0].trim();
-               if (dateStr.includes('-')) {
-                   let pts = dateStr.split('-');
-                   d = new Date(parseInt(pts[0], 10), parseInt(pts[1], 10) - 1, parseInt(pts[2], 10));
-               }
-           }
-           
-           if (d && !isNaN(d.getTime())) {
-               if (timelines[i][tMap['Sub_Event_Type']] === 'SHOW_DAY') showDayDates.push(d);
-               if (timelines[i][tMap['Sub_Event_Type']] === 'MAIN_EVENT') mainEventDates.push(d);
-           }
-       }
-    }
-    
-    // Strictly use Show Day dates. Fallback to Main Event. Fallback to today if missing.
-    let targetDates = showDayDates;
-    if (targetDates.length === 0) targetDates = mainEventDates;
-    if (targetDates.length === 0) targetDates = [new Date()];
-    
-    let minEpoch = Math.min(...targetDates.map(d => d.getTime()));
-    let maxEpoch = Math.max(...targetDates.map(d => d.getTime()));
-    let minDate = new Date(minEpoch);
-    let maxDate = new Date(maxEpoch);
-    
-    let yStart = minDate.getFullYear();
-    let mStart = minDate.getMonth() + 1; // 1-12
-    let dStart = minDate.getDate();
-    
-    let yEnd = maxDate.getFullYear();
-    let mEnd = maxDate.getMonth() + 1;
-    let dEnd = maxDate.getDate();
-    
-    // Smart string formatting requested: "Test 9-11.3.2026"
-    let dateRangeStr = "";
-    if (yStart === yEnd && mStart === mEnd && dStart === dEnd) {
-        dateRangeStr = `${dStart}.${mStart}.${yStart}`;
-    } else if (yStart === yEnd && mStart === mEnd) {
-        dateRangeStr = `${dStart}-${dEnd}.${mStart}.${yStart}`;
-    } else if (yStart === yEnd) {
-        dateRangeStr = `${dStart}.${mStart}-${dEnd}.${mEnd}.${yStart}`;
-    } else {
-        dateRangeStr = `${dStart}.${mStart}.${yStart}-${dEnd}.${mEnd}.${yEnd}`;
-    }
-    
-    let formattedProjName = `${projectName} ${dateRangeStr}`;
-    
+    // 1. Build folder date label from painted MAIN_EVENT + SHOW_DAY phases (union of all days).
+    let phaseDates = collectProjectPhaseDates_(projectId, timelinesOverride);
+    let dateLabel = buildProjectFolderDateLabel_(phaseDates.showDayDates, phaseDates.mainEventDates);
+    let formattedProjName = `${projectName} ${dateLabel.dateRangeStr}`;
+    let yStart = dateLabel.yStart;
+    let monthFolderName = dateLabel.monthFolderName;
+
     // 2. Build the exact Year -> Month Hierarchy dynamically
     let opsYearFolder = getOrCreateFolder(opsBaseFolder, yStart.toString());
     let finYearFolder = getOrCreateFolder(finBaseFolder, yStart.toString());
-    let monthFolderName = String(mStart).padStart(2, '0');
     let opsMonthFolder = getOrCreateFolder(opsYearFolder, monthFolderName);
     let finMonthFolder = getOrCreateFolder(finYearFolder, monthFolderName);
-    
-    let existingOpsProj = driveRetry(() => opsMonthFolder.searchFolders("title = '" + formattedProjName.replace(/'/g, "\\'") + "'"));
-    let opsProjectFolder;
+
+    let existingFolderId = '';
+    const indexData = executeWithRetry(() => getSheetData(verifyDatabaseSchema(true).index));
+    let iMap = indexData.hMap;
+    for (let i = 1; i < indexData.length; i++) {
+      if (indexData[i][iMap['uid']] === projectId) {
+        existingFolderId = String(indexData[i][iMap['Folder_ID']] || '').trim();
+        break;
+      }
+    }
+
+    let opsProjectFolder = null;
     let finProjectFolder = null;
-    
-    if (existingOpsProj.hasNext()) {
+    let priorFolderName = '';
+
+    if (existingFolderId) {
+      try {
+        opsProjectFolder = driveRetry(() => DriveApp.getFolderById(existingFolderId));
+        priorFolderName = opsProjectFolder.getName();
+        if (opsProjectFolder.getName() !== formattedProjName) {
+          driveRetry(() => opsProjectFolder.setName(formattedProjName));
+        }
+        moveDriveFolderIfNeeded_(opsProjectFolder, opsMonthFolder);
+        let finSearchName = priorFolderName || formattedProjName;
+        let existingFinProj = driveRetry(() => finMonthFolder.searchFolders("title = '" + finSearchName.replace(/'/g, "\\'") + "'"));
+        if (!existingFinProj.hasNext() && priorFolderName) {
+          existingFinProj = driveRetry(() => finYearFolder.searchFolders("title = '" + priorFolderName.replace(/'/g, "\\'") + "'"));
+        }
+        if (existingFinProj.hasNext()) {
+          finProjectFolder = existingFinProj.next();
+          if (finProjectFolder.getName() !== formattedProjName) {
+            driveRetry(() => finProjectFolder.setName(formattedProjName));
+          }
+          moveDriveFolderIfNeeded_(finProjectFolder, finMonthFolder);
+        }
+      } catch (e) {}
+    }
+
+    if (!opsProjectFolder) {
+      let existingOpsProj = driveRetry(() => opsMonthFolder.searchFolders("title = '" + formattedProjName.replace(/'/g, "\\'") + "'"));
+      if (existingOpsProj.hasNext()) {
         opsProjectFolder = existingOpsProj.next();
         let existingFinProj = driveRetry(() => finMonthFolder.searchFolders("title = '" + formattedProjName.replace(/'/g, "\\'") + "'"));
         if (existingFinProj.hasNext()) finProjectFolder = existingFinProj.next();
-    } else {
+      }
+    }
+
+    if (!opsProjectFolder) {
         opsProjectFolder = driveRetry(() => opsMonthFolder.createFolder(formattedProjName));
         Utilities.sleep(1000); // Allow Drive to stabilize before copying files
         copyRecursiveExact(opsTemplateFolder, opsProjectFolder); // Deep duplicate template

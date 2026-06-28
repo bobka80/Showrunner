@@ -360,20 +360,20 @@ function runSchedule() {
             
             let finalId = resObj.id || res;
 
-            if (id === 'NEW' && finalId && finalId !== "Success") {
-                document.getElementById('edit-folder-id').value = finalId;
-                
+            if (finalId && finalId !== "Success") {
+                if (id === 'NEW') document.getElementById('edit-folder-id').value = finalId;
+
                 google.script.run
                     .withFailureHandler(err => {
                         console.error("Folder generation failed:", err);
-                        alert("Project saved, but Drive folder creation failed: " + err.message);
+                        alert("Project saved, but Drive folder sync failed: " + err.message);
                     })
                     .withSuccessHandler(folderUrl => {
                         if (folderUrl && typeof refreshData === 'function') refreshData();
                     })
-                    .generateProjectFolders(ACTIVE_USER_NAME, finalId, newT);
-                
-                if (typeof startPresencePing === 'function') startPresencePing(finalId);
+                    .generateProjectFolders(ACTIVE_USER_NAME, finalId, newT, timelines);
+
+                if (id === 'NEW' && typeof startPresencePing === 'function') startPresencePing(finalId);
             }
             
             if (resObj.timestamp) {
