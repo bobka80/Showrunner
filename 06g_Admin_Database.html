@@ -103,11 +103,23 @@ function buildOpsLogListHtml(ops) {
 }
 
 function renderLiveFileTicket(label, file, accent) {
+  const layoutBadge = file.layoutOk
+    ? '<span style="color:#10b981; font-size:9px; font-weight:bold;">✓ ' + file.expectedPath + '</span>'
+    : '<span style="color:#f59e0b; font-size:9px; font-weight:bold;">⚠ Expected: ' + file.expectedPath + '</span>';
+  const locationLine = file.parentFolderName
+    ? '<div style="color:#71717a; font-size:9px; margin-top:2px;">Now: <strong style="color:#a1a1aa;">' + file.parentFolderName + '/' + file.name + '</strong></div>'
+    : '';
+  const factoryLine = file.isOriginalFactoryFile
+    ? '<div style="color:#52525b; font-size:8px; margin-top:2px;">Factory original file (never restored)</div>'
+    : '<div style="color:#52525b; font-size:8px; margin-top:2px;">Active ID differs from factory original</div>';
   return '<div style="background:#111; border:1px solid #333; border-left:3px solid ' + accent + '; border-radius:6px; padding:8px 10px; margin-bottom:8px;">'
     + '<div style="color:#888; font-size:9px; font-weight:bold; letter-spacing:0.5px;">' + label + '</div>'
     + '<div style="color:#fff; font-weight:bold; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="' + file.name + '">' + file.name + '</div>'
+    + '<div style="margin-top:3px;">' + layoutBadge + '</div>'
+    + locationLine
     + '<div style="color:#71717a; font-size:9px; margin-top:2px;">' + file.modifiedLabel + '</div>'
-    + (file.url ? '<a href="' + file.url + '" target="_blank" style="color:#3b82f6; font-size:9px;">Open in Drive ↗</a>' : '')
+    + factoryLine
+    + (file.url ? '<a href="' + file.url + '" target="_blank" style="color:#3b82f6; font-size:9px; display:inline-block; margin-top:4px;">Open live file ↗</a>' : '')
     + '</div>';
 }
 
@@ -146,6 +158,16 @@ function renderDatabaseBackupArchiveTab(res) {
     + '</div>'
     + '<div style="flex:1; min-height:0; display:flex; flex-direction:column; padding:10px 14px; overflow:hidden;">'
     + buildBackupHealthBannerHtml(res.health)
+    + '<div style="flex-shrink:0; margin-bottom:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; padding:8px 10px;">'
+    + '<div style="color:#94a3b8; font-size:9px; font-weight:bold; letter-spacing:0.5px; margin-bottom:4px;">CANONICAL LIVE FOLDER</div>'
+    + '<div style="color:#fff; font-size:10px; font-weight:bold;">' + (res.canonicalFolder ? res.canonicalFolder.name : '01_DATABASE') + '/ENGINE + VAULT</div>'
+    + (res.canonicalFolder && res.canonicalFolder.url
+      ? '<a href="' + res.canonicalFolder.url + '" target="_blank" style="color:#3b82f6; font-size:9px;">Open folder in Drive ↗</a>'
+      : '')
+    + ((res.engine && !res.engine.layoutOk) || (res.vault && !res.vault.layoutOk)
+      ? '<button class="btn-outline btn-sm" style="margin:8px 0 0 0; width:100%; border-color:#f59e0b; color:#f59e0b; justify-content:center;" onclick="runDbRepairLayout()">REPAIR LAYOUT — move &amp; rename live files (no data copy)</button>'
+      : '<div style="color:#10b981; font-size:9px; margin-top:6px;">✓ Live files are in the canonical folder.</div>')
+    + '</div>'
     + '<div style="flex-shrink:0;">'
     + '<div style="color:#888; font-size:9px; font-weight:bold; margin-bottom:6px; letter-spacing:0.5px;">LIVE FILES</div>'
     + renderLiveFileTicket('ENGINE', res.engine, '#f59e0b')
@@ -307,5 +329,17 @@ function revertDatabaseStep(stepId) {
       loadDatabaseOpsPanel();
     })
     .revertDatabaseOperation(ACTIVE_USER_NAME, stepId);
+}
+
+function runDbRepairLayout() {
+  if (!confirm('Move the current live ENGINE and VAULT into 01_DATABASE and rename them to ENGINE / VAULT?\n\nThis only changes folder location and file names — no spreadsheet data is copied or modified.')) return;
+
+  google.script.run
+    .withFailureHandler(function(err) { alert('Repair failed: ' + err.message); })
+    .withSuccessHandler(function(res) {
+      alert(res.message || res);
+      loadDatabaseOpsPanel();
+    })
+    .repairLiveDatabaseLayout(ACTIVE_USER_NAME);
 }
 </script>

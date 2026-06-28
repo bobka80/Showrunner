@@ -293,7 +293,7 @@ function getDbFileTypeMeta(fileType) {
       type: 'ENGINE',
       prefix: 'ENGINE_',
       backupPrefix: 'ENGINE_BACKUP_',
-      liveName: 'ENGINE_LIVE',
+      liveName: LIVE_ENGINE_FILE_NAME,
       propKey: 'ACTIVE_ENGINE_SHEET_ID',
       fallbackId: ENGINE_SHEET_ID,
       getter: getEngineSheetId
@@ -304,13 +304,49 @@ function getDbFileTypeMeta(fileType) {
       type: 'VAULT',
       prefix: 'VAULT_',
       backupPrefix: 'VAULT_BACKUP_',
-      liveName: 'VAULT_LIVE',
+      liveName: LIVE_VAULT_FILE_NAME,
       propKey: 'ACTIVE_VAULT_SHEET_ID',
       fallbackId: VAULT_SHEET_ID,
       getter: getVaultSheetId
     };
   }
   throw new Error('file_type must be ENGINE or VAULT');
+}
+
+function getFileParentFolderId_(file) {
+  const parents = file.getParents();
+  return parents.hasNext() ? parents.next().getId() : '';
+}
+
+function getFileParentFolderName_(file) {
+  const parents = file.getParents();
+  return parents.hasNext() ? parents.next().getName() : '(root)';
+}
+
+function findFileByNameInFolder_(folder, name) {
+  const it = folder.getFilesByName(name);
+  return it.hasNext() ? it.next() : null;
+}
+
+function clearCanonicalLiveSlot_(canonicalFolder, meta, replacedFolder, ts, keepId) {
+  const slot = findFileByNameInFolder_(canonicalFolder, meta.liveName);
+  if (!slot || slot.getId() === keepId) return '';
+  slot.setName(meta.prefix + 'STALE_SLOT_' + ts);
+  slot.moveTo(replacedFolder);
+  return slot.getId();
+}
+
+function moveLiveFileToReplaced_(liveFile, meta, replacedFolder, ts) {
+  const prevName = liveFile.getName();
+  liveFile.setName(meta.prefix + 'REPLACED_' + ts);
+  liveFile.moveTo(replacedFolder);
+  return { prevName: prevName, replacedFileId: liveFile.getId() };
+}
+
+function placeFileAsCanonicalLive_(file, meta, canonicalFolder) {
+  if (file.getName() !== meta.liveName) file.setName(meta.liveName);
+  if (getFileParentFolderId_(file) !== canonicalFolder.getId()) file.moveTo(canonicalFolder);
+  return file.getId();
 }
 
 function verifyDbOperationsLogSchema() {
@@ -442,12 +478,47 @@ function describeLiveFile_(fileId) {
   }
 }
 
+function describeLiveFileDetail_(fileId, fileType) {
+  const meta = getDbFileTypeMeta(fileType);
+  const canonicalFolder = getLiveDatabaseFolder();
+  const base = describeLiveFile_(fileId);
+  let parentFolderName = '';
+  let parentFolderId = '';
+  let inCanonicalFolder = false;
+  let hasCanonicalName = false;
+  try {
+    const f = DriveApp.getFileById(fileId);
+    parentFolderId = getFileParentFolderId_(f);
+    parentFolderName = getFileParentFolderName_(f);
+    inCanonicalFolder = parentFolderId === canonicalFolder.getId();
+    hasCanonicalName = f.getName() === meta.liveName;
+  } catch (e) { /* ignore */ }
+  return Object.assign({}, base, {
+    parentFolderName: parentFolderName,
+    parentFolderId: parentFolderId,
+    inCanonicalFolder: inCanonicalFolder,
+    hasCanonicalName: hasCanonicalName,
+    layoutOk: inCanonicalFolder && hasCanonicalName,
+    canonicalFolderName: LIVE_DATABASE_FOLDER_NAME,
+    canonicalFolderUrl: canonicalFolder.getUrl(),
+    expectedPath: LIVE_DATABASE_FOLDER_NAME + '/' + meta.liveName,
+    originalFactoryId: meta.fallbackId,
+    isOriginalFactoryFile: fileId === meta.fallbackId
+  });
+}
+
 function getLiveDatabaseStatus(actor) {
   return executeWithRetry(() => {
     assertRootDbAccess(actor);
+    const canonicalFolder = getLiveDatabaseFolder();
     return {
-      engine: describeLiveFile_(getEngineSheetId()),
-      vault: describeLiveFile_(getVaultSheetId()),
+      engine: describeLiveFileDetail_(getEngineSheetId(), 'ENGINE'),
+      vault: describeLiveFileDetail_(getVaultSheetId(), 'VAULT'),
+      canonicalFolder: {
+        name: LIVE_DATABASE_FOLDER_NAME,
+        id: canonicalFolder.getId(),
+        url: canonicalFolder.getUrl()
+      },
       backups: {
         engine: listBackupFiles_('ENGINE').slice(0, 50),
         vault: listBackupFiles_('VAULT').slice(0, 50)
@@ -457,6 +528,45 @@ function getLiveDatabaseStatus(actor) {
         .filter((r) => r.status === 'ACTIVE' || r.status === 'REVERTED')
         .sort((a, b) => parseInt(b.step_id, 10) - parseInt(a.step_id, 10))
         .slice(0, 20)
+    };
+  });
+}
+
+function repairOneCanonicalLive_(fileType) {
+  const meta = getDbFileTypeMeta(fileType);
+  const liveId = meta.getter();
+  const canonicalFolder = getLiveDatabaseFolder();
+  const replacedFolder = getReplacedDatabaseFolder();
+  const ts = dbOpsTimestampSlug();
+  const liveFile = DriveApp.getFileById(liveId);
+  const beforeName = liveFile.getName();
+  const beforeParent = getFileParentFolderName_(liveFile);
+  clearCanonicalLiveSlot_(canonicalFolder, meta, replacedFolder, ts, liveId);
+  const afterId = placeFileAsCanonicalLive_(liveFile, meta, canonicalFolder);
+  setActiveSheetId(meta.propKey, afterId);
+  return {
+    fileType: meta.type,
+    liveId: afterId,
+    beforeName: beforeName,
+    beforeParent: beforeParent,
+    afterName: meta.liveName,
+    afterFolder: LIVE_DATABASE_FOLDER_NAME,
+    layoutOk: true
+  };
+}
+
+function repairLiveDatabaseLayout(actor) {
+  return executeWithRetry(() => {
+    assertRootDbAccess(actor);
+    const results = ['ENGINE', 'VAULT'].map((t) => repairOneCanonicalLive_(t));
+    cachedEngineSheets = null;
+    cachedVaultSheets = null;
+    flushCache();
+    writeToAuditLog(actor, 'REPAIR', 'DATABASE', 'GLOBAL', 'Layout',
+      results.map((r) => r.fileType + ': ' + r.beforeName + ' @ ' + r.beforeParent + ' → ' + r.afterFolder + '/' + r.afterName).join(' | '));
+    return {
+      results: results,
+      message: 'Live files moved to ' + LIVE_DATABASE_FOLDER_NAME + '/ENGINE and /VAULT. Hard-refresh the app.'
     };
   });
 }
@@ -506,15 +616,11 @@ function restoreDatabaseFromBackup(actor, fileType, backupFileId) {
 
     const ts = dbOpsTimestampSlug();
     const replacedFolder = getReplacedDatabaseFolder();
-    const prevName = prevLiveFile.getName();
-    const replacedName = `${meta.prefix}REPLACED_${ts}`;
+    const canonicalFolder = getLiveDatabaseFolder();
+    const prev = moveLiveFileToReplaced_(prevLiveFile, meta, replacedFolder, ts);
+    clearCanonicalLiveSlot_(canonicalFolder, meta, replacedFolder, ts, null);
 
-    prevLiveFile.setName(replacedName);
-    prevLiveFile.moveTo(replacedFolder);
-    const replacedFileId = prevLiveFile.getId();
-
-    const liveParent = DriveApp.getFolderById(SYSTEM_ROOT_ID);
-    const newLiveFile = backupFile.makeCopy(`${meta.liveName}_${ts}`, liveParent);
+    const newLiveFile = backupFile.makeCopy(meta.liveName, canonicalFolder);
     const newLiveId = newLiveFile.getId();
 
     setActiveSheetId(meta.propKey, newLiveId);
@@ -530,18 +636,18 @@ function restoreDatabaseFromBackup(actor, fileType, backupFileId) {
       operation: 'RESTORE',
       file_type: meta.type,
       prev_live_id: prevLiveId,
-      prev_live_name: prevName,
-      replaced_file_id: replacedFileId,
+      prev_live_name: prev.prevName,
+      replaced_file_id: prev.replacedFileId,
       new_live_id: newLiveId,
       backup_source_id: backupFileId,
       status: 'ACTIVE',
-      notes: `Restored from ${backupName}`
+      notes: `Restored from ${backupName} → ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}`
     });
 
     writeToAuditLog(actor, 'RESTORE', 'DATABASE', 'GLOBAL', meta.type,
-      `Live ${prevName} (${prevLiveId}) → Replaced folder; backup ${backupName} → ${newLiveId}`);
+      `Live ${prev.prevName} (${prevLiveId}) → Replaced; backup ${backupName} → ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName} (${newLiveId})`);
 
-    return `RESTORE complete for ${meta.type}. New live file: ${newLiveFile.getName()}. Previous live moved to Replaced folder. Hard-refresh the app.`;
+    return `RESTORE complete for ${meta.type}. Live file: ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}. Previous live moved to Replaced folder. Hard-refresh the app.`;
   });
 }
 
@@ -563,7 +669,7 @@ function revertDatabaseOperation(actor, stepId) {
 
     const ts = dbOpsTimestampSlug();
     const replacedFolder = getReplacedDatabaseFolder();
-    const liveParent = DriveApp.getFolderById(SYSTEM_ROOT_ID);
+    const canonicalFolder = getLiveDatabaseFolder();
 
     let mistakenLiveFile = null;
     let mistakenName = '';
@@ -572,17 +678,16 @@ function revertDatabaseOperation(actor, stepId) {
       mistakenName = mistakenLiveFile.getName();
     } catch (e) { /* ignore */ }
 
-    const restoredFile = DriveApp.getFileById(replacedFileId);
-    restoredFile.moveTo(liveParent);
-    restoredFile.setName(`${meta.liveName}_RESTORED_${ts}`);
-    const restoredLiveId = restoredFile.getId();
-
     let mistakenReplacedId = '';
-    if (mistakenLiveFile && mistakenLiveFile.getId() !== restoredLiveId) {
-      mistakenLiveFile.setName(`${meta.prefix}SUPERSEDED_${ts}`);
+    if (mistakenLiveFile && mistakenLiveFile.getId() !== replacedFileId) {
+      mistakenLiveFile.setName(meta.prefix + 'SUPERSEDED_' + ts);
       mistakenLiveFile.moveTo(replacedFolder);
       mistakenReplacedId = mistakenLiveFile.getId();
     }
+
+    clearCanonicalLiveSlot_(canonicalFolder, meta, replacedFolder, ts, replacedFileId);
+    const restoredFile = DriveApp.getFileById(replacedFileId);
+    const restoredLiveId = placeFileAsCanonicalLive_(restoredFile, meta, canonicalFolder);
 
     setActiveSheetId(meta.propKey, restoredLiveId);
     cachedEngineSheets = null;
@@ -602,13 +707,13 @@ function revertDatabaseOperation(actor, stepId) {
       new_live_id: restoredLiveId,
       backup_source_id: row.step_id,
       status: 'ACTIVE',
-      notes: `Reverted restore step #${row.step_id}`
+      notes: `Reverted restore step #${row.step_id} → ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}`
     });
 
     writeToAuditLog(actor, 'REVERT', 'DATABASE', 'GLOBAL', meta.type,
-      `Reverted step ${row.step_id}; live is again ${restoredLiveId}`);
+      `Reverted step ${row.step_id}; live is ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName} (${restoredLiveId})`);
 
-    return `REVERT complete for ${meta.type}. Live data restored from Replaced folder. Hard-refresh the app.`;
+    return `REVERT complete for ${meta.type}. Live file: ${LIVE_DATABASE_FOLDER_NAME}/${meta.liveName}. Hard-refresh the app.`;
   });
 }
 

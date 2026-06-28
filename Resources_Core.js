@@ -11,7 +11,16 @@ const AUDIT_DB_SHEET_ID = '1UdEONWScrTQSoa_spIEjfN3lJdMcxu9zLCXVZZcJbG8';
 
 const SYSTEM_ROOT_ID = '1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre';
 const DB_BACKUP_FOLDER_NAME = '05_DATABASE_BACKUPS';
+const LIVE_DATABASE_FOLDER_NAME = '01_DATABASE';
+const LIVE_ENGINE_FILE_NAME = 'ENGINE';
+const LIVE_VAULT_FILE_NAME = 'VAULT';
 const REPLACED_DB_FOLDER_ID = '1aZSru-d8OryHpNCooPm78oWdFjSauTPN';
+
+function getLiveDatabaseFolder() {
+  const rootDrive = DriveApp.getFolderById(SYSTEM_ROOT_ID);
+  const folders = rootDrive.getFoldersByName(LIVE_DATABASE_FOLDER_NAME);
+  return folders.hasNext() ? folders.next() : rootDrive.createFolder(LIVE_DATABASE_FOLDER_NAME);
+}
 
 function getActiveSheetId(propKey, fallbackId) {
   try {
