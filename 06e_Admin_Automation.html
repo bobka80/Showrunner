@@ -177,52 +177,105 @@ function renderRuleRows(rulesArray) {
  if (!rulesArray) rulesArray = [];
  rulesArray.forEach(r => { html += createRuleRow(r); });
  document.getElementById('rule-list').innerHTML = html;
+ document.querySelectorAll('.rule-row').forEach(syncRuleRowUI);
+}
+
+function normalizeRuleTaskType(rule) {
+ let t = (rule && rule.taskType) ? String(rule.taskType).toLowerCase() : '';
+ if (t === 'basic' || t === 'automated') return t;
+ return 'automated';
+}
+
+function syncRuleRowUI(row) {
+ if (!row) return;
+ let typeEl = row.querySelector('.rule-task-type');
+ let type = typeEl ? typeEl.value : 'automated';
+ let autoBlock = row.querySelector('.rule-automated-fields');
+ if (autoBlock) autoBlock.style.display = (type === 'basic') ? 'none' : 'flex';
+
+ let typeLabel = row.querySelector('.rule-row-type-label');
+ if (typeLabel) typeLabel.innerText = (type === 'basic') ? 'MANUAL TASK' : 'AUTOMATED TASK';
+
+ let remCb = row.querySelector('.rule-reminder-enabled');
+ let remDays = row.querySelector('.rule-reminder-days');
+ if (remCb && remDays) {
+     remDays.disabled = !remCb.checked;
+     remDays.style.opacity = remCb.checked ? '1' : '0.45';
+ }
 }
 
 function createRuleRow(r) {
+ let taskType = normalizeRuleTaskType(r);
+ let reminderEnabled = !!(r && (r.reminderEnabled === true || r.reminderEnabled === 'true'));
+ let reminderDays = (r && r.reminderDaysBefore) ? parseInt(r.reminderDaysBefore, 10) : 5;
+ if (!reminderDays || reminderDays < 1) reminderDays = 5;
  return `
  <div class="rule-row" style="display:flex; flex-direction:column; gap:10px; background:#222; padding:12px; border-radius:6px; border: 1px solid #333;">
     <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div style="font-size:11px; font-weight:800; color:#f97316; text-transform:uppercase;">AUTOMATION TASK</div>
+        <div class="rule-row-type-label" style="font-size:11px; font-weight:800; color:#f97316; text-transform:uppercase;">${taskType === 'basic' ? 'MANUAL TASK' : 'AUTOMATED TASK'}</div>
         <button class="btn-delete" style="width:auto; margin:0; padding:4px 8px; height:auto; font-size:10px;" onclick="this.closest('.rule-row').remove()" title="Delete Rule">X</button>
     </div>
 
-    <div style="display:flex; gap:10px; align-items:center;">
-        <div style="flex:1;">
+    <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div style="flex:2; min-width:140px;">
             <div class="input-label" style="margin-bottom:2px;">Task Name</div>
             <input type="text" class="rule-task input-compact" placeholder="e.g. Rider" value="${String(r.taskName || r.word || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
         </div>
-        <div style="flex:1;">
-            <div class="input-label" style="margin-bottom:2px;">Source (Template)</div>
-            <div style="display:flex; gap:5px;">
-               <input type="text" class="rule-src-name input-compact" disabled placeholder="Event Root" value="${String(r.srcFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; box-sizing:border-box;">
-               <button class="btn-outline btn-sm" style="width:auto; margin:0;" onclick="openSharedDrivePicker('rule-src', this)" title="Browse">📁</button>
-            </div>
-        </div>
-        <div style="flex:1.5;">
-            <div class="input-label" style="margin-bottom:2px;">Search Contains</div>
-            <input type="text" class="rule-search input-compact" placeholder="Tech Rider" value="${String(r.searchString || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
+        <div style="flex:1; min-width:130px;">
+            <div class="input-label" style="margin-bottom:2px;">Task Type</div>
+            <select class="rule-task-type input-compact" onchange="syncRuleRowUI(this.closest('.rule-row'))" style="width:100%; box-sizing:border-box; height:32px;">
+                <option value="basic" ${taskType === 'basic' ? 'selected' : ''}>Manual checkbox</option>
+                <option value="automated" ${taskType === 'automated' ? 'selected' : ''}>Automated files</option>
+            </select>
         </div>
     </div>
 
-    <div style="display:flex; gap:10px; align-items:center;">
-        <div style="flex:1;">
-            <div class="input-label" style="margin-bottom:2px;">Append Suffix</div>
-            <input type="text" class="rule-suffix input-compact" placeholder="_FINAL" value="${String(r.suffix || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
-        </div>
-        <div style="flex:2;">
-            <div class="input-label" style="margin-bottom:2px;">Destination (Template)</div>
-            <div style="display:flex; gap:5px;">
-               <input type="text" class="rule-dest-name input-compact" disabled placeholder="Event Root" value="${String(r.destFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; box-sizing:border-box;">
-               <button class="btn-outline btn-sm" style="width:auto; margin:0;" onclick="openSharedDrivePicker('rule-dest', this)" title="Browse">📁</button>
+    <div class="rule-automated-fields" style="display:${taskType === 'basic' ? 'none' : 'flex'}; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div style="flex:1; min-width:120px;">
+                <div class="input-label" style="margin-bottom:2px;">Source (Template)</div>
+                <div style="display:flex; gap:5px;">
+                   <input type="text" class="rule-src-name input-compact" disabled placeholder="Event Root" value="${String(r.srcFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; box-sizing:border-box;">
+                   <button class="btn-outline btn-sm" style="width:auto; margin:0;" onclick="openSharedDrivePicker('rule-src', this)" title="Browse">📁</button>
+                </div>
             </div>
+            <div style="flex:1.5; min-width:140px;">
+                <div class="input-label" style="margin-bottom:2px;">Search Contains</div>
+                <input type="text" class="rule-search input-compact" placeholder="Tech Rider" value="${String(r.searchString || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
+            </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <div style="flex:1; min-width:100px;">
+                <div class="input-label" style="margin-bottom:2px;">Append Suffix</div>
+                <input type="text" class="rule-suffix input-compact" placeholder="_FINAL" value="${String(r.suffix || '').replace(/"/g, '&quot;')}" style="width:100%; box-sizing:border-box;">
+            </div>
+            <div style="flex:2; min-width:140px;">
+                <div class="input-label" style="margin-bottom:2px;">Destination (Template)</div>
+                <div style="display:flex; gap:5px;">
+                   <input type="text" class="rule-dest-name input-compact" disabled placeholder="Event Root" value="${String(r.destFolderName || '').replace(/"/g, '&quot;')}" style="width:100%; cursor:not-allowed; opacity:0.8; box-sizing:border-box;">
+                   <button class="btn-outline btn-sm" style="width:auto; margin:0;" onclick="openSharedDrivePicker('rule-dest', this)" title="Browse">📁</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="rule-reminder-row" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding-top:8px; border-top:1px solid #333;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+            <input type="checkbox" class="rule-reminder-enabled" ${reminderEnabled ? 'checked' : ''} onchange="syncRuleRowUI(this.closest('.rule-row'))" style="width:16px; height:16px; margin:0;">
+            <span style="color:#e4e4e7; font-size:12px; font-weight:700;">Remind if not done</span>
+        </label>
+        <div style="display:flex; align-items:center; gap:8px;">
+            <input type="number" class="rule-reminder-days input-compact" min="1" max="365" value="${reminderDays}" ${reminderEnabled ? '' : 'disabled'} style="width:64px; box-sizing:border-box; opacity:${reminderEnabled ? '1' : '0.45'};">
+            <span style="color:#71717a; font-size:11px; font-weight:700; text-transform:uppercase;">days before event</span>
         </div>
     </div>
  </div>`;
 }
 
 function addRuleRow() {
- document.getElementById('rule-list').insertAdjacentHTML('beforeend', createRuleRow({}));
+ document.getElementById('rule-list').insertAdjacentHTML('beforeend', createRuleRow({ taskType: 'basic' }));
+ let rows = document.querySelectorAll('.rule-row');
+ syncRuleRowUI(rows[rows.length - 1]);
 }
 
 function renderRenameRuleRows(rulesArray) {
@@ -306,22 +359,35 @@ function submitManagerConfig() {
              hasError = true;
          }
          taskNames.add(taskName.toLowerCase());
-         
+
+         let taskType = row.querySelector('.rule-task-type').value || 'automated';
          let searchStr = row.querySelector('.rule-search').value.trim();
          let srcFolder = row.querySelector('.rule-src-name').value.trim();
-         let comboKey = (srcFolder + "|||" + searchStr).toLowerCase();
-         if (searchCombos.has(comboKey)) {
-             alert("Validation Error: Multiple rules are searching for the exact same keyword ('" + searchStr + "') in the exact same source folder. This overlap will cause conflicting file duplications.");
+         if (taskType === 'automated') {
+             let comboKey = (srcFolder + "|||" + searchStr).toLowerCase();
+             if (searchStr && searchCombos.has(comboKey)) {
+                 alert("Validation Error: Multiple rules are searching for the exact same keyword ('" + searchStr + "') in the exact same source folder. This overlap will cause conflicting file duplications.");
+                 hasError = true;
+             }
+             if (searchStr) searchCombos.add(comboKey);
+         }
+
+         let reminderEnabled = row.querySelector('.rule-reminder-enabled').checked;
+         let reminderDays = parseInt(row.querySelector('.rule-reminder-days').value, 10) || 0;
+         if (reminderEnabled && reminderDays < 1) {
+             alert("Validation Error: Reminder days must be at least 1 for task '" + taskName + "'.");
              hasError = true;
          }
-         searchCombos.add(comboKey);
-         
+
          rules.push({
              taskName: taskName,
+             taskType: taskType,
              srcFolderName: srcFolder,
              searchString: searchStr,
              suffix: row.querySelector('.rule-suffix').value.trim(),
-             destFolderName: row.querySelector('.rule-dest-name').value.trim()
+             destFolderName: row.querySelector('.rule-dest-name').value.trim(),
+             reminderEnabled: reminderEnabled,
+             reminderDaysBefore: reminderEnabled ? reminderDays : 0
          });
      }
   });
@@ -769,11 +835,15 @@ function openChecklistModal(projectId, e) {
   globalManagerConfig.rules.forEach((r, idx) => {
       let isChecked = state[r.taskName] && state[r.taskName].checked;
       let loadingId = `chk-load-${idx}`;
+      let taskType = normalizeRuleTaskType(r);
+      let typeBadge = taskType === 'basic'
+          ? '<span style="font-size:9px; font-weight:800; color:#3b82f6; background:rgba(59,130,246,0.15); padding:2px 6px; border-radius:4px; margin-left:6px;">MANUAL</span>'
+          : '<span style="font-size:9px; font-weight:800; color:#f97316; background:rgba(249,115,22,0.15); padding:2px 6px; border-radius:4px; margin-left:6px;">AUTO</span>';
       html += `
       <div style="display:flex; align-items:center; justify-content:space-between; background:#222; padding:12px; border-radius:6px;">
          <label style="display:flex; align-items:center; gap:10px; cursor:pointer; flex:1;">
             <input type="checkbox" id="chk-${idx}" class="crew-cb" ${isChecked ? 'checked' : ''} onchange="toggleChecklistItem('${projectId}', ${idx}, this.checked)">
-            <span style="color:#fff; font-weight:bold; font-size:13px;">${r.taskName}</span>
+            <span style="color:#fff; font-weight:bold; font-size:13px;">${r.taskName}${typeBadge}</span>
          </label>
          <span id="${loadingId}" style="font-size:11px; color:#a855f7; display:none; font-weight:800;">PROCESSING...</span>
       </div>`;
@@ -784,21 +854,25 @@ function openChecklistModal(projectId, e) {
 
 function toggleChecklistItem(projectId, ruleIdx, isChecked) {
   let rule = globalManagerConfig.rules[ruleIdx];
+  let taskType = normalizeRuleTaskType(rule);
   let loader = document.getElementById(`chk-load-${ruleIdx}`);
   let chk = document.getElementById(`chk-${ruleIdx}`);
-  
-  loader.style.display = 'block';
+
+  if (loader) {
+      loader.innerText = (taskType === 'basic') ? 'SAVING...' : 'PROCESSING...';
+      loader.style.display = 'block';
+  }
   chk.disabled = true;
   
   google.script.run
   .withFailureHandler(err => {
-      alert("Automation Error: " + err.message);
-      loader.style.display = 'none';
+      alert((taskType === 'basic' ? "Checklist Error: " : "Automation Error: ") + err.message);
+      if (loader) loader.style.display = 'none';
       chk.disabled = false;
       chk.checked = !isChecked; 
   })
   .withSuccessHandler(newStateStr => {
-      loader.style.display = 'none';
+      if (loader) loader.style.display = 'none';
       chk.disabled = false;
       
       let ev = calendar.getEventById(projectId);
@@ -808,7 +882,17 @@ function toggleChecklistItem(projectId, ruleIdx, isChecked) {
           ev.setExtendedProp('rawDbData', raw); 
       }
   })
-  .processChecklistAction(projectId, rule.taskName, rule.srcFolderName, rule.searchString, rule.suffix, rule.destFolderName, isChecked, ACTIVE_USER_NAME);
+  .processChecklistAction(
+      projectId,
+      rule.taskName,
+      rule.srcFolderName,
+      rule.searchString,
+      rule.suffix,
+      rule.destFolderName,
+      isChecked,
+      ACTIVE_USER_NAME,
+      taskType
+  );
 }
 
 // ==========================================

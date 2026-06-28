@@ -651,7 +651,11 @@ function triggerManualCrewEmail(folderId, title, startDate, endDate, whDate, wh2
 // ==========================================
 // --- GOOGLE DRIVE: AUTOMATION WORKFLOW ---
 // ==========================================
-function processChecklistAction(projectId, taskName, srcFolderName, searchString, suffix, destFolderName, isChecked, actor = "System UI") {
+function processChecklistAction(projectId, taskName, srcFolderName, searchString, suffix, destFolderName, isChecked, actor, taskType) {
+  actor = actor || "System UI";
+  taskType = (taskType || 'automated').toString().toLowerCase();
+  const isBasic = taskType === 'basic';
+
   return executeWithRetry(() => {
     const sheets = verifyDatabaseSchema(true);
     const indexData = getSheetData(sheets.index);
@@ -667,7 +671,7 @@ function processChecklistAction(projectId, taskName, srcFolderName, searchString
     }
     if (typeof flushCache !== 'undefined') flushCache();
     
-    if (!folderId) throw new Error("Project does not have a Google Drive Folder yet. Please Save & Sync first.");
+    if (!isBasic && !folderId) throw new Error("Project does not have a Google Drive Folder yet. Please Save & Sync first.");
     
     let checkRowIndex = -1;
     let existingCopiedId = null;
@@ -685,46 +689,50 @@ function processChecklistAction(projectId, taskName, srcFolderName, searchString
     }
 
     if (isChecked && isAlreadyCheckedInDB) {
-        throw new Error("This task was just completed by another user. The file has already been generated.");
+        throw new Error(isBasic
+            ? "This task is already marked as done."
+            : "This task was just completed by another user. The file has already been generated.");
     }
 
     let newCopiedId = existingCopiedId || "";
     
-    if (isChecked) {
-        const rootEventFolder = DriveApp.getFolderById(folderId);
-        let targetFolder = rootEventFolder;
-        
-        if (srcFolderName && srcFolderName.trim() !== "") {
-            let subfolders = driveRetry(() => rootEventFolder.searchFolders(`title = '${srcFolderName.replace(/'/g, "\\'")}' and trashed = false`));
-            if (subfolders.hasNext()) targetFolder = subfolders.next();
-            else throw new Error(`Source folder '${srcFolderName}' not found inside the Event Folder.`);
-        }
-        
-        let targetDestFolder = rootEventFolder;
-        if (destFolderName && destFolderName.trim() !== "") {
-            let destSubfolders = driveRetry(() => rootEventFolder.searchFolders(`title = '${destFolderName.replace(/'/g, "\\'")}' and trashed = false`));
-            if (destSubfolders.hasNext()) targetDestFolder = destSubfolders.next();
-            else throw new Error(`Destination folder '${destFolderName}' not found inside the Event Folder.`);
-        }
-        
-        if (!searchString) throw new Error(`Task '${taskName}' is missing a file search keyword.`);
-        
-        const files = driveRetry(() => targetFolder.searchFiles(`title contains '${searchString.replace(/'/g, "\\'")}' and trashed = false`));
-        if (files.hasNext()) {
-            const file = files.next();
+    if (!isBasic) {
+        if (isChecked) {
+            const rootEventFolder = DriveApp.getFolderById(folderId);
+            let targetFolder = rootEventFolder;
             
-            let oldName = file.getName();
-            let dotIndex = oldName.lastIndexOf('.');
-            let newName = (dotIndex > -1) ? oldName.substring(0, dotIndex) + (suffix || "") + oldName.substring(dotIndex) : oldName + (suffix || "");
+            if (srcFolderName && srcFolderName.trim() !== "") {
+                let subfolders = driveRetry(() => rootEventFolder.searchFolders(`title = '${srcFolderName.replace(/'/g, "\\'")}' and trashed = false`));
+                if (subfolders.hasNext()) targetFolder = subfolders.next();
+                else throw new Error(`Source folder '${srcFolderName}' not found inside the Event Folder.`);
+            }
             
-            const copiedFile = driveRetry(() => file.makeCopy(newName, targetDestFolder));
-            newCopiedId = copiedFile.getId();
+            let targetDestFolder = rootEventFolder;
+            if (destFolderName && destFolderName.trim() !== "") {
+                let destSubfolders = driveRetry(() => rootEventFolder.searchFolders(`title = '${destFolderName.replace(/'/g, "\\'")}' and trashed = false`));
+                if (destSubfolders.hasNext()) targetDestFolder = destSubfolders.next();
+                else throw new Error(`Destination folder '${destFolderName}' not found inside the Event Folder.`);
+            }
+            
+            if (!searchString) throw new Error(`Task '${taskName}' is missing a file search keyword.`);
+            
+            const files = driveRetry(() => targetFolder.searchFiles(`title contains '${searchString.replace(/'/g, "\\'")}' and trashed = false`));
+            if (files.hasNext()) {
+                const file = files.next();
+                
+                let oldName = file.getName();
+                let dotIndex = oldName.lastIndexOf('.');
+                let newName = (dotIndex > -1) ? oldName.substring(0, dotIndex) + (suffix || "") + oldName.substring(dotIndex) : oldName + (suffix || "");
+                
+                const copiedFile = driveRetry(() => file.makeCopy(newName, targetDestFolder));
+                newCopiedId = copiedFile.getId();
+            } else {
+                throw new Error(`No file containing '${searchString}' was found in the designated folder.`);
+            }
         } else {
-            throw new Error(`No file containing '${searchString}' was found in the designated folder.`);
+            if (existingCopiedId) { try { driveRetry(() => DriveApp.getFileById(existingCopiedId).setTrashed(true)); } catch(e) {} }
+            newCopiedId = "";
         }
-    } else {
-        if (existingCopiedId) { try { driveRetry(() => DriveApp.getFileById(existingCopiedId).setTrashed(true)); } catch(e) {} }
-        newCopiedId = "";
     }
     
     // Write back to Relational DB
@@ -741,7 +749,9 @@ function processChecklistAction(projectId, taskName, srcFolderName, searchString
     }
     state[taskName] = { checked: isChecked, copiedFileId: newCopiedId };
     
-    writeToAuditLog(actor, "UPDATE", "CHECKLIST", projectId, checkUid, (isChecked ? "Marked as done and generated files." : "Unchecked task."));
+    writeToAuditLog(actor, "UPDATE", "CHECKLIST", projectId, checkUid, (isChecked
+        ? (isBasic ? "Marked manual checklist task as done." : "Marked as done and generated files.")
+        : "Unchecked task."));
     
     return JSON.stringify(state);
   });
