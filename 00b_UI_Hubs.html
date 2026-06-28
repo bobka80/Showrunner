@@ -189,38 +189,47 @@
       <button type="button" class="btn-outline personal-hub-pin-btn" onclick="openPersonalPinModal()">CHANGE PIN</button>
     </div>
 
-    <div id="personal-hub-manager-tools" class="hub-manager-only personal-hub-mgr-body" style="padding: 25px 30px; flex: 1; overflow-y: auto; display: flex; flex-wrap: wrap; gap: 30px; align-items: flex-start;">
-       <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column;">
-           <h3 style="color:#a855f7; margin-top:0; font-size: 20px;">Drive Folder Automation</h3>
-           <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 20px;">Define where your project folders are created and which template folder is copied.</p>
-           <div style="margin-bottom: 25px; width: 100%;">
+    <div id="personal-hub-manager-tools" class="hub-manager-only personal-hub-mgr-body">
+       <div class="personal-hub-mgr-col">
+           <h3 class="personal-hub-mgr-heading personal-hub-mgr-heading--drive">Drive Folder Automation</h3>
+           <p class="personal-hub-mgr-desc">Define where your project folders are created and which template folder is copied.</p>
+           <div class="personal-hub-mgr-block">
              <div class="input-label">Selective Native Sync (Physical Sharing)</div>
-             <p style="color:#a1a1aa; font-size: 13px; margin-top: 0; margin-bottom: 10px;">Select which sub-folders or files from the template should be automatically shared with your Google Drive Desktop.</p>
+             <p class="personal-hub-mgr-desc personal-hub-mgr-desc--tight">Select which sub-folders or files from the template should be automatically shared with your Google Drive Desktop.</p>
              <input type="hidden" id="mgr-sync-selection" value="[]">
-             <button class="btn-outline" style="width: 100%; border-color:#a855f7; color:#a855f7;" onclick="openSyncPickerModal()">CONFIGURE SYNC LIST</button>
+             <button class="btn-outline personal-hub-mgr-sync-btn" onclick="openSyncPickerModal()">CONFIGURE SYNC LIST</button>
+           </div>
+
+           <div class="mgr-nested-section">
+             <h3 class="personal-hub-mgr-subheading" onclick="toggleMgrAccordion('rename-accordion')">
+                 <span>Template File Renaming</span>
+                 <span id="rename-accordion-icon" class="mgr-accordion-icon">▼</span>
+             </h3>
+             <p class="personal-hub-mgr-desc personal-hub-mgr-desc--tight">Auto-rename specific files when the template is duplicated.</p>
+             <div id="rename-accordion" class="mgr-accordion-panel" style="display:none;">
+                 <button id="add-rename-rule-btn" class="btn-outline personal-hub-mgr-add-btn personal-hub-mgr-add-btn--rename" onclick="addRenameRuleRow()">+ ADD RENAME RULE</button>
+                 <div id="rename-rule-list" class="personal-hub-mgr-list"></div>
+             </div>
            </div>
        </div>
 
-       <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; border-left: 1px solid #333; padding-left: 30px;">
-           <h3 onclick="toggleMgrAccordion('rename-accordion')" style="color:#10b981; margin-top:0; font-size: 20px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
-               <span>Template File Renaming</span> <span id="rename-accordion-icon" style="font-size:12px; color:#555;">▼</span>
+       <div class="personal-hub-mgr-col">
+           <h3 class="personal-hub-mgr-heading personal-hub-mgr-heading--rules" onclick="toggleMgrAccordion('rule-accordion')">
+               <span>Rule Editor (Automation Tasks)</span>
+               <span id="rule-accordion-icon" class="mgr-accordion-icon">▲</span>
            </h3>
-           <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 15px;">Auto-rename specific files when the template is duplicated.</p>
-           <div id="rename-accordion" style="display:none; flex-direction:column; width:100%;">
-               <button id="add-rename-rule-btn" class="btn-outline" style="width: 100%; margin-bottom: 15px; border-color:#10b981; color:#10b981;" onclick="addRenameRuleRow()">+ ADD RENAME RULE</button>
-               <div id="rename-rule-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
+           <p class="personal-hub-mgr-desc personal-hub-mgr-desc--tight">Define keywords to search inside an Event Folder, and where to automatically publish them.</p>
+           <div id="rule-accordion" class="mgr-accordion-panel" style="display:flex;">
+               <button id="add-rule-btn" class="btn-outline personal-hub-mgr-add-btn personal-hub-mgr-add-btn--rules" onclick="addRuleRow()">+ ADD TASK RULE</button>
+               <div id="rule-list" class="personal-hub-mgr-list"></div>
            </div>
        </div>
 
-       <div style="flex: 1; min-width: 300px; display: flex; flex-direction: column; border-left: 1px solid #333; padding-left: 30px;">
-           <h3 onclick="toggleMgrAccordion('rule-accordion')" style="color:#f97316; margin-top:0; font-size: 20px; cursor:pointer; display:flex; justify-content:space-between; align-items:center; user-select:none;">
-               <span>Rule Editor (Automation Tasks)</span> <span id="rule-accordion-icon" style="font-size:12px; color:#555;">▼</span>
-           </h3>
-           <p style="color:#a1a1aa; font-size: 13px; margin-bottom: 15px;">Define keywords to search inside an Event Folder, and where to automatically publish them.</p>
-           <div id="rule-accordion" style="display:none; flex-direction:column; width:100%;">
-               <button id="add-rule-btn" class="btn-outline" style="width: 100%; margin-bottom: 15px; border-color:#f97316; color:#f97316;" onclick="addRuleRow()">+ ADD TASK RULE</button>
-               <div id="rule-list" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
-           </div>
+       <div class="personal-hub-mgr-col">
+           <h3 class="personal-hub-mgr-heading personal-hub-mgr-heading--assets">Project Assets Reminders</h3>
+           <p class="personal-hub-mgr-desc personal-hub-mgr-desc--tight">Simple packing reminders shown inside the Project Assets window (e.g. distro, open ends, fixtures).</p>
+           <button id="add-asset-checklist-btn" class="btn-outline personal-hub-mgr-add-btn personal-hub-mgr-add-btn--assets" onclick="addAssetChecklistRow()">+ ADD REMINDER ITEM</button>
+           <div id="asset-checklist-list" class="personal-hub-mgr-list"></div>
        </div>
     </div>
 

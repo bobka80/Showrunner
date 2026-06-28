@@ -145,17 +145,20 @@ function openManagerSettings() {
 
   const addBtn = document.getElementById('add-rule-btn');
   const addRenameBtn = document.getElementById('add-rename-rule-btn');
+  const addAssetBtn = document.getElementById('add-asset-checklist-btn');
   if (addBtn) {
       addBtn.disabled = true;
       addBtn.style.opacity = 0.5;
       addBtn.style.cursor = 'wait';
       if (addRenameBtn) { addRenameBtn.disabled = true; addRenameBtn.style.opacity = 0.5; addRenameBtn.style.cursor = 'wait'; }
+      if (addAssetBtn) { addAssetBtn.disabled = true; addAssetBtn.style.opacity = 0.5; addAssetBtn.style.cursor = 'wait'; }
   }
   
   google.script.run.withSuccessHandler(config => {
-      globalManagerConfig = config || { rules: [], renameRules: [], syncSelection: [] };
+      globalManagerConfig = config || { rules: [], renameRules: [], syncSelection: [], assetChecklistItems: [] };
       renderRuleRows(globalManagerConfig.rules || []);
       renderRenameRuleRows(globalManagerConfig.renameRules || []);
+      renderAssetChecklistRows(globalManagerConfig.assetChecklistItems || []);
       let syncInput = document.getElementById('mgr-sync-selection');
       if (syncInput) syncInput.value = JSON.stringify(globalManagerConfig.syncSelection || []);
 
@@ -164,6 +167,7 @@ function openManagerSettings() {
           addBtn.style.opacity = 1;
           addBtn.style.cursor = 'pointer';
           if (addRenameBtn) { addRenameBtn.disabled = false; addRenameBtn.style.opacity = 1; addRenameBtn.style.cursor = 'pointer'; }
+          if (addAssetBtn) { addAssetBtn.disabled = false; addAssetBtn.style.opacity = 1; addAssetBtn.style.cursor = 'pointer'; }
       }
   }).getManagerConfig(ACTIVE_USER_NAME);
 }
@@ -262,6 +266,28 @@ function addRenameRuleRow() {
  document.getElementById('rename-rule-list').insertAdjacentHTML('beforeend', createRenameRuleRow({}));
 }
 
+function renderAssetChecklistRows(itemsArray) {
+ let html = '';
+ if (!itemsArray) itemsArray = [];
+ itemsArray.forEach(item => {
+     let name = (typeof item === 'string') ? item : (item && item.name ? item.name : '');
+     if (name) html += createAssetChecklistRow({ name: name });
+ });
+ document.getElementById('asset-checklist-list').innerHTML = html;
+}
+
+function createAssetChecklistRow(r) {
+ return `
+ <div class="asset-checklist-row" style="display:flex; gap:10px; align-items:center; background:#222; padding:10px 12px; border-radius:6px; border:1px solid #333;">
+    <input type="text" class="asset-checklist-name input-compact" placeholder="e.g. Distro box" value="${String(r.name || '').replace(/"/g, '&quot;')}" style="flex:1; box-sizing:border-box;">
+    <button class="btn-delete" style="width:auto; margin:0; padding:4px 8px; height:auto; font-size:10px; flex-shrink:0;" onclick="this.closest('.asset-checklist-row').remove()" title="Delete Item">X</button>
+ </div>`;
+}
+
+function addAssetChecklistRow() {
+ document.getElementById('asset-checklist-list').insertAdjacentHTML('beforeend', createAssetChecklistRow({}));
+}
+
 // @INDEX: AUTOMATION -> Save Manager Rules
 function submitManagerConfig() {
   const btn = document.getElementById('btn-save-mgr');
@@ -331,6 +357,26 @@ function submitManagerConfig() {
       return;
   }
 
+  let assetChecklistItems = [];
+  let assetNames = new Set();
+
+  document.querySelectorAll('.asset-checklist-row').forEach(row => {
+     let itemName = row.querySelector('.asset-checklist-name').value.trim();
+     if (itemName) {
+         if (assetNames.has(itemName.toLowerCase())) {
+             alert("Validation Error: Multiple asset reminder items have the same name ('" + itemName + "'). Each item must be unique.");
+             hasError = true;
+         }
+         assetNames.add(itemName.toLowerCase());
+         assetChecklistItems.push({ name: itemName });
+     }
+  });
+
+  if (hasError) {
+      btn.innerText = "SAVE CONFIGURATION"; btn.disabled = false;
+      return;
+  }
+
   let parsedSyncSelection = [];
   try {
       parsedSyncSelection = JSON.parse(document.getElementById('mgr-sync-selection').value || "[]");
@@ -347,6 +393,7 @@ function submitManagerConfig() {
   globalManagerConfig.rules = rules;
   globalManagerConfig.renameRules = renameRules;
   globalManagerConfig.syncSelection = parsedSyncSelection;
+  globalManagerConfig.assetChecklistItems = assetChecklistItems;
   
   google.script.run
       .withFailureHandler(err => {
