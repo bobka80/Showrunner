@@ -68,11 +68,12 @@ After **v330**, the director reported:
 - [x] Task deleted FCM; weather FCM + shift `user_uid` fix
 - [ ] Director test matrix on web.app
 
-### Step D — Foreground UX
+### Step D — Foreground UX ✅ (GAS v344 + hosting)
 
-- [ ] `host-boot.js` `SHOWRUNNER_FOREGROUND_PUSH` bridge
-- [ ] Toast + drawer in `01b_Calendar_Tasks.html`
-- [ ] Hosting deploy if shell changes
+- [x] `SHOWRUNNER_FOREGROUND_PUSH` bridge (host → iframe)
+- [x] In-app toast + `refreshData()` for notification list + tasks
+- [x] Fix client `isNotifRead` (bell was broken by server-only helper)
+- [ ] Director test: push while app open → toast + badge update without long wait
 
 ### Step E — Deferred (partial)
 

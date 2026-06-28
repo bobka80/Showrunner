@@ -18,7 +18,7 @@ function getTasksAndNotifs(crewName) {
     let aData = getSheetData(sheets.taskAssignees);
     let tdData = getSheetData(sheets.taskTodos);
     let asData = getSheetData(sheets.taskAssets);
-    const canGlobalTasks = effectiveBackendPermission(crewName, 'task_manage_global');
+    const canGlobalTasks = canViewAllGlobalTasks_(crewName);
     
     for(let i=1; i<tData.length; i++) {
         let taskId = tData[i][tData.hMap['uid']];

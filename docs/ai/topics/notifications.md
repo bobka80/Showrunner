@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-28 (codebase @ GAS **v335**)
+**Last swept:** 2026-06-28 (codebase @ GAS **v345**)
 
 **Canonical topic file** for all notification work. Recovery re-ship: [active/recovery-after-v330.md](../active/recovery-after-v330.md) Steps C–D.
 
@@ -26,7 +26,8 @@ Firebase Hosting + FCM + Apps Script backend. Event-driven batch sends. No secre
 - [x] **Multi-device tokens** per user (`getFcmDevicesForUid_` / device list in DATABASE)
 - [x] ROOT **test push** + per-device test (`sendTestPushNotification`, `sendTestPushToDevice`)
 - [x] PWA session hardening (v328+) — see `RELEASES.md`
-- [x] Foreground push on hosting parent when tab visible (`messaging.onMessage` → local `Notification`)
+- [x] Foreground: host toast over iframe + SW → client bridge + iframe `refreshData()` (v344–v345)
+- [x] FCM **data-only** payload (avoids double system notification in background)
 
 ### Dispatch core
 - [x] `dispatchPushToUsers` / `dispatchPushToIdentifiers` — batch FCM + audit log entry
@@ -58,7 +59,7 @@ Firebase Hosting + FCM + Apps Script backend. Event-driven batch sends. No secre
 ### Product rules
 - [ ] Per-user notification preferences (type toggles)
 - [ ] Explicit **debounce/coalesce** for rapid timeline edits
-- [ ] In-app **drawer/toast sync** with push (recovery Step D — `01b`, foreground bridge polish)
+- [ ] In-app **drawer/toast sync** polish — verify shift-assign path on web.app (Step D follow-up)
 
 ### Recovery Step C (re-merge after rollback)
 - [ ] Re-verify expanded v330 dispatch hooks if re-applied

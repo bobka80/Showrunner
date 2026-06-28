@@ -21,7 +21,7 @@ function renderMobileTasksList() {
     if (!container) return;
 
     const tasks = (typeof globalTasks !== 'undefined' && globalTasks) ? globalTasks : [];
-    const canGlobal = (typeof canManageGlobalTasks === 'function') && canManageGlobalTasks();
+    const canGlobal = (typeof canViewAllGlobalTasks === 'function') && canViewAllGlobalTasks();
     let html = '';
     let openCount = 0;
 

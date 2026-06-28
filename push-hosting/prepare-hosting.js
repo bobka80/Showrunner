@@ -128,16 +128,23 @@ messaging.onBackgroundMessage(function(payload) {
   const n = payload.notification || {};
   const title = n.title || d.title || 'Showrunner';
   const body = n.body || d.body || '';
-  const options = {
-    body: body,
-    icon: n.icon || SR_PUSH_ICON,
-    badge: n.badge || SR_PUSH_ICON,
-    data: d,
-    tag: 'showrunner-push',
-    renotify: true,
-    vibrate: [180, 80, 180]
-  };
-  return self.registration.showNotification(title, options);
+  const msg = { type: 'SHOWRUNNER_FOREGROUND_PUSH', title: title, body: body };
+  return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+    clientList.forEach(function(client) {
+      try { client.postMessage(msg); } catch (e) { /* ignore */ }
+    });
+    const anyVisible = clientList.some(function(c) { return c.visibilityState === 'visible'; });
+    if (anyVisible) return;
+    return self.registration.showNotification(title, {
+      body: body,
+      icon: n.icon || SR_PUSH_ICON,
+      badge: n.badge || SR_PUSH_ICON,
+      data: d,
+      tag: 'showrunner-push',
+      renotify: true,
+      vibrate: [180, 80, 180]
+    });
+  });
 });
 `;
   fs.writeFileSync(swPath, sw);

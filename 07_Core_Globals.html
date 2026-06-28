@@ -112,6 +112,27 @@ window.canManageGlobalTasks = function() {
   return effectiveHasPerm('task_manage_global');
 };
 
+/** List filter: managers see all tasks; crew see assigned only. IAM key: task_view_all */
+window.canViewAllGlobalTasks = function() {
+  if (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ROOT') return true;
+  if (typeof userHasPerm === 'function' && userHasPerm('task_view_all')) return true;
+  if (effectiveHasPerm('task_manage_global')) return true;
+  if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('MANAGER')) return true;
+  const name = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME.toLowerCase().trim() : '';
+  if (name) {
+    const pools = [];
+    if (typeof globalRosterData !== 'undefined' && globalRosterData && globalRosterData.roster) pools.push(globalRosterData.roster);
+    if (typeof activeRoster !== 'undefined' && activeRoster && activeRoster.length) pools.push(activeRoster);
+    for (let ri = 0; ri < pools.length; ri++) {
+      for (let i = 0; i < pools[ri].length; i++) {
+        const c = pools[ri][i];
+        if (c.name && c.name.toLowerCase().trim() === name && c.isManager) return true;
+      }
+    }
+  }
+  return false;
+};
+
 window.canManagePersonalTasks = function() {
   return effectiveHasPerm('task_manage_personal');
 };

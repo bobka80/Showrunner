@@ -36,7 +36,7 @@ const IAM_PERMISSION_KEYS = [
   'Is_Tunneling', 'db_view_assets', 'db_edit_assets', 'db_delete_assets',
   'db_view_vehicles', 'db_view_warehouses', 'db_view_clients',
   'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
-  'event_view_pricing', 'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal',
+  'event_view_pricing', 'view_month_roster', 'view_logistics', 'task_manage_global', 'task_manage_personal', 'task_view_all',
   'hr_view_rates', 'fin_view_roi', 'fin_view_internal'
 ];
 
@@ -348,6 +348,12 @@ function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
   }
   bundle.task_manage_personal = true;
 
+  let isManager = false;
+  if (cMap['IsManager'] !== undefined) {
+    isManager = isTruthyCell(crewData[i][cMap['IsManager']]);
+  }
+  bundle.task_view_all = accessTierAtLeastValue(normalizeAccessTier(sysAccess), 'MANAGER') || isManager;
+
   const uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : '';
   return {
     success: true,
@@ -592,6 +598,16 @@ function effectiveBackendPermission(crewName, permissionKey) {
   return false;
 }
 
+/** Managers see every global task; crew see only assigned tasks. IAM: task_view_all (future editor split). */
+function canViewAllGlobalTasks_(crewName) {
+  if (!crewName) return false;
+  if (crewName.toLowerCase().trim() === 'bogdan') return true;
+  if (effectiveBackendPermission(crewName, 'task_manage_global')) return true;
+  if (verifyBackendPrivilege(crewName, 'MANAGER')) return true;
+  const profile = getUserSecurityProfile(crewName);
+  return !!(profile && profile.isManager);
+}
+
 function crewHasShiftOnProject(crewName, projectId) {
   if (!crewName || !projectId) return false;
   const profile = getUserSecurityProfile(crewName);
@@ -719,9 +735,9 @@ function enforceCrossRentOnlyProjectFields_(actor, projectData) {
 // ==========================================
 // @INDEX: SECURITY -> User Security Profile Extractor
 function getUserSecurityProfile(crewName) {
-  if (!crewName) return { email: null, uid: null, tunneling: false, isFreelancer: false, sysAccess: 'CREW' };
+  if (!crewName) return { email: null, uid: null, tunneling: false, isFreelancer: false, isManager: false, sysAccess: 'CREW' };
   if (crewName.toLowerCase().trim() === 'bogdan') {
-    return { email: 'bobby@showrider.com', uid: 'UID_BOGDAN', tunneling: false, isFreelancer: false, sysAccess: 'ROOT' };
+    return { email: 'bobby@showrider.com', uid: 'UID_BOGDAN', tunneling: false, isFreelancer: false, isManager: true, sysAccess: 'ROOT' };
   }
 
   const sheets = verifyVaultSchema(true);
@@ -740,6 +756,10 @@ function getUserSecurityProfile(crewName) {
       if (cMap['IsFreelancer'] !== undefined) {
         isFreelancer = isTruthyCell(crewData[i][cMap['IsFreelancer']]);
       }
+      let isManager = false;
+      if (cMap['IsManager'] !== undefined) {
+        isManager = isTruthyCell(crewData[i][cMap['IsManager']]);
+      }
       let isTunneling = false;
       for (let r = 1; r < roleData.length; r++) {
         if (crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
@@ -755,11 +775,12 @@ function getUserSecurityProfile(crewName) {
         uid: uid,
         tunneling: isTunneling,
         isFreelancer: isFreelancer,
+        isManager: isManager,
         sysAccess: normalizeAccessTier(sysAccess)
       };
     }
   }
-  return { email: null, uid: null, tunneling: false, isFreelancer: false, sysAccess: 'CREW' };
+  return { email: null, uid: null, tunneling: false, isFreelancer: false, isManager: false, sysAccess: 'CREW' };
 }
 
 // ==========================================
