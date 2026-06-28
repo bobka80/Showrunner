@@ -59,6 +59,33 @@ function describeDriveFolder_(folderId, label) {
   }
 }
 
+function describeResolvedBackupFolder_() {
+  try {
+    const f = getDatabaseBackupFolder();
+    let path = f.getName();
+    const parents = f.getParents();
+    if (parents.hasNext()) path = parents.next().getName() + '/' + f.getName();
+    return {
+      label: 'BACKUPS',
+      name: f.getName(),
+      id: f.getId(),
+      url: f.getUrl(),
+      path: path
+    };
+  } catch (e) {
+    return Object.assign(describeDriveFolder_(DB_BACKUP_FOLDER_ID, 'BACKUPS'), { path: 'BACKUPS (unresolved)' });
+  }
+}
+
+function folderInventorySummary_(folder) {
+  if (!folder) return null;
+  const parents = folder.getParents();
+  const path = parents.hasNext()
+    ? parents.next().getName() + '/' + folder.getName()
+    : folder.getName();
+  return { name: folder.getName(), id: folder.getId(), url: folder.getUrl(), path: path };
+}
+
 function liveDbFolderLabel_() {
   return getLiveDatabaseFolder().getName();
 }
@@ -111,31 +138,38 @@ function pruneOldBackupsSafely_(folder, retainDays) {
 }
 
 function scanBackupFolderInventory_() {
-  const folder = getDatabaseBackupFolder();
+  const scanFolders = getBackupScanFolders_();
   const engineByDate = {};
   const vaultByDate = {};
   let fileCount = 0;
+  const scannedPaths = [];
 
-  const files = folder.getFiles();
-  while (files.hasNext()) {
-    const f = files.next();
-    fileCount++;
-    const name = f.getName();
-    const date = parseBackupDateFromFilename_(name);
-    if (!date) continue;
-    const entry = {
-      id: f.getId(),
-      name: name,
-      date: date,
-      modified: f.getLastUpdated().getTime(),
-      modifiedLabel: Utilities.formatDate(f.getLastUpdated(), BACKUP_TZ, 'yyyy-MM-dd HH:mm')
-    };
-    if (name.indexOf('ENGINE_BACKUP_') === 0) {
-      if (!engineByDate[date] || entry.modified > engineByDate[date].modified) engineByDate[date] = entry;
-    } else if (name.indexOf('VAULT_BACKUP_') === 0) {
-      if (!vaultByDate[date] || entry.modified > vaultByDate[date].modified) vaultByDate[date] = entry;
+  scanFolders.forEach(function(folder) {
+    const summary = folderInventorySummary_(folder);
+    if (summary) scannedPaths.push(summary.path);
+
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      fileCount++;
+      const name = f.getName();
+      const date = parseBackupDateFromFilename_(name);
+      if (!date) continue;
+      const entry = {
+        id: f.getId(),
+        name: name,
+        date: date,
+        modified: f.getLastUpdated().getTime(),
+        modifiedLabel: Utilities.formatDate(f.getLastUpdated(), BACKUP_TZ, 'yyyy-MM-dd HH:mm'),
+        folderPath: summary ? summary.path : folder.getName()
+      };
+      if (name.indexOf('ENGINE_BACKUP_') === 0) {
+        if (!engineByDate[date] || entry.modified > engineByDate[date].modified) engineByDate[date] = entry;
+      } else if (name.indexOf('VAULT_BACKUP_') === 0) {
+        if (!vaultByDate[date] || entry.modified > vaultByDate[date].modified) vaultByDate[date] = entry;
+      }
     }
-  }
+  });
 
   const paired = [];
   Object.keys(engineByDate).forEach(function(d) {
@@ -164,7 +198,10 @@ function scanBackupFolderInventory_() {
     lastEngine: lastEngine,
     lastVault: lastVault,
     engineOnlyDates: engineOnly,
-    vaultOnlyDates: vaultOnly
+    vaultOnlyDates: vaultOnly,
+    scannedPaths: scannedPaths,
+    canonicalPath: folderInventorySummary_(getDatabaseBackupFolder()),
+    legacyPath: folderInventorySummary_(getLegacyDatabaseBackupFolder_())
   };
 }
 
@@ -188,15 +225,20 @@ function computeBackupHealthReport_() {
   const propsMismatch = propsLastDate && lastPairedDate && propsLastDate !== lastPairedDate;
 
   let warning = null;
+  const scanLabel = inv.scannedPaths.length ? inv.scannedPaths.join(' + ') : '05_DATABASE/BACKUPS';
   if (!lastPairedDate) {
-    warning = 'No paired Engine+Vault backups found in BACKUPS.';
+    warning = 'No paired Engine+Vault backups found in ' + scanLabel + '.';
   } else if (!healthy) {
-    warning = 'Last successful paired backup is ' + lastPairedDate + ' (' + daysSincePaired + ' day(s) ago). Expected ' + yesterdayLocal + ' or ' + todayLocal + '.';
+    warning = 'Last successful paired backup is ' + lastPairedDate + ' (' + daysSincePaired + ' day(s) ago). Expected ' + yesterdayLocal + ' or ' + todayLocal + '. Scanned: ' + scanLabel + '.';
   } else if (inv.engineOnlyDates.length || inv.vaultOnlyDates.length) {
-    warning = 'Some backup dates are missing a pair (Engine-only or Vault-only days detected).';
+    warning = 'Some backup dates are missing a pair (Engine-only or Vault-only days detected) in ' + scanLabel + '.';
   }
   if (propsMismatch) {
     warning = (warning ? warning + ' ' : '') + 'Script property LAST_BACKUP_DATE (' + propsLastDate + ') does not match newest files (' + lastPairedDate + ') — trusting Drive files.';
+  }
+  if (inv.legacyPath && inv.canonicalPath && inv.legacyPath.id !== inv.canonicalPath.id && !healthy) {
+    const legacyNote = 'Also scanned legacy folder ' + inv.legacyPath.path + ' — new backups write to ' + inv.canonicalPath.path + '.';
+    warning = warning ? warning + ' ' + legacyNote : legacyNote;
   }
 
   return {
@@ -209,6 +251,8 @@ function computeBackupHealthReport_() {
     propsLastBackupDate: propsLastDate,
     propsMismatch: propsMismatch,
     fileCount: inv.fileCount,
+    scannedPaths: inv.scannedPaths,
+    backupFolderPath: inv.canonicalPath ? inv.canonicalPath.path : '05_DATABASE/BACKUPS',
     lastPaired: inv.lastPaired,
     lastEngineDate: inv.lastEngine ? inv.lastEngine.date : null,
     lastVaultDate: inv.lastVault ? inv.lastVault.date : null,
@@ -453,20 +497,25 @@ function supersedeActiveDbOps(fileType) {
 
 function listBackupFiles_(fileType) {
   const meta = getDbFileTypeMeta(fileType);
-  const folder = getDatabaseBackupFolder();
   const out = [];
-  const files = folder.getFiles();
-  while (files.hasNext()) {
-    const f = files.next();
-    const name = f.getName();
-    if (!name.startsWith(meta.backupPrefix)) continue;
-    out.push({
-      id: f.getId(),
-      name: name,
-      modified: f.getLastUpdated().getTime(),
-      modifiedLabel: f.getLastUpdated().toISOString()
-    });
-  }
+  const seen = {};
+  getBackupScanFolders_().forEach(function(folder) {
+    const files = folder.getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      const name = f.getName();
+      if (!name.startsWith(meta.backupPrefix)) continue;
+      const id = f.getId();
+      if (seen[id]) continue;
+      seen[id] = true;
+      out.push({
+        id: id,
+        name: name,
+        modified: f.getLastUpdated().getTime(),
+        modifiedLabel: f.getLastUpdated().toISOString()
+      });
+    }
+  });
   out.sort((a, b) => b.modified - a.modified);
   return out;
 }
@@ -529,7 +578,7 @@ function getLiveDatabaseStatus(actor) {
       },
       driveFolders: {
         database: describeDriveFolder_(LIVE_DATABASE_FOLDER_ID, '05_DATABASE'),
-        backups: describeDriveFolder_(DB_BACKUP_FOLDER_ID, 'BACKUPS'),
+        backups: describeResolvedBackupFolder_(),
         replaced: describeDriveFolder_(REPLACED_DB_FOLDER_ID, 'REPLACED'),
         archives: describeDriveFolder_(ARCHIVE_FOLDER_ID, 'ARCHIVES')
       },

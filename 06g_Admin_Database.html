@@ -193,10 +193,11 @@ function buildRestorePill(label, selectId, fileType, optionsHtml) {
 
 function buildBackupHealthBannerHtml(health) {
   if (!health) return '';
+  const folderLabel = health.backupFolderPath || '05_DATABASE/BACKUPS';
   if (health.healthy) {
     return '<div class="admin-banner-ok" style="margin-bottom:10px;">'
       + '✓ Backup OK — last Engine+Vault pair: <strong>' + (health.lastPairedDate || '—') + '</strong>'
-      + ' · ' + health.fileCount + ' files in BACKUPS</div>';
+      + ' · ' + health.fileCount + ' files in ' + escapePushHtml(folderLabel) + '</div>';
   }
   return '<div class="admin-banner-warn" style="margin-bottom:10px;">'
     + '⚠️ <strong>BACKUP FAILSAFE:</strong> ' + (health.warning || 'Backup unhealthy') + '</div>';

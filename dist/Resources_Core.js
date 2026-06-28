@@ -17,6 +17,9 @@ const OPS_TEMPLATE_ID = '19J-3qT7ABLIRK7Si1xfp_KEPRQYcbKbe';
 const FIN_TEMPLATE_ID = '1qmchnnh21Lp3iPR73B_LV6oihbiTJSwW';
 const LIVE_DATABASE_FOLDER_ID = '1EAgUzjbwq5CootjKmZhQP3Mfm2VYsZox';
 const DB_BACKUP_FOLDER_ID = '1yVRU7ZsYwrazsIkSlt0-afYFLWtScMre';
+const DB_BACKUP_FOLDER_NAME = 'BACKUPS';
+/** v354–355 mistakenly created/wrote here — scan for legacy copies only */
+const LEGACY_BACKUP_FOLDER_NAME = '05_DATABASE_BACKUPS';
 const REPLACED_DB_FOLDER_ID = '1aZSru-d8OryHpNCooPm78oWdFjSauTPN';
 const ARCHIVE_FOLDER_ID = '1KFhrzhwxuMocMQzW9DfWc5QcO-_Pg81z';
 const LIVE_ENGINE_FILE_NAME = 'SM_Showrunner_ENGINE';
@@ -34,7 +37,46 @@ function getLiveDatabaseFolder() {
 }
 
 function getDatabaseBackupFolder() {
-  return DriveApp.getFolderById(DB_BACKUP_FOLDER_ID);
+  try {
+    const folder = DriveApp.getFolderById(DB_BACKUP_FOLDER_ID);
+    const parents = folder.getParents();
+    if (parents.hasNext() && parents.next().getId() !== LIVE_DATABASE_FOLDER_ID) {
+      console.warn('DB_BACKUP_FOLDER_ID parent is not 05_DATABASE — still using confirmed BACKUPS folder ID.');
+    }
+    return folder;
+  } catch (e) { /* fall through to name resolve */ }
+
+  const dbFolder = getLiveDatabaseFolder();
+  const byName = dbFolder.getFoldersByName(DB_BACKUP_FOLDER_NAME);
+  if (byName.hasNext()) return byName.next();
+
+  throw new Error('BACKUPS folder not found — expected ID ' + DB_BACKUP_FOLDER_ID + ' or '
+    + dbFolder.getName() + '/' + DB_BACKUP_FOLDER_NAME);
+}
+
+function getLegacyDatabaseBackupFolder_() {
+  try {
+    const dbFolder = getLiveDatabaseFolder();
+    const it = dbFolder.getFoldersByName(LEGACY_BACKUP_FOLDER_NAME);
+    return it.hasNext() ? it.next() : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function getBackupScanFolders_() {
+  const folders = [];
+  const seen = {};
+  function add(folder) {
+    if (!folder) return;
+    const id = folder.getId();
+    if (seen[id]) return;
+    seen[id] = true;
+    folders.push(folder);
+  }
+  add(getDatabaseBackupFolder());
+  add(getLegacyDatabaseBackupFolder_());
+  return folders;
 }
 
 function getArchiveDatabaseFolder() {

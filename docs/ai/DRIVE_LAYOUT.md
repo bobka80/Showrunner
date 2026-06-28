@@ -88,8 +88,7 @@ All four live spreadsheets sit **directly in `05_DATABASE`** (not in subfolders)
 - **Retention:** Files older than **30 days** pruned on nightly run (`BACKUP_RETAIN_DAYS`).
 - **Restore:** Copy from `BACKUPS` → live slot in `05_DATABASE` as **`SM_Showrunner_ENGINE`** / **`SM_Showrunner_VAULT`**; previous live moved to `REPLACED`.
 - **Backups are never moved** — only copied from; dated names stay in `BACKUPS`.
-
-**Code drift:** `getDatabaseBackupFolder()` still searches folder name `05_DATABASE_BACKUPS` — must use folder ID `DB_BACKUP_FOLDER_ID` and/or name **`BACKUPS`**.
+- **Legacy:** v354–355 briefly wrote to `05_DATABASE/05_DATABASE_BACKUPS` — code still **scans** that folder for old copies but **writes** only to `BACKUPS` (`DB_BACKUP_FOLDER_ID`).
 
 ---
 
