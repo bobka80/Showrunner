@@ -127,11 +127,19 @@ function renderProjectAssetsUI() {
             gridConfAssigned.cols[k].vis = true;
             gridConfAssigned.cols[k].w = (k === 'name') ? 150 : (k === 'action' ? 140 : 56);
         });
-        Object.keys(gridConfAssigned.cols).forEach(function(k) {
-            if (['name', 'qty', 'unit', 'action'].indexOf(k) === -1) gridConfAssigned.cols[k].vis = false;
-        });
-        gridConfAssigned.order = ['name', 'qty', 'unit', 'action'];
-        visibleColsAssigned = ['name', 'qty', 'unit', 'action'];
+        if (window.currentPaMode === 'operation') {
+            gridConfAssigned.cols['unit'].vis = false;
+            gridConfAssigned.cols['name'].w = 130;
+            gridConfAssigned.cols['action'].w = 118;
+            gridConfAssigned.order = ['name', 'qty', 'action'];
+            visibleColsAssigned = ['name', 'qty', 'action'];
+        } else {
+            Object.keys(gridConfAssigned.cols).forEach(function(k) {
+                if (['name', 'qty', 'unit', 'action'].indexOf(k) === -1) gridConfAssigned.cols[k].vis = false;
+            });
+            gridConfAssigned.order = ['name', 'qty', 'unit', 'action'];
+            visibleColsAssigned = ['name', 'qty', 'unit', 'action'];
+        }
         let el = document.getElementById('style-grid-project_assigned');
         if (el) el.remove();
     }
@@ -156,31 +164,38 @@ function renderProjectAssetsUI() {
         }
         if (sQty > 0) {
             const midLabel = isMobPa ? (opLabel + ' ' + sQty + '/' + cQty) : (sQty + '/' + cQty + ' ALL');
-            return `<div style="${widthStyle} text-align:center;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${remQty})" title="${manualTitle}">${midLabel}</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm mobile-pa-undo-btn" style="padding:2px 5px !important;margin:0;font-weight:bold;display:inline-flex !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', 1)" title="Undo 1">✖</button></div>`;
+            return `<div style="${widthStyle} text-align:center;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;">${autoBadge}<button class="btn-main btn-sm mobile-pa-op-btn" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${remQty})" title="${manualTitle}">${midLabel}</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm mobile-pa-op-btn" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm mobile-pa-undo-btn" style="padding:2px 5px !important;margin:0;font-weight:bold;display:inline-flex !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', 1)" title="Undo 1">✖</button></div>`;
         }
         if (cQty > 1) {
-            return `<div style="${widthStyle} text-align:center;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${cQty})" title="${manualTitle}">${opLabel} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
+            return `<div style="${widthStyle} text-align:center;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;">${autoBadge}<button class="btn-main btn-sm mobile-pa-op-btn" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${cQty})" title="${manualTitle}">${opLabel} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm mobile-pa-op-btn" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
         }
-        return `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', 1)" title="${manualTitle}">${opLabel}</button></div>`;
+        return `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm mobile-pa-op-btn" style="padding:2px 8px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', 1)" title="${manualTitle}">${opLabel}</button></div>`;
     };
-    const buildOpHeaderRight = function(assetId, cQty, sQty) {
+    const buildOpHeaderRight = function(assetId, cQty, sQty, containerUniqueCid) {
         const doneBtnText = window.currentOperationType === 'CHECK-IN' ? 'CHECKED IN ✓' : 'CHECKED OUT ✓';
         const opLabel = isMobPa ? mobOpLabel() : (window.currentOperationType ? window.currentOperationType.replace('-', ' ') : 'CHECK OUT');
         const bs = mobOpBtnCss();
         const remQty = cQty - sQty;
         const uniqueSq = 'sq-case-' + Math.random().toString(36).substr(2, 5);
         const manualTitle = 'Manual tap if RFID does not work';
+        const scanFn = containerUniqueCid
+            ? `triggerContainerInstanceCheckout('${containerUniqueCid}')`
+            : `triggerManualScan('${assetId}', ${remQty > 0 ? remQty : cQty})`;
+        const scanAllFn = containerUniqueCid
+            ? `triggerContainerInstanceCheckout('${containerUniqueCid}')`
+            : `triggerManualScan('${assetId}', ${cQty})`;
         if (sQty >= cQty) {
             return `<button class="btn-main btn-sm" style="background:#10b981 !important;border-color:#10b981 !important;color:#000 !important;margin:0;padding:2px 8px !important;cursor:pointer;font-size:9px !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', ${cQty})" title="Undo">${doneBtnText}</button>`;
         }
         if (sQty > 0) {
             const midLabel = isMobPa ? (opLabel + ' ' + sQty + '/' + cQty) : (sQty + '/' + cQty + ' ALL');
-            return `<div style="display:flex;gap:2px;flex-wrap:wrap;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${remQty})" title="${manualTitle}">${midLabel}</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm mobile-pa-undo-btn" style="padding:2px 5px !important;margin:0;font-weight:bold;display:inline-flex !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', 1)" title="Undo 1">✖</button></div>`;
+            return `<div style="display:flex;gap:2px;flex-wrap:wrap;"><button class="btn-main btn-sm mobile-pa-op-btn" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); ${scanFn}" title="${manualTitle}">${midLabel}</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm mobile-pa-op-btn" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm mobile-pa-undo-btn" style="padding:2px 5px !important;margin:0;font-weight:bold;display:inline-flex !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', 1)" title="Undo 1">✖</button></div>`;
         }
-        if (cQty > 1) {
-            return `<div style="display:flex;gap:2px;flex-wrap:wrap;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${cQty})" title="${manualTitle}">${opLabel} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
+        if (cQty > 1 || containerUniqueCid) {
+            const allLabel = containerUniqueCid ? opLabel + ' ALL' : (opLabel + ' ALL');
+            return `<div style="display:flex;gap:2px;flex-wrap:wrap;"><button class="btn-main btn-sm mobile-pa-op-btn" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); ${scanAllFn}" title="${manualTitle}">${allLabel}</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm mobile-pa-op-btn" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
         }
-        return `<button class="btn-main btn-sm" style="margin:0;padding:2px 8px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', 1)" title="${manualTitle}">${opLabel}</button>`;
+        return `<button class="btn-main btn-sm mobile-pa-op-btn" style="margin:0;padding:2px 8px !important;${bs}" onclick="event.stopPropagation(); ${containerUniqueCid ? scanAllFn : `triggerManualScan('${assetId}', 1)`}" title="${manualTitle}">${opLabel}</button>`;
     };
 
     let dynCssAssigned = window.GridEngine.buildCSS('project_assigned');
@@ -627,6 +642,7 @@ function renderProjectAssetsUI() {
         });
         sortAssetsList(looseItems, window.paAssignedSort, true);
         containerInstances.forEach(inst => sortAssetsList(inst.children, window.paAssignedSort, true));
+        window._paRenderContainerInstances = containerInstances;
         
         let itemsByDept = {};
         looseItems.forEach(item => {
@@ -682,11 +698,19 @@ function renderProjectAssetsUI() {
             let isTarget = (window.activeContainerTarget === cid);
             let bgH = isTarget ? 'rgba(245, 158, 11, 0.1)' : '#151518';
             let brd = isTarget ? 'border: 2px solid #f59e0b;' : 'border: 1px solid #333;';
+            let containerAssetId = cAsset ? cAsset.id : String(cid).split('|||')[0];
             
             let headerRight = '';
             if (window.currentPaMode === 'operation') {
-                let sQty = cPa ? (cPa.scannedQty || 0) : 0;
-                headerRight = buildOpHeaderRight(cid, cQty, sQty);
+                let instNeed = 0;
+                let instGot = 0;
+                inst.children.forEach(function(child) {
+                    instNeed += parseInt(child.pa.qty, 10) || 1;
+                    instGot += child.pa.scannedQty || 0;
+                });
+                let opCQty = Math.max(1, instNeed || cQty);
+                let opSQty = inst.children.length > 0 ? instGot : (cPa ? (cPa.scannedQty || 0) : 0);
+                headerRight = buildOpHeaderRight(containerAssetId, opCQty, opSQty, inst.uniqueCid);
             } else if (isTarget) {
                 headerRight = `<div style="display:flex; gap:6px;"><button class="btn-outline btn-sm" style="border-color:#3b82f6; color:#3b82f6; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); alert('QR/RFID Scanner module pending.')">SCAN</button><button class="btn-outline btn-sm" style="border-color:#a855f7; color:#a855f7; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); alert('Manual unit number linking module pending.')">LINK</button><button class="btn-outline btn-sm" style="border-color:#ef4444; color:#ef4444; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); cancelContainerPacking()">CANCEL</button><button class="btn-main btn-sm" style="background:#10b981; color:#000; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); clearContainerTarget()">DONE</button></div>`;
             } else {

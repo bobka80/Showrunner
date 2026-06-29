@@ -1066,26 +1066,36 @@ body.mobile-pa-compact #pa-right-panel > div:first-child > div:first-child > div
 }
 
 /* List: sublist name visible; formula blob hidden; no group EDIT/DEL */
-body.mobile-pa-compact #pa-assigned-list div[title="Formula String"],
-body.mobile-pa-compact #pa-assigned-list div[title="Standalone Items"] {
+body.mobile-pa-compact #pa-view-logistics div[title="Formula String"],
+body.mobile-pa-compact #pa-view-logistics div[title="Standalone Items"],
+body.mobile-pa-compact .pa-assigned-list div[title="Formula String"],
+body.mobile-pa-compact .pa-assigned-list div[title="Standalone Items"] {
     display: none !important;
 }
 
-body.mobile-pa-compact #pa-assigned-list .btn-blue.btn-sm,
-body.mobile-pa-compact:not(.mobile-pa-mode-operation) #pa-assigned-list .btn-delete.btn-sm {
+body.mobile-pa-compact #pa-view-logistics .btn-blue.btn-sm,
+body.mobile-pa-compact .pa-assigned-list .btn-blue.btn-sm,
+body.mobile-pa-compact:not(.mobile-pa-mode-operation) #pa-view-logistics .btn-delete.btn-sm,
+body.mobile-pa-compact:not(.mobile-pa-mode-operation) .pa-assigned-list .btn-delete.btn-sm {
     display: none !important;
 }
 
-body.mobile-pa-compact.mobile-pa-mode-operation #pa-assigned-list .mobile-pa-undo-btn {
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-view-logistics .mobile-pa-undo-btn,
+body.mobile-pa-compact.mobile-pa-mode-operation .pa-assigned-list .mobile-pa-undo-btn {
     display: inline-flex !important;
 }
 
+body.mobile-pa-compact.mobile-pa-mode-operation #project-assets-modal-overlay {
+    box-shadow: inset 0 0 0 3px #ef4444;
+}
+
 body.mobile-pa-compact.mobile-pa-mode-operation #project-assets-modal-overlay .modal {
-    border-color: #ef4444 !important;
+    border: 4px solid #ef4444 !important;
+    box-shadow: inset 0 0 12px rgba(239, 68, 68, 0.2);
 }
 
 body.mobile-pa-compact.mobile-pa-mode-packing #project-assets-modal-overlay .modal {
-    border-color: #f59e0b !important;
+    border: 4px solid #f59e0b !important;
 }
 
 body.mobile-pa-compact.mobile-pa-mode-operation #pa-operation-bar {
@@ -1107,6 +1117,24 @@ body.mobile-pa-compact.mobile-pa-mode-operation #pa-rfid-scanner {
 body.mobile-pa-compact.mobile-pa-mode-operation #pa-mobile-mode-bar #btn-master-operation {
     border-color: #ef4444 !important;
     color: #ef4444 !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-view-logistics .asset-row,
+body.mobile-pa-compact.mobile-pa-mode-operation .pa-assigned-list .asset-row {
+    flex-wrap: wrap !important;
+    row-gap: 4px;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-view-logistics .btn-main.btn-sm,
+body.mobile-pa-compact.mobile-pa-mode-operation .pa-assigned-list .btn-main.btn-sm {
+    display: inline-flex !important;
+    visibility: visible !important;
+    min-height: 26px;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-view-logistics .parent-row.project_assigned-container,
+body.mobile-pa-compact.mobile-pa-mode-operation .pa-assigned-list .parent-row.project_assigned-container {
+    flex-wrap: wrap !important;
 }
 
 body.mobile-pa-compact #pa-operation-bar {

@@ -57,6 +57,7 @@ window.startOperationUI = function(type, e) {
         if (typeof togglePaMode === 'function') togglePaMode('operation');
         if (typeof evalOperationButtons === 'function') evalOperationButtons();
         if (typeof applyMobilePaModeChrome === 'function') applyMobilePaModeChrome();
+        if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
     })
     .withFailureHandler(err => {
         btn.innerText = origText; btn.disabled = false;
@@ -142,6 +143,39 @@ window.handleRfidScan = function() {
 };
 
 // @INDEX: OPERATIONS -> Trigger Manual Scan
+window.triggerContainerInstanceCheckout = function(uniqueCid) {
+    const inst = (window._paRenderContainerInstances || []).find(function(i) { return i.uniqueCid === uniqueCid; });
+    if (!inst || !inst.asset) return;
+    const assetId = inst.asset.id;
+    const children = (inst.children || []).map(function(child) {
+        return { id: child.asset.id, qty: parseInt(child.pa.qty, 10) || 1 };
+    });
+    const projectId = document.getElementById('edit-folder-id').value;
+    const input = document.getElementById('pa-rfid-scanner');
+    const deltas = typeof calculatePaDeltas === 'function' ? calculatePaDeltas() : [];
+    const runScan = function() {
+        executeManualScanCall(projectId, assetId, input, 1, { containerInstanceChildren: children });
+    };
+    if (deltas.length > 0) {
+        if (input) { input.value = 'SAVING...'; input.disabled = true; }
+        google.script.run
+        .withSuccessHandler(function() {
+            window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+            runScan();
+        })
+        .withFailureHandler(function(err) {
+            if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
+                window.showMobilePaToast('Save failed', err.message);
+            } else {
+                alert('Failed to auto-save equipment: ' + err.message);
+            }
+            if (input) { input.value = ''; input.disabled = false; input.focus(); }
+        }).saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+    } else {
+        runScan();
+    }
+};
+
 window.triggerManualScan = function(assetId, scanQtyOverride) {
     let scanQty = parseInt(scanQtyOverride, 10) || 1;
     let projectId = document.getElementById('edit-folder-id').value;
@@ -165,7 +199,8 @@ window.triggerManualScan = function(assetId, scanQtyOverride) {
     }
 };
 
-function executeManualScanCall(projectId, assetId, input, scanQty) {
+function executeManualScanCall(projectId, assetId, input, scanQty, opts) {
+    opts = opts || {};
     let q = parseInt(scanQty, 10) || 1;
     let asset = globalAssets.find(a => a.id === assetId);
     let aName = asset ? asset.name : "Asset";
@@ -184,7 +219,9 @@ function executeManualScanCall(projectId, assetId, input, scanQty) {
     };
 
     let childrenIds = [];
-    if (typeof currentProjectAssets !== 'undefined') {
+    if (opts.containerInstanceChildren && opts.containerInstanceChildren.length) {
+        childrenIds = opts.containerInstanceChildren.slice();
+    } else if (typeof currentProjectAssets !== 'undefined') {
         currentProjectAssets.forEach(pa => {
             let cid = pa.containerUid || "";
             if (!cid) {
@@ -195,7 +232,10 @@ function executeManualScanCall(projectId, assetId, input, scanQty) {
                     if (autoContainer) cid = autoContainer.assetId;
                 }
             }
-            if (cid === assetId) childrenIds.push({ id: pa.assetId, qty: parseInt(pa.qty, 10) || 1 });
+            const baseCid = String(cid).split('|||')[0];
+            if (baseCid === assetId || cid === assetId) {
+                childrenIds.push({ id: pa.assetId, qty: parseInt(pa.qty, 10) || 1 });
+            }
         });
     }
 

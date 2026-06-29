@@ -43,7 +43,7 @@ window._mobilePaDomRestore = {};
 window._mobilePaChoiceHandlers = null;
 
 window.isMobilePaExplicitSaveMode = function() {
-    return !!window.mobilePaCompactActive || (!!window.mobileCrewHubProjectId && window.innerWidth <= 768);
+    return false;
 };
 
 window.hasUnsavedPaChanges = function() {
@@ -365,12 +365,15 @@ window.applyMobilePaModeChrome = function() {
     body.classList.remove('mobile-pa-mode-packing', 'mobile-pa-mode-operation', 'mobile-pa-mode-design');
     if (window.currentPaMode === 'operation') {
         body.classList.add('mobile-pa-mode-operation');
-        if (modal) modal.style.setProperty('border-color', '#ef4444', 'important');
+        if (modal) modal.style.setProperty('border', '4px solid #ef4444', 'important');
         if (opStatus) opStatus.style.color = '#ef4444';
-        if (opBar) opBar.style.borderBottomColor = '#ef4444';
+        if (opBar) {
+            opBar.style.display = 'flex';
+            opBar.style.borderBottomColor = '#ef4444';
+        }
     } else if (window.currentPaMode === 'packing') {
         body.classList.add('mobile-pa-mode-packing');
-        if (modal) modal.style.setProperty('border-color', '#f59e0b', 'important');
+        if (modal) modal.style.setProperty('border', '4px solid #f59e0b', 'important');
         if (opStatus) opStatus.style.color = '#f59e0b';
         if (opBar) opBar.style.borderBottomColor = '#333';
     } else {
@@ -520,7 +523,7 @@ window.showMobilePaDetail = function(title, bodyHtml) {
 
 document.addEventListener('click', function(e) {
     if (!window.mobilePaCompactActive) return;
-    const row = e.target.closest('#pa-assigned-list [id^="fg_"] > div:first-child');
+    const row = e.target.closest('#pa-view-logistics [id^="fg_"] > div:first-child, .pa-assigned-list [id^="fg_"] > div:first-child');
     if (!row || e.target.closest('button')) return;
     const formulaDiv = row.querySelector('div[title="Formula String"]');
     const locInput = row.querySelector('input[type="text"]');
