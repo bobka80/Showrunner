@@ -23,7 +23,6 @@
   let desktopLockVerifying = false;
   let desktopLockIdleTimer = null;
   let desktopLockClockTimer = null;
-  let desktopLockQuickBuffer = '';
 
   function desktopLockCrewKey() {
     let crew = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'default';
@@ -97,7 +96,6 @@
     let cap = document.getElementById('desktop-lock-quick-capture');
     if (!cap || desktopLockRequireFull) return;
     cap.value = '';
-    desktopLockQuickBuffer = '';
     setTimeout(function() {
       try { cap.focus({ preventScroll: true }); } catch (e) { cap.focus(); }
     }, 50);
@@ -120,7 +118,6 @@
 
   function resetDesktopLockUnlockUI() {
     desktopLockRequireFull = false;
-    desktopLockQuickBuffer = '';
     let form = document.getElementById('desktop-lock-full-form');
     if (form) form.style.display = 'none';
     let fullInp = document.getElementById('desktop-lock-full-input');
@@ -266,22 +263,6 @@
     }
   }
 
-  function onDesktopLockQuickKeydown(e) {
-    if (!desktopLockActive || desktopLockRequireFull) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === 'Tab' || e.key === 'Escape') return;
-    if (e.key === 'Enter' && desktopLockRequireFull) return;
-    if (e.key.length === 1) {
-      desktopLockQuickBuffer += e.key;
-      if (desktopLockQuickBuffer.length >= 2) {
-        handleQuickUnlockAttempt(desktopLockQuickBuffer.substring(0, 2));
-        desktopLockQuickBuffer = '';
-        let cap = document.getElementById('desktop-lock-quick-capture');
-        if (cap) cap.value = '';
-      }
-    }
-  }
-
   window.initDesktopLockWatch = function() {
     if (!isDesktopLockEligible()) return;
     syncDesktopLockIdleSelect();
@@ -290,7 +271,6 @@
     });
     let cap = document.getElementById('desktop-lock-quick-capture');
     if (cap) cap.addEventListener('input', onDesktopLockQuickInput);
-    document.addEventListener('keydown', onDesktopLockQuickKeydown);
     let fullInp = document.getElementById('desktop-lock-full-input');
     if (fullInp) {
       fullInp.addEventListener('keydown', function(e) {
