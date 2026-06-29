@@ -18,7 +18,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 **Does NOT:** Create an Apps Script version or change production URL.
 
 **Rollback:** *"Rollback to last this works"* or *"Rollback to works #5"*  
-→ AI checks out that Git commit → `node build.js` → `clasp push` → director retests in dev.
+→ AI checks out that Git commit → `node build.js` → `gas-push-sync` (or `node dev-push.js`) → director retests in dev.
 
 ---
 
@@ -30,7 +30,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 **What happens (automatic via `node milestone.js "note"`):**
 1. Reads latest GAS version (e.g. 265) — next will be 266
-2. `node build.js` + `clasp push`
+2. `node build.js` + **`gas-push-sync.js`** (full replace of GAS files from `dist/` — removes orphans; plain `clasp push` does not delete removed files)
 3. `clasp version "<note>"` — frozen snapshot with your name on Google
 4. `clasp deploy` that new version (updates saved production URL if `deploy-config.json` exists; otherwise creates a new deployment and saves the ID)
 5. Git commit + row in root **`RELEASES.md`**
@@ -112,7 +112,7 @@ Many directors use **two different accounts**. That is expected and supported.
 | Account | Used for | Where it lives |
 |---------|----------|----------------|
 | **Your Cursor / developer identity** | AI subscription, `git config user.name` / `user.email`, optional **personal GitHub** | Your PC; not tied to company Google |
-| **Company Google (clasp login)** | Apps Script project, `clasp push`, **GAS versions**, production web app URL | Host / company Google account |
+| **Company Google (clasp login)** | Apps Script project, **`gas-push-sync`** / deploy, **GAS versions**, production web app URL | Host / company Google account |
 
 **Git (“This works” saves)** does **not** use your Cursor login or your company Google login. It only uses:
 - Files on your computer (or Google Drive folder)

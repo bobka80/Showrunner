@@ -25,7 +25,8 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Main.js`**: GAS backend entry point. Handles HTTP GET/POST routing and the high-speed boot payload.
 - **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits. Copies backend `.js` + `Login.html` to `dist/`; excludes Node tooling (`milestone.js`, `deploy-hosting.js`, etc.).
 - **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md`.
-- **`check-google-account.js`**: Node-only (not deployed to GAS). Verifies clasp login matches `google-account.json` and can reach the bound Apps Script project. Run: `node check-google-account.js` or `npm run check-google`. Auto-runs on workspace open via `.vscode/tasks.json` (`runOn: folderOpen`).
+- **`check-google-account.js`**: Node-only (not deployed to GAS). Verifies clasp login matches `google-account.json`. Run: `node check-google-account.js` or `npm run check-google`.
+- **`gas-push-sync.js`**: Node-only. Replaces all Apps Script project files from `dist/` via API (deletes orphans). Used by `milestone.js` and `dev-push.js` instead of bare `clasp push`.
 - **`Security.js`**: Manages user authentication and extracts security profiles.
 - **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.
 - **`Styles_Mobile.html`**: Mobile-only CSS (`≤768px`) + crew hub / phase rail / timeline zoom / compact PA. Included after `Styles.html`.

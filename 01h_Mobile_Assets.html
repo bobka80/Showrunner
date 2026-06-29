@@ -26,6 +26,172 @@
  */
 
 window.mobilePaCompactActive = false;
+window._mobilePaDomRestore = {};
+
+window.isPaContainerRow = function(pa, asset) {
+    if (!asset && pa && pa.assetId && typeof globalAssets !== 'undefined') {
+        asset = globalAssets.find(function(a) { return a.id === pa.assetId; });
+    }
+    if (!asset) return false;
+    return !!(pa.isAuto || asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
+};
+
+window.evaluateMobileLogisticsStatus = function() {
+    const assets = (typeof currentProjectAssets !== 'undefined' && currentProjectAssets) ? currentProjectAssets : [];
+    const gA = (typeof globalAssets !== 'undefined' && globalAssets) ? globalAssets : [];
+    const rs = window.currentReadinessState || {};
+    const containerPas = [];
+    assets.forEach(function(pa) {
+        const a = gA.find(function(x) { return x.id === pa.assetId; });
+        if (isPaContainerRow(pa, a)) containerPas.push(pa);
+    });
+    const hasContainers = containerPas.length > 0;
+    let truckDone = false;
+    if (hasContainers) {
+        truckDone = containerPas.every(function(pa) {
+            if (pa.outboundStaged) return false;
+            return !!(pa.outboundTruckUid && pa.outboundX != null && pa.outboundX !== '');
+        });
+    }
+    const truckAuto = truckDone && (rs.truck === 'arranged_auto' || !!window._truckArrangeUsedAuto);
+    const areasDone = !!(rs.loadin === 'done' || rs.loadin === 'complete');
+    return { hasContainers: hasContainers, truckDone: truckDone, truckAuto: truckAuto, areasDone: areasDone, areasEnabled: truckDone };
+};
+
+window.ensureMobilePaCache = function(projectId, cb) {
+    if (typeof currentProjectAssets !== 'undefined' && currentProjectAssets && currentProjectAssets.length) {
+        if (cb) cb();
+        return;
+    }
+    try {
+        const cached = localStorage.getItem('sm_pa_cache_' + projectId);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed && parsed.current && parsed.current.length) {
+                currentProjectAssets = parsed.current;
+                if (cb) cb();
+                return;
+            }
+        }
+    } catch (e) { /* ignore */ }
+    if (cb) cb();
+};
+
+window.updateMobileCrewLogisticsButtons = function() {
+    const truckBtn = document.getElementById('mch-btn-truck');
+    const areasBtn = document.getElementById('mch-btn-areas');
+    if (!truckBtn && !areasBtn) return;
+    const st = evaluateMobileLogisticsStatus();
+    if (truckBtn) {
+        let label = '🚛 TRUCK';
+        if (st.truckAuto) label += ' <span class="mch-auto-badge">A</span>';
+        truckBtn.innerHTML = label;
+        truckBtn.classList.toggle('mch-footer-btn--complete', st.truckDone);
+        truckBtn.classList.toggle('mch-footer-btn--incomplete', !st.truckDone);
+        truckBtn.disabled = !st.hasContainers;
+    }
+    if (areasBtn) {
+        areasBtn.classList.toggle('mch-footer-btn--complete', st.areasDone);
+        areasBtn.classList.toggle('mch-footer-btn--incomplete', !st.areasDone);
+        areasBtn.classList.toggle('mch-footer-btn--disabled', !st.areasEnabled);
+        areasBtn.disabled = !st.areasEnabled;
+    }
+};
+
+window.mobileCrewOpenTruck = function() {
+    const pId = window.mobileCrewHubProjectId;
+    if (!pId) return;
+    syncProjectEditorHiddenFields(window.mobileCrewHubProject, pId);
+    document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
+    ensureMobilePaCache(pId, function() {
+        if (typeof openTruckArrangementDashboard === 'function') openTruckArrangementDashboard();
+        else alert('Truck arrangement is not available.');
+    });
+};
+
+window.mobileCrewOpenAreas = function() {
+    const pId = window.mobileCrewHubProjectId;
+    if (!pId) return;
+    const st = evaluateMobileLogisticsStatus();
+    if (!st.areasEnabled) return alert('Finish truck loading before opening venue areas.');
+    syncProjectEditorHiddenFields(window.mobileCrewHubProject, pId);
+    document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
+    ensureMobilePaCache(pId, function() {
+        if (typeof openLoadinPlanDashboard === 'function') openLoadinPlanDashboard();
+        else alert('Venue load-in plan is not available.');
+    });
+};
+
+window.refreshMobileProjectAssetsCache = function(projectId, cb) {
+    try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) { /* ignore */ }
+    const sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+    const eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
+    google.script.run
+        .withSuccessHandler(function(res) {
+            currentProjectAssets = (res && res.current) ? res.current : [];
+            try {
+                localStorage.setItem('sm_pa_cache_' + projectId, JSON.stringify({
+                    sDate: sDate,
+                    eDate: eDate,
+                    current: res.current,
+                    overlapping: res.overlapping || {}
+                }));
+            } catch (e) { /* ignore */ }
+            if (cb) cb();
+        })
+        .withFailureHandler(function() { if (cb) cb(); })
+        .getProjectAssets(projectId, sDate, eDate);
+};
+
+window.finishMobileLogisticsModal = function() {
+    const hub = document.getElementById('mobile-crew-hub-overlay');
+    if (window.mobileCrewHubProjectId && hub) {
+        hub.style.display = 'flex';
+        if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
+    }
+};
+
+window.persistMobileReadinessState = function() {
+    const pId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : null;
+    if (!pId || !window.currentReadinessState) return;
+    if (window.mobileCrewHubProject) window.mobileCrewHubProject.readinessState = window.currentReadinessState;
+    if (typeof calendar !== 'undefined' && calendar) {
+        const ev = calendar.getEventById(pId);
+        if (ev && ev.extendedProps && ev.extendedProps.rawDbData) {
+            const raw = ev.extendedProps.rawDbData;
+            raw.readinessState = window.currentReadinessState;
+            ev.setExtendedProp('rawDbData', raw);
+        }
+    }
+    google.script.run.updateProjectReadiness(
+        pId,
+        JSON.stringify(window.currentReadinessState),
+        typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI'
+    );
+};
+
+function stashMobilePaEl(id) {
+    const el = document.getElementById(id);
+    const bar = document.getElementById('pa-mobile-mode-bar');
+    if (!el || !bar || el.parentElement === bar) return;
+    if (!window._mobilePaDomRestore[id]) {
+        window._mobilePaDomRestore[id] = { parent: el.parentElement, next: el.nextSibling };
+    }
+    bar.appendChild(el);
+}
+
+function restoreMobilePaDom() {
+    Object.keys(window._mobilePaDomRestore).forEach(function(id) {
+        const el = document.getElementById(id);
+        const stash = window._mobilePaDomRestore[id];
+        if (!el || !stash || !stash.parent) return;
+        if (stash.next && stash.next.parentNode === stash.parent) stash.parent.insertBefore(el, stash.next);
+        else stash.parent.appendChild(el);
+    });
+    window._mobilePaDomRestore = {};
+    const bar = document.getElementById('pa-mobile-mode-bar');
+    if (bar) bar.style.display = 'none';
+};
 
 window.openMobileProjectAssets = function(projectId) {
     const pId = projectId || window.mobileCrewHubProjectId;
@@ -50,9 +216,23 @@ window.applyMobilePaChrome = function() {
     if (!window.mobilePaCompactActive) return;
     const saveM = document.getElementById('btn-save-pa-mobile');
     const searchM = document.getElementById('btn-mobile-pa-search');
+    const closeX = document.getElementById('btn-pa-close-x');
     const ro = !!window.projectAssetsReadOnly;
     if (saveM) saveM.style.display = ro ? 'none' : 'inline-flex';
     if (searchM) searchM.style.display = ro ? 'none' : 'inline-flex';
+    if (closeX) closeX.style.display = 'inline-flex';
+    stashMobilePaEl('mode-toggle-btn');
+    stashMobilePaEl('pa-packing-filters');
+    const modeBar = document.getElementById('pa-mobile-mode-bar');
+    if (modeBar) modeBar.style.display = 'flex';
+    if (typeof evalOperationButtons === 'function') evalOperationButtons();
+    const opBtn = document.getElementById('btn-master-operation');
+    if (opBtn && window.currentPaMode === 'packing') {
+        stashMobilePaEl('btn-master-operation');
+        opBtn.style.display = '';
+    } else if (opBtn && modeBar && opBtn.parentElement === modeBar) {
+        opBtn.style.display = 'none';
+    }
 };
 
 window.exitMobilePaCompactMode = function() {
@@ -60,10 +240,14 @@ window.exitMobilePaCompactMode = function() {
     window.mobilePaCompactActive = false;
     closeMobilePaDetail();
     closeMobilePaVaultSearch();
+    restoreMobilePaDom();
     const saveM = document.getElementById('btn-save-pa-mobile');
     const searchM = document.getElementById('btn-mobile-pa-search');
+    const closeX = document.getElementById('btn-pa-close-x');
     if (saveM) saveM.style.display = 'none';
     if (searchM) searchM.style.display = 'none';
+    if (closeX) closeX.style.display = 'none';
+    if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
 };
 
 window.closeMobilePaDetail = function() {
@@ -157,6 +341,7 @@ window.showMobilePaDetail = function(title, bodyHtml) {
             exitMobilePaCompactMode();
             if (window.mobileCrewHubProjectId) {
                 document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
+                if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
             }
         }
     };

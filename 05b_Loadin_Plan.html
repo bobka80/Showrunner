@@ -15,7 +15,7 @@
         <div style="display:flex; align-items:center; gap: 12px;">
             <button class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444;" onclick="addLoadinElement('stage')">+ STAGE / NO-GO</button>
             <button class="btn-outline btn-sm" style="margin:0; border-color:#a1a1aa; color:#a1a1aa;" onclick="addLoadinElement('dock')">+ LOAD IN DOCK</button>
-            <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('loadin-plan-overlay').style.display='none'">CLOSE</button>
+            <button class="btn-close" style="width:auto; margin:0;" onclick="closeLoadinPlanDashboard()">CLOSE</button>
         </div>
     </div>
     
@@ -44,6 +44,22 @@ function openLoadinPlanDashboard() {
     if (!loadinAttached && typeof attachZoomPan === 'function') {
         attachZoomPan('#loadin-svg-container', '#loadin-svg', loadinZoomObj);
         loadinAttached = true;
+    }
+
+    const rs = window.currentReadinessState || {};
+    if (rs.loadinPlan && Array.isArray(rs.loadinPlan.rects) && rs.loadinPlan.rects.length) {
+        loadinRects = JSON.parse(JSON.stringify(rs.loadinPlan.rects));
+        if (rs.loadinPlan.venueW) {
+            const wEl = document.getElementById('venue-dim-w');
+            if (wEl) wEl.value = rs.loadinPlan.venueW;
+        }
+        if (rs.loadinPlan.venueL) {
+            const lEl = document.getElementById('venue-dim-l');
+            if (lEl) lEl.value = rs.loadinPlan.venueL;
+        }
+        renderLoadinPlan();
+        setTimeout(autoFitVenue, 100);
+        return;
     }
 
     let deptAreas = {};
@@ -242,5 +258,20 @@ function autoFitVenue() {
     
     loadinZoomObj.zoom = scale; loadinZoomObj.panX = (svgContainer.clientWidth / 2) - ((minX + maxX) / 2) * scale; loadinZoomObj.panY = (svgContainer.clientHeight / 2) - ((minY + maxY) / 2) * scale;
     document.getElementById('loadin-svg').style.transform = `translate(${loadinZoomObj.panX}px, ${loadinZoomObj.panY}px) scale(${loadinZoomObj.zoom})`;
+}
+
+function closeLoadinPlanDashboard() {
+    if (!window.currentReadinessState) window.currentReadinessState = {};
+    window.currentReadinessState.loadin = 'done';
+    window.currentReadinessState.loadinPlan = {
+        rects: JSON.parse(JSON.stringify(loadinRects)),
+        venueW: document.getElementById('venue-dim-w') ? document.getElementById('venue-dim-w').value : '',
+        venueL: document.getElementById('venue-dim-l') ? document.getElementById('venue-dim-l').value : ''
+    };
+    if (typeof persistMobileReadinessState === 'function') persistMobileReadinessState();
+    document.getElementById('loadin-plan-overlay').style.display = 'none';
+    if (window.mobileCrewHubProjectId && typeof finishMobileLogisticsModal === 'function') {
+        finishMobileLogisticsModal();
+    }
 }
 </script>

@@ -288,16 +288,27 @@
     flex-shrink: 0;
 }
 
-.mch-back-btn {
+.mch-back-btn,
+.mch-close-x {
     background: transparent;
     border: 1px solid #444;
     color: #a1a1aa;
-    font-size: 11px;
+    font-size: 16px;
     font-weight: 800;
     padding: 8px 12px;
     border-radius: 6px;
     margin-bottom: 10px;
     cursor: pointer;
+    line-height: 1;
+}
+
+.mch-close-x {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .mch-header-main { min-width: 0; }
@@ -443,7 +454,7 @@
 
 .mch-footer {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 8px;
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     border-top: 1px solid #333;
@@ -454,10 +465,49 @@
 .mch-footer-btn {
     width: 100% !important;
     margin: 0 !important;
-    padding: 14px 6px !important;
-    font-size: 11px !important;
+    padding: 14px 4px !important;
+    font-size: 10px !important;
     justify-content: center !important;
     white-space: nowrap;
+}
+
+.mch-footer-btn--incomplete {
+    opacity: 0.42 !important;
+    border-color: #3f3f46 !important;
+    color: #71717a !important;
+}
+
+.mch-footer-btn--complete.mch-footer-btn--truck {
+    opacity: 1 !important;
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+}
+
+.mch-footer-btn--complete.mch-footer-btn--areas {
+    opacity: 1 !important;
+    border-color: #10b981 !important;
+    color: #10b981 !important;
+}
+
+.mch-footer-btn--disabled,
+.mch-footer-btn--disabled:disabled {
+    opacity: 0.3 !important;
+    border-color: #3f3f46 !important;
+    color: #52525b !important;
+    pointer-events: none;
+}
+
+.mch-auto-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 900;
+    background: #f97316;
+    color: #000;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: 2px;
+    vertical-align: middle;
+    letter-spacing: 0;
 }
 
 /* Mobile weather detail popup (crew hub only) */
@@ -954,12 +1004,44 @@ body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > 
 }
 
 body.mobile-pa-compact #pa-modal-title {
-    font-size: 11px !important;
-    letter-spacing: 0.5px !important;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none !important;
+}
+
+body.mobile-pa-compact #btn-pa-cancel-desktop {
+    display: none !important;
+}
+
+body.mobile-pa-compact #btn-pa-close-x {
+    display: inline-flex !important;
+}
+
+body.mobile-pa-compact #pa-mobile-mode-bar {
+    display: flex !important;
+}
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:first-child {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 6px !important;
+    min-width: 0;
+    align-items: center;
+}
+
+body.mobile-pa-compact #btn-print-lists { order: 1; }
+body.mobile-pa-compact #btn-mobile-pa-search { order: 2; }
+body.mobile-pa-compact #btn-save-pa-mobile { order: 3; }
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {
+    margin-right: 0 !important;
+    flex: 0 0 auto;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    order: 4;
+    margin-left: auto;
+}
+
+body.mobile-pa-compact #pa-modal-title {
+    display: none !important;
 }
 
 body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {

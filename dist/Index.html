@@ -2107,16 +2107,27 @@
     flex-shrink: 0;
 }
 
-.mch-back-btn {
+.mch-back-btn,
+.mch-close-x {
     background: transparent;
     border: 1px solid #444;
     color: #a1a1aa;
-    font-size: 11px;
+    font-size: 16px;
     font-weight: 800;
     padding: 8px 12px;
     border-radius: 6px;
     margin-bottom: 10px;
     cursor: pointer;
+    line-height: 1;
+}
+
+.mch-close-x {
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .mch-header-main { min-width: 0; }
@@ -2262,7 +2273,7 @@
 
 .mch-footer {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     gap: 8px;
     padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
     border-top: 1px solid #333;
@@ -2273,10 +2284,49 @@
 .mch-footer-btn {
     width: 100% !important;
     margin: 0 !important;
-    padding: 14px 6px !important;
-    font-size: 11px !important;
+    padding: 14px 4px !important;
+    font-size: 10px !important;
     justify-content: center !important;
     white-space: nowrap;
+}
+
+.mch-footer-btn--incomplete {
+    opacity: 0.42 !important;
+    border-color: #3f3f46 !important;
+    color: #71717a !important;
+}
+
+.mch-footer-btn--complete.mch-footer-btn--truck {
+    opacity: 1 !important;
+    border-color: #3b82f6 !important;
+    color: #3b82f6 !important;
+}
+
+.mch-footer-btn--complete.mch-footer-btn--areas {
+    opacity: 1 !important;
+    border-color: #10b981 !important;
+    color: #10b981 !important;
+}
+
+.mch-footer-btn--disabled,
+.mch-footer-btn--disabled:disabled {
+    opacity: 0.3 !important;
+    border-color: #3f3f46 !important;
+    color: #52525b !important;
+    pointer-events: none;
+}
+
+.mch-auto-badge {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 900;
+    background: #f97316;
+    color: #000;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: 2px;
+    vertical-align: middle;
+    letter-spacing: 0;
 }
 
 /* Mobile weather detail popup (crew hub only) */
@@ -2773,12 +2823,44 @@ body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > 
 }
 
 body.mobile-pa-compact #pa-modal-title {
-    font-size: 11px !important;
-    letter-spacing: 0.5px !important;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: none !important;
+}
+
+body.mobile-pa-compact #btn-pa-cancel-desktop {
+    display: none !important;
+}
+
+body.mobile-pa-compact #btn-pa-close-x {
+    display: inline-flex !important;
+}
+
+body.mobile-pa-compact #pa-mobile-mode-bar {
+    display: flex !important;
+}
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:first-child {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 6px !important;
+    min-width: 0;
+    align-items: center;
+}
+
+body.mobile-pa-compact #btn-print-lists { order: 1; }
+body.mobile-pa-compact #btn-mobile-pa-search { order: 2; }
+body.mobile-pa-compact #btn-save-pa-mobile { order: 3; }
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {
+    margin-right: 0 !important;
+    flex: 0 0 auto;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    order: 4;
+    margin-left: auto;
+}
+
+body.mobile-pa-compact #pa-modal-title {
+    display: none !important;
 }
 
 body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {
@@ -4836,7 +4918,7 @@ body.mobile-pa-compact #pa-operation-bar {
 <!-- @INDEX: MOBILE -> Crew Hub Shell -->
 <div id="mobile-crew-hub-overlay">
     <div class="mch-header">
-        <button type="button" class="mch-back-btn" onclick="closeMobileCrewHub()">⬅ BACK</button>
+        <button type="button" class="mch-close-x" onclick="closeMobileCrewHub()" title="Close">✕</button>
         <div class="mch-header-main">
             <div class="mch-title-row">
                 <h2 class="mch-title" id="mch-title">Project</h2>
@@ -4856,7 +4938,8 @@ body.mobile-pa-compact #pa-operation-bar {
     <div class="mch-footer">
         <button type="button" class="btn-outline btn-outline-purple mch-footer-btn" onclick="mobileCrewOpenTimeline()">TIMELINE</button>
         <button type="button" class="btn-outline btn-outline-orange mch-footer-btn req-event_assets_window" onclick="mobileCrewOpenAssets()">ASSETS</button>
-        <button type="button" class="btn-close mch-footer-btn" onclick="closeMobileCrewHub()">CANCEL</button>
+        <button type="button" id="mch-btn-truck" class="btn-outline mch-footer-btn mch-footer-btn--truck" onclick="mobileCrewOpenTruck()">🚛 TRUCK</button>
+        <button type="button" id="mch-btn-areas" class="btn-outline mch-footer-btn mch-footer-btn--areas" onclick="mobileCrewOpenAreas()">📍 AREAS</button>
     </div>
 </div>
 
@@ -5079,10 +5162,13 @@ body.mobile-pa-compact #pa-operation-bar {
              </div>
              <div id="pa-human-list" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; margin-top: 4px; background: #151518; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; gap: 6px; align-items: center; z-index: 50; padding: 10px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.8); box-sizing: border-box;"></div>
          </div>
-         <button class="btn-close" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="cancelProjectAssetsModal()">CANCEL</button>
+         <button class="btn-close" id="btn-pa-cancel-desktop" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="cancelProjectAssetsModal()">CANCEL</button>
+         <button type="button" id="btn-pa-close-x" class="btn-close btn-sm" style="display:none; width:38px; height:38px; margin:0; padding:0 !important; font-size:18px; line-height:1; box-sizing:border-box;" onclick="cancelProjectAssetsModal()" title="Close">✕</button>
          <button id="btn-save-pa" class="btn-main" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="saveProjectAssets()">SAVE EQUIPMENT</button>
       </div>
     </div>
+
+    <div id="pa-mobile-mode-bar" style="display:none; padding:8px 10px; background:#111; border-bottom:1px solid #333; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0;"></div>
     
     <!-- Scanner Bar -->
     <div id="pa-operation-bar" style="display:none; padding: 10px 25px; background: #151518; border-bottom: 1px solid #333; align-items: center; gap: 15px; flex-shrink: 0;">
@@ -5345,7 +5431,7 @@ body.mobile-pa-compact #pa-operation-bar {
         <div style="display:flex; align-items:center; gap: 12px;">
             <button class="btn-outline btn-sm" style="margin:0; border-color:#ef4444; color:#ef4444;" onclick="addLoadinElement('stage')">+ STAGE / NO-GO</button>
             <button class="btn-outline btn-sm" style="margin:0; border-color:#a1a1aa; color:#a1a1aa;" onclick="addLoadinElement('dock')">+ LOAD IN DOCK</button>
-            <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('loadin-plan-overlay').style.display='none'">CLOSE</button>
+            <button class="btn-close" style="width:auto; margin:0;" onclick="closeLoadinPlanDashboard()">CLOSE</button>
         </div>
     </div>
     

@@ -1,7 +1,7 @@
 <!-- @INDEX: MOBILE -> Crew Hub Shell -->
 <div id="mobile-crew-hub-overlay">
     <div class="mch-header">
-        <button type="button" class="mch-back-btn" onclick="closeMobileCrewHub()">⬅ BACK</button>
+        <button type="button" class="mch-close-x" onclick="closeMobileCrewHub()" title="Close">✕</button>
         <div class="mch-header-main">
             <div class="mch-title-row">
                 <h2 class="mch-title" id="mch-title">Project</h2>
@@ -21,7 +21,8 @@
     <div class="mch-footer">
         <button type="button" class="btn-outline btn-outline-purple mch-footer-btn" onclick="mobileCrewOpenTimeline()">TIMELINE</button>
         <button type="button" class="btn-outline btn-outline-orange mch-footer-btn req-event_assets_window" onclick="mobileCrewOpenAssets()">ASSETS</button>
-        <button type="button" class="btn-close mch-footer-btn" onclick="closeMobileCrewHub()">CANCEL</button>
+        <button type="button" id="mch-btn-truck" class="btn-outline mch-footer-btn mch-footer-btn--truck" onclick="mobileCrewOpenTruck()">🚛 TRUCK</button>
+        <button type="button" id="mch-btn-areas" class="btn-outline mch-footer-btn mch-footer-btn--areas" onclick="mobileCrewOpenAreas()">📍 AREAS</button>
     </div>
 </div>
 
@@ -274,6 +275,8 @@ window.syncProjectEditorHiddenFields = function(p, pId) {
     setVal('edit-proj-location', p.locationUrl || '');
     setVal('edit-proj-lat', (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lat : (p.lat || ''));
     setVal('edit-proj-lng', (p.readinessState && p.readinessState.coords) ? p.readinessState.coords.lng : (p.lng || ''));
+    if (p.readinessState) window.currentReadinessState = p.readinessState;
+    else if (!window.currentReadinessState) window.currentReadinessState = {};
     const outdoor = document.getElementById('edit-proj-outdoor');
     if (outdoor) outdoor.checked = projectIsOutdoorMobile(p);
     const statusEl = document.getElementById('display-event-status');
@@ -329,6 +332,13 @@ window.openMobileCrewHub = function(pId) {
     renderMobileWeatherSummaryBadge(document.getElementById('mch-weather-widget-host'), p, { interactive: true });
 
     document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
+    if (typeof ensureMobilePaCache === 'function') {
+        ensureMobilePaCache(pId, function() {
+            if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
+        });
+    } else if (typeof updateMobileCrewLogisticsButtons === 'function') {
+        updateMobileCrewLogisticsButtons();
+    }
 };
 
 window.closeMobileCrewHub = function() {

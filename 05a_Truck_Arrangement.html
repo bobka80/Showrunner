@@ -536,6 +536,7 @@ function zoomStagingToFit() {
 function autoArrangeTruck(strategy = 'heavy-first') {
     let m = document.getElementById('auto-arrange-menu');
     if (m) m.style.display = 'none';
+    window._truckArrangeUsedAuto = true;
 
     if (selectedTruckIds.size === 0) {
         allTruckStacks.forEach(s => selectedTruckIds.add(s.id));
@@ -1357,6 +1358,9 @@ function cancelTruckArrangement() {
     window.isTruckDirty = false;
     window.activePresenceModule = 'assets';
     document.getElementById('truck-modal-overlay').style.display = 'none';
+    if (window.mobileCrewHubProjectId && typeof finishMobileLogisticsModal === 'function') {
+        finishMobileLogisticsModal();
+    }
 }
 
 function saveTruckArrangement() {
@@ -1398,10 +1402,20 @@ function saveTruckArrangement() {
         btn.innerText = "SAVED ✓";
         setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
         window.isTruckDirty = false;
-        // Force a reload of the equipment window to fetch the new split rows with their new UIDs
+        if (!window.currentReadinessState) window.currentReadinessState = {};
+        window.currentReadinessState.truck = window._truckArrangeUsedAuto ? 'arranged_auto' : 'assigned';
+        if (typeof persistMobileReadinessState === 'function') persistMobileReadinessState();
+        window._truckArrangeUsedAuto = false;
+        const fromMobileCrew = !!window.mobileCrewHubProjectId && !window.mobilePaCompactActive;
         setTimeout(() => {
             document.getElementById('truck-modal-overlay').style.display = 'none';
-            openProjectAssetsModal();
+            if (fromMobileCrew && typeof refreshMobileProjectAssetsCache === 'function') {
+                refreshMobileProjectAssetsCache(projectId, function() {
+                    if (typeof finishMobileLogisticsModal === 'function') finishMobileLogisticsModal();
+                });
+            } else {
+                openProjectAssetsModal();
+            }
         }, 1000);
     })
     .withFailureHandler(err => {

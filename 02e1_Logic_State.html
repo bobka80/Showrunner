@@ -255,6 +255,7 @@ function executeTogglePaMode(targetMode) {
     }
     if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
     if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+    if (typeof applyMobilePaChrome === 'function') applyMobilePaChrome();
 }
 
 window.togglePackingDept = function(dept, noRender = false) {
