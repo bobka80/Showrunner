@@ -1825,8 +1825,8 @@
     .personal-hub-lock-select { min-width: 118px; }
     body.desktop-lock-active { overflow: hidden; }
     body.desktop-lock-active .dashboard {
-        filter: blur(22px) saturate(0.85);
-        -webkit-filter: blur(22px) saturate(0.85);
+        filter: blur(12px) saturate(0.9);
+        -webkit-filter: blur(12px) saturate(0.9);
     }
     .desktop-lock-overlay {
         position: fixed;
@@ -1836,9 +1836,9 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: rgba(0, 0, 0, 0.78);
-        backdrop-filter: blur(28px) saturate(0.9);
-        -webkit-backdrop-filter: blur(28px) saturate(0.9);
+        background: rgba(0, 0, 0, 0.70);
+        backdrop-filter: blur(14px) saturate(0.92);
+        -webkit-backdrop-filter: blur(14px) saturate(0.92);
         overflow: hidden;
         user-select: none;
     }
@@ -1851,6 +1851,8 @@
         justify-content: center;
         overflow: hidden;
         pointer-events: none;
+        padding-left: 10vw;
+        box-sizing: border-box;
     }
     .desktop-lock-hero-a {
         height: calc(100vh - 40px);
@@ -1858,11 +1860,11 @@
         width: auto;
         opacity: 0.07;
         transform-origin: center center;
-        animation: desktop-lock-hero-pulse 24s ease-in-out infinite alternate;
+        animation: desktop-lock-hero-pulse 52s ease-in-out infinite alternate;
     }
     @keyframes desktop-lock-hero-pulse {
-        0% { transform: scale(1); opacity: 0.06; }
-        100% { transform: scale(14); opacity: 0.10; }
+        0% { transform: translateX(4vw) scale(1); opacity: 0.06; }
+        100% { transform: translateX(4vw) scale(14); opacity: 0.10; }
     }
     .desktop-lock-bus-lanes {
         position: absolute;
@@ -1870,46 +1872,40 @@
         overflow: hidden;
         pointer-events: none;
         z-index: 1;
-        -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
-        mask-image: linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
     }
-    .desktop-lock-bus-track {
+    .desktop-lock-bus {
         position: absolute;
         left: 0;
-        right: 0;
-        height: 36px;
-        overflow: hidden;
-        pointer-events: none;
+        white-space: nowrap;
+        will-change: transform, opacity;
+        opacity: 0;
     }
-    .desktop-lock-bus-strip {
-        display: flex;
-        width: max-content;
-        will-change: transform;
-    }
-    .desktop-lock-bus-strip--ltr {
-        animation: desktop-lock-marquee-ltr 40s linear infinite;
-    }
-    .desktop-lock-bus-strip--rtl {
-        animation: desktop-lock-marquee-rtl 40s linear infinite;
-    }
-    .desktop-lock-bus-unit {
-        flex-shrink: 0;
-        display: block;
-        padding-right: 12vw;
-        box-sizing: content-box;
-    }
-    .desktop-lock-bus-unit svg {
+    .desktop-lock-bus svg {
         width: 100%;
         height: auto;
         display: block;
     }
-    @keyframes desktop-lock-marquee-ltr {
-        0% { transform: translateX(0); }
-        100% { transform: translateX(-50%); }
+    .desktop-lock-bus--ltr {
+        animation-name: desktop-lock-bus-ltr;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
     }
-    @keyframes desktop-lock-marquee-rtl {
-        0% { transform: translateX(-50%); }
-        100% { transform: translateX(0); }
+    .desktop-lock-bus--rtl {
+        animation-name: desktop-lock-bus-rtl;
+        animation-timing-function: linear;
+        animation-iteration-count: infinite;
+    }
+    @keyframes desktop-lock-bus-ltr {
+        0%   { transform: translateX(-110%); opacity: 0; }
+        11%  { opacity: var(--bus-o, 0.15); }
+        89%  { opacity: var(--bus-o, 0.15); }
+        100% { transform: translateX(110vw); opacity: 0; }
+    }
+    @keyframes desktop-lock-bus-rtl {
+        0%   { transform: translateX(110vw); opacity: 0; }
+        11%  { opacity: var(--bus-o, 0.15); }
+        89%  { opacity: var(--bus-o, 0.15); }
+        100% { transform: translateX(-110%); opacity: 0; }
     }
     .desktop-lock-foreground {
         position: relative;
