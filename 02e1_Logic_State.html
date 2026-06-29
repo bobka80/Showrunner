@@ -135,6 +135,13 @@ window.togglePaMode = function(forcedMode) {
     let targetMode = forcedMode || ((window.currentPaMode === 'design') ? 'packing' : 'design');
     
     if (targetMode === 'packing' && typeof window.calculatePaDeltas === 'function' && window.calculatePaDeltas().length > 0) {
+        if (typeof window.isMobilePaExplicitSaveMode === 'function' && window.isMobilePaExplicitSaveMode()) {
+            if (typeof window.updateMobilePaUnsavedUI === 'function') window.updateMobilePaUnsavedUI();
+            if (typeof window.showMobilePaToast === 'function') {
+                window.showMobilePaToast('Unsaved changes', 'Tap SAVE before switching to packing mode.');
+            }
+            return;
+        }
         window.autoSaveAndExecute(() => {
             executeTogglePaMode(targetMode);
         }, true);

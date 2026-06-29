@@ -156,6 +156,16 @@ window.autoSaveAndExecute = function(callback, optimistic = true, failureCallbac
         return;
     }
     let deltas = window.calculatePaDeltas();
+
+    if (typeof window.isMobilePaExplicitSaveMode === 'function' && window.isMobilePaExplicitSaveMode() && deltas.length > 0) {
+        if (typeof window.updateMobilePaUnsavedUI === 'function') window.updateMobilePaUnsavedUI();
+        if (typeof window.showMobilePaToast === 'function') {
+            window.showMobilePaToast('Save equipment first', 'Tap SAVE — mobile does not auto-save equipment changes.');
+        }
+        if (failureCallback) failureCallback();
+        return;
+    }
+
     if (deltas.length === 0 && !forceSync) {
         if (callback) callback();
         return;
@@ -290,13 +300,27 @@ window.autoSaveAndExecute = function(callback, optimistic = true, failureCallbac
     }
 };
 
-function saveProjectAssets() {
+function saveProjectAssets(doneCb) {
     if (window.projectAssetsReadOnly) {
-        return alert('🛑 Read-only view — you cannot edit project assets.');
+        if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
+            window.showMobilePaToast('Read-only', 'Cannot save equipment in this view.');
+        } else {
+            return alert('🛑 Read-only view — you cannot edit project assets.');
+        }
+        if (doneCb) doneCb(false);
+        return;
     }
-    if (window.guardDatabaseBackupLock && window.guardDatabaseBackupLock('equipment save')) return;
+    if (window.guardDatabaseBackupLock && window.guardDatabaseBackupLock('equipment save')) {
+        if (doneCb) doneCb(false);
+        return;
+    }
     if (window.currentOperationType) {
-        alert("⚠️ Please PAUSE the active operation before saving the equipment list.");
+        if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
+            window.showMobilePaToast('Operation active', 'Pause check-out before saving.');
+        } else {
+            alert("⚠️ Please PAUSE the active operation before saving the equipment list.");
+        }
+        if (doneCb) doneCb(false);
         return;
     }
     
@@ -304,17 +328,25 @@ function saveProjectAssets() {
     let deltas = window.calculatePaDeltas();
     
     let btn = document.getElementById('btn-save-pa');
+    let btnMobile = document.getElementById('btn-save-pa-mobile');
     let origText = btn ? btn.innerText : "SAVE EQUIPMENT";
+    let origMobileText = btnMobile ? btnMobile.innerText : "SAVE";
 
     if (deltas.length === 0) {
         if (btn) {
             btn.innerText = "NO CHANGES";
             setTimeout(() => { btn.innerText = origText; }, 1500);
         }
+        if (btnMobile) {
+            btnMobile.innerText = "NO CHANGES";
+            setTimeout(() => { btnMobile.innerText = origMobileText; }, 1500);
+        }
+        if (doneCb) doneCb(false);
         return;
     }
 
     if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+    if (btnMobile) { btnMobile.innerText = "SAVING..."; btnMobile.disabled = true; }
     
     let safetyTimer = setTimeout(() => {
         if (btn) { btn.innerText = origText; btn.disabled = false; }
@@ -324,8 +356,14 @@ function saveProjectAssets() {
     google.script.run
     .withFailureHandler(err => {
         clearTimeout(safetyTimer);
-        alert("Equipment Save Failed: " + err.message);
+        if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
+            window.showMobilePaToast('Save failed', err.message);
+        } else {
+            alert("Equipment Save Failed: " + err.message);
+        }
         if (btn) { btn.innerText = origText; btn.disabled = false; }
+        if (btnMobile) { btnMobile.innerText = origMobileText; btnMobile.disabled = false; }
+        if (doneCb) doneCb(false);
     })
     .withSuccessHandler(res => {
         clearTimeout(safetyTimer);
@@ -333,9 +371,15 @@ function saveProjectAssets() {
             btn.innerText = "SAVED ✓"; 
             setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
         }
-        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets)); // Re-sync pristine state
+        if (btnMobile) {
+            btnMobile.innerText = "SAVED ✓";
+            setTimeout(() => { btnMobile.innerText = origMobileText; btnMobile.disabled = false; }, 2000);
+        }
+        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
         
         if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+        if (typeof updateMobilePaUnsavedUI === 'function') updateMobilePaUnsavedUI();
+        if (doneCb) doneCb(true);
     }).saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
 }
 

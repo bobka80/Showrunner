@@ -7,6 +7,19 @@
     <div id="mobile-pa-detail-body" style="font-size:13px;color:#d4d4d8;line-height:1.5;"></div>
 </div>
 
+<div id="mobile-pa-choice-sheet" class="mobile-pa-choice-sheet" aria-hidden="true">
+    <div class="mobile-pa-choice-sheet__backdrop" onclick="closeMobilePaChoiceSheet()"></div>
+    <div class="mobile-pa-choice-sheet__panel">
+        <div class="mobile-pa-choice-sheet__title" id="mobile-pa-choice-title">Unsaved equipment</div>
+        <div class="mobile-pa-choice-sheet__body" id="mobile-pa-choice-body">Save changes before leaving?</div>
+        <div class="mobile-pa-choice-sheet__actions">
+            <button type="button" class="btn-main mobile-pa-choice-sheet__btn" id="mobile-pa-choice-save">SAVE</button>
+            <button type="button" class="btn-outline mobile-pa-choice-sheet__btn" id="mobile-pa-choice-discard" style="border-color:#ef4444;color:#ef4444;">DISCARD</button>
+            <button type="button" class="btn-outline mobile-pa-choice-sheet__btn" id="mobile-pa-choice-stay">STAY</button>
+        </div>
+    </div>
+</div>
+
 <div id="mobile-pa-vault-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;">
         <div style="font-weight:900;color:#10b981;font-size:13px;letter-spacing:0.5px;">ADD TO GENERAL</div>
@@ -27,6 +40,128 @@
 
 window.mobilePaCompactActive = false;
 window._mobilePaDomRestore = {};
+window._mobilePaChoiceHandlers = null;
+
+window.isMobilePaExplicitSaveMode = function() {
+    return !!window.mobilePaCompactActive || (!!window.mobileCrewHubProjectId && window.innerWidth <= 768);
+};
+
+window.hasUnsavedPaChanges = function() {
+    return typeof calculatePaDeltas === 'function' && calculatePaDeltas().length > 0;
+};
+
+window.showMobilePaToast = function(title, body) {
+    if (typeof showPushToast === 'function') {
+        showPushToast(title, body);
+        return;
+    }
+    const container = document.getElementById('push-toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'push-toast';
+    const esc = typeof escapeHTML === 'function' ? escapeHTML : function(s) { return String(s || ''); };
+    toast.innerHTML = '<div class="push-toast-brand">SHOWRUNNER</div><div class="push-toast-title">' + esc(title) + '</div>' +
+        (body ? '<div class="push-toast-body">' + esc(body) + '</div>' : '');
+    container.appendChild(toast);
+    setTimeout(function() {
+        toast.classList.add('push-toast--out');
+        setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 280);
+    }, 4500);
+};
+
+window.updateMobilePaUnsavedUI = function() {
+    const bar = document.getElementById('mobile-pa-unsaved-bar');
+    const saveBtn = document.getElementById('btn-save-pa-mobile');
+    const dirty = window.mobilePaCompactActive && hasUnsavedPaChanges();
+    if (bar) bar.classList.toggle('mobile-pa-unsaved-bar--visible', dirty);
+    if (saveBtn) saveBtn.classList.toggle('btn-save-pa-mobile--dirty', dirty);
+};
+
+window.closeMobilePaChoiceSheet = function() {
+    const sheet = document.getElementById('mobile-pa-choice-sheet');
+    if (sheet) {
+        sheet.classList.remove('open');
+        sheet.setAttribute('aria-hidden', 'true');
+    }
+    window._mobilePaChoiceHandlers = null;
+};
+
+window.openMobilePaChoiceSheet = function(opts) {
+    const sheet = document.getElementById('mobile-pa-choice-sheet');
+    const titleEl = document.getElementById('mobile-pa-choice-title');
+    const bodyEl = document.getElementById('mobile-pa-choice-body');
+    const saveBtn = document.getElementById('mobile-pa-choice-save');
+    const discardBtn = document.getElementById('mobile-pa-choice-discard');
+    const stayBtn = document.getElementById('mobile-pa-choice-stay');
+    if (!sheet || !saveBtn || !discardBtn || !stayBtn) return;
+    opts = opts || {};
+    if (titleEl) titleEl.innerText = opts.title || 'Unsaved equipment';
+    if (bodyEl) bodyEl.innerText = opts.body || 'Save changes before leaving?';
+    window._mobilePaChoiceHandlers = opts;
+    saveBtn.onclick = function() {
+        closeMobilePaChoiceSheet();
+        if (opts.onSave) opts.onSave();
+    };
+    discardBtn.onclick = function() {
+        closeMobilePaChoiceSheet();
+        if (opts.onDiscard) opts.onDiscard();
+    };
+    stayBtn.onclick = function() {
+        closeMobilePaChoiceSheet();
+        if (opts.onStay) opts.onStay();
+    };
+    sheet.classList.add('open');
+    sheet.setAttribute('aria-hidden', 'false');
+};
+
+window.finishMobilePaClose = function(opts) {
+    opts = opts || {};
+    if (opts.revertChanges && typeof currentProjectAssets !== 'undefined' && window.originalProjectAssets) {
+        currentProjectAssets = JSON.parse(JSON.stringify(window.originalProjectAssets));
+    }
+    window.activePresenceModule = 'main';
+    const overlay = document.getElementById('project-assets-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    if (window.mobilePaCompactActive) {
+        exitMobilePaCompactMode();
+        if (opts.returnToHub !== false && window.mobileCrewHubProjectId) {
+            document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
+            if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
+        }
+    }
+    updateMobilePaUnsavedUI();
+    if (opts.onClosed) opts.onClosed();
+};
+
+window.requestMobilePaClose = function(opts) {
+    opts = opts || {};
+    if (window.currentOperationType) {
+        showMobilePaToast('Operation active', 'Pause check-out before closing.');
+        return;
+    }
+    if (!hasUnsavedPaChanges()) {
+        finishMobilePaClose(opts);
+        return;
+    }
+    openMobilePaChoiceSheet({
+        title: 'Unsaved equipment',
+        body: 'Changes are only on this phone until you save. What should we do?',
+        onSave: function() {
+            saveProjectAssets(function(ok) {
+                if (ok) finishMobilePaClose(opts);
+            });
+        },
+        onDiscard: function() { finishMobilePaClose(Object.assign({}, opts, { revertChanges: true })); },
+        onStay: function() {}
+    });
+};
+
+window.blockMobilePaIfUnsaved = function(message) {
+    if (!isMobilePaExplicitSaveMode() || !hasUnsavedPaChanges()) return false;
+    updateMobilePaUnsavedUI();
+    showMobilePaToast('Save equipment first', message || 'Tap SAVE before continuing.');
+    return true;
+};
 
 window.isPaContainerRow = function(pa, asset) {
     if (!asset && pa && pa.assetId && typeof globalAssets !== 'undefined') {
@@ -101,24 +236,29 @@ window.updateMobileCrewLogisticsButtons = function() {
 window.mobileCrewOpenTruck = function() {
     const pId = window.mobileCrewHubProjectId;
     if (!pId) return;
+    if (blockMobilePaIfUnsaved('Save your equipment list before opening truck.')) return;
     syncProjectEditorHiddenFields(window.mobileCrewHubProject, pId);
     document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
     ensureMobilePaCache(pId, function() {
         if (typeof openTruckArrangementDashboard === 'function') openTruckArrangementDashboard();
-        else alert('Truck arrangement is not available.');
+        else showMobilePaToast('Unavailable', 'Truck arrangement is not available.');
     });
 };
 
 window.mobileCrewOpenAreas = function() {
     const pId = window.mobileCrewHubProjectId;
     if (!pId) return;
+    if (blockMobilePaIfUnsaved('Save your equipment list before opening venue areas.')) return;
     const st = evaluateMobileLogisticsStatus();
-    if (!st.areasEnabled) return alert('Finish truck loading before opening venue areas.');
+    if (!st.areasEnabled) {
+        showMobilePaToast('Truck not finished', 'Load all cases onto trucks before venue areas.');
+        return;
+    }
     syncProjectEditorHiddenFields(window.mobileCrewHubProject, pId);
     document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
     ensureMobilePaCache(pId, function() {
         if (typeof openLoadinPlanDashboard === 'function') openLoadinPlanDashboard();
-        else alert('Venue load-in plan is not available.');
+        else showMobilePaToast('Unavailable', 'Venue load-in plan is not available.');
     });
 };
 
@@ -196,7 +336,10 @@ function restoreMobilePaDom() {
 window.openMobileProjectAssets = function(projectId) {
     const pId = projectId || window.mobileCrewHubProjectId;
     const p = resolveMobileProject(pId) || window.mobileCrewHubProject;
-    if (!pId || !p) return alert('Could not open equipment for this project.');
+    if (!pId || !p) {
+        showMobilePaToast('Could not open', 'Equipment list unavailable for this project.');
+        return;
+    }
 
     syncProjectEditorHiddenFields(p, pId);
     document.body.classList.add('mobile-pa-compact');
@@ -210,6 +353,7 @@ window.openMobileProjectAssets = function(projectId) {
     }
     if (typeof switchPaView === 'function') switchPaView('logistics');
     applyMobilePaChrome();
+    updateMobilePaUnsavedUI();
 };
 
 window.applyMobilePaChrome = function() {
@@ -233,6 +377,7 @@ window.applyMobilePaChrome = function() {
     } else if (opBtn && modeBar && opBtn.parentElement === modeBar) {
         opBtn.style.display = 'none';
     }
+    updateMobilePaUnsavedUI();
 };
 
 window.exitMobilePaCompactMode = function() {
@@ -247,6 +392,7 @@ window.exitMobilePaCompactMode = function() {
     if (saveM) saveM.style.display = 'none';
     if (searchM) searchM.style.display = 'none';
     if (closeX) closeX.style.display = 'none';
+    updateMobilePaUnsavedUI();
     if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
 };
 
@@ -265,7 +411,10 @@ window.closeMobilePaVaultSearch = function() {
 };
 
 window.openMobilePaVaultSearch = function() {
-    if (window.projectAssetsReadOnly) return alert('Read-only — cannot add equipment.');
+    if (window.projectAssetsReadOnly) {
+        showMobilePaToast('Read-only', 'Cannot add equipment in this view.');
+        return;
+    }
     const sheet = document.getElementById('mobile-pa-vault-sheet');
     if (!sheet) return;
     sheet.classList.add('open');
@@ -319,6 +468,7 @@ window.mobileAddVaultAsset = function(assetId) {
     if (typeof addPa === 'function') addPa(assetId, 1);
     window.activePaTarget = prevTarget;
     if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+    updateMobilePaUnsavedUI();
 };
 
 window.showMobilePaDetail = function(title, bodyHtml) {
@@ -331,20 +481,15 @@ window.showMobilePaDetail = function(title, bodyHtml) {
     sheet.classList.add('open');
 };
 
-(function patchMobilePaCancel() {
-    const orig = window.cancelProjectAssetsModal;
-    if (typeof orig !== 'function') return;
-    window.cancelProjectAssetsModal = function() {
-        const wasMobile = window.mobilePaCompactActive;
-        orig.apply(this, arguments);
-        if (wasMobile) {
-            exitMobilePaCompactMode();
-            if (window.mobileCrewHubProjectId) {
-                document.getElementById('mobile-crew-hub-overlay').style.display = 'flex';
-                if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
-            }
-        }
-    };
+(function patchMobilePaRender() {
+    const origRender = window.renderProjectAssetsUI;
+    if (typeof origRender === 'function') {
+        window.renderProjectAssetsUI = function() {
+            const result = origRender.apply(this, arguments);
+            if (window.mobilePaCompactActive && typeof updateMobilePaUnsavedUI === 'function') updateMobilePaUnsavedUI();
+            return result;
+        };
+    }
 })();
 
 document.addEventListener('click', function(e) {

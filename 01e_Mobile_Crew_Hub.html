@@ -342,6 +342,15 @@ window.openMobileCrewHub = function(pId) {
 };
 
 window.closeMobileCrewHub = function() {
+    const paOverlay = document.getElementById('project-assets-modal-overlay');
+    const paOpen = paOverlay && paOverlay.style.display !== 'none' && window.mobilePaCompactActive;
+    if (paOpen && typeof requestMobilePaClose === 'function') {
+        requestMobilePaClose({ returnToHub: false });
+        return;
+    }
+    if (typeof blockMobilePaIfUnsaved === 'function' && blockMobilePaIfUnsaved('Save equipment before leaving this project.')) {
+        return;
+    }
     closeMobileWeatherPopup();
     document.getElementById('mobile-crew-hub-overlay').style.display = 'none';
     window.mobileCrewHubProjectId = null;

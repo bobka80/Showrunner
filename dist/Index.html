@@ -2938,6 +2938,82 @@ body.mobile-pa-compact #pa-operation-bar {
     display: flex;
 }
 
+body.mobile-pa-compact #mobile-pa-unsaved-bar {
+    display: none;
+}
+
+body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
+    display: flex !important;
+}
+
+#btn-save-pa-mobile.btn-save-pa-mobile--dirty {
+    box-shadow: 0 0 0 2px #f59e0b, 0 0 12px rgba(245, 158, 11, 0.45) !important;
+    animation: mobile-pa-save-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mobile-pa-save-pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.15); }
+}
+
+.mobile-pa-choice-sheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 6500;
+}
+
+.mobile-pa-choice-sheet.open {
+    display: block;
+}
+
+.mobile-pa-choice-sheet__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.mobile-pa-choice-sheet__panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #18181b;
+    border-radius: 14px 14px 0 0;
+    border-top: 2px solid #f59e0b;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
+}
+
+.mobile-pa-choice-sheet__title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: 0.03em;
+}
+
+.mobile-pa-choice-sheet__body {
+    font-size: 13px;
+    color: #a1a1aa;
+    line-height: 1.45;
+    margin-bottom: 16px;
+}
+
+.mobile-pa-choice-sheet__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-pa-choice-sheet__btn {
+    width: 100% !important;
+    margin: 0 !important;
+    justify-content: center !important;
+    padding: 14px !important;
+    font-size: 12px !important;
+}
+
 /* --- Mobile Personal Hub (full view) --- */
 @media (max-width: 900px) {
     #manager-settings-overlay.personal-hub-desktop-view {
@@ -4967,6 +5043,19 @@ body.mobile-pa-compact #pa-operation-bar {
     <div id="mobile-pa-detail-body" style="font-size:13px;color:#d4d4d8;line-height:1.5;"></div>
 </div>
 
+<div id="mobile-pa-choice-sheet" class="mobile-pa-choice-sheet" aria-hidden="true">
+    <div class="mobile-pa-choice-sheet__backdrop" onclick="closeMobilePaChoiceSheet()"></div>
+    <div class="mobile-pa-choice-sheet__panel">
+        <div class="mobile-pa-choice-sheet__title" id="mobile-pa-choice-title">Unsaved equipment</div>
+        <div class="mobile-pa-choice-sheet__body" id="mobile-pa-choice-body">Save changes before leaving?</div>
+        <div class="mobile-pa-choice-sheet__actions">
+            <button type="button" class="btn-main mobile-pa-choice-sheet__btn" id="mobile-pa-choice-save">SAVE</button>
+            <button type="button" class="btn-outline mobile-pa-choice-sheet__btn" id="mobile-pa-choice-discard" style="border-color:#ef4444;color:#ef4444;">DISCARD</button>
+            <button type="button" class="btn-outline mobile-pa-choice-sheet__btn" id="mobile-pa-choice-stay">STAY</button>
+        </div>
+    </div>
+</div>
+
 <div id="mobile-pa-vault-sheet">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;">
         <div style="font-weight:900;color:#10b981;font-size:13px;letter-spacing:0.5px;">ADD TO GENERAL</div>
@@ -5169,6 +5258,10 @@ body.mobile-pa-compact #pa-operation-bar {
     </div>
 
     <div id="pa-mobile-mode-bar" style="display:none; padding:8px 10px; background:#111; border-bottom:1px solid #333; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0;"></div>
+    <div id="mobile-pa-unsaved-bar" style="display:none; padding:8px 12px; background:#422006; border-bottom:1px solid #f59e0b; color:#fcd34d; font-size:11px; font-weight:800; letter-spacing:0.04em; flex-shrink:0; align-items:center; justify-content:space-between; gap:10px;">
+        <span>UNSAVED — not on server until you tap SAVE</span>
+        <button type="button" class="btn-main btn-sm" style="margin:0;padding:6px 12px !important;font-size:10px !important;flex-shrink:0;" onclick="saveProjectAssets()">SAVE</button>
+    </div>
     
     <!-- Scanner Bar -->
     <div id="pa-operation-bar" style="display:none; padding: 10px 25px; background: #151518; border-bottom: 1px solid #333; align-items: center; gap: 15px; flex-shrink: 0;">

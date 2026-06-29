@@ -1119,6 +1119,82 @@ body.mobile-pa-compact #pa-operation-bar {
     display: flex;
 }
 
+body.mobile-pa-compact #mobile-pa-unsaved-bar {
+    display: none;
+}
+
+body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
+    display: flex !important;
+}
+
+#btn-save-pa-mobile.btn-save-pa-mobile--dirty {
+    box-shadow: 0 0 0 2px #f59e0b, 0 0 12px rgba(245, 158, 11, 0.45) !important;
+    animation: mobile-pa-save-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mobile-pa-save-pulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.15); }
+}
+
+.mobile-pa-choice-sheet {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 6500;
+}
+
+.mobile-pa-choice-sheet.open {
+    display: block;
+}
+
+.mobile-pa-choice-sheet__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.mobile-pa-choice-sheet__panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #18181b;
+    border-radius: 14px 14px 0 0;
+    border-top: 2px solid #f59e0b;
+    padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.85);
+}
+
+.mobile-pa-choice-sheet__title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #fff;
+    margin-bottom: 8px;
+    letter-spacing: 0.03em;
+}
+
+.mobile-pa-choice-sheet__body {
+    font-size: 13px;
+    color: #a1a1aa;
+    line-height: 1.45;
+    margin-bottom: 16px;
+}
+
+.mobile-pa-choice-sheet__actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-pa-choice-sheet__btn {
+    width: 100% !important;
+    margin: 0 !important;
+    justify-content: center !important;
+    padding: 14px !important;
+    font-size: 12px !important;
+}
+
 /* --- Mobile Personal Hub (full view) --- */
 @media (max-width: 900px) {
     #manager-settings-overlay.personal-hub-desktop-view {
