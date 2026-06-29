@@ -909,28 +909,81 @@
     }
 }
 
-/* --- Mobile Project Assets compact --- */
+/* --- Mobile Project Assets compact (crew field view) --- */
 body.mobile-pa-compact #pa-left-panel { display: none !important; }
 body.mobile-pa-compact #pa-right-panel { width: 100% !important; flex: 1 !important; }
 body.mobile-pa-compact #pa-split-pane > div { min-height: auto !important; border-bottom: none !important; }
+
+/* Header: hide desktop CLI, offer tab, office tools, big save */
 body.mobile-pa-compact #pa-search-cli,
 body.mobile-pa-compact #pa-search-ghost,
 body.mobile-pa-compact #syntax-help-btn,
-body.mobile-pa-compact #pa-view-offer-btn { display: none !important; }
+body.mobile-pa-compact #pa-view-toggles,
+body.mobile-pa-compact #pa-view-offer-btn,
+body.mobile-pa-compact #btn-save-pa,
+body.mobile-pa-compact #btn-loadin-plan,
+body.mobile-pa-compact #btn-auto-add-cases,
+body.mobile-pa-compact #btn-arrange-truck,
+body.mobile-pa-compact #pa-human-list,
+body.mobile-pa-compact #pa-clipboard-actions,
+body.mobile-pa-compact #pa-new-sublist-btn,
+body.mobile-pa-compact #toggle-auto-containers-btn,
+body.mobile-pa-compact #pa-count-badge,
+body.mobile-pa-compact #toggle-auto-fill-cases-btn {
+    display: none !important;
+}
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child > div:first-child,
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child > div:nth-child(2) {
+    display: none !important;
+}
 
 body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child {
     flex-wrap: wrap !important;
     height: auto !important;
-    min-height: 60px;
-    padding: 10px 12px !important;
-    gap: 8px;
+    min-height: 56px;
+    padding: 8px 10px !important;
+    gap: 6px;
+}
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:first-child {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 6px !important;
+    min-width: 0;
+}
+
+body.mobile-pa-compact #pa-modal-title {
+    font-size: 11px !important;
+    letter-spacing: 0.5px !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {
     margin-right: 0 !important;
-    flex: 1 1 100%;
+    flex: 0 0 auto;
+    justify-content: flex-end !important;
+    gap: 6px !important;
 }
 
+body.mobile-pa-compact #btn-mobile-pa-search,
+body.mobile-pa-compact #btn-save-pa-mobile {
+    display: inline-flex !important;
+}
+
+/* Assigned toolbar: mode toggle + packing tools only */
+body.mobile-pa-compact #pa-right-panel > div:first-child > div:first-child > span:first-child {
+    display: none !important;
+}
+
+body.mobile-pa-compact #pa-right-panel > div:first-child > div:first-child > div[style*="width: 2px"] {
+    display: none !important;
+}
+
+/* List: sublist name visible; formula blob hidden; no group EDIT/DEL */
 body.mobile-pa-compact #pa-assigned-list div[title="Formula String"],
 body.mobile-pa-compact #pa-assigned-list div[title="Standalone Items"] {
     display: none !important;
@@ -941,7 +994,14 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     display: none !important;
 }
 
-#mobile-pa-detail-sheet {
+body.mobile-pa-compact #pa-operation-bar {
+    flex-wrap: wrap;
+    padding: 8px 10px !important;
+    gap: 8px !important;
+}
+
+#mobile-pa-detail-sheet,
+#mobile-pa-vault-sheet {
     display: none;
     position: fixed;
     bottom: 0;
@@ -949,15 +1009,33 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     right: 0;
     z-index: 6000;
     background: #18181b;
-    border-top: 2px solid #a855f7;
     border-radius: 12px 12px 0 0;
-    padding: 20px;
-    max-height: 50vh;
-    overflow-y: auto;
+    padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
     box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
 }
 
-#mobile-pa-detail-sheet.open { display: block; }
+#mobile-pa-detail-sheet {
+    border-top: 2px solid #a855f7;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+#mobile-pa-vault-sheet {
+    border-top: 2px solid #10b981;
+    max-height: 75vh;
+    display: none;
+    flex-direction: column;
+}
+
+#mobile-pa-detail-sheet.open,
+#mobile-pa-vault-sheet.open {
+    display: block;
+}
+
+#mobile-pa-vault-sheet.open {
+    display: flex;
+}
 
 /* --- Mobile Personal Hub (full view) --- */
 @media (max-width: 900px) {

@@ -22,4 +22,4 @@
 - [ ] **Generic fleet tier presets** — Sprinter → Artic dimensions driving truck planner
 - [ ] **RBAC Phase 6 QA** — role templates + director test checklist before beta
 
-Push notifications: [notifications.md](notifications.md).
+Push notification scenarios: [notifications-catalog.md](notifications-catalog.md).

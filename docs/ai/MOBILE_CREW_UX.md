@@ -52,10 +52,16 @@ Crew on phones use the **Mobile Command Center** (unchanged shell) and open proj
 - **CANCEL** on timeline returns to Crew Hub if opened from mobile
 
 ### Project Assets (mobile compact)
-- Class `mobile-pa-compact` on `body`
-- Hides: vault pane, syntax CLI, offer tab, formula strings in list
-- Tap equipment **group header** → bottom sheet `#mobile-pa-detail-sheet` with formula/location
-- Cancel on PA modal → returns to Crew Hub
+- Class `mobile-pa-compact` on `body` (Crew Hub → PROJECT ASSETS)
+- **Logistics only** — no Offer tab; **PRINT** for paper checklists
+- **SEARCH** → bottom sheet: vault search, **+ ADD** goes to **General** list only
+- **SAVE** (compact) — persists qty/add changes via normal equipment save
+- **Design mode** default (full tree, collapse triangles, sublist names, qty +/−)
+- **Packing mode** toggle kept — for packing into cases (cables, etc.)
+- **Check-out / check-in** + scanner bar when operation active
+- Hides: vault split pane, CLI syntax bar, clipboard, new sublist, office tools (truck/load-in/auto-pack in PA header)
+- Tap group header → bottom sheet with full formula (list shows sublist name only)
+- Cancel → returns to Crew Hub
 
 ### Tasks
 - Command Center → **MY TASKS** — reuses `globalTasks` + `openTaskModal()`
@@ -91,16 +97,18 @@ Colors use existing `--color-paint-*` CSS variables.
 3. Phase rail shows WH / MAIN / etc. with dates (if fragments exist).
 4. Outdoor project → weather strip appears.
 5. OPEN TIMELINE → zoom bar; overview hides shift labels; slider shows detail.
-6. PROJECT ASSETS → only assigned list; PACK / CHECK-OUT buttons visible (if permitted).
-7. Tap formula group → detail sheet.
-8. Manager account → MANAGER: FULL EDITOR visible.
-9. Desktop width >768px → unchanged dashboard; no crew hub takeover.
+6. PROJECT ASSETS → assigned list; PRINT + SEARCH + SAVE; Design/Packing toggle; PACK / CHECK-OUT when permitted.
+7. SEARCH → add item to General; SAVE after qty changes.
+8. Tap formula group → detail sheet (full formula).
+9. Manager account → MANAGER: FULL EDITOR visible.
+10. Desktop width >768px → unchanged dashboard; no crew hub takeover.
 
 ---
 
 ## Next work (after mobile sign-off)
 
-- Real push notification wiring (see [topics/notifications.md](topics/notifications.md))
+- Mobile project editor: **Truck arrangement** + **venue unload** buttons (deferred)
+- Real push notification scenarios: [topics/notifications-catalog.md](topics/notifications-catalog.md) (deploy: [notifications.md](topics/notifications.md))
 - Optional: `saveAndCloseShifts()` return path to Crew Hub
 - Optional: share `buildPhaseSegmentsFromFragments` with `01c` to dedupe
 

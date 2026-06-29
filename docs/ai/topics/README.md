@@ -4,11 +4,11 @@ One file per feature area. **Read only the topic you need.**
 
 **Index:** [Project_TODO.md](../Project_TODO.md) · **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md)
 
-**Last index sweep:** 2026-06-28 (codebase @ GAS v345)
+**Last index sweep:** 2026-06-28 (codebase @ GAS v359)
 
 | Topic | Status | File |
 |-------|--------|------|
-| Notifications | Step C/D — foreground host toast v345 | [notifications.md](notifications.md) |
+| Notifications | Catalog @ v359 — crew/manager checklist | [notifications-catalog.md](notifications-catalog.md) · [notifications.md](notifications.md) |
 | Global tasks | Manager vs crew visibility + `task_view_all` v345 | [tasks.md](tasks.md) |
 | Mobile crew UX | Shipped v314 | [mobile-crew.md](mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [database-ops.md](database-ops.md) |

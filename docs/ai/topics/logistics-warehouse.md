@@ -49,4 +49,4 @@
 
 ## Alerts
 
-- [ ] **Missing transit legs alert** — on save + FCM when live ([notifications.md](notifications.md))
+Missing transit legs and other logistics alerts: [notifications-catalog.md](notifications-catalog.md) → **Managers → Logistics / warehouse**.

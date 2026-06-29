@@ -3,8 +3,11 @@ node_modules/
 
 # Editor / tooling noise
 .VSCodeCounter/
-.vscode/
-.cursor/
+.vscode/*
+!.vscode/tasks.json
+!.vscode/settings.json
+.cursor/*
+!.cursor/permissions.json
 
 # Local scratch (not production)
 scratch_*.js

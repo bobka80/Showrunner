@@ -13,4 +13,4 @@
 - [x] Compact Project Assets (`01h`)
 - [x] Timeline zoom (`03f`)
 
-**Follow-up:** [notifications.md](notifications.md) for push polish after mobile sign-off.
+**Follow-up:** [notifications-catalog.md](notifications-catalog.md) for push scenario checklist; [notifications.md](notifications.md) for deploy.

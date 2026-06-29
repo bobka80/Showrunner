@@ -7,4 +7,4 @@
 - [ ] **Personal user hub:** Restricted profile modal (contact, dietary, password) via left nav
 - [ ] **Freelancer shift placeholders & bidding:** TBD shifts, broadcast pool, accept/bid, rating-based selection
 
-**Deferred (recovery Step E):** Personal Hub on mobile theme-only, PIN change, desktop lock screen, manager agenda reminders.
+**Deferred (recovery Step E):** Personal Hub on mobile theme-only, PIN change, desktop lock screen. Manager agenda reminders → [notifications-catalog.md](notifications-catalog.md).

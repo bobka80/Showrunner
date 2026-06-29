@@ -1,0 +1,4 @@
+{
+  "expectedEmail": "you@example.com",
+  "notes": "Copy to google-account.json and set expectedEmail to the Google account used for clasp / Apps Script on this machine."
+}

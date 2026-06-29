@@ -25,6 +25,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Main.js`**: GAS backend entry point. Handles HTTP GET/POST routing and the high-speed boot payload.
 - **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits. Copies backend `.js` + `Login.html` to `dist/`; excludes Node tooling (`milestone.js`, `deploy-hosting.js`, etc.).
 - **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md`.
+- **`check-google-account.js`**: Verifies clasp login matches `google-account.json` and can reach the bound Apps Script project. Run: `node check-google-account.js` or `npm run check-google`. Auto-runs on workspace open via `.vscode/tasks.json` (`runOn: folderOpen`).
 - **`Security.js`**: Manages user authentication and extracts security profiles.
 - **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.
 - **`Styles_Mobile.html`**: Mobile-only CSS (`≤768px`) + crew hub / phase rail / timeline zoom / compact PA. Included after `Styles.html`.
@@ -105,7 +106,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 
 ## 10. Notifications & Push (10 Series + backend)
 
-**Push notifications:** [topics/notifications.md](topics/notifications.md) · **Production log:** root `RELEASES.md` (updated by `milestone.js` on each GAS deploy).
+**Push notifications:** [topics/notifications-catalog.md](topics/notifications-catalog.md) (checklist) · [topics/notifications.md](topics/notifications.md) (architecture) · **Production log:** root `RELEASES.md` (updated by `milestone.js` on each GAS deploy).
 
 Users must open **Firebase Hosting** (`https://sm-showrunner-97405.web.app`) for FCM registration; raw `script.google.com` bookmarks do not receive push.
 

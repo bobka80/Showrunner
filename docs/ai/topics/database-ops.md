@@ -17,7 +17,7 @@
 - [x] Dynamic DB registry (Script Properties)
 - [x] Restore — move live to Replaced folder, promote backup
 - [x] Multi-step revert via `DB_Operations_Log`
-- [x] **Push admin panel** in Ops tab (`renderPushAdminPanel` — see [notifications.md](notifications.md))
+- [x] **Push admin panel** in Ops tab (`renderPushAdminPanel` — see [notifications.md](notifications.md); scenarios in [notifications-catalog.md](notifications-catalog.md))
 - [x] BOTH backup with countdown + UI lock
 
 ## Remaining

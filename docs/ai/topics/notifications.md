@@ -1,12 +1,14 @@
-# Push notifications
+# Push notifications — architecture & deploy
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-28 (codebase @ GAS **v345**)
+**Scenario checklist (have / need):** **[notifications-catalog.md](notifications-catalog.md)** — canonical inventory; do not duplicate checklists here.
 
-**Canonical topic file** for all notification work. Recovery re-ship: [active/recovery-after-v330.md](../active/recovery-after-v330.md) Steps C–D.
+**Recovery context:** [active/recovery-after-v330.md](../active/recovery-after-v330.md) Steps C–D.
 
 **Users must open:** https://sm-showrunner-97405.web.app
+
+**Last swept:** 2026-06-28 · **Code baseline:** GAS **v359**
 
 ---
 
@@ -14,80 +16,36 @@
 
 Firebase Hosting + FCM + Apps Script backend. Event-driven batch sends. No secrets in this doc.
 
----
-
-## Shipped (verified in codebase)
-
-### Infrastructure & admin
-- [x] Firebase Hosting shell, service worker, `push-hosting/`
-- [x] `Notifications_Store.js`, `Notifications_Push.js`, `Notifications_Dispatch.js`
-- [x] `Main.js` — `fcfg`, `fcmreg`; `10a` iframe bridge; `10c` ROOT DATABASE panel
-- [x] `saveMyFcmDeviceToken` + parent token rebroadcast (`host-boot.js`)
-- [x] **Multi-device tokens** per user (`getFcmDevicesForUid_` / device list in DATABASE)
-- [x] ROOT **test push** + per-device test (`sendTestPushNotification`, `sendTestPushToDevice`)
-- [x] PWA session hardening (v328+) — see `RELEASES.md`
-- [x] Fast `getTasksNotifsPayload` + `refreshTasksAndNotifs()` (v346 — no full calendar reload)
-- [x] Phantom boot skips stale tasks/notifs; local cache synced on clear/dismiss
-- [x] FCM **data-only** payload (avoids double system notification in background)
-
-### Dispatch core
-- [x] `dispatchPushToUsers` / `dispatchPushToIdentifiers` — batch FCM + audit log entry
-- [x] UID resolution for push targets (`resolveVaultUidForPush_`)
-
-### Event hooks (live today)
-- [x] **Timeline:** crew added to schedule → in-app notif + FCM push
-- [x] **Timeline:** shift time changed → in-app notif + FCM push
-- [x] **Tasks:** new task assignees → in-app notif + FCM push
-- [x] **Weather:** in-app Notifications sheet rows with **same-day dedupe** (`dispatchWeatherAlerts`) — **not FCM yet**
-
----
-
-## Open / not shipped
-
-### Registration & reliability
-- [ ] Reliable **iPhone** registration (Add to Home Screen path; Safari quirks)
-- [ ] Phone **push service error** edge cases (see DATABASE yellow state)
-
-### Scenarios not wired to FCM
-- [ ] Project assign / remove (beyond timeline shift rows)
-- [ ] Truck / logistics timeline save
-- [ ] Show-day / master timeline bulk changes (debounced)
-- [ ] Crew shift conflict report
-- [ ] Checklist milestone → PM
-- [ ] Manager overdue jobs cron (offer, invoice, staffing)
-- [ ] **Weather → FCM** (sheet-only today)
-
-### Product rules
-- [ ] Per-user notification preferences (type toggles)
-- [ ] Explicit **debounce/coalesce** for rapid timeline edits
-- [x] Notification click → open event (project) or task; snooze removed; larger dismiss (v347)
-
-### Recovery Step C (re-merge after rollback)
-- [ ] Re-verify expanded v330 dispatch hooks if re-applied
-- [ ] UID normalization for in-app notification rows
-- [ ] Full test matrix: assign, remove, shift (other user), truck, cancel, new event → managers
-
----
-
-## Key files
-
-| File | Role |
-|------|------|
-| `push-hosting/public/host-boot.js` | FCM, session, iframe, foreground handler |
+| Layer | Role |
+|-------|------|
+| `push-hosting/` | PWA shell, service worker, FCM registration, foreground push bridge |
 | `Notifications_Store.js` | Multi-device token storage |
-| `Notifications_Push.js` | FCM HTTP v1 send |
-| `Notifications_Dispatch.js` | Push dispatch helpers |
-| `Logistics_Timeline.js` | Timeline save → push |
-| `Logistics_Tasks.js` | Task assign → push; weather sheet alerts |
-| `10a_Notifications_Boot.html`, `10c_Notifications_Admin.html` | UI |
+| `Notifications_Push.js` | FCM HTTP v1 send (data-only payloads) |
+| `Notifications_Dispatch.js` | `dispatchPushToUsers` / `dispatchPushToIdentifiers` |
+| `Logistics_Timeline.js` | Timeline save → crew schedule notifications |
+| `Logistics_Tasks.js` | Task assign/delete + weather alerts |
+| `10a_Notifications_Boot.html` | Iframe ↔ hosting bridge |
+| `10c_Notifications_Admin.html` | ROOT push admin panel |
+| `01b_Calendar_Tasks.html` | Bell drawer, notif list UI |
 
 ---
 
 ## Deploy
 
 ```powershell
-node milestone.js "note"     # GAS
-node deploy-hosting.js       # Firebase Hosting
+node milestone.js "note"     # GAS (Apps Script)
+node deploy-hosting.js       # Firebase Hosting (when push-hosting/ changes)
 ```
 
-**Production log:** root `RELEASES.md`
+**Production log:** root **`RELEASES.md`**
+
+---
+
+## Related topics
+
+| Doc | Role |
+|-----|------|
+| [notifications-catalog.md](notifications-catalog.md) | **What we notify for** — crew vs manager checklist |
+| [FILE_MAP.md](../FILE_MAP.md) | Module index, push file map |
+| [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) | PWA session + iframe-before-FCM rules |
+| [training-manuals.md](training-manuals.md) | Crew install / onboarding manuals (separate from this checklist) |

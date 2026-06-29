@@ -28,7 +28,7 @@ After **v330**, the director reported:
 
 | Item | Introduced in | Notes |
 |------|---------------|--------|
-| Event-driven push (assign/remove/shift/truck/cancel) | v330 backend | Test with **another crew member’s** shift; see [topics/notifications.md](../topics/notifications.md) |
+| Event-driven push (assign/remove/shift/truck/cancel) | v330 backend | See [topics/notifications-catalog.md](../topics/notifications-catalog.md) |
 | Foreground toast + drawer sync | v330 hosting / `01b` | Requires hosting deploy if shell changes |
 | Project checklist % bar | v330 UI | Depends on `globalManagerConfig.rules` refresh on `refreshData()` |
 | Mini-calendar layout / boot rewrite | v330–v332 | Likely conflict: `pe-checklist-status-bar`, `pe-mini-cal-wrap`, modal `overflow`, FC `height: 100%` |
@@ -73,14 +73,14 @@ After **v330**, the director reported:
 - [x] `SHOWRUNNER_FOREGROUND_PUSH` bridge (host → iframe)
 - [x] In-app toast + `refreshData()` for notification list + tasks
 - [x] Fix client `isNotifRead` (bell was broken by server-only helper)
-- [ ] Director test: push while app open → toast + badge update without long wait
+- [ ] Director test matrix — see [topics/notifications-catalog.md](../topics/notifications-catalog.md) (cross-cutting)
 
 ### Step E — Deferred (partial)
 
 - [x] Personal Hub — unified panel for all users (theme, logout, change PIN); manager tools inside same hub (GAS **v336**)
 - [ ] Personal Hub on mobile (theme only)
 - [ ] Desktop lock screen
-- [ ] Manager agenda reminders
+- [ ] Manager agenda reminders — [notifications-catalog.md](../topics/notifications-catalog.md)
 
 ---
 

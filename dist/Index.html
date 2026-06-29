@@ -2728,28 +2728,81 @@
     }
 }
 
-/* --- Mobile Project Assets compact --- */
+/* --- Mobile Project Assets compact (crew field view) --- */
 body.mobile-pa-compact #pa-left-panel { display: none !important; }
 body.mobile-pa-compact #pa-right-panel { width: 100% !important; flex: 1 !important; }
 body.mobile-pa-compact #pa-split-pane > div { min-height: auto !important; border-bottom: none !important; }
+
+/* Header: hide desktop CLI, offer tab, office tools, big save */
 body.mobile-pa-compact #pa-search-cli,
 body.mobile-pa-compact #pa-search-ghost,
 body.mobile-pa-compact #syntax-help-btn,
-body.mobile-pa-compact #pa-view-offer-btn { display: none !important; }
+body.mobile-pa-compact #pa-view-toggles,
+body.mobile-pa-compact #pa-view-offer-btn,
+body.mobile-pa-compact #btn-save-pa,
+body.mobile-pa-compact #btn-loadin-plan,
+body.mobile-pa-compact #btn-auto-add-cases,
+body.mobile-pa-compact #btn-arrange-truck,
+body.mobile-pa-compact #pa-human-list,
+body.mobile-pa-compact #pa-clipboard-actions,
+body.mobile-pa-compact #pa-new-sublist-btn,
+body.mobile-pa-compact #toggle-auto-containers-btn,
+body.mobile-pa-compact #pa-count-badge,
+body.mobile-pa-compact #toggle-auto-fill-cases-btn {
+    display: none !important;
+}
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child > div:first-child,
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child > div:nth-child(2) {
+    display: none !important;
+}
 
 body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child {
     flex-wrap: wrap !important;
     height: auto !important;
-    min-height: 60px;
-    padding: 10px 12px !important;
-    gap: 8px;
+    min-height: 56px;
+    padding: 8px 10px !important;
+    gap: 6px;
+}
+
+body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:first-child {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    gap: 6px !important;
+    min-width: 0;
+}
+
+body.mobile-pa-compact #pa-modal-title {
+    font-size: 11px !important;
+    letter-spacing: 0.5px !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {
     margin-right: 0 !important;
-    flex: 1 1 100%;
+    flex: 0 0 auto;
+    justify-content: flex-end !important;
+    gap: 6px !important;
 }
 
+body.mobile-pa-compact #btn-mobile-pa-search,
+body.mobile-pa-compact #btn-save-pa-mobile {
+    display: inline-flex !important;
+}
+
+/* Assigned toolbar: mode toggle + packing tools only */
+body.mobile-pa-compact #pa-right-panel > div:first-child > div:first-child > span:first-child {
+    display: none !important;
+}
+
+body.mobile-pa-compact #pa-right-panel > div:first-child > div:first-child > div[style*="width: 2px"] {
+    display: none !important;
+}
+
+/* List: sublist name visible; formula blob hidden; no group EDIT/DEL */
 body.mobile-pa-compact #pa-assigned-list div[title="Formula String"],
 body.mobile-pa-compact #pa-assigned-list div[title="Standalone Items"] {
     display: none !important;
@@ -2760,7 +2813,14 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     display: none !important;
 }
 
-#mobile-pa-detail-sheet {
+body.mobile-pa-compact #pa-operation-bar {
+    flex-wrap: wrap;
+    padding: 8px 10px !important;
+    gap: 8px !important;
+}
+
+#mobile-pa-detail-sheet,
+#mobile-pa-vault-sheet {
     display: none;
     position: fixed;
     bottom: 0;
@@ -2768,15 +2828,33 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     right: 0;
     z-index: 6000;
     background: #18181b;
-    border-top: 2px solid #a855f7;
     border-radius: 12px 12px 0 0;
-    padding: 20px;
-    max-height: 50vh;
-    overflow-y: auto;
+    padding: 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
     box-shadow: 0 -10px 40px rgba(0,0,0,0.8);
 }
 
-#mobile-pa-detail-sheet.open { display: block; }
+#mobile-pa-detail-sheet {
+    border-top: 2px solid #a855f7;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+#mobile-pa-vault-sheet {
+    border-top: 2px solid #10b981;
+    max-height: 75vh;
+    display: none;
+    flex-direction: column;
+}
+
+#mobile-pa-detail-sheet.open,
+#mobile-pa-vault-sheet.open {
+    display: block;
+}
+
+#mobile-pa-vault-sheet.open {
+    display: flex;
+}
 
 /* --- Mobile Personal Hub (full view) --- */
 @media (max-width: 900px) {
@@ -4806,6 +4884,17 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
     <div id="mobile-pa-detail-body" style="font-size:13px;color:#d4d4d8;line-height:1.5;"></div>
 </div>
 
+<div id="mobile-pa-vault-sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;">
+        <div style="font-weight:900;color:#10b981;font-size:13px;letter-spacing:0.5px;">ADD TO GENERAL</div>
+        <button class="btn-close" style="width:auto;margin:0;padding:8px 14px !important;flex-shrink:0;" onclick="closeMobilePaVaultSearch()">CLOSE</button>
+    </div>
+    <input type="text" id="mobile-pa-vault-search" placeholder="Search vault by name…" autocomplete="off"
+        style="width:100%;padding:12px;background:#0a0a0c;border:1px solid #10b981;color:#fff;border-radius:6px;font-size:14px;box-sizing:border-box;margin-bottom:12px;outline:none;"
+        oninput="renderMobilePaVaultResults()">
+    <div id="mobile-pa-vault-results" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:0;"></div>
+</div>
+
 
 
 <div id="edit-modal-overlay" class="modal-overlay">
@@ -4971,6 +5060,8 @@ body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
           <div style="width: 2px; height: 20px; background: #333; margin: 0 5px;"></div>
           <button id="btn-master-operation" class="btn-outline btn-sm" style="border-color:#f59e0b; color:#f59e0b; margin:0; flex-shrink:0; display:none; height: 38px; box-sizing: border-box;" onclick="startOperationUI('CHECK-OUT', event)">START CHECK-OUT</button>
           <button id="btn-print-lists" class="btn-outline btn-sm" style="border-color:#3b82f6; color:#3b82f6; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box;" onclick="openPrintModal()">🖨️ PRINT</button>
+          <button id="btn-mobile-pa-search" class="btn-outline btn-sm" style="display:none; border-color:#10b981; color:#10b981; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box;" onclick="openMobilePaVaultSearch()">🔍 SEARCH</button>
+          <button id="btn-save-pa-mobile" class="btn-main btn-sm" style="display:none; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box; padding: 0 14px !important;" onclick="saveProjectAssets()">SAVE</button>
       </div>
       <div style="display:flex; align-items:center; gap: 12px; flex: 1; justify-content: flex-end;">
          <div style="display:flex; gap: 10px; margin-right: 100px;">

@@ -26,7 +26,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Topic | Status | File |
 |-------|--------|------|
-| Notifications | Step C/D shipped; foreground host toast v345 | [topics/notifications.md](topics/notifications.md) |
+| Notifications | Catalog + infra @ v359; see catalog for test matrix | [topics/notifications-catalog.md](topics/notifications-catalog.md) · [notifications.md](topics/notifications.md) |
 | Global tasks | Visibility rules + `task_view_all` IAM v345 | [topics/tasks.md](topics/tasks.md) |
 | Mobile crew UX | Shipped v314 | [topics/mobile-crew.md](topics/mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |

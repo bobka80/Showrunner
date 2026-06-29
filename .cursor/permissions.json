@@ -1,0 +1,22 @@
+{
+  "terminalAllowlist": [
+    "node check-google-account.js",
+    "node build.js",
+    "node milestone.js",
+    "node dev-push.js",
+    "node works-save.js",
+    "node rollback-works.js",
+    "node rollback-milestone.js",
+    "clasp push",
+    "clasp list-versions",
+    "clasp show-authorized-user",
+    "clasp deploy",
+    "clasp version"
+  ],
+  "autoRun": {
+    "allow_instructions": [
+      "This is the Showrunner / ShowRider repo on the director's trusted machine. Auto-approve Showrunner Node and clasp commands.",
+      "Auto-approve reading project files under docs/ai, dist/, and root *.js without asking."
+    ]
+  }
+}

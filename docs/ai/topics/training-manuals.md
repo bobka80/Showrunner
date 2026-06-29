@@ -16,7 +16,7 @@
 - [ ] Login & stay signed in
 - [ ] Mobile Command Center — Events, Tasks, Notifications
 - [ ] Crew Hub → Timeline — MY SHIFTS vs full TIMELINE; pinch zoom; shift detail
-- [ ] Push alerts — setup, bar visibility, blocked notifications
+- [ ] Push alerts — see [notifications-catalog.md](notifications-catalog.md) for scenario list; manual covers setup UX
 - [ ] Manager-only flows — project editor, timeline, admin
 
 ## Deliverables

@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Check Google account (clasp)",
+      "type": "shell",
+      "command": "node",
+      "args": ["check-google-account.js"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated",
+        "focus": false,
+        "showReuseMessage": false,
+        "clear": true
+      },
+      "runOptions": {
+        "runOn": "default"
+      },
+      "problemMatcher": []
+    }
+  ]
+}
