@@ -125,7 +125,7 @@ function renderProjectAssetsUI() {
         ['name', 'qty', 'unit', 'action'].forEach(function(k) {
             if (!gridConfAssigned.cols[k]) gridConfAssigned.cols[k] = {};
             gridConfAssigned.cols[k].vis = true;
-            gridConfAssigned.cols[k].w = (k === 'name') ? 150 : (k === 'action' ? 110 : 56);
+            gridConfAssigned.cols[k].w = (k === 'name') ? 150 : (k === 'action' ? 140 : 56);
         });
         Object.keys(gridConfAssigned.cols).forEach(function(k) {
             if (['name', 'qty', 'unit', 'action'].indexOf(k) === -1) gridConfAssigned.cols[k].vis = false;
@@ -135,6 +135,54 @@ function renderProjectAssetsUI() {
         let el = document.getElementById('style-grid-project_assigned');
         if (el) el.remove();
     }
+
+    const mobOpLabel = function() {
+        return window.currentOperationType === 'CHECK-IN' ? 'CHECK IN' : 'CHECK OUT';
+    };
+    const mobOpBtnCss = function() {
+        return isMobPa
+            ? 'background:#ef4444 !important;border-color:#ef4444 !important;color:#fff !important;font-weight:800;font-size:9px !important;line-height:1.15;'
+            : 'background:#f59e0b !important;border-color:#f59e0b !important;color:#000 !important;font-weight:bold;';
+    };
+    const buildOpActionCell = function(widthStyle, autoBadge, assetId, cQty, sQty) {
+        const doneBtnText = window.currentOperationType === 'CHECK-IN' ? 'CHECKED IN ✓' : 'CHECKED OUT ✓';
+        const opLabel = isMobPa ? mobOpLabel() : (window.currentOperationType ? window.currentOperationType.replace('-', ' ') : 'CHECK OUT');
+        const bs = mobOpBtnCss();
+        const remQty = cQty - sQty;
+        const uniqueSq = 'sq-op-' + Math.random().toString(36).substr(2, 5);
+        const manualTitle = 'Manual tap if RFID does not work';
+        if (sQty > 0 && sQty >= cQty) {
+            return `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important;margin:0;font-weight:bold;background:#10b981 !important;border-color:#10b981 !important;color:#000 !important;cursor:pointer;font-size:9px !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', ${cQty})" title="Undo">${doneBtnText}</button></div>`;
+        }
+        if (sQty > 0) {
+            const midLabel = isMobPa ? (opLabel + ' ' + sQty + '/' + cQty) : (sQty + '/' + cQty + ' ALL');
+            return `<div style="${widthStyle} text-align:center;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${remQty})" title="${manualTitle}">${midLabel}</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm mobile-pa-undo-btn" style="padding:2px 5px !important;margin:0;font-weight:bold;display:inline-flex !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', 1)" title="Undo 1">✖</button></div>`;
+        }
+        if (cQty > 1) {
+            return `<div style="${widthStyle} text-align:center;display:flex;gap:2px;justify-content:center;flex-wrap:wrap;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${cQty})" title="${manualTitle}">${opLabel} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="padding:2px 5px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
+        }
+        return `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important;margin:0;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', 1)" title="${manualTitle}">${opLabel}</button></div>`;
+    };
+    const buildOpHeaderRight = function(assetId, cQty, sQty) {
+        const doneBtnText = window.currentOperationType === 'CHECK-IN' ? 'CHECKED IN ✓' : 'CHECKED OUT ✓';
+        const opLabel = isMobPa ? mobOpLabel() : (window.currentOperationType ? window.currentOperationType.replace('-', ' ') : 'CHECK OUT');
+        const bs = mobOpBtnCss();
+        const remQty = cQty - sQty;
+        const uniqueSq = 'sq-case-' + Math.random().toString(36).substr(2, 5);
+        const manualTitle = 'Manual tap if RFID does not work';
+        if (sQty >= cQty) {
+            return `<button class="btn-main btn-sm" style="background:#10b981 !important;border-color:#10b981 !important;color:#000 !important;margin:0;padding:2px 8px !important;cursor:pointer;font-size:9px !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', ${cQty})" title="Undo">${doneBtnText}</button>`;
+        }
+        if (sQty > 0) {
+            const midLabel = isMobPa ? (opLabel + ' ' + sQty + '/' + cQty) : (sQty + '/' + cQty + ' ALL');
+            return `<div style="display:flex;gap:2px;flex-wrap:wrap;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${remQty})" title="${manualTitle}">${midLabel}</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm mobile-pa-undo-btn" style="padding:2px 5px !important;margin:0;font-weight:bold;display:inline-flex !important;" onclick="event.stopPropagation(); undoManualScan('${assetId}', 1)" title="Undo 1">✖</button></div>`;
+        }
+        if (cQty > 1) {
+            return `<div style="display:flex;gap:2px;flex-wrap:wrap;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', ${cQty})" title="${manualTitle}">${opLabel} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:26px;padding:0;text-align:center;font-size:10px;background:#111;color:#fff;border:1px solid #333;margin:0;"><button class="btn-main btn-sm" style="margin:0;padding:2px 5px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
+        }
+        return `<button class="btn-main btn-sm" style="margin:0;padding:2px 8px !important;${bs}" onclick="event.stopPropagation(); triggerManualScan('${assetId}', 1)" title="${manualTitle}">${opLabel}</button>`;
+    };
+
     let dynCssAssigned = window.GridEngine.buildCSS('project_assigned');
     if (dynCssAssigned && !document.getElementById('style-grid-project_assigned')) document.head.insertAdjacentHTML('beforeend', dynCssAssigned);
 
@@ -332,23 +380,14 @@ function renderProjectAssetsUI() {
                         let remQty = cQty - sQty;
                         let uniqueSq = 'sq-op-' + Math.random().toString(36).substr(2, 5);
                         if (window.currentPaMode === 'operation') {
-                            if (sQty > 0 && sQty >= cQty) {
-                                html += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0; font-weight:bold; background:#10b981 !important; border-color:#10b981 !important; color:#000 !important; cursor:pointer;" onclick="event.stopPropagation(); undoManualScan('${a.id}', ${cQty})" title="Click to Undo Scan">${doneBtnText}</button></div>`;
-                            } else if (sQty > 0) {
-                                html += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', ${remQty})" title="Scan remaining">${sQty}/${cQty} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', document.getElementById('${uniqueSq}').value)" title="Scan specific amount">+</button><button class="btn-delete btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold;" onclick="event.stopPropagation(); undoManualScan('${a.id}', 1)" title="Undo 1 Scan">✖</button></div>`;
-                            } else {
-                                if (cQty > 1) {
-                                    html += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', ${cQty})">${opBtnText} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
-                                } else {
-                                    html += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', 1)">${opBtnText}</button></div>`;
-                                }
-                            }
+                            html += buildOpActionCell(widthStyle, autoBadge, a.id, cQty, sQty);
                         } else if (window.currentPaMode === 'packing') {
                             if (!paContainer && window.activeContainerTarget) {
+                                const packMain = isMobPa ? 'background:#f59e0b !important;border-color:#f59e0b !important;color:#000 !important;' : '';
                                 if (cQty > 1) {
-                                    html += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0;" onclick="event.stopPropagation(); packItem(${paIndex}, '${window.activeContainerTarget}', ${cQty})">PACK ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0;" onclick="event.stopPropagation(); packItem(${paIndex}, '${window.activeContainerTarget}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
+                                    html += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0;${packMain}" onclick="event.stopPropagation(); packItem(${paIndex}, '${window.activeContainerTarget}', ${cQty})">PACK ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0;${packMain}" onclick="event.stopPropagation(); packItem(${paIndex}, '${window.activeContainerTarget}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
                                 } else {
-                                    html += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0;" onclick="event.stopPropagation(); packItem(${paIndex}, '${window.activeContainerTarget}', 1)">PACK ⬇</button></div>`;
+                                    html += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0;${packMain}" onclick="event.stopPropagation(); packItem(${paIndex}, '${window.activeContainerTarget}', 1)">PACK ⬇</button></div>`;
                                 }
                             } else if (paContainer) {
                                 if (cQty > 1) {
@@ -391,17 +430,7 @@ function renderProjectAssetsUI() {
                         let remQty = cQty - sQty;
                         let uniqueSq = 'sq-sum-' + Math.random().toString(36).substr(2, 5);
                         if (window.currentPaMode === 'operation') {
-                            if (sQty > 0 && sQty >= cQty) {
-                                html += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0; font-weight:bold; background:#10b981 !important; border-color:#10b981 !important; color:#000 !important; cursor:pointer;" onclick="event.stopPropagation(); undoManualScan('${a.id}', ${cQty})" title="Click to Undo Scan">${doneBtnText}</button></div>`;
-                            } else if (sQty > 0) {
-                                html += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', ${remQty})">${sQty}/${cQty} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold;" onclick="event.stopPropagation(); undoManualScan('${a.id}', 1)" title="Undo 1 Scan">✖</button></div>`;
-                            } else {
-                                if (cQty > 1) {
-                                    html += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', ${cQty})">${opBtnText} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
-                                } else {
-                                    html += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', 1)">${opBtnText}</button></div>`;
-                                }
-                            }
+                            html += buildOpActionCell(widthStyle, autoBadge, a.id, cQty, sQty);
                         } else {
                             if (a.isConsumable === true || a.isConsumable === 'true') {
                                 let uniqueI = 'cons-inp-' + Math.random().toString(36).substr(2, 5);
@@ -657,20 +686,7 @@ function renderProjectAssetsUI() {
             let headerRight = '';
             if (window.currentPaMode === 'operation') {
                 let sQty = cPa ? (cPa.scannedQty || 0) : 0;
-                let doneBtnText = window.currentOperationType === 'CHECK-IN' ? 'CHECKED IN ✓' : 'CHECKED OUT ✓';
-                let remQty = cQty - sQty;
-                let uniqueSq = 'sq-case-' + Math.random().toString(36).substr(2, 5);
-                if (sQty >= cQty) {
-                    headerRight = `<button class="btn-main btn-sm" style="background:#10b981 !important; border-color:#10b981 !important; color:#000 !important; margin:0; padding:2px 8px !important; cursor:pointer;" onclick="event.stopPropagation(); undoManualScan('${cid}', ${cQty})" title="Click to Undo Case Scan">${doneBtnText}</button>`;
-                } else if (sQty > 0) {
-                    headerRight = `<div style="display:flex; gap:2px;"><button class="btn-main btn-sm" style="background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important; margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); triggerManualScan('${cid}', ${remQty})">${sQty}/${cQty} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important; margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); triggerManualScan('${cid}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold;" onclick="event.stopPropagation(); undoManualScan('${cid}', 1)" title="Undo 1 Scan">✖</button></div>`;
-                } else {
-                    if (cQty > 1) {
-                        headerRight = `<div style="display:flex; gap:2px;"><button class="btn-main btn-sm" style="background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important; margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); triggerManualScan('${cid}', ${cQty})">${opBtnText} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${cQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important; margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); triggerManualScan('${cid}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
-                    } else {
-                        headerRight = `<button class="btn-main btn-sm" style="background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); triggerManualScan('${cid}', 1)">${opBtnText}</button>`;
-                    }
-                }
+                headerRight = buildOpHeaderRight(cid, cQty, sQty);
             } else if (isTarget) {
                 headerRight = `<div style="display:flex; gap:6px;"><button class="btn-outline btn-sm" style="border-color:#3b82f6; color:#3b82f6; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); alert('QR/RFID Scanner module pending.')">SCAN</button><button class="btn-outline btn-sm" style="border-color:#a855f7; color:#a855f7; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); alert('Manual unit number linking module pending.')">LINK</button><button class="btn-outline btn-sm" style="border-color:#ef4444; color:#ef4444; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); cancelContainerPacking()">CANCEL</button><button class="btn-main btn-sm" style="background:#10b981; color:#000; margin:0; padding:2px 8px !important;" onclick="event.stopPropagation(); clearContainerTarget()">DONE</button></div>`;
             } else {
@@ -997,19 +1013,7 @@ function renderProjectAssetsUI() {
                             let doneBtnText = window.currentOperationType === 'CHECK-IN' ? 'CHECKED IN ✓' : 'CHECKED OUT ✓';
                             if (window.currentPaMode === 'operation') {
                                 let sumScanned = items.reduce((sum, x) => sum + (x.pa.scannedQty || 0), 0);
-                                let remQty = sumQty - sumScanned;
-                                let uniqueSq = 'sq-fg-' + Math.random().toString(36).substr(2, 5);
-                                if (sumScanned > 0 && sumScanned >= sumQty) {
-                                    assignedHtml += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0; font-weight:bold; background:#10b981 !important; border-color:#10b981 !important; color:#000 !important; cursor:pointer;" onclick="event.stopPropagation(); undoManualScan('${a.id}', ${sumQty})" title="Undo Scan">${doneBtnText}</button></div>`;
-                                } else if (sumScanned > 0) {
-                                    assignedHtml += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', ${remQty})">${sumScanned}/${sumQty} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${remQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', document.getElementById('${uniqueSq}').value)">+</button><button class="btn-delete btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold;" onclick="event.stopPropagation(); undoManualScan('${a.id}', 1)" title="Undo 1 Scan">✖</button></div>`;
-                                } else {
-                                    if (sumQty > 1) {
-                                        assignedHtml += `<div style="${widthStyle} text-align:center; display:flex; gap:2px; justify-content:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', ${sumQty})">${opBtnText} ALL</button><input type="number" id="${uniqueSq}" min="1" max="${sumQty}" value="1" onclick="event.stopPropagation()" style="width:28px; padding:0; text-align:center; font-size:10px; background:#111; color:#fff; border:1px solid #333; margin:0;"><button class="btn-main btn-sm" style="padding:2px 6px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', document.getElementById('${uniqueSq}').value)">+</button></div>`;
-                                    } else {
-                                        assignedHtml += `<div style="${widthStyle} text-align:center;">${autoBadge}<button class="btn-main btn-sm" style="padding:2px 8px !important; margin:0; font-weight:bold; background:#f59e0b !important; border-color:#f59e0b !important; color:#000 !important;" onclick="event.stopPropagation(); triggerManualScan('${a.id}', 1)">${opBtnText}</button></div>`;
-                                    }
-                                }
+                                assignedHtml += buildOpActionCell(widthStyle, autoBadge, a.id, sumQty, sumScanned);
                             } else {
                                 let indicesStr = items.map(x => x.originalIndex).join(',');
                                 assignedHtml += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">${autoBadge}<button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', -1)">-</button><span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${sumQty}</span><button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', 1)">+</button><button class="btn-delete btn-sm" style="margin:0; padding:2px 6px !important; font-weight:bold; margin-left:4px;" onclick="event.stopPropagation(); removePaIndices('${indicesStr}')" title="Remove all">DEL</button></div>`;

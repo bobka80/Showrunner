@@ -356,6 +356,30 @@ window.openMobileProjectAssets = function(projectId) {
     updateMobilePaUnsavedUI();
 };
 
+window.applyMobilePaModeChrome = function() {
+    if (!window.mobilePaCompactActive) return;
+    const modal = document.querySelector('#project-assets-modal-overlay .modal');
+    const opBar = document.getElementById('pa-operation-bar');
+    const opStatus = document.getElementById('pa-op-status');
+    const body = document.body;
+    body.classList.remove('mobile-pa-mode-packing', 'mobile-pa-mode-operation', 'mobile-pa-mode-design');
+    if (window.currentPaMode === 'operation') {
+        body.classList.add('mobile-pa-mode-operation');
+        if (modal) modal.style.setProperty('border-color', '#ef4444', 'important');
+        if (opStatus) opStatus.style.color = '#ef4444';
+        if (opBar) opBar.style.borderBottomColor = '#ef4444';
+    } else if (window.currentPaMode === 'packing') {
+        body.classList.add('mobile-pa-mode-packing');
+        if (modal) modal.style.setProperty('border-color', '#f59e0b', 'important');
+        if (opStatus) opStatus.style.color = '#f59e0b';
+        if (opBar) opBar.style.borderBottomColor = '#333';
+    } else {
+        body.classList.add('mobile-pa-mode-design');
+        if (modal) modal.style.borderColor = 'transparent';
+        if (opBar) opBar.style.borderBottomColor = '#333';
+    }
+};
+
 window.applyMobilePaChrome = function() {
     if (!window.mobilePaCompactActive) return;
     const saveM = document.getElementById('btn-save-pa-mobile');
@@ -371,12 +395,13 @@ window.applyMobilePaChrome = function() {
     if (modeBar) modeBar.style.display = 'flex';
     if (typeof evalOperationButtons === 'function') evalOperationButtons();
     const opBtn = document.getElementById('btn-master-operation');
-    if (opBtn && window.currentPaMode === 'packing') {
+    if (opBtn && (window.currentPaMode === 'packing' || window.currentPaMode === 'operation')) {
         stashMobilePaEl('btn-master-operation');
-        opBtn.style.display = '';
+        opBtn.style.display = 'inline-flex';
     } else if (opBtn && modeBar && opBtn.parentElement === modeBar) {
         opBtn.style.display = 'none';
     }
+    applyMobilePaModeChrome();
     updateMobilePaUnsavedUI();
 };
 
@@ -392,6 +417,7 @@ window.exitMobilePaCompactMode = function() {
     if (saveM) saveM.style.display = 'none';
     if (searchM) searchM.style.display = 'none';
     if (closeX) closeX.style.display = 'none';
+    document.body.classList.remove('mobile-pa-mode-packing', 'mobile-pa-mode-operation', 'mobile-pa-mode-design');
     updateMobilePaUnsavedUI();
     if (typeof updateMobileCrewLogisticsButtons === 'function') updateMobileCrewLogisticsButtons();
 };

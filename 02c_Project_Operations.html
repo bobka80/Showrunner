@@ -56,6 +56,7 @@ window.startOperationUI = function(type, e) {
         window.currentOperationType = type;
         if (typeof togglePaMode === 'function') togglePaMode('operation');
         if (typeof evalOperationButtons === 'function') evalOperationButtons();
+        if (typeof applyMobilePaModeChrome === 'function') applyMobilePaModeChrome();
     })
     .withFailureHandler(err => {
         btn.innerText = origText; btn.disabled = false;
@@ -326,6 +327,7 @@ window.stopOperationUI = function(e) {
     window.currentOperationType = null;
     if (typeof togglePaMode === 'function') togglePaMode('packing');
     if (typeof evalOperationButtons === 'function') evalOperationButtons();
+    if (typeof applyMobilePaModeChrome === 'function') applyMobilePaModeChrome();
 };
 
 window.finalizeOperationUI = function(e) {
@@ -348,6 +350,7 @@ window.finalizeOperationUI = function(e) {
         window.currentOperationType = null;
         if (typeof togglePaMode === 'function') togglePaMode('design');
         if (typeof evalOperationButtons === 'function') evalOperationButtons();
+        if (typeof applyMobilePaModeChrome === 'function') applyMobilePaModeChrome();
     })
     .withFailureHandler(err => {
         btn.innerText = origText; btn.disabled = false;

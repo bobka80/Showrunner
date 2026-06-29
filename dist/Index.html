@@ -2891,8 +2891,41 @@ body.mobile-pa-compact #pa-assigned-list div[title="Standalone Items"] {
 }
 
 body.mobile-pa-compact #pa-assigned-list .btn-blue.btn-sm,
-body.mobile-pa-compact #pa-assigned-list .btn-delete.btn-sm {
+body.mobile-pa-compact:not(.mobile-pa-mode-operation) #pa-assigned-list .btn-delete.btn-sm {
     display: none !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-assigned-list .mobile-pa-undo-btn {
+    display: inline-flex !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #project-assets-modal-overlay .modal {
+    border-color: #ef4444 !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-packing #project-assets-modal-overlay .modal {
+    border-color: #f59e0b !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-operation-bar {
+    display: flex !important;
+    border-bottom: 2px solid #ef4444 !important;
+    background: #1a0a0a !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-op-status {
+    color: #ef4444 !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-rfid-scanner {
+    border-color: #ef4444 !important;
+    color: #fca5a5 !important;
+    box-shadow: inset 0 0 5px rgba(239, 68, 68, 0.2) !important;
+}
+
+body.mobile-pa-compact.mobile-pa-mode-operation #pa-mobile-mode-bar #btn-master-operation {
+    border-color: #ef4444 !important;
+    color: #ef4444 !important;
 }
 
 body.mobile-pa-compact #pa-operation-bar {
