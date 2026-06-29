@@ -16,6 +16,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const build = require('./build');
+const gasPushSync = require('./gas-push-sync');
 
 const MAX_MILESTONE_LOG = 50;
 const LOG_PATH = path.join(__dirname, 'RELEASES.md');
@@ -127,77 +128,84 @@ if (before) {
 }
 
 build();
-runInherit('clasp push');
-
-console.log('\nCreating Apps Script version...');
-const safeNote = note.replace(/"/g, "'");
-let versionOut = '';
-try {
-  versionOut = run(`clasp version "${safeNote}"`);
-  if (versionOut) console.log(versionOut);
-} catch (e) {
-  const err = (e.stdout || e.stderr || e.message || '').toString();
-  if (err) console.error(err);
-  process.exit(1);
-}
-
-let gasVersion = null;
-const m = versionOut.match(/(\d+)\s*$/m) || versionOut.match(/version\s+(\d+)/i);
-if (m) gasVersion = m[1];
-if (!gasVersion) {
-  const after = getLatestGasVersion();
-  if (after) gasVersion = String(after.num);
-}
-if (!gasVersion) {
-  console.error('Could not determine new version number. Check clasp list-versions.');
-  process.exit(1);
-}
-
-const existingDeployId = loadOptionalDeploymentId();
-let deploymentId = existingDeployId;
-let deployOut = '';
-
-console.log(`\nDeploying version ${gasVersion}...`);
-const deployDesc = safeNote.replace(/"/g, "'");
-try {
-  if (existingDeployId) {
-    console.log(`Updating production deployment ${existingDeployId.slice(0, 12)}…`);
-    deployOut = run(`clasp deploy -i ${existingDeployId} -V ${gasVersion} -d "${deployDesc}"`);
-  } else {
-    console.log('No production deployment ID saved yet — creating a new web app deployment.');
-    deployOut = run(`clasp deploy -V ${gasVersion} -d "${deployDesc}"`);
-    const newId = parseDeploymentId(deployOut);
-    if (newId) {
-      deploymentId = newId;
-      saveDeploymentId(newId);
-      console.log(`Saved production deployment ID to deploy-config.json`);
-    }
+(async () => {
+  try {
+    await gasPushSync();
+  } catch (e) {
+    console.error(e.message || e);
+    process.exit(1);
   }
-  if (deployOut) console.log(deployOut);
-} catch (e) {
-  const err = (e.stdout || e.stderr || e.message || '').toString();
-  if (err) console.error(err);
-  process.exit(1);
-}
 
-if (!deploymentId) {
-  deploymentId = parseDeploymentId(deployOut) || 'unknown';
-}
+  console.log('\nCreating Apps Script version...');
+  const safeNote = note.replace(/"/g, "'");
+  let versionOut = '';
+  try {
+    versionOut = run(`clasp version "${safeNote}"`);
+    if (versionOut) console.log(versionOut);
+  } catch (e) {
+    const err = (e.stdout || e.stderr || e.message || '').toString();
+    if (err) console.error(err);
+    process.exit(1);
+  }
 
-updateReleasesLog(gasVersion, deploymentId, note);
+  let gasVersion = null;
+  const m = versionOut.match(/(\d+)\s*$/m) || versionOut.match(/version\s+(\d+)/i);
+  if (m) gasVersion = m[1];
+  if (!gasVersion) {
+    const after = getLatestGasVersion();
+    if (after) gasVersion = String(after.num);
+  }
+  if (!gasVersion) {
+    console.error('Could not determine new version number. Check clasp list-versions.');
+    process.exit(1);
+  }
 
-const safeMsg = `Milestone v${gasVersion}: ${safeNote}`;
-run('git add -A');
-try {
-  run(`git commit -m "${safeMsg}"`);
-} catch (e) {
-  console.log('(Git: nothing new to commit after RELEASES.md update, or commit skipped)');
-}
+  const existingDeployId = loadOptionalDeploymentId();
+  let deploymentId = existingDeployId;
+  let deployOut = '';
 
-console.log(`\nMilestone complete — Apps Script version ${gasVersion}`);
-console.log('Updated RELEASES.md');
-if (existingDeployId) {
-  console.log('Production web app URL updated to this version.');
-} else {
-  console.log('New deployment created. Bookmark the web app URL from Apps Script → Deploy → Manage deployments.');
-}
+  console.log(`\nDeploying version ${gasVersion}...`);
+  const deployDesc = safeNote.replace(/"/g, "'");
+  try {
+    if (existingDeployId) {
+      console.log(`Updating production deployment ${existingDeployId.slice(0, 12)}…`);
+      deployOut = run(`clasp deploy -i ${existingDeployId} -V ${gasVersion} -d "${deployDesc}"`);
+    } else {
+      console.log('No production deployment ID saved yet — creating a new web app deployment.');
+      deployOut = run(`clasp deploy -V ${gasVersion} -d "${deployDesc}"`);
+      const newId = parseDeploymentId(deployOut);
+      if (newId) {
+        deploymentId = newId;
+        saveDeploymentId(newId);
+        console.log(`Saved production deployment ID to deploy-config.json`);
+      }
+    }
+    if (deployOut) console.log(deployOut);
+  } catch (e) {
+    const err = (e.stdout || e.stderr || e.message || '').toString();
+    if (err) console.error(err);
+    process.exit(1);
+  }
+
+  if (!deploymentId) {
+    deploymentId = parseDeploymentId(deployOut) || 'unknown';
+  }
+
+  updateReleasesLog(gasVersion, deploymentId, note);
+
+  const safeMsg = `Milestone v${gasVersion}: ${safeNote}`;
+  run('git add -A');
+  try {
+    run(`git commit -m "${safeMsg}"`);
+  } catch (e) {
+    console.log('(Git: nothing new to commit after RELEASES.md update, or commit skipped)');
+  }
+
+  console.log(`\nMilestone complete — Apps Script version ${gasVersion}`);
+  console.log('Updated RELEASES.md');
+  if (existingDeployId) {
+    console.log('Production web app URL updated to this version.');
+  } else {
+    console.log('New deployment created. Bookmark the web app URL from Apps Script → Deploy → Manage deployments.');
+  }
+})();

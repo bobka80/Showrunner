@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <script>
+  (function(){ if (window.self !== window.top) { var b = document.querySelector('base'); if (b) b.target = '_self'; } })();
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg-dark: #0a0a0c; --bg-card: #1a1a1e; --accent: #698b99; --text-main: #f4f4f5; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .login-card { background: var(--bg-card); padding: 40px; border-radius: 12px; border-top: 6px solid var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,0.8); text-align: center; width: 100%; max-width: 320px; box-sizing: border-box;}
+    
+    input[type="password"] { width: 100%; padding: 14px; margin: 20px 0 15px 0; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; text-align: center; letter-spacing: 2px;}
+    .btn-main { width: 100%; padding: 14px; background: rgba(16, 185, 129, 0.4); border: 1px solid #10b981; color: white; border-radius: 6px; font-weight: 800; cursor: pointer; transition: 0.2s; letter-spacing: 0.5px; text-transform: uppercase; font-size: 12px; box-sizing: border-box;}
+    .btn-main:hover { background: rgba(16, 185, 129, 0.6); }
+    #session-booting { display: none; color: #10b981; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h2 style="margin: 0 0 5px 0;">SYSTEM SECURE</h2>
+    <p style="color: #71717a; font-size: 12px; margin-bottom: 20px;">Enter Command Passcode</p>
+    <div id="session-booting">Opening Showrunner…</div>
+    <div id="error-display" style="color: #ef4444; font-size: 12px; font-weight: bold; margin-bottom: 15px; display: none;"></div>
+    
+    <form id="login-form" method="post" action="<?= scriptUrl ?>" target="_self">
+      <div style="text-align: left; margin-bottom: 10px;">
+        <label class="input-label">Crew Name</label>
+        <input type="text" name="name" id="name-input" placeholder="e.g. John Doe" required style="width: 100%; padding: 14px; margin-top: 5px; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box;">
+      </div>
+      
+      <div style="text-align: left; margin-bottom: 20px;">
+        <label class="input-label">6-Character Passcode</label>
+        <input type="password" name="passcode" id="pass-input" placeholder="••••••" maxlength="6" required style="width: 100%; padding: 14px; margin-top: 5px; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; letter-spacing: 4px; font-size: 18px; text-align: center;">
+      </div>
+
+      <p style="font-size:11px; font-weight:700; color:#71717a; margin:0 0 20px 0; line-height:1.45;">
+        Stay signed in on this device for <strong style="color:#10b981;">30 days</strong> after login.
+      </p>
+
+      <button type="submit" id="login-btn" class="btn-main">AUTHENTICATE</button>
+    </form>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      const nameInput = document.getElementById('name-input');
+      const passInput = document.getElementById('pass-input');
+      const form = document.getElementById('login-form');
+      const btn = document.getElementById('login-btn');
+      const bootMsg = document.getElementById('session-booting');
+      const scriptUrl = <?!= JSON.stringify(scriptUrl || '') ?>;
+      const clearSession = <?!= JSON.stringify(!!clearSession) ?>;
+      
+      const errorDisplayRaw = <?!= JSON.stringify(errorMsg || "") ?>;
+      const errorDisplay = errorDisplayRaw ? errorDisplayRaw.toString() : "";
+      const isError = (errorDisplay && errorDisplay.trim() !== '' && errorDisplay.trim() !== 'none');
+
+      const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+
+      function sessionCheckJsonp(token) {
+        return new Promise(function(resolve) {
+          if (!token || !scriptUrl) return resolve({ valid: false });
+          var cb = '__srSessChk_' + Date.now();
+          window[cb] = function(res) {
+            delete window[cb];
+            resolve(res || { valid: false });
+          };
+          var s = document.createElement('script');
+          s.src = scriptUrl + '?action=sessioncheck&token=' + encodeURIComponent(token) + '&callback=' + encodeURIComponent(cb);
+          s.onerror = function() {
+            delete window[cb];
+            resolve({ valid: false });
+          };
+          document.head.appendChild(s);
+        });
+      }
+
+      function beginSessionBoot(token, crewName, expiresAt) {
+        if (form) form.style.display = 'none';
+        if (bootMsg) bootMsg.style.display = 'block';
+        notifyParentSessionToken(token, crewName, expiresAt);
+        window.location.replace(scriptUrl + '?action=sessionboot&token=' + encodeURIComponent(token));
+      }
+
+      function clearStoredSession() {
+        try {
+          localStorage.removeItem('sm_session_token');
+          localStorage.removeItem('sm_session_expires');
+          localStorage.removeItem('sm_crew_name');
+          localStorage.removeItem('sm_crew_pass');
+          localStorage.removeItem('sm_crew_timestamp');
+        } catch (e) { /* ignore */ }
+      }
+
+      function notifyParentSessionClear() {
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage({ type: 'SHOWRUNNER_SESSION_CLEAR' }, '*');
+          } catch (e) { /* ignore */ }
+        }
+      }
+
+      function notifyParentSessionToken(token, crewName, expiresAt) {
+        if (!token || window.parent === window) return;
+        try {
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_SESSION_TOKEN',
+            token: token,
+            crewName: crewName || '',
+            expiresAt: expiresAt || (Date.now() + SESSION_MS)
+          }, '*');
+        } catch (e) { /* ignore */ }
+      }
+
+      if (clearSession) {
+        clearStoredSession();
+        notifyParentSessionClear();
+      }
+
+      if (isError) {
+         document.getElementById('error-display').innerText = errorDisplay;
+         document.getElementById('error-display').style.display = 'block';
+         btn.innerText = 'AUTHENTICATE';
+      } else {
+         try {
+           const savedName = localStorage.getItem('sm_crew_name');
+           if (savedName) nameInput.value = savedName;
+         } catch (e) { /* ignore */ }
+
+         const token = localStorage.getItem('sm_session_token');
+         const exp = parseInt(localStorage.getItem('sm_session_expires') || '0', 10);
+         if (token && exp > Date.now() && scriptUrl) {
+           if (form) form.style.display = 'none';
+           if (bootMsg) bootMsg.style.display = 'block';
+           sessionCheckJsonp(token).then(function(res) {
+             if (res && res.valid) {
+               var crew = res.crewName || localStorage.getItem('sm_crew_name') || nameInput.value;
+               var newExp = res.expiresAt || exp;
+               try {
+                 localStorage.setItem('sm_session_expires', String(newExp));
+                 if (crew) localStorage.setItem('sm_crew_name', crew);
+               } catch (e) { /* ignore */ }
+               beginSessionBoot(token, crew, newExp);
+               return;
+             }
+             clearStoredSession();
+             notifyParentSessionClear();
+             if (form) form.style.display = '';
+             if (bootMsg) bootMsg.style.display = 'none';
+           });
+           return;
+         }
+         if (token && exp <= Date.now()) {
+           clearStoredSession();
+         }
+      }
+
+      passInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');
+        if (this.value.length === 6) {
+          if (btn.disabled) return;
+          this.blur();
+          btn.click(); 
+        }
+      });
+
+      form.addEventListener('submit', function() {
+        try {
+          localStorage.setItem('sm_crew_name', nameInput.value);
+        } catch (e) { /* ignore */ }
+        if (window.parent && window.parent !== window) {
+          try {
+            var crew = String(nameInput.value || '').trim();
+            if (crew) {
+              window.parent.postMessage({
+                type: 'SHOWRUNNER_SESSION',
+                crewName: crew,
+                regKey: '',
+                loggedIn: true,
+                pendingLogin: true
+              }, '*');
+            }
+          } catch (e) { /* ignore */ }
+        }
+        btn.innerText = 'VERIFYING...';
+        btn.style.opacity = '0.7';
+        btn.disabled = true;
+      });
+
+      if (window.parent && window.parent !== window) {
+        try {
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_LOGIN_STATE',
+            loggedIn: false,
+            clearSession: !!clearSession
+          }, '*');
+        } catch (e) { /* ignore */ }
+      }
+    });
+  </script>
+</body>
+</html>

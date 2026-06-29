@@ -166,6 +166,7 @@ function getFrontendLogicChunk(index) {
     'rollback-works.js', 'rollback-milestone.js',
     'deploy-hosting.js',
     'check-google-account.js',
+    'gas-push-sync.js',
     'test.js', 'test_db.js', 'run_test.js'
   ]);
   const files = fs.readdirSync(__dirname);
