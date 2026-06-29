@@ -366,6 +366,7 @@ window.applyMobilePaModeChrome = function() {
     if (window.currentPaMode === 'operation') {
         body.classList.add('mobile-pa-mode-operation');
         if (modal) modal.style.setProperty('border', '4px solid #ef4444', 'important');
+        if (modal) modal.style.boxShadow = 'none';
         if (opStatus) opStatus.style.color = '#ef4444';
         if (opBar) {
             opBar.style.display = 'flex';
