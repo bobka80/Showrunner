@@ -21,6 +21,19 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 
 ---
 
+## Task routing (read before you code or advise)
+
+| If the task touches… | Read first (in order) |
+|----------------------|------------------------|
+| Project Assets, packing, checkout, cables, containers, RFID/QR | [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) → [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) |
+| Formula / CLI / equipment list sync | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (Triangle of Truth) |
+| Deploy, mobile black screen, session | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (boot) → [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) |
+| Warehouse gate, guns, station profile, PA concurrency | [topics/logistics-warehouse.md](docs/ai/topics/logistics-warehouse.md) + [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) |
+
+The director may dictate by voice — match **terminology lock** in [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) when searching code.
+
+---
+
 ## The AI Doctrine (Mandatory Execution Rules)
 
 1. **Autonomously Maintain the Knowledge Base:** If you change JSON shape, architecture, magic strings, or **Drive folder IDs / live file names**, update the matching file in `docs/ai/` (`SCHEMA.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `FRAGILE_ZONES.md`, **`DRIVE_LAYOUT.md`**) in the same session.
@@ -47,8 +60,10 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 
 9. **Doc Hygiene (autonomous):**
    - **Every build session:** update relevant active/topic file + index row when you finish work.
-   - **Trigger "doc hygiene":** full pass on `active/`, `topics/`, `Project_TODO.md` index, and hub links; move finished campaigns to `archive/`.
+   - **Trigger "doc hygiene":** full pass on `active/`, `topics/`, `Project_TODO.md` index, and hub links; move finished campaigns to `archive/`; align GAS version mentions with `RELEASES.md`.
    - **Close campaign:** when director confirms done, move `active/*.md` → `archive/` and update index.
+
+10. **Drawer placement (mandatory):** When creating or moving documentation, follow [Where to put new documentation](docs/ai/README.md#where-to-put-new-documentation). One canonical home per fact; topics = backlog only; stable reference = how things work. Update `AI_DOCTRINE.md` task routing when adding a new stable domain doc.
 
 ---
 
@@ -80,6 +95,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 | [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) | Two-layer versioning |
 | [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md) | Milestone-now protocol |
 | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) | Dangerous areas |
+| [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) | Bulk vs unique, Matryoshka, two packing engines — **before PA/warehouse work** |
 | [DRIVE_LAYOUT.md](docs/ai/DRIVE_LAYOUT.md) | `STAGE_MASTERS_SYSTEM_ROOT` — folder IDs, live DB names, sync vs backup |
 | [DIRECTOR_WORKFLOW.md](docs/ai/DIRECTOR_WORKFLOW.md) | How to work with the director |
 

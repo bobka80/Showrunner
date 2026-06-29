@@ -13,6 +13,8 @@ When a user works with the project equipment, multiple users could theoretically
 - **Rule**: If the backend sees multiple objects with the *exact same `uid`*, the Optimistic Healing Engine assumes it is a duplication glitch and squashes them into a single object.
 - **Why this matters**: If you split one object into multiple pieces on the frontend, you MUST delete the `uid` from the clones so the backend assigns them fresh IDs.
 
+**Multi-user warehouse (Project Assets):** Checkout uses a shared ops ledger; list editing uses deltas + Optimistic Healing but is **not** yet safe for many simultaneous editors without save discipline. Full backlog: [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md). Station host/empty scan rules: [topics/logistics-warehouse.md](topics/logistics-warehouse.md).
+
 ---
 
 ## 🛑 KNOWN TRAPS & FRAGILE MECHANICS
@@ -38,6 +40,9 @@ When a user works with the project equipment, multiple users could theoretically
 - **The Impact:** Attempting to group physical items on the backend by summing their quantities is futile—`processFormulas()` will rip them apart immediately upon saving. Bulk items intentionally bypass this so they can be grouped.
 
 ### 4. Top-Down vs. Bottom-Up Packing (Matryoshka Protocol)
+
+> **Canonical equipment model (Bulk vs unique, two packing engines, cable-case bind gap):** [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md)
+
 - **Location:** `02e4_Logic_Containers.html`
 - **The Trap:** The UI allows users to pack "Phantom" or generic cases (e.g., "Auto-Container") using a "Top-Down" approach. However, the Relational Database ALWAYS links "Bottom-Up" (Physical items point to their parent UID).
 - **The Impact:** AIs must not attempt to lock physical Case UIDs in the frontend packing UI. UIDs are only locked at checkout (via RFID or ledger commits in `Operations.js`).

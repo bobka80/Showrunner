@@ -1807,4 +1807,165 @@
     }
     .admin-backup-actions .btn-outline { flex: 1; min-width: 80px; justify-content: center; }
     .admin-folder-links { display: flex; flex-wrap: wrap; gap: 12px 16px; margin-top: 8px; }
+
+    /* --- Desktop lock screen --- */
+    .nav-desktop-lock-btn { margin-top: 6px; }
+    @media (max-width: 768px) {
+        .nav-desktop-lock-btn { display: none !important; }
+    }
+    .personal-hub-lock-select { min-width: 118px; }
+    body.desktop-lock-active { overflow: hidden; }
+    .desktop-lock-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10050;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.62);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        overflow: hidden;
+        user-select: none;
+    }
+    .desktop-lock-bus-lanes {
+        position: absolute;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+        z-index: 1;
+    }
+    .desktop-lock-bus {
+        position: absolute;
+        left: -55%;
+        width: 110%;
+        white-space: nowrap;
+        will-change: transform;
+    }
+    .desktop-lock-bus svg {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .desktop-lock-bus--ltr {
+        animation: desktop-lock-bus-ltr 30s linear infinite;
+    }
+    .desktop-lock-bus--rtl {
+        left: auto;
+        right: -55%;
+        animation: desktop-lock-bus-rtl 30s linear infinite;
+    }
+    @keyframes desktop-lock-bus-ltr {
+        0% { transform: translateX(-8%) scale(var(--bus-scale, 1)); }
+        100% { transform: translateX(108%) scale(var(--bus-scale, 1)); }
+    }
+    @keyframes desktop-lock-bus-rtl {
+        0% { transform: translateX(8%) scale(var(--bus-scale, 1)); }
+        100% { transform: translateX(-108%) scale(var(--bus-scale, 1)); }
+    }
+    .desktop-lock-hero {
+        position: relative;
+        z-index: 3;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+    }
+    .desktop-lock-hero-a {
+        width: min(28vw, 220px);
+        height: auto;
+        filter: drop-shadow(0 8px 32px rgba(235, 28, 36, 0.45));
+        animation: desktop-lock-hero-pulse 9s ease-in-out infinite alternate;
+    }
+    @keyframes desktop-lock-hero-pulse {
+        0% { transform: scale(0.82); opacity: 0.88; }
+        100% { transform: scale(1.14); opacity: 1; }
+    }
+    .desktop-lock-clock {
+        position: relative;
+        z-index: 3;
+        font-size: clamp(42px, 6vw, 72px);
+        font-weight: 900;
+        color: #fff;
+        letter-spacing: 2px;
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.6);
+        line-height: 1;
+        margin-top: 8px;
+    }
+    .desktop-lock-crew-name {
+        position: relative;
+        z-index: 3;
+        margin-top: 10px;
+        font-size: 14px;
+        font-weight: 700;
+        color: rgba(255, 255, 255, 0.55);
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }
+    .desktop-lock-hidden-capture {
+        position: fixed;
+        left: -9999px;
+        top: 0;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+    }
+    .desktop-lock-full-form {
+        position: relative;
+        z-index: 4;
+        margin-top: 28px;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        padding: 18px 22px;
+        background: rgba(17, 17, 17, 0.88);
+        border: 1px solid #333;
+        border-radius: 10px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+        min-width: 260px;
+    }
+    .desktop-lock-full-label {
+        font-size: 12px;
+        font-weight: 800;
+        color: #f87171;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+    }
+    .desktop-lock-full-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 12px 14px;
+        font-size: 20px;
+        letter-spacing: 6px;
+        text-align: center;
+        background: #1a1a1e;
+        color: #fff;
+        border: 1px solid #444;
+        border-radius: 8px;
+        outline: none;
+    }
+    .desktop-lock-full-input:focus { border-color: #eb1c24; }
+    .desktop-lock-full-btn {
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    .desktop-lock-msg {
+        min-height: 16px;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
+    }
+    .desktop-lock-shake {
+        animation: desktop-lock-shake 0.45s ease;
+    }
+    @keyframes desktop-lock-shake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-8px); }
+        40% { transform: translateX(8px); }
+        60% { transform: translateX(-6px); }
+        80% { transform: translateX(6px); }
+    }
 </style>

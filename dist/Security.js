@@ -262,6 +262,42 @@ function authenticateUser(crewName, passcode) {
   });
 }
 
+/** Desktop lock: verify 2-char prefix or full 6-char PIN (session stays on success). */
+function verifyDesktopLockUnlock(crewName, code, mode) {
+  return executeWithRetry(() => {
+    const trimmedName = String(crewName || '').toLowerCase().trim();
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+
+    for (let i = 0; i < crewData.length; i++) {
+      let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
+      let mappedPass = cMap['Passcode'] !== undefined ? crewData[i][cMap['Passcode']] : undefined;
+      let hardName = crewData[i][2];
+      let hardPass = crewData[i][7];
+      let dbNameRaw = mappedName || hardName;
+      let dbPassRaw = mappedPass || hardPass;
+      if ((!mappedPass || mappedPass.toString().trim() === '') && hardPass && hardPass.toString().trim() !== '') {
+        dbPassRaw = hardPass;
+      }
+      if ((!mappedName || mappedName.toString().trim() === '') && hardName && hardName.toString().trim() !== '') {
+        dbNameRaw = hardName;
+      }
+      let dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : '';
+      let dbPass = dbPassRaw ? dbPassRaw.toString().trim() : '';
+      if (dbName !== trimmedName || !dbPass) continue;
+
+      if (mode === 'prefix') {
+        const prefix = String(code || '').substring(0, 2);
+        if (prefix.length < 2) return { success: false };
+        return { success: dbPass.substring(0, 2) === prefix };
+      }
+      return { success: dbPass === String(code || '').trim() };
+    }
+    return { success: false };
+  });
+}
+
 // ==========================================
 // --- 30-DAY DEVICE SESSION (Script Properties) ---
 // ==========================================

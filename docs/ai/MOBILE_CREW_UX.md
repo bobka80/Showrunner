@@ -63,6 +63,14 @@ Crew on phones use the **Mobile Command Center** (unchanged shell) and open proj
 - Tap group header → bottom sheet with full formula (list shows sublist name only)
 - Cancel → returns to Crew Hub
 
+### Project Assets — planned auto-save
+
+**Decision (backlog):** Mobile compact PA will **auto-save** all equipment mutations (add, qty, pack, unpack). Manual **SAVE** becomes optional or hidden after ship. Desktop keeps explicit save for now.
+
+Rationale: floor crew must not depend on SAVE; GAS latency handled via debounce + collision toast, not blocking the UI.
+
+Backlog: [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md).
+
 ### Tasks
 - Command Center → **MY TASKS** — reuses `globalTasks` + `openTaskModal()`
 
@@ -98,7 +106,7 @@ Colors use existing `--color-paint-*` CSS variables.
 4. Outdoor project → weather strip appears.
 5. OPEN TIMELINE → zoom bar; overview hides shift labels; slider shows detail.
 6. PROJECT ASSETS → assigned list; PRINT + SEARCH + SAVE; Design/Packing toggle; PACK / CHECK-OUT when permitted.
-7. SEARCH → add item to General; SAVE after qty changes.
+7. SEARCH → add item to General; changes persist (today: SAVE after qty changes; planned: auto-save).
 8. Tap formula group → detail sheet (full formula).
 9. Manager account → MANAGER: FULL EDITOR visible.
 10. Desktop width >768px → unchanged dashboard; no crew hub takeover.

@@ -456,6 +456,8 @@ function refreshPersonalHubUI() {
 
     let pinBtn = document.getElementById('btn-personal-pin-save');
     if (pinBtn) { pinBtn.disabled = false; pinBtn.innerText = 'UPDATE PIN'; }
+
+    if (typeof syncDesktopLockIdleSelect === 'function') syncDesktopLockIdleSelect();
 }
 
 function closePersonalHub() {

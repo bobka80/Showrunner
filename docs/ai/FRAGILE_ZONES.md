@@ -14,8 +14,10 @@ When the director reports a bug in these areas, state the risk in plain language
 |------|---------------|----------|--------------|
 | **Triangle of Truth** | `02b_Project_Syntax.html`, `02d_Equipment_Render.html` | Break bidirectional sync between human formula ↔ beautiful formula ↔ equipment list; rewrite slash parser casually | UI labels, non-parser display tweaks with testing |
 | **Formula explosion** | `02e5_Logic_Sync.html` (canonical); **duplicates** in `02a_Project_Equipment.html`, `02_Project_Editor_Logistics.html` | Sum physical item qty on backend; edit one copy without checking others; disable `processFormulas()` without understanding | Bug fixes that preserve qty=1 burst rule for Physical types — sync all copies or consolidate |
+| **Equipment model (Bulk / Matryoshka / two engines)** | [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md) — **read before PA/warehouse answers** | Conflate Auto-Packing with Auto-Containerization; assume cables use `recalcAutoContainers`; assume bulk items can have RFID | Link to canonical model; code only in the correct engine |
 | **Auto-Containerization** | `02e5_Logic_Sync.html` (`recalcAutoContainers`); called from `02e2`, `02e4`, `02e5` | Mix with bulk Auto-Packing; lock physical Case UIDs in planning UI | Fixes inside fluid kit logic only |
-| **Auto-Packing (Bulk)** | `02e4_Logic_Containers.html` (`autoProvisionCableCases`); **called from** `02_Project_Editor_Logistics.html` | Touch predefined kits/fixtures; confuse with Auto-Containerization | Bulk cable/trunk logic in `02e4` only |
+| **Auto-Packing (Bulk)** | `02e4_Logic_Containers.html` (`autoProvisionCableCases`); **called from** `02_Project_Editor_Logistics.html` | Touch predefined kits/fixtures; confuse with Auto-Containerization; re-run after physical cable-case bind without preserving bindings | Bulk cable/trunk logic in `02e4` only |
+| **Unpack vs auto-pack rerun** | `02e4_Logic_Containers.html` (`unpackItem`, `autoProvisionCableCases`) | Casual unpack during active cable packing; re-run Auto-Pack without understanding `isGenericAuto` wipe | Planned: hold-to-unpack ~1.5s; preserve physical case binds when re-running |
 | **Matryoshka / nesting** | `02e4_Logic_Containers.html`, `Operations.js` | Store "children arrays" on containers in DB; hard-allocate unit IDs during planning | Respect bottom-up `containerUid` linking |
 | **UID / optimistic healing** | `02e5_Logic_Sync.html`, backend save paths | Leave duplicate `uid`s on burst clones | Delete `uid` on clones when splitting items |
 | **CLI regex** | `02b_Project_Syntax.html` | "Clean up" the unified regex | Leave parser alone unless fixing a documented bug |
@@ -83,12 +85,18 @@ Showrunner on crew phones is **two layers**:
 
 ## Auto-Containerization vs Auto-Packing
 
-Two **completely separate** engines. Never merge their logic.
+Two **completely separate** engines. Never merge their logic. **Full model:** [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md).
 
 | Engine | File / Function | Applies To |
 |--------|-----------------|------------|
 | **Auto-Containerization** | `02e5_Logic_Sync.html` / `recalcAutoContainers()` | Physical fixtures in predefined cases (fluid kits) |
 | **Auto-Packing** | `02e4_Logic_Containers.html` / `autoProvisionCableCases()` (triggered from logistics wizard) | `type: "Bulk"` loose gear (cables, tape) into trunks |
+
+**Bulk vs unique:** Bulk = one vault row, counts only, **no RFID**. Physical level-6 = unique units. Level-3 cases = identity (RFID + QR = vault `id`). Cables must marry to a case to checkout.
+
+**Cable auto-pack (shipped):** Groups by CBL child tag → `[BULK] …` trunks (`isGenericAuto`). **Only gap:** packing-mode bind of **which physical cable case** holds that trunk (scan QR/RFID). Do not rebuild this with Auto-Containerization.
+
+**Unpack / rerun risk:** `autoProvisionCableCases()` deletes all `isGenericAuto` rows. Planned: hold-to-unpack ~1.5s. See [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md).
 
 ---
 

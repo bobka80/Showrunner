@@ -1,0 +1,316 @@
+<div id="desktop-lock-overlay" class="desktop-lock-overlay" style="display:none;" aria-hidden="true">
+  <div id="desktop-lock-bus-lanes" class="desktop-lock-bus-lanes" aria-hidden="true"></div>
+  <div class="desktop-lock-hero">
+    <svg class="desktop-lock-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
+  </div>
+  <div id="desktop-lock-clock" class="desktop-lock-clock"></div>
+  <div id="desktop-lock-crew-name" class="desktop-lock-crew-name"></div>
+  <input type="password" id="desktop-lock-quick-capture" class="desktop-lock-hidden-capture" autocomplete="off" maxlength="2" aria-hidden="true" tabindex="-1" />
+  <div id="desktop-lock-full-form" class="desktop-lock-full-form" style="display:none;">
+    <div class="desktop-lock-full-label">Enter full PIN to unlock</div>
+    <input type="password" id="desktop-lock-full-input" class="desktop-lock-full-input" maxlength="6" autocomplete="off" placeholder="••••••" />
+    <button type="button" id="desktop-lock-full-btn" class="btn-main desktop-lock-full-btn" onclick="submitDesktopLockFullPin()">UNLOCK</button>
+    <div id="desktop-lock-msg" class="desktop-lock-msg"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const STAGE_MASTERS_LOGO_SVG_LOCK = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 513.6 42.4"><path fill="#fff" d="M513.6,31.13c-3.06,10.13-12.85,11.85-22.29,11.01-7.67-.68-14.2-5.48-14.64-13.64-.05-.99-.01-.62.71-.72,1.55-.21,11.33-.87,11.75-.45s-.11,4.28,3.43,5.91c6.18,2.85,11.7-3.31,6.84-6.35-6.26-3.92-20.29-2.14-21.24-13.78-1.24-15.2,26.77-16.88,32.49-6.56.77,1.4,2.72,5.94.32,6.39-2.89.54-7.32-.33-10.5.51-.46-.13-.51-1.87-.88-2.56-3.38-6.26-14.36-.64-7.22,2.42s18.41,2.07,21.24,12.07v5.75Z"/><path fill="#fff" d="M227.55.96l6.71,22.99,6.24-22.99h16.54v39.98c0,.05-.67.72-.72.72h-9.59c-.05,0-.72-.67-.72-.72V14.37l-7.26,27.23-9.21.08-7.99-29.23v29.21h-10.55V.96h16.54Z"/><path fill="#fff" d="M461.09.96c11.86,1.4,14.22,16.26,4.03,21.74-.94.51-2.48.41-2.83,1.24l2.38.74c4.84,4.59,7.08,11.17,10.09,16.98h-14.15c-2.74-3.02-6.76-14.95-10.28-16.07-.95-.3-1.93-.24-2.9-.21v16.28h-12.23c-.05,0-.72-.67-.72-.72V1.68c0-.13.56-.48.72-.72,8.18.7,17.91-.95,25.9,0ZM447.42,17.24c3.83,0,12.83.94,10.93-5.41-.19-.63-2.11-2.25-2.54-2.25h-8.39v7.66Z"/><path fill="#fff" d="M164.01,35.91c-13.58,9.21-37.16,10.51-41.11-9.47-1.75-8.87,1.02-19.8,9.76-23.99,7.45-3.57,22.59-3.72,27.99,3.53.62.83,3.24,5.29,2.12,6.04-.49.33-10.93,2.29-11.5,2.19s-1.66-4.16-5.71-4.65c-8.23-.98-10.58,5.72-10.32,12.69.33,8.59,5.27,12.73,13.79,9.96,3.41-1.11,3.84-1.58,3.46-5.4h-8.15v-8.62h19.66v17.72Z"/><path fill="#fff" d="M205.25.96v8.38c0,.05-.67.72-.72.72h-19.9v5.75h19.18v8.62h-19.18v7.66h21.1v9.58h-33.81c-.05,0-.72-.67-.72-.72V1.68c0-.05.67-.72.72-.72h33.33Z"/><path fill="#fff" d="M406.18,10.06v5.75h19.18v8.62h-19.18v7.66h21.58v8.86c0,.05-.67.72-.72.72h-33.81V.96h33.33c.05,0,.72.67.72.72v7.66c0,.05-.67.72-.72.72h-20.38Z"/><path fill="#fff" d="M308.83,27.77c2.2.37,10.53-1.32,11.93-.42.28.18.57,2.45.92,3.15,3.1,6.24,13.88,3.05,11.07-1.95-2.57-4.57-16.17-3.16-20.96-10.68-4.1-6.44-.17-13.91,6.5-16.34,9.2-3.35,25.77-1.67,25.83,10.93-.64.87-9.54.29-11.48.88-.97-.34-.74-2.41-1.73-3.55-2.43-2.84-10.12-2.33-8.57,2.33.46,1.37,13.43,3.95,16.22,5.35,11.68,5.86,8.13,20.96-3.82,23.94-11,2.74-25.8.22-25.9-13.65Z"/><path fill="#fff" d="M262.32,41.66l15.09-40.24c1.17-1.19,11.14-.05,13.46-.5l15.57,40.74h-12.71c-1.25-1.89-1.94-4.46-2.18-6.68l-14.07-.05-2.45,6.73h-12.71ZM280.06,25.86h8.63c-1.13-1.5-3.43-12.74-4.08-12.93-.97-.29-.66.51-.84,1.05-1.31,3.93-2.08,8.06-3.71,11.88Z"/><path fill="#fff" d="M387.48.96v9.82c0,.05-.67.72-.72.72h-11.75v29.45c0,.05-.67.72-.72.72h-12.23V11.49h-12.23c-.05,0-.72-.67-.72-.72V.96h38.36Z"/><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/><path fill="#fff" d="M23.56,13.34c-.62-2.85-1.94-4.88-5.09-5.21-5-.52-7.58,3.67-2.54,5.41,6.66,2.3,16.86,2.33,20.05,10.15,3.85,9.43-4.13,17.44-13.26,18.39-10.99,1.14-22.24-1.33-22.72-14.31,2.2.37,10.53-1.32,11.93-.42.21.14.69,3.13,1.96,4.51,4.25,4.59,12.85.94,9.83-3.59S6.26,25.66,2.31,16.61C-1.24,8.45,5.09,2.07,12.83.6,18.95-.56,28.71,0,32.81,5.31c1.13,1.46,4.14,7.13,1.48,7.62-2.9.53-7.52-.21-10.72.41Z"/><path fill="#fff" d="M78.65.96v9.82c0,.05-.67.72-.72.72h-11.75v29.45c0,.05-.67.72-.72.72h-12.23V11.49h-12.23c-.05,0-.72-.67-.72-.72V.96h38.36Z"/></svg>`;
+
+  let desktopLockActive = false;
+  let desktopLockRequireFull = false;
+  let desktopLockVerifying = false;
+  let desktopLockIdleTimer = null;
+  let desktopLockClockTimer = null;
+  let desktopLockQuickBuffer = '';
+
+  function desktopLockCrewKey() {
+    let crew = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'default';
+    return String(crew).toLowerCase().trim().replace(/\s+/g, '_');
+  }
+
+  window.getDesktopLockIdleMinutes = function() {
+    let key = 'sm_lock_idle_min_' + desktopLockCrewKey();
+    let v = 5;
+    try { v = parseInt(localStorage.getItem(key), 10); } catch (e) { /* ignore */ }
+    if (!v || isNaN(v) || v < 5) return 5;
+    if (v > 30) return 30;
+    return Math.round(v / 5) * 5;
+  };
+
+  window.setDesktopLockIdleMinutes = function(minutes) {
+    let m = parseInt(minutes, 10);
+    if (!m || isNaN(m)) m = 5;
+    m = Math.max(5, Math.min(30, Math.round(m / 5) * 5));
+    try { localStorage.setItem('sm_lock_idle_min_' + desktopLockCrewKey(), String(m)); } catch (e) { /* ignore */ }
+    syncDesktopLockIdleSelect();
+    resetDesktopLockIdleTimer();
+  };
+
+  window.syncDesktopLockIdleSelect = function() {
+    let mins = getDesktopLockIdleMinutes();
+    ['desktop-lock-idle-select'].forEach(function(id) {
+      let sel = document.getElementById(id);
+      if (sel) sel.value = String(mins);
+    });
+  };
+
+  function isDesktopLockEligible() {
+    if (!window.matchMedia('(min-width: 769px)').matches) return false;
+    return !!(typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME);
+  }
+
+  function buildDesktopLockBuses() {
+    let lanes = document.getElementById('desktop-lock-bus-lanes');
+    if (!lanes || lanes.dataset.built === '1') return;
+    lanes.dataset.built = '1';
+    let html = '';
+    const configs = [
+      { top: '8%',  scale: 0.55, dur: 38, delay: 0,   dir: 'ltr', opacity: 0.12 },
+      { top: '18%', scale: 0.85, dur: 28, delay: -4,  dir: 'rtl', opacity: 0.18 },
+      { top: '28%', scale: 0.65, dur: 44, delay: -12, dir: 'ltr', opacity: 0.10 },
+      { top: '38%', scale: 1.05, dur: 32, delay: -8,  dir: 'rtl', opacity: 0.22 },
+      { top: '48%', scale: 0.75, dur: 36, delay: -16, dir: 'ltr', opacity: 0.14 },
+      { top: '58%', scale: 0.95, dur: 26, delay: -2,  dir: 'rtl', opacity: 0.20 },
+      { top: '68%', scale: 0.60, dur: 42, delay: -20, dir: 'ltr', opacity: 0.11 },
+      { top: '78%', scale: 0.90, dur: 30, delay: -6,  dir: 'rtl', opacity: 0.16 },
+      { top: '88%', scale: 0.70, dur: 34, delay: -14, dir: 'ltr', opacity: 0.13 },
+      { top: '14%', scale: 1.15, dur: 48, delay: -22, dir: 'rtl', opacity: 0.08 },
+      { top: '44%', scale: 0.50, dur: 52, delay: -28, dir: 'ltr', opacity: 0.09 },
+      { top: '72%', scale: 1.10, dur: 40, delay: -10, dir: 'rtl', opacity: 0.15 }
+    ];
+    configs.forEach(function(cfg, i) {
+      html += '<div class="desktop-lock-bus desktop-lock-bus--' + cfg.dir + '" style="top:' + cfg.top + ';opacity:' + cfg.opacity + ';animation-duration:' + cfg.dur + 's;animation-delay:' + cfg.delay + 's;transform:scale(' + cfg.scale + ');">' + STAGE_MASTERS_LOGO_SVG_LOCK + '</div>';
+    });
+    lanes.innerHTML = html;
+  }
+
+  function updateDesktopLockClock() {
+    let el = document.getElementById('desktop-lock-clock');
+    if (!el) return;
+    let now = new Date();
+    el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function focusDesktopLockQuickCapture() {
+    let cap = document.getElementById('desktop-lock-quick-capture');
+    if (!cap || desktopLockRequireFull) return;
+    cap.value = '';
+    desktopLockQuickBuffer = '';
+    setTimeout(function() {
+      try { cap.focus({ preventScroll: true }); } catch (e) { cap.focus(); }
+    }, 50);
+  }
+
+  function showDesktopLockFullForm() {
+    desktopLockRequireFull = true;
+    let form = document.getElementById('desktop-lock-full-form');
+    let cap = document.getElementById('desktop-lock-quick-capture');
+    if (cap) cap.blur();
+    if (form) form.style.display = 'flex';
+    let inp = document.getElementById('desktop-lock-full-input');
+    if (inp) {
+      inp.value = '';
+      setTimeout(function() { inp.focus(); }, 80);
+    }
+    let msg = document.getElementById('desktop-lock-msg');
+    if (msg) { msg.textContent = ''; msg.style.color = ''; }
+  }
+
+  function resetDesktopLockUnlockUI() {
+    desktopLockRequireFull = false;
+    desktopLockQuickBuffer = '';
+    let form = document.getElementById('desktop-lock-full-form');
+    if (form) form.style.display = 'none';
+    let fullInp = document.getElementById('desktop-lock-full-input');
+    if (fullInp) fullInp.value = '';
+    let cap = document.getElementById('desktop-lock-quick-capture');
+    if (cap) cap.value = '';
+    let msg = document.getElementById('desktop-lock-msg');
+    if (msg) { msg.textContent = ''; msg.style.color = ''; }
+  }
+
+  function finishDesktopUnlock() {
+    desktopLockActive = false;
+    let overlay = document.getElementById('desktop-lock-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('desktop-lock-active');
+    if (desktopLockClockTimer) {
+      clearInterval(desktopLockClockTimer);
+      desktopLockClockTimer = null;
+    }
+    resetDesktopLockUnlockUI();
+    resetDesktopLockIdleTimer();
+  }
+
+  function verifyDesktopLockOnServer(code, mode, onDone) {
+    if (desktopLockVerifying) return;
+    desktopLockVerifying = true;
+    let crew = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : '';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        desktopLockVerifying = false;
+        onDone(res && res.success === true);
+      })
+      .withFailureHandler(function() {
+        desktopLockVerifying = false;
+        onDone(false);
+      })
+      .verifyDesktopLockUnlock(crew, code, mode);
+  }
+
+  function handleQuickUnlockAttempt(prefix) {
+    verifyDesktopLockOnServer(prefix, 'prefix', function(ok) {
+      if (ok) {
+        finishDesktopUnlock();
+        return;
+      }
+      showDesktopLockFullForm();
+    });
+  }
+
+  window.submitDesktopLockFullPin = function() {
+    let inp = document.getElementById('desktop-lock-full-input');
+    let msg = document.getElementById('desktop-lock-msg');
+    if (!inp) return;
+    let code = String(inp.value || '').trim();
+    if (code.length < 6) {
+      if (msg) { msg.textContent = 'Enter your full 6-character PIN.'; msg.style.color = '#f87171'; }
+      inp.classList.add('desktop-lock-shake');
+      setTimeout(function() { inp.classList.remove('desktop-lock-shake'); }, 500);
+      return;
+    }
+    verifyDesktopLockOnServer(code, 'full', function(ok) {
+      if (ok) {
+        finishDesktopUnlock();
+        return;
+      }
+      if (msg) { msg.textContent = 'Incorrect PIN.'; msg.style.color = '#f87171'; }
+      inp.value = '';
+      inp.classList.add('desktop-lock-shake');
+      setTimeout(function() { inp.classList.remove('desktop-lock-shake'); }, 500);
+      inp.focus();
+    });
+  };
+
+  window.lockDesktopScreen = function() {
+    if (!isDesktopLockEligible()) return;
+    if (desktopLockActive) return;
+    if (typeof closeModals === 'function') closeModals();
+    if (typeof closePersonalHub === 'function') closePersonalHub();
+
+    buildDesktopLockBuses();
+    resetDesktopLockUnlockUI();
+
+    let overlay = document.getElementById('desktop-lock-overlay');
+    if (!overlay) return;
+    overlay.style.display = 'flex';
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('desktop-lock-active');
+
+    let crewEl = document.getElementById('desktop-lock-crew-name');
+    if (crewEl) crewEl.textContent = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : '';
+
+    updateDesktopLockClock();
+    if (desktopLockClockTimer) clearInterval(desktopLockClockTimer);
+    desktopLockClockTimer = setInterval(updateDesktopLockClock, 1000);
+
+    desktopLockActive = true;
+    if (desktopLockIdleTimer) {
+      clearTimeout(desktopLockIdleTimer);
+      desktopLockIdleTimer = null;
+    }
+    focusDesktopLockQuickCapture();
+  };
+
+  window.lockDesktop = window.lockDesktopScreen;
+  window.unlockDesktop = function(pin) {
+    if (!desktopLockActive) return;
+    if (pin && String(pin).length >= 6) {
+      let inp = document.getElementById('desktop-lock-full-input');
+      if (inp) inp.value = String(pin);
+      submitDesktopLockFullPin();
+    }
+  };
+
+  function resetDesktopLockIdleTimer() {
+    if (desktopLockIdleTimer) {
+      clearTimeout(desktopLockIdleTimer);
+      desktopLockIdleTimer = null;
+    }
+    if (!isDesktopLockEligible() || desktopLockActive) return;
+    let ms = getDesktopLockIdleMinutes() * 60 * 1000;
+    desktopLockIdleTimer = setTimeout(function() {
+      lockDesktopScreen();
+    }, ms);
+  }
+
+  function onDesktopLockActivity() {
+    if (desktopLockActive) return;
+    if (!isDesktopLockEligible()) return;
+    resetDesktopLockIdleTimer();
+  }
+
+  function onDesktopLockQuickInput() {
+    if (!desktopLockActive || desktopLockRequireFull) return;
+    let cap = document.getElementById('desktop-lock-quick-capture');
+    if (!cap) return;
+    let val = String(cap.value || '');
+    if (val.length >= 2) {
+      handleQuickUnlockAttempt(val.substring(0, 2));
+      cap.value = '';
+    }
+  }
+
+  function onDesktopLockQuickKeydown(e) {
+    if (!desktopLockActive || desktopLockRequireFull) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === 'Tab' || e.key === 'Escape') return;
+    if (e.key === 'Enter' && desktopLockRequireFull) return;
+    if (e.key.length === 1) {
+      desktopLockQuickBuffer += e.key;
+      if (desktopLockQuickBuffer.length >= 2) {
+        handleQuickUnlockAttempt(desktopLockQuickBuffer.substring(0, 2));
+        desktopLockQuickBuffer = '';
+        let cap = document.getElementById('desktop-lock-quick-capture');
+        if (cap) cap.value = '';
+      }
+    }
+  }
+
+  window.initDesktopLockWatch = function() {
+    if (!isDesktopLockEligible()) return;
+    syncDesktopLockIdleSelect();
+    ['mousemove', 'mousedown', 'keydown', 'click', 'scroll', 'touchstart', 'wheel'].forEach(function(evt) {
+      document.addEventListener(evt, onDesktopLockActivity, { passive: true });
+    });
+    let cap = document.getElementById('desktop-lock-quick-capture');
+    if (cap) cap.addEventListener('input', onDesktopLockQuickInput);
+    document.addEventListener('keydown', onDesktopLockQuickKeydown);
+    let fullInp = document.getElementById('desktop-lock-full-input');
+    if (fullInp) {
+      fullInp.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitDesktopLockFullPin();
+        }
+      });
+    }
+    let overlay = document.getElementById('desktop-lock-overlay');
+    if (overlay) {
+      overlay.addEventListener('click', function() {
+        if (!desktopLockRequireFull) focusDesktopLockQuickCapture();
+      });
+    }
+    resetDesktopLockIdleTimer();
+  };
+
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof initDesktopLockWatch === 'function') initDesktopLockWatch();
+  });
+})();
+</script>

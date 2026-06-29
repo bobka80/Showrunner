@@ -14,3 +14,7 @@
 - [x] Timeline zoom (`03f`)
 
 **Follow-up:** [notifications-catalog.md](notifications-catalog.md) for push scenario checklist; [notifications.md](notifications.md) for deploy.
+
+## Planned (warehouse floor)
+
+- [ ] **Mobile PA auto-save** — all equipment changes on `mobile-pa-compact` save automatically (debounced); see [project-assets-concurrency.md](project-assets-concurrency.md)

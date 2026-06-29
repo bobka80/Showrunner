@@ -2,6 +2,14 @@
 
 The ShowRider Logistics system uses several string flags and constants to drive routing and logic. This glossary maps out what they mean.
 
+## Vault types & nesting (see [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md))
+
+- **`type: "Bulk"`** — One vault row; quantity is a **count**. Not unique; **cannot** have per-piece RFID. Married to a level-3 case via `containerUid` for checkout.
+- **`nestingLevel` 3** — Cases/containers; each unit has vault `id`, `rfidTag`, QR (primary key). Cable cases live here.
+- **`nestingLevel` 6** (default physical) — Unique units; exploded to `qty: 1` on project save (non-Bulk).
+- **`isGenericAuto`** — Phantom **cable trunk** from **Auto-Packing** (`autoProvisionCableCases`). Formula often `[BULK] XLR CASE - AUDIO`.
+- **`isAuto`** — Phantom **kit case** from **Auto-Containerization** (`recalcAutoContainers`). Not the same as `isGenericAuto`.
+
 ## `ProjectAsset.formula` Flags
 - `"Standalone"`: The default state. This asset is not part of any syntax grouping or shortage.
 - `"Manual"`: A legacy term for "Standalone". It is actively converted to "Standalone" during syncs.
@@ -9,6 +17,7 @@ The ShowRider Logistics system uses several string flags and constants to drive 
 - `"Auto-Container"`: This was auto-generated to box up other assets. Converted to `isAuto: true` and `formula: "Standalone"` during processing.
 - `"Gen-Auto-Container"`: A generic box. Converted to `isAuto: true`, `isGenericAuto: true`.
 - `"[AUTO] {string}"`: Similar auto-conversion flags.
+- `"[BULK] {TAG} CASE - {DEPT}"`: Cable trunk label from **Auto-Packing** (not Auto-Containerization). See [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md).
 
 ## `ProjectAsset.location` Flags
 - `"General"`: The default location. If an asset has no specific stage or zone assigned, it defaults to this.

@@ -23,6 +23,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 |----------|---------|
 | [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md) | Brainstorm vs build; how the director works with AI |
 | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) | Pre-flight checklist before dangerous edits |
+| [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md) | Bulk vs unique, Matryoshka, Auto-Packing vs Auto-Containerization — **read before PA/warehouse** |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Deep traps, build pipeline, RBAC boot |
 | [SCHEMA.md](SCHEMA.md) | JSON shapes |
 | [GLOSSARY.md](GLOSSARY.md) | Magic strings |
@@ -35,7 +36,31 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) | Google Drive — `STAGE_MASTERS_SYSTEM_ROOT`, `05_DATABASE`, Showrunner Sync |
 | [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now protocol |
 
-**Intentional pairs (same truth, different job):** `FRAGILE_ZONES` = checklist; `ARCHITECTURE` = explanation. Link, do not copy.
+**Intentional pairs (same truth, different job):** `FRAGILE_ZONES` = checklist; `ARCHITECTURE` = explanation; `EQUIPMENT_MODEL` = how gear works on projects. Link, do not copy.
+
+---
+
+## Where to put new documentation
+
+**AI rule:** Every new or moved doc goes in **one** drawer. Link from elsewhere; do not copy checklists or long explanations.
+
+| If the content is… | Put it in… | Examples |
+|--------------------|------------|----------|
+| **Urgent / in-flight campaign** | [active/](active/) | Recovery, production blockers |
+| **Backlog, shipped checklist, feature plan** | [topics/](topics/) + one row in [Project_TODO.md](Project_TODO.md) | logistics-warehouse, notifications |
+| **Finished campaign or obsolete plan** | [archive/](archive/) + stub at old path if moved | rbac-event-access-plan |
+| **“Don’t break this” pre-flight** | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) quick table + link to detail | Triangle, boot pipeline |
+| **How a domain works (canonical model)** | New or existing **stable** file in `docs/ai/` + row in stable table above | `EQUIPMENT_MODEL.md` |
+| **Deep trap / build / pipeline explanation** | [ARCHITECTURE.md](ARCHITECTURE.md) | LogicPayload, Matryoshka traps |
+| **Magic strings, flags** | [GLOSSARY.md](GLOSSARY.md) — stub only, link to model doc | `[BULK]`, formula flags |
+| **JSON / sheet shapes** | [SCHEMA.md](SCHEMA.md) | ProjectAsset fields |
+| **UI structure rules** | [UI_DOCTRINE.md](UI_DOCTRINE.md) | Buttons, modals |
+| **Deploy / rollback** | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) | milestone.js |
+| **Incident learned the hard way** | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) incident log — **director approval only** | Black screen postmortem |
+
+**When expanding the system:** add stable reference docs to the table in this README and one task-routing line in [AI_DOCTRINE.md](../../AI_DOCTRINE.md). Add topic backlogs under `topics/` only for **work remaining**.
+
+**Never:** duplicate a full checklist in `Project_TODO.md`; create a second canonical home for the same fact; add equipment-only signposts in `topics/README` (point to this section instead).
 
 ---
 
