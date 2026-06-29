@@ -61,29 +61,41 @@
     return !!(typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME);
   }
 
+  function busOpacityForWidth(widthStr) {
+    const w = parseFloat(widthStr) || 80;
+    const minW = 72;
+    const maxW = 280;
+    const clamped = Math.max(minW, Math.min(maxW, w));
+    const t = (clamped - minW) / (maxW - minW);
+    const maxO = 0.15;
+    const minO = 0.04;
+    return +(maxO - t * (maxO - minO)).toFixed(3);
+  }
+
   function buildDesktopLockBuses() {
     let lanes = document.getElementById('desktop-lock-bus-lanes');
-    if (!lanes || lanes.dataset.built === 'v5') return;
-    lanes.dataset.built = 'v5';
+    if (!lanes || lanes.dataset.built === 'v6') return;
+    lanes.dataset.built = 'v6';
     let html = '';
     const configs = [
-      { top: '6%',  width: '188vw', dur: 40,  delay: 0,   dir: 'ltr', opacity: 0.20 },
-      { top: '14%', width: '80vw',  dur: 108, delay: -14, dir: 'rtl', opacity: 0.13 },
-      { top: '22%', width: '152vw', dur: 56,  delay: -28, dir: 'ltr', opacity: 0.17 },
-      { top: '30%', width: '104vw', dur: 80,  delay: -8,  dir: 'rtl', opacity: 0.15 },
-      { top: '38%', width: '176vw', dur: 36,  delay: -3,  dir: 'ltr', opacity: 0.21 },
-      { top: '46%', width: '72vw',  dur: 130, delay: -52, dir: 'rtl', opacity: 0.11 },
-      { top: '54%', width: '136vw', dur: 50,  delay: -20, dir: 'ltr', opacity: 0.18 },
-      { top: '62%', width: '192vw', dur: 38,  delay: -1,  dir: 'rtl', opacity: 0.20 },
-      { top: '70%', width: '88vw',  dur: 92,  delay: -62, dir: 'ltr', opacity: 0.14 },
-      { top: '78%', width: '164vw', dur: 42,  delay: -12, dir: 'rtl', opacity: 0.19 },
-      { top: '86%', width: '116vw', dur: 64,  delay: -36, dir: 'ltr', opacity: 0.16 },
-      { top: '50%', width: '180vw', dur: 38,  delay: -6,  dir: 'rtl', opacity: 0.22 }
+      { top: '6%',  width: '250vw', dur: 56,  delay: 0,   dir: 'ltr' },
+      { top: '14%', width: '80vw',  dur: 108, delay: -14, dir: 'rtl' },
+      { top: '22%', width: '152vw', dur: 62,  delay: -28, dir: 'ltr' },
+      { top: '30%', width: '104vw', dur: 80,  delay: -8,  dir: 'rtl' },
+      { top: '38%', width: '240vw', dur: 52,  delay: -3,  dir: 'ltr' },
+      { top: '46%', width: '72vw',  dur: 130, delay: -52, dir: 'rtl' },
+      { top: '54%', width: '136vw', dur: 54,  delay: -20, dir: 'ltr' },
+      { top: '62%', width: '280vw', dur: 54,  delay: -1,  dir: 'rtl' },
+      { top: '70%', width: '88vw',  dur: 92,  delay: -62, dir: 'ltr' },
+      { top: '78%', width: '164vw', dur: 56,  delay: -12, dir: 'rtl' },
+      { top: '86%', width: '116vw', dur: 68,  delay: -36, dir: 'ltr' },
+      { top: '50%', width: '245vw', dur: 52,  delay: -6,  dir: 'rtl' }
     ];
     configs.forEach(function(cfg) {
+      const op = busOpacityForWidth(cfg.width);
       html += '<div class="desktop-lock-bus desktop-lock-bus--' + cfg.dir + '" style="' +
         'top:' + cfg.top + ';width:' + cfg.width + ';' +
-        '--bus-o:' + cfg.opacity + ';' +
+        '--bus-o:' + op + ';' +
         'animation-duration:' + cfg.dur + 's;animation-delay:' + cfg.delay + 's;">' +
         STAGE_MASTERS_LOGO_SVG_LOCK + '</div>';
     });
