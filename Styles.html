@@ -1888,14 +1888,14 @@
     }
     @keyframes desktop-lock-bus-ltr {
         0%   { transform: translateX(-110%); opacity: 0; }
-        11%  { opacity: var(--bus-o, 0.15); }
-        89%  { opacity: var(--bus-o, 0.15); }
+        7%   { opacity: var(--bus-o, 0.15); }
+        93%  { opacity: var(--bus-o, 0.15); }
         100% { transform: translateX(110vw); opacity: 0; }
     }
     @keyframes desktop-lock-bus-rtl {
         0%   { transform: translateX(110vw); opacity: 0; }
-        11%  { opacity: var(--bus-o, 0.15); }
-        89%  { opacity: var(--bus-o, 0.15); }
+        7%   { opacity: var(--bus-o, 0.15); }
+        93%  { opacity: var(--bus-o, 0.15); }
         100% { transform: translateX(-110%); opacity: 0; }
     }
     .desktop-lock-foreground {
@@ -1907,10 +1907,11 @@
         justify-content: center;
     }
     .desktop-lock-clock {
-        font-size: clamp(42px, 6vw, 72px);
+        font-size: clamp(84px, 12vw, 144px);
         font-weight: 900;
         color: #6b7280;
-        letter-spacing: 2px;
+        letter-spacing: 3px;
+        font-variant-numeric: tabular-nums;
         text-shadow: none;
         line-height: 1;
     }
