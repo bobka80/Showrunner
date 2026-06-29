@@ -63,30 +63,22 @@
 
   function buildDesktopLockBuses() {
     let lanes = document.getElementById('desktop-lock-bus-lanes');
-    if (!lanes || lanes.dataset.built === 'v4') return;
-    lanes.dataset.built = 'v4';
+    if (!lanes || lanes.dataset.built === 'v5') return;
+    lanes.dataset.built = 'v5';
     let html = '';
     const configs = [
-      { top: '5%',  width: '94vw', dur: 34,  delay: 0,   dir: 'ltr', opacity: 0.20 },
-      { top: '9%',  width: '40vw', dur: 92,  delay: -10, dir: 'rtl', opacity: 0.13 },
-      { top: '13%', width: '76vw', dur: 48,  delay: -22, dir: 'ltr', opacity: 0.17 },
-      { top: '17%', width: '52vw', dur: 68,  delay: -6,  dir: 'rtl', opacity: 0.15 },
-      { top: '21%', width: '88vw', dur: 30,  delay: -3,  dir: 'ltr', opacity: 0.21 },
-      { top: '26%', width: '36vw', dur: 112, delay: -40, dir: 'rtl', opacity: 0.11 },
-      { top: '30%', width: '68vw', dur: 42,  delay: -15, dir: 'ltr', opacity: 0.18 },
-      { top: '34%', width: '96vw', dur: 32,  delay: -1,  dir: 'rtl', opacity: 0.20 },
-      { top: '39%', width: '44vw', dur: 78,  delay: -50, dir: 'ltr', opacity: 0.14 },
-      { top: '43%', width: '82vw', dur: 36,  delay: -8,  dir: 'rtl', opacity: 0.19 },
-      { top: '48%', width: '58vw', dur: 54,  delay: -28, dir: 'ltr', opacity: 0.16 },
-      { top: '52%', width: '90vw', dur: 28,  delay: -5,  dir: 'rtl', opacity: 0.22 },
-      { top: '57%', width: '38vw', dur: 104, delay: -65, dir: 'ltr', opacity: 0.12 },
-      { top: '61%', width: '72vw', dur: 44,  delay: -18, dir: 'rtl', opacity: 0.17 },
-      { top: '66%', width: '48vw', dur: 60,  delay: -35, dir: 'ltr', opacity: 0.15 },
-      { top: '70%', width: '86vw', dur: 30,  delay: -12, dir: 'rtl', opacity: 0.21 },
-      { top: '75%', width: '42vw', dur: 86,  delay: -45, dir: 'ltr', opacity: 0.13 },
-      { top: '79%', width: '80vw', dur: 38,  delay: -24, dir: 'rtl', opacity: 0.18 },
-      { top: '84%', width: '56vw', dur: 56,  delay: -32, dir: 'ltr', opacity: 0.16 },
-      { top: '88%', width: '92vw', dur: 32,  delay: -7,  dir: 'rtl', opacity: 0.20 }
+      { top: '6%',  width: '188vw', dur: 40,  delay: 0,   dir: 'ltr', opacity: 0.20 },
+      { top: '14%', width: '80vw',  dur: 108, delay: -14, dir: 'rtl', opacity: 0.13 },
+      { top: '22%', width: '152vw', dur: 56,  delay: -28, dir: 'ltr', opacity: 0.17 },
+      { top: '30%', width: '104vw', dur: 80,  delay: -8,  dir: 'rtl', opacity: 0.15 },
+      { top: '38%', width: '176vw', dur: 36,  delay: -3,  dir: 'ltr', opacity: 0.21 },
+      { top: '46%', width: '72vw',  dur: 130, delay: -52, dir: 'rtl', opacity: 0.11 },
+      { top: '54%', width: '136vw', dur: 50,  delay: -20, dir: 'ltr', opacity: 0.18 },
+      { top: '62%', width: '192vw', dur: 38,  delay: -1,  dir: 'rtl', opacity: 0.20 },
+      { top: '70%', width: '88vw',  dur: 92,  delay: -62, dir: 'ltr', opacity: 0.14 },
+      { top: '78%', width: '164vw', dur: 42,  delay: -12, dir: 'rtl', opacity: 0.19 },
+      { top: '86%', width: '116vw', dur: 64,  delay: -36, dir: 'ltr', opacity: 0.16 },
+      { top: '50%', width: '180vw', dur: 38,  delay: -6,  dir: 'rtl', opacity: 0.22 }
     ];
     configs.forEach(function(cfg) {
       html += '<div class="desktop-lock-bus desktop-lock-bus--' + cfg.dir + '" style="' +
