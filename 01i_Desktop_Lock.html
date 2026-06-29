@@ -1,16 +1,17 @@
 <div id="desktop-lock-overlay" class="desktop-lock-overlay" style="display:none;" aria-hidden="true">
-  <div id="desktop-lock-bus-lanes" class="desktop-lock-bus-lanes" aria-hidden="true"></div>
-  <div class="desktop-lock-hero">
+  <div class="desktop-lock-hero" aria-hidden="true">
     <svg class="desktop-lock-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
   </div>
-  <div id="desktop-lock-clock" class="desktop-lock-clock"></div>
-  <div id="desktop-lock-crew-name" class="desktop-lock-crew-name"></div>
-  <input type="password" id="desktop-lock-quick-capture" class="desktop-lock-hidden-capture" autocomplete="off" maxlength="2" aria-hidden="true" tabindex="-1" />
-  <div id="desktop-lock-full-form" class="desktop-lock-full-form" style="display:none;">
-    <div class="desktop-lock-full-label">Enter full PIN to unlock</div>
-    <input type="password" id="desktop-lock-full-input" class="desktop-lock-full-input" maxlength="6" autocomplete="off" placeholder="••••••" />
-    <button type="button" id="desktop-lock-full-btn" class="btn-main desktop-lock-full-btn" onclick="submitDesktopLockFullPin()">UNLOCK</button>
-    <div id="desktop-lock-msg" class="desktop-lock-msg"></div>
+  <div id="desktop-lock-bus-lanes" class="desktop-lock-bus-lanes" aria-hidden="true"></div>
+  <div class="desktop-lock-foreground">
+    <div id="desktop-lock-clock" class="desktop-lock-clock"></div>
+    <input type="password" id="desktop-lock-quick-capture" class="desktop-lock-hidden-capture" autocomplete="off" maxlength="2" aria-hidden="true" tabindex="-1" />
+    <div id="desktop-lock-full-form" class="desktop-lock-full-form" style="display:none;">
+      <div class="desktop-lock-full-label">Enter full PIN to unlock</div>
+      <input type="password" id="desktop-lock-full-input" class="desktop-lock-full-input" maxlength="6" autocomplete="off" placeholder="••••••" />
+      <button type="button" id="desktop-lock-full-btn" class="btn-main desktop-lock-full-btn" onclick="submitDesktopLockFullPin()">UNLOCK</button>
+      <div id="desktop-lock-msg" class="desktop-lock-msg"></div>
+    </div>
   </div>
 </div>
 
@@ -66,21 +67,22 @@
     lanes.dataset.built = '1';
     let html = '';
     const configs = [
-      { top: '8%',  scale: 0.55, dur: 38, delay: 0,   dir: 'ltr', opacity: 0.12 },
-      { top: '18%', scale: 0.85, dur: 28, delay: -4,  dir: 'rtl', opacity: 0.18 },
-      { top: '28%', scale: 0.65, dur: 44, delay: -12, dir: 'ltr', opacity: 0.10 },
-      { top: '38%', scale: 1.05, dur: 32, delay: -8,  dir: 'rtl', opacity: 0.22 },
-      { top: '48%', scale: 0.75, dur: 36, delay: -16, dir: 'ltr', opacity: 0.14 },
-      { top: '58%', scale: 0.95, dur: 26, delay: -2,  dir: 'rtl', opacity: 0.20 },
-      { top: '68%', scale: 0.60, dur: 42, delay: -20, dir: 'ltr', opacity: 0.11 },
-      { top: '78%', scale: 0.90, dur: 30, delay: -6,  dir: 'rtl', opacity: 0.16 },
-      { top: '88%', scale: 0.70, dur: 34, delay: -14, dir: 'ltr', opacity: 0.13 },
-      { top: '14%', scale: 1.15, dur: 48, delay: -22, dir: 'rtl', opacity: 0.08 },
-      { top: '44%', scale: 0.50, dur: 52, delay: -28, dir: 'ltr', opacity: 0.09 },
-      { top: '72%', scale: 1.10, dur: 40, delay: -10, dir: 'rtl', opacity: 0.15 }
+      { top: '8%',  width: '38vw', dur: 52, delay: 0,   dir: 'ltr', opacity: 0.14 },
+      { top: '18%', width: '52vw', dur: 44, delay: -8,  dir: 'rtl', opacity: 0.18 },
+      { top: '28%', width: '42vw', dur: 58, delay: -18, dir: 'ltr', opacity: 0.11 },
+      { top: '38%', width: '58vw', dur: 40, delay: -12, dir: 'rtl', opacity: 0.20 },
+      { top: '48%', width: '46vw', dur: 50, delay: -24, dir: 'ltr', opacity: 0.13 },
+      { top: '58%', width: '54vw', dur: 36, delay: -4,  dir: 'rtl', opacity: 0.17 },
+      { top: '68%', width: '40vw', dur: 56, delay: -30, dir: 'ltr', opacity: 0.10 },
+      { top: '78%', width: '50vw', dur: 42, delay: -14, dir: 'rtl', opacity: 0.15 },
+      { top: '88%', width: '44vw', dur: 48, delay: -20, dir: 'ltr', opacity: 0.12 }
     ];
-    configs.forEach(function(cfg, i) {
-      html += '<div class="desktop-lock-bus desktop-lock-bus--' + cfg.dir + '" style="top:' + cfg.top + ';opacity:' + cfg.opacity + ';animation-duration:' + cfg.dur + 's;animation-delay:' + cfg.delay + 's;transform:scale(' + cfg.scale + ');">' + STAGE_MASTERS_LOGO_SVG_LOCK + '</div>';
+    configs.forEach(function(cfg) {
+      const unit = '<span class="desktop-lock-bus-unit" style="width:' + cfg.width + '">' + STAGE_MASTERS_LOGO_SVG_LOCK + '</span>';
+      const strip = unit + unit;
+      html += '<div class="desktop-lock-bus-track" style="top:' + cfg.top + ';opacity:' + cfg.opacity + ';">' +
+        '<div class="desktop-lock-bus-strip desktop-lock-bus-strip--' + cfg.dir + '" style="animation-duration:' + cfg.dur + 's;animation-delay:' + cfg.delay + 's;">' +
+        strip + '</div></div>';
     });
     lanes.innerHTML = html;
   }
@@ -208,9 +210,6 @@
     overlay.style.display = 'flex';
     overlay.setAttribute('aria-hidden', 'false');
     document.body.classList.add('desktop-lock-active');
-
-    let crewEl = document.getElementById('desktop-lock-crew-name');
-    if (crewEl) crewEl.textContent = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : '';
 
     updateDesktopLockClock();
     if (desktopLockClockTimer) clearInterval(desktopLockClockTimer);
