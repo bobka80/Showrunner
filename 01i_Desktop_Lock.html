@@ -496,6 +496,9 @@
       });
     }
     resetDesktopLockIdleTimer();
+    window.addEventListener('resize', function() {
+      if (desktopLockActive) requestAnimationFrame(syncDesktopLockClockDim);
+    }, { passive: true });
   };
 
   document.addEventListener('DOMContentLoaded', function() {
