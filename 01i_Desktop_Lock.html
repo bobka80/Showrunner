@@ -159,7 +159,32 @@
     let el = document.getElementById('desktop-lock-clock');
     if (!el) return;
     let now = new Date();
-    el.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    let str = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    let prev = el.dataset.clockStr || '';
+
+    if (!prev || el.querySelectorAll('.desktop-lock-clock-part').length !== str.length) {
+      el.textContent = '';
+      for (let i = 0; i < str.length; i++) {
+        let span = document.createElement('span');
+        span.className = 'desktop-lock-clock-part';
+        span.textContent = str[i];
+        el.appendChild(span);
+      }
+      el.dataset.clockStr = str;
+      return;
+    }
+
+    if (prev === str) return;
+
+    let parts = el.querySelectorAll('.desktop-lock-clock-part');
+    for (let i = 0; i < str.length; i++) {
+      if (str[i] === prev[i] || !parts[i]) continue;
+      parts[i].textContent = str[i];
+      parts[i].classList.remove('is-ticking');
+      void parts[i].offsetWidth;
+      parts[i].classList.add('is-ticking');
+    }
+    el.dataset.clockStr = str;
   }
 
   function focusDesktopLockQuickCapture() {

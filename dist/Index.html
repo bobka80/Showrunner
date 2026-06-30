@@ -1985,6 +1985,20 @@
         margin: 0;
         padding: 0;
         transform: translateY(-0.04em);
+        white-space: nowrap;
+    }
+    .desktop-lock-clock-part {
+        display: inline-block;
+        opacity: 1;
+    }
+    .desktop-lock-clock-part.is-ticking {
+        animation: desktop-lock-clock-tick 0.55s ease;
+    }
+    @keyframes desktop-lock-clock-tick {
+        0%   { opacity: 1;   transform: translateY(0); }
+        42%  { opacity: 0.15; transform: translateY(-0.04em); }
+        58%  { opacity: 0.15; transform: translateY(0.04em); }
+        100% { opacity: 1;   transform: translateY(0); }
     }
     .desktop-lock-hidden-capture {
         position: fixed;
