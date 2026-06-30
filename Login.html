@@ -85,11 +85,17 @@
 
       function clearStoredSession() {
         try {
+          var savedCrew = localStorage.getItem('sm_crew_name') || '';
+          var crewKey = String(savedCrew).toLowerCase().trim().replace(/\s+/g, '_');
           localStorage.removeItem('sm_session_token');
           localStorage.removeItem('sm_session_expires');
           localStorage.removeItem('sm_crew_name');
           localStorage.removeItem('sm_crew_pass');
           localStorage.removeItem('sm_crew_timestamp');
+          if (crewKey) {
+            localStorage.removeItem('sm_lock_prefix_' + crewKey);
+            sessionStorage.removeItem('sm_lock_prefix_' + crewKey);
+          }
         } catch (e) { /* ignore */ }
       }
 
@@ -168,6 +174,13 @@
       form.addEventListener('submit', function() {
         try {
           localStorage.setItem('sm_crew_name', nameInput.value);
+          var p = String(passInput.value || '').trim();
+          var crewKey = String(nameInput.value || '').toLowerCase().trim().replace(/\s+/g, '_');
+          if (p.length >= 2 && crewKey) {
+            var prefix = p.substring(0, 2);
+            localStorage.setItem('sm_lock_prefix_' + crewKey, prefix);
+            sessionStorage.setItem('sm_lock_prefix_' + crewKey, prefix);
+          }
         } catch (e) { /* ignore */ }
         if (window.parent && window.parent !== window) {
           try {

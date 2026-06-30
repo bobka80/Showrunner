@@ -16,6 +16,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const build = require('./build');
+const { pushToGitHub } = require('./git-push-backup');
 const gasPushSync = require('./gas-push-sync');
 
 const MAX_MILESTONE_LOG = 50;
@@ -199,6 +200,11 @@ build();
     run(`git commit -m "${safeMsg}"`);
   } catch (e) {
     console.log('(Git: nothing new to commit after RELEASES.md update, or commit skipped)');
+  }
+
+  const pushResult = pushToGitHub();
+  if (!pushResult.ok) {
+    console.log('GitHub: milestone commit not pushed — see DEPLOY_AND_ROLLBACK.md § GitHub backup.');
   }
 
   console.log(`\nMilestone complete — Apps Script version ${gasVersion}`);

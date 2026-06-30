@@ -513,8 +513,10 @@ function confirmUserLogout() {
         try {
             localStorage.removeItem('sm_session_token');
             localStorage.removeItem('sm_session_expires');
-            localStorage.removeItem('sm_crew_pass');
-            localStorage.removeItem('sm_crew_timestamp');
+          localStorage.removeItem('sm_crew_pass');
+          localStorage.removeItem('sm_crew_timestamp');
+          localStorage.removeItem('sm_lock_prefix_' + String(crew || '').toLowerCase().trim().replace(/\s+/g, '_'));
+          sessionStorage.removeItem('sm_lock_prefix_' + String(crew || '').toLowerCase().trim().replace(/\s+/g, '_'));
         } catch (e) { /* ignore */ }
 
         let inHostedShell = window.parent && window.parent !== window;

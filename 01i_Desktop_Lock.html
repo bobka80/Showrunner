@@ -24,6 +24,57 @@
   let desktopLockVerifying = false;
   let desktopLockIdleTimer = null;
   let desktopLockClockTimer = null;
+  let desktopLockCachedPrefix = '';
+  const DESKTOP_LOCK_FADE_MS = 500;
+
+  function desktopLockPrefixStorageKey() {
+    return 'sm_lock_prefix_' + desktopLockCrewKey();
+  }
+
+  function readStoredLockPrefix() {
+    let key = desktopLockPrefixStorageKey();
+    try {
+      let v = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (v && String(v).length >= 2) return String(v).substring(0, 2);
+    } catch (e) { /* ignore */ }
+    return '';
+  }
+
+  function storeLockPrefix(prefix) {
+    let p = String(prefix || '').substring(0, 2);
+    if (p.length < 2) return;
+    desktopLockCachedPrefix = p;
+    let key = desktopLockPrefixStorageKey();
+    try {
+      sessionStorage.setItem(key, p);
+      localStorage.setItem(key, p);
+    } catch (e) { /* ignore */ }
+  }
+
+  function getDesktopLockExpectedPrefix() {
+    if (desktopLockCachedPrefix && desktopLockCachedPrefix.length === 2) return desktopLockCachedPrefix;
+    let stored = readStoredLockPrefix();
+    if (stored) desktopLockCachedPrefix = stored;
+    return stored;
+  }
+
+  function prefetchDesktopLockPrefix() {
+    let stored = readStoredLockPrefix();
+    if (stored) {
+      desktopLockCachedPrefix = stored;
+      return;
+    }
+    let crew = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : '';
+    if (!crew) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.prefix && String(res.prefix).length >= 2) {
+          storeLockPrefix(res.prefix);
+        }
+      })
+      .withFailureHandler(function() { /* ignore */ })
+      .getDesktopLockPrefix(crew);
+  }
 
   function desktopLockCrewKey() {
     let crew = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'default';
@@ -146,19 +197,45 @@
   }
 
   function finishDesktopUnlock() {
-    desktopLockActive = false;
     let overlay = document.getElementById('desktop-lock-overlay');
-    if (overlay) {
+    if (!overlay) {
+      desktopLockActive = false;
+      document.body.classList.remove('desktop-lock-active');
+      resetDesktopLockUnlockUI();
+      resetDesktopLockIdleTimer();
+      return;
+    }
+
+    function teardownLock() {
+      desktopLockActive = false;
+      overlay.classList.remove('is-visible', 'is-leaving', 'is-mounted');
       overlay.style.display = 'none';
       overlay.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('desktop-lock-active');
+      if (desktopLockClockTimer) {
+        clearInterval(desktopLockClockTimer);
+        desktopLockClockTimer = null;
+      }
+      resetDesktopLockUnlockUI();
+      resetDesktopLockIdleTimer();
     }
-    document.body.classList.remove('desktop-lock-active');
-    if (desktopLockClockTimer) {
-      clearInterval(desktopLockClockTimer);
-      desktopLockClockTimer = null;
+
+    if (!overlay.classList.contains('is-visible')) {
+      teardownLock();
+      return;
     }
-    resetDesktopLockUnlockUI();
-    resetDesktopLockIdleTimer();
+
+    overlay.classList.remove('is-visible');
+    overlay.classList.add('is-leaving');
+    let done = false;
+    function onFadeDone() {
+      if (done) return;
+      done = true;
+      overlay.removeEventListener('transitionend', onFadeDone);
+      teardownLock();
+    }
+    overlay.addEventListener('transitionend', onFadeDone);
+    setTimeout(onFadeDone, DESKTOP_LOCK_FADE_MS + 80);
   }
 
   function verifyDesktopLockOnServer(code, mode, onDone) {
@@ -178,8 +255,18 @@
   }
 
   function handleQuickUnlockAttempt(prefix) {
+    let expected = getDesktopLockExpectedPrefix();
+    if (expected && expected.length === 2) {
+      if (prefix === expected) {
+        finishDesktopUnlock();
+        return;
+      }
+      showDesktopLockFullForm();
+      return;
+    }
     verifyDesktopLockOnServer(prefix, 'prefix', function(ok) {
       if (ok) {
+        storeLockPrefix(prefix);
         finishDesktopUnlock();
         return;
       }
@@ -222,9 +309,18 @@
 
     let overlay = document.getElementById('desktop-lock-overlay');
     if (!overlay) return;
+    overlay.classList.remove('is-leaving', 'is-visible');
+    overlay.classList.add('is-mounted');
     overlay.style.display = 'flex';
     overlay.setAttribute('aria-hidden', 'false');
     document.body.classList.add('desktop-lock-active');
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        overlay.classList.add('is-visible');
+      });
+    });
+
+    prefetchDesktopLockPrefix();
 
     updateDesktopLockClock();
     if (desktopLockClockTimer) clearInterval(desktopLockClockTimer);
@@ -280,6 +376,7 @@
   window.initDesktopLockWatch = function() {
     if (!isDesktopLockEligible()) return;
     syncDesktopLockIdleSelect();
+    prefetchDesktopLockPrefix();
     ['mousemove', 'mousedown', 'keydown', 'click', 'scroll', 'touchstart', 'wheel'].forEach(function(evt) {
       document.addEventListener(evt, onDesktopLockActivity, { passive: true });
     });

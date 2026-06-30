@@ -1,7 +1,7 @@
 # Project Assets — multi-user warehouse concurrency
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
-**Related:** [logistics-warehouse.md](logistics-warehouse.md) · [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
+**Related:** [logistics-warehouse.md](logistics-warehouse.md) · [warehouse-prep-session.md](warehouse-prep-session.md) · [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
 **Last swept:** 2026-06-28 · **Status:** Backlog — checkout ledger shared; list editing still single-editor semantics
 
@@ -94,6 +94,8 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 3. PA presence count  
 4. Desktop auto-save + merge improvements  
 5. Checkout/list status closure  
+
+**Floor / prep mode (multi-user at scale):** When **Start preparation** ships, PA + expanded ledger move to the Firebase fork — see [warehouse-prep-session.md](warehouse-prep-session.md). **Cache policies** flip to `session-live` backend — [data-cache-engine.md](data-cache-engine.md). This doc stays authoritative for **normal-day** Sheets concurrency until then.
 
 ---
 

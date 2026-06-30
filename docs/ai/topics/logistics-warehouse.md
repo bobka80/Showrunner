@@ -80,6 +80,8 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 
 Concurrent packing, checkout, and office adds: [project-assets-concurrency.md](project-assets-concurrency.md).
 
+**Preparation session (fork):** Manager **Start preparation** routes PA, expanded ledger, trucks, and logistics hub to Firebase — no direct Sheets for those slices until **End preparation**. See [warehouse-prep-session.md](warehouse-prep-session.md) · platform [session-fork-platform.md](session-fork-platform.md).
+
 **Bulk cables & physical case bind:** Auto-Pack groups cables by CBL tag; only gap is packing-mode scan of **which** level-3 cable case holds the trunk — [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md).
 
 ## Fleet & load planning

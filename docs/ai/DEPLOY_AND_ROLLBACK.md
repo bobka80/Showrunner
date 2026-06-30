@@ -14,11 +14,13 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 1. `node build.js`
 2. `git add` + `git commit` (snapshot of project files on disk)
 3. New row in root **`WORKS_LOG.md`** (rolling **last 50** entries)
+4. **`git push`** to **`origin`** (GitHub) — same commit; see [GitHub backup](#github-backup-mandatory-after-setup) below
 
 **Does NOT:** Create an Apps Script version or change production URL.
 
 **Rollback:** *"Rollback to last this works"* or *"Rollback to works #5"*  
-→ AI checks out that Git commit → `node build.js` → `gas-push-sync` (or `node dev-push.js`) → director retests in dev.
+→ AI checks out that Git commit → `node build.js` → `gas-push-sync` (or `node dev-push.js`) → director retests in dev.  
+→ If the checkpoint exists on GitHub, AI may `git fetch` / `git checkout` from `origin` when local history is missing.
 
 ---
 
@@ -34,6 +36,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 3. `clasp version "<note>"` — frozen snapshot with your name on Google
 4. `clasp deploy` that new version (updates saved production URL if `deploy-config.json` exists; otherwise creates a new deployment and saves the ID)
 5. Git commit + row in root **`RELEASES.md`**
+6. **`git push`** to **`origin`** (GitHub) — same commit as step 5
 
 **Does NOT:** Run on **"This works"** alone.
 
@@ -64,8 +67,9 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 | When | AI must |
 |------|---------|
-| Completed implementation (code shipped) | `node build.js` → `node milestone.js "<note>"` |
+| Completed implementation (code shipped) | `node build.js` → `node milestone.js "<note>"` (includes GitHub push) |
 | Director says **Milestone** / **OK ship** / **Milestone now** | `milestone.js` (now may be first step if starting new work on tested prod) |
+| Director says **This works** | `works-save.js` (Git + GitHub push) |
 | Brainstorming / docs-only | No milestone |
 | Milestone command fails | Stop; report blocker — do not pretend work is live |
 
@@ -77,8 +81,8 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 |--------|-------|--------|
 | **OK go** (completed implementation) | Production milestone | `build.js` → `milestone.js` (automatic) |
 | **Summarize** | Understanding only — no code until approved | Wait for **OK go** / **go** |
-| **This works** | Git save only (optional mid-session) | `works-save.js` |
-| **Milestone** / **OK ship** | Apps Script production | `milestone.js` |
+| **This works** | Git save + GitHub push | `works-save.js` |
+| **Milestone** / **OK ship** | Apps Script production + GitHub push | `milestone.js` |
 | **Milestone now** (+ optional follow-up) | Apps Script production **first**, then dev/build | `milestone.js` → then other work |
 | **Rollback to last this works** | Git | `rollback-works.js` |
 | **Rollback production** | Apps Script | `rollback-milestone.js` |
@@ -96,6 +100,51 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 2. Install [clasp](https://github.com/google/clasp) and log in: `clasp login`
 3. *(Optional)* Copy `deploy-config.example.json` → `deploy-config.json` and paste a **Production Web App** deployment ID if you already have a fixed crew URL. Otherwise the first **Milestone** saves one automatically.
 4. First **"This works"** creates the first Git save (`node works-save.js "note"`)
+5. **GitHub backup (one-time):** [§ GitHub backup](#github-backup-mandatory-after-setup) — required for cloud copies of all checkpoints
+
+---
+
+## GitHub backup (mandatory after setup)
+
+**Goal:** Every **"This works"** checkpoint and every **milestone** Git commit is pushed to a **private GitHub repo** on the director’s account — not only on disk / Google Drive.
+
+| What | Local | GitHub |
+|------|-------|--------|
+| **WORKS_LOG.md** | Rolling table of **last 50** checkpoints | Full **Git history** (all commits; GitHub is not limited to 50) |
+| **RELEASES.md** | Rolling milestone log | Same commits on `origin` |
+| **Rollback** | `rollback-works.js` / checkout commit hash | `git fetch origin` then checkout if PC is missing history |
+
+**Scripts:** After each commit, `works-save.js` and `milestone.js` call **`git-push-backup.js`** (`git push -u origin <branch>`).
+
+**AI rule:** If push fails, report clearly (no `origin`, auth, or network). Do **not** treat the save as fully backed up until push succeeds.
+
+### One-time setup (director — cannot be skipped)
+
+The AI **cannot** create your GitHub repo or log Git in on your behalf without these once:
+
+1. **Create a private repo** on GitHub (e.g. `showrunner` or `sm-showrunner`).
+2. **Add remote** (replace URL with your repo):
+   ```
+   git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+   ```
+3. **First push** (may prompt for login once):
+   ```
+   git push -u origin master
+   ```
+4. **Credentials** — one of:
+   - Git Credential Manager (GitHub login in browser when prompted), or
+   - SSH key added to GitHub (`git@github.com:USER/REPO.git`), or
+   - Personal access token (store in credential manager; never commit).
+
+**Logged into GitHub in Cursor** is not enough by itself — `git push` must succeed from a terminal on this PC.
+
+After setup, **"This works"** and **milestone** runs push automatically; director does nothing extra.
+
+### Optional: repair push only
+
+```
+node git-push-backup.js
+```
 
 ---
 
@@ -122,15 +171,14 @@ Many directors use **two different accounts**. That is expected and supported.
 
 **Cursor subscription** is only for the AI editor. It does not store code versions and does not replace Git.
 
-### Optional: personal GitHub backup
+### GitHub vs company Google
 
-To keep Git history on **your** account in the cloud (not only on disk):
+| System | Account | Purpose |
+|--------|---------|---------|
+| **GitHub `origin`** | Director personal / dev | Cloud backup of all Git checkpoints + milestones |
+| **clasp / GAS** | Company host | Live web app + frozen GAS versions |
 
-1. Create a **private** repo on your personal GitHub.
-2. `git remote add origin https://github.com/YOU/showrunner.git`
-3. After each **“This works”**, AI or you can `git push` (only if you want cloud backup).
-
-Company Google never needs access to that GitHub repo.
+Company Google never needs access to the GitHub repo. Keep the repo **private**.
 
 ### clasp stays on company account
 

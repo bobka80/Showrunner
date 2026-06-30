@@ -8,7 +8,7 @@ Read **one topic file** for the area you are working on — not this whole page.
 
 ## URGENT (blocks current campaign)
 
-*Nothing urgent.* Recovery Step A shipped (v335) — director to confirm web.app before Step B. See [active/recovery-after-v330.md](active/recovery-after-v330.md).
+*Nothing urgent.*
 
 When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
@@ -18,7 +18,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| Post-v330 recovery | Step A done (v335); B–E pending | [active/recovery-after-v330.md](active/recovery-after-v330.md) |
+| *(none)* | Post-v330 recovery closed @ v376 | [archive/recovery-after-v330.md](archive/recovery-after-v330.md) |
 
 ---
 
@@ -32,12 +32,20 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [topics/financials.md](topics/financials.md) |
 | Logistics & warehouse RFID | Partial — checkout bar; gate + station profile planned | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
-| Project Assets concurrency | Backlog — multi-user, digests, mobile auto-save | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
+| Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |
 | Availability & fleet tracker | Partial — equipment tracker matrix | [topics/availability-fleet.md](topics/availability-fleet.md) |
-| UX & platform | Partial — Personal Hub shipped; desktop lock backlog | [topics/ux-platform.md](topics/ux-platform.md) |
+| UX & platform | Partial — Personal Hub + desktop lock shipped v376 | [topics/ux-platform.md](topics/ux-platform.md) |
 | Beta prep (payroll, transport, audit) | Partial — RBAC 1–5, fin globals | [topics/beta-prep.md](topics/beta-prep.md) |
 | Training manuals | Backlog | [topics/training-manuals.md](topics/training-manuals.md) |
+| Google Workspace migration | Backlog — prerequisite for host + NAS | [topics/workspace-migration.md](topics/workspace-migration.md) |
+| Drive → NAS year archive | Backlog — after Workspace host | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
+| Session fork platform | Backlog — Firebase buffer + router | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
+| Unified data cache engine | Backlog — one API, per-screen policies | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
+| Warehouse prep session | Backlog — PA + ledger on fork | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) |
+| Timeline collab session | Backlog — multi-user timeline room | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
+
+**Build order (infrastructure → platform → sessions):** Workspace → NAS year archive → **data cache engine (Phase A)** + **session fork platform** (parallel shells) → warehouse prep → timeline collab. Cache **Phase C** locks to session fork.
 
 ---
 
@@ -45,6 +53,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Plan | File |
 |------|------|
+| Post-v330 recovery (closed) | [archive/recovery-after-v330.md](archive/recovery-after-v330.md) |
 | RBAC & event access (Phases 1–5 done) | [archive/rbac-event-access-plan.md](archive/rbac-event-access-plan.md) |
 
 ---

@@ -8,6 +8,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const build = require('./build');
+const { pushToGitHub } = require('./git-push-backup');
 
 const MAX_ENTRIES = 50;
 const LOG_PATH = path.join(__dirname, 'WORKS_LOG.md');
@@ -89,4 +90,12 @@ updateWorksLog(hash, note);
 
 console.log(`\nSaved Git checkpoint ${hash}`);
 console.log('Updated WORKS_LOG.md (max', MAX_ENTRIES, 'entries).');
+
+const pushResult = pushToGitHub();
+if (!pushResult.ok) {
+  console.log('GitHub: not pushed — local checkpoint only. Fix origin/credentials then re-run: node git-push-backup.js');
+} else {
+  console.log('GitHub: WORKS_LOG checkpoint backed up on origin.');
+}
+
 console.log('Production unchanged. Say "Milestone" or "OK ship" when ready for Apps Script deploy.');

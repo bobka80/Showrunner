@@ -6,7 +6,7 @@ One file per feature area. **Read only the topic you need.**
 
 **Stable reference (how the system works — not backlog):** see the parent [README.md](../README.md). Topics here are **what to build**; stable docs are **how things work** and **what not to break**.
 
-**Last index sweep:** 2026-06-28 (codebase @ GAS v359)
+**Last index sweep:** 2026-06-30 (codebase @ GAS v376)
 
 | Topic | Status | File |
 |-------|--------|------|
@@ -16,11 +16,19 @@ One file per feature area. **Read only the topic you need.**
 | Database operations | Partial — backup/restore + push admin | [database-ops.md](database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [financials.md](financials.md) |
 | Logistics & warehouse RFID | Partial — checkout bar; gate + station profile planned | [logistics-warehouse.md](logistics-warehouse.md) |
-| Project Assets concurrency | Backlog — multi-user PA, digests, mobile auto-save | [project-assets-concurrency.md](project-assets-concurrency.md) |
+| Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [project-assets-concurrency.md](project-assets-concurrency.md) |
 | Compliance & H&S | Backlog (nothing shipped) | [compliance.md](compliance.md) |
 | Availability & fleet tracker | Partial — equipment tracker matrix | [availability-fleet.md](availability-fleet.md) |
-| UX & platform | Partial — Personal Hub shipped; desktop lock backlog | [ux-platform.md](ux-platform.md) |
+| UX & platform | Partial — Personal Hub + desktop lock shipped v376 | [ux-platform.md](ux-platform.md) |
 | Beta prep | Partial — RBAC 1–5, fin globals | [beta-prep.md](beta-prep.md) |
 | Training manuals | Backlog (product exists; manual pack not started) | [training-manuals.md](training-manuals.md) |
+| Google Workspace migration | Backlog — host account prerequisite | [workspace-migration.md](workspace-migration.md) |
+| Drive → NAS year archive | Backlog — Synology year ≤ N−2 | [drive-nas-year-archive.md](drive-nas-year-archive.md) |
+| Session fork platform | Backlog — shared Firebase buffer + router | [session-fork-platform.md](session-fork-platform.md) |
+| Unified data cache engine | Backlog — one API, per-screen policies | [data-cache-engine.md](data-cache-engine.md) |
+| Warehouse prep session | Backlog — PA + ledger + trucks on fork | [warehouse-prep-session.md](warehouse-prep-session.md) |
+| Timeline collab session | Backlog — multi-user timeline room | [timeline-collab-session.md](timeline-collab-session.md) |
+
+**Build order:** [workspace-migration.md](workspace-migration.md) → [drive-nas-year-archive.md](drive-nas-year-archive.md) → [data-cache-engine.md](data-cache-engine.md) (Phase A) + [session-fork-platform.md](session-fork-platform.md) → [warehouse-prep-session.md](warehouse-prep-session.md) → [timeline-collab-session.md](timeline-collab-session.md).
 
 When adding a new area: create a topic file here, add one line to `Project_TODO.md` index. **Do not** put canonical “how it works” docs in this folder — use [drawer placement rules](../README.md#where-to-put-new-documentation) in the parent README.

@@ -1827,6 +1827,10 @@
     body.desktop-lock-active .dashboard {
         filter: blur(12px) saturate(0.9);
         -webkit-filter: blur(12px) saturate(0.9);
+        transition: filter 0.5s ease, -webkit-filter 0.5s ease;
+    }
+    .dashboard {
+        transition: filter 0.5s ease, -webkit-filter 0.5s ease;
     }
     .desktop-lock-overlay {
         position: fixed;
@@ -1837,10 +1841,24 @@
         align-items: center;
         justify-content: center;
         background: rgba(0, 0, 0, 0.70);
-        backdrop-filter: blur(14px) saturate(0.92);
-        -webkit-backdrop-filter: blur(14px) saturate(0.92);
+        --lock-blur: 0px;
+        backdrop-filter: blur(var(--lock-blur)) saturate(0.92);
+        -webkit-backdrop-filter: blur(var(--lock-blur)) saturate(0.92);
         overflow: hidden;
         user-select: none;
+        opacity: 0;
+        transition: opacity 0.5s ease, backdrop-filter 0.5s ease, -webkit-backdrop-filter 0.5s ease;
+    }
+    .desktop-lock-overlay.is-mounted {
+        display: flex;
+    }
+    .desktop-lock-overlay.is-visible {
+        opacity: 1;
+        --lock-blur: 14px;
+    }
+    .desktop-lock-overlay.is-leaving {
+        opacity: 0;
+        --lock-blur: 0px;
     }
     .desktop-lock-hero {
         position: absolute;
@@ -1918,7 +1936,7 @@
     .desktop-lock-clock {
         font-size: clamp(84px, 12vw, 144px);
         font-weight: 900;
-        color: #6b7280;
+        color: #c4cdd8;
         letter-spacing: 3px;
         font-variant-numeric: tabular-nums;
         text-shadow: none;

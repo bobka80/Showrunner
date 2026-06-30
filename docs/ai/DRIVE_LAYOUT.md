@@ -6,6 +6,8 @@
 
 Canonical map of host Drive layout, **live database file names**, backup/archive naming, and **Showrunner Sync** (shortcut mirror — not backup).
 
+**Year archive to NAS (policy):** Keep **current + previous year** on Google Drive; years **≤ current − 2** sync one-way to Synology — [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md). Requires [Workspace host](topics/workspace-migration.md).
+
 ---
 
 ## Folder ID registry

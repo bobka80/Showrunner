@@ -2,14 +2,10 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-28 · **Status:** Partial — Personal Hub shipped v336+; desktop lock shipped (pending director web.app confirm)
+**Last swept:** 2026-06-28 · **Status:** Partial — Personal Hub + desktop lock shipped (v376)
 
 - [ ] **Personal user hub:** Extended profile modal (contact, dietary) — partial; theme/logout/PIN shipped
 - [ ] **Freelancer shift placeholders & bidding:** TBD shifts, broadcast pool, accept/bid, rating-based selection
-
-**Deferred (recovery Step E — closes archive when director confirms on web.app):**
-
-- [x] **Desktop lock screen** — shipped; see [Desktop lock screen (spec)](#desktop-lock-screen-spec) below
 - [ ] Personal Hub on mobile (theme-only polish)
 - [ ] Manager agenda reminders → [notifications-catalog.md](notifications-catalog.md)
 
@@ -48,4 +44,4 @@ Full-screen `#desktop-lock-overlay`, z-index `10050` above the app, below critic
 
 ### Recovery archive gate
 
-When desktop lock ships and director confirms on web.app, recovery **Step E** lock item is done → move [recovery-after-v330.md](../active/recovery-after-v330.md) to `archive/`.
+Desktop lock shipped and director confirmed on web.app → campaign closed. See [archive/recovery-after-v330.md](../archive/recovery-after-v330.md).

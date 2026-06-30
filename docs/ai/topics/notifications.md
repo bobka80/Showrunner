@@ -4,7 +4,7 @@
 
 **Scenario checklist (have / need):** **[notifications-catalog.md](notifications-catalog.md)** — canonical inventory; do not duplicate checklists here.
 
-**Recovery context:** [active/recovery-after-v330.md](../active/recovery-after-v330.md) Steps C–D.
+**Recovery context (archived):** [archive/recovery-after-v330.md](../archive/recovery-after-v330.md)
 
 **Users must open:** https://sm-showrunner-97405.web.app
 
