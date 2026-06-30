@@ -155,34 +155,84 @@
     lanes.innerHTML = html;
   }
 
+  const DESKTOP_LOCK_DIGIT_FADE_MS = 300;
+
+  function buildDesktopLockClockFace(el, str) {
+    el.textContent = '';
+    for (let i = 0; i < str.length; i++) {
+      let ch = str[i];
+      if (/\d/.test(ch)) {
+        let slot = document.createElement('span');
+        slot.className = 'desktop-lock-clock-slot';
+        let digit = document.createElement('span');
+        digit.className = 'desktop-lock-clock-digit';
+        digit.textContent = ch;
+        slot.appendChild(digit);
+        el.appendChild(slot);
+      } else {
+        let sep = document.createElement('span');
+        sep.className = 'desktop-lock-clock-sep';
+        sep.textContent = ch;
+        el.appendChild(sep);
+      }
+    }
+  }
+
+  function crossfadeClockDigit(slot, newChar) {
+    let active = slot.querySelector('.desktop-lock-clock-digit:not(.is-leaving)');
+    if (!active) {
+      let d = document.createElement('span');
+      d.className = 'desktop-lock-clock-digit';
+      d.textContent = newChar;
+      slot.appendChild(d);
+      return;
+    }
+    if (active.textContent === newChar) return;
+
+    if (slot.dataset.fadeTimer) {
+      clearTimeout(parseInt(slot.dataset.fadeTimer, 10));
+      delete slot.dataset.fadeTimer;
+    }
+    slot.querySelectorAll('.is-leaving').forEach(function(n) { n.remove(); });
+
+    active.classList.add('is-leaving');
+
+    let incoming = document.createElement('span');
+    incoming.className = 'desktop-lock-clock-digit is-entering';
+    incoming.textContent = newChar;
+    slot.appendChild(incoming);
+
+    let t = setTimeout(function() {
+      slot.querySelectorAll('.is-leaving').forEach(function(n) { n.remove(); });
+      let enter = slot.querySelector('.is-entering');
+      if (enter) enter.classList.remove('is-entering');
+      delete slot.dataset.fadeTimer;
+    }, DESKTOP_LOCK_DIGIT_FADE_MS + 50);
+    slot.dataset.fadeTimer = String(t);
+  }
+
   function updateDesktopLockClock() {
     let el = document.getElementById('desktop-lock-clock');
     if (!el) return;
     let now = new Date();
     let str = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     let prev = el.dataset.clockStr || '';
+    let slots = el.querySelectorAll('.desktop-lock-clock-slot');
 
-    if (!prev || el.querySelectorAll('.desktop-lock-clock-part').length !== str.length) {
-      el.textContent = '';
-      for (let i = 0; i < str.length; i++) {
-        let span = document.createElement('span');
-        span.className = 'desktop-lock-clock-part';
-        span.textContent = str[i];
-        el.appendChild(span);
-      }
+    if (!prev || slots.length === 0) {
+      buildDesktopLockClockFace(el, str);
       el.dataset.clockStr = str;
       return;
     }
 
     if (prev === str) return;
 
-    let parts = el.querySelectorAll('.desktop-lock-clock-part');
+    let slotIdx = 0;
     for (let i = 0; i < str.length; i++) {
-      if (str[i] === prev[i] || !parts[i]) continue;
-      parts[i].textContent = str[i];
-      parts[i].classList.remove('is-ticking');
-      void parts[i].offsetWidth;
-      parts[i].classList.add('is-ticking');
+      if (!/\d/.test(str[i])) continue;
+      let slot = slots[slotIdx++];
+      if (!slot) continue;
+      if (str[i] !== prev[i]) crossfadeClockDigit(slot, str[i]);
     }
     el.dataset.clockStr = str;
   }
