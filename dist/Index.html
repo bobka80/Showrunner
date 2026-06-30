@@ -1951,7 +1951,7 @@
         isolation: isolate;
         --lock-fade-out: 50px;
     }
-    /* Clock dim: flat plateau (clock + 50px pad), 100px outward fade to transparent */
+    /* Clock dim: flat plateau (clock + 50px pad), 50px outward fade to transparent */
     .desktop-lock-clock-panel::before {
         content: "";
         position: absolute;
@@ -1963,7 +1963,7 @@
         background: rgba(5, 5, 8, 0.68);
         pointer-events: none;
         z-index: -1;
-        border-radius: 0;
+        border-radius: 40px;
         filter: none;
         -webkit-mask-image:
             linear-gradient(to right, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%),
