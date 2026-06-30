@@ -4,56 +4,56 @@ Created only on **Milestone** / **OK ship** / **Milestone now** — not on every
 
 | # | Date | GAS version | Deployment | Note |
 |---|------|-------------|------------|------|
-| 1 | 2026-06-30 | 379 | `AKfycbxy…` | Desktop lock clock panel + Bahnschrift |
-| 2 | 2026-06-30 | 378 | `AKfycbxy…` | Exclude git-push-backup from GAS deploy |
-| 3 | 2026-06-30 | 377 | `AKfycbxy…` | Desktop lock: fuzzy fade + instant prefix unlock + whiter clock |
-| 4 | 2026-06-29 | 376 | `AKfycbxy…` | Milestone |
-| 5 | 2026-06-29 | 375 | `AKfycbxy…` | Milestone |
-| 6 | 2026-06-29 | 374 | `AKfycbxy…` | Milestone |
-| 7 | 2026-06-29 | 373 | `AKfycbxy…` | Milestone |
-| 8 | 2026-06-29 | 372 | `AKfycbxy…` | Milestone |
-| 9 | 2026-06-29 | 371 | `AKfycbxy…` | Milestone |
-| 10 | 2026-06-29 | 370 | `AKfycbxy…` | Milestone |
-| 11 | 2026-06-29 | 369 | `AKfycbxy…` | Fix checkout mode switch bug, plain red frame, pack/unpack in packing mode |
-| 12 | 2026-06-29 | 368 | `AKfycbxy…` | Mobile PA checkout red frame, per-item/container buttons, container cascade checkout, re-enable auto-save |
-| 13 | 2026-06-29 | 367 | `AKfycbxy…` | Mobile PA check-in/out red UI + manual buttons |
-| 14 | 2026-06-29 | 366 | `AKfycbxy…` | Mobile PA explicit save + in-app choice sheet |
-| 15 | 2026-06-29 | 365 | `AKfycbxy…` | Mobile PA layout + crew hub truck/areas |
-| 16 | 2026-06-29 | 364 | `AKfycbxy…` | Fix: gas-push-sync removes orphan Node files from GAS |
-| 17 | 2026-06-29 | 363 | `AKfycbxy…` | Fix: exclude check-google-account from GAS push |
-| 18 | 2026-06-29 | 362 | `AKfycbxy…` | Mobile PA: search sheet, small SAVE, field toolbar cleanup |
-| 19 | 2026-06-28 | 359 | `AKfycbxy…` | BACKUPS resolve by 05_DATABASE/BACKUPS child folder — not blind folder ID |
-| 20 | 2026-06-28 | 358 | `AKfycbxy…` | Fix BACKUPS folder resolve — scan BACKUPS + legacy 05_DATABASE_BACKUPS |
-| 21 | 2026-06-28 | 357 | `AKfycbxy…` | DATABASE pills: in-frame 4-col info grid; restore BACKUP\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \| ARCHIVE column layout |
-| 22 | 2026-06-28 | 356 | `AKfycbxy…` | Drive folder IDs + SM_Showrunner live names; DATABASE 4-col admin grid UI |
-| 23 | 2026-06-28 | 355 | `AKfycbxy…` | Fix live DB folder ID — backups inside database folder |
-| 24 | 2026-06-28 | 354 | `AKfycbxy…` | Canonical live DB folder 01_DATABASE — ENGINE/VAULT layout repair + restore/revert fix |
-| 25 | 2026-06-28 | 353 | `AKfycbxy…` | Fix Drive folder date range from painted phases; rename/move folders on every save |
-| 26 | 2026-06-28 | 352 | `AKfycbxy…` | Fix project save — timelines on anti-dup, project_uid column, save error UX |
-| 27 | 2026-06-28 | 351 | `AKfycbxy…` | Step 3 — rule types basic/automated, agenda reminder fields, manual checklist save |
-| 28 | 2026-06-28 | 350 | `AKfycbxy…` | Step 2 — Manager Hub 3-column layout, rename under drive, asset reminder list |
-| 29 | 2026-06-28 | 349 | `AKfycbxy…` | Step 1 — per-manager config: rules, rename, sync, asset checklist templates in user vault |
-| 30 | 2026-06-28 | 348 | `AKfycbxy…` | Task crew names, instant task cache, fix missed tasks filter |
-| 31 | 2026-06-28 | 347 | `AKfycbxy…` | Notification click-to-event, bigger dismiss, remove snooze |
-| 32 | 2026-06-28 | 346 | `AKfycbxy…` | Fast tasks/notifs refresh + fix clear notifications |
-| 33 | 2026-06-28 | 345 | `AKfycbxy…` | Foreground host toast + task_view_all manager task list |
-| 34 | 2026-06-28 | 344 | `AKfycbxy…` | Step D — foreground push toast + live notif/task refresh; fix bell render |
-| 35 | 2026-06-28 | 343 | `AKfycbxy…` | Fix task/notif list — cross-match uid email name for crew |
-| 36 | 2026-06-28 | 342 | `AKfycbxy…` | Step C — crew notifications: UID normalize, removed from schedule, task delete + weather FCM |
-| 37 | 2026-06-28 | 341 | `AKfycbxy…` | Logout confirm modal + reliable login gate redirect on web.app |
-| 38 | 2026-06-28 | 340 | `AKfycbxy…` | Mobile Personal Hub — name/logout, PIN, then theme order |
-| 39 | 2026-06-28 | 339 | `AKfycbxy…` | Personal Hub layout polish — desktop bar, manager columns, mobile header icon, summarize doctrine |
-| 40 | 2026-06-28 | 338 | `AKfycbxy…` | Personal Hub full desktop view + mobile ACCOUNT view; manager tools restored |
-| 41 | 2026-06-28 | 337 | `AKfycbxy…` | Personal Hub UX — compact panel, nav order, PIN modal, mobile ACCOUNT row, manager tools parked |
-| 42 | 2026-06-28 | 336 | `AKfycbxy…` | Personal Hub for all users — theme, logout, change PIN; manager tools gated inside same panel |
-| 43 | 2026-06-27 | 335 | `AKfycbxy…` | Step A — break editor recursion (region label / distance visibility) |
-| 44 | 2026-06-27 | 334 | `AKfycbxy…` | Rollback to v329 — before editor/notification regressions (v330–333) |
-| 45 | 2026-06-27 | 329 | `AKfycbxy…` | Mobile home — brand header, sidebar nav icons; remove timeline shift popup |
-| 46 | 2026-06-27 | 328 | `AKfycbxy…` | Harden PWA session — sessioncheck before boot, multi-device tokens |
-| 47 | 2026-06-27 | 327 | `AKfycbxy…` | Fix mobile weather badges — use readinessState.isOutdoor |
-| 48 | 2026-06-27 | 326 | `AKfycbxy…` | Mobile crew hub — sub-event strips, weather badge, read-only timeline footer strip |
-| 49 | 2026-06-27 | 325 | `AKfycbxy…` | Fix mobile shift card CSS |
-| 50 | 2026-06-27 | 324 | `AKfycbxy…` | Mobile timeline — MY SHIFTS strips + pinch-zoom full crew grid |
+| 1 | 2026-06-30 | 380 | `AKfycbxy…` | Desktop lock clock gradient fade + bold Bahnschrift |
+| 2 | 2026-06-30 | 379 | `AKfycbxy…` | Desktop lock clock panel + Bahnschrift |
+| 3 | 2026-06-30 | 378 | `AKfycbxy…` | Exclude git-push-backup from GAS deploy |
+| 4 | 2026-06-30 | 377 | `AKfycbxy…` | Desktop lock: fuzzy fade + instant prefix unlock + whiter clock |
+| 5 | 2026-06-29 | 376 | `AKfycbxy…` | Milestone |
+| 6 | 2026-06-29 | 375 | `AKfycbxy…` | Milestone |
+| 7 | 2026-06-29 | 374 | `AKfycbxy…` | Milestone |
+| 8 | 2026-06-29 | 373 | `AKfycbxy…` | Milestone |
+| 9 | 2026-06-29 | 372 | `AKfycbxy…` | Milestone |
+| 10 | 2026-06-29 | 371 | `AKfycbxy…` | Milestone |
+| 11 | 2026-06-29 | 370 | `AKfycbxy…` | Milestone |
+| 12 | 2026-06-29 | 369 | `AKfycbxy…` | Fix checkout mode switch bug, plain red frame, pack/unpack in packing mode |
+| 13 | 2026-06-29 | 368 | `AKfycbxy…` | Mobile PA checkout red frame, per-item/container buttons, container cascade checkout, re-enable auto-save |
+| 14 | 2026-06-29 | 367 | `AKfycbxy…` | Mobile PA check-in/out red UI + manual buttons |
+| 15 | 2026-06-29 | 366 | `AKfycbxy…` | Mobile PA explicit save + in-app choice sheet |
+| 16 | 2026-06-29 | 365 | `AKfycbxy…` | Mobile PA layout + crew hub truck/areas |
+| 17 | 2026-06-29 | 364 | `AKfycbxy…` | Fix: gas-push-sync removes orphan Node files from GAS |
+| 18 | 2026-06-29 | 363 | `AKfycbxy…` | Fix: exclude check-google-account from GAS push |
+| 19 | 2026-06-29 | 362 | `AKfycbxy…` | Mobile PA: search sheet, small SAVE, field toolbar cleanup |
+| 20 | 2026-06-28 | 359 | `AKfycbxy…` | BACKUPS resolve by 05_DATABASE/BACKUPS child folder — not blind folder ID |
+| 21 | 2026-06-28 | 358 | `AKfycbxy…` | Fix BACKUPS folder resolve — scan BACKUPS + legacy 05_DATABASE_BACKUPS |
+| 22 | 2026-06-28 | 357 | `AKfycbxy…` | DATABASE pills: in-frame 4-col info grid; restore BACKUP\ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \ \| ARCHIVE column layout |
+| 23 | 2026-06-28 | 356 | `AKfycbxy…` | Drive folder IDs + SM_Showrunner live names; DATABASE 4-col admin grid UI |
+| 24 | 2026-06-28 | 355 | `AKfycbxy…` | Fix live DB folder ID — backups inside database folder |
+| 25 | 2026-06-28 | 354 | `AKfycbxy…` | Canonical live DB folder 01_DATABASE — ENGINE/VAULT layout repair + restore/revert fix |
+| 26 | 2026-06-28 | 353 | `AKfycbxy…` | Fix Drive folder date range from painted phases; rename/move folders on every save |
+| 27 | 2026-06-28 | 352 | `AKfycbxy…` | Fix project save — timelines on anti-dup, project_uid column, save error UX |
+| 28 | 2026-06-28 | 351 | `AKfycbxy…` | Step 3 — rule types basic/automated, agenda reminder fields, manual checklist save |
+| 29 | 2026-06-28 | 350 | `AKfycbxy…` | Step 2 — Manager Hub 3-column layout, rename under drive, asset reminder list |
+| 30 | 2026-06-28 | 349 | `AKfycbxy…` | Step 1 — per-manager config: rules, rename, sync, asset checklist templates in user vault |
+| 31 | 2026-06-28 | 348 | `AKfycbxy…` | Task crew names, instant task cache, fix missed tasks filter |
+| 32 | 2026-06-28 | 347 | `AKfycbxy…` | Notification click-to-event, bigger dismiss, remove snooze |
+| 33 | 2026-06-28 | 346 | `AKfycbxy…` | Fast tasks/notifs refresh + fix clear notifications |
+| 34 | 2026-06-28 | 345 | `AKfycbxy…` | Foreground host toast + task_view_all manager task list |
+| 35 | 2026-06-28 | 344 | `AKfycbxy…` | Step D — foreground push toast + live notif/task refresh; fix bell render |
+| 36 | 2026-06-28 | 343 | `AKfycbxy…` | Fix task/notif list — cross-match uid email name for crew |
+| 37 | 2026-06-28 | 342 | `AKfycbxy…` | Step C — crew notifications: UID normalize, removed from schedule, task delete + weather FCM |
+| 38 | 2026-06-28 | 341 | `AKfycbxy…` | Logout confirm modal + reliable login gate redirect on web.app |
+| 39 | 2026-06-28 | 340 | `AKfycbxy…` | Mobile Personal Hub — name/logout, PIN, then theme order |
+| 40 | 2026-06-28 | 339 | `AKfycbxy…` | Personal Hub layout polish — desktop bar, manager columns, mobile header icon, summarize doctrine |
+| 41 | 2026-06-28 | 338 | `AKfycbxy…` | Personal Hub full desktop view + mobile ACCOUNT view; manager tools restored |
+| 42 | 2026-06-28 | 337 | `AKfycbxy…` | Personal Hub UX — compact panel, nav order, PIN modal, mobile ACCOUNT row, manager tools parked |
+| 43 | 2026-06-28 | 336 | `AKfycbxy…` | Personal Hub for all users — theme, logout, change PIN; manager tools gated inside same panel |
+| 44 | 2026-06-27 | 335 | `AKfycbxy…` | Step A — break editor recursion (region label / distance visibility) |
+| 45 | 2026-06-27 | 334 | `AKfycbxy…` | Rollback to v329 — before editor/notification regressions (v330–333) |
+| 46 | 2026-06-27 | 329 | `AKfycbxy…` | Mobile home — brand header, sidebar nav icons; remove timeline shift popup |
+| 47 | 2026-06-27 | 328 | `AKfycbxy…` | Harden PWA session — sessioncheck before boot, multi-device tokens |
+| 48 | 2026-06-27 | 327 | `AKfycbxy…` | Fix mobile weather badges — use readinessState.isOutdoor |
+| 49 | 2026-06-27 | 326 | `AKfycbxy…` | Mobile crew hub — sub-event strips, weather badge, read-only timeline footer strip |
+| 50 | 2026-06-27 | 325 | `AKfycbxy…` | Fix mobile shift card CSS |
 
 ---
 
