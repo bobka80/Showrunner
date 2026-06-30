@@ -8,6 +8,7 @@ works-save.js
 milestone.js
 rollback-works.js
 rollback-milestone.js
+git-push-backup.js
 test.js
 test_db.js
 run_test.js

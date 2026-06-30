@@ -167,6 +167,7 @@ function getFrontendLogicChunk(index) {
     'deploy-hosting.js',
     'check-google-account.js',
     'gas-push-sync.js',
+    'git-push-backup.js',
     'test.js', 'test_db.js', 'run_test.js'
   ]);
   const files = fs.readdirSync(__dirname);
