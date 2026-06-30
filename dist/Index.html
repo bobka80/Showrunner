@@ -1933,11 +1933,28 @@
         align-items: center;
         justify-content: center;
     }
+    .desktop-lock-clock-panel {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 22px 44px 26px;
+        border-radius: 22px;
+        background: rgba(8, 8, 10, 0.52);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow:
+            0 18px 48px rgba(0, 0, 0, 0.45),
+            inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(10px) saturate(0.85);
+        -webkit-backdrop-filter: blur(10px) saturate(0.85);
+    }
     .desktop-lock-clock {
+        font-family: "Bahnschrift SemiLight", "Bahnschrift", "Segoe UI", sans-serif;
         font-size: clamp(84px, 12vw, 144px);
-        font-weight: 900;
-        color: #c4cdd8;
-        letter-spacing: 3px;
+        font-weight: 300;
+        color: #8a939f;
+        letter-spacing: 2px;
         font-variant-numeric: tabular-nums;
         text-shadow: none;
         line-height: 1;
@@ -5216,7 +5233,9 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
   </div>
   <div id="desktop-lock-bus-lanes" class="desktop-lock-bus-lanes" aria-hidden="true"></div>
   <div class="desktop-lock-foreground">
-    <div id="desktop-lock-clock" class="desktop-lock-clock"></div>
+    <div class="desktop-lock-clock-panel">
+      <div id="desktop-lock-clock" class="desktop-lock-clock"></div>
+    </div>
     <input type="password" id="desktop-lock-quick-capture" class="desktop-lock-hidden-capture" autocomplete="off" maxlength="2" aria-hidden="true" tabindex="-1" />
     <div id="desktop-lock-full-form" class="desktop-lock-full-form" style="display:none;">
       <div class="desktop-lock-full-label">Enter full PIN to unlock</div>

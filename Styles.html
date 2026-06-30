@@ -1924,11 +1924,28 @@
         align-items: center;
         justify-content: center;
     }
+    .desktop-lock-clock-panel {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 22px 44px 26px;
+        border-radius: 22px;
+        background: rgba(8, 8, 10, 0.52);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        box-shadow:
+            0 18px 48px rgba(0, 0, 0, 0.45),
+            inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        backdrop-filter: blur(10px) saturate(0.85);
+        -webkit-backdrop-filter: blur(10px) saturate(0.85);
+    }
     .desktop-lock-clock {
+        font-family: "Bahnschrift SemiLight", "Bahnschrift", "Segoe UI", sans-serif;
         font-size: clamp(84px, 12vw, 144px);
-        font-weight: 900;
-        color: #c4cdd8;
-        letter-spacing: 3px;
+        font-weight: 300;
+        color: #8a939f;
+        letter-spacing: 2px;
         font-variant-numeric: tabular-nums;
         text-shadow: none;
         line-height: 1;
