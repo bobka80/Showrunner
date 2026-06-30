@@ -1963,7 +1963,7 @@
         background: rgba(5, 5, 8, 0.68);
         pointer-events: none;
         z-index: -1;
-        border-radius: 40px;
+        border-radius: var(--lock-dim-radius, 0);
         filter: none;
         -webkit-mask-image:
             linear-gradient(to right, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%),
