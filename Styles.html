@@ -1894,6 +1894,14 @@
         height: auto;
         display: block;
     }
+    .desktop-lock-bus--soft svg {
+        filter: blur(1.25px);
+        -webkit-filter: blur(1.25px);
+    }
+    .desktop-lock-bus--soft {
+        -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+        mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+    }
     .desktop-lock-bus--ltr {
         animation-name: desktop-lock-bus-ltr;
         animation-timing-function: linear;
@@ -1930,39 +1938,32 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 0.12em 0.28em;
+        padding: 0;
         isolation: isolate;
+        --lock-fade-out: 100px;
     }
-    .desktop-lock-clock-panel::before,
-    .desktop-lock-clock-panel::after {
+    /* Clock dim: flat plateau (clock + 50px pad), 100px outward fade to transparent */
+    .desktop-lock-clock-panel::before {
         content: "";
         position: absolute;
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
+        width: var(--lock-dim-w, 520px);
+        height: var(--lock-dim-h, 220px);
+        background: rgba(5, 5, 8, 0.68);
         pointer-events: none;
         z-index: -1;
-        border-radius: 50%;
-    }
-    /* Inner dim — tighter center (half previous spread) */
-    .desktop-lock-clock-panel::before {
-        width: 38%;
-        height: 98%;
-        min-width: 150px;
-        min-height: 62px;
-        background: rgba(5, 5, 8, 0.58);
-        filter: blur(20px);
-        -webkit-filter: blur(20px);
-    }
-    /* Outer wash — half previous spread */
-    .desktop-lock-clock-panel::after {
-        width: 68%;
-        height: 145%;
-        min-width: 220px;
-        min-height: 100px;
-        background: rgba(4, 4, 6, 0.28);
-        filter: blur(30px);
-        -webkit-filter: blur(30px);
+        border-radius: 0;
+        filter: none;
+        -webkit-mask-image:
+            linear-gradient(to right, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%),
+            linear-gradient(to bottom, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%);
+        mask-image:
+            linear-gradient(to right, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%),
+            linear-gradient(to bottom, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%);
+        -webkit-mask-composite: source-in;
+        mask-composite: intersect;
     }
     .desktop-lock-clock {
         font-family: "Bahnschrift", "Segoe UI", sans-serif;
