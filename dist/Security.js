@@ -223,11 +223,13 @@ function authenticateUser(crewName, passcode) {
   return executeWithRetry(() => {
     const sheets = verifyVaultSchema(true); 
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
-    const rMap = getHeaderMap(roleData);
-    
-    let debugLog = [];
+    let rMap = getHeaderMap(roleData);
+    if (typeof ensureStationRoleColumns === 'function') {
+      rMap = ensureStationRoleColumns(sheets.roles);
+      roleData = sheets.roles.getDataRange().getValues();
+    }
     
     // Start at i=0 in case they don't have headers at all
     for (let i = 0; i < crewData.length; i++) {
@@ -403,6 +405,17 @@ function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
         if (roleSys) sysAccess = roleSys.toUpperCase();
         isTunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
         bundle = loadRolePermissionsBundle(roleData[r], rMap);
+        if (typeof isStationDeviceProfileRow === 'function' && isStationDeviceProfileRow(roleData[r], rMap)) {
+          bundle.is_station_device = true;
+          bundle.station_device_layout = typeof normalizeStationDeviceLayout === 'function'
+            ? normalizeStationDeviceLayout(roleData[r][rMap['station_device_layout']])
+            : 'chainway_handheld';
+          if (typeof STATION_IAM_PERMISSION_KEYS !== 'undefined') {
+            STATION_IAM_PERMISSION_KEYS.forEach(k => {
+              if (rMap[k] !== undefined) bundle[k] = isTruthyCell(roleData[r][rMap[k]]);
+            });
+          }
+        }
         break;
       }
     }
@@ -427,6 +440,8 @@ function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
   bundle.task_view_all = accessTierAtLeastValue(normalizeAccessTier(sysAccess), 'MANAGER') || isManager;
 
   const uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : '';
+  const isStationDevice = !!bundle.is_station_device;
+  const stationDeviceLayout = bundle.station_device_layout || '';
   return {
     success: true,
     name: crewData[i][cMap['Name']] || hardName,
@@ -434,7 +449,9 @@ function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
     permissions: bundle,
     tunnelingActive: isTunneling,
     uid: uid,
-    email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : ''
+    email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : '',
+    isStationDevice: isStationDevice,
+    stationDeviceLayout: stationDeviceLayout
   };
 }
 
@@ -444,9 +461,13 @@ function getAuthBundleForCrewName_(crewName) {
     if (!target) return { success: false, error: 'Missing crew name.' };
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
-    const rMap = getHeaderMap(roleData);
+    let rMap = getHeaderMap(roleData);
+    if (typeof ensureStationRoleColumns === 'function') {
+      rMap = ensureStationRoleColumns(sheets.roles);
+      roleData = sheets.roles.getDataRange().getValues();
+    }
 
     for (let i = 0; i < crewData.length; i++) {
       let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
@@ -630,7 +651,7 @@ function verifyBackendPrivilege(crewName, requiredTier) {
 
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
     const rMap = getHeaderMap(roleData);
 
@@ -646,7 +667,7 @@ function verifyBackendPermission(crewName, permissionKey) {
 
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
     const rMap = getHeaderMap(roleData);
     const bundle = resolveCrewPermissionBundle(crewName, crewData, roleData, cMap, rMap);
@@ -862,7 +883,7 @@ function getSystemDirectory() {
   return executeWithRetry(() => {
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
     const rMap = getHeaderMap(roleData);
 

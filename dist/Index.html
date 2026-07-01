@@ -3450,6 +3450,8 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
   <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
   <meta name="fcm-reg-key" content="<?= fcmRegKey ?>">
   <meta name="session-token" content="<?= typeof sessionToken !== 'undefined' ? sessionToken : '' ?>">
+  <meta name="station-device" content="<?= typeof isStationDevice !== 'undefined' ? isStationDevice : '0' ?>">
+  <meta name="station-device-layout" content="<?= typeof stationDeviceLayout !== 'undefined' ? stationDeviceLayout : '' ?>">
   
   
 
@@ -5321,6 +5323,190 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
     <div id="backup-modal-sub" style="color: #a1a1aa; font-size: 11px;">Please save your work. The interface will be locked during the backup.</div>
   </div>
 </div>
+
+<style>
+html.station-device-root .dashboard,
+html.station-device-root #mobile-dashboard,
+html.station-device-root #sr-hosting-only-banner,
+html.station-device-root #floating-bell-container {
+  display: none !important;
+}
+html.station-device-root,
+html.station-device-root body {
+  overflow: hidden;
+  height: 100%;
+}
+#station-shell {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+html.station-device-root #station-shell {
+  display: flex;
+}
+.station-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #111114;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+.station-shell-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.station-shell-brand__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #f97316;
+  text-transform: uppercase;
+}
+.station-shell-brand__device {
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+}
+.station-shell-brand__profile {
+  font-size: 11px;
+  color: #71717a;
+  font-weight: 600;
+}
+.station-shell-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  gap: 16px;
+  text-align: center;
+}
+.station-shell-state-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+.station-shell-prompt {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.25;
+  max-width: 320px;
+}
+.station-shell-host-name {
+  font-size: 28px;
+  font-weight: 900;
+  color: #10b981;
+  word-break: break-word;
+}
+.station-shell-status {
+  min-height: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a1a1aa;
+}
+.station-shell-status.is-error { color: #ef4444; }
+.station-shell-status.is-ok { color: #10b981; }
+.station-shell-last-scan {
+  font-family: monospace;
+  font-size: 11px;
+  color: #52525b;
+  word-break: break-all;
+  max-width: 100%;
+}
+.station-shell-lanes {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 8px;
+}
+.station-shell-lane {
+  flex: 1;
+  padding: 14px 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #111;
+  opacity: 0.45;
+}
+.station-shell-lane.is-ready {
+  opacity: 1;
+  border-color: #f97316;
+}
+.station-shell-lane__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f97316;
+}
+.station-shell-lane__hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #71717a;
+  line-height: 1.35;
+}
+.station-shell-footer {
+  flex-shrink: 0;
+  padding: 12px 16px 20px;
+  border-top: 1px solid #27272a;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-shell-footer .btn-main,
+.station-shell-footer .btn-close {
+  width: 100%;
+  margin: 0;
+}
+</style>
+
+<div id="station-shell" aria-label="Warehouse station">
+  <div class="station-shell-header">
+    <div class="station-shell-brand">
+      <div class="station-shell-brand__title">Warehouse station</div>
+      <div id="station-shell-device-name" class="station-shell-brand__device">—</div>
+      <div id="station-shell-profile-name" class="station-shell-brand__profile">—</div>
+    </div>
+    <div id="station-shell-layout-pill" style="font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#71717a; border:1px solid #333; border-radius:999px; padding:6px 10px;">HANDHELD</div>
+  </div>
+
+  <div class="station-shell-main">
+    <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
+    <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>
+    <div id="station-shell-host-name" class="station-shell-host-name" style="display:none;"></div>
+    <div id="station-shell-status" class="station-shell-status"></div>
+    <div id="station-shell-last-scan" class="station-shell-last-scan"></div>
+
+    <div class="station-shell-lanes">
+      <div id="station-lane-project" class="station-shell-lane">
+        <div class="station-shell-lane__label">Project</div>
+        <div class="station-shell-lane__hint">Checkout / check-in (soon)</div>
+      </div>
+      <div id="station-lane-vault" class="station-shell-lane">
+        <div class="station-shell-lane__label">Vault</div>
+        <div class="station-shell-lane__hint">Maintenance / repair (soon)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="station-shell-footer">
+    <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
+    <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
+  </div>
+</div>
+
+
 
 <div id="desktop-lock-overlay" class="desktop-lock-overlay" style="display:none;" aria-hidden="true">
   <div class="desktop-lock-hero" aria-hidden="true">

@@ -19,6 +19,8 @@
   <meta name="user-permissions" content="<?= userPermissionsB64 ?>">
   <meta name="fcm-reg-key" content="<?= fcmRegKey ?>">
   <meta name="session-token" content="<?= typeof sessionToken !== 'undefined' ? sessionToken : '' ?>">
+  <meta name="station-device" content="<?= typeof isStationDevice !== 'undefined' ? isStationDevice : '0' ?>">
+  <meta name="station-device-layout" content="<?= typeof stationDeviceLayout !== 'undefined' ? stationDeviceLayout : '' ?>">
   <script>
   (function() {
     var SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -364,6 +366,11 @@
   const ACTIVE_USER_NAME = (document.querySelector('meta[name="user-name"]') || {}).content || '';
   const ACTIVE_USER_UID = (document.querySelector('meta[name="user-uid"]') || {}).content || '';
   const ACTIVE_USER_EMAIL = (document.querySelector('meta[name="user-email"]') || {}).content || '';
+  const IS_STATION_DEVICE = (document.querySelector('meta[name="station-device"]') || {}).content === '1';
+  const STATION_DEVICE_LAYOUT = (document.querySelector('meta[name="station-device-layout"]') || {}).content || 'chainway_handheld';
+  window.IS_STATION_DEVICE = IS_STATION_DEVICE;
+  window.STATION_DEVICE_LAYOUT = STATION_DEVICE_LAYOUT;
+  if (IS_STATION_DEVICE) document.documentElement.classList.add('station-device-root');
   window.ACTIVE_USER_UID = ACTIVE_USER_UID;
   window.ACTIVE_USER_EMAIL = ACTIVE_USER_EMAIL;
   
@@ -443,6 +450,7 @@
 <?!= include('00d_UI_Visuals'); ?>
 <?!= include('00e_UI_Modals'); ?>
 <?!= include('07_Core_Globals'); ?>
+<?!= include('11_Station_Shell'); ?>
 <?!= include('01i_Desktop_Lock'); ?>
 <?!= include('07b_Grid_Engine'); ?>
 <?!= include('07c_Generalization_Engine'); ?>

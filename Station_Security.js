@@ -268,3 +268,98 @@ function deleteStationProfileConfig(adminName, profileIdRef) {
     return { success: true, message: "Station profile '" + deletedName + "' deleted." };
   });
 }
+
+function getStationPermissionsForDeviceActor_(deviceActor) {
+  const out = {};
+  STATION_IAM_PERMISSION_KEYS.forEach(k => { out[k] = false; });
+  if (!deviceActor) return out;
+  STATION_IAM_PERMISSION_KEYS.forEach(k => {
+    out[k] = effectiveStationPermission(deviceActor, k);
+  });
+  return out;
+}
+
+// @INDEX: STATION_SHELL -> Bootstrap (device login UI)
+function getStationShellBootstrap(deviceActor) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'Not a station device login.' };
+    }
+    const sheets = verifyVaultSchema(true);
+    const rMap = ensureStationRoleColumns(sheets.roles);
+    const roleData = sheets.roles.getDataRange().getValues();
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+    const target = String(deviceActor).toLowerCase().trim();
+    let profileName = '';
+    let layout = STATION_DEVICE_LAYOUTS.CHAINWAY_HANDHELD;
+
+    for (let i = 1; i < crewData.length; i++) {
+      const rowName = getSheetCell(crewData[i], cMap, 'Name').toLowerCase().trim();
+      if (rowName !== target) continue;
+      const roleId = getSheetCell(crewData[i], cMap, 'Role_ID');
+      for (let r = 1; r < roleData.length; r++) {
+        if (!crewRoleRefMatchesRow(roleId, roleData[r], rMap)) continue;
+        if (!isStationDeviceProfileRow(roleData[r], rMap)) break;
+        profileName = getSheetCell(roleData[r], rMap, 'Role_Name') || profileName;
+        layout = normalizeStationDeviceLayout(roleData[r][rMap['station_device_layout']]);
+        break;
+      }
+      break;
+    }
+
+    const perms = getStationPermissionsForDeviceActor_(deviceActor);
+    return {
+      success: true,
+      deviceName: deviceActor,
+      profileName: profileName,
+      layout: layout,
+      permissions: perms,
+      hostInheritEnabled: !!perms.station_host_inherit
+    };
+  });
+}
+
+// @INDEX: STATION_SHELL -> RFID scan router (host badge first)
+function processStationRfidScan(deviceActor, rfidTag, options) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'PERMISSION DENIED: Station device login only.' };
+    }
+    const tag = normalizeStationRfidTag(rfidTag);
+    if (!tag) return { success: false, error: 'Empty scan.' };
+
+    const opts = options || {};
+    const hostOnly = opts.hostOnly !== false;
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+    const crew = lookupCrewMemberByRfidTag(tag, crewData, cMap);
+
+    if (crew) {
+      if (!effectiveStationPermission(deviceActor, 'station_host_inherit')) {
+        return { success: false, error: 'Host inherit is not enabled for this device profile.' };
+      }
+      writeToAuditLog(deviceActor, 'STATION_HOST', 'STATION', 'GLOBAL', crew.uid || crew.name,
+        'Crew badge host: ' + crew.name + ' (' + tag + ').');
+      return {
+        success: true,
+        scanType: 'host',
+        host: {
+          uid: crew.uid,
+          name: crew.name,
+          rfidTag: crew.rfidTag
+        }
+      };
+    }
+
+    if (hostOnly) {
+      return { success: false, error: 'Unknown crew badge. Scan your warehouse crew RFID.' };
+    }
+
+    return {
+      success: false,
+      error: 'Equipment scans require an active host session (coming soon).'
+    };
+  });
+}

@@ -96,6 +96,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`06_System_Admin.html`**: Core admin resource hub router.
 - **`06a_Admin_IAM.html`**: User access and role configuration (office crew roles).
 - **`06h_Admin_Station_Profiles.html`**: **Warehouse device IAM** — gun/tablet station profiles (Chainway handheld, TL dock). Separate from office Role Editor. Backend: **`Station_Security.js`**.
+- **`11_Station_Shell.html`**: **Warehouse gun UI** — station login takeover, crew badge host inherit, `window.onStationRfidScan` SDK hook. APIs: `getStationShellBootstrap`, `processStationRfidScan`.
 - **`06b1_Admin_Assets_Core.html`** to **`06b4_Admin_Assets_QR.html`**: The Equipment Vault. Covers bulk review, asset provisioning, smart merges, and the QR print generator.
 - **`06c_Admin_Visuals.html`**: Real-time theme application engine.
 - **`06d_Admin_Fleet.html`**: Vehicle database CRUD.

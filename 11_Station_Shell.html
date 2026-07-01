@@ -1,0 +1,380 @@
+<style>
+html.station-device-root .dashboard,
+html.station-device-root #mobile-dashboard,
+html.station-device-root #sr-hosting-only-banner,
+html.station-device-root #floating-bell-container {
+  display: none !important;
+}
+html.station-device-root,
+html.station-device-root body {
+  overflow: hidden;
+  height: 100%;
+}
+#station-shell {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+html.station-device-root #station-shell {
+  display: flex;
+}
+.station-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #111114;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+.station-shell-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.station-shell-brand__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #f97316;
+  text-transform: uppercase;
+}
+.station-shell-brand__device {
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+}
+.station-shell-brand__profile {
+  font-size: 11px;
+  color: #71717a;
+  font-weight: 600;
+}
+.station-shell-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  gap: 16px;
+  text-align: center;
+}
+.station-shell-state-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+.station-shell-prompt {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.25;
+  max-width: 320px;
+}
+.station-shell-host-name {
+  font-size: 28px;
+  font-weight: 900;
+  color: #10b981;
+  word-break: break-word;
+}
+.station-shell-status {
+  min-height: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #a1a1aa;
+}
+.station-shell-status.is-error { color: #ef4444; }
+.station-shell-status.is-ok { color: #10b981; }
+.station-shell-last-scan {
+  font-family: monospace;
+  font-size: 11px;
+  color: #52525b;
+  word-break: break-all;
+  max-width: 100%;
+}
+.station-shell-lanes {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 8px;
+}
+.station-shell-lane {
+  flex: 1;
+  padding: 14px 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #111;
+  opacity: 0.45;
+}
+.station-shell-lane.is-ready {
+  opacity: 1;
+  border-color: #f97316;
+}
+.station-shell-lane__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f97316;
+}
+.station-shell-lane__hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #71717a;
+  line-height: 1.35;
+}
+.station-shell-footer {
+  flex-shrink: 0;
+  padding: 12px 16px 20px;
+  border-top: 1px solid #27272a;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-shell-footer .btn-main,
+.station-shell-footer .btn-close {
+  width: 100%;
+  margin: 0;
+}
+</style>
+
+<div id="station-shell" aria-label="Warehouse station">
+  <div class="station-shell-header">
+    <div class="station-shell-brand">
+      <div class="station-shell-brand__title">Warehouse station</div>
+      <div id="station-shell-device-name" class="station-shell-brand__device">—</div>
+      <div id="station-shell-profile-name" class="station-shell-brand__profile">—</div>
+    </div>
+    <div id="station-shell-layout-pill" style="font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#71717a; border:1px solid #333; border-radius:999px; padding:6px 10px;">HANDHELD</div>
+  </div>
+
+  <div class="station-shell-main">
+    <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
+    <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>
+    <div id="station-shell-host-name" class="station-shell-host-name" style="display:none;"></div>
+    <div id="station-shell-status" class="station-shell-status"></div>
+    <div id="station-shell-last-scan" class="station-shell-last-scan"></div>
+
+    <div class="station-shell-lanes">
+      <div id="station-lane-project" class="station-shell-lane">
+        <div class="station-shell-lane__label">Project</div>
+        <div class="station-shell-lane__hint">Checkout / check-in (soon)</div>
+      </div>
+      <div id="station-lane-vault" class="station-shell-lane">
+        <div class="station-shell-lane__label">Vault</div>
+        <div class="station-shell-lane__hint">Maintenance / repair (soon)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="station-shell-footer">
+    <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
+    <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
+  </div>
+</div>
+
+<script>
+/**
+ * 11_Station_Shell.html
+ * Warehouse gun / fixed station UI — host badge inherit first.
+ * Native Chainway SDK calls: window.onStationRfidScan(epcString)
+ */
+
+window.stationShellBootstrap = null;
+window.stationHostSession = null;
+window.stationScanBusy = false;
+
+function stationHostStorageKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_host_v1_' + dev;
+}
+
+function stationReadHostSession_() {
+  try {
+    const raw = sessionStorage.getItem(stationHostStorageKey_());
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.name) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function stationWriteHostSession_(host) {
+  window.stationHostSession = host;
+  try {
+    if (host) sessionStorage.setItem(stationHostStorageKey_(), JSON.stringify(host));
+    else sessionStorage.removeItem(stationHostStorageKey_());
+  } catch (e) { /* ignore */ }
+}
+
+function stationSetStatus_(msg, kind) {
+  const el = document.getElementById('station-shell-status');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.classList.remove('is-error', 'is-ok');
+  if (kind === 'error') el.classList.add('is-error');
+  if (kind === 'ok') el.classList.add('is-ok');
+}
+
+function stationSetLastScan_(tag) {
+  const el = document.getElementById('station-shell-last-scan');
+  if (!el) return;
+  el.textContent = tag ? ('Last scan: ' + tag) : '';
+}
+
+function stationRenderShellState_() {
+  const host = stationReadHostSession_();
+  window.stationHostSession = host;
+  const stateLabel = document.getElementById('station-shell-state-label');
+  const prompt = document.getElementById('station-shell-prompt');
+  const hostNameEl = document.getElementById('station-shell-host-name');
+  const logoutHostBtn = document.getElementById('station-btn-logout-host');
+  const laneProject = document.getElementById('station-lane-project');
+  const laneVault = document.getElementById('station-lane-vault');
+
+  if (host) {
+    if (stateLabel) stateLabel.textContent = 'Hosted session';
+    if (prompt) prompt.style.display = 'none';
+    if (hostNameEl) {
+      hostNameEl.style.display = 'block';
+      hostNameEl.textContent = host.name;
+    }
+    if (logoutHostBtn) logoutHostBtn.style.display = 'block';
+    if (laneProject) laneProject.classList.add('is-ready');
+    if (laneVault) laneVault.classList.add('is-ready');
+    stationSetStatus_('Ready for warehouse scans.', 'ok');
+  } else {
+    if (stateLabel) stateLabel.textContent = 'Waiting for host';
+    if (prompt) {
+      prompt.style.display = 'block';
+      prompt.textContent = 'Scan your crew badge';
+    }
+    if (hostNameEl) hostNameEl.style.display = 'none';
+    if (logoutHostBtn) logoutHostBtn.style.display = 'none';
+    if (laneProject) laneProject.classList.remove('is-ready');
+    if (laneVault) laneVault.classList.remove('is-ready');
+    stationSetStatus_('', '');
+  }
+}
+
+function stationApplyBootstrap_(data) {
+  window.stationShellBootstrap = data;
+  const devEl = document.getElementById('station-shell-device-name');
+  const profEl = document.getElementById('station-shell-profile-name');
+  const layoutEl = document.getElementById('station-shell-layout-pill');
+  if (devEl) devEl.textContent = data.deviceName || ACTIVE_USER_NAME || '—';
+  if (profEl) profEl.textContent = data.profileName || 'Station profile';
+  if (layoutEl) {
+    const layout = (data.layout || 'chainway_handheld').replace(/_/g, ' ');
+    layoutEl.textContent = layout.toUpperCase();
+  }
+}
+
+function stationHandleRfidScan_(rawTag) {
+  const tag = String(rawTag || '').trim();
+  if (!tag || window.stationScanBusy) return;
+  if (!window.IS_STATION_DEVICE) return;
+
+  const host = stationReadHostSession_();
+  if (host) {
+    stationSetLastScan_(tag);
+    stationSetStatus_('Equipment scans coming soon. Log out host to scan another badge.', 'error');
+    return;
+  }
+
+  window.stationScanBusy = true;
+  stationSetLastScan_(tag);
+  stationSetStatus_('Looking up badge…', '');
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationScanBusy = false;
+      if (!res || !res.success) {
+        stationSetStatus_((res && res.error) ? res.error : 'Scan failed.', 'error');
+        return;
+      }
+      if (res.scanType === 'host' && res.host) {
+        stationWriteHostSession_(res.host);
+        stationRenderShellState_();
+        stationSetStatus_('Hosted as ' + res.host.name, 'ok');
+        return;
+      }
+      stationSetStatus_('Unrecognized scan.', 'error');
+    })
+    .withFailureHandler(function(err) {
+      window.stationScanBusy = false;
+      stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .processStationRfidScan(ACTIVE_USER_NAME, tag, { hostOnly: true });
+}
+
+/** Entry point for Chainway Android SDK bridge. */
+window.onStationRfidScan = function(rawTag) {
+  stationHandleRfidScan_(rawTag);
+};
+
+window.stationLogoutHost = function() {
+  stationWriteHostSession_(null);
+  stationRenderShellState_();
+  stationSetStatus_('Host cleared. Scan crew badge.', '');
+  stationSetLastScan_('');
+};
+
+window.stationDeviceSignOut = function() {
+  if (!confirm('Sign this warehouse device out of Showrunner?')) return;
+  stationWriteHostSession_(null);
+  try {
+    localStorage.removeItem('sm_session_token');
+    localStorage.removeItem('sm_session_expires');
+  } catch (e) { /* ignore */ }
+  const base = document.querySelector('base');
+  const scriptUrl = base && base.href ? base.href.split('?')[0] : '';
+  if (scriptUrl) window.top.location.href = scriptUrl;
+  else window.top.location.reload();
+};
+
+function initStationShell_() {
+  if (!window.IS_STATION_DEVICE) return;
+
+  document.documentElement.classList.add('station-device-root');
+  const shell = document.getElementById('station-shell');
+  if (shell) shell.style.display = 'flex';
+
+  stationRenderShellState_();
+  stationSetStatus_('Loading station profile…', '');
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        stationSetStatus_((res && res.error) ? res.error : 'Station bootstrap failed.', 'error');
+        return;
+      }
+      stationApplyBootstrap_(res);
+      if (!res.hostInheritEnabled) {
+        stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
+        return;
+      }
+      if (stationReadHostSession_()) stationRenderShellState_();
+      else stationSetStatus_('Pull trigger and scan your crew badge.', '');
+    })
+    .withFailureHandler(function(err) {
+      stationSetStatus_('Bootstrap error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .getStationShellBootstrap(ACTIVE_USER_NAME);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.IS_STATION_DEVICE) initStationShell_();
+});
+</script>

@@ -36,6 +36,10 @@ window.setDashboardIcon = function(mode) {
 // @INDEX: BOOT -> System Boot Sequence
 document.addEventListener('DOMContentLoaded', function() {
 
+  if (window.IS_STATION_DEVICE || (typeof isStationDeviceLogin === 'function' && isStationDeviceLogin())) {
+    return;
+  }
+
   // ==========================================
   // 1. ROSTER AUTO-LOAD & STRICT TRAP ENGINE
   // ==========================================

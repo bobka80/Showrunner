@@ -239,6 +239,8 @@ function renderIndexForAuth_(authResult, sessionToken) {
   template.userPermissionsB64 = Utilities.base64Encode(JSON.stringify(authResult.permissions || {}));
   template.fcmRegKey = createFcmRegistrationKey_(authResult.name);
   template.sessionToken = sessionToken || '';
+  template.isStationDevice = authResult.isStationDevice ? '1' : '0';
+  template.stationDeviceLayout = authResult.stationDeviceLayout || '';
   return template.evaluate()
     .setTitle('SM Showrunner Command Center')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
