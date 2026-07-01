@@ -85,8 +85,10 @@
 
   window.getDesktopLockIdleMinutes = function() {
     let key = 'sm_lock_idle_min_' + desktopLockCrewKey();
-    let v = 5;
-    try { v = parseInt(localStorage.getItem(key), 10); } catch (e) { /* ignore */ }
+    let raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) { /* ignore */ }
+    if (raw === '0') return 0;
+    let v = parseInt(raw, 10);
     if (!v || isNaN(v) || v < 5) return 5;
     if (v > 30) return 30;
     return Math.round(v / 5) * 5;
@@ -94,7 +96,13 @@
 
   window.setDesktopLockIdleMinutes = function(minutes) {
     let m = parseInt(minutes, 10);
-    if (!m || isNaN(m)) m = 5;
+    if (isNaN(m)) m = 5;
+    if (m === 0) {
+      try { localStorage.setItem('sm_lock_idle_min_' + desktopLockCrewKey(), '0'); } catch (e) { /* ignore */ }
+      syncDesktopLockIdleSelect();
+      resetDesktopLockIdleTimer();
+      return;
+    }
     m = Math.max(5, Math.min(30, Math.round(m / 5) * 5));
     try { localStorage.setItem('sm_lock_idle_min_' + desktopLockCrewKey(), String(m)); } catch (e) { /* ignore */ }
     syncDesktopLockIdleSelect();
@@ -452,7 +460,9 @@
       desktopLockIdleTimer = null;
     }
     if (!isDesktopLockEligible() || desktopLockActive) return;
-    let ms = getDesktopLockIdleMinutes() * 60 * 1000;
+    let mins = getDesktopLockIdleMinutes();
+    if (!mins) return;
+    let ms = mins * 60 * 1000;
     desktopLockIdleTimer = setTimeout(function() {
       lockDesktopScreen();
     }, ms);

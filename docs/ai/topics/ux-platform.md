@@ -33,7 +33,7 @@
 - [x] Stage Masters **bus lanes** (some lanes soft-edge); hero **A** pulse
 - [x] **Bahnschrift bold** clock; digit **crossfade** on change; **perimeter dim** (50px plateau + 50px outward fade, radius ≈ height÷3)
 - [x] **Quick unlock** — 2-char prefix, **local** (prefix cached at login / prefetch); full PIN on failure
-- [x] Idle **5–30 min** (5-min steps), per crew device
+- [x] Idle **5–30 min** (5-min steps) or **Off** (manual padlock only), per crew device in Personal Hub
 - [x] **Mobile** — out of scope (no lock)
 
 ### Recovery campaign
