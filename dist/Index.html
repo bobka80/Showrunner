@@ -1822,7 +1822,17 @@
     @media (max-width: 768px) {
         .nav-desktop-lock-btn { display: none !important; }
     }
-    .personal-hub-lock-select { min-width: 148px; }
+    .personal-hub-lock-select { min-width: 118px; }
+    .personal-hub-auto-login-btn {
+        height: 32px;
+        padding: 0 12px;
+        font-size: 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    @media (max-width: 768px) {
+        .personal-hub-auto-login-btn { display: none !important; }
+    }
     body.desktop-lock-active { overflow: hidden; }
     body.desktop-lock-active .dashboard {
         filter: blur(12px) saturate(0.9);
@@ -3905,20 +3915,21 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
 <div id="manager-settings-overlay" class="personal-hub-desktop-view" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
   <div style="display: flex; flex-direction: column; width: 100%; height: 100%; overflow: hidden; box-sizing: border-box;">
     <div class="personal-hub-account-bar">
-      <div class="view-header-title" style="margin-right: 8px;">👤 PERSONAL HUB</div>
+      <div class="view-header-title" style="margin-right: 8px;">PERSONAL HUB</div>
       <select id="user-theme-select" class="personal-hub-theme-select" onchange="changeUserTheme(this.value)" title="UI Theme">
-        <option value="dark">🌙 Dark</option>
-        <option value="light">☀️ Light</option>
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
       </select>
-      <select id="desktop-lock-idle-select" class="personal-hub-theme-select personal-hub-lock-select" onchange="setDesktopLockIdleMinutes(parseInt(this.value, 10))" title="Auto screen lock after inactivity (desktop). Off = padlock only.">
-        <option value="0">🔒 Auto-lock: Off</option>
-        <option value="5">🔒 Auto-lock: 5 min</option>
-        <option value="10">🔒 Auto-lock: 10 min</option>
-        <option value="15">🔒 Auto-lock: 15 min</option>
-        <option value="20">🔒 Auto-lock: 20 min</option>
-        <option value="25">🔒 Auto-lock: 25 min</option>
-        <option value="30">🔒 Auto-lock: 30 min</option>
+      <select id="desktop-lock-idle-select" class="personal-hub-theme-select personal-hub-lock-select" onchange="setDesktopLockIdleMinutes(parseInt(this.value, 10))" title="Screen lock after inactivity (desktop). Disabled = padlock only.">
+        <option value="0">Disabled</option>
+        <option value="5">Lock: 5 min</option>
+        <option value="10">Lock: 10 min</option>
+        <option value="15">Lock: 15 min</option>
+        <option value="20">Lock: 20 min</option>
+        <option value="25">Lock: 25 min</option>
+        <option value="30">Lock: 30 min</option>
       </select>
+      <button type="button" id="btn-disable-desktop-auto-login" class="btn-outline personal-hub-auto-login-btn" onclick="disableDesktopAutoLogin()" title="Require full login on every browser open (desktop only)">DISABLE AUTO-LOGIN</button>
       <div class="personal-hub-bar-spacer"></div>
       <div class="personal-hub-user-cluster">
         <span id="personal-hub-name" class="personal-hub-name">—</span>

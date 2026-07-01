@@ -51,6 +51,16 @@
 
 ---
 
+## 2b. Emojis (director rule)
+
+**Do not** add emojis to structural UI — headers, buttons, labels, dropdown options, tabs, hub titles, or toolbars — unless the director **explicitly** asks for them in that task.
+
+**Exception:** **Notifications only** (bell, push, in-app toasts, notification catalog copy) — emojis may be used when they aid quick scanning of alert type.
+
+When touching existing UI that still has decorative emojis, remove them if you are already editing that control; do not run repo-wide emoji purges unless asked.
+
+---
+
 ## 4. Typography ladder (structural only)
 
 | Level | Size | Weight | Class / use |

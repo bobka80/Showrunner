@@ -253,6 +253,7 @@
 
   function readParentSession() {
     try {
+      if (isDesktopAutoLoginOff()) return null;
       var token = localStorage.getItem('sm_session_token');
       var exp = parseInt(localStorage.getItem('sm_session_expires') || '0', 10);
       var crewName = localStorage.getItem('sm_crew_name') || '';
@@ -265,6 +266,7 @@
 
   function saveParentSession(token, crewName, expiresAt) {
     if (!token) return;
+    if (isDesktopAutoLoginOff()) return;
     try {
       localStorage.setItem('sm_session_token', String(token).trim());
       localStorage.setItem('sm_session_expires', String(expiresAt || (Date.now() + SESSION_MS)));
@@ -277,6 +279,18 @@
       localStorage.removeItem('sm_session_token');
       localStorage.removeItem('sm_session_expires');
     } catch (e) { /* ignore */ }
+  }
+
+  function isDesktopAutoLoginOff() {
+    try {
+      if (!window.matchMedia('(min-width: 769px)').matches) return false;
+      var crew = localStorage.getItem('sm_crew_name') || '';
+      var crewKey = String(crew).toLowerCase().trim().replace(/\s+/g, '_');
+      if (!crewKey) return false;
+      return localStorage.getItem('sm_auto_login_off_' + crewKey) === '1';
+    } catch (e) {
+      return false;
+    }
   }
 
   function getGasBaseUrl() {

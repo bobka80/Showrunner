@@ -1813,7 +1813,17 @@
     @media (max-width: 768px) {
         .nav-desktop-lock-btn { display: none !important; }
     }
-    .personal-hub-lock-select { min-width: 148px; }
+    .personal-hub-lock-select { min-width: 118px; }
+    .personal-hub-auto-login-btn {
+        height: 32px;
+        padding: 0 12px;
+        font-size: 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    @media (max-width: 768px) {
+        .personal-hub-auto-login-btn { display: none !important; }
+    }
     body.desktop-lock-active { overflow: hidden; }
     body.desktop-lock-active .dashboard {
         filter: blur(12px) saturate(0.9);

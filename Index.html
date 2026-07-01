@@ -25,8 +25,15 @@
     var t = document.querySelector('meta[name="session-token"]');
     if (t && t.content) {
       try {
-        localStorage.setItem('sm_session_token', String(t.content).trim());
-        localStorage.setItem('sm_session_expires', String(Date.now() + SESSION_MS));
+        var crewMeta = document.querySelector('meta[name="user-name"]');
+        var crew = crewMeta && crewMeta.content ? String(crewMeta.content).trim() : '';
+        var crewKey = crew.toLowerCase().replace(/\s+/g, '_');
+        var desktop = window.matchMedia('(min-width: 769px)').matches;
+        var autoLoginOff = desktop && crewKey && localStorage.getItem('sm_auto_login_off_' + crewKey) === '1';
+        if (!autoLoginOff) {
+          localStorage.setItem('sm_session_token', String(t.content).trim());
+          localStorage.setItem('sm_session_expires', String(Date.now() + SESSION_MS));
+        }
       } catch (e) { /* ignore */ }
     }
   })();
@@ -35,6 +42,14 @@
   (function() {
     if (window.self === window.top) return;
     var SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+    function shouldPersistSessionToken(crew) {
+      try {
+        if (!window.matchMedia('(min-width: 769px)').matches) return true;
+        var crewKey = String(crew || '').toLowerCase().trim().replace(/\s+/g, '_');
+        if (!crewKey) return true;
+        return localStorage.getItem('sm_auto_login_off_' + crewKey) !== '1';
+      } catch (e) { return true; }
+    }
     function postSessionToParent() {
       var n = document.querySelector('meta[name="user-name"]');
       var t = document.querySelector('meta[name="session-token"]');
@@ -47,6 +62,7 @@
       try { exp = parseInt(localStorage.getItem('sm_session_expires') || '0', 10); } catch (e) { /* ignore */ }
       if (!exp) exp = Date.now() + SESSION_MS;
       if (!token || token.length < 20 || !crew) return;
+      if (!shouldPersistSessionToken(crew)) return;
       try {
         window.parent.postMessage({
           type: 'SHOWRUNNER_SESSION_TOKEN',

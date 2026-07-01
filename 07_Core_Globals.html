@@ -413,6 +413,88 @@ function applyTheme(theme) {
 // ==========================================
 // --- PERSONAL HUB (ACCOUNT / LOGOUT / PIN) ---
 // ==========================================
+function personalHubCrewKey(name) {
+    let crew = name || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '');
+    return String(crew).toLowerCase().trim().replace(/\s+/g, '_');
+}
+
+function isDesktopBrowserContext() {
+    try { return window.matchMedia('(min-width: 769px)').matches; } catch (e) { return true; }
+}
+
+function desktopAutoLoginStorageKey(crewKey) {
+    return 'sm_auto_login_off_' + (crewKey || personalHubCrewKey());
+}
+
+function isDesktopAutoLoginDisabled(crewKey) {
+    if (!isDesktopBrowserContext()) return false;
+    try {
+        return localStorage.getItem(desktopAutoLoginStorageKey(crewKey)) === '1';
+    } catch (e) { return false; }
+}
+
+function setDesktopAutoLoginDisabled(disabled, crewKey) {
+    let key = desktopAutoLoginStorageKey(crewKey);
+    try {
+        if (disabled) localStorage.setItem(key, '1');
+        else localStorage.removeItem(key);
+    } catch (e) { /* ignore */ }
+}
+
+function syncDesktopAutoLoginButton() {
+    let btn = document.getElementById('btn-disable-desktop-auto-login');
+    if (!btn) return;
+    let show = isDesktopBrowserContext() && !isDesktopAutoLoginDisabled();
+    btn.style.display = show ? '' : 'none';
+    btn.disabled = false;
+    btn.innerText = 'DISABLE AUTO-LOGIN';
+}
+
+function disableDesktopAutoLogin() {
+    if (!isDesktopBrowserContext()) return;
+    let crew = (typeof ACTIVE_USER_NAME !== 'undefined') ? ACTIVE_USER_NAME : '';
+    let crewKey = personalHubCrewKey(crew);
+    setDesktopAutoLoginDisabled(true, crewKey);
+
+    let btn = document.getElementById('btn-disable-desktop-auto-login');
+    if (btn) { btn.disabled = true; btn.innerText = 'DISABLING…'; }
+
+    if (typeof closePersonalHub === 'function') closePersonalHub();
+
+    let token = getActiveSessionToken();
+
+    function finishDisableRedirect() {
+        try {
+            localStorage.removeItem('sm_session_token');
+            localStorage.removeItem('sm_session_expires');
+        } catch (e) { /* ignore */ }
+
+        let inHostedShell = window.parent && window.parent !== window;
+        if (inHostedShell) {
+            try {
+                window.parent.postMessage({ type: 'SHOWRUNNER_NAVIGATE_LOGIN_GATE' }, '*');
+                window.parent.postMessage({ type: 'SHOWRUNNER_SESSION_CLEAR' }, '*');
+                window.parent.postMessage({ type: 'SHOWRUNNER_LOGIN_STATE', loggedIn: false, clearSession: true }, '*');
+            } catch (e) { /* ignore */ }
+            return;
+        }
+
+        let url = getScriptLoginUrl();
+        if (url) window.location.replace(url);
+        else window.location.reload();
+    }
+
+    if (!token || !crew) {
+        finishDisableRedirect();
+        return;
+    }
+
+    google.script.run
+        .withSuccessHandler(function() { finishDisableRedirect(); })
+        .withFailureHandler(function() { finishDisableRedirect(); })
+        .apiLogoutSession(crew, token);
+}
+
 function getActiveSessionToken() {
     try {
         let t = localStorage.getItem('sm_session_token');
@@ -458,6 +540,7 @@ function refreshPersonalHubUI() {
     if (pinBtn) { pinBtn.disabled = false; pinBtn.innerText = 'UPDATE PIN'; }
 
     if (typeof syncDesktopLockIdleSelect === 'function') syncDesktopLockIdleSelect();
+    if (typeof syncDesktopAutoLoginButton === 'function') syncDesktopAutoLoginButton();
 }
 
 function closePersonalHub() {
