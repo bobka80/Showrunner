@@ -1940,6 +1940,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        flex: 0 0 auto;
     }
     .desktop-lock-clock-panel {
         position: relative;
@@ -1948,31 +1949,25 @@
         align-items: center;
         justify-content: center;
         padding: 0;
+        margin: 0;
         isolation: isolate;
         --lock-fade-out: 50px;
     }
-    /* Clock dim: flat plateau (clock + 50px pad), 50px outward fade to transparent */
+    /* Clock dim: rounded plateau + blur fade (follows corners uniformly) */
     .desktop-lock-clock-panel::before {
         content: "";
         position: absolute;
         left: 50%;
         top: 50%;
         transform: translate(-50%, -50%);
-        width: var(--lock-dim-w, 520px);
-        height: var(--lock-dim-h, 220px);
-        background: rgba(5, 5, 8, 0.68);
+        width: var(--lock-dim-w, 420px);
+        height: var(--lock-dim-h, 170px);
+        background: rgba(5, 5, 8, 0.72);
         pointer-events: none;
         z-index: -1;
         border-radius: var(--lock-dim-radius, 0);
-        filter: none;
-        -webkit-mask-image:
-            linear-gradient(to right, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%),
-            linear-gradient(to bottom, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%);
-        mask-image:
-            linear-gradient(to right, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%),
-            linear-gradient(to bottom, transparent 0, #000 var(--lock-fade-out), #000 calc(100% - var(--lock-fade-out)), transparent 100%);
-        -webkit-mask-composite: source-in;
-        mask-composite: intersect;
+        filter: blur(var(--lock-fade-out, 50px));
+        -webkit-filter: blur(var(--lock-fade-out, 50px));
     }
     .desktop-lock-clock {
         font-family: "Bahnschrift", "Segoe UI", sans-serif;
@@ -1985,7 +1980,6 @@
         line-height: 1;
         margin: 0;
         padding: 0;
-        transform: translateY(-0.04em);
         white-space: nowrap;
     }
     .desktop-lock-clock-slot {

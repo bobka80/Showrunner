@@ -2,11 +2,11 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Depends on:** [workspace-migration.md](workspace-migration.md) — NAS sync must use **Workspace host** Google account.
+**Depends on:** [workspace-migration.md](workspace-migration.md) — NAS sync uses **Workspace host** Google account (**prerequisite met** — in-place upgrade, same Drive).
 
 **Canonical Drive tree:** [DRIVE_LAYOUT.md](../DRIVE_LAYOUT.md)
 
-**Status:** Backlog
+**Status:** Backlog — ready to configure on Synology
 
 **Last swept:** 2026-06-30
 

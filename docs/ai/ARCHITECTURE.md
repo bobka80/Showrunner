@@ -100,9 +100,9 @@ When an AI agent changes frontend code, the live web app will **not** update unt
 
 1. **Edit source only** — Root `.html` files and backend `.js` files. Never hand-edit compiled output in `dist/` except to verify build output.
 2. **Run the compiler** — From the project root: `node build.js`  
-   This extracts inline scripts, generates chunked payloads, and refreshes `dist/`.
-3. **Deploy to GAS** — `clasp push` (requires [clasp](https://github.com/google/clasp) configured via `.clasp.json`).
-4. **Verify in browser** — Hard refresh the web app; confirm no `Uncaught SyntaxError` in the console (sign of truncated or broken chunk load).
+   This extracts inline scripts, generates chunked payloads, and refreshes `dist/`. Root Node tooling is excluded via **`gas-node-only.js`**.
+3. **Deploy to GAS** — `gas-push-sync` (via `milestone.js` or `dev-push.js`). **Not** bare `clasp push` — orphans on Google’s server cause white-screen boot failures if they are PC-only scripts (`require is not defined`). See [FRAGILE_ZONES.md](FRAGILE_ZONES.md) § Node-only files.
+4. **Verify** — `node check-google-account.js` (check **3** = no Node-only files on remote GAS). Hard refresh web.app; confirm login boots.
 
 **Index.html wiring rule:** Every production `.html` module must appear as `<?!= include('ModuleName'); ?>` in root `Index.html` or it will **not** ship in the build. Orphan files on disk are invisible to the live app.
 

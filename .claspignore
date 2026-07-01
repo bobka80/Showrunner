@@ -8,6 +8,10 @@ works-save.js
 milestone.js
 rollback-works.js
 rollback-milestone.js
+deploy-hosting.js
+check-google-account.js
+gas-push-sync.js
+gas-node-only.js
 git-push-backup.js
 test.js
 test_db.js

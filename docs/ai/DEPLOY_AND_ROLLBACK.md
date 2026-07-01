@@ -186,6 +186,24 @@ Do **not** re-login clasp to your personal Google unless you intend to move the 
 
 ---
 
+## Google account check (`google-account.json` + `check-google-account.js`)
+
+**One-time:** Copy `google-account.example.json` → `google-account.json` and set `expectedEmail` to the **host** Google account used for `clasp login` / Apps Script.
+
+**Run:** `node check-google-account.js` or `npm run check-google` (also via VS Code task on folder open).
+
+| # | Check | What it means |
+|---|--------|----------------|
+| **1** | **clasp logged in** | This PC can talk to Google for deploy |
+| **2** | **Account + project access** | Active clasp email matches `expectedEmail`; `clasp list-versions` reaches the bound script |
+| **3** | **No PC-only scripts on live GAS** | Remote Apps Script project must not contain Node tooling (`milestone`, `check-google-account`, `git-push-backup`, …). If present → **white screen** (`require is not defined`) until `gas-push-sync` removes them |
+
+If check **3** fails: `node build.js` then `node milestone.js "Remove Node-only orphans from GAS"` (or ask the AI to ship that fix).
+
+**Canonical block list:** `gas-node-only.js` · **Fragile detail:** [FRAGILE_ZONES.md](FRAGILE_ZONES.md) § Node-only files must never ship to GAS.
+
+---
+
 ## Related
 
 - [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md)

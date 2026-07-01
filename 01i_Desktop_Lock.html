@@ -125,7 +125,7 @@
     return +(maxO - t * (maxO - minO)).toFixed(3);
   }
 
-  const DESKTOP_LOCK_DIM_PAD = 50;
+  const DESKTOP_LOCK_DIM_PAD = 25;
   const DESKTOP_LOCK_DIM_FADE = 50;
 
   function syncDesktopLockClockDim() {
@@ -135,11 +135,12 @@
     let w = clock.offsetWidth;
     let h = clock.offsetHeight;
     if (!w || !h) return;
-    let totalH = h + DESKTOP_LOCK_DIM_PAD * 2 + DESKTOP_LOCK_DIM_FADE * 2;
-    panel.style.setProperty('--lock-dim-w', (w + DESKTOP_LOCK_DIM_PAD * 2 + DESKTOP_LOCK_DIM_FADE * 2) + 'px');
-    panel.style.setProperty('--lock-dim-h', totalH + 'px');
+    let coreW = w + DESKTOP_LOCK_DIM_PAD * 2;
+    let coreH = h + DESKTOP_LOCK_DIM_PAD * 2;
+    panel.style.setProperty('--lock-dim-w', coreW + 'px');
+    panel.style.setProperty('--lock-dim-h', coreH + 'px');
     panel.style.setProperty('--lock-fade-out', DESKTOP_LOCK_DIM_FADE + 'px');
-    panel.style.setProperty('--lock-dim-radius', Math.round(totalH / 3) + 'px');
+    panel.style.setProperty('--lock-dim-radius', Math.round(coreH / 3) + 'px');
   }
 
   function buildDesktopLockBuses() {

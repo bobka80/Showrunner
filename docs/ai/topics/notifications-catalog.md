@@ -40,6 +40,8 @@ Each scenario below should eventually specify which channels apply. Today most c
 - [ ] **Shift conflict reported** — crew flags overlap / availability clash → manager
 - [ ] **Event cancelled** — explicit cancel copy (today may only surface via remove-from-schedule)
 - [ ] **Debounce** — many rapid timeline edits → single coalesced message per crew member
+- [ ] **Confirm your shift** — crew must ack availability (see [timeline-shift-field-crew.md](timeline-shift-field-crew.md))
+- [ ] **Crew declined shift** — manager alert
 
 ### Tasks
 

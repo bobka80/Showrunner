@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Status:** Backlog — **prerequisite** for company host Drive, NAS year archive, and proper production ownership.
+**Status:** **Host in-place upgrade verified** (2026) — same Google account, no Drive/script migration required. NAS + Chat backlog still apply.
 
 **Blocks:** [drive-nas-year-archive.md](drive-nas-year-archive.md) (NAS sync should use Workspace host, not personal Gmail).
 
@@ -10,7 +10,27 @@
 
 ---
 
-## Before you start
+## Path A — In-place upgrade (what we did)
+
+Same host Google account upgraded to Workspace (billing + admin). **No file move**, folder IDs unchanged, Apps Script same project.
+
+- [x] Workspace active on host account (2 TB, admin console)
+- [x] `STAGE_MASTERS_SYSTEM_ROOT` + `05_DATABASE` in place — [DRIVE_LAYOUT.md](../DRIVE_LAYOUT.md)
+- [x] Production smoke test: backup, modals, notifications @ web.app
+- [x] Optional: `node milestone.js "Workspace in-place upgrade verified"` for RELEASES note (director smoke test passed; not required for ops)
+- [ ] NAS year archive — [drive-nas-year-archive.md](drive-nas-year-archive.md)
+
+**No company domain** — intentional; add later without re-migrating Showrunner if same host user.
+
+---
+
+## Path B — New Workspace user (not used)
+
+Full account swap + Drive transfer + script ownership — only if host identity changes. See checklist below if ever needed.
+
+---
+
+## Before you start (Path B only)
 
 - [ ] Inventory what runs on the **host Google account** today:
   - Apps Script project (Showrunner) + `clasp login`

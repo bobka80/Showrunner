@@ -1,5 +1,6 @@
 /**
- * Check Node/clasp Google account — login state, expected email, and GAS project access.
+ * Check Node/clasp Google account — login state, expected email, GAS project access,
+ * and that no PC-only Node scripts leaked to the live Apps Script project.
  *
  * Usage: node check-google-account.js
  *
@@ -9,11 +10,17 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const NODE_ONLY = require('./gas-node-only');
+const { getRemoteGasFileNames } = require('./gas-push-sync');
 
 const ROOT = __dirname;
 const ACCOUNT_PATH = path.join(ROOT, 'google-account.json');
 const ACCOUNT_EXAMPLE_PATH = path.join(ROOT, 'google-account.example.json');
 const CLASP_PATH = path.join(ROOT, '.clasp.json');
+
+const NODE_ONLY_BASENAMES = new Set(
+  [...NODE_ONLY].map((file) => file.replace(/\.js$/i, ''))
+);
 
 function run(cmd) {
   return execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
@@ -84,7 +91,13 @@ function parseLatestVersion(output) {
   return latest;
 }
 
-function main() {
+function nodeOnlyLeakedOnGas(remoteFiles) {
+  return remoteFiles.filter(
+    (f) => f.type === 'SERVER_JS' && NODE_ONLY_BASENAMES.has(f.name)
+  );
+}
+
+async function main() {
   const lines = [];
   const issues = [];
   let ok = true;
@@ -114,7 +127,7 @@ function main() {
     issues.push('clasp is not logged in.');
     if (auth.error) issues.push(auth.error);
     lines.push('Logged in:         NO');
-    lines.push(`Active account:    (none)`);
+    lines.push('Active account:    (none)');
   } else {
     lines.push('Logged in:         YES');
     lines.push(`Active account:    ${actualEmail || '(unknown — token may be expired)'}`);
@@ -143,8 +156,29 @@ function main() {
         lines.push(`Latest GAS version: v${latestVersion.num} — ${latestVersion.desc}`);
       }
     }
+
+    lines.push('');
+    lines.push('Check 3 — PC-only scripts must not be on Apps Script:');
+    try {
+      const remoteFiles = await getRemoteGasFileNames();
+      const leaked = nodeOnlyLeakedOnGas(remoteFiles);
+      if (leaked.length) {
+        ok = false;
+        const names = leaked.map((f) => `${f.name}.js`).join(', ');
+        issues.push(`PC-only Node file(s) on live Apps Script: ${names} — causes white screen (require is not defined).`);
+        lines.push(`  NOT OK — found: ${names}`);
+        lines.push('  Fix: node build.js && node milestone.js "Remove Node-only orphans from GAS"');
+      } else {
+        lines.push('  OK — no PC-only Node scripts on the remote project');
+      }
+    } catch (e) {
+      ok = false;
+      issues.push(`Could not list remote Apps Script files: ${e.message}`);
+      lines.push(`  FAILED — ${e.message}`);
+    }
   } else {
     lines.push('Project access:    skipped (not logged in)');
+    lines.push('Check 3:           skipped (not logged in)');
   }
 
   lines.push('');
@@ -161,4 +195,7 @@ function main() {
   process.exit(ok ? 0 : 1);
 }
 
-main();
+main().catch((e) => {
+  console.error(e.message || e);
+  process.exit(1);
+});

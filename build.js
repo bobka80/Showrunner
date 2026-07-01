@@ -160,16 +160,7 @@ function getFrontendLogicChunk(index) {
   console.log(`Compiled LogicPayload_Master.js`);
 
   // 6. Copy backend .js files, appsscript.json, and Login.html (never Node tooling)
-  const NODE_ONLY = new Set([
-    'build.js', 'watch.js',
-    'dev-push.js', 'works-save.js', 'milestone.js',
-    'rollback-works.js', 'rollback-milestone.js',
-    'deploy-hosting.js',
-    'check-google-account.js',
-    'gas-push-sync.js',
-    'git-push-backup.js',
-    'test.js', 'test_db.js', 'run_test.js'
-  ]);
+  const NODE_ONLY = require('./gas-node-only');
   const files = fs.readdirSync(__dirname);
   let filesCopied = 0;
   files.forEach(file => {

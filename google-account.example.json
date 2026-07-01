@@ -1,4 +1,9 @@
 {
   "expectedEmail": "you@example.com",
-  "notes": "Copy to google-account.json and set expectedEmail to the Google account used for clasp / Apps Script on this machine."
+  "notes": "Copy to google-account.json and set expectedEmail to the Google account used for clasp / Apps Script on this machine.",
+  "checkups": [
+    "1. clasp is logged in on this PC",
+    "2. Active clasp email matches expectedEmail and clasp can reach the bound Apps Script project (list-versions)",
+    "3. No PC-only Node scripts (milestone, check-google-account, git-push-backup, etc.) are on the live Apps Script project — they cause white screen (require is not defined). Verified by node check-google-account.js"
+  ]
 }

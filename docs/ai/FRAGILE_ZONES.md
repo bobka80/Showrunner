@@ -24,7 +24,8 @@ When the director reports a bug in these areas, state the risk in plain language
 | **processFormulas duplicates** | `02e5` (canonical), `02a`, `02_Project_Editor_Logistics` | Edit one copy only | Sync all copies or consolidate to single source |
 | **Generalization / Blueprint** | `07c_Generalization_Engine.html` | Force `assetId` matching on blueprint `{ name, qty }` rows | Accept intentional ID stripping |
 | **Index.html wiring** | `Index.html` | Add HTML module without `<?!= include ?>` | Every production module must be included before build |
-| **Build pipeline** | `build.js`, root `.html`, `dist/` | Edit `dist/` manually; revert to inline `<?!= getFrontendLogic() ?>` | Edit source HTML → `node build.js` → `clasp push` |
+| **Build pipeline** | `build.js`, `gas-node-only.js`, root `.html`, `dist/` | Edit `dist/` manually; copy Node-only `.js` to `dist/`; deploy with bare `clasp push` (orphans linger); add root `.js` without `gas-node-only.js` entry | Edit source HTML → `node build.js` → `gas-push-sync` via milestone; run `node check-google-account.js` |
+| **Node-only files on GAS (white screen)** | `gas-node-only.js`, `build.js`, `gas-push-sync.js`, `check-google-account.js` | Ship `milestone.js`, `check-google-account.js`, `git-push-backup.js`, etc. to Apps Script; rely on clasp push alone to remove them | Keep PC-only list in `gas-node-only.js`; milestone uses `gas-push-sync`; check #3 in `check-google-account.js` |
 | **RBAC boot payload** | `Main.js`, `Index.html`, `Security.js` | Inject raw JSON permissions into HTML without Base64 | Keep `userPermissionsB64` + `atob()` pattern |
 | **PWA session + login boot** | `push-hosting/public/host-boot.js`, `Login.html`, `Index.html` (session `postMessage`), `Main.js` (`sessionboot`, `sessioncheck`), `Security.js` | Change iframe load order; skip `sessioncheck` before `sessionboot`; clear parent session on every login screen paint; single-token login that kicks other devices without director approval | Token sync only via `SHOWRUNNER_SESSION_TOKEN`; validate server-side before `sessionboot`; multi-device sessions in `Security.js` |
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
@@ -70,6 +71,7 @@ Showrunner on crew phones is **two layers**:
 |--------|----------------|-------|
 | “Session expired” loop | Session bridge | Stale parent token; server rejected `sessionboot`; `clearSession` wiped parent |
 | Black screen after auth | App boot | `LogicPayload_*` chunk load/eval failed; bootloader order wrong; JS syntax error in **any** included module |
+| White screen + `require is not defined` | Node-only on GAS | A PC-only script (`check-google-account`, `git-push-backup`, `milestone`, …) was pushed to Apps Script — GAS runs every `.js` at startup |
 
 **AI rules:**
 
@@ -80,6 +82,28 @@ Showrunner on crew phones is **two layers**:
 5. **Every milestone smoke test** — After `node milestone.js`, director or AI verifies: open `web.app` (PWA path) **and** GAS URL on desktop → login or auto-boot → calendar/mobile home visible. Mobile-only notes still redeploy **the entire** `Index.html` payload.
 
 **Deploy pairing:** Session logic spans GAS **and** hosting. If you change `host-boot.js`, run `node deploy-hosting.js` as well as `milestone.js`. GAS-only mobile UI changes do not require hosting — unless you also touched `push-hosting/`.
+
+---
+
+## Node-only files must never ship to GAS (white screen)
+
+**Plain language:** Showrunner is built on your PC, then uploaded to Google. Some files are **only for your PC** (they use Node’s `require`). If one of those lands on Google by mistake, the live app **crashes on load** — white screen, error like `ReferenceError: require is not defined`. This is **not** task notes, RELEASES notes, or in-app data.
+
+**How it happens:**
+1. `build.js` copies root `.js` files into `dist/` for upload — anything not on the block list can leak.
+2. Plain **`clasp push` does not delete** files already on Google’s server. Removing a file locally leaves an **orphan** online until `gas-push-sync` runs (milestone does this).
+
+**Canonical block list:** root **`gas-node-only.js`** (used by `build.js` and `check-google-account.js`).
+
+**Known leaks (fixed):** `check-google-account.js` @ v363–364; `git-push-backup.js` @ v377–378.
+
+**AI rules:**
+1. New root `.js` tooling → add to **`gas-node-only.js`** immediately (and `.claspignore` if clasp might see it).
+2. Never end a milestone with bare `clasp push` — use **`gas-push-sync`** via `milestone.js` / `dev-push.js`.
+3. After deploy issues, run **`node check-google-account.js`** — **check 3** lists any PC-only scripts still on the live project.
+4. **Smoke test** web.app login after every milestone (see boot pipeline above).
+
+**Director symptom:** White screen right after an update → tell the AI the **file name in the error** (e.g. `git-push-backup`).
 
 ---
 
@@ -146,6 +170,17 @@ CAUSE: (1) Hosting shell blocked iframe until Firebase config finished. (2) Boot
 FRAGILE ZONE: App boot pipeline; PWA session + login boot
 FILES TOUCHED: build.js (bootloader before </body>, showBootFailure), host-boot.js (iframe loads immediately)
 LESSON: Iframe first, FCM second. Bootloader must inject before </body>. showBootFailure must remain for chunk errors.
+```
+
+#### 2026-06-29 — White screen: PC-only Node scripts on Apps Script (fixed v363–364, v378)
+
+```
+DATE: 2026-06-29
+SYMPTOM: After milestones, web.app white screen; console ReferenceError: require is not defined (file check-google-account or git-push-backup).
+CAUSE: Node-only helper scripts (clasp account check, GitHub push) were copied to dist/ and/or left as orphans on GAS. Apps Script runs every .js at startup; require() does not exist in GAS.
+FRAGILE ZONE: Build pipeline; Node-only files on GAS
+FILES TOUCHED: gas-node-only.js, build.js, gas-push-sync.js, check-google-account.js (check 3), .claspignore
+LESSON: Never add root Node tooling without gas-node-only.js. Never deploy with bare clasp push. check-google-account.js check 3 must pass before assuming deploy is clean.
 ```
 
 #### 2026-06-24 — Print Studio unwired (fixed)

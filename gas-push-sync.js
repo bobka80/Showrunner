@@ -136,6 +136,16 @@ async function gasPushSync() {
   }
 }
 
+async function getRemoteGasFileNames() {
+  const clasp = readJson(CLASP_JSON);
+  const scriptId = String(clasp.scriptId || '').trim();
+  if (!scriptId) throw new Error('.clasp.json missing scriptId');
+
+  const token = await getAccessToken();
+  const content = await gasApiRequest(token, scriptId, 'GET', '/content');
+  return (content.files || []).map((f) => ({ name: f.name, type: f.type }));
+}
+
 if (require.main === module) {
   gasPushSync().catch((err) => {
     console.error('gas-push-sync failed:', err.message);
@@ -144,3 +154,4 @@ if (require.main === module) {
 }
 
 module.exports = gasPushSync;
+module.exports.getRemoteGasFileNames = getRemoteGasFileNames;

@@ -17,7 +17,7 @@
 ## Remaining
 
 - [ ] **Dual payroll multiplier matrix** — personal multiplier on crew profile × project multiplier × shift phasing (Build/Duty/Breakdown) wired end-to-end
-- [ ] **Crew payroll adjustment module** — overtime/long-duty submissions for manager approval
+- [ ] **Crew payroll adjustment module** — overtime/long-duty submissions for manager approval (see [timeline-shift-field-crew.md](timeline-shift-field-crew.md) field actuals)
 - [ ] **Automated transport quoting** — local flat / per-km + tolls + border + stay fees as priced lines
 - [ ] **Generic fleet tier presets** — Sprinter → Artic dimensions driving truck planner
 - [ ] **RBAC Phase 6 QA** — role templates + director test checklist before beta

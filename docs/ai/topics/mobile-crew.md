@@ -8,6 +8,7 @@
 
 - [x] `Styles_Mobile.html` extracted from `Styles.html`
 - [x] Crew Hub (`01e`) — phase rail, weather, my shift, timeline/assets/cancel
+- [ ] Shift **confirm/decline** + **field actuals** (substitution, hours ±) — [timeline-shift-field-crew.md](timeline-shift-field-crew.md)
 - [x] Phase Rail (`01f`)
 - [x] Mobile Tasks (`01g`)
 - [x] Compact Project Assets (`01h`)

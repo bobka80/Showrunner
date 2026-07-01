@@ -2,7 +2,9 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-28 · **Status:** Partial — Personal Hub + desktop lock shipped (v376)
+**Last swept:** 2026-06-30 · **Production:** GAS **v388** · **Status:** Partial — Personal Hub + **desktop lock shipped**
+
+## Backlog
 
 - [ ] **Personal user hub:** Extended profile modal (contact, dietary) — partial; theme/logout/PIN shipped
 - [ ] **Freelancer shift placeholders & bidding:** TBD shifts, broadcast pool, accept/bid, rating-based selection
@@ -11,37 +13,29 @@
 
 ---
 
-## Desktop lock screen (spec)
+## Desktop lock screen (shipped @ v377–v388)
 
-**Not** the same as `Login.html`. Login is **before** the app loads. Lock is **after** you are signed in — session stays valid; UI is covered until PIN re-entry.
+**Not** `Login.html` (pre-app gate). Lock runs **after** sign-in — session stays valid; UI covered until PIN re-entry.
 
-### Where it lives (code)
+### Code map
 
 | Piece | Location |
 |-------|----------|
-| Overlay + unlock UI | New module e.g. `01i_Desktop_Lock.html`, included from `Index.html` |
-| Styles | `Styles.html` (structural; follow [UI_DOCTRINE.md](../UI_DOCTRINE.md)) |
-| Idle timer + lock API | `01i_Desktop_Lock.html` — `window.lockDesktopScreen()` / `window.lockDesktop()` / `window.unlockDesktop(pin)` |
-| User trigger | Left nav **padlock** (desktop only, all users); idle timeout in **Personal Hub** (per crew, device-local) |
+| Overlay + unlock | `01i_Desktop_Lock.html` (included from `Index.html`) |
+| Styles | `Styles.html` — `.desktop-lock-*` |
+| Server | `Security.js` — `verifyDesktopLockUnlock`, `getDesktopLockPrefix` |
+| API | `lockDesktopScreen()` / `lockDesktop()` / `unlockDesktop(pin)` |
+| Triggers | Left nav **padlock** (desktop ≥769px); idle timeout in **Personal Hub** (per crew, `localStorage`) |
 
-Full-screen `#desktop-lock-overlay`, z-index `10050` above the app, below critical emergency banners.
+### Shipped behavior
 
-### How it should look
+- [x] Full-screen overlay `z-index 10050`; dashboard blur; **0.5s fade** in/out
+- [x] Stage Masters **bus lanes** (some lanes soft-edge); hero **A** pulse
+- [x] **Bahnschrift bold** clock; digit **crossfade** on change; **perimeter dim** (50px plateau + 50px outward fade, radius ≈ height÷3)
+- [x] **Quick unlock** — 2-char prefix, **local** (prefix cached at login / prefetch); full PIN on failure
+- [x] Idle **5–30 min** (5-min steps), per crew device
+- [x] **Mobile** — out of scope (no lock)
 
-- **Full viewport** dark overlay with `backdrop-filter: blur(5px)` on the app underneath
-- **Background:** multiple `STAGE_MASTERS` logo “buses” in lanes (L/R, varied size/speed/opacity)
-- **Center:** red stylized **A** mark (`mobile-header-logo` path) — slow zoom pulse
-- **Clock + crew name** below the mark
-- **Unlock:** no visible field initially — hidden capture of first **2** PIN characters; on wrong attempt, full **6-character** PIN form appears
+### Recovery campaign
 
-### Behavior
-
-- **Idle lock** — default **5 minutes**; Personal Hub dropdown **5 / 10 / 15 / 20 / 25 / 30** min (per person, `localStorage` on device)
-- **Manual lock** — padlock at bottom of left sidebar (desktop only, all users)
-- **Quick unlock** — first 2 chars of command passcode (server verify via `verifyDesktopLockUnlock`)
-- **Full unlock** — after one wrong quick attempt, require full 6-char PIN (session stays; no logout)
-- **Mobile** — out of scope for v1
-
-### Recovery archive gate
-
-Desktop lock shipped and director confirmed on web.app → campaign closed. See [archive/recovery-after-v330.md](../archive/recovery-after-v330.md).
+Closed @ v376; polish continued through v388. See [archive/recovery-after-v330.md](../archive/recovery-after-v330.md).

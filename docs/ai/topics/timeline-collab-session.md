@@ -92,3 +92,5 @@ Is: **collaborative room** with shared live state.
 | **Data** | PA + ledger + trucks | Shifts / phases |
 
 Both use [session-fork-platform.md](session-fork-platform.md).
+
+**Crew confirm & field actuals** (separate from collab edit room): [timeline-shift-field-crew.md](timeline-shift-field-crew.md).

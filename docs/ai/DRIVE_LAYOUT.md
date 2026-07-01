@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Database ops:** [topics/database-ops.md](topics/database-ops.md) · **Code:** `Resources_Core.js`, `Resources_Database.js`, `Integrations.js`
 
-**Last updated:** 2026-06-28 · **Source:** Director Drive screenshots + folder IDs
+**Last updated:** 2026-06-30 · **Source:** Director Drive screenshots + folder IDs · **Host:** Google Workspace (in-place upgrade on same account — IDs unchanged)
 
 Canonical map of host Drive layout, **live database file names**, backup/archive naming, and **Showrunner Sync** (shortcut mirror — not backup).
 
@@ -14,7 +14,7 @@ Canonical map of host Drive layout, **live database file names**, backup/archive
 
 | Drive path | Folder ID | Code constant (target) | Notes |
 |------------|-----------|------------------------|-------|
-| **`STAGE_MASTERS_SYSTEM_ROOT`** | `1YVNMQRIq7FrRSeD2MuQO0zNSXR0XeTsc` | `SYSTEM_ROOT_ID` | Host root on director My Drive |
+| **`STAGE_MASTERS_SYSTEM_ROOT`** | `1YVNMQRIq7FrRSeD2MuQO0zNSXR0XeTsc` | `SYSTEM_ROOT_ID` | Host root — Workspace host My Drive (in-place upgrade) |
 | **`05_DATABASE`** | `1EAgUzjbwq5CootjKmZhQP3Mfm2VYsZox` | `LIVE_DATABASE_FOLDER_ID` | Live spreadsheets + lifecycle subfolders |
 | **`05_DATABASE/REPLACED`** | `1aZSru-d8OryHpNCooPm78oWdFjSauTPN` | `REPLACED_DB_FOLDER_ID` | Confirmed |
 | **`05_DATABASE/ARCHIVES`** | `1KFhrzhwxuMocMQzW9DfWc5QcO-_Pg81z` | `ARCHIVE_FOLDER_ID` | Confirmed |
