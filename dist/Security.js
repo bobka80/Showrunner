@@ -203,6 +203,12 @@ function buildRoleDirectory(roleData, rMap) {
     IAM_PERMISSION_KEYS.forEach(k => {
       if (rMap[k] !== undefined) entry[k] = isTruthyCell(roleData[i][rMap[k]]);
     });
+    if (rMap['is_station_device'] !== undefined) {
+      entry.is_station_device = isTruthyCell(roleData[i][rMap['is_station_device']]);
+    }
+    if (rMap['station_device_layout'] !== undefined) {
+      entry.station_device_layout = roleData[i][rMap['station_device_layout']] || '';
+    }
     rolesList.push(entry);
   }
   return { rolesList, roleMap };
@@ -912,9 +918,13 @@ function getSecureIamDirectory(adminName) {
     }
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
-    const rMap = getHeaderMap(roleData);
+    let rMap = getHeaderMap(roleData);
+    if (typeof ensureStationRoleColumns === 'function') {
+      rMap = ensureStationRoleColumns(sheets.roles);
+      roleData = sheets.roles.getDataRange().getValues();
+    }
     
     let crewList = [];
     for (let i = 1; i < crewData.length; i++) {

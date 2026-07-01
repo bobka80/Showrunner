@@ -201,6 +201,7 @@ function submitStationProfile() {
     .withSuccessHandler(function(res) {
       if (!res || !res.success) return alert((res && res.message) ? res.message : 'Save failed.');
       alert(res.message);
+      if (typeof refreshCrewFormRoles === 'function') refreshCrewFormRoles();
       openStationProfilesDashboard();
     })
     .saveStationProfileConfig(typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '', payload);

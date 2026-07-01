@@ -160,8 +160,8 @@ function saveStationProfileConfig(adminName, profileData) {
     }
     const sheets = verifyVaultSchema();
     const roleSheet = sheets.roles;
-    const data = roleSheet.getDataRange().getValues();
     const rMap = ensureStationRoleColumns(roleSheet);
+    const data = roleSheet.getDataRange().getValues();
 
     const name = (profileData.name || '').toString().trim();
     if (!name) return { success: false, message: 'Profile name is required.' };

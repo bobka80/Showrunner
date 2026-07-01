@@ -100,7 +100,62 @@ function getRoleOptionValue(r) {
 
 function getRoleOptionLabel(r) {
     if (typeof r === 'string') return safeText(r);
-    return safeText(r.name || r.key || r.id);
+    let label = safeText(r.name || r.key || r.id);
+    if (r.is_station_device) label = '[STATION] ' + label;
+    return label;
+}
+
+function populateCrewRoleSelect(selectEl, selectedValue) {
+    if (!selectEl) return;
+    selectEl.innerHTML = '<option value="">Select IAM role...</option>';
+    if (!globalRoles || !globalRoles.length) return;
+    const office = [];
+    const station = [];
+    globalRoles.forEach(function(r) {
+        if (r.is_station_device) station.push(r);
+        else office.push(r);
+    });
+    station.forEach(function(r) {
+        let val = getRoleOptionValue(r);
+        let label = getRoleOptionLabel(r);
+        let sel = selectedValue && (isMatch(selectedValue, val) || isMatch(selectedValue, r.id) || isMatch(selectedValue, label)) ? ' selected' : '';
+        selectEl.innerHTML += '<option value="' + val + '"' + sel + '>' + label + '</option>';
+    });
+    if (station.length && office.length) {
+        selectEl.innerHTML += '<option disabled>──────── office roles ────────</option>';
+    }
+    office.forEach(function(r) {
+        let val = getRoleOptionValue(r);
+        let label = getRoleOptionLabel(r);
+        let sel = selectedValue && (isMatch(selectedValue, val) || isMatch(selectedValue, r.id) || isMatch(selectedValue, label)) ? ' selected' : '';
+        selectEl.innerHTML += '<option value="' + val + '"' + sel + '>' + label + '</option>';
+    });
+}
+
+function refreshCrewFormRoles(done) {
+    const roleSelect = document.getElementById('add-member-role');
+    const editRoleSelect = document.getElementById('edit-member-role');
+    if (roleSelect) roleSelect.innerHTML = '<option value="">Loading roles...</option>';
+    google.script.run
+      .withFailureHandler(function(err) {
+          if (roleSelect) roleSelect.innerHTML = '<option value="">Failed to load roles</option>';
+          if (typeof done === 'function') done(err);
+      })
+      .withSuccessHandler(function(response) {
+          if (response && response.error) {
+              if (roleSelect) roleSelect.innerHTML = '<option value="">Access denied</option>';
+              if (typeof done === 'function') done(response.error);
+              return;
+          }
+          globalRoles = (response && response.roles) ? response.roles : [];
+          populateCrewRoleSelect(roleSelect, '');
+          if (editRoleSelect && editRoleSelect.options.length) {
+              const cur = editRoleSelect.value;
+              populateCrewRoleSelect(editRoleSelect, cur);
+          }
+          if (typeof done === 'function') done(null);
+      })
+      .getSecureIamDirectory(ACTIVE_USER_NAME);
 }
 
 function userMatchesRole(user, r) {
@@ -135,14 +190,9 @@ function openAddMemberModal() {
     document.getElementById('add-member-email').value = '';
     document.getElementById('add-member-pass').value = '';
     document.getElementById('add-member-mult').value = '1.0';
-    document.getElementById('add-member-mult').value = '1.0';
 
-    const roleSelect = document.getElementById('add-member-role');
-    roleSelect.innerHTML = '<option value="">Select Logic Key...</option>';
-    if (typeof globalRoles !== 'undefined') globalRoles.forEach(r => {
-        let val = getRoleOptionValue(r);
-        let label = getRoleOptionLabel(r);
-        roleSelect.innerHTML += `<option value="${val}">${label}</option>`;
+    refreshCrewFormRoles(function() {
+        /* roles loaded into DATA: Role Name */
     });
 
     const assignSelect = document.getElementById('add-member-assign');
@@ -482,13 +532,11 @@ function openEditMemberModal(userIndex) {
     document.getElementById('edit-member-mult').value = user.payrollMultiplier || 1.0;
 
     const sRole = document.getElementById('edit-member-role');
-    sRole.innerHTML = '<option value="">None</option>';
-    if(globalRoles) {
-        globalRoles.forEach(r => {
-            let val = getRoleOptionValue(r);
-            let label = getRoleOptionLabel(r);
-            let isSelected = userMatchesRole(user, r) ? 'selected' : '';
-            sRole.innerHTML += `<option value="${val}" ${isSelected}>${label}</option>`;
+    const selectedRoleRef = user.roleId || user.roleName || '';
+    populateCrewRoleSelect(sRole, selectedRoleRef);
+    if (!globalRoles || !globalRoles.length) {
+        refreshCrewFormRoles(function() {
+            populateCrewRoleSelect(sRole, selectedRoleRef);
         });
     }
 
