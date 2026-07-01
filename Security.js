@@ -960,26 +960,58 @@ function saveDirectoryUpdate(adminName, updates) {
     
     let hasChanges = false;
     let updatedUids = [];
-    updates.forEach(update => {
+    let auditNotes = [];
+
+    for (let u = 0; u < updates.length; u++) {
+      const update = updates[u];
       const normalizedRoleId = normalizeCrewRoleId(update.roleId, roleData, rMap);
-      for(let i = 1; i < data.length; i++) {
-         if (data[i][cMap['uid']] && data[i][cMap['uid']].toString().trim() === update.uid.trim()) {
-            if(cMap['Job_Title'] !== undefined) data[i][cMap['Job_Title']] = update.jobTitle;  
-            if(cMap['Department'] !== undefined) data[i][cMap['Department']] = update.dept;      
-            if(cMap['Meal'] !== undefined) data[i][cMap['Meal']] = update.meal;      
-            if(cMap['Role_ID'] !== undefined) data[i][cMap['Role_ID']] = normalizedRoleId;    
-            if(cMap['Passcode'] !== undefined) data[i][cMap['Passcode']] = update.passcode; 
-            if(cMap['Payroll_Multiplier'] !== undefined) data[i][cMap['Payroll_Multiplier']] = update.payrollMultiplier; 
-            if(cMap['uid'] !== undefined) updatedUids.push(data[i][cMap['uid']]);
-            hasChanges = true;
-            break;
-         }
+      const newName = update.name !== undefined ? String(update.name || '').trim() : null;
+      if (newName !== null && !newName) {
+        return { success: false, message: "Name cannot be empty." };
       }
-    });
+
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][cMap['uid']] && data[i][cMap['uid']].toString().trim() === String(update.uid || '').trim()) {
+          rowIndex = i;
+          break;
+        }
+      }
+      if (rowIndex < 0) continue;
+
+      if (newName !== null && cMap['Name'] !== undefined) {
+        const targetName = newName.toLowerCase();
+        for (let j = 1; j < data.length; j++) {
+          if (j === rowIndex) continue;
+          const otherName = data[j][cMap['Name']] ? data[j][cMap['Name']].toString().trim().toLowerCase() : '';
+          if (otherName && otherName === targetName) {
+            return { success: false, message: 'Another crew member already uses the name "' + newName + '".' };
+          }
+        }
+        const oldName = data[rowIndex][cMap['Name']] ? data[rowIndex][cMap['Name']].toString().trim() : '';
+        if (oldName !== newName) {
+          data[rowIndex][cMap['Name']] = newName;
+          auditNotes.push(oldName + ' -> ' + newName);
+        }
+      }
+
+      if (cMap['Job_Title'] !== undefined) data[rowIndex][cMap['Job_Title']] = update.jobTitle;
+      if (cMap['Department'] !== undefined) data[rowIndex][cMap['Department']] = update.dept;
+      if (cMap['Meal'] !== undefined) data[rowIndex][cMap['Meal']] = update.meal;
+      if (cMap['Role_ID'] !== undefined) data[rowIndex][cMap['Role_ID']] = normalizedRoleId;
+      if (cMap['Passcode'] !== undefined) data[rowIndex][cMap['Passcode']] = update.passcode;
+      if (cMap['Payroll_Multiplier'] !== undefined) data[rowIndex][cMap['Payroll_Multiplier']] = update.payrollMultiplier;
+      if (cMap['uid'] !== undefined) updatedUids.push(data[rowIndex][cMap['uid']]);
+      hasChanges = true;
+    }
+
     if (hasChanges) {
         crewSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
         if (typeof flushCache !== 'undefined') flushCache();
-        writeToAuditLog(adminName, "UPDATE", "IAM", "GLOBAL", updatedUids.length > 0 ? updatedUids.join(', ') : "Directory Sync", `Updated ${updates.length} user profile(s).`);
+        const detail = auditNotes.length
+          ? `Updated ${updates.length} user profile(s). Renamed: ${auditNotes.join('; ')}.`
+          : `Updated ${updates.length} user profile(s).`;
+        writeToAuditLog(adminName, "UPDATE", "IAM", "GLOBAL", updatedUids.length > 0 ? updatedUids.join(', ') : "Directory Sync", detail);
         return { success: true, message: "Vault updated successfully." };
     }
     return { success: false, message: "No matching user found to update. Please refresh and try again." };

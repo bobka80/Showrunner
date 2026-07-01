@@ -82,7 +82,7 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 ```json
 {
   "uid": "uuid-string",
-  "Name": "John Doe",
+  "Name": "John Doe (editable in Resources → Crew → Edit; matched by uid, not display name)",
   "Email": "john@showrider.com",
   "Passcode": "123456",
   "Role_ID": "uuid-linking-to-role-matrix"

@@ -509,7 +509,8 @@ function openEditMemberModal(userIndex) {
 
 function submitEditMember() {
     const payload = {
-        uid: document.getElementById('edit-member-uid').value, // Used for exact matching
+        uid: document.getElementById('edit-member-uid').value,
+        name: document.getElementById('edit-member-name').value,
         passcode: document.getElementById('edit-member-pass').value,
         payrollMultiplier: document.getElementById('edit-member-mult').value,
         jobTitle: document.getElementById('edit-member-assign').value,
@@ -518,29 +519,36 @@ function submitEditMember() {
         roleId: document.getElementById('edit-member-role').value
     };
 
+    if (!safeText(payload.name)) {
+        return alert('Full name is required.');
+    }
+    if (!payload.passcode || String(payload.passcode).trim().length !== 6) {
+        return alert('Passcode must be exactly 6 characters.');
+    }
+
     const btn = document.getElementById('btn-submit-edit');
     btn.innerText = "SAVING..."; btn.disabled = true;
 
     let safetyTimer = setTimeout(() => {
-        btn.innerText = "💾 SAVE PROFILE"; btn.disabled = false;
+        btn.innerText = "SAVE PROFILE"; btn.disabled = false;
         alert("Network Timeout: Update failed.");
     }, 15000);
 
     google.script.run
         .withFailureHandler(err => {
             clearTimeout(safetyTimer);
-            btn.innerText = "💾 SAVE PROFILE"; btn.disabled = false;
+            btn.innerText = "SAVE PROFILE"; btn.disabled = false;
             alert("Error: " + err.message);
         })
         .withSuccessHandler(res => {
             clearTimeout(safetyTimer);
-            btn.innerText = "💾 SAVE PROFILE"; btn.disabled = false;
+            btn.innerText = "SAVE PROFILE"; btn.disabled = false;
             if (res && res.success === false) {
                 alert("Update Failed: " + (res.message || res.error));
                 return;
             }
             document.getElementById('edit-member-modal-overlay').style.display = 'none';
-            openMasterSettings(); // Reloads grid
+            openMasterSettings();
         }).saveDirectoryUpdate(ACTIVE_USER_NAME, [payload]);
 }
 
