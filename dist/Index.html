@@ -3902,6 +3902,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
     <div style="padding: 15px 25px; background: var(--bg-sidebar); border-top: 1px solid #333; display: flex; justify-content: space-between; align-items: center;">
       <div id="footer-left-crew" style="display: flex; gap: 12px;">
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openIamDashboard()">ROLE EDITOR</button>
+        <button class="btn-outline req-root-only" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="openStationProfilesDashboard()">STATION PROFILES</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openAssignmentManager()">ASSIGNMENTS</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openDeptManager()">DEPTS</button>
         <button class="btn-outline req-root-only" style="margin:0;" onclick="openMealManager()">MEALS</button>
@@ -5933,6 +5934,53 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
   </div>
 </div>
 
+
+
+
+<!-- @INDEX: STATION_IAM -> Device profile editor (separate from office Role Editor in 06a) -->
+<div id="station-profiles-modal-overlay" class="modal-overlay" style="z-index: 3050; display:none;">
+  <div class="modal" style="width: 92vw; max-width: 900px; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; flex-shrink: 0;">
+      <h3 class="modal-title" style="margin:0;">STATION DEVICE PROFILES</h3>
+      <button class="btn-close btn-sm" style="margin:0;" onclick="closeStationProfilesDashboard()">CLOSE</button>
+    </div>
+    <p style="color:#a1a1aa; font-size:12px; margin:0 0 14px 0; line-height:1.5; flex-shrink: 0;">
+      Fixed gun/tablet logins (e.g. WH-GUN-01). Office crew roles stay in <strong>ROLE EDITOR</strong>.
+      Chainway handheld first; TL dock + large monitor layout ships separately.
+    </p>
+    <div style="display:flex; gap:12px; margin-bottom: 14px; flex-shrink: 0; flex-wrap: wrap;">
+      <select id="station-profile-select" class="input-compact" style="min-width:220px; flex:1;" onchange="handleStationProfileSelectionChange()"></select>
+      <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="prepareNewStationProfile()">+ NEW PROFILE</button>
+      <button type="button" id="btn-delete-station-profile" class="btn-delete btn-sm" style="margin:0; display:none;" onclick="deleteSelectedStationProfile()">DELETE</button>
+    </div>
+    <div style="flex:1; overflow-y:auto; padding-right: 4px;">
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div>
+          <div class="input-label">Profile name</div>
+          <input type="text" id="station-profile-name" placeholder="e.g. WH-GUN-01 Chainway" style="width:100%; box-sizing:border-box; margin:0 0 12px 0; padding:12px;" />
+          <div class="input-label">Device layout</div>
+          <select id="station-profile-layout" style="width:100%; box-sizing:border-box; margin:0 0 12px 0; padding:12px; background:#111; color:#fff; border:1px solid #333; border-radius:6px;">
+            <option value="chainway_handheld">Chainway handheld (phone on gun)</option>
+            <option value="tsl_dock_desktop">TL Solutions dock + large monitor (later)</option>
+          </select>
+          <div class="input-label">System access tier (login)</div>
+          <select id="station-profile-sysAccess" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; color:#fff; border:1px solid #333; border-radius:6px;">
+            <option value="CREW">CREW (station account only)</option>
+            <option value="EDITOR">EDITOR</option>
+          </select>
+        </div>
+        <div>
+          <div class="input-label" style="margin-bottom:8px;">Station permissions</div>
+          <div id="station-profile-perms-grid" style="display:grid; grid-template-columns: 1fr; gap: 8px; background:#111; border:1px solid #333; border-radius:6px; padding:12px;"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top: 14px; flex-shrink: 0;">
+      <button type="button" class="btn-close" style="width:auto; margin:0;" onclick="closeStationProfilesDashboard()">CANCEL</button>
+      <button type="button" class="btn-main" style="width:auto; margin:0;" onclick="submitStationProfile()">SAVE PROFILE</button>
+    </div>
+  </div>
+</div>
 
 
 

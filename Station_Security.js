@@ -1,0 +1,230 @@
+/**
+ * Station_Security.js
+ * Device / warehouse-gun IAM — separate from office crew roles (Security.js).
+ * Chainway handheld first; TL Solutions dock + large monitor later (device_layout).
+ */
+
+const STATION_DEVICE_LAYOUTS = {
+  CHAINWAY_HANDHELD: 'chainway_handheld',
+  TSL_DOCK_DESKTOP: 'tsl_dock_desktop'
+};
+
+/** Permission keys stored on Roles sheet — station block only (not office IAM_ROLE_FORM_KEYS). */
+const STATION_IAM_PERMISSION_KEYS = [
+  'station_host_inherit',
+  'station_vault_maintenance',
+  'station_vault_repair',
+  'station_vault_broken',
+  'station_project_checkout',
+  'station_project_checkin',
+  'station_pack_floor',
+  'station_tag_new_asset'
+];
+
+const STATION_ROLE_META_KEYS = ['is_station_device', 'station_device_layout'];
+
+function isStationTruthyCell(val) {
+  return val === true || val === 'TRUE' || val === 'true' || val === 1 || val === '1';
+}
+
+function normalizeStationDeviceLayout(layout) {
+  const raw = (layout || '').toString().trim().toLowerCase();
+  if (raw === STATION_DEVICE_LAYOUTS.TSL_DOCK_DESKTOP) return STATION_DEVICE_LAYOUTS.TSL_DOCK_DESKTOP;
+  return STATION_DEVICE_LAYOUTS.CHAINWAY_HANDHELD;
+}
+
+function ensureStationRoleColumns(roleSheet) {
+  const data = roleSheet.getDataRange().getValues();
+  if (!data.length) return getHeaderMap(data);
+  let headers = data[0].map(h => (h || '').toString().trim());
+  let rMap = {};
+  headers.forEach((h, i) => { if (h) rMap[h] = i; });
+
+  const missing = STATION_ROLE_META_KEYS.concat(STATION_IAM_PERMISSION_KEYS).filter(k => rMap[k] === undefined);
+  if (!missing.length) return rMap;
+
+  missing.forEach(col => {
+    roleSheet.insertColumnAfter(headers.length);
+    headers.push(col);
+    roleSheet.getRange(1, headers.length).setValue(col);
+    rMap[col] = headers.length - 1;
+  });
+  return rMap;
+}
+
+function readStationProfileRow(row, rMap) {
+  const f = typeof getRoleRowFields === 'function' ? getRoleRowFields(row, rMap) : {};
+  const profile = {
+    id: f.rId || (rMap['Role_ID'] !== undefined ? row[rMap['Role_ID']] : ''),
+    name: f.displayName || (rMap['Role_Name'] !== undefined ? row[rMap['Role_Name']] : ''),
+    key: f.vaultKey || '',
+    sysAccess: typeof normalizeAccessTier === 'function'
+      ? normalizeAccessTier(getSheetCell(row, rMap, 'sysAccess') || 'CREW')
+      : 'CREW',
+    is_station_device: isStationTruthyCell(row[rMap['is_station_device']]),
+    station_device_layout: normalizeStationDeviceLayout(row[rMap['station_device_layout']])
+  };
+  STATION_IAM_PERMISSION_KEYS.forEach(k => {
+    if (rMap[k] !== undefined) profile[k] = isStationTruthyCell(row[rMap[k]]);
+  });
+  return profile;
+}
+
+function isStationDeviceProfileRow(row, rMap) {
+  if (!row || !rMap) return false;
+  if (isStationTruthyCell(row[rMap['is_station_device']])) return true;
+  const name = (getSheetCell(row, rMap, 'Role_Name') || '').toString().toUpperCase();
+  return name.indexOf('STATION') === 0 || name.indexOf('WH-GUN') === 0 || name.indexOf('WH-DOOR') === 0;
+}
+
+function getStationProfilesFromRoleData(roleData, rMap) {
+  const list = [];
+  for (let i = 1; i < roleData.length; i++) {
+    if (!isStationDeviceProfileRow(roleData[i], rMap)) continue;
+    list.push(readStationProfileRow(roleData[i], rMap));
+  }
+  return list;
+}
+
+function actorUsesStationShell(crewName) {
+  if (!crewName) return false;
+  const profile = typeof getUserSecurityProfile === 'function' ? getUserSecurityProfile(crewName) : null;
+  if (!profile || !profile.roleId) return false;
+  const sheets = verifyVaultSchema(true);
+  const roleData = getSheetData(sheets.roles);
+  const rMap = ensureStationRoleColumns(sheets.roles);
+  for (let i = 1; i < roleData.length; i++) {
+    if (typeof crewRoleRefMatchesRow === 'function' && crewRoleRefMatchesRow(profile.roleId, roleData[i], rMap)) {
+      return isStationDeviceProfileRow(roleData[i], rMap);
+    }
+  }
+  return false;
+}
+
+function effectiveStationPermission(crewName, permissionKey) {
+  if (!crewName || STATION_IAM_PERMISSION_KEYS.indexOf(permissionKey) === -1) return false;
+  if (crewName.toLowerCase().trim() === 'bogdan') return true;
+  const sheets = verifyVaultSchema(true);
+  const crewData = getSheetData(sheets.crew);
+  const roleData = getSheetData(sheets.roles);
+  const cMap = crewData.hMap;
+  const rMap = ensureStationRoleColumns(sheets.roles);
+  const target = crewName.toLowerCase().trim();
+  for (let i = 1; i < crewData.length; i++) {
+    let dbName = getSheetCell(crewData[i], cMap, 'Name').toLowerCase().trim();
+    if (dbName !== target) continue;
+    let roleId = getSheetCell(crewData[i], cMap, 'Role_ID');
+    for (let r = 1; r < roleData.length; r++) {
+      if (!crewRoleRefMatchesRow(roleId, roleData[r], rMap)) continue;
+      if (!isStationDeviceProfileRow(roleData[r], rMap)) return false;
+      return isStationTruthyCell(roleData[r][rMap[permissionKey]]);
+    }
+  }
+  return false;
+}
+
+function assertActorCanUseStationVaultOps(actor) {
+  if (!actorUsesStationShell(actor) && !verifyBackendPrivilege(actor, 'MANAGER')) {
+    throw new Error('PERMISSION DENIED: Station vault operations require a warehouse device profile.');
+  }
+  if (!effectiveStationPermission(actor, 'station_vault_maintenance')
+      && !effectiveStationPermission(actor, 'station_vault_repair')
+      && !effectiveStationPermission(actor, 'station_vault_broken')
+      && !verifyBackendPrivilege(actor, 'MANAGER')) {
+    throw new Error('PERMISSION DENIED: Station vault ops not enabled for this device profile.');
+  }
+}
+
+// @INDEX: STATION_IAM -> Load profiles (ROOT admin UI)
+function getSecureStationProfilesDirectory(adminName) {
+  return executeWithRetry(() => {
+    if (!verifyBackendPrivilege(adminName, 'ROOT')) {
+      return { error: 'API DENIED: ROOT privileges required.' };
+    }
+    const sheets = verifyVaultSchema(true);
+    const rMap = ensureStationRoleColumns(sheets.roles);
+    const roleData = sheets.roles.getDataRange().getValues();
+    return {
+      profiles: getStationProfilesFromRoleData(roleData, rMap),
+      layouts: Object.values(STATION_DEVICE_LAYOUTS),
+      permissionKeys: STATION_IAM_PERMISSION_KEYS.slice()
+    };
+  });
+}
+
+// @INDEX: STATION_IAM -> Save device profile
+function saveStationProfileConfig(adminName, profileData) {
+  return executeWithRetry(() => {
+    if (!verifyBackendPrivilege(adminName, 'ROOT')) {
+      return { success: false, message: 'API DENIED: ROOT privileges required.' };
+    }
+    const sheets = verifyVaultSchema();
+    const roleSheet = sheets.roles;
+    const data = roleSheet.getDataRange().getValues();
+    const rMap = ensureStationRoleColumns(roleSheet);
+
+    const name = (profileData.name || '').toString().trim();
+    if (!name) return { success: false, message: 'Profile name is required.' };
+
+    let roleUuid = (profileData.id && profileData.id !== 'NEW') ? profileData.id.toString().trim() : Utilities.getUuid();
+    let newRow = new Array(data[0].length).fill('');
+    if (rMap['Role_ID'] !== undefined) newRow[rMap['Role_ID']] = roleUuid;
+    if (rMap['Role_Name'] !== undefined) newRow[rMap['Role_Name']] = name;
+    if (rMap['sysAccess'] !== undefined) {
+      newRow[rMap['sysAccess']] = normalizeAccessTier(profileData.sysAccess || 'CREW');
+    }
+    if (rMap['is_station_device'] !== undefined) newRow[rMap['is_station_device']] = true;
+    if (rMap['station_device_layout'] !== undefined) {
+      newRow[rMap['station_device_layout']] = normalizeStationDeviceLayout(profileData.station_device_layout);
+    }
+    STATION_IAM_PERMISSION_KEYS.forEach(k => {
+      if (rMap[k] !== undefined) newRow[rMap[k]] = !!profileData[k];
+    });
+
+    for (let i = 1; i < data.length; i++) {
+      if (crewRoleRefMatchesRow(profileData.id, data[i], rMap)
+          || (profileData.name && getSheetCell(data[i], rMap, 'Role_Name').toLowerCase() === name.toLowerCase())) {
+        let existingId = getSheetCell(data[i], rMap, 'Role_ID');
+        if (existingId) newRow[rMap['Role_ID']] = existingId;
+        roleSheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow]);
+        flushCache();
+        writeToAuditLog(adminName, 'UPDATE', 'STATION_PROFILES', 'GLOBAL', newRow[rMap['Role_ID']], 'Modified station device profile.');
+        return { success: true, message: "Station profile '" + name + "' updated." };
+      }
+    }
+    roleSheet.appendRow(newRow);
+    flushCache();
+    writeToAuditLog(adminName, 'CREATE', 'STATION_PROFILES', 'GLOBAL', roleUuid, 'Created station device profile.');
+    return { success: true, message: "Station profile '" + name + "' created." };
+  });
+}
+
+function deleteStationProfileConfig(adminName, profileIdRef) {
+  return executeWithRetry(() => {
+    if (!verifyBackendPrivilege(adminName, 'ROOT')) {
+      return { success: false, message: 'API DENIED: ROOT privileges required.' };
+    }
+    const sheets = verifyVaultSchema();
+    const roleSheet = sheets.roles;
+    const data = roleSheet.getDataRange().getValues();
+    const rMap = ensureStationRoleColumns(roleSheet);
+
+    let keptRows = [data[0]];
+    let deletedName = '';
+    let deletedId = '';
+    for (let i = 1; i < data.length; i++) {
+      if (crewRoleRefMatchesRow(profileIdRef, data[i], rMap) && isStationDeviceProfileRow(data[i], rMap)) {
+        deletedName = getSheetCell(data[i], rMap, 'Role_Name');
+        deletedId = getSheetCell(data[i], rMap, 'Role_ID');
+      } else {
+        keptRows.push(data[i]);
+      }
+    }
+    if (!deletedId && !deletedName) return { success: false, message: 'Station profile not found.' };
+    roleSheet.clearContents();
+    roleSheet.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
+    flushCache();
+    writeToAuditLog(adminName, 'DELETE', 'STATION_PROFILES', 'GLOBAL', deletedId || deletedName, "Deleted station profile '" + deletedName + "'.");
+    return { success: true, message: "Station profile '" + deletedName + "' deleted." };
+  });
+}

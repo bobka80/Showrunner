@@ -1,0 +1,226 @@
+<!-- @INDEX: STATION_IAM -> Device profile editor (separate from office Role Editor in 06a) -->
+<div id="station-profiles-modal-overlay" class="modal-overlay" style="z-index: 3050; display:none;">
+  <div class="modal" style="width: 92vw; max-width: 900px; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; flex-shrink: 0;">
+      <h3 class="modal-title" style="margin:0;">STATION DEVICE PROFILES</h3>
+      <button class="btn-close btn-sm" style="margin:0;" onclick="closeStationProfilesDashboard()">CLOSE</button>
+    </div>
+    <p style="color:#a1a1aa; font-size:12px; margin:0 0 14px 0; line-height:1.5; flex-shrink: 0;">
+      Fixed gun/tablet logins (e.g. WH-GUN-01). Office crew roles stay in <strong>ROLE EDITOR</strong>.
+      Chainway handheld first; TL dock + large monitor layout ships separately.
+    </p>
+    <div style="display:flex; gap:12px; margin-bottom: 14px; flex-shrink: 0; flex-wrap: wrap;">
+      <select id="station-profile-select" class="input-compact" style="min-width:220px; flex:1;" onchange="handleStationProfileSelectionChange()"></select>
+      <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="prepareNewStationProfile()">+ NEW PROFILE</button>
+      <button type="button" id="btn-delete-station-profile" class="btn-delete btn-sm" style="margin:0; display:none;" onclick="deleteSelectedStationProfile()">DELETE</button>
+    </div>
+    <div style="flex:1; overflow-y:auto; padding-right: 4px;">
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div>
+          <div class="input-label">Profile name</div>
+          <input type="text" id="station-profile-name" placeholder="e.g. WH-GUN-01 Chainway" style="width:100%; box-sizing:border-box; margin:0 0 12px 0; padding:12px;" />
+          <div class="input-label">Device layout</div>
+          <select id="station-profile-layout" style="width:100%; box-sizing:border-box; margin:0 0 12px 0; padding:12px; background:#111; color:#fff; border:1px solid #333; border-radius:6px;">
+            <option value="chainway_handheld">Chainway handheld (phone on gun)</option>
+            <option value="tsl_dock_desktop">TL Solutions dock + large monitor (later)</option>
+          </select>
+          <div class="input-label">System access tier (login)</div>
+          <select id="station-profile-sysAccess" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; color:#fff; border:1px solid #333; border-radius:6px;">
+            <option value="CREW">CREW (station account only)</option>
+            <option value="EDITOR">EDITOR</option>
+          </select>
+        </div>
+        <div>
+          <div class="input-label" style="margin-bottom:8px;">Station permissions</div>
+          <div id="station-profile-perms-grid" style="display:grid; grid-template-columns: 1fr; gap: 8px; background:#111; border:1px solid #333; border-radius:6px; padding:12px;"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:10px; margin-top: 14px; flex-shrink: 0;">
+      <button type="button" class="btn-close" style="width:auto; margin:0;" onclick="closeStationProfilesDashboard()">CANCEL</button>
+      <button type="button" class="btn-main" style="width:auto; margin:0;" onclick="submitStationProfile()">SAVE PROFILE</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * 06h_Admin_Station_Profiles.html
+ * Warehouse gun / tablet device IAM — kept separate from 06a_Admin_IAM.html (office roles).
+ */
+
+let globalStationProfiles = [];
+
+const STATION_PROFILE_FORM_KEYS = [
+  { key: 'station_host_inherit', label: 'Crew badge host inherit' },
+  { key: 'station_vault_maintenance', label: 'Vault: maintenance (no project)' },
+  { key: 'station_vault_repair', label: 'Vault: repair (no project)' },
+  { key: 'station_vault_broken', label: 'Vault: mark broken (no project)' },
+  { key: 'station_project_checkout', label: 'Project: check-out' },
+  { key: 'station_project_checkin', label: 'Project: check-in' },
+  { key: 'station_pack_floor', label: 'Pack on floor (later)' },
+  { key: 'station_tag_new_asset', label: 'Tag new asset (later)' }
+];
+
+function renderStationProfilePermCheckboxes() {
+  const grid = document.getElementById('station-profile-perms-grid');
+  if (!grid) return;
+  grid.innerHTML = STATION_PROFILE_FORM_KEYS.map(function(item) {
+    return '<label style="display:flex; align-items:center; gap:10px; cursor:pointer; color:#e4e4e7; font-size:13px;">'
+      + '<input type="checkbox" id="sp-' + item.key + '" class="crew-cb" style="margin:0;">'
+      + '<span>' + item.label + '</span></label>';
+  }).join('');
+}
+
+function setStationProfileCheckbox(key, checked) {
+  const el = document.getElementById('sp-' + key);
+  if (el) el.checked = !!checked;
+}
+
+function readStationProfileForm() {
+  const select = document.getElementById('station-profile-select');
+  const payload = {
+    id: (select && select.value && select.value !== 'NEW') ? select.value : 'NEW',
+    name: (document.getElementById('station-profile-name') || {}).value || '',
+    station_device_layout: (document.getElementById('station-profile-layout') || {}).value || 'chainway_handheld',
+    sysAccess: (document.getElementById('station-profile-sysAccess') || {}).value || 'CREW'
+  };
+  STATION_PROFILE_FORM_KEYS.forEach(function(item) {
+    const el = document.getElementById('sp-' + item.key);
+    payload[item.key] = !!(el && el.checked);
+  });
+  return payload;
+}
+
+function populateStationProfileForm(profile) {
+  const nameEl = document.getElementById('station-profile-name');
+  const layoutEl = document.getElementById('station-profile-layout');
+  const tierEl = document.getElementById('station-profile-sysAccess');
+  const delBtn = document.getElementById('btn-delete-station-profile');
+  if (!profile) {
+    if (nameEl) nameEl.value = '';
+    if (layoutEl) layoutEl.value = 'chainway_handheld';
+    if (tierEl) tierEl.value = 'CREW';
+    if (delBtn) delBtn.style.display = 'none';
+    STATION_PROFILE_FORM_KEYS.forEach(function(item) { setStationProfileCheckbox(item.key, false); });
+    setStationProfileCheckbox('station_host_inherit', true);
+    setStationProfileCheckbox('station_vault_maintenance', true);
+    setStationProfileCheckbox('station_vault_repair', true);
+    setStationProfileCheckbox('station_vault_broken', true);
+    setStationProfileCheckbox('station_project_checkout', true);
+    setStationProfileCheckbox('station_project_checkin', true);
+    return;
+  }
+  if (nameEl) nameEl.value = profile.name || '';
+  if (layoutEl) layoutEl.value = profile.station_device_layout || 'chainway_handheld';
+  if (tierEl) tierEl.value = typeof normalizeAccessTier === 'function'
+    ? normalizeAccessTier(profile.sysAccess || 'CREW') : (profile.sysAccess || 'CREW');
+  if (delBtn) delBtn.style.display = 'inline-flex';
+  STATION_PROFILE_FORM_KEYS.forEach(function(item) {
+    setStationProfileCheckbox(item.key, profile[item.key] === true || profile[item.key] === 'TRUE' || profile[item.key] === 1);
+  });
+}
+
+function populateStationProfileSelect(preferredId) {
+  const select = document.getElementById('station-profile-select');
+  if (!select) return;
+  select.innerHTML = '<option value="NEW" style="display:none;">---</option>';
+  if (globalStationProfiles && globalStationProfiles.length) {
+    globalStationProfiles.forEach(function(p) {
+      const val = p.id || p.name;
+      select.innerHTML += '<option value="' + val + '">' + (p.name || val) + '</option>';
+    });
+    const match = preferredId && globalStationProfiles.find(function(p) {
+      return p.id === preferredId || p.name === preferredId;
+    });
+    select.value = match ? (match.id || match.name) : (globalStationProfiles[0].id || globalStationProfiles[0].name);
+  } else {
+    select.value = 'NEW';
+  }
+  handleStationProfileSelectionChange();
+}
+
+function handleStationProfileSelectionChange() {
+  const select = document.getElementById('station-profile-select');
+  if (!select || select.value === 'NEW') {
+    populateStationProfileForm(null);
+    return;
+  }
+  const profile = globalStationProfiles.find(function(p) {
+    return p.id === select.value || p.name === select.value;
+  });
+  populateStationProfileForm(profile || null);
+}
+
+function prepareNewStationProfile() {
+  const select = document.getElementById('station-profile-select');
+  if (select) select.value = 'NEW';
+  populateStationProfileForm(null);
+}
+
+function openStationProfilesDashboard() {
+  renderStationProfilePermCheckboxes();
+  document.getElementById('station-profiles-modal-overlay').style.display = 'flex';
+  const select = document.getElementById('station-profile-select');
+  if (select) {
+    select.innerHTML = '<option value="">Loading...</option>';
+    select.disabled = true;
+  }
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (select) select.disabled = false;
+      alert('Could not load station profiles: ' + err.message);
+    })
+    .withSuccessHandler(function(res) {
+      if (select) select.disabled = false;
+      if (res && res.error) {
+        alert(res.error);
+        return;
+      }
+      globalStationProfiles = (res && res.profiles) ? res.profiles : [];
+      if (!globalStationProfiles.length) {
+        prepareNewStationProfile();
+        populateStationProfileSelect('NEW');
+      } else {
+        populateStationProfileSelect();
+      }
+    })
+    .getSecureStationProfilesDirectory(typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '');
+}
+
+function closeStationProfilesDashboard() {
+  const el = document.getElementById('station-profiles-modal-overlay');
+  if (el) el.style.display = 'none';
+}
+
+function submitStationProfile() {
+  const payload = readStationProfileForm();
+  if (!payload.name.trim()) return alert('Profile name is required (e.g. WH-GUN-01).');
+  google.script.run
+    .withFailureHandler(function(err) { alert('Save failed: ' + err.message); })
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) return alert((res && res.message) ? res.message : 'Save failed.');
+      alert(res.message);
+      openStationProfilesDashboard();
+    })
+    .saveStationProfileConfig(typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '', payload);
+}
+
+function deleteSelectedStationProfile() {
+  const select = document.getElementById('station-profile-select');
+  if (!select || select.value === 'NEW') return;
+  if (!confirm('Delete this station device profile?')) return;
+  google.script.run
+    .withFailureHandler(function(err) { alert('Delete failed: ' + err.message); })
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) return alert((res && res.message) ? res.message : 'Delete failed.');
+      alert(res.message);
+      openStationProfilesDashboard();
+    })
+    .deleteStationProfileConfig(typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '', select.value);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  renderStationProfilePermCheckboxes();
+});
+</script>

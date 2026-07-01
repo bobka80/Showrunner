@@ -61,12 +61,14 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 
 ### Software — not yet built
 
-- [ ] Dedicated scan home / kiosk shell (today: project asset bar only)
+- [ ] Dedicated scan home / kiosk shell (`11_Station_Shell.html` — planned; handheld first)
 - [ ] Crew `rfid_tag` field + admin record path
-- [ ] Device profile `TL Solutions warehouse gun` in RBAC
+- [x] **Station profile editor** — `06h_Admin_Station_Profiles.html` + `Station_Security.js` (separate from office `06a` / `Security.js`)
 - [ ] Host-empty / host-locked scan router (crew lookup before vault lookup)
 - [ ] Gate integration (bulk door read — hardware TBD)
 - [ ] Tag-map / new-equipment RFID provisioning UX on station
+
+**IAM split:** Office crew permissions → **ROLE EDITOR** (`06a`). Fixed gun/tablet logins → **STATION PROFILES** (`06h`). Tamper each independently.
 
 ### Phase order (remaining)
 
