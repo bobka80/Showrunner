@@ -363,3 +363,43 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
     };
   });
 }
+
+function lookupCrewMemberByName_(crewName, crewData, cMap) {
+  const target = String(crewName || '').toLowerCase().trim();
+  if (!target || !crewData || crewData.length < 2) return null;
+  for (let i = 1; i < crewData.length; i++) {
+    const name = getSheetCell(crewData[i], cMap, 'Name');
+    if (!name || name.toString().toLowerCase().trim() !== target) continue;
+    return {
+      uid: getSheetCell(crewData[i], cMap, 'uid'),
+      name: name,
+      email: getSheetCell(crewData[i], cMap, 'Email'),
+      rfidTag: cMap['rfid_tag'] !== undefined
+        ? normalizeStationRfidTag(crewData[i][cMap['rfid_tag']])
+        : ''
+    };
+  }
+  return null;
+}
+
+/** TEMP: dev host bypass until Chainway SDK is wired — station guns only. */
+function stationDevHostAsBogdan(deviceActor) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'Station device login only.' };
+    }
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+    const crew = lookupCrewMemberByName_('Bogdan', crewData, cMap);
+    if (!crew) return { success: false, error: 'Crew member Bogdan not found in vault.' };
+    writeToAuditLog(deviceActor, 'STATION_HOST', 'STATION', 'GLOBAL', crew.uid || crew.name,
+      'DEV host bypass: ' + crew.name + '.');
+    return {
+      success: true,
+      scanType: 'host',
+      devBypass: true,
+      host: crew
+    };
+  });
+}

@@ -175,6 +175,7 @@ html.station-device-root #station-shell {
   </div>
 
   <div class="station-shell-footer">
+    <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
@@ -322,6 +323,28 @@ function stationHandleRfidScan_(rawTag) {
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag) {
   stationHandleRfidScan_(rawTag);
+};
+
+window.stationDevHostAsBogdan = function() {
+  if (!window.IS_STATION_DEVICE || window.stationScanBusy) return;
+  window.stationScanBusy = true;
+  stationSetStatus_('Dev host…', '');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationScanBusy = false;
+      if (!res || !res.success || !res.host) {
+        stationSetStatus_((res && res.error) ? res.error : 'Dev host failed.', 'error');
+        return;
+      }
+      stationWriteHostSession_(res.host);
+      stationRenderShellState_();
+      stationSetStatus_('DEV hosted as ' + res.host.name, 'ok');
+    })
+    .withFailureHandler(function(err) {
+      window.stationScanBusy = false;
+      stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .stationDevHostAsBogdan(ACTIVE_USER_NAME);
 };
 
 window.stationLogoutHost = function() {
