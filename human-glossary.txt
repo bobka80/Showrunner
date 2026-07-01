@@ -1,0 +1,348 @@
+================================================================================
+SHOWRUNNER — HUMAN GLOSSARY
+================================================================================
+Plain-language terms + one-word names for every screen.
+Say the ONE WORD in column 2 when you and the AI (or crew) need the same screen.
+
+Last swept: 2026-06-28 (production UI, GAS v393 era)
+
+================================================================================
+PART 1 — SYSTEM WORDS (things you hear in conversation)
+================================================================================
+
+PA
+  Project Assets. The equipment list for one job/event.
+  Where you add gear, pack cases, run the slash formula bar, and SAVE.
+  Mobile compact version = same PA, smaller layout.
+
+IAM
+  Identity & Access Management. Who can do what.
+  In the app this is mostly the ROLE EDITOR (permissions per role)
+  and crew login tiers (VIEWER, EDITOR, MANAGER, ROOT).
+
+ROLE EDITOR
+  Same as IAM screen. Pick a role, tick permission checkboxes, save.
+  Lives inside Resources (ROOT only).
+
+ROOT
+  Top permission tier. Full system access — crew, database ops, IAM, audit.
+
+MANAGER / EDITOR / VIEWER
+  Login tiers below ROOT. Each tier unlocks different buttons and tabs.
+
+uid
+  Unique ID string for a person, project, asset, or row in the database.
+  Like a serial number the software uses so names can change without
+  breaking links. Example: project_uid separates jobs in one spreadsheet.
+
+Vault
+  The master equipment database — every case, fixture, cable type, QR, RFID.
+  Not the project list; the warehouse catalog everything is picked from.
+
+Engine (spreadsheet)
+  The live Google Sheet backend that stores projects, assets, crew, ledger.
+  One Engine file for all projects; rows are filtered by project_uid.
+
+Project Assets vs Vault Assets
+  Vault = catalog. Project Assets (PA) = what this job borrowed from catalog.
+
+GAS
+  Google Apps Script. The server code that runs Showrunner in Google's cloud.
+  When we say "ship" or "deploy", we push a new GAS version.
+
+Firebase / Hosting
+  The web address sm-showrunner-97405.web.app — used for push notifications
+  and keeping you signed in. The main app UI still loads from GAS.
+
+milestone
+  Command: node milestone.js — builds, deploys to GAS, logs version in RELEASES.md.
+
+clasp / build.js
+  Developer tools on the PC. build.js bundles HTML into dist/; clasp talks to Google.
+
+Sweep (when talking to AI)
+  "Read through the whole codebase/docs for X" — not a button in the app.
+
+Triangle of Truth
+  Three things that must stay in sync on a project:
+  (1) slash formula you type, (2) pretty formula display, (3) equipment rows.
+
+Formula / CLI bar
+  The text bar in PA where you type things like "12x Fixture / Audio".
+  Also called pa-search-cli in code.
+
+Beautiful Formula
+  Human-readable version of the slash formula for reviewers.
+
+Standalone
+  Normal equipment row — not auto-packed, not marked short.
+
+[SHORT]
+  Flag on a row meaning we need more than the Vault has available.
+
+Auto-Packing
+  Cable/trunk engine. Groups bulk cable into phantom cases ([BULK] … CASE).
+
+Auto-Containerization
+  Kit engine. Puts physical fixtures into auto-generated cases (isAuto).
+  NOT the same as Auto-Packing.
+
+Bulk
+  Countable stock (cables, tape) — quantity, not one RFID per piece.
+
+Container / Case (level 3)
+  Physical case with its own QR/RFID. Gear lives inside cases (Matryoshka).
+
+Physical / unique (level 6)
+  Individual units (fixtures, mics) — can have RFID each.
+
+Ledger / Operations_Ledger
+  Checkout log — what left the warehouse, scans, pack/unpack events.
+
+Session / auto-login
+  Stay signed in via token in browser. Desktop can opt out in Personal Hub.
+  Different from idle LOCK (screensaver).
+
+Lock (desktop)
+  Idle screensaver with clock + PIN. Optional timer in Personal Hub.
+  Manual padlock on nav bar works even when timer is Disabled.
+
+Showrunner Sync
+  Google Drive shortcuts copied into a project folder (Personal Hub config).
+
+Prep session / Firebase fork (planned, not live)
+  Future mode: edit one project in Firebase during prep, then commit to Engine.
+
+Collision (auto-save, planned)
+  Someone else saved the same project first — you refresh and retry.
+
+ROOT folder / Drive layout
+  Numbered folders on Drive (01_WORKSPACE … 05_DATABASE). See DRIVE_LAYOUT.md.
+
+Fragile zones
+  Code areas where a small change breaks PA, timeline, or checkout — touch carefully.
+
+================================================================================
+PART 2 — FULL-SCREEN VIEWS (one word to say aloud)
+================================================================================
+
+ONE WORD          ON-SCREEN TITLE / WHAT IT IS
+----------        ---------------------------------
+Dashboard         Home calendar + event list (left nav, top icon).
+                  Toggle same button for list view.
+
+Timeline          Shift layer — crew rows, phases, drag shifts (tt- / shift-layer).
+                  Open from project editor or mobile crew hub.
+
+Roster            Master Month Roster — who is booked / leave blocks (month-roster-layer).
+
+Tracker           EQUIPMENT TRACKER — global gear availability matrix (availability-modal-overlay).
+
+Resources         RESOURCES hub — Crew, Assets, Vehicles, Warehouse, Clients tabs
+                  (master-settings-overlay). ROOT sees DATABASE tab too.
+
+PersonalHub       PERSONAL HUB — your theme, PIN, idle lock, sync list, auto-login
+                  (manager-settings-overlay). Same name on mobile (mobile-view-account).
+
+Financials        FINANCIALS HUB — payroll, P&L, financial settings.
+
+AuditStudio       DATABASE AUDIT STUDIO — duplicate merge, item review (audit-studio-overlay).
+
+Login             Standalone login page (Login.html) before the app shell.
+
+MobileHome        Phone home menu (mobile-view-home).
+
+MobileEvents      Phone event list (mobile-view-events).
+
+MobileTasks       Phone MY TASKS (mobile-view-tasks).
+
+MobileNotifs      Phone notifications list (mobile-view-notifs).
+
+MobileRFID        Phone MAP RFID — assign tags in the field (mobile-view-rfid).
+
+CrewHub           Mobile crew briefing for one event (mobile-crew-hub-overlay).
+
+DesktopLock       Idle lock / screensaver overlay (desktop-lock-overlay).
+
+================================================================================
+PART 3 — RESOURCES TABS (inside Resources)
+================================================================================
+
+ONE WORD          TAB LABEL
+----------        ---------
+CrewTab           CREW — directory, add/edit member, IAM buttons.
+AssetsTab         ASSETS — vault grid, QR print, add asset.
+VehiclesTab       VEHICLES — fleet list.
+WarehouseTab      WAREHOUSE — 2D warehouse roots / zones map.
+ClientsTab        CLIENTS — client companies.
+DatabaseTab       DATABASE — backup, archive, push admin (ROOT only).
+
+================================================================================
+PART 4 — MODALS & POPUPS (one word each)
+================================================================================
+
+ONE WORD          WHAT IT IS
+----------        -----------
+ProjectEditor     Configure Project — main event editor (edit-modal-overlay).
+                  Dates, client, location, open PA, timeline, logistics.
+
+PA                PROJECT EQUIPMENT LIST — project assets modal
+                  (project-assets-modal-overlay).
+
+LogisticsHub      LOGISTICS HUB wizard — auto engines, packing tools
+                  (logistics-hub-modal-overlay).
+
+CrewManager       Full-screen crew picker for timeline (crew-manager-modal).
+
+LocationMap       Map picker for venue address (location-modal-overlay).
+
+PrintStudio       Print equipment lists / tree (print-studio-overlay).
+
+Shortage          Shortage detail popup for one asset (shortage-modal-overlay).
+
+TruckArrange      ARRANGE TRUCK — 2D truck packing (truck-modal-overlay).
+
+LoadinPlan        LOAD IN PLAN — timing plan (loadin-plan-overlay).
+
+Tasks             Global task create/edit (task-modal-overlay).
+
+TaskCrew          Pick crew for a task (task-crew-modal-overlay).
+
+Checklist         Reusable checklist popup (checklist-modal-overlay).
+
+AddMember         Add crew member form (add-member-modal-overlay).
+
+EditMember        Edit crew member — name, email, dept (edit-member-modal-overlay).
+
+RoleEditor        IAM — roles and permissions (iam-modal-overlay).
+
+AddAsset          Create/edit vault asset (asset-modal-overlay).
+
+QRStudio          Print QR labels batch (qr-studio-modal).
+
+RootProvision     Provision warehouse root zone (root-modal-overlay).
+
+AddClient         New/edit client (client-modal-overlay).
+
+AddVehicle        New/edit truck (vehicle-modal-overlay).
+
+LeaveBlock        Month roster leave entry (leave-modal).
+
+SyntaxHelp        PA formula cheat sheet — dynamic (syntax-help-modal).
+
+SmartMerge        Vault duplicate merge tool (smart-merge-overlay).
+
+ExtractionReview  Review extracted vault rows (extraction-review-overlay).
+
+BackupBlocker     Full-screen "backup in progress" lock (backup-modal-overlay).
+
+LogoutConfirm     Confirm sign out (logout-confirm-modal-overlay).
+
+ChangePin         Change your quick PIN (personal-pin-modal-overlay).
+
+SyncPicker        Configure Showrunner Sync folder list (sync-picker-modal).
+
+DrivePicker       Pick a Google Drive folder (drive-picker-modal).
+
+History           Project file history timeline — dynamic (universal-history-modal).
+
+PushToken         Manual FCM device token entry — dynamic (push-token-modal-overlay).
+
+WeatherPopup      Mobile weather detail (mobile-weather-popup).
+
+================================================================================
+PART 5 — VISUAL SETTINGS DRAWERS (right-side panels, not full modals)
+================================================================================
+
+Say "Visuals" or the specific name:
+
+ONE WORD          SCOPE
+----------        -----
+Visuals           Default theme drawer (visual-settings-modal).
+CalVisuals        Dashboard / calendar colors (cal-visual-settings-modal).
+MiniVisuals       Mini calendar editor colors (mini-visual-settings-modal).
+RosterVisuals     Month roster colors (mr-visual-settings-modal).
+PAVisuals         Project assets row colors (project-asset-visual-settings-modal).
+AssetVisuals      Vault asset grid colors (asset-visual-settings-modal).
+PhaseManager      Edit timeline phase types (phase-manager-modal).
+StripEditor       Timeline strip formatting (strip-editor-modal).
+Assignments       Crew assignment labels (assignment-manager-modal).
+Colors            Global color dictionary (color-manager-modal).
+Depts             Department list (dept-manager-modal).
+Meals             Meal types (meal-manager-modal).
+Tags              Tag dictionary tree (tag-manager-modal).
+
+Opened from: nav paintbrush (contextual) or Resources admin buttons.
+
+================================================================================
+PART 6 — DRAWERS (hover from left nav, not full screens)
+================================================================================
+
+ONE WORD          WHAT IT IS
+----------        -----------
+NotifDrawer       Notifications list (notif-drawer-wrapper).
+TaskDrawer        Quick personal task list (task-drawer-wrapper).
+AssetConflicts    Asset shortage triage list (asset-conflict-drawer).
+CrewConflicts     Crew double-booking list (crew-conflict-drawer).
+
+================================================================================
+PART 7 — INSIDE PROJECT EDITOR & PA (sub-areas, if you need precision)
+================================================================================
+
+ONE WORD          MEANING
+----------        -------
+MiniCal           Small phase calendar on project editor.
+PhaseRail         Mobile deconstructed timeline strip (footer of CrewHub).
+PackingMode       PA mode for packing cases (mobile + desktop).
+OperationMode     PA mode for checkout/scan operations.
+ConflictDrawer    Timeline/equipment triage side panel (08_Conflict_Manager).
+
+================================================================================
+PART 8 — FINANCIALS SUB-VIEWS
+================================================================================
+
+ONE WORD          TAB / AREA
+----------        ----------
+Payroll           PAYROLL & LABOR tab.
+PnL               P&L PREDICTIONS tab.
+FinSettings       FINANCIAL SETTINGS tab.
+PayrollByPerson   View by person (inside Payroll).
+PayrollByEvent    View by event (inside Payroll).
+
+================================================================================
+PART 9 — QUICK CHEAT SHEET (most common confusions)
+================================================================================
+
+PA              = project equipment list (per job), NOT the vault catalog
+Vault / AssetsTab = master catalog of all gear
+IAM / RoleEditor = permissions, NOT crew names list
+PersonalHub     = your settings, NOT admin Resources
+Resources       = admin master data (ROOT/MANAGER), NOT PersonalHub
+Tracker         = global "who has what when", NOT the PA list
+Timeline        = crew shifts/phases, NOT the month roster
+Roster          = crew availability month grid, NOT equipment
+Lock            = screensaver PIN, NOT logout
+Auto-login      = remember session, NOT lock timer
+Auto-Packing    = cables only
+Auto-Container  = fixture kits only
+uid             = hidden ID; crew "Full Name" can be edited, uid cannot
+
+================================================================================
+PART 10 — HOW TO USE THIS WITH THE AI
+================================================================================
+
+Good:  "Open PA on the Sofia job and fix the [SHORT] rows."
+Good:  "In RoleEditor, give EDITOR access to WarehouseTab."
+Good:  "Ship milestone after the change."
+Bad:   "The equipment thing" (ambiguous — Vault? PA? Tracker?)
+
+When you add a new screen in a future version, add one row here so vocabulary
+stays shared.
+
+Technical deep glossary for developers: docs/ai/GLOSSARY.md
+Equipment model (Bulk, cases, packing): docs/ai/EQUIPMENT_MODEL.md
+File map (which .html file is which): docs/ai/FILE_MAP.md
+
+================================================================================
+END
+================================================================================
