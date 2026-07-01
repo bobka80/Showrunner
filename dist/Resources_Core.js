@@ -166,17 +166,32 @@ function crewColumnMostlyEmpty_(sheet, colIndex1Based) {
   return true;
 }
 
-/** Keep Payroll_Multiplier in slot 13; rfid_tag is always appended last — never overwrites pay mult. */
-function repairAndEnsureCrewRosterSchema_(crewSheet) {
-  const crewBaseHeaders = [
-    "uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer",
-    "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier"
-  ];
-  const RFID_HEADER = "rfid_tag";
-  const paySlot = crewBaseHeaders.length;
+function crewColumnMostlyDeptUids_(sheet, colIndex1Based) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return false;
+  const values = sheet.getRange(2, colIndex1Based, lastRow, colIndex1Based).getValues();
+  let checked = 0;
+  let deptLike = 0;
+  for (let i = 0; i < values.length; i++) {
+    const raw = String(values[i][0] || '').trim().toLowerCase();
+    if (!raw) continue;
+    checked++;
+    if (raw.indexOf('dept_') === 0) deptLike++;
+  }
+  return checked > 0 && deptLike / checked >= 0.5;
+}
 
-  let lastCol = Math.max(1, crewSheet.getLastColumn());
-  let headers = crewSheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || '').trim());
+function isRfidLikeHeader_(header) {
+  const key = normalizeVaultHeaderKey_(header);
+  return key === 'rfidtag' || key === 'rfid' || key === 'lfid' || key === 'lfidtag';
+}
+
+/** Fix compact Crew_Roster layouts: payroll stays put, rfid_tag only on the last column. */
+function repairAndEnsureCrewRosterSchema_(crewSheet) {
+  const RFID_HEADER = 'rfid_tag';
+
+  let headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
+    .map(h => String(h || '').trim());
 
   function headerIndex(key) {
     const needle = normalizeVaultHeaderKey_(key);
@@ -186,19 +201,37 @@ function repairAndEnsureCrewRosterSchema_(crewSheet) {
     return -1;
   }
 
-  let payIdx = headerIndex('Payroll_Multiplier');
-  let rfidIdx = headerIndex(RFID_HEADER);
-
-  // Repair: rfid_tag header stole the payroll column (multiplier values still underneath).
-  if (rfidIdx >= 0 && payIdx < 0 && crewColumnMostlyNumeric_(crewSheet, rfidIdx + 1)) {
-    crewSheet.getRange(1, rfidIdx + 1).setValue('Payroll_Multiplier');
-    headers[rfidIdx] = 'Payroll_Multiplier';
-    payIdx = rfidIdx;
-    rfidIdx = -1;
+  // Mislabeled RFID/LFID header on department data -> Department.
+  for (let i = 0; i < headers.length; i++) {
+    if (!isRfidLikeHeader_(headers[i])) continue;
+    if (!crewColumnMostlyDeptUids_(crewSheet, i + 1)) continue;
+    if (headerIndex('Department') < 0) {
+      crewSheet.getRange(1, i + 1).setValue('Department');
+      headers[i] = 'Department';
+    }
   }
 
-  // Repair: duplicate trailing Payroll_Multiplier after a bad migration (empty column).
-  if (payIdx >= 0 && rfidIdx < 0) {
+  // Mislabeled RFID/LFID header on payroll multipliers -> Payroll_Multiplier.
+  for (let i = 0; i < headers.length; i++) {
+    if (!isRfidLikeHeader_(headers[i])) continue;
+    if (!crewColumnMostlyNumeric_(crewSheet, i + 1)) continue;
+    if (headerIndex('Payroll_Multiplier') < 0) {
+      crewSheet.getRange(1, i + 1).setValue('Payroll_Multiplier');
+      headers[i] = 'Payroll_Multiplier';
+    }
+  }
+
+  headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
+    .map(h => String(h || '').trim());
+
+  let payIdx = headerIndex('Payroll_Multiplier');
+  let rfidIdx = -1;
+  for (let i = 0; i < headers.length; i++) {
+    if (isRfidLikeHeader_(headers[i])) { rfidIdx = i; break; }
+  }
+
+  // Duplicate empty Payroll_Multiplier columns from a bad migration.
+  if (payIdx >= 0) {
     for (let i = headers.length - 1; i >= 0; i--) {
       if (i === payIdx) continue;
       if (normalizeVaultHeaderKey_(headers[i]) !== 'payrollmultiplier') continue;
@@ -206,13 +239,13 @@ function repairAndEnsureCrewRosterSchema_(crewSheet) {
         crewSheet.deleteColumn(i + 1);
         headers.splice(i, 1);
         if (i < payIdx) payIdx--;
+        if (rfidIdx > i) rfidIdx--;
       }
     }
   }
 
-  // Repair: real RFID values landed in payroll slot — move to new rfid_tag column at end.
-  if (payIdx >= 0 && normalizeVaultHeaderKey_(headers[payIdx]) === 'rfidtag'
-      && !crewColumnMostlyNumeric_(crewSheet, payIdx + 1)) {
+  // Real RFID hex values in payroll slot -> move to trailing rfid_tag column.
+  if (payIdx >= 0 && isRfidLikeHeader_(headers[payIdx]) && !crewColumnMostlyNumeric_(crewSheet, payIdx + 1)) {
     const lastRow = Math.max(crewSheet.getLastRow(), 2);
     crewSheet.insertColumnAfter(crewSheet.getLastColumn());
     const destCol = crewSheet.getLastColumn();
@@ -223,27 +256,36 @@ function repairAndEnsureCrewRosterSchema_(crewSheet) {
     crewSheet.getRange(1, payIdx + 1).setValue('Payroll_Multiplier');
     headers[payIdx] = 'Payroll_Multiplier';
     headers.push(RFID_HEADER);
-    lastCol = crewSheet.getLastColumn();
+    rfidIdx = headers.length - 1;
   }
 
   headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
     .map(h => String(h || '').trim());
+  rfidIdx = -1;
+  for (let i = 0; i < headers.length; i++) {
+    if (isRfidLikeHeader_(headers[i])) { rfidIdx = i; break; }
+  }
 
-  crewBaseHeaders.forEach(h => {
-    const norm = normalizeVaultHeaderKey_(h);
-    const found = headers.some(x => normalizeVaultHeaderKey_(x) === norm);
-    if (!found) {
-      crewSheet.insertColumnAfter(crewSheet.getLastColumn());
-      crewSheet.getRange(1, crewSheet.getLastColumn()).setValue(h);
-      headers.push(h);
-    }
-  });
-
-  headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
-    .map(h => String(h || '').trim());
-  if (!headers.some(x => normalizeVaultHeaderKey_(x) === 'rfidtag')) {
+  // rfid_tag must be the last column — append if missing; never insert optional crew columns in between.
+  if (rfidIdx < 0) {
     crewSheet.insertColumnAfter(crewSheet.getLastColumn());
     crewSheet.getRange(1, crewSheet.getLastColumn()).setValue(RFID_HEADER);
+  } else if (rfidIdx !== headers.length - 1) {
+    const lastRow = Math.max(crewSheet.getLastRow(), 1);
+    const srcCol = rfidIdx + 1;
+    const hasRfidData = !crewColumnMostlyEmpty_(crewSheet, srcCol);
+    crewSheet.insertColumnAfter(crewSheet.getLastColumn());
+    const destCol = crewSheet.getLastColumn();
+    crewSheet.getRange(1, destCol).setValue(RFID_HEADER);
+    if (hasRfidData && lastRow >= 2) {
+      const moved = crewSheet.getRange(2, srcCol, lastRow, srcCol).getValues();
+      crewSheet.getRange(2, destCol, lastRow, destCol).setValues(moved);
+      crewSheet.getRange(2, srcCol, lastRow, srcCol).clearContent();
+    }
+    crewSheet.getRange(1, srcCol).setValue('');
+    if (normalizeVaultHeaderKey_(headers[srcCol - 1]) === 'rfidtag' && crewColumnMostlyEmpty_(crewSheet, srcCol)) {
+      crewSheet.deleteColumn(srcCol);
+    }
   }
 
   crewSheet.getRange(1, 1, 1, crewSheet.getLastColumn())
