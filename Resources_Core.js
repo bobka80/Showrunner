@@ -136,6 +136,120 @@ let cachedVaultSheets = null;
 let vaultAssetCache = null;
 let sheetDataCache = {};
 
+function normalizeVaultHeaderKey_(header) {
+  return String(header || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+}
+
+function crewColumnMostlyNumeric_(sheet, colIndex1Based) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return true;
+  const values = sheet.getRange(2, colIndex1Based, lastRow, colIndex1Based).getValues();
+  let checked = 0;
+  let numeric = 0;
+  for (let i = 0; i < values.length; i++) {
+    const raw = values[i][0];
+    if (raw === '' || raw === null || raw === undefined) continue;
+    checked++;
+    const n = parseFloat(raw);
+    if (!isNaN(n) && String(raw).trim().match(/^-?\d+(\.\d+)?$/)) numeric++;
+  }
+  return checked === 0 || numeric / checked >= 0.6;
+}
+
+function crewColumnMostlyEmpty_(sheet, colIndex1Based) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return true;
+  const values = sheet.getRange(2, colIndex1Based, lastRow, colIndex1Based).getValues();
+  for (let i = 0; i < values.length; i++) {
+    if (values[i][0] !== '' && values[i][0] !== null && values[i][0] !== undefined) return false;
+  }
+  return true;
+}
+
+/** Keep Payroll_Multiplier in slot 13; rfid_tag is always appended last — never overwrites pay mult. */
+function repairAndEnsureCrewRosterSchema_(crewSheet) {
+  const crewBaseHeaders = [
+    "uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer",
+    "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier"
+  ];
+  const RFID_HEADER = "rfid_tag";
+  const paySlot = crewBaseHeaders.length;
+
+  let lastCol = Math.max(1, crewSheet.getLastColumn());
+  let headers = crewSheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || '').trim());
+
+  function headerIndex(key) {
+    const needle = normalizeVaultHeaderKey_(key);
+    for (let i = 0; i < headers.length; i++) {
+      if (normalizeVaultHeaderKey_(headers[i]) === needle) return i;
+    }
+    return -1;
+  }
+
+  let payIdx = headerIndex('Payroll_Multiplier');
+  let rfidIdx = headerIndex(RFID_HEADER);
+
+  // Repair: rfid_tag header stole the payroll column (multiplier values still underneath).
+  if (rfidIdx >= 0 && payIdx < 0 && crewColumnMostlyNumeric_(crewSheet, rfidIdx + 1)) {
+    crewSheet.getRange(1, rfidIdx + 1).setValue('Payroll_Multiplier');
+    headers[rfidIdx] = 'Payroll_Multiplier';
+    payIdx = rfidIdx;
+    rfidIdx = -1;
+  }
+
+  // Repair: duplicate trailing Payroll_Multiplier after a bad migration (empty column).
+  if (payIdx >= 0 && rfidIdx < 0) {
+    for (let i = headers.length - 1; i >= 0; i--) {
+      if (i === payIdx) continue;
+      if (normalizeVaultHeaderKey_(headers[i]) !== 'payrollmultiplier') continue;
+      if (crewColumnMostlyEmpty_(crewSheet, i + 1)) {
+        crewSheet.deleteColumn(i + 1);
+        headers.splice(i, 1);
+        if (i < payIdx) payIdx--;
+      }
+    }
+  }
+
+  // Repair: real RFID values landed in payroll slot — move to new rfid_tag column at end.
+  if (payIdx >= 0 && normalizeVaultHeaderKey_(headers[payIdx]) === 'rfidtag'
+      && !crewColumnMostlyNumeric_(crewSheet, payIdx + 1)) {
+    const lastRow = Math.max(crewSheet.getLastRow(), 2);
+    crewSheet.insertColumnAfter(crewSheet.getLastColumn());
+    const destCol = crewSheet.getLastColumn();
+    crewSheet.getRange(1, destCol).setValue(RFID_HEADER);
+    const srcValues = crewSheet.getRange(2, payIdx + 1, lastRow, payIdx + 1).getValues();
+    crewSheet.getRange(2, destCol, lastRow, destCol).setValues(srcValues);
+    crewSheet.getRange(2, payIdx + 1, lastRow, payIdx + 1).clearContent();
+    crewSheet.getRange(1, payIdx + 1).setValue('Payroll_Multiplier');
+    headers[payIdx] = 'Payroll_Multiplier';
+    headers.push(RFID_HEADER);
+    lastCol = crewSheet.getLastColumn();
+  }
+
+  headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
+    .map(h => String(h || '').trim());
+
+  crewBaseHeaders.forEach(h => {
+    const norm = normalizeVaultHeaderKey_(h);
+    const found = headers.some(x => normalizeVaultHeaderKey_(x) === norm);
+    if (!found) {
+      crewSheet.insertColumnAfter(crewSheet.getLastColumn());
+      crewSheet.getRange(1, crewSheet.getLastColumn()).setValue(h);
+      headers.push(h);
+    }
+  });
+
+  headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
+    .map(h => String(h || '').trim());
+  if (!headers.some(x => normalizeVaultHeaderKey_(x) === 'rfidtag')) {
+    crewSheet.insertColumnAfter(crewSheet.getLastColumn());
+    crewSheet.getRange(1, crewSheet.getLastColumn()).setValue(RFID_HEADER);
+  }
+
+  crewSheet.getRange(1, 1, 1, crewSheet.getLastColumn())
+    .setFontWeight('bold').setBackground('#064e3b').setFontColor('#ffffff');
+}
+
 // @INDEX: SCHEMA_VAULT -> Relational Schema Engine
 function verifyVaultSchema(readOnly = false) {
   if (cachedVaultSheets && readOnly) return cachedVaultSheets;
@@ -192,25 +306,17 @@ function verifyVaultSchema(readOnly = false) {
 
   // TABLE 1: CREW ROSTER
   let crewSheet = sm["Crew_Roster"];
-  const crewHeaders = ["uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer", "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier", "rfid_tag"];
-  if (!crewSheet) { 
-    crewSheet = ss.insertSheet("Crew_Roster"); 
-    crewSheet.appendRow(crewHeaders); 
-    crewSheet.getRange(1, 1, 1, crewHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff"); 
-    crewSheet.setFrozenRows(1); 
+  const crewHeaders = [
+    "uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer",
+    "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier", "rfid_tag"
+  ];
+  if (!crewSheet) {
+    crewSheet = ss.insertSheet("Crew_Roster");
+    crewSheet.appendRow(crewHeaders);
+    crewSheet.getRange(1, 1, 1, crewHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
+    crewSheet.setFrozenRows(1);
   } else {
-    let headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
-      .map(h => String(h || "").trim());
-    crewHeaders.forEach(h => {
-      let norm = h.toLowerCase().replace(/[\s_]+/g, "");
-      let found = headers.some(x => x.toLowerCase().replace(/[\s_]+/g, "") === norm);
-      if (!found) {
-        crewSheet.insertColumnAfter(crewSheet.getLastColumn());
-        crewSheet.getRange(1, crewSheet.getLastColumn()).setValue(h);
-        headers.push(h);
-      }
-    });
-    crewSheet.getRange(1, 1, 1, crewSheet.getLastColumn()).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
+    repairAndEnsureCrewRosterSchema_(crewSheet);
   }
 
   // TABLE 2: IAM ROLES (current credential matrix — legacy Role_Permissions is ignored)
