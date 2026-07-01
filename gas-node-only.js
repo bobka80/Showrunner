@@ -12,6 +12,7 @@ module.exports = new Set([
   'rollback-works.js',
   'rollback-milestone.js',
   'deploy-hosting.js',
+  'build-station-apk.js',
   'check-google-account.js',
   'gas-push-sync.js',
   'gas-node-only.js',
