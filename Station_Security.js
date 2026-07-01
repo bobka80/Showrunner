@@ -102,6 +102,30 @@ function buildSyntheticStationEmail(name, uid) {
   return slug + '.' + shortUid + '@station.showrider';
 }
 
+function normalizeStationRfidTag(tag) {
+  return (tag || '').toString().trim().toLowerCase();
+}
+
+/** Crew badge lookup for host-inherit (station shell). */
+function lookupCrewMemberByRfidTag(rfidTag, crewData, cMap) {
+  const needle = normalizeStationRfidTag(rfidTag);
+  if (!needle || !crewData || crewData.length < 2 || !cMap) return null;
+  for (let i = 1; i < crewData.length; i++) {
+    if (cMap['rfid_tag'] === undefined) continue;
+    const rowTag = normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]);
+    if (!rowTag || rowTag !== needle) continue;
+    const name = getSheetCell(crewData[i], cMap, 'Name');
+    if (!name) continue;
+    return {
+      uid: getSheetCell(crewData[i], cMap, 'uid'),
+      name: name,
+      email: getSheetCell(crewData[i], cMap, 'Email'),
+      rfidTag: rowTag
+    };
+  }
+  return null;
+}
+
 function actorUsesStationShell(crewName) {
   if (!crewName) return false;
   const profile = typeof getUserSecurityProfile === 'function' ? getUserSecurityProfile(crewName) : null;

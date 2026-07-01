@@ -943,7 +943,10 @@ function getSecureIamDirectory(adminName) {
           roleId: row[cMap['Role_ID']] ? row[cMap['Role_ID']].toString().trim() : "",
           roleName: "",
           payrollMultiplier: row[cMap['Payroll_Multiplier']] ? parseFloat(row[cMap['Payroll_Multiplier']]) || 1.0 : 1.0,
-          passcode: row[cMap['Passcode']] ? row[cMap['Passcode']].toString().trim() : ""   
+          passcode: row[cMap['Passcode']] ? row[cMap['Passcode']].toString().trim() : "",
+          rfidTag: cMap['rfid_tag'] !== undefined && row[cMap['rfid_tag']]
+            ? row[cMap['rfid_tag']].toString().trim()
+            : ""
         });
     }
     const { rolesList, roleMap } = buildRoleDirectory(roleData, rMap);

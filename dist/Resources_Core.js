@@ -192,15 +192,25 @@ function verifyVaultSchema(readOnly = false) {
 
   // TABLE 1: CREW ROSTER
   let crewSheet = sm["Crew_Roster"];
-  const crewHeaders = ["uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer", "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier"];
+  const crewHeaders = ["uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer", "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier", "rfid_tag"];
   if (!crewSheet) { 
     crewSheet = ss.insertSheet("Crew_Roster"); 
     crewSheet.appendRow(crewHeaders); 
     crewSheet.getRange(1, 1, 1, crewHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff"); 
     crewSheet.setFrozenRows(1); 
   } else {
-    if (crewSheet.getMaxColumns() < crewHeaders.length) crewSheet.insertColumnsAfter(crewSheet.getMaxColumns(), crewHeaders.length - crewSheet.getMaxColumns());
-    crewSheet.getRange(1, 1, 1, crewHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
+    let headers = crewSheet.getRange(1, 1, 1, Math.max(1, crewSheet.getLastColumn())).getValues()[0]
+      .map(h => String(h || "").trim());
+    crewHeaders.forEach(h => {
+      let norm = h.toLowerCase().replace(/[\s_]+/g, "");
+      let found = headers.some(x => x.toLowerCase().replace(/[\s_]+/g, "") === norm);
+      if (!found) {
+        crewSheet.insertColumnAfter(crewSheet.getLastColumn());
+        crewSheet.getRange(1, crewSheet.getLastColumn()).setValue(h);
+        headers.push(h);
+      }
+    });
+    crewSheet.getRange(1, 1, 1, crewSheet.getLastColumn()).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
   }
 
   // TABLE 2: IAM ROLES (current credential matrix — legacy Role_Permissions is ignored)
