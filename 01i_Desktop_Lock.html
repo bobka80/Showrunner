@@ -174,7 +174,8 @@
     lanes.innerHTML = html;
   }
 
-  const DESKTOP_LOCK_DIGIT_FADE_MS = 300;
+  const DESKTOP_LOCK_DIGIT_FADE_OUT_MS = 600;
+  const DESKTOP_LOCK_DIGIT_FADE_IN_MS = 300;
 
   function buildDesktopLockClockFace(el, str) {
     el.textContent = '';
@@ -226,7 +227,7 @@
       let enter = slot.querySelector('.is-entering');
       if (enter) enter.classList.remove('is-entering');
       delete slot.dataset.fadeTimer;
-    }, DESKTOP_LOCK_DIGIT_FADE_MS + 50);
+    }, Math.max(DESKTOP_LOCK_DIGIT_FADE_OUT_MS, DESKTOP_LOCK_DIGIT_FADE_IN_MS) + 50);
     slot.dataset.fadeTimer = String(t);
   }
 
