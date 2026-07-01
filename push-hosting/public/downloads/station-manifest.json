@@ -1,0 +1,8 @@
+{
+  "versionName": "0.1.0-dev",
+  "versionCode": 1,
+  "apkFile": "showrunner-station.apk",
+  "published": false,
+  "updatedAt": null,
+  "notes": "Run node build-station-apk.js then node deploy-hosting.js to publish."
+}

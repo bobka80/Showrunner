@@ -1,0 +1,2 @@
+# Built station APK — publish via build-station-apk.js + deploy-hosting.js
+public/downloads/*.apk

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Showrunner Station — Install</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0a0a0c; --card: #1a1a1e; --accent: #f97316; --ok: #10b981; --muted: #71717a; --text: #f4f4f5; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; font-family: Inter, system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .card {
+      width: 100%; max-width: 420px; background: var(--card);
+      border-radius: 12px; border-top: 6px solid var(--accent);
+      padding: 28px 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+    }
+    h1 { margin: 0 0 6px; font-size: 20px; font-weight: 900; letter-spacing: 0.02em; }
+    .sub { color: var(--muted); font-size: 12px; margin: 0 0 20px; line-height: 1.5; }
+    .ver { font-size: 11px; color: var(--muted); margin-bottom: 18px; }
+    .btn {
+      display: block; width: 100%; padding: 14px; border: none; border-radius: 8px;
+      font-weight: 800; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase;
+      cursor: pointer; text-align: center; text-decoration: none;
+    }
+    .btn-primary { background: rgba(249,115,22,0.25); border: 1px solid var(--accent); color: #fff; }
+    .btn-primary:hover { background: rgba(249,115,22,0.4); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-ghost { margin-top: 12px; background: transparent; border: 1px solid #333; color: var(--muted); font-size: 11px; }
+    ol { margin: 18px 0 0; padding-left: 18px; color: #a1a1aa; font-size: 12px; line-height: 1.55; }
+    ol strong { color: var(--text); }
+    #status { margin-top: 14px; font-size: 12px; font-weight: 700; min-height: 18px; }
+    #status.ok { color: var(--ok); }
+    #status.warn { color: var(--accent); }
+    #status.err { color: #ef4444; }
+    .hidden { display: none; }
+    .desktop-note {
+      margin-top: 16px; padding: 12px; border-radius: 8px; background: #111114;
+      border: 1px solid #27272a; font-size: 11px; color: var(--muted); line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Showrunner Station</h1>
+    <p class="sub">Warehouse gun app — RFID badge login for Chainway R6 devices. Install once, then open <strong>Showrunner Station</strong> instead of Chrome.</p>
+    <p class="ver" id="version-line">Checking release…</p>
+
+    <button type="button" class="btn btn-primary" id="download-btn" disabled>Download &amp; install</button>
+    <a class="btn btn-ghost" id="back-login" href="/">Back to Showrunner login</a>
+
+    <p id="status" class="hidden"></p>
+
+    <ol id="steps-android" class="hidden">
+      <li>Tap <strong>Download &amp; install</strong> above.</li>
+      <li>When the file finishes, open it from the notification or <strong>Downloads</strong>.</li>
+      <li>If asked, allow <strong>Install unknown apps</strong> for your browser or Files app.</li>
+      <li>Tap <strong>Install</strong>, then open <strong>Showrunner Station</strong> from the app drawer.</li>
+      <li>Log in as your warehouse gun account (e.g. WH-GUN-01).</li>
+    </ol>
+
+    <div id="desktop-note" class="desktop-note hidden">
+      Open this page on the gun phone (or scan a QR code to this URL). Desktop browsers cannot install Android apps.
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var APK_URL = '/downloads/showrunner-station.apk';
+      var MANIFEST_URL = '/downloads/station-manifest.json';
+      var isAndroid = /Android/i.test(navigator.userAgent);
+      var autoInstall = new URLSearchParams(location.search).get('install') === '1';
+
+      var btn = document.getElementById('download-btn');
+      var statusEl = document.getElementById('status');
+      var verLine = document.getElementById('version-line');
+      var steps = document.getElementById('steps-android');
+      var desktopNote = document.getElementById('desktop-note');
+
+      function setStatus(msg, kind) {
+        statusEl.textContent = msg || '';
+        statusEl.className = kind || '';
+        statusEl.classList.toggle('hidden', !msg);
+      }
+
+      function startDownload() {
+        setStatus('Starting download…', 'ok');
+        var a = document.createElement('a');
+        a.href = APK_URL + '?t=' + Date.now();
+        a.setAttribute('download', 'showrunner-station.apk');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setStatus('Download started — open the APK from Downloads when it finishes.', 'ok');
+      }
+
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        startDownload();
+      });
+
+      if (isAndroid) {
+        steps.classList.remove('hidden');
+      } else {
+        desktopNote.classList.remove('hidden');
+      }
+
+      fetch(MANIFEST_URL, { cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (m) {
+          var published = m && m.published !== false;
+          var name = (m && m.versionName) ? m.versionName : '0.1.0-dev';
+          var code = (m && m.versionCode) ? (' (build ' + m.versionCode + ')') : '';
+          verLine.textContent = 'Version ' + name + code;
+
+          return fetch(APK_URL, { method: 'HEAD', cache: 'no-store' })
+            .then(function (head) {
+              if (!head.ok || !published) {
+                btn.disabled = true;
+                btn.textContent = 'APK not published yet';
+                setStatus('Ask ops to run build-station-apk.js and deploy hosting.', 'warn');
+                return;
+              }
+              btn.disabled = false;
+              btn.textContent = isAndroid ? 'Download & install' : 'Download APK';
+              if (isAndroid && autoInstall) {
+                setTimeout(startDownload, 600);
+              }
+            });
+        })
+        .catch(function () {
+          verLine.textContent = 'Version unknown';
+          btn.disabled = true;
+          setStatus('Could not load release info.', 'err');
+        });
+    })();
+  </script>
+</body>
+</html>

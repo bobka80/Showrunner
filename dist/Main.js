@@ -16,6 +16,16 @@ function isValidFirebaseVapidKey_(key) {
   return /^[A-Za-z0-9_-]+$/.test(key);
 }
 
+function getStationAppUrl_() {
+  const hosting = getFirebasePublicConfig().hostingUrl || 'https://sm-showrunner-97405.web.app';
+  return String(hosting).replace(/\/$/, '') + '/station-app?install=1';
+}
+
+function applyLoginTemplateDefaults_(loginTemplate) {
+  loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+  loginTemplate.stationAppUrl = getStationAppUrl_();
+}
+
 function getFirebasePublicConfig() {
   const p = PropertiesService.getScriptProperties();
   const projectId = p.getProperty('FIREBASE_PROJECT_ID') || 'sm-showrunner-97405';
@@ -149,7 +159,7 @@ function doGet(e) {
     const crewName = validateUserSession_(sessionToken);
     if (!crewName) {
       let loginTemplate = HtmlService.createTemplateFromFile('Login');
-      loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+      applyLoginTemplateDefaults_(loginTemplate);
       loginTemplate.errorMsg = 'Session expired — please log in again.';
       loginTemplate.clearSession = true;
       return loginTemplate.evaluate()
@@ -161,7 +171,7 @@ function doGet(e) {
     if (!authResult.success) {
       revokeUserSession_(sessionToken);
       let loginTemplate = HtmlService.createTemplateFromFile('Login');
-      loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+      applyLoginTemplateDefaults_(loginTemplate);
       loginTemplate.errorMsg = authResult.error || 'Account not found.';
       loginTemplate.clearSession = true;
       return loginTemplate.evaluate()
@@ -173,7 +183,7 @@ function doGet(e) {
   }
 
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
-  loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+  applyLoginTemplateDefaults_(loginTemplate);
   loginTemplate.errorMsg = "none";
   loginTemplate.clearSession = false;
   return loginTemplate.evaluate().setTitle('System Login').addMetaTag('viewport', 'width=device-width, initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -215,7 +225,7 @@ function doPost(e) {
   
   // INCORRECT CREDENTIALS ROUTE
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
-  loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+  applyLoginTemplateDefaults_(loginTemplate);
   loginTemplate.errorMsg = authResult.error;
   loginTemplate.clearSession = true;
   
