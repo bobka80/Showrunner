@@ -86,13 +86,29 @@ function getStationProfilesFromRoleData(roleData, rMap) {
   return list;
 }
 
+function isStationRoleRef(roleRef, roleData, rMap) {
+  if (!roleRef) return false;
+  for (let i = 1; i < roleData.length; i++) {
+    if (crewRoleRefMatchesRow(roleRef, roleData[i], rMap) && isStationDeviceProfileRow(roleData[i], rMap)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildSyntheticStationEmail(name, uid) {
+  const slug = String(name || 'device').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'device';
+  const shortUid = String(uid || Utilities.getUuid()).replace(/-/g, '').slice(0, 8);
+  return slug + '.' + shortUid + '@station.showrider';
+}
+
 function actorUsesStationShell(crewName) {
   if (!crewName) return false;
   const profile = typeof getUserSecurityProfile === 'function' ? getUserSecurityProfile(crewName) : null;
   if (!profile || !profile.roleId) return false;
   const sheets = verifyVaultSchema(true);
-  const roleData = getSheetData(sheets.roles);
   const rMap = ensureStationRoleColumns(sheets.roles);
+  const roleData = sheets.roles.getDataRange().getValues();
   for (let i = 1; i < roleData.length; i++) {
     if (typeof crewRoleRefMatchesRow === 'function' && crewRoleRefMatchesRow(profile.roleId, roleData[i], rMap)) {
       return isStationDeviceProfileRow(roleData[i], rMap);
@@ -106,9 +122,9 @@ function effectiveStationPermission(crewName, permissionKey) {
   if (crewName.toLowerCase().trim() === 'bogdan') return true;
   const sheets = verifyVaultSchema(true);
   const crewData = getSheetData(sheets.crew);
-  const roleData = getSheetData(sheets.roles);
-  const cMap = crewData.hMap;
   const rMap = ensureStationRoleColumns(sheets.roles);
+  const roleData = sheets.roles.getDataRange().getValues();
+  const cMap = crewData.hMap;
   const target = crewName.toLowerCase().trim();
   for (let i = 1; i < crewData.length; i++) {
     let dbName = getSheetCell(crewData[i], cMap, 'Name').toLowerCase().trim();

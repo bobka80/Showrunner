@@ -149,6 +149,7 @@ function refreshCrewFormRoles(done) {
           }
           globalRoles = (response && response.roles) ? response.roles : [];
           populateCrewRoleSelect(roleSelect, '');
+          if (typeof updateAddMemberStationMode === 'function') updateAddMemberStationMode();
           if (editRoleSelect && editRoleSelect.options.length) {
               const cur = editRoleSelect.value;
               populateCrewRoleSelect(editRoleSelect, cur);
@@ -183,6 +184,28 @@ function resolveRoleDisplayName(roleRef, resolvedName) {
     return ref;
 }
 
+function isSelectedAddMemberRoleStation() {
+    const sel = document.getElementById('add-member-role');
+    const val = sel && sel.value;
+    if (!val || val === 'NEW' || !globalRoles || !globalRoles.length) return false;
+    const hit = globalRoles.find(function(r) {
+        return isMatch(getRoleOptionValue(r), val) || isMatch(r.id, val) || isMatch(r.name, val);
+    });
+    return !!(hit && hit.is_station_device);
+}
+
+function updateAddMemberStationMode() {
+    const station = isSelectedAddMemberRoleStation();
+    const title = document.getElementById('add-member-modal-title');
+    const emailWrap = document.getElementById('add-member-email-wrap');
+    const officeRow = document.getElementById('add-member-office-row');
+    const nameInput = document.getElementById('add-member-name');
+    if (title) title.innerText = station ? 'PROVISION STATION DEVICE' : 'PROVISION NEW USER';
+    if (emailWrap) emailWrap.style.display = station ? 'none' : '';
+    if (officeRow) officeRow.style.display = station ? 'none' : '';
+    if (nameInput) nameInput.placeholder = station ? 'WH-GUN-01' : 'John Doe';
+}
+
 function openAddMemberModal() {
     document.getElementById('add-member-modal-overlay').style.display = 'flex';
     
@@ -192,7 +215,7 @@ function openAddMemberModal() {
     document.getElementById('add-member-mult').value = '1.0';
 
     refreshCrewFormRoles(function() {
-        /* roles loaded into DATA: Role Name */
+        updateAddMemberStationMode();
     });
 
     const assignSelect = document.getElementById('add-member-assign');
@@ -209,6 +232,7 @@ function openAddMemberModal() {
 }
 
 function submitNewMember() {
+    const isStation = isSelectedAddMemberRoleStation();
     const payload = {
         name: document.getElementById('add-member-name').value,
         email: document.getElementById('add-member-email').value,
@@ -217,11 +241,15 @@ function submitNewMember() {
         jobTitle: document.getElementById('add-member-assign').value,
         department: document.getElementById('add-member-dept').value,
         meal: document.getElementById('add-member-meal').value,
-        roleId: document.getElementById('add-member-role').value
+        roleId: document.getElementById('add-member-role').value,
+        isStationDevice: isStation
     };
     
-    if(!payload.name || !payload.email || payload.passcode.length !== 6 || !payload.roleId) {
-        return alert("Name, Email, 6-char Passcode, and Role are required.");
+    if(!payload.name || payload.passcode.length !== 6 || !payload.roleId) {
+        return alert("Name, 6-char Passcode, and IAM Role are required.");
+    }
+    if (!isStation && !payload.email) {
+        return alert("Email is required for office crew members.");
     }
 
     const btn = document.getElementById('btn-submit-member');

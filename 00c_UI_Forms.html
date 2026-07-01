@@ -1,20 +1,20 @@
 <!-- @INDEX: FORMS -> Crew & IAM Provisioning -->
 <div id="add-member-modal-overlay" class="modal-overlay" style="z-index: 3000; display:none;">
   <div class="modal" style="max-width: 600px; width: 95%;">
-    <h3 class="modal-title">👤 Provision New User</h3>
+    <h3 class="modal-title" id="add-member-modal-title">PROVISION NEW USER</h3>
     <div style="display:flex; gap:10px; margin-bottom: 15px;">
         <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Full Name</div><input type="text" id="add-member-name" placeholder="John Doe" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></div>
-        <div style="flex:2;"><div class="input-label" style="font-size: 12px;">Email Address</div><input type="email" id="add-member-email" placeholder="john@company.com" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></div>
+        <div id="add-member-email-wrap" style="flex:2;"><div class="input-label" style="font-size: 12px;">Email Address</div><input type="email" id="add-member-email" placeholder="john@company.com" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px;"></div>
         <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Passcode (6)</div><input type="text" id="add-member-pass" placeholder="••••••" maxlength="6" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; letter-spacing: 2px; text-align:center;"></div>
     </div>
-    <div style="display:flex; gap:10px; margin-bottom: 20px; padding-top: 15px; border-top: 1px solid #333;">
+    <div id="add-member-office-row" style="display:flex; gap:10px; margin-bottom: 20px; padding-top: 15px; border-top: 1px solid #333;">
         <div style="flex:0.6;"><div class="input-label" style="font-size: 12px;">Pay Mult.</div><input type="number" step="0.1" id="add-member-mult" value="1.0" style="width:100%; box-sizing:border-box; margin:0; padding:12px; background:#111; border:1px solid #10b981; color:#10b981; font-weight:bold; border-radius:4px; text-align:center;"></div>
         <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Assignment (Role)</div><select id="add-member-assign" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
         <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Department</div><select id="add-member-dept" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
         <div style="flex:1;"><div class="input-label" style="font-size: 12px;">Meal Preference</div><select id="add-member-meal" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
     </div>
     <div style="display:flex; gap:10px; margin-bottom: 20px; padding-top: 15px; border-top: 1px solid #333;">
-        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">DATA: Role Name</div><select id="add-member-role" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;"><option value="">Loading...</option></select></div>
+        <div style="flex:1;"><div class="input-label" style="font-size: 12px;">IAM Role</div><select id="add-member-role" style="width:100%; padding:12px; background:#111; border:1px solid #333; color:#fff; border-radius:4px; margin:0; box-sizing:border-box;" onchange="if(typeof updateAddMemberStationMode==='function')updateAddMemberStationMode();"><option value="">Loading...</option></select></div>
     </div>
     <div style="display:flex; gap:12px; margin-top:20px; padding-top: 15px; border-top: 1px solid #333; justify-content: flex-end; align-items: center;">
       <button class="btn-close" style="width:auto; margin:0;" onclick="document.getElementById('add-member-modal-overlay').style.display='none';">CANCEL</button>

@@ -929,11 +929,13 @@ function getSecureIamDirectory(adminName) {
     let crewList = [];
     for (let i = 1; i < crewData.length; i++) {
       let row = crewData[i];
-      if (row[cMap['Email']]) {
+      const rowEmail = row[cMap['Email']] ? row[cMap['Email']].toString().trim() : '';
+      const rowName = row[cMap['Name']] ? row[cMap['Name']].toString().trim() : '';
+      if (!rowEmail && !rowName) continue;
         crewList.push({
           uid: row[cMap['uid']] ? row[cMap['uid']].toString().trim() : "",
-          email: row[cMap['Email']].toString().trim(), 
-          name: row[cMap['Name']] ? row[cMap['Name']].toString().trim() : "", 
+          email: rowEmail, 
+          name: rowName, 
           jobTitle: row[cMap['Job_Title']] ? row[cMap['Job_Title']].toString().trim() : "",
           dept: row[cMap['Department']] ? row[cMap['Department']].toString().trim() : "", 
           meal: row[cMap['Meal']] ? row[cMap['Meal']].toString().trim() : "",
@@ -943,7 +945,6 @@ function getSecureIamDirectory(adminName) {
           payrollMultiplier: row[cMap['Payroll_Multiplier']] ? parseFloat(row[cMap['Payroll_Multiplier']]) || 1.0 : 1.0,
           passcode: row[cMap['Passcode']] ? row[cMap['Passcode']].toString().trim() : ""   
         });
-      }
     }
     const { rolesList, roleMap } = buildRoleDirectory(roleData, rMap);
 
@@ -1130,39 +1131,64 @@ function provisionNewUser(adminName, payload) {
     const sheets = verifyVaultSchema();
     const crewSheet = sheets.crew;
     const roleSheet = sheets.roles;
+    const rMap = typeof ensureStationRoleColumns === 'function'
+      ? ensureStationRoleColumns(roleSheet)
+      : getHeaderMap(roleSheet.getDataRange().getValues());
     const roleData = roleSheet.getDataRange().getValues();
-    const rMap = getHeaderMap(roleData);
     const data = crewSheet.getDataRange().getValues();
     const cMap = getHeaderMap(data);
-    
-    // --- ANTI-DUPLICATION ENGINE ---
-    let targetEmail = payload.email.trim().toLowerCase();
-    for (let i = 1; i < data.length; i++) {
-        if (data[i][cMap['Email']] && data[i][cMap['Email']].toString().trim().toLowerCase() === targetEmail) {
-            return { success: false, error: "A user with this email address already exists in the Vault." };
-        }
+
+    const name = (payload.name || '').toString().trim();
+    const passcode = (payload.passcode || '').toString().trim();
+    if (!name || passcode.length !== 6 || !payload.roleId) {
+      return { success: false, error: "Name, 6-char Passcode, and Role are required." };
     }
-    // -------------------------------
-    
+
+    const isStationDevice = typeof isStationRoleRef === 'function'
+      ? isStationRoleRef(payload.roleId, roleData, rMap)
+      : !!payload.isStationDevice;
+
+    let email = (payload.email || '').toString().trim();
     let newUid = Utilities.getUuid();
+    if (isStationDevice) {
+      if (!email) email = buildSyntheticStationEmail(name, newUid);
+    } else if (!email) {
+      return { success: false, error: "Email is required for office crew members." };
+    }
+
+    const targetEmail = email.toLowerCase();
+    const targetName = name.toLowerCase();
+    for (let i = 1; i < data.length; i++) {
+      const rowEmail = data[i][cMap['Email']] ? data[i][cMap['Email']].toString().trim().toLowerCase() : '';
+      if (rowEmail && rowEmail === targetEmail) {
+        return { success: false, error: "A user with this email address already exists in the Vault." };
+      }
+      const rowName = data[i][cMap['Name']] ? data[i][cMap['Name']].toString().trim().toLowerCase() : '';
+      if (isStationDevice && rowName && rowName === targetName) {
+        return { success: false, error: "A station device with this login name already exists." };
+      }
+    }
+
     let newRow = new Array(data[0].length).fill("");
     if(cMap['uid'] !== undefined) newRow[cMap['uid']] = newUid;
-    if(cMap['Email'] !== undefined) newRow[cMap['Email']] = payload.email.trim();
-    if(cMap['Name'] !== undefined) newRow[cMap['Name']] = payload.name.trim();
+    if(cMap['Email'] !== undefined) newRow[cMap['Email']] = email;
+    if(cMap['Name'] !== undefined) newRow[cMap['Name']] = name;
     if(cMap['Job_Title'] !== undefined) newRow[cMap['Job_Title']] = payload.jobTitle || "";
     if(cMap['Department'] !== undefined) newRow[cMap['Department']] = payload.department || "";
     if(cMap['Meal'] !== undefined) newRow[cMap['Meal']] = payload.meal || "";
     if(cMap['IsManager'] !== undefined) newRow[cMap['IsManager']] = false;
     if(cMap['IsFreelancer'] !== undefined) newRow[cMap['IsFreelancer']] = (payload.systemAccess === "VIEWER");
     if(cMap['Role_ID'] !== undefined) newRow[cMap['Role_ID']] = normalizeCrewRoleId(payload.roleId, roleData, rMap);
-    if(cMap['Passcode'] !== undefined) newRow[cMap['Passcode']] = payload.passcode.trim();
-    if(cMap['Payroll_Multiplier'] !== undefined) newRow[cMap['Payroll_Multiplier']] = payload.payrollMultiplier;
+    if(cMap['Passcode'] !== undefined) newRow[cMap['Passcode']] = passcode;
+    if(cMap['Payroll_Multiplier'] !== undefined) newRow[cMap['Payroll_Multiplier']] = payload.payrollMultiplier || 1.0;
     if(cMap['OrderIndex'] !== undefined) newRow[cMap['OrderIndex']] = "";
     
     crewSheet.appendRow(newRow);
     if (typeof flushCache !== 'undefined') flushCache();
-    writeToAuditLog(adminName, "CREATE", "IAM", "GLOBAL", newUid, `Provisioned new user as ${payload.roleId}.`);
-    return { success: true, message: "User securely added to the Vault." };
+    writeToAuditLog(adminName, "CREATE", "IAM", "GLOBAL", newUid, isStationDevice
+      ? `Provisioned station device login as ${payload.roleId}.`
+      : `Provisioned new user as ${payload.roleId}.`);
+    return { success: true, message: isStationDevice ? "Station device login added." : "User securely added to the Vault." };
   });
 }
 
