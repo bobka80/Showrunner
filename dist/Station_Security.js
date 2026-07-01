@@ -128,15 +128,21 @@ function lookupCrewMemberByRfidTag(rfidTag, crewData, cMap) {
 
 function actorUsesStationShell(crewName) {
   if (!crewName) return false;
-  const profile = typeof getUserSecurityProfile === 'function' ? getUserSecurityProfile(crewName) : null;
-  if (!profile || !profile.roleId) return false;
   const sheets = verifyVaultSchema(true);
+  const crewData = getSheetData(sheets.crew);
   const rMap = ensureStationRoleColumns(sheets.roles);
   const roleData = sheets.roles.getDataRange().getValues();
-  for (let i = 1; i < roleData.length; i++) {
-    if (typeof crewRoleRefMatchesRow === 'function' && crewRoleRefMatchesRow(profile.roleId, roleData[i], rMap)) {
-      return isStationDeviceProfileRow(roleData[i], rMap);
+  const cMap = getHeaderMap(crewData);
+  const target = crewName.toLowerCase().trim();
+  for (let i = 1; i < crewData.length; i++) {
+    const dbName = getSheetCell(crewData[i], cMap, 'Name').toLowerCase().trim();
+    if (dbName !== target) continue;
+    const roleId = getSheetCell(crewData[i], cMap, 'Role_ID');
+    for (let r = 1; r < roleData.length; r++) {
+      if (!crewRoleRefMatchesRow(roleId, roleData[r], rMap)) continue;
+      return isStationDeviceProfileRow(roleData[r], rMap);
     }
+    return false;
   }
   return false;
 }

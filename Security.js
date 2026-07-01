@@ -866,6 +866,7 @@ function getUserSecurityProfile(crewName) {
       return {
         email: email,
         uid: uid,
+        roleId: roleId,
         tunneling: isTunneling,
         isFreelancer: isFreelancer,
         isManager: isManager,
