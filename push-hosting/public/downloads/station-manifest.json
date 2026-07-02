@@ -1,14 +1,24 @@
 {
-  "versionName": "0.1.8",
-  "versionCode": 10,
+  "versionName": "0.1.9",
+  "versionCode": 11,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-02T19:02:11.441Z",
+  "updatedAt": "2026-07-02T19:24:17.996Z",
   "sizeBytes": 12040645,
   "notes": [
-    "Settings now apply live the moment you change them (Done just closes the menu) - the app talks to the gun directly instead of through a slower relay. Added an on-screen diagnostic overlay (bottom-left) plus native status messages so we can finally SEE the scan/settings path on the device: it shows whether the station bridge is connected, echoes 'Gun set: ...' when a setting reaches the gun, and prints 'Trigger DOWN/UP' so we can tell why Hold behaves like a toggle. This build is about pinpointing why scans reach the bottom text but not the top strip."
+    "Fixes scans not showing on the top strip: the app now sends tags to the screen through a direct, reliable channel instead of the relay that was dropping them - your reads should now appear up top, not just in the bottom text. Removed Hold mode: this gun model does not report when you release the trigger, so Hold could not work",
+    "scan modes are now Single and Continuous only (any device set to Hold is moved back to Single automatically)."
   ],
   "history": [
+    {
+      "versionName": "0.1.9",
+      "versionCode": 11,
+      "date": "2026-07-02T19:24:17.996Z",
+      "notes": [
+        "Fixes scans not showing on the top strip: the app now sends tags to the screen through a direct, reliable channel instead of the relay that was dropping them - your reads should now appear up top, not just in the bottom text. Removed Hold mode: this gun model does not report when you release the trigger, so Hold could not work",
+        "scan modes are now Single and Continuous only (any device set to Hold is moved back to Single automatically)."
+      ]
+    },
     {
       "versionName": "0.1.8",
       "versionCode": 10,

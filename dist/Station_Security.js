@@ -326,6 +326,44 @@ function getStationShellBootstrap(deviceActor) {
   });
 }
 
+// @INDEX: STATION_SHELL -> Equipment RFID map (epc -> equipment name/unit)
+// Preloaded on the station shell so scanned tags resolve to a human name/unit
+// instantly and offline. Same fragile trim/lowercase matching contract as crew tags.
+function getStationEquipmentRfidMap(deviceActor) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'Not a station device login.' };
+    }
+    const sheets = verifyVaultSchema(true);
+    const data = getSheetData(sheets.assets);
+    const map = data.hMap || getHeaderMap(data);
+    const getCol = (matchStrs) => {
+      const key = Object.keys(map).find(k => matchStrs.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return key !== undefined ? map[key] : undefined;
+    };
+    const cUid = getCol(['uid', 'id', 'assetuid']) ?? map['uid'];
+    const cName = getCol(['name', 'assetname', 'itemname']) ?? map['name'];
+    const cUnit = getCol(['unitnumber', 'unit']) ?? map['unit_number'];
+    const cRfid = getCol(['rfidtag', 'rfid']) ?? map['rfid_tag'];
+
+    const out = {};
+    let count = 0;
+    if (cRfid !== undefined) {
+      for (let i = 1; i < data.length; i++) {
+        const tag = normalizeStationRfidTag(data[i][cRfid]);
+        if (!tag) continue;
+        out[tag] = {
+          name: cName !== undefined ? String(data[i][cName] || '') : '',
+          unitId: cUid !== undefined ? String(data[i][cUid] || '') : '',
+          unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : ''
+        };
+        count++;
+      }
+    }
+    return { success: true, map: out, count: count, ts: Date.now() };
+  });
+}
+
 // @INDEX: STATION_SHELL -> RFID scan router (host badge first)
 function processStationRfidScan(deviceActor, rfidTag, options) {
   return executeWithRetry(() => {

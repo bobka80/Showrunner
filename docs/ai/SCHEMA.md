@@ -90,6 +90,8 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 }
 ```
 
+**`rfid_tag` matching contract (fragile — keep both sides identical):** the tag is stored and compared through `normalizeStationRfidTag()` = `trim().toLowerCase()` **only** (no hex cleanup, no leading-zero/space stripping). The native gun sends `epc.uppercase()`; the server lowercases it. Matching therefore works **only if enrollment and login read the exact same EPC representation** — same memory bank, same formatting. If a gun/firmware ever returns a differently-formatted EPC (embedded spaces, different length, TID vs EPC), the stored badge silently stops matching. The `rfid_tag` **column must exist** on `Crew_Roster` (provisioned by `verifyVaultSchema`); if absent, enrollment errors and badge login silently returns no match. Enrollment (`enrollStationCrewRfidTag`) calls `flushCache()` so a freshly linked badge logs in immediately. Full lifecycle + fragilities: [active/rfid-station-profiles.md](active/rfid-station-profiles.md).
+
 ---
 
 ## Appendix: 30-Table Index (One-Line Reference)

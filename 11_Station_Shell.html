@@ -54,6 +54,121 @@ html.station-device-root #station-shell {
   color: #71717a;
   font-weight: 600;
 }
+.station-shell-brand__line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.station-shell-brand__host {
+  font-size: 14px;
+  font-weight: 900;
+  color: #10b981;
+}
+/* Read-power / sensitivity bar on the main screen (above the live scans) */
+.station-sens-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #0d0d10;
+  border-bottom: 1px solid #1c1c1f;
+}
+.station-sens-bar__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-sens-bar input[type="range"] { flex: 1; }
+.station-sens-bar output {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 800;
+  color: #10b981;
+  min-width: 56px;
+  text-align: right;
+}
+/* Long PROJECT / VAULT nav buttons at the bottom */
+.station-shell-footer .station-nav-btn {
+  width: 100%;
+  margin: 0;
+  padding: 15px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.station-nav-btn[disabled],
+.station-nav-btn.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+/* Equipment-resolved scan rows (name + unit instead of raw tag) */
+.station-scan-feed__row .name {
+  font-family: Inter, sans-serif;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__row .unit {
+  font-family: monospace;
+  font-size: 11px;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-scan-feed__row.is-unknown .name { color: #eab308; font-weight: 600; }
+.station-scan-feed__row.is-unknown .unit { color: #71717a; }
+/* Station project picker overlay */
+#station-project-picker {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50002;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+#station-project-picker.is-open { display: flex; }
+.station-project-picker__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-project-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.station-project-item {
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #27272a;
+  background: #111114;
+  color: #f4f4f5;
+  cursor: pointer;
+}
+.station-project-item:active { border-color: #f97316; }
+.station-project-item__name {
+  font-size: 15px;
+  font-weight: 800;
+}
+.station-project-item__meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #71717a;
+}
 .station-shell-main {
   flex: 1;
   display: flex;
@@ -323,11 +438,18 @@ html.station-device-root #station-shell {
 <div id="station-shell" aria-label="Warehouse station">
   <div class="station-shell-header">
     <div class="station-shell-brand">
-      <div class="station-shell-brand__title">Warehouse station</div>
-      <div id="station-shell-device-name" class="station-shell-brand__device">—</div>
-      <div id="station-shell-profile-name" class="station-shell-brand__profile">—</div>
+      <div class="station-shell-brand__line">
+        <span id="station-shell-profile-name" class="station-shell-brand__device">—</span>
+        <span id="station-shell-host-inline" class="station-shell-brand__host" style="display:none;"></span>
+      </div>
     </div>
     <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="cursor:pointer; background:transparent; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#a1a1aa; border:1px solid #3f3f46; border-radius:999px; padding:6px 12px; display:flex; align-items:center; gap:6px;"><span id="station-shell-layout-text">HANDHELD</span><span aria-hidden="true" style="color:#f97316;">&#9881;</span></button>
+  </div>
+
+  <div id="station-sens-bar" class="station-sens-bar" aria-label="Read power / sensitivity">
+    <span class="station-sens-bar__label">Sensitivity</span>
+    <input type="range" id="station-main-power" min="5" max="30" step="1" oninput="stationOnMainPowerInput()" onchange="stationSaveMainPower()">
+    <output id="station-main-power-out">—</output>
   </div>
 
   <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans">
@@ -351,20 +473,11 @@ html.station-device-root #station-shell {
     <div id="station-shell-host-name" class="station-shell-host-name" style="display:none;"></div>
     <div id="station-shell-status" class="station-shell-status"></div>
     <div id="station-shell-last-scan" class="station-shell-last-scan"></div>
-
-    <div class="station-shell-lanes">
-      <div id="station-lane-project" class="station-shell-lane">
-        <div class="station-shell-lane__label">Project</div>
-        <div class="station-shell-lane__hint">Checkout / check-in (soon)</div>
-      </div>
-      <div id="station-lane-vault" class="station-shell-lane">
-        <div class="station-shell-lane__label">Vault</div>
-        <div class="station-shell-lane__hint">Maintenance / repair (soon)</div>
-      </div>
-    </div>
   </div>
 
   <div class="station-shell-footer">
+    <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
+    <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
     <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
     <button type="button" id="station-btn-enroll" class="btn-outline btn-sm" style="display:none;" onclick="stationToggleEnroll()">LINK MY RFID BADGE</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
@@ -449,6 +562,17 @@ html.station-device-root #station-shell {
   </div>
 </div>
 
+<div id="station-project-picker" aria-label="Pick a project">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Open a project</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseProjectPicker()">Cancel</button>
+  </div>
+  <div class="station-project-picker__body">
+    <div id="station-project-picker-status" class="station-shell-status" style="text-align:center;">Loading projects…</div>
+    <div id="station-project-picker-list" class="station-project-picker__list"></div>
+  </div>
+</div>
+
 <script>
 /**
  * 11_Station_Shell.html
@@ -481,6 +605,51 @@ var STATION_MODE_KEY = 'sm_station_scan_mode';
 var STATION_POLL_KEY = 'sm_station_poll_ms';
 var STATION_POWER_KEY = 'sm_station_power';
 var STATION_BEEP_KEY = 'sm_station_beep';
+
+/**
+ * Equipment RFID map (epc -> { name, unitId, unitNumber }) preloaded from the vault so the
+ * live scan strip can show a human name/unit instead of the raw tag — instantly and offline.
+ */
+var STATION_EQUIP_MAP_KEY = 'sm_station_equip_map_v1';
+var STATION_EQUIP_MAP_REFRESH_MS = 5 * 60 * 1000;
+window.stationEquipMap = window.stationEquipMap || {};
+
+/** Same trim/lowercase contract the backend uses for tag matching. */
+function stationNormalizeEpc_(epc) {
+  return String(epc == null ? '' : epc).trim().toLowerCase();
+}
+
+function stationResolveEpc_(epc) {
+  var key = stationNormalizeEpc_(epc);
+  if (!key) return null;
+  var m = window.stationEquipMap || {};
+  return m[key] || null;
+}
+
+function stationLoadEquipMapCache_() {
+  try {
+    var raw = localStorage.getItem(STATION_EQUIP_MAP_KEY);
+    if (!raw) return;
+    var parsed = JSON.parse(raw);
+    if (parsed && parsed.map) window.stationEquipMap = parsed.map;
+  } catch (e) { /* ignore */ }
+}
+
+function stationRefreshEquipMap_() {
+  if (!window.IS_STATION_DEVICE) return;
+  try {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success || !res.map) return;
+        window.stationEquipMap = res.map;
+        try { localStorage.setItem(STATION_EQUIP_MAP_KEY, JSON.stringify({ map: res.map, ts: Date.now() })); } catch (e) { /* ignore */ }
+        stationDebug_('equip map: ' + (res.count || 0));
+        stationRenderScanFeed_();
+      })
+      .withFailureHandler(function(err) { stationDebug_('equip map ERR'); })
+      .getStationEquipmentRfidMap(ACTIVE_USER_NAME);
+  } catch (e) { /* ignore */ }
+}
 
 function stationStoredSetting_(key) {
   try { var v = localStorage.getItem(key); return (v === null || v === undefined) ? null : v; } catch (e) { return null; }
@@ -588,12 +757,25 @@ function stationRenderScanFeed_() {
     list.innerHTML = '<span class="station-scan-feed__empty">Waiting for scans…</span>';
     return;
   }
-  const rows = scans.map(function(s) {
-    const time = new Date(s.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const safeTag = String(s.tag).replace(/[<&>]/g, function(c) {
+  const esc = function(v) {
+    return String(v == null ? '' : v).replace(/[<&>]/g, function(c) {
       return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
     });
-    return '<div class="station-scan-feed__row"><span class="tag">' + safeTag + '</span><span class="time">' + time + '</span></div>';
+  };
+  const rows = scans.map(function(s) {
+    const time = new Date(s.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const eq = stationResolveEpc_(s.tag);
+    if (eq && eq.name) {
+      const unit = eq.unitNumber || eq.unitId || '';
+      return '<div class="station-scan-feed__row">'
+        + '<span class="name">' + esc(eq.name) + '</span>'
+        + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '')
+        + '<span class="time">' + time + '</span></div>';
+    }
+    return '<div class="station-scan-feed__row is-unknown">'
+      + '<span class="name">' + esc(s.tag) + '</span>'
+      + '<span class="unit">Unknown tag</span>'
+      + '<span class="time">' + time + '</span></div>';
   });
   list.innerHTML = rows.join('');
 }
@@ -617,8 +799,9 @@ function stationRenderShellState_() {
   const hostNameEl = document.getElementById('station-shell-host-name');
   const logoutHostBtn = document.getElementById('station-btn-logout-host');
   const enrollBtn = document.getElementById('station-btn-enroll');
-  const laneProject = document.getElementById('station-lane-project');
-  const laneVault = document.getElementById('station-lane-vault');
+  const hostInline = document.getElementById('station-shell-host-inline');
+  const projectBtn = document.getElementById('station-btn-project');
+  const vaultBtn = document.getElementById('station-btn-vault');
 
   if (host) {
     if (stateLabel) stateLabel.textContent = 'Hosted session';
@@ -627,10 +810,14 @@ function stationRenderShellState_() {
       hostNameEl.style.display = 'block';
       hostNameEl.textContent = host.name;
     }
+    if (hostInline) {
+      hostInline.style.display = 'inline';
+      hostInline.textContent = '— ' + host.name;
+    }
     if (logoutHostBtn) logoutHostBtn.style.display = 'block';
     if (enrollBtn) enrollBtn.style.display = 'block';
-    if (laneProject) laneProject.classList.add('is-ready');
-    if (laneVault) laneVault.classList.add('is-ready');
+    if (projectBtn) projectBtn.classList.remove('is-disabled');
+    if (vaultBtn) vaultBtn.classList.remove('is-disabled');
     stationSetStatus_(host.rfidTag
       ? ('Ready. Badge on file: ' + host.rfidTag)
       : 'Ready. No badge linked yet — tap “Link my RFID badge”.', 'ok');
@@ -642,12 +829,13 @@ function stationRenderShellState_() {
       prompt.textContent = 'Scan your crew badge';
     }
     if (hostNameEl) hostNameEl.style.display = 'none';
+    if (hostInline) { hostInline.style.display = 'none'; hostInline.textContent = ''; }
     if (logoutHostBtn) logoutHostBtn.style.display = 'none';
     if (enrollBtn) enrollBtn.style.display = 'none';
+    if (projectBtn) projectBtn.classList.add('is-disabled');
+    if (vaultBtn) vaultBtn.classList.add('is-disabled');
     window.stationEnrollMode = false;
     stationSetEnrollButton_('idle');
-    if (laneProject) laneProject.classList.remove('is-ready');
-    if (laneVault) laneVault.classList.remove('is-ready');
     stationSetStatus_('', '');
     stationClearHostIdleTimer_();
   }
@@ -681,11 +869,11 @@ window.stationToggleEnroll = function() {
 
 function stationApplyBootstrap_(data) {
   window.stationShellBootstrap = data;
-  const devEl = document.getElementById('station-shell-device-name');
   const profEl = document.getElementById('station-shell-profile-name');
   const layoutEl = document.getElementById('station-shell-layout-text');
-  if (devEl) devEl.textContent = data.deviceName || ACTIVE_USER_NAME || '—';
-  if (profEl) profEl.textContent = data.profileName || 'Station profile';
+  // Header now shows only the device PROFILE (e.g. "CW1 Chainway"); the host name is
+  // appended in green by stationRenderShellState_(). "Warehouse station" is gone.
+  if (profEl) profEl.textContent = data.profileName || data.deviceName || ACTIVE_USER_NAME || 'Station';
   if (layoutEl) {
     const layout = (data.layout || 'chainway_handheld').replace(/_/g, ' ');
     layoutEl.textContent = layout.toUpperCase();
@@ -829,6 +1017,118 @@ window.stationLogoutHost = function() {
   stationSetLastScan_('');
 };
 
+/* ---- Project lane: reuse the phone's compact Project Assets view ---- */
+
+window.stationOpenProject = function() {
+  if (!stationReadHostSession_()) {
+    stationSetStatus_('Scan your badge to host a session first.', 'error');
+    return;
+  }
+  stationOpenProjectPicker_();
+};
+
+window.stationOpenVault = function() {
+  if (!stationReadHostSession_()) {
+    stationSetStatus_('Scan your badge to host a session first.', 'error');
+    return;
+  }
+  // Pass B builds the compact station vault (search + status + manager RFID recording).
+  stationSetStatus_('Vault is coming in the next update.', '');
+};
+
+window.stationCloseProjectPicker = function() {
+  const panel = document.getElementById('station-project-picker');
+  if (panel) panel.classList.remove('is-open');
+};
+
+function stationOpenProjectPicker_() {
+  const panel = document.getElementById('station-project-picker');
+  const statusEl = document.getElementById('station-project-picker-status');
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!panel) return;
+  panel.classList.add('is-open');
+  if (listEl) listEl.innerHTML = '';
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading projects…'; }
+
+  // Reuse the same payload phones cache into sm_phantom_payload so resolveMobileProject works.
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      var projects = (payload && payload.projects) ? payload.projects : [];
+      try {
+        var phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+        phantom.projects = projects;
+        if (payload && payload.monthData) phantom.monthData = payload.monthData;
+        if (payload && payload.tasks) phantom.tasks = payload.tasks;
+        if (payload && payload.notifs) phantom.notifs = payload.notifs;
+        localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+      } catch (e) { /* ignore */ }
+      stationRenderProjectList_(projects);
+    })
+    .withFailureHandler(function(err) {
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Could not load projects: ' + (err && err.message ? err.message : String(err)); }
+    })
+    .getRefreshPayload(ACTIVE_USER_NAME);
+}
+
+function stationRenderProjectList_(projects) {
+  const statusEl = document.getElementById('station-project-picker-status');
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!listEl) return;
+  const list = (projects || []).slice().sort(function(a, b) {
+    return String(a.start || '').localeCompare(String(b.start || ''));
+  });
+  if (!list.length) {
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'No projects available on this device.'; }
+    return;
+  }
+  if (statusEl) statusEl.style.display = 'none';
+  const esc = function(v) {
+    return String(v == null ? '' : v).replace(/[<&>"]/g, function(c) {
+      return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&amp;'));
+    });
+  };
+  listEl.innerHTML = list.map(function(p) {
+    const when = [p.start, p.end].filter(Boolean).join(' → ');
+    return '<button type="button" class="station-project-item" onclick="stationPickProject_(\'' + esc(p.id) + '\')">'
+      + '<div class="station-project-item__name">' + esc(p.title || p.name || 'Untitled') + '</div>'
+      + (when ? '<div class="station-project-item__meta">' + esc(when) + '</div>' : '')
+      + '</button>';
+  }).join('');
+}
+
+window.stationPickProject_ = function(pId) {
+  stationCloseProjectPicker();
+  if (typeof window.openMobileProjectAssets !== 'function') {
+    stationSetStatus_('Project view unavailable.', 'error');
+    return;
+  }
+  // Hide the station shell so the (lower z-index) PA modal is visible; restore on close.
+  const shell = document.getElementById('station-shell');
+  if (shell) shell.style.display = 'none';
+  try {
+    window.openMobileProjectAssets(pId);
+  } catch (e) {
+    if (shell) shell.style.display = 'flex';
+    stationSetStatus_('Could not open project: ' + (e && e.message ? e.message : String(e)), 'error');
+    return;
+  }
+  stationWatchPaExit_();
+};
+
+/** Restore the station shell once the phone PA compact view is closed (any exit path). */
+function stationWatchPaExit_() {
+  if (window.stationPaWatchTimer) return;
+  window.stationPaWatchTimer = setInterval(function() {
+    if (!document.body.classList.contains('mobile-pa-compact')) {
+      clearInterval(window.stationPaWatchTimer);
+      window.stationPaWatchTimer = null;
+      const shell = document.getElementById('station-shell');
+      if (shell) shell.style.display = 'flex';
+      stationRenderShellState_();
+    }
+  }, 400);
+}
+
 window.stationDeviceSignOut = function() {
   if (!confirm('Sign this warehouse device out of Showrunner?')) return;
   stationWriteHostSession_(null);
@@ -945,7 +1245,7 @@ function stationPopulateGunControlsFromStorage_() {
 
   var storedPower = stationStoredSetting_(STATION_POWER_KEY);
   if (powerEl && storedPower != null) powerEl.value = storedPower;
-  if (powerOut && powerEl) powerOut.textContent = (powerEl.value || '—') + (powerEl.value ? ' dBm' : '');
+  stationSyncPowerControls_(powerEl ? powerEl.value : null);
 
   var storedMode = stationStoredSetting_(STATION_MODE_KEY);
   if (modeEl && storedMode) modeEl.value = storedMode;
@@ -1002,7 +1302,7 @@ function stationApplyGunConfig_(cfg) {
     var pv = (storedPower != null) ? storedPower : cfg.power;
     if (pv != null) powerEl.value = pv;
     if (storedPower == null && cfg.power != null) stationSetStoredSetting_(STATION_POWER_KEY, cfg.power);
-    if (powerOut && powerEl.value) powerOut.textContent = powerEl.value + ' dBm';
+    stationSyncPowerControls_(powerEl.value);
   }
 
   // Scan mode
@@ -1035,17 +1335,50 @@ function stationApplyGunConfig_(cfg) {
   if (fwEl) fwEl.textContent = cfg.firmware || '—';
 }
 
+/** Keep the Settings power slider and the on-screen sensitivity bar showing the same value. */
+function stationSyncPowerControls_(val) {
+  const setEl = document.getElementById('station-set-power');
+  const setOut = document.getElementById('station-set-power-out');
+  const mainEl = document.getElementById('station-main-power');
+  const mainOut = document.getElementById('station-main-power-out');
+  if (val != null) {
+    if (setEl) setEl.value = val;
+    if (mainEl) mainEl.value = val;
+  }
+  const shown = (mainEl && mainEl.value) || (setEl && setEl.value) || '';
+  if (setOut) setOut.textContent = shown ? (shown + ' dBm') : '—';
+  if (mainOut) mainOut.textContent = shown ? (shown + ' dBm') : '—';
+  // Mirror the min/max bounds the gun reported (seeded onto the settings slider).
+  if (setEl && mainEl) {
+    if (setEl.min) mainEl.min = setEl.min;
+    if (setEl.max) mainEl.max = setEl.max;
+  }
+}
+
 window.stationOnPowerInput = function() {
   const powerEl = document.getElementById('station-set-power');
-  const powerOut = document.getElementById('station-set-power-out');
-  if (powerEl && powerOut) powerOut.textContent = powerEl.value + ' dBm';
+  if (powerEl) stationSyncPowerControls_(powerEl.value);
 };
 
 window.stationSavePower = function() {
   const powerEl = document.getElementById('station-set-power');
   if (!powerEl) return;
   stationSetStoredSetting_(STATION_POWER_KEY, powerEl.value);
+  stationSyncPowerControls_(powerEl.value);
   stationApplyGunSetting_('power', parseInt(powerEl.value, 10));
+};
+
+window.stationOnMainPowerInput = function() {
+  const mainEl = document.getElementById('station-main-power');
+  if (mainEl) stationSyncPowerControls_(mainEl.value);
+};
+
+window.stationSaveMainPower = function() {
+  const mainEl = document.getElementById('station-main-power');
+  if (!mainEl) return;
+  stationSetStoredSetting_(STATION_POWER_KEY, mainEl.value);
+  stationSyncPowerControls_(mainEl.value);
+  stationApplyGunSetting_('power', parseInt(mainEl.value, 10));
 };
 
 window.stationSaveScanMode = function() {
@@ -1131,8 +1464,18 @@ function initStationShell_() {
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' });
   // Push device-local gun settings down so the screen and the gun agree on boot.
   stationSyncSettingsToGun_();
+  // Seed the on-screen sensitivity bar from the stored (source-of-truth) power value.
+  stationSyncPowerControls_(stationStoredSetting_(STATION_POWER_KEY));
   // Pull scans directly from the gun (reliable path; relay stays as fallback).
   stationStartScanPoll_();
+
+  // Equipment name/unit resolution for the live scan strip: show cache instantly, then refresh.
+  stationLoadEquipMapCache_();
+  stationRenderScanFeed_();
+  stationRefreshEquipMap_();
+  if (!window.stationEquipMapTimer) {
+    window.stationEquipMapTimer = setInterval(stationRefreshEquipMap_, STATION_EQUIP_MAP_REFRESH_MS);
+  }
 
   google.script.run
     .withSuccessHandler(function(res) {

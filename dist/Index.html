@@ -5411,6 +5411,121 @@ html.station-device-root #station-shell {
   color: #71717a;
   font-weight: 600;
 }
+.station-shell-brand__line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.station-shell-brand__host {
+  font-size: 14px;
+  font-weight: 900;
+  color: #10b981;
+}
+/* Read-power / sensitivity bar on the main screen (above the live scans) */
+.station-sens-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #0d0d10;
+  border-bottom: 1px solid #1c1c1f;
+}
+.station-sens-bar__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-sens-bar input[type="range"] { flex: 1; }
+.station-sens-bar output {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 800;
+  color: #10b981;
+  min-width: 56px;
+  text-align: right;
+}
+/* Long PROJECT / VAULT nav buttons at the bottom */
+.station-shell-footer .station-nav-btn {
+  width: 100%;
+  margin: 0;
+  padding: 15px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.station-nav-btn[disabled],
+.station-nav-btn.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+/* Equipment-resolved scan rows (name + unit instead of raw tag) */
+.station-scan-feed__row .name {
+  font-family: Inter, sans-serif;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__row .unit {
+  font-family: monospace;
+  font-size: 11px;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-scan-feed__row.is-unknown .name { color: #eab308; font-weight: 600; }
+.station-scan-feed__row.is-unknown .unit { color: #71717a; }
+/* Station project picker overlay */
+#station-project-picker {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50002;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+#station-project-picker.is-open { display: flex; }
+.station-project-picker__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-project-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.station-project-item {
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #27272a;
+  background: #111114;
+  color: #f4f4f5;
+  cursor: pointer;
+}
+.station-project-item:active { border-color: #f97316; }
+.station-project-item__name {
+  font-size: 15px;
+  font-weight: 800;
+}
+.station-project-item__meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #71717a;
+}
 .station-shell-main {
   flex: 1;
   display: flex;
@@ -5680,11 +5795,18 @@ html.station-device-root #station-shell {
 <div id="station-shell" aria-label="Warehouse station">
   <div class="station-shell-header">
     <div class="station-shell-brand">
-      <div class="station-shell-brand__title">Warehouse station</div>
-      <div id="station-shell-device-name" class="station-shell-brand__device">—</div>
-      <div id="station-shell-profile-name" class="station-shell-brand__profile">—</div>
+      <div class="station-shell-brand__line">
+        <span id="station-shell-profile-name" class="station-shell-brand__device">—</span>
+        <span id="station-shell-host-inline" class="station-shell-brand__host" style="display:none;"></span>
+      </div>
     </div>
     <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="cursor:pointer; background:transparent; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#a1a1aa; border:1px solid #3f3f46; border-radius:999px; padding:6px 12px; display:flex; align-items:center; gap:6px;"><span id="station-shell-layout-text">HANDHELD</span><span aria-hidden="true" style="color:#f97316;">&#9881;</span></button>
+  </div>
+
+  <div id="station-sens-bar" class="station-sens-bar" aria-label="Read power / sensitivity">
+    <span class="station-sens-bar__label">Sensitivity</span>
+    <input type="range" id="station-main-power" min="5" max="30" step="1" oninput="stationOnMainPowerInput()" onchange="stationSaveMainPower()">
+    <output id="station-main-power-out">—</output>
   </div>
 
   <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans">
@@ -5708,20 +5830,11 @@ html.station-device-root #station-shell {
     <div id="station-shell-host-name" class="station-shell-host-name" style="display:none;"></div>
     <div id="station-shell-status" class="station-shell-status"></div>
     <div id="station-shell-last-scan" class="station-shell-last-scan"></div>
-
-    <div class="station-shell-lanes">
-      <div id="station-lane-project" class="station-shell-lane">
-        <div class="station-shell-lane__label">Project</div>
-        <div class="station-shell-lane__hint">Checkout / check-in (soon)</div>
-      </div>
-      <div id="station-lane-vault" class="station-shell-lane">
-        <div class="station-shell-lane__label">Vault</div>
-        <div class="station-shell-lane__hint">Maintenance / repair (soon)</div>
-      </div>
-    </div>
   </div>
 
   <div class="station-shell-footer">
+    <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
+    <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
     <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
     <button type="button" id="station-btn-enroll" class="btn-outline btn-sm" style="display:none;" onclick="stationToggleEnroll()">LINK MY RFID BADGE</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
@@ -5803,6 +5916,17 @@ html.station-device-root #station-shell {
       </div>
     </div>
 
+  </div>
+</div>
+
+<div id="station-project-picker" aria-label="Pick a project">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Open a project</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseProjectPicker()">Cancel</button>
+  </div>
+  <div class="station-project-picker__body">
+    <div id="station-project-picker-status" class="station-shell-status" style="text-align:center;">Loading projects…</div>
+    <div id="station-project-picker-list" class="station-project-picker__list"></div>
   </div>
 </div>
 

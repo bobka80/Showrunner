@@ -68,7 +68,8 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 
 - [x] Dedicated scan home / kiosk shell (`11_Station_Shell.html` — host badge first)
 - [x] Crew `rfid_tag` on `Crew_Roster` (sheet column; paste from Chainway scan — no interim UI)
-- [x] **Live RFID scan strip** — station shell shows every incoming EPC at the top in any state (debug/visibility; `STATION_SCAN_FEED_MAX`=8)
+- [x] **Live RFID scan strip** — station shell shows every incoming EPC at the top in any state (debug/visibility; `STATION_SCAN_FEED_MAX`=8). **v420+: resolves each tag to equipment name + unit** (not the raw EPC; raw + "Unknown tag" fallback), multi-tag per pull, via a preloaded map (`getStationEquipmentRfidMap` → localStorage `sm_station_equip_map_v1`, refreshed every 5 min).
+- [x] **Station main-screen redesign (Pass A, v420+):** header = **device profile — host (green)** ("Warehouse station" removed); **read-power/sensitivity slider on the main screen** (synced with setup); **PROJECT / VAULT long buttons** replace the middle lane tiles. **PROJECT reuses the phone's compact PA** (project picker via `getRefreshPayload` → `openMobileProjectAssets`; shell hides while PA is open, restores on close). **VAULT is a stub** pending Pass B (compact vault list + status setters + manager-gated RFID recording + cascade tagging).
 - [x] **Self-serve crew badge enrollment on the station** — while hosted, "Link my RFID badge" captures the next scan → `enrollStationCrewRfidTag` writes it to the host's `rfid_tag` (collision-guarded)
 - [ ] Crew `rfid_tag` in office admin UI (deferred — station self-enroll + sheet paste cover it for now)
 - [x] **Station profile editor** — `06h_Admin_Station_Profiles.html` + `Station_Security.js` (separate from office `06a` / `Security.js`)
