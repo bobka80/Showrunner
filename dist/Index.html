@@ -5694,6 +5694,14 @@ html.station-device-root #station-shell {
     </div>
   </div>
 
+  <!-- Diagnostic breadcrumb overlay: makes the scan/settings bridge visible on-device.
+       Tap to hide. Remove once the pipeline is confirmed on hardware. -->
+  <div id="station-debug" onclick="this.style.display='none';"
+       style="position:fixed; left:8px; bottom:8px; z-index:9999; max-width:60vw; padding:6px 8px; background:rgba(8,10,14,0.86); border:1px solid #3f3f46; border-radius:8px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10px; line-height:1.4; color:#a7f3d0; white-space:pre; pointer-events:auto;">
+    <div id="station-debug-badge" style="color:#f97316; font-weight:700; margin-bottom:2px;">diag</div>
+    <div id="station-debug-log">waiting…</div>
+  </div>
+
   <div class="station-shell-main">
     <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
     <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>

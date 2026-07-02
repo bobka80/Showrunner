@@ -337,6 +337,14 @@ html.station-device-root #station-shell {
     </div>
   </div>
 
+  <!-- Diagnostic breadcrumb overlay: makes the scan/settings bridge visible on-device.
+       Tap to hide. Remove once the pipeline is confirmed on hardware. -->
+  <div id="station-debug" onclick="this.style.display='none';"
+       style="position:fixed; left:8px; bottom:8px; z-index:9999; max-width:60vw; padding:6px 8px; background:rgba(8,10,14,0.86); border:1px solid #3f3f46; border-radius:8px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10px; line-height:1.4; color:#a7f3d0; white-space:pre; pointer-events:auto;">
+    <div id="station-debug-badge" style="color:#f97316; font-weight:700; margin-bottom:2px;">diag</div>
+    <div id="station-debug-log">waiting…</div>
+  </div>
+
   <div class="station-shell-main">
     <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
     <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>
@@ -759,6 +767,7 @@ function stationHandleRfidScan_(rawTag) {
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag) {
   const tag = String(rawTag || '').trim();
+  stationDebug_('scan IN: ' + (tag || '(empty)'));
   if (tag) stationPushScanFeed_(tag);
   stationHandleRfidScan_(rawTag);
 };
@@ -810,6 +819,50 @@ function stationPostToHosting_(payload) {
   try { if (window.top && window.top !== window && window.top !== window.parent) window.top.postMessage(payload, '*'); } catch (e) { /* ignore */ }
 }
 
+/**
+ * Android injects @JavascriptInterface objects into every frame (including this iframe),
+ * so prefer calling the native gun bridge DIRECTLY — no postMessage/host-boot hop to lose.
+ * Returns the bridge if it looks usable, else null (plain browser / relay fallback).
+ */
+function stationNativeBridge_() {
+  try {
+    var b = window.AndroidStation;
+    if (b && typeof b.getConfig === 'function' && typeof b.setScanMode === 'function') return b;
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+/** Apply one gun setting live — direct native call first, relay as fallback. */
+function stationApplyGunSetting_(key, value) {
+  var b = stationNativeBridge_();
+  if (b) {
+    try {
+      if (key === 'power' && typeof b.setPower === 'function') b.setPower(parseInt(value, 10));
+      else if (key === 'scanMode' && typeof b.setScanMode === 'function') b.setScanMode(String(value));
+      else if (key === 'pollMs' && typeof b.setPollMs === 'function') b.setPollMs(parseInt(value, 10));
+      else if (key === 'beep' && typeof b.setBeep === 'function') b.setBeep(!!value);
+      stationDebug_('set ' + key + '=' + value + ' →native');
+      return;
+    } catch (e) { stationDebug_('direct set ' + key + ' ERR'); }
+  }
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: key, value: value });
+  stationDebug_('set ' + key + '=' + value + ' →relay');
+}
+
+/**
+ * Lightweight on-screen breadcrumb log so the whole scan/settings pipeline is VISIBLE on the
+ * device (after 8 blind tries). Keeps the last few events; harmless in a plain browser.
+ */
+window.stationDebugLog = window.stationDebugLog || [];
+function stationDebug_(msg) {
+  try {
+    window.stationDebugLog.unshift(new Date().toLocaleTimeString([], { hour12: false }) + '  ' + msg);
+    if (window.stationDebugLog.length > 6) window.stationDebugLog.length = 6;
+    var el = document.getElementById('station-debug-log');
+    if (el) el.textContent = window.stationDebugLog.join('\n');
+  } catch (e) { /* ignore */ }
+}
+
 window.stationOpenSettings = function() {
   const panel = document.getElementById('station-settings');
   if (!panel) return;
@@ -828,7 +881,17 @@ window.stationCloseSettings = function() {
 };
 
 function stationRequestGunConfig_() {
+  var b = stationNativeBridge_();
+  if (b) {
+    try {
+      var cfg = JSON.parse(b.getConfig());
+      stationApplyGunConfig_(cfg);
+      stationDebug_('config ←native');
+      return;
+    } catch (e) { stationDebug_('direct getConfig ERR'); }
+  }
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_GET' });
+  stationDebug_('config req →relay');
 }
 
 function stationSpeedLabel_(ms) {
@@ -873,13 +936,13 @@ function stationPopulateGunControlsFromStorage_() {
 /** Push the stored settings down to the native gun (screen ↔ gun stay in sync). */
 function stationSyncSettingsToGun_() {
   var mode = stationStoredSetting_(STATION_MODE_KEY);
-  if (mode) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'scanMode', value: mode });
+  if (mode) stationApplyGunSetting_('scanMode', mode);
   var poll = stationStoredSetting_(STATION_POLL_KEY);
-  if (poll != null) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'pollMs', value: parseInt(poll, 10) });
+  if (poll != null) stationApplyGunSetting_('pollMs', parseInt(poll, 10));
   var power = stationStoredSetting_(STATION_POWER_KEY);
-  if (power != null) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'power', value: parseInt(power, 10) });
+  if (power != null) stationApplyGunSetting_('power', parseInt(power, 10));
   var beep = stationStoredSetting_(STATION_BEEP_KEY);
-  if (beep != null) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'beep', value: (beep === '1') });
+  if (beep != null) stationApplyGunSetting_('beep', (beep === '1'));
 }
 
 function stationApplyGunConfig_(cfg) {
@@ -955,7 +1018,7 @@ window.stationSavePower = function() {
   const powerEl = document.getElementById('station-set-power');
   if (!powerEl) return;
   stationSetStoredSetting_(STATION_POWER_KEY, powerEl.value);
-  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'power', value: parseInt(powerEl.value, 10) });
+  stationApplyGunSetting_('power', parseInt(powerEl.value, 10));
 };
 
 window.stationSaveScanMode = function() {
@@ -963,7 +1026,7 @@ window.stationSaveScanMode = function() {
   if (!modeEl) return;
   stationSetStoredSetting_(STATION_MODE_KEY, modeEl.value);
   stationUpdateSpeedVisibility_();
-  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'scanMode', value: modeEl.value });
+  stationApplyGunSetting_('scanMode', modeEl.value);
 };
 
 window.stationOnSpeedInput = function() {
@@ -976,14 +1039,14 @@ window.stationSaveSpeed = function() {
   const speedEl = document.getElementById('station-set-speed');
   if (!speedEl) return;
   stationSetStoredSetting_(STATION_POLL_KEY, speedEl.value);
-  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'pollMs', value: parseInt(speedEl.value, 10) });
+  stationApplyGunSetting_('pollMs', parseInt(speedEl.value, 10));
 };
 
 window.stationSaveBeep = function() {
   const beepEl = document.getElementById('station-set-beep');
   if (!beepEl) return;
   stationSetStoredSetting_(STATION_BEEP_KEY, beepEl.checked ? '1' : '0');
-  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'beep', value: !!beepEl.checked });
+  stationApplyGunSetting_('beep', !!beepEl.checked);
 };
 
 window.stationSaveEjectMinutes = function() {
@@ -1008,8 +1071,10 @@ function stationBindMessageListener_() {
     const d = ev && ev.data;
     if (!d) return;
     if (d.type === 'SHOWRUNNER_RFID_SCAN') {
+      stationDebug_('relay scan: ' + (d.tag || '(empty)'));
       if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag);
     } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
+      stationDebug_('relay config');
       stationApplyGunConfig_(d.config || null);
     }
   });
@@ -1026,6 +1091,11 @@ function initStationShell_() {
   stationBindMessageListener_();
   stationRenderShellState_();
   stationSetStatus_('Loading station profile…', '');
+
+  // Diagnostic badge: the two facts that decide the whole pipeline.
+  var badge = document.getElementById('station-debug-badge');
+  if (badge) badge.textContent = 'station=' + (!!window.IS_STATION_DEVICE) + '  native=' + (!!stationNativeBridge_());
+  stationDebug_('shell init');
 
   // Tell the native host shell we're mounted so it can drop the startup splash.
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' });
