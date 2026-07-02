@@ -32,6 +32,9 @@ class RfidManager(
     private val uhf = RFIDWithUHFBLE.getInstance()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val worker: ExecutorService = Executors.newSingleThreadExecutor()
+    // Separate thread for config/device-info calls (setPower/setBeep/battery/firmware) so a slow
+    // BLE round-trip can NEVER starve the tag-read worker above.
+    private val configWorker: ExecutorService = Executors.newSingleThreadExecutor()
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     @Volatile
@@ -193,7 +196,7 @@ class RfidManager(
             override fun onKeyDown(keycode: Int) {
                 if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
                 if (scanMode == SCAN_MODE_CONTINUOUS) {
-                    // Continuous: one pull starts the burst, next pull stops it.
+                    // Continuous: one pull starts the repeat, next pull stops it.
                     if (inventoryRunning) stopInventory() else startInventory()
                 } else {
                     // Single (default station mode): one pull = one tag.
@@ -203,33 +206,39 @@ class RfidManager(
             }
 
             override fun onKeyUp(keycode: Int) {
-                if (inventoryRunning) stopInventory()
+                // No-op: single mode already read on key-down; continuous is a pull-to-toggle.
             }
         })
     }
 
+    private val continuousRunnable = object : Runnable {
+        override fun run() {
+            if (!inventoryRunning) return
+            performSingleRead()
+            mainHandler.postDelayed(this, CONTINUOUS_POLL_MS)
+        }
+    }
+
+    /**
+     * "Continuous" scanning implemented as a fast repeat of the single-tag read. The SDK's
+     * hardware inventory callback did not deliver tags on this R6, whereas single reads do — so
+     * both modes share the one reliable primitive.
+     */
     fun startInventory() {
         if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) {
             postStatus("RFID not connected")
             return
         }
         if (inventoryRunning) return
-
-        uhf.setInventoryCallback(IUHFInventoryCallback { info -> deliverTag(info) })
-        val parameter = InventoryParameter()
-        if (uhf.startInventoryTag(parameter)) {
-            inventoryRunning = true
-            postStatus("Scanning tags…")
-        } else {
-            postStatus("Could not start inventory")
-        }
+        inventoryRunning = true
+        postStatus("Scanning tags…")
+        mainHandler.post(continuousRunnable)
     }
 
     fun stopInventory() {
         if (!inventoryRunning) return
-        uhf.stopInventory()
-        uhf.setInventoryCallback(null)
         inventoryRunning = false
+        mainHandler.removeCallbacks(continuousRunnable)
         if (connected) postStatus("RFID ready")
     }
 
@@ -272,19 +281,33 @@ class RfidManager(
             initialized.set(false)
             connected = false
         }
+        configWorker.shutdown()
     }
 
     /** Push the persisted settings to the connected gun (called after connect + after each change). */
     private fun applyConfigToGun() {
-        worker.execute {
+        configWorker.execute {
             try {
                 if (uhf.connectStatus != ConnectionStatus.CONNECTED) return@execute
                 uhf.setPower(powerDbm.coerceIn(POWER_MIN, POWER_MAX))
                 uhf.setBeep(beepEnabled)
+            } catch (e: Exception) {
+                Log.e(TAG, "applyConfigToGun failed", e)
+            }
+        }
+        // Device info (battery/firmware) is a separate, best-effort task — if the gun is slow to
+        // answer it must not delay applying power/beep, and it runs off the read worker regardless.
+        refreshDeviceInfo()
+    }
+
+    private fun refreshDeviceInfo() {
+        configWorker.execute {
+            try {
+                if (uhf.connectStatus != ConnectionStatus.CONNECTED) return@execute
                 battery = try { uhf.getBattery() } catch (e: Exception) { -1 }
                 firmware = try { uhf.getSTM32Version() ?: "" } catch (e: Exception) { "" }
             } catch (e: Exception) {
-                Log.e(TAG, "applyConfigToGun failed", e)
+                Log.e(TAG, "refreshDeviceInfo failed", e)
             }
         }
     }
@@ -293,7 +316,7 @@ class RfidManager(
     fun setPowerLevel(power: Int) {
         powerDbm = power.coerceIn(POWER_MIN, POWER_MAX)
         prefs.edit().putInt(PREF_POWER, powerDbm).apply()
-        worker.execute {
+        configWorker.execute {
             try { if (connected) uhf.setPower(powerDbm) } catch (e: Exception) { Log.e(TAG, "setPower failed", e) }
         }
     }
@@ -307,7 +330,7 @@ class RfidManager(
     fun setBeepEnabled(enabled: Boolean) {
         beepEnabled = enabled
         prefs.edit().putBoolean(PREF_BEEP, enabled).apply()
-        worker.execute {
+        configWorker.execute {
             try { if (connected) uhf.setBeep(enabled) } catch (e: Exception) { Log.e(TAG, "setBeep failed", e) }
         }
     }
@@ -349,7 +372,9 @@ class RfidManager(
         const val SCAN_MODE_CONTINUOUS = "continuous"
         private const val POWER_MIN = 5
         private const val POWER_MAX = 30
-        private const val DEFAULT_POWER = 20
+        // Default to full power so reads are guaranteed on first run; the operator dials the
+        // range DOWN from the setup view. (Matches the known-working pre-settings behaviour.)
+        private const val DEFAULT_POWER = 30
         private const val TARGET_BT_NAME = "Nordic_UART_CW"
         // Chainway UHF guns pair under varied names — match any of these tokens.
         private val GUN_NAME_HINTS = listOf(
@@ -359,5 +384,6 @@ class RfidManager(
         private const val SCAN_MS = 4000L
         private const val RECONNECT_MS = 5000L
         private const val DEBOUNCE_MS = 2000L
+        private const val CONTINUOUS_POLL_MS = 500L
     }
 }
