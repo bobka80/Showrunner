@@ -151,6 +151,10 @@ class StationWebActivity : AppCompatActivity() {
         @JavascriptInterface
         fun setPollMs(ms: Int) { rfid.setPollMs(ms) }
 
+        /** Iframe pulls queued scans directly (bypasses the top-frame relay). */
+        @JavascriptInterface
+        fun pollScans(): String = rfid.drainPendingScans()
+
         /** Station shell mounted inside the WebView — drop the kiosk splash. */
         @JavascriptInterface
         fun shellReady() { hideSplash() }

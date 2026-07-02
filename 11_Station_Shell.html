@@ -410,19 +410,18 @@ html.station-device-root #station-shell {
         <label class="station-field__label" for="station-set-mode">Scan mode</label>
         <select id="station-set-mode" onchange="stationSaveScanMode()">
           <option value="single">Single — one pull, one tag</option>
-          <option value="hold">Hold — read while the trigger is held</option>
           <option value="continuous">Continuous — pull to start/stop a burst</option>
         </select>
-        <div class="station-field__hint">Single is best for badge and one-at-a-time scans. Hold reads continuously only while you squeeze the trigger. Continuous toggles a hands-free burst.</div>
+        <div class="station-field__hint">Single is best for badge and one-at-a-time scans. Continuous toggles a hands-free burst (pull to start, pull again to stop).</div>
       </div>
 
       <div class="station-field" id="station-speed-field" style="display:none;">
-        <label class="station-field__label" for="station-set-speed">Repeat speed (hold &amp; continuous)</label>
+        <label class="station-field__label" for="station-set-speed">Continuous scan speed</label>
         <div class="station-range-row">
           <input type="range" id="station-set-speed" min="100" max="2000" step="50" oninput="stationOnSpeedInput()" onchange="stationSaveSpeed()">
           <output id="station-set-speed-out">—</output>
         </div>
-        <div class="station-field__hint">Time between repeat reads in Hold and Continuous modes. Left = faster (machine-gun), right = slower / gentler.</div>
+        <div class="station-field__hint">Time between repeat reads in Continuous mode. Left = faster (machine-gun), right = slower / gentler.</div>
       </div>
 
       <div class="station-field">
@@ -767,10 +766,39 @@ function stationHandleRfidScan_(rawTag) {
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag) {
   const tag = String(rawTag || '').trim();
+  // Dedup: one physical scan can arrive via BOTH the direct poll and the relay fallback.
+  if (tag) {
+    var now = Date.now();
+    if (tag === window.stationLastScanTag && (now - (window.stationLastScanAt || 0)) < 1500) return;
+    window.stationLastScanTag = tag;
+    window.stationLastScanAt = now;
+  }
   stationDebug_('scan IN: ' + (tag || '(empty)'));
   if (tag) stationPushScanFeed_(tag);
   stationHandleRfidScan_(rawTag);
 };
+
+/**
+ * Pull scans straight from the gun via the injected native bridge — the reliable path when
+ * native=true, since the top-frame relay proved lossy. Started once the shell mounts.
+ */
+function stationStartScanPoll_() {
+  if (window.stationScanPollTimer) return;
+  var b = stationNativeBridge_();
+  if (!b || typeof b.pollScans !== 'function') { stationDebug_('poll: unavailable'); return; }
+  stationDebug_('poll: on');
+  window.stationScanPollTimer = setInterval(function() {
+    var raw;
+    try { raw = b.pollScans(); } catch (e) { return; }
+    if (!raw || raw === '[]') return;
+    var arr;
+    try { arr = JSON.parse(raw); } catch (e) { return; }
+    for (var i = 0; i < arr.length; i++) {
+      stationDebug_('poll scan: ' + arr[i]);
+      window.onStationRfidScan(arr[i]);
+    }
+  }, 300);
+}
 
 window.stationDevHostAsBogdan = function() {
   if (!window.IS_STATION_DEVICE || window.stationScanBusy) return;
@@ -903,8 +931,7 @@ function stationSpeedLabel_(ms) {
 function stationUpdateSpeedVisibility_() {
   var modeEl = document.getElementById('station-set-mode');
   var field = document.getElementById('station-speed-field');
-  var repeats = modeEl && (modeEl.value === 'continuous' || modeEl.value === 'hold');
-  if (field) field.style.display = repeats ? 'block' : 'none';
+  if (field) field.style.display = (modeEl && modeEl.value === 'continuous') ? 'block' : 'none';
 }
 
 /** Reflect the stored (web source-of-truth) gun settings in the controls. */
@@ -1092,6 +1119,9 @@ function initStationShell_() {
   stationRenderShellState_();
   stationSetStatus_('Loading station profile…', '');
 
+  // Retire the removed "hold" mode on any device that stored it during testing.
+  if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
+
   // Diagnostic badge: the two facts that decide the whole pipeline.
   var badge = document.getElementById('station-debug-badge');
   if (badge) badge.textContent = 'station=' + (!!window.IS_STATION_DEVICE) + '  native=' + (!!stationNativeBridge_());
@@ -1101,6 +1131,8 @@ function initStationShell_() {
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' });
   // Push device-local gun settings down so the screen and the gun agree on boot.
   stationSyncSettingsToGun_();
+  // Pull scans directly from the gun (reliable path; relay stays as fallback).
+  stationStartScanPoll_();
 
   google.script.run
     .withSuccessHandler(function(res) {

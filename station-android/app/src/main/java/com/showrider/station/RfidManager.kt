@@ -16,6 +16,7 @@ import com.rscja.deviceapi.interfaces.ConnectionStatusCallback
 import com.rscja.deviceapi.interfaces.IUHFInventoryCallback
 import com.rscja.deviceapi.interfaces.KeyEventCallback
 import com.rscja.deviceapi.interfaces.ScanBTCallback
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -53,6 +54,11 @@ class RfidManager(
     @Volatile private var pollMs = prefs.getInt(PREF_POLL_MS, DEFAULT_POLL_MS)
     @Volatile private var battery = -1
     @Volatile private var firmware = ""
+
+    // Reliable scan delivery: native evaluateJavascript can only reach the TOP frame, so scans had
+    // to be relayed into the Showrunner iframe (fragile). Instead we queue EPCs here and let the
+    // iframe pull them directly via the injected AndroidStation bridge (proven working).
+    private val pendingScans = ConcurrentLinkedQueue<String>()
 
     private val connectionCallback = ConnectionStatusCallback<Any> { status, device ->
         mainHandler.post { handleConnectionStatus(status, device as? BluetoothDevice) }
@@ -276,9 +282,27 @@ class RfidManager(
         lastEpc = epc
         lastEpcAt = now
 
+        val upper = epc.uppercase()
         // Native echo: proves the phone received the EPC even if the web bridge fails.
-        postStatus("Read: ${epc.uppercase()}")
-        mainHandler.post { onTagScanned(epc.uppercase()) }
+        postStatus("Read: $upper")
+        // Queue for the iframe to pull directly (primary path), and also fire the relay (fallback).
+        pendingScans.add(upper)
+        if (pendingScans.size > 32) pendingScans.poll()
+        mainHandler.post { onTagScanned(upper) }
+    }
+
+    /** Drain queued EPCs as a JSON array (called by the iframe poll). Clears as it reads. */
+    fun drainPendingScans(): String {
+        if (pendingScans.isEmpty()) return "[]"
+        val sb = StringBuilder("[")
+        var first = true
+        while (true) {
+            val e = pendingScans.poll() ?: break
+            if (!first) sb.append(",")
+            sb.append("\"").append(e.replace("\\", "\\\\").replace("\"", "\\\"")).append("\"")
+            first = false
+        }
+        return sb.append("]").toString()
     }
 
     fun disconnect() {

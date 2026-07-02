@@ -5767,19 +5767,18 @@ html.station-device-root #station-shell {
         <label class="station-field__label" for="station-set-mode">Scan mode</label>
         <select id="station-set-mode" onchange="stationSaveScanMode()">
           <option value="single">Single — one pull, one tag</option>
-          <option value="hold">Hold — read while the trigger is held</option>
           <option value="continuous">Continuous — pull to start/stop a burst</option>
         </select>
-        <div class="station-field__hint">Single is best for badge and one-at-a-time scans. Hold reads continuously only while you squeeze the trigger. Continuous toggles a hands-free burst.</div>
+        <div class="station-field__hint">Single is best for badge and one-at-a-time scans. Continuous toggles a hands-free burst (pull to start, pull again to stop).</div>
       </div>
 
       <div class="station-field" id="station-speed-field" style="display:none;">
-        <label class="station-field__label" for="station-set-speed">Repeat speed (hold &amp; continuous)</label>
+        <label class="station-field__label" for="station-set-speed">Continuous scan speed</label>
         <div class="station-range-row">
           <input type="range" id="station-set-speed" min="100" max="2000" step="50" oninput="stationOnSpeedInput()" onchange="stationSaveSpeed()">
           <output id="station-set-speed-out">—</output>
         </div>
-        <div class="station-field__hint">Time between repeat reads in Hold and Continuous modes. Left = faster (machine-gun), right = slower / gentler.</div>
+        <div class="station-field__hint">Time between repeat reads in Continuous mode. Left = faster (machine-gun), right = slower / gentler.</div>
       </div>
 
       <div class="station-field">

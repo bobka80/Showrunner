@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v418**
+**Opened:** 2026-07-02 · **Production:** GAS **v419**
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -50,7 +50,10 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
   - **On-screen breadcrumb overlay** (`#station-debug`, `stationDebug_`) logs every hop on the device: `shell init`, `station=<bool> native=<bool>` badge, `set <key> →native/→relay`, `scan IN`, `relay scan`. Tap to hide.
   - **Native confirmations**: `RfidManager` setters `postStatus("Gun set: …")` so the status bar proves a web→gun call reached the SDK; **trigger breadcrumbs** `Trigger DOWN/UP [mode]` — if `onKeyUp` never fires on the R6, that's why Hold can't stop on release (the decisive datum still pending from the field).
   - **Note (SDK question answered):** gun radio settings (power/mode/speed/beeper) are impossible to change from the web without the native SDK layer; only the **eject timer** is pure web. So "changed in menu" ≠ "changed on gun" unless the bridge is live.
-- [ ] **Read the build-10 breadcrumbs on hardware** — confirm `native=true` (direct bridge works), whether `Trigger UP` fires (hold feasibility), and where a scan trail stops if the strip stays empty.
+- [x] **Build-10 breadcrumbs read on hardware (the breakthrough).** Field result: **`station=true native=true`** (shell mounts, direct iframe→gun bridge works — confirms settings are reliable) but **scans still never reached the top strip**, and **`Trigger UP` never fired**. Two conclusions:
+- [x] **Scans reach the strip via direct poll, not the relay (v419/build 11).** Root cause isolated: native `evaluateJavascript` can only execute in the **top frame**, so scans depended on the host-boot→iframe `postMessage` relay — the one hop that stayed lossy. Since the iframe can call native directly (`native=true`), we flipped it: `RfidManager` queues EPCs (`pendingScans`), exposes `drainPendingScans()` via `AndroidStation.pollScans()`, and the shell **pulls** every 300 ms (`stationStartScanPoll_`) → `onStationRfidScan`. The old relay stays as a fallback; a 1.5 s client dedup (`stationLastScanTag`) stops one physical scan being processed twice.
+- [x] **Hold mode removed (v419).** The R6 fires **no key-up** on trigger release (`Trigger UP` never logged), so hold-to-scan can't stop on release — it degrades to a toggle. Dropped from the setup dropdown (Single / Continuous only); stored `hold` migrates to `single` on boot; speed slider is Continuous-only again. Native `SCAN_MODE_HOLD` left inert.
+- [ ] **Confirm on hardware:** scans now land on the top strip (`poll scan:` breadcrumb → row appears); then we can retire the debug overlay + trigger/`Gun set:` status echoes.
 - [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).
 - [ ] **Verify the full loop on real hardware** — gun trigger → EPC → top strip → host/enroll → ledger, on an actual station tablet
