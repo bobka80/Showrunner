@@ -191,6 +191,47 @@ html.station-device-root #station-shell {
 window.stationShellBootstrap = null;
 window.stationHostSession = null;
 window.stationScanBusy = false;
+window.stationHostIdleTimer = null;
+window.stationHostIdleListenersBound = false;
+
+/** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
+var STATION_HOST_IDLE_MS = 10 * 60 * 1000;
+
+function stationClearHostIdleTimer_() {
+  if (window.stationHostIdleTimer) {
+    clearTimeout(window.stationHostIdleTimer);
+    window.stationHostIdleTimer = null;
+  }
+}
+
+function stationResetHostIdleTimer_() {
+  stationClearHostIdleTimer_();
+  if (!window.IS_STATION_DEVICE) return;
+  if (!stationReadHostSession_()) return;
+  window.stationHostIdleTimer = setTimeout(stationHostIdleExpired_, STATION_HOST_IDLE_MS);
+}
+
+function stationHostIdleExpired_() {
+  stationClearHostIdleTimer_();
+  if (!stationReadHostSession_()) return;
+  stationWriteHostSession_(null);
+  stationRenderShellState_();
+  var mins = Math.max(1, Math.round(STATION_HOST_IDLE_MS / 60000));
+  stationSetStatus_('Signed out after ' + mins + ' min of inactivity. Scan your badge.', 'error');
+  stationSetLastScan_('');
+}
+
+function stationBindHostIdleListeners_() {
+  if (window.stationHostIdleListenersBound) return;
+  window.stationHostIdleListenersBound = true;
+  var shell = document.getElementById('station-shell') || document;
+  var onActivity = function() {
+    if (stationReadHostSession_()) stationResetHostIdleTimer_();
+  };
+  ['touchstart', 'pointerdown', 'mousedown', 'keydown', 'click'].forEach(function(evt) {
+    shell.addEventListener(evt, onActivity, { passive: true });
+  });
+}
 
 function stationHostStorageKey_() {
   const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
@@ -255,6 +296,7 @@ function stationRenderShellState_() {
     if (laneProject) laneProject.classList.add('is-ready');
     if (laneVault) laneVault.classList.add('is-ready');
     stationSetStatus_('Ready for warehouse scans.', 'ok');
+    stationResetHostIdleTimer_();
   } else {
     if (stateLabel) stateLabel.textContent = 'Waiting for host';
     if (prompt) {
@@ -266,6 +308,7 @@ function stationRenderShellState_() {
     if (laneProject) laneProject.classList.remove('is-ready');
     if (laneVault) laneVault.classList.remove('is-ready');
     stationSetStatus_('', '');
+    stationClearHostIdleTimer_();
   }
 }
 
@@ -289,6 +332,7 @@ function stationHandleRfidScan_(rawTag) {
 
   const host = stationReadHostSession_();
   if (host) {
+    stationResetHostIdleTimer_();
     stationSetLastScan_(tag);
     stationSetStatus_('Equipment scans coming soon. Log out host to scan another badge.', 'error');
     return;
@@ -374,6 +418,7 @@ function initStationShell_() {
   const shell = document.getElementById('station-shell');
   if (shell) shell.style.display = 'flex';
 
+  stationBindHostIdleListeners_();
   stationRenderShellState_();
   stationSetStatus_('Loading station profile…', '');
 
