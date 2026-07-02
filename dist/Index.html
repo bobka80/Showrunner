@@ -5481,6 +5481,14 @@ html.station-device-root #station-shell {
 }
 .station-scan-feed__row.is-unknown .name { color: #eab308; font-weight: 600; }
 .station-scan-feed__row.is-unknown .unit { color: #71717a; }
+.station-scan-feed__row.is-crew .name { color: #38bdf8; }
+.station-scan-feed__row.is-crew .unit {
+  color: #0ea5e9;
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  align-self: center;
+}
 /* Station project picker overlay */
 #station-project-picker {
   display: none;
@@ -5525,6 +5533,92 @@ html.station-device-root #station-shell {
   margin-top: 4px;
   font-size: 11px;
   color: #71717a;
+}
+/* Station vault overlay */
+#station-vault {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50002;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+#station-vault.is-open { display: flex; }
+.station-vault__search {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #27272a;
+}
+.station-vault__search input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #10b981;
+  background: #0a0a0c;
+  color: #fff;
+  font-size: 15px;
+  box-sizing: border-box;
+  outline: none;
+}
+.station-vault__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.station-vault-item {
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  background: #111114;
+  padding: 12px 14px;
+}
+.station-vault-item__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.station-vault-item__name { font-size: 15px; font-weight: 800; }
+.station-vault-item__unit { font-family: monospace; font-size: 11px; color: #a1a1aa; flex-shrink: 0; }
+.station-vault-item__badge {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.station-vault-item__badge.s-active { background: #064e3b; color: #6ee7b7; }
+.station-vault-item__badge.s-maintenance { background: #422006; color: #fcd34d; }
+.station-vault-item__badge.s-broken { background: #450a0a; color: #fca5a5; }
+.station-vault-item__badge.s-parent { background: #1e1b4b; color: #a5b4fc; margin-left: 6px; }
+.station-vault-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.station-vault-item__actions .btn-sm { margin: 0; padding: 8px 10px; font-size: 12px; }
+.station-vault-record-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #10251f;
+  border-top: 1px solid #10b981;
+}
+.station-vault-record-bar__text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6ee7b7;
 }
 .station-shell-main {
   flex: 1;
@@ -5816,20 +5910,10 @@ html.station-device-root #station-shell {
     </div>
   </div>
 
-  <!-- Diagnostic breadcrumb overlay: makes the scan/settings bridge visible on-device.
-       Tap to hide. Remove once the pipeline is confirmed on hardware. -->
-  <div id="station-debug" onclick="this.style.display='none';"
-       style="position:fixed; left:8px; bottom:8px; z-index:9999; max-width:60vw; padding:6px 8px; background:rgba(8,10,14,0.86); border:1px solid #3f3f46; border-radius:8px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:10px; line-height:1.4; color:#a7f3d0; white-space:pre; pointer-events:auto;">
-    <div id="station-debug-badge" style="color:#f97316; font-weight:700; margin-bottom:2px;">diag</div>
-    <div id="station-debug-log">waiting…</div>
-  </div>
-
   <div class="station-shell-main">
     <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
     <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>
-    <div id="station-shell-host-name" class="station-shell-host-name" style="display:none;"></div>
     <div id="station-shell-status" class="station-shell-status"></div>
-    <div id="station-shell-last-scan" class="station-shell-last-scan"></div>
   </div>
 
   <div class="station-shell-footer">
@@ -5927,6 +6011,24 @@ html.station-device-root #station-shell {
   <div class="station-project-picker__body">
     <div id="station-project-picker-status" class="station-shell-status" style="text-align:center;">Loading projects…</div>
     <div id="station-project-picker-list" class="station-project-picker__list"></div>
+  </div>
+</div>
+
+<div id="station-vault" aria-label="Vault equipment">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Vault</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseVault()">Done</button>
+  </div>
+  <div class="station-vault__search">
+    <input type="text" id="station-vault-search" placeholder="Search equipment by name, unit or tag…" autocomplete="off" oninput="stationVaultRenderList_()">
+  </div>
+  <div id="station-vault-status" class="station-shell-status" style="text-align:center;">Loading vault…</div>
+  <div id="station-vault-list" class="station-vault__list"></div>
+
+  <!-- Record-mode banner: armed while a manager records equipment tags (with cascade). -->
+  <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
+    <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
+    <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>
   </div>
 </div>
 

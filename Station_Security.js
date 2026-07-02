@@ -353,6 +353,7 @@ function getStationEquipmentRfidMap(deviceActor) {
         const tag = normalizeStationRfidTag(data[i][cRfid]);
         if (!tag) continue;
         out[tag] = {
+          kind: 'equipment',
           name: cName !== undefined ? String(data[i][cName] || '') : '',
           unitId: cUid !== undefined ? String(data[i][cUid] || '') : '',
           unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : ''
@@ -360,7 +361,152 @@ function getStationEquipmentRfidMap(deviceActor) {
         count++;
       }
     }
+
+    // Crew badges too, so the live strip shows the PERSON's name instead of a raw/unknown tag.
+    const crewData = getSheetData(sheets.crew);
+    const crewMap = getHeaderMap(crewData);
+    if (crewMap['rfid_tag'] !== undefined) {
+      for (let i = 1; i < crewData.length; i++) {
+        const tag = normalizeStationRfidTag(crewData[i][crewMap['rfid_tag']]);
+        if (!tag || out[tag]) continue;
+        const nm = getSheetCell(crewData[i], crewMap, 'Name');
+        if (!nm) continue;
+        out[tag] = { kind: 'crew', name: String(nm) };
+        count++;
+      }
+    }
     return { success: true, map: out, count: count, ts: Date.now() };
+  });
+}
+
+// @INDEX: STATION_SHELL -> Vault list (compact station equipment list; client-side search)
+function getStationVaultList(deviceActor, hostName) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'Not a station device login.' };
+    }
+    const sheets = verifyVaultSchema(true);
+    const data = getSheetData(sheets.assets);
+    const map = data.hMap || getHeaderMap(data);
+    const col = (arr) => {
+      const k = Object.keys(map).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return k !== undefined ? map[k] : undefined;
+    };
+    const cUid = col(['uid', 'id', 'assetuid']) ?? map['uid'];
+    const cName = col(['name', 'assetname', 'itemname']) ?? map['name'];
+    const cUnit = col(['unitnumber', 'unit']) ?? map['unit_number'];
+    const cRfid = col(['rfidtag', 'rfid']) ?? map['rfid_tag'];
+    const cStatus = col(['status', 'lifecycle']) ?? map['status'];
+    const cContainer = col(['containertype', 'container']) ?? map['container_type'];
+    const cNesting = col(['nestinglevel', 'level', 'nesting']) ?? map['nesting_level'];
+    const cConsum = col(['isconsumable', 'consumable']) ?? map['is_consumable'];
+
+    const items = [];
+    for (let i = 1; i < data.length; i++) {
+      if (cUid === undefined || !data[i][cUid]) continue;
+      items.push({
+        id: String(data[i][cUid]),
+        name: cName !== undefined ? String(data[i][cName] || '') : '',
+        unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : '',
+        rfidTag: cRfid !== undefined ? String(data[i][cRfid] || '') : '',
+        status: cStatus !== undefined ? String(data[i][cStatus] || '') : '',
+        containerType: cContainer !== undefined ? String(data[i][cContainer] || '') : '',
+        nestingLevel: cNesting !== undefined ? String(data[i][cNesting] || '') : '',
+        isBulk: cConsum !== undefined ? isStationTruthyCell(data[i][cConsum]) : false
+      });
+    }
+    return {
+      success: true,
+      items: items,
+      canRecordRfid: !!hostName && verifyBackendPrivilege(hostName, 'MANAGER'),
+      ts: Date.now()
+    };
+  });
+}
+
+// @INDEX: STATION_SHELL -> Set asset lifecycle status (anyone hosted at a vault-enabled station)
+function setStationAssetStatus(deviceActor, hostName, assetId, status) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'Station device login only.' };
+    }
+    if (!hostName) return { success: false, error: 'Scan your badge to host a session first.' };
+    const allowed = ['Active', 'Maintenance', 'Broken', 'Repaired'];
+    const want = String(status || '').trim();
+    const label = allowed.find(a => a.toLowerCase() === want.toLowerCase());
+    if (!label) return { success: false, error: 'Unknown status.' };
+    // "Repaired" is an action that returns an item to service; store it as Active.
+    const writeStatus = (label === 'Repaired') ? 'Active' : label;
+
+    const sheets = verifyVaultSchema();
+    const data = sheets.assets.getDataRange().getValues();
+    const map = {};
+    data[0].forEach((h, i) => { map[h.toString().trim()] = i; });
+    const col = (arr) => {
+      const k = Object.keys(map).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return k !== undefined ? map[k] : undefined;
+    };
+    const cUid = col(['uid', 'id', 'assetuid']) ?? map['uid'];
+    const cStatus = col(['status', 'lifecycle']) ?? map['status'];
+    const cName = col(['name', 'assetname', 'itemname']) ?? map['name'];
+    if (cUid === undefined || cStatus === undefined) {
+      return { success: false, error: 'Assets sheet missing uid/status column.' };
+    }
+    const target = String(assetId).trim();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][cUid]).trim() !== target) continue;
+      sheets.assets.getRange(i + 1, cStatus + 1).setValue(writeStatus);
+      if (typeof flushCache !== 'undefined') flushCache();
+      const nm = cName !== undefined ? String(data[i][cName] || '') : target;
+      writeToAuditLog(deviceActor, 'STATION_VAULT_STATUS', 'ASSETS', 'GLOBAL', target, (hostName || 'host') + ' set ' + nm + ' → ' + label + '.');
+      return { success: true, id: target, status: writeStatus, label: label };
+    }
+    return { success: false, error: 'Asset not found.' };
+  });
+}
+
+// @INDEX: STATION_SHELL -> Record RFID onto equipment (MANAGERS only), mirror of crew enroll
+function recordStationAssetRfid(deviceActor, hostName, assetId, rfidTag) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'Station device login only.' };
+    }
+    if (!verifyBackendPrivilege(hostName, 'MANAGER')) {
+      return { success: false, error: 'Only managers can record equipment RFIDs.' };
+    }
+    const tag = normalizeStationRfidTag(rfidTag);
+    if (!tag) return { success: false, error: 'Empty scan — pull the trigger on the tag.' };
+
+    const sheets = verifyVaultSchema();
+    const data = sheets.assets.getDataRange().getValues();
+    const map = {};
+    data[0].forEach((h, i) => { map[h.toString().trim()] = i; });
+    const col = (arr) => {
+      const k = Object.keys(map).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return k !== undefined ? map[k] : undefined;
+    };
+    const cUid = col(['uid', 'id', 'assetuid']) ?? map['uid'];
+    const cRfid = col(['rfidtag', 'rfid']) ?? map['rfid_tag'];
+    const cName = col(['name', 'assetname', 'itemname']) ?? map['name'];
+    if (cUid === undefined || cRfid === undefined) {
+      return { success: false, error: 'Assets sheet missing uid/rfid_tag column.' };
+    }
+    const target = String(assetId).trim();
+    let targetRow = -1;
+    for (let i = 1; i < data.length; i++) {
+      const rowTag = normalizeStationRfidTag(data[i][cRfid]);
+      if (rowTag && rowTag === tag && String(data[i][cUid]).trim() !== target) {
+        const owner = cName !== undefined ? String(data[i][cName] || 'another asset') : 'another asset';
+        return { success: false, error: 'That tag is already on ' + owner + '.' };
+      }
+      if (String(data[i][cUid]).trim() === target) targetRow = i;
+    }
+    if (targetRow === -1) return { success: false, error: 'Asset not found.' };
+    sheets.assets.getRange(targetRow + 1, cRfid + 1).setValue(tag);
+    if (typeof flushCache !== 'undefined') flushCache();
+    const nm = cName !== undefined ? String(data[targetRow][cName] || '') : target;
+    writeToAuditLog(deviceActor, 'STATION_VAULT_RFID', 'ASSETS', 'GLOBAL', target, (hostName || 'manager') + ' tagged ' + nm + ' (' + tag + ').');
+    return { success: true, id: target, rfidTag: tag, name: nm };
   });
 }
 
