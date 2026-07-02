@@ -1,15 +1,22 @@
 {
-  "versionName": "0.1.5",
-  "versionCode": 7,
+  "versionName": "0.1.6",
+  "versionCode": 8,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-02T17:13:30.862Z",
+  "updatedAt": "2026-07-02T17:57:23.033Z",
   "sizeBytes": 12040229,
   "notes": [
-    "Fixed the real cause: the gun was in Continuous mode, which did not deliver tags on this reader. Both Single and Continuous now use the reliable read, so the trigger shows the tag again",
-    "Tip: Single mode (one pull = one tag) is recommended for badge and equipment scans"
+    "Continuous scan speed is now adjustable (settings slider). Auto-eject timer is a 1/3/5/10-minute dropdown. Gun mode/power/beeper/speed are remembered on the device and pushed to the gun on every start, so the screen and gun always match (fixes booting in machine-gun mode while settings showed Single). App now opens straight into the station screen with a Showrunner Station splash instead of briefly showing the normal phone view."
   ],
   "history": [
+    {
+      "versionName": "0.1.6",
+      "versionCode": 8,
+      "date": "2026-07-02T17:57:23.033Z",
+      "notes": [
+        "Continuous scan speed is now adjustable (settings slider). Auto-eject timer is a 1/3/5/10-minute dropdown. Gun mode/power/beeper/speed are remembered on the device and pushed to the gun on every start, so the screen and gun always match (fixes booting in machine-gun mode while settings showed Single). App now opens straight into the station screen with a Showrunner Station splash instead of briefly showing the normal phone view."
+      ]
+    },
     {
       "versionName": "0.1.5",
       "versionCode": 7,

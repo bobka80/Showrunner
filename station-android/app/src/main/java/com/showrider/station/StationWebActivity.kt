@@ -4,7 +4,10 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
+import android.view.View
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -19,7 +22,10 @@ class StationWebActivity : AppCompatActivity() {
 
     private lateinit var webView: WebView
     private lateinit var statusBar: TextView
+    private lateinit var splash: View
     private lateinit var rfid: RfidManager
+    private val splashHandler = Handler(Looper.getMainLooper())
+    private var splashHidden = false
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -29,6 +35,9 @@ class StationWebActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.station_webview)
         statusBar = findViewById(R.id.station_status)
+        splash = findViewById(R.id.station_splash)
+        // Safety net: never let the splash trap the operator if the shell never reports in.
+        splashHandler.postDelayed({ hideSplash() }, SPLASH_TIMEOUT_MS)
 
         rfid = RfidManager(
             context = this,
@@ -102,6 +111,17 @@ class StationWebActivity : AppCompatActivity() {
         }
     }
 
+    private fun hideSplash() {
+        if (splashHidden) return
+        splashHidden = true
+        splashHandler.removeCallbacksAndMessages(null)
+        runOnUiThread {
+            splash.animate().alpha(0f).setDuration(300).withEndAction {
+                splash.visibility = View.GONE
+            }.start()
+        }
+    }
+
     private fun deliverEpcToShowrunner(epc: String) {
         val safe = epc.replace("\\", "\\\\").replace("'", "\\'")
         // Showrunner runs inside an iframe on the hosting shell, so onStationRfidScan lives in the
@@ -130,6 +150,14 @@ class StationWebActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun setPollMs(ms: Int) { rfid.setPollMs(ms) }
+
+        /** Station shell mounted inside the WebView — drop the kiosk splash. */
+        @JavascriptInterface
+        fun shellReady() { hideSplash() }
+
+        /** A login screen needs the operator — reveal the WebView so they can act. */
+        @JavascriptInterface
+        fun loginNeeded() { hideSplash() }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -147,6 +175,7 @@ class StationWebActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        splashHandler.removeCallbacksAndMessages(null)
         rfid.disconnect()
         webView.destroy()
         super.onDestroy()
@@ -156,5 +185,6 @@ class StationWebActivity : AppCompatActivity() {
         private const val SHOWRUNNER_URL = "https://sm-showrunner-97405.web.app"
         private const val REQ_BLE_PERMISSIONS = 1001
         private const val REQ_ENABLE_BT = 1002
+        private const val SPLASH_TIMEOUT_MS = 30000L
     }
 }

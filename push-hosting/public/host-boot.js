@@ -76,6 +76,13 @@
     setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
   }
   if (isNativeStationApp()) showStationSplash();
+
+  // Relay shell-ready / login-needed to the native kiosk splash (StationWebActivity).
+  function notifyNativeSplash(method) {
+    try {
+      if (window.AndroidStation && typeof AndroidStation[method] === 'function') AndroidStation[method]();
+    } catch (e) { /* ignore */ }
+  }
   // ---------------------------------------------------------------------------
   const installBtn = document.getElementById('install-pwa-btn-install');
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
@@ -1042,10 +1049,12 @@
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
       hideStationSplash();
+      notifyNativeSplash('loginNeeded');
       if (ev.data.clearSession === true) navigateHostingToLoginGate();
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_READY') {
       hideStationSplash();
+      notifyNativeSplash('shellReady');
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_LINK_ERROR') {

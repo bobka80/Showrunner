@@ -19,4 +19,41 @@
         android:textColor="#f97316"
         android:textSize="11sp"
         android:visibility="gone" />
+
+    <!-- Kiosk splash: covers the WebView until the station shell reports ready, so the
+         operator never sees the personal dashboard while the web app boots. -->
+    <LinearLayout
+        android:id="@+id/station_splash"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="#0d0f12"
+        android:clickable="true"
+        android:focusable="true">
+
+        <ProgressBar
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:indeterminateTint="#e11d48" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="SHOWRUNNER STATION"
+            android:textColor="#e8eaed"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.14" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="STARTING…"
+            android:textColor="#8a8f98"
+            android:textSize="11sp"
+            android:letterSpacing="0.2" />
+    </LinearLayout>
 </FrameLayout>

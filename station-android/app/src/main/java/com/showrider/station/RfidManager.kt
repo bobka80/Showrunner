@@ -196,18 +196,25 @@ class RfidManager(
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
                 if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
-                if (scanMode == SCAN_MODE_CONTINUOUS) {
-                    // Continuous: one pull starts the repeat, next pull stops it.
-                    if (inventoryRunning) stopInventory() else startInventory()
-                } else {
-                    // Single (default station mode): one pull = one tag.
-                    if (inventoryRunning) stopInventory()
-                    performSingleRead()
+                when (scanMode) {
+                    SCAN_MODE_CONTINUOUS ->
+                        // Continuous: one pull starts the repeat, next pull stops it.
+                        if (inventoryRunning) stopInventory() else startInventory()
+                    SCAN_MODE_HOLD ->
+                        // Hold: read repeatedly while the trigger is held down.
+                        startInventory()
+                    else -> {
+                        // Single (default station mode): one pull = one tag.
+                        if (inventoryRunning) stopInventory()
+                        performSingleRead()
+                    }
                 }
             }
 
             override fun onKeyUp(keycode: Int) {
-                // No-op: single mode already read on key-down; continuous is a pull-to-toggle.
+                // Hold mode stops the moment the trigger is released; the other modes
+                // already handled the read on key-down (single) or toggle (continuous).
+                if (scanMode == SCAN_MODE_HOLD) stopInventory()
             }
         })
     }
@@ -323,7 +330,11 @@ class RfidManager(
     }
 
     fun setScanMode(mode: String) {
-        scanMode = if (mode == SCAN_MODE_CONTINUOUS) SCAN_MODE_CONTINUOUS else SCAN_MODE_SINGLE
+        scanMode = when (mode) {
+            SCAN_MODE_CONTINUOUS -> SCAN_MODE_CONTINUOUS
+            SCAN_MODE_HOLD -> SCAN_MODE_HOLD
+            else -> SCAN_MODE_SINGLE
+        }
         prefs.edit().putString(PREF_SCAN_MODE, scanMode).apply()
         if (scanMode == SCAN_MODE_SINGLE && inventoryRunning) stopInventory()
     }
@@ -381,6 +392,7 @@ class RfidManager(
         private const val PREF_POLL_MS = "gun_poll_ms"
         const val SCAN_MODE_SINGLE = "single"
         const val SCAN_MODE_CONTINUOUS = "continuous"
+        const val SCAN_MODE_HOLD = "hold"
         private const val POWER_MIN = 5
         private const val POWER_MAX = 30
         // Default to full power so reads are guaranteed on first run; the operator dials the

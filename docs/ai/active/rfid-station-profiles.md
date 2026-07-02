@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v416**
+**Opened:** 2026-07-02 · **Production:** GAS **v417**
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -43,6 +43,8 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [x] **Continuous speed setting (v416).** Continuous ("machine-gun") repeat interval is now a slider (`station-set-speed`, 100–2000 ms) shown only in continuous mode; native `RfidManager.setPollMs` drives `continuousRunnable` (`pollMs`, was fixed 500 ms). Faster = shorter interval.
 - [x] **Eject timer is now a dropdown (v416)** — 1 / 3 / 5 / 10 minutes (`STATION_EJECT_CHOICES`) instead of a free number field.
 - [x] **No "normal phone" flash on cold start (v416).** The native app (UA `ShowrunnerStation`) now shows a station splash from first paint (`host-boot.js` `showStationSplash`), cleared when the station shell posts `SHOWRUNNER_STATION_READY` or a login screen appears (12 s safety timeout so it can never block login).
+- [x] **Hold-to-scan trigger mode (v417/build 9).** Third scan mode `hold`: squeeze = read repeatedly while held, release = stop (`RfidManager` `onKeyDown` starts `startInventory`, `onKeyUp` stops it). Uses the same repeat-speed slider as continuous. Modes are now Single / Hold / Continuous.
+- [x] **In-app dashboard flash → native kiosk splash gate (v417/build 9).** Root cause: on cold start the WebView briefly renders a **non-station (personal) view** before the station shell mounts/reloads, and the top-frame web splash was dropped by the transient login screen. Added a **native splash overlay** (`activity_station_web.xml` `station_splash`) that covers the WebView until the station shell truly mounts — `host-boot.js` relays `SHOWRUNNER_STATION_READY`→`AndroidStation.shellReady()` and login-needed→`loginNeeded()`; 30 s safety timeout. Note: if the device is signed into a **personal** account it still lands on the dashboard — the kiosk must be signed in as its **station-device** account for the station screen (meta `station-device=1`).
 - [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).
 - [ ] **Verify the full loop on real hardware** — gun trigger → EPC → top strip → host/enroll → ledger, on an actual station tablet

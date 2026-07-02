@@ -56,10 +56,10 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 
 **Session UX:**
 - [x] **Host idle auto-eject** (shipped v411). Resets on touch/tap/key/RFID scan; ejects the **host only** (device stays logged in, no device passcode re-entry). **Timeout is a device-local dropdown — 1 / 3 / 5 / 10 min (default 10)** in the setup view — `stationEjectMinutes_()` / localStorage `sm_station_eject_min` in `11_Station_Shell.html`.
-- [x] **Gun trigger = single read** by default; **scan mode selectable** (single vs continuous) in the setup view; **continuous repeat speed** is a slider (100–2000 ms).
+- [x] **Gun trigger = single read** by default; **scan mode selectable** — Single / **Hold** (read while trigger held) / Continuous — in the setup view; **repeat speed** for Hold & Continuous is a slider (100–2000 ms).
 - [x] **Scan-bridge fix (v414):** Showrunner runs in an **iframe** on the hosting shell — native scan delivery now relays via `showrunnerStationDeliverScan` (host-boot.js) → `postMessage SHOWRUNNER_RFID_SCAN` → station shell listener. This is why "gun beeps but nothing reached the software" happened (calls hit the wrong frame).
 - [x] **Station setup view (⚙ on the "CHAINWAY HANDHELD" pill):** device-local, anyone can change — read **power/sensitivity** (`setPower` 5–30 dBm, shrinks radius), **scan mode**, **continuous speed** (`setPollMs`), **beeper on/off** (`setBeep`), **eject timer**, + read-only battery/firmware. The **web setup is the source of truth** (localStorage `sm_station_*`) and pushes settings to the gun on every boot via `AndroidStation` `@JavascriptInterface` + `SHOWRUNNER_STATION_CONFIG_GET/SET` relay, so screen and gun never disagree (fixes "boots in machine-gun though setup says Single").
-- [x] **No personal-phone flash on native cold start (v416):** hosting shell shows a station splash until the shell posts `SHOWRUNNER_STATION_READY`.
+- [x] **No personal-phone flash on native cold start (v416/v417):** the native app shows a kiosk splash (`station_splash`) over the WebView until the station shell posts `SHOWRUNNER_STATION_READY` (relayed to `AndroidStation.shellReady()`); reveals early if a login screen is needed. The kiosk must be signed into its **station-device** account or it lands on the personal dashboard.
 - Large **Log out** control at bottom of station screen
 - Ledger actor = hosted user; device identity = station profile
 
