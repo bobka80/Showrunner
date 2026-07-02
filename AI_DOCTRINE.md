@@ -135,6 +135,8 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
    - **Always** run `node build-station-apk.js "<what changed>" …` **with release notes** (the script fails without them), then `node deploy-hosting.js`.
    - `versionCode` auto-increments and `versionName` bumps each build; the notes + build timestamp + rolling history land in `station-manifest.json` and render on the `/station-app` download page. The director reads app state **there**, not from chat — so notes must be plain and field-readable. Canonical process: [station-android/README.md](station-android/README.md) → *Versioning & changelog*.
 
+7. **Hosting-shell cache-buster:** WebViews (and browsers) hard-cache `push-hosting/public/host-boot.js`. **Any** edit to `host-boot.js` **must** bump the `?v=` query on its `<script>` tag in `push-hosting/public/index.html` in the same change, then `node deploy-hosting.js` — otherwise devices keep running the old shell (this caused scans/settings to silently no-op). Keep the `?v=` aligned to the shipped GAS version for traceability.
+
 ---
 
 *Maintained via AI Collaboration — June 2026*

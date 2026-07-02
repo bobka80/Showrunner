@@ -127,6 +127,9 @@ class StationWebActivity : AppCompatActivity() {
 
         @JavascriptInterface
         fun setBeep(enabled: Boolean) { rfid.setBeepEnabled(enabled) }
+
+        @JavascriptInterface
+        fun setPollMs(ms: Int) { rfid.setPollMs(ms) }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

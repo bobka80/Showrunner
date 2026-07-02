@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v414**
+**Opened:** 2026-07-02 · **Production:** GAS **v416**
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -39,6 +39,10 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [x] **Regression fix (build 6): trigger stopped reading after build 5.** Device-info reads (`getBattery`/`getSTM32Version`) shared the single read worker and hung it, starving every trigger read. Moved all config/device-info SDK calls to a dedicated `configWorker`; default power set to max (30 dBm).
 - [x] **Continuous mode delivered no tags (build 7).** Diagnosed from the field: trigger showed "Scanning tags…" (= continuous branch) but no EPC — the SDK's hardware inventory callback (`startInventoryTag`/`IUHFInventoryCallback`) does **not** deliver on this R6, while single-tag reads do. Reimplemented continuous as a fast repeat of `performSingleRead()` (`continuousRunnable`, `CONTINUOUS_POLL_MS`=500ms) so **both** scan modes use the one reliable primitive. This also un-sticks a device left in continuous mode.
 - [x] **Bridge/settings not taking effect → stale cached shell (v415).** The device ran an old cached `host-boot.js` because its cache-buster (`index.html` `?v=`) was never bumped when the relay + config handlers were added — so scans never reached the top strip and settings changes (scan mode) did nothing. Bumped `?v=323`→`?v=415`; hosting-only (no reinstall — reopen the app). Beeper checkbox now defaults ON.
+- [x] **Boots in "machine-gun" though setup says Single → screen/gun desync (v416).** The gun's mode was remembered natively while the web setup showed its own default. Made the **web setup the source of truth** (device localStorage: `sm_station_scan_mode` / `sm_station_poll_ms` / `sm_station_power` / `sm_station_beep`); `stationSyncSettingsToGun_()` pushes stored settings to the gun on every shell boot, and `stationApplyGunConfig_` seeds localStorage from the gun only when unset. Remembers the last chosen mode with screen and gun in agreement.
+- [x] **Continuous speed setting (v416).** Continuous ("machine-gun") repeat interval is now a slider (`station-set-speed`, 100–2000 ms) shown only in continuous mode; native `RfidManager.setPollMs` drives `continuousRunnable` (`pollMs`, was fixed 500 ms). Faster = shorter interval.
+- [x] **Eject timer is now a dropdown (v416)** — 1 / 3 / 5 / 10 minutes (`STATION_EJECT_CHOICES`) instead of a free number field.
+- [x] **No "normal phone" flash on cold start (v416).** The native app (UA `ShowrunnerStation`) now shows a station splash from first paint (`host-boot.js` `showStationSplash`), cleared when the station shell posts `SHOWRUNNER_STATION_READY` or a login screen appears (12 s safety timeout so it can never block login).
 - [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).
 - [ ] **Verify the full loop on real hardware** — gun trigger → EPC → top strip → host/enroll → ledger, on an actual station tablet

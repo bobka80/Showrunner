@@ -375,8 +375,13 @@ html.station-device-root #station-shell {
       <div class="station-settings-section__title">Session</div>
       <div class="station-field">
         <label class="station-field__label" for="station-set-eject">Sign the host out after (minutes of inactivity)</label>
-        <input type="number" id="station-set-eject" min="1" max="120" step="1" onchange="stationSaveEjectMinutes()">
-        <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected. 1–120 min.</div>
+        <select id="station-set-eject" onchange="stationSaveEjectMinutes()">
+          <option value="1">1 minute</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected.</div>
       </div>
       <div id="station-eject-saved" class="station-settings-saved"></div>
     </div>
@@ -400,6 +405,15 @@ html.station-device-root #station-shell {
           <option value="continuous">Continuous — pull to start/stop a burst</option>
         </select>
         <div class="station-field__hint">Single is best for badge and one-at-a-time equipment scans.</div>
+      </div>
+
+      <div class="station-field" id="station-speed-field" style="display:none;">
+        <label class="station-field__label" for="station-set-speed">Continuous scan speed</label>
+        <div class="station-range-row">
+          <input type="range" id="station-set-speed" min="100" max="2000" step="50" oninput="stationOnSpeedInput()" onchange="stationSaveSpeed()">
+          <output id="station-set-speed-out">—</output>
+        </div>
+        <div class="station-field__hint">Time between repeats while the trigger is held. Left = faster (machine-gun), right = slower / gentler.</div>
       </div>
 
       <div class="station-field">
@@ -448,12 +462,30 @@ var STATION_SCAN_FEED_MAX = 8;
 /** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
 var STATION_HOST_IDLE_DEFAULT_MIN = 10;
 var STATION_EJECT_STORAGE_KEY = 'sm_station_eject_min';
+var STATION_EJECT_CHOICES = [1, 3, 5, 10];
+
+/**
+ * Device-local gun settings. The web setup is the source of truth (survives app
+ * updates), and is pushed down to the native gun on every startup so the screen
+ * and the gun never disagree.
+ */
+var STATION_MODE_KEY = 'sm_station_scan_mode';
+var STATION_POLL_KEY = 'sm_station_poll_ms';
+var STATION_POWER_KEY = 'sm_station_power';
+var STATION_BEEP_KEY = 'sm_station_beep';
+
+function stationStoredSetting_(key) {
+  try { var v = localStorage.getItem(key); return (v === null || v === undefined) ? null : v; } catch (e) { return null; }
+}
+function stationSetStoredSetting_(key, val) {
+  try { localStorage.setItem(key, String(val)); } catch (e) { /* ignore */ }
+}
 
 /** Configurable per-device eject timeout (minutes) — set in the station setup view. */
 function stationEjectMinutes_() {
   try {
     var v = parseInt(localStorage.getItem(STATION_EJECT_STORAGE_KEY), 10);
-    if (!isNaN(v) && v >= 1 && v <= 120) return v;
+    if (STATION_EJECT_CHOICES.indexOf(v) !== -1) return v;
   } catch (e) { /* ignore */ }
   return STATION_HOST_IDLE_DEFAULT_MIN;
 }
@@ -782,9 +814,10 @@ window.stationOpenSettings = function() {
   if (!panel) return;
   panel.classList.add('is-open');
   const ejectEl = document.getElementById('station-set-eject');
-  if (ejectEl) ejectEl.value = stationEjectMinutes_();
+  if (ejectEl) ejectEl.value = String(stationEjectMinutes_());
   const savedEl = document.getElementById('station-eject-saved');
   if (savedEl) savedEl.textContent = '';
+  stationPopulateGunControlsFromStorage_();
   stationRequestGunConfig_();
 };
 
@@ -797,16 +830,68 @@ function stationRequestGunConfig_() {
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_GET' });
 }
 
+function stationSpeedLabel_(ms) {
+  var n = parseInt(ms, 10);
+  if (isNaN(n)) return '—';
+  return n + ' ms';
+}
+
+function stationUpdateSpeedVisibility_() {
+  var modeEl = document.getElementById('station-set-mode');
+  var field = document.getElementById('station-speed-field');
+  if (field) field.style.display = (modeEl && modeEl.value === 'continuous') ? 'block' : 'none';
+}
+
+/** Reflect the stored (web source-of-truth) gun settings in the controls. */
+function stationPopulateGunControlsFromStorage_() {
+  var powerEl = document.getElementById('station-set-power');
+  var powerOut = document.getElementById('station-set-power-out');
+  var modeEl = document.getElementById('station-set-mode');
+  var speedEl = document.getElementById('station-set-speed');
+  var speedOut = document.getElementById('station-set-speed-out');
+  var beepEl = document.getElementById('station-set-beep');
+
+  var storedPower = stationStoredSetting_(STATION_POWER_KEY);
+  if (powerEl && storedPower != null) powerEl.value = storedPower;
+  if (powerOut && powerEl) powerOut.textContent = (powerEl.value || '—') + (powerEl.value ? ' dBm' : '');
+
+  var storedMode = stationStoredSetting_(STATION_MODE_KEY);
+  if (modeEl && storedMode) modeEl.value = storedMode;
+
+  var storedPoll = stationStoredSetting_(STATION_POLL_KEY);
+  if (speedEl && storedPoll != null) speedEl.value = storedPoll;
+  if (speedOut && speedEl && speedEl.value) speedOut.textContent = stationSpeedLabel_(speedEl.value);
+
+  var storedBeep = stationStoredSetting_(STATION_BEEP_KEY);
+  if (beepEl && storedBeep != null) beepEl.checked = (storedBeep === '1');
+
+  stationUpdateSpeedVisibility_();
+}
+
+/** Push the stored settings down to the native gun (screen ↔ gun stay in sync). */
+function stationSyncSettingsToGun_() {
+  var mode = stationStoredSetting_(STATION_MODE_KEY);
+  if (mode) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'scanMode', value: mode });
+  var poll = stationStoredSetting_(STATION_POLL_KEY);
+  if (poll != null) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'pollMs', value: parseInt(poll, 10) });
+  var power = stationStoredSetting_(STATION_POWER_KEY);
+  if (power != null) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'power', value: parseInt(power, 10) });
+  var beep = stationStoredSetting_(STATION_BEEP_KEY);
+  if (beep != null) stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'beep', value: (beep === '1') });
+}
+
 function stationApplyGunConfig_(cfg) {
   const unavailable = document.getElementById('station-gun-unavailable');
   const powerEl = document.getElementById('station-set-power');
   const powerOut = document.getElementById('station-set-power-out');
   const modeEl = document.getElementById('station-set-mode');
+  const speedEl = document.getElementById('station-set-speed');
+  const speedOut = document.getElementById('station-set-speed-out');
   const beepEl = document.getElementById('station-set-beep');
   const connEl = document.getElementById('station-info-conn');
   const battEl = document.getElementById('station-info-battery');
   const fwEl = document.getElementById('station-info-fw');
-  const gunControls = [powerEl, modeEl, beepEl];
+  const gunControls = [powerEl, modeEl, speedEl, beepEl];
 
   if (!cfg) {
     if (unavailable) unavailable.style.display = 'block';
@@ -817,14 +902,42 @@ function stationApplyGunConfig_(cfg) {
   if (unavailable) unavailable.style.display = 'none';
   gunControls.forEach(function(el) { if (el) el.disabled = false; });
 
+  // Power — web value wins if set, otherwise seed from the gun.
   if (powerEl) {
     if (cfg.powerMin != null) powerEl.min = cfg.powerMin;
     if (cfg.powerMax != null) powerEl.max = cfg.powerMax;
-    if (cfg.power != null) powerEl.value = cfg.power;
+    var storedPower = stationStoredSetting_(STATION_POWER_KEY);
+    var pv = (storedPower != null) ? storedPower : cfg.power;
+    if (pv != null) powerEl.value = pv;
+    if (storedPower == null && cfg.power != null) stationSetStoredSetting_(STATION_POWER_KEY, cfg.power);
+    if (powerOut && powerEl.value) powerOut.textContent = powerEl.value + ' dBm';
   }
-  if (powerOut && cfg.power != null) powerOut.textContent = cfg.power + ' dBm';
-  if (modeEl && cfg.scanMode) modeEl.value = cfg.scanMode;
-  if (beepEl) beepEl.checked = cfg.beep !== false;
+
+  // Scan mode
+  var storedMode = stationStoredSetting_(STATION_MODE_KEY);
+  var mv = storedMode || cfg.scanMode;
+  if (modeEl && mv) modeEl.value = mv;
+  if (storedMode == null && cfg.scanMode) stationSetStoredSetting_(STATION_MODE_KEY, cfg.scanMode);
+
+  // Continuous speed
+  if (speedEl) {
+    if (cfg.pollMin != null) speedEl.min = cfg.pollMin;
+    if (cfg.pollMax != null) speedEl.max = cfg.pollMax;
+    var storedPoll = stationStoredSetting_(STATION_POLL_KEY);
+    var sv = (storedPoll != null) ? storedPoll : cfg.pollMs;
+    if (sv != null) speedEl.value = sv;
+    if (storedPoll == null && cfg.pollMs != null) stationSetStoredSetting_(STATION_POLL_KEY, cfg.pollMs);
+    if (speedOut && speedEl.value) speedOut.textContent = stationSpeedLabel_(speedEl.value);
+  }
+  stationUpdateSpeedVisibility_();
+
+  // Beeper
+  if (beepEl) {
+    var storedBeep = stationStoredSetting_(STATION_BEEP_KEY);
+    beepEl.checked = (storedBeep != null) ? (storedBeep === '1') : (cfg.beep !== false);
+    if (storedBeep == null) stationSetStoredSetting_(STATION_BEEP_KEY, (cfg.beep !== false) ? '1' : '0');
+  }
+
   if (connEl) connEl.textContent = cfg.connected ? 'Connected' : 'Not connected';
   if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
   if (fwEl) fwEl.textContent = cfg.firmware || '—';
@@ -839,18 +952,35 @@ window.stationOnPowerInput = function() {
 window.stationSavePower = function() {
   const powerEl = document.getElementById('station-set-power');
   if (!powerEl) return;
+  stationSetStoredSetting_(STATION_POWER_KEY, powerEl.value);
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'power', value: parseInt(powerEl.value, 10) });
 };
 
 window.stationSaveScanMode = function() {
   const modeEl = document.getElementById('station-set-mode');
   if (!modeEl) return;
+  stationSetStoredSetting_(STATION_MODE_KEY, modeEl.value);
+  stationUpdateSpeedVisibility_();
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'scanMode', value: modeEl.value });
+};
+
+window.stationOnSpeedInput = function() {
+  const speedEl = document.getElementById('station-set-speed');
+  const speedOut = document.getElementById('station-set-speed-out');
+  if (speedEl && speedOut) speedOut.textContent = stationSpeedLabel_(speedEl.value);
+};
+
+window.stationSaveSpeed = function() {
+  const speedEl = document.getElementById('station-set-speed');
+  if (!speedEl) return;
+  stationSetStoredSetting_(STATION_POLL_KEY, speedEl.value);
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'pollMs', value: parseInt(speedEl.value, 10) });
 };
 
 window.stationSaveBeep = function() {
   const beepEl = document.getElementById('station-set-beep');
   if (!beepEl) return;
+  stationSetStoredSetting_(STATION_BEEP_KEY, beepEl.checked ? '1' : '0');
   stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'beep', value: !!beepEl.checked });
 };
 
@@ -859,9 +989,8 @@ window.stationSaveEjectMinutes = function() {
   const savedEl = document.getElementById('station-eject-saved');
   if (!ejectEl) return;
   let mins = parseInt(ejectEl.value, 10);
-  if (isNaN(mins) || mins < 1) mins = 1;
-  if (mins > 120) mins = 120;
-  ejectEl.value = mins;
+  if (STATION_EJECT_CHOICES.indexOf(mins) === -1) mins = STATION_HOST_IDLE_DEFAULT_MIN;
+  ejectEl.value = String(mins);
   try { localStorage.setItem(STATION_EJECT_STORAGE_KEY, String(mins)); } catch (e) { /* ignore */ }
   if (stationReadHostSession_()) stationResetHostIdleTimer_();
   if (savedEl) {
@@ -895,6 +1024,11 @@ function initStationShell_() {
   stationBindMessageListener_();
   stationRenderShellState_();
   stationSetStatus_('Loading station profile…', '');
+
+  // Tell the native host shell we're mounted so it can drop the startup splash.
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' });
+  // Push device-local gun settings down so the screen and the gun agree on boot.
+  stationSyncSettingsToGun_();
 
   google.script.run
     .withSuccessHandler(function(res) {

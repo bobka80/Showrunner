@@ -39,10 +39,43 @@
         if (key === 'power' && typeof AndroidStation.setPower === 'function') AndroidStation.setPower(parseInt(value, 10));
         else if (key === 'scanMode' && typeof AndroidStation.setScanMode === 'function') AndroidStation.setScanMode(String(value));
         else if (key === 'beep' && typeof AndroidStation.setBeep === 'function') AndroidStation.setBeep(!!value);
+        else if (key === 'pollMs' && typeof AndroidStation.setPollMs === 'function') AndroidStation.setPollMs(parseInt(value, 10));
       }
     } catch (e) { /* ignore */ }
     relayStationConfigToIframe();
   }
+
+  // Native app cold-start: cover the "normal phone" hosting chrome with a
+  // station splash until the Showrunner station shell mounts (or login is needed).
+  var stationSplashTimer = null;
+  function showStationSplash() {
+    if (document.getElementById('sr-station-splash')) return;
+    var el = document.createElement('div');
+    el.id = 'sr-station-splash';
+    el.setAttribute('style', [
+      'position:fixed', 'inset:0', 'z-index:2147483000',
+      'display:flex', 'flex-direction:column', 'align-items:center', 'justify-content:center', 'gap:18px',
+      'background:#0d0f12', 'color:#e8eaed', 'font-family:Inter,system-ui,sans-serif',
+      'letter-spacing:.14em', 'text-align:center'
+    ].join(';'));
+    el.innerHTML =
+      '<div style="width:46px;height:46px;border-radius:50%;border:3px solid rgba(255,255,255,.15);border-top-color:#e11d48;animation:srspin 1s linear infinite"></div>' +
+      '<div style="font-size:15px;font-weight:700">SHOWRUNNER<span style="color:#e11d48"> STATION</span></div>' +
+      '<div style="font-size:11px;opacity:.55;letter-spacing:.2em">STARTING…</div>' +
+      '<style>@keyframes srspin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(el);
+    // Safety: never let the splash block login/use if the shell never pings ready.
+    stationSplashTimer = setTimeout(hideStationSplash, 12000);
+  }
+  function hideStationSplash() {
+    if (stationSplashTimer) { clearTimeout(stationSplashTimer); stationSplashTimer = null; }
+    var el = document.getElementById('sr-station-splash');
+    if (!el) return;
+    el.style.transition = 'opacity .35s ease';
+    el.style.opacity = '0';
+    setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
+  }
+  if (isNativeStationApp()) showStationSplash();
   // ---------------------------------------------------------------------------
   const installBtn = document.getElementById('install-pwa-btn-install');
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
@@ -1008,7 +1041,12 @@
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
+      hideStationSplash();
       if (ev.data.clearSession === true) navigateHostingToLoginGate();
+    }
+    if (ev.data.type === 'SHOWRUNNER_STATION_READY') {
+      hideStationSplash();
+      return;
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_LINK_ERROR') {
       iframeLinkError = (ev.data.message || 'App server link failed').slice(0, 120);

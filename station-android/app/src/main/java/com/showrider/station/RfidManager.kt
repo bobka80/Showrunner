@@ -50,6 +50,7 @@ class RfidManager(
     @Volatile private var powerDbm = prefs.getInt(PREF_POWER, DEFAULT_POWER)
     @Volatile private var scanMode = prefs.getString(PREF_SCAN_MODE, SCAN_MODE_SINGLE) ?: SCAN_MODE_SINGLE
     @Volatile private var beepEnabled = prefs.getBoolean(PREF_BEEP, true)
+    @Volatile private var pollMs = prefs.getInt(PREF_POLL_MS, DEFAULT_POLL_MS)
     @Volatile private var battery = -1
     @Volatile private var firmware = ""
 
@@ -215,7 +216,7 @@ class RfidManager(
         override fun run() {
             if (!inventoryRunning) return
             performSingleRead()
-            mainHandler.postDelayed(this, CONTINUOUS_POLL_MS)
+            mainHandler.postDelayed(this, pollMs.toLong())
         }
     }
 
@@ -327,6 +328,12 @@ class RfidManager(
         if (scanMode == SCAN_MODE_SINGLE && inventoryRunning) stopInventory()
     }
 
+    /** Continuous-mode repeat interval in ms. Lower = faster machine-gun repeat. */
+    fun setPollMs(ms: Int) {
+        pollMs = ms.coerceIn(POLL_MIN, POLL_MAX)
+        prefs.edit().putInt(PREF_POLL_MS, pollMs).apply()
+    }
+
     fun setBeepEnabled(enabled: Boolean) {
         beepEnabled = enabled
         prefs.edit().putBoolean(PREF_BEEP, enabled).apply()
@@ -344,6 +351,9 @@ class RfidManager(
             "\"powerMin\":$POWER_MIN," +
             "\"powerMax\":$POWER_MAX," +
             "\"scanMode\":\"$scanMode\"," +
+            "\"pollMs\":$pollMs," +
+            "\"pollMin\":$POLL_MIN," +
+            "\"pollMax\":$POLL_MAX," +
             "\"beep\":$beepEnabled," +
             "\"battery\":$battery," +
             "\"firmware\":\"$fw\"" +
@@ -368,6 +378,7 @@ class RfidManager(
         private const val PREF_POWER = "gun_power"
         private const val PREF_SCAN_MODE = "gun_scan_mode"
         private const val PREF_BEEP = "gun_beep"
+        private const val PREF_POLL_MS = "gun_poll_ms"
         const val SCAN_MODE_SINGLE = "single"
         const val SCAN_MODE_CONTINUOUS = "continuous"
         private const val POWER_MIN = 5
@@ -384,6 +395,8 @@ class RfidManager(
         private const val SCAN_MS = 4000L
         private const val RECONNECT_MS = 5000L
         private const val DEBOUNCE_MS = 2000L
-        private const val CONTINUOUS_POLL_MS = 500L
+        private const val DEFAULT_POLL_MS = 500
+        private const val POLL_MIN = 100
+        private const val POLL_MAX = 2000
     }
 }

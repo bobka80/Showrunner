@@ -5732,8 +5732,13 @@ html.station-device-root #station-shell {
       <div class="station-settings-section__title">Session</div>
       <div class="station-field">
         <label class="station-field__label" for="station-set-eject">Sign the host out after (minutes of inactivity)</label>
-        <input type="number" id="station-set-eject" min="1" max="120" step="1" onchange="stationSaveEjectMinutes()">
-        <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected. 1–120 min.</div>
+        <select id="station-set-eject" onchange="stationSaveEjectMinutes()">
+          <option value="1">1 minute</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected.</div>
       </div>
       <div id="station-eject-saved" class="station-settings-saved"></div>
     </div>
@@ -5757,6 +5762,15 @@ html.station-device-root #station-shell {
           <option value="continuous">Continuous — pull to start/stop a burst</option>
         </select>
         <div class="station-field__hint">Single is best for badge and one-at-a-time equipment scans.</div>
+      </div>
+
+      <div class="station-field" id="station-speed-field" style="display:none;">
+        <label class="station-field__label" for="station-set-speed">Continuous scan speed</label>
+        <div class="station-range-row">
+          <input type="range" id="station-set-speed" min="100" max="2000" step="50" oninput="stationOnSpeedInput()" onchange="stationSaveSpeed()">
+          <output id="station-set-speed-out">—</output>
+        </div>
+        <div class="station-field__hint">Time between repeats while the trigger is held. Left = faster (machine-gun), right = slower / gentler.</div>
       </div>
 
       <div class="station-field">
