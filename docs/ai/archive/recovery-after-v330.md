@@ -1,6 +1,6 @@
 # Recovery — after rollback to v329 (archived)
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Archived:** 2026-06-28 · **Closed at GAS v376**
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Archived:** 2026-06-28 · **Closed at GAS v376**
 
 **Status:** **Complete** — director confirmed web.app (desktop lock + recovery items shipped).
 

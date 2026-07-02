@@ -2,7 +2,7 @@
 
 **Status:** Implemented v314 (2026-06-26)  
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · [FILE_MAP.md](FILE_MAP.md)  
-**Breakpoint:** `768px` — same single app, same `build.js` → `clasp push` pipeline. No separate mobile binary.
+**Breakpoint:** `768px` — same single app, same `build.js` → `milestone.js` (`gas-push-sync`) pipeline. No separate mobile binary.
 
 ---
 

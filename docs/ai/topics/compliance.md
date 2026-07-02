@@ -1,6 +1,6 @@
 # Compliance, health & safety
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Last swept:** 2026-06-28 · **Status:** Backlog — no dedicated compliance module found in codebase
 

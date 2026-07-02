@@ -36,7 +36,11 @@ The director may dictate by voice — match **terminology lock** in [EQUIPMENT_M
 
 ## The AI Doctrine (Mandatory Execution Rules)
 
-1. **Autonomously Maintain the Knowledge Base:** If you change JSON shape, architecture, magic strings, or **Drive folder IDs / live file names**, update the matching file in `docs/ai/` (`SCHEMA.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `FRAGILE_ZONES.md`, **`DRIVE_LAYOUT.md`**) in the same session.
+1. **Autonomously Maintain the Knowledge Base:** If you change JSON shape, architecture, magic strings, or **Drive folder IDs / live file names**, update the matching file in `docs/ai/` (`SCHEMA.md`, `ARCHITECTURE.md`, `GLOSSARY.md`, `FRAGILE_ZONES.md`, **`DRIVE_LAYOUT.md`**) in the same session. **This also fires when:**
+   - **New file / module** (any `.html`, `.js`, folder, or hosting asset) → add a row to **`FILE_MAP.md`** (and wire `Index.html` if it is a compiled module).
+   - **New build / deploy / distribution tooling or workflow** (e.g. a new `node *.js` script, an APK/hosting pipeline, a new `?action=` endpoint, an install page, a Spark/plan workaround) → document it in **`FILE_MAP.md`** + the relevant **topic** file, including the exact command(s) to run.
+   - **Config constant that changes behavior** (timeouts, idle limits, feature flags) → record its name, file, and current value in the owning topic file.
+   - **Not sure it "counts"?** Default to documenting. It is never wrong to add a `FILE_MAP.md` row or a topic line for something you just built.
 
 2. **Autonomously Maintain Work Drawers:** When you complete a task, update the **topic** or **active** file and the one-line status in [Project_TODO.md](docs/ai/Project_TODO.md). Do not duplicate checklists in the index.
 
@@ -59,11 +63,18 @@ The director may dictate by voice — match **terminology lock** in [EQUIPMENT_M
    - **Unambiguous stale doc** (e.g. shipped step still unchecked): fix to match production/`RELEASES.md`.
 
 9. **Doc Hygiene (autonomous):**
-   - **Every build session:** update relevant active/topic file + index row when you finish work.
-   - **Trigger "doc hygiene":** full pass on `active/`, `topics/`, `Project_TODO.md` index, and hub links; move finished campaigns to `archive/`; align GAS version mentions with `RELEASES.md`.
+   - **Every build session:** update relevant active/topic file + index row when you finish work. **When you edit any doc that carries a `Last swept:` / `Production:` header, bump that header** to today's date and the current `RELEASES.md` GAS version — do not leave a stale header above content you just changed.
+   - **Status table is singular:** `Project_TODO.md` is the **only** status table. `topics/README.md` is a link directory — never re-add a status column there.
+   - **Trigger "doc hygiene":** full pass on `active/`, `topics/`, `Project_TODO.md` index, and hub links; move finished campaigns to `archive/`; align all GAS version + sweep-date mentions with `RELEASES.md`.
    - **Close campaign:** when director confirms done, move `active/*.md` → `archive/` and update index.
 
 10. **Drawer placement (mandatory):** When creating or moving documentation, follow [Where to put new documentation](docs/ai/README.md#where-to-put-new-documentation). One canonical home per fact; topics = backlog only; stable reference = how things work. Update `AI_DOCTRINE.md` task routing when adding a new stable domain doc.
+
+11. **Active Campaign Lifecycle (autonomous, mandatory):** Every campaign in `docs/ai/active/` has a checklist. You **own** driving it to completion:
+    - **Tick as you ship:** the moment a piece of work lands, flip its box `[ ]` → `[x]` in the active file (and the matching topic file) in the **same session** — do not let the checklist lag behind the code.
+    - **Announce completion + ask what's next:** when **every** box in an active campaign is checked, **stop and tell the director** the campaign is complete, and **ask what to do next** — proposing 2–3 concrete candidate next steps drawn from that campaign's remaining backlog and the [Project_TODO.md](docs/ai/Project_TODO.md) topics (e.g. the next phase, or a related topic). Do not silently start new work.
+    - **Archive on the director's go:** once the director confirms the campaign is done, move its `active/*.md` file → `docs/ai/archive/`, update the **Active campaigns** row in `Project_TODO.md` (mark closed), and carry any still-open items back to the owning topic file so nothing is lost.
+    - **Keep the drawer honest:** the files present in `active/` must always reflect what is genuinely in flight — no completed campaigns lingering, no in-flight work missing a file.
 
 ---
 
@@ -114,10 +125,15 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 4. **Deploy:** Edit source → `node build.js` → deploy. Never hand-edit `dist/` as source of truth.
 
 5. **Two-layer versioning:** [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md), **`RELEASES.md`**, **`WORKS_LOG.md`**.
-   - **After every completed implementation** (any build session after **"OK go"** / fix / feature): AI runs **`node build.js`** (if needed) then **`node milestone.js "<note>"`** — **automatically**. Do **not** tell the director to deploy. Production **GAS version** (e.g. v336) is required for **web.app** and mobile field testing.
+   - **After every completed implementation** (any build session after **"OK go"** / fix / feature): AI runs **`node build.js`** (if needed) then **`node milestone.js "<note>"`** — **automatically**. Do **not** tell the director to deploy. Production **GAS version** (e.g. v411) is required for **web.app** and mobile field testing.
+   - **Always pass a descriptive `<note>`** to `milestone.js` (what shipped, not the word "Milestone") so `RELEASES.md` stays a usable changelog.
    - **"This works"** → `works-save.js` (extra Git checkpoint during long dev — optional, does not replace milestone)
    - **"Milestone" / "OK ship" / "Milestone now"** → `milestone.js` (same script; director may say these explicitly before or instead of other work)
    - **Brainstorming / docs-only** → no milestone unless code shipped
+
+6. **Station APK releases (native gun app):** The Android app (`station-android/`) is versioned and shipped **separately** from GAS — `node milestone.js` does **not** touch it. When you build/publish it:
+   - **Always** run `node build-station-apk.js "<what changed>" …` **with release notes** (the script fails without them), then `node deploy-hosting.js`.
+   - `versionCode` auto-increments and `versionName` bumps each build; the notes + build timestamp + rolling history land in `station-manifest.json` and render on the `/station-app` download page. The director reads app state **there**, not from chat — so notes must be plain and field-readable. Canonical process: [station-android/README.md](station-android/README.md) → *Versioning & changelog*.
 
 ---
 

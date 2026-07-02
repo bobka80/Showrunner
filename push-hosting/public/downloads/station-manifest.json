@@ -1,8 +1,25 @@
-﻿{
-  "versionName": "0.1.0-dev",
-  "versionCode": 1,
+{
+  "versionName": "0.1.0",
+  "versionCode": 2,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-01T14:05:00.000Z",
-  "sizeBytes": 12035825
+  "updatedAt": "2026-07-02T14:59:38.288Z",
+  "sizeBytes": 12040229,
+  "notes": [
+    "Connects to gun already paired in Bluetooth",
+    "App opens directly (no add-to-home-screen screen)",
+    "New Stage Masters app icon"
+  ],
+  "history": [
+    {
+      "versionName": "0.1.0",
+      "versionCode": 2,
+      "date": "2026-07-02T14:59:38.288Z",
+      "notes": [
+        "Connects to gun already paired in Bluetooth",
+        "App opens directly (no add-to-home-screen screen)",
+        "New Stage Masters app icon"
+      ]
+    }
+  ]
 }

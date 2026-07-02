@@ -1,6 +1,6 @@
 # Timeline shifts — crew confirm & field actuals
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Related:** [notifications-catalog.md](notifications-catalog.md) · [mobile-crew.md](mobile-crew.md) · [timeline-collab-session.md](timeline-collab-session.md) · [beta-prep.md](beta-prep.md)
 

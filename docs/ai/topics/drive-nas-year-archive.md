@@ -1,6 +1,6 @@
 # Drive → Synology NAS (year archive policy)
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Depends on:** [workspace-migration.md](workspace-migration.md) — NAS sync uses **Workspace host** Google account (**prerequisite met** — in-place upgrade, same Drive).
 

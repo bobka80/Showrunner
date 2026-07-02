@@ -28,7 +28,7 @@ When the director says **"Milestone now"** (with or without extra instructions i
 2. Run:  
    `node milestone.js "<note>"`  
    Use a short note (this becomes the **Apps Script version name**), e.g. `Personal Hub — theme, logout, PIN`.
-3. On **success**: report the **new GAS version number** (e.g. “was 335 → now 336”) and deployment result; then proceed with remaining instructions or hand off to director for web.app testing.
+3. On **success**: report the **new GAS version number** (e.g. “was 410 → now 411”) and deployment result; then proceed with remaining instructions or hand off to director for web.app testing.
 4. On **failure**: report the error; **do not** start risky work until milestone is unblocked or the director explicitly says to skip (rare).
 
 **Also mandatory:** At the end of **every completed implementation** (after **OK go**), run the same `milestone.js` step even if the director did not say “milestone”. Never tell the director to deploy manually.
@@ -39,13 +39,13 @@ When the director says **"Milestone now"** (with or without extra instructions i
 
 ## What a milestone does (reminder)
 
-1. Reads **latest Apps Script version** (e.g. 265)  
-2. `node build.js` + `clasp push` (upload current code)  
-3. `clasp version "<your note>"` → creates **next** numbered version (e.g. 266) with that name  
+1. Reads **latest Apps Script version** (e.g. 410)  
+2. `node build.js` + **`gas-push-sync`** — replaces all Apps Script files from `dist/` and deletes orphans (**not** bare `clasp push`)  
+3. `clasp version "<your note>"` → creates **next** numbered version (e.g. 411) with that name  
 4. `clasp deploy` that new version to the web app  
-5. Git commit + row in root **`RELEASES.md`**
+5. Git commit **+ push to `origin`** (`git-push-backup`) + row in root **`RELEASES.md`**
 
-This is **not** the same as **"This works"** (`works-save.js`), which only saves Git locally.
+This is **not** the same as **"This works"** (`works-save.js`), which is a Git checkpoint (commits **and pushes to `origin`**) — not a production ship.
 
 ---
 
@@ -71,7 +71,7 @@ Milestone      →  Production snapshot only
 OK go          →  AI implements, then milestones automatically (web.app test)
 ```
 
-**Default after any build:** AI runs `milestone.js` and tells you the version (e.g. **v336**). You test on web.app — you do not run clasp or deploy yourself.
+**Default after any build:** AI runs `milestone.js` and tells you the version (e.g. **v411**). You test on web.app — you do not run clasp or deploy yourself.
 
 **Rollback production:** *"Rollback production to last milestone"*  
 **Rollback dev:** *"Rollback to last this works"*

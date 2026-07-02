@@ -66,7 +66,7 @@ There are two completely distinct automated protocols handling container logic:
 ## 8. The 1MB Workaround Build Process (Async Chunk Fetching)
 Google Apps Script (GAS) has a hard file size limit of ~1MB for HTML templates, and `HtmlOutput` will silently truncate large string injections via `<?!= ... ?>`, causing catastrophic `Uncaught SyntaxError: Invalid or unexpected token` errors in Chrome because the script tag is left open/incomplete. To support complex logic, we utilize an extraction build step and an ASYNC frontend chunk loader.
 - `build.js` scans `Index.html` and extracts any `<script>` tag that does not have a `src`.
-- It deletes those scripts from the `.html` file and combines them into `dist/LogicPayload.js` on the backend, slicing the string into manageable chunks in `FRONTEND_CHUNKS`.
+- It deletes those scripts from the `.html` file, slices the combined logic into chunks, and writes one file per chunk — `dist/LogicPayload_${index}.js` (each defines `FRONTEND_CHUNK_${index}`) plus a `dist/LogicPayload_Master.js` dispatcher. Any stale `dist/LogicPayload.js` is removed.
 - It dynamically injects an `async fetcher` (polyfill) into `dist/Index.html` that uses `google.script.run.getFrontendLogicChunk(index)` to piece the massive script back together on the client side, completely bypassing the `HtmlTemplate` string injection limit.
 - **Warning**: Do not manually edit `dist/Index.html`! Any changes will be instantly overwritten the next time `node build.js` runs. Only edit the source `.html` files in the root directory.
 - **Critical AI Instruction**: NEVER revert the loader to use inline evaluation (e.g., `<?!= getFrontendLogic() ?>`). It might seem faster, but it guarantees UI failure and broken calendars.

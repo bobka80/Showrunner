@@ -31,7 +31,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 **"Milestone now" (before new work):** AI runs **`milestone.js` first**, then continues with any other instructions in the same message (e.g. start a new feature). Full protocol: **[MILESTONE_NOW.md](MILESTONE_NOW.md)**.
 
 **What happens (automatic via `node milestone.js "note"`):**
-1. Reads latest GAS version (e.g. 265) — next will be 266
+1. Reads latest GAS version (e.g. 410) — next will be 411
 2. `node build.js` + **`gas-push-sync.js`** (full replace of GAS files from `dist/` — removes orphans; plain `clasp push` does not delete removed files)
 3. `clasp version "<note>"` — frozen snapshot with your name on Google
 4. `clasp deploy` that new version (updates saved production URL if `deploy-config.json` exists; otherwise creates a new deployment and saves the ID)
@@ -53,7 +53,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 1. AI edits source code
 2. `node build.js`
 3. **`node milestone.js "<note>"`** — production Apps Script version + deploy to web.app
-4. AI reports the new **GAS version number** (e.g. **v336**) in the handoff
+4. AI reports the new **GAS version number** (e.g. **v411**) in the handoff
 
 **Director tests on:** `https://sm-showrunner-97405.web.app` (production), not developer mode, unless the task explicitly says otherwise.
 
@@ -73,7 +73,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 | Brainstorming / docs-only | No milestone |
 | Milestone command fails | Stop; report blocker — do not pretend work is live |
 
-**Why:** The mobile PWA and field crew test against **production** web.app. Each ship needs a **point GAS version** in `RELEASES.md` for rollback and director communication ("test v336").
+**Why:** The mobile PWA and field crew test against **production** web.app. Each ship needs a **point GAS version** in `RELEASES.md` for rollback and director communication ("test v411").
 
 ## Trigger phrase summary
 

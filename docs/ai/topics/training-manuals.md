@@ -1,6 +1,6 @@
 # Operation manuals & training assets
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Last swept:** 2026-06-28 · **Status:** Backlog — PWA/mobile/push **product** exists; screenshot/manual pack not started
 

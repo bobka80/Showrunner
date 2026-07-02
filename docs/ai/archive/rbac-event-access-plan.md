@@ -3,7 +3,7 @@
 > **Status:** Phases 1–5 implemented — **OK go Phase 6** when ready.  
 > **Last updated:** 2026-06-25  
 > **Drawer:** `docs/ai/archive/` — RBAC regressions or Phase 6 only.  
-> **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md)
+> **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md)
 
 ---
 

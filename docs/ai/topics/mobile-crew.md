@@ -1,6 +1,6 @@
 # Mobile crew field UX
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Shipped:** GAS v314 · **Last swept:** 2026-06-28
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Shipped:** GAS v314 · **Last swept:** 2026-07-02
 
 **Reference doc (UI detail):** [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.md)
 
@@ -16,6 +16,6 @@
 
 **Follow-up:** [notifications-catalog.md](notifications-catalog.md) for push scenario checklist; [notifications.md](notifications.md) for deploy.
 
-## Planned (warehouse floor)
+## Warehouse floor
 
-- [ ] **Mobile PA auto-save** — all equipment changes on `mobile-pa-compact` save automatically (debounced); see [project-assets-concurrency.md](project-assets-concurrency.md)
+- [x] **Mobile PA auto-save** (shipped v368) — all equipment changes on `mobile-pa-compact` save automatically (debounced; `isMobilePaExplicitSaveMode()` = false); see [project-assets-concurrency.md](project-assets-concurrency.md)

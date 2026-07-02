@@ -73,7 +73,7 @@ All four live spreadsheets sit **directly in `05_DATABASE`** (not in subfolders)
 
 **Registry:** App uses **file ID** in Script Properties (`getEngineSheetId()`, etc.). Fallback IDs apply only when a property is unset.
 
-**v354–355 mistake:** Repair/restore code renamed Engine/Vault to bare `ENGINE` / `VAULT`. Director layout requires **`SM_Showrunner_ENGINE`** and **`SM_Showrunner_VAULT`**. Code must be aligned; files may need manual rename in Drive until next fix ships.
+**v354–355 mistake (resolved):** Repair/restore code once renamed Engine/Vault to bare `ENGINE` / `VAULT`. Director layout requires **`SM_Showrunner_ENGINE`** and **`SM_Showrunner_VAULT`** — code is now **aligned** (`LIVE_ENGINE_FILE_NAME = 'SM_Showrunner_ENGINE'` in `Resources_Core.js`; see *Known code drift* below).
 
 ---
 
@@ -236,7 +236,7 @@ AGENTS.md ──► AI_DOCTRINE.md ──► docs/ai/README.md (drawer map)
 | Showrunner Sync shortcuts | This file § Sync + `Integrations.js` + `06e_Admin_Automation.html` |
 | Ship to production | `RELEASES.md` via `node milestone.js` — [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) |
 
-**Code constants (target registry — alignment pending):**
+**Code constants (registry — aligned in `Resources_Core.js`):**
 
 | Constant | ID |
 |----------|-----|

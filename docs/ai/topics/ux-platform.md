@@ -1,8 +1,8 @@
 # UX, platform & crew tools
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-30 · **Production:** GAS **v388** · **Status:** Partial — Personal Hub + **desktop lock shipped**
+**Last swept:** 2026-07-02 · **Production:** GAS **v411** · **Status:** Partial — Personal Hub + **desktop lock shipped** (lock polish through v409)
 
 ## Backlog
 
@@ -30,8 +30,8 @@
 ### Shipped behavior
 
 - [x] Full-screen overlay `z-index 10050`; dashboard blur; **0.5s fade** in/out
-- [x] Stage Masters **bus lanes** (some lanes soft-edge); hero **A** pulse
-- [x] **Bahnschrift bold** clock; digit **crossfade** on change; **perimeter dim** (50px plateau + 50px outward fade, radius ≈ height÷3)
+- [x] Stage Masters **bus lanes** — ~45% randomly blurred with **sandy/grainy edges** (SVG turbulence `#desktop-lock-sandy` + grain overlay; per-bus `--bus-blur` / `--bus-sand`); hero **A** pulse (polish through v409)
+- [x] **Bahnschrift bold** clock; per-glyph **soft edges** (blur + layered glow); **second hour digit** muted brand red `#c25860`; digit **crossfade** on change; **perimeter dim** (50px plateau + 50px outward fade, radius ≈ height÷3)
 - [x] **Quick unlock** — 2-char prefix, **local** (prefix cached at login / prefetch); full PIN on failure
 - [x] Idle **5–30 min** (5-min steps) or **Disabled** (manual padlock only), per crew device in Personal Hub
 - [x] **Desktop auto-login opt-out** — Personal Hub **DISABLE AUTO-LOGIN**; mobile always stay signed in; re-enable via checkbox on login screen

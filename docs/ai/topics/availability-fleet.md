@@ -1,6 +1,6 @@
 # Global availability & fleet tracker
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Last swept:** 2026-06-28 · **Status:** Partial — equipment tracker matrix shipped; truck envelopes + TRANSFER UI pending
 

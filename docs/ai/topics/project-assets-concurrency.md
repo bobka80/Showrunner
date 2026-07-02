@@ -1,9 +1,9 @@
 # Project Assets — multi-user warehouse concurrency
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Related:** [logistics-warehouse.md](logistics-warehouse.md) · [warehouse-prep-session.md](warehouse-prep-session.md) · [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Last swept:** 2026-06-28 · **Status:** Backlog — checkout ledger shared; list editing still single-editor semantics
+**Last swept:** 2026-07-02 · **Status:** Backlog — checkout ledger shared; list editing still single-editor semantics (mobile auto-save shipped v368)
 
 ---
 
@@ -22,7 +22,7 @@ Project Assets is the **hot zone** during load-out and recovery: many people on 
 - [x] Shared checkout session per project (`Operations.js` — `Active_Operation`, `Active_Session_UID`, ops ledger)
 - [x] Multi-scanner checkout batch queue (~1.5s) + resume from ledger
 - [x] Department **view** filters in packing (`packingDeptFilters`) — UI only, not server isolation
-- [x] Mobile compact PA (`01h_Mobile_Assets.html`) — limited surface; explicit SAVE today
+- [x] Mobile compact PA (`01h_Mobile_Assets.html`) — limited surface; **debounced auto-save** (explicit-save mode off since v368)
 
 ## Known gaps (honest assessment)
 
@@ -36,13 +36,13 @@ Project Assets is the **hot zone** during load-out and recovery: many people on 
 
 ---
 
-## Planned — mobile auto-save
+## Mobile auto-save (shipped @ v368)
 
-**Decision:** On `body.mobile-pa-compact` only, **all** equipment mutations auto-save (debounced). Remove reliance on manual SAVE for floor crew.
+**Behavior:** On `body.mobile-pa-compact`, **all** equipment mutations auto-save (debounced) — no manual SAVE for floor crew. `isMobilePaExplicitSaveMode()` returns `false`.
 
-- [ ] Re-enable / implement debounced `autoSaveAndExecute` on mobile PA mutations
-- [ ] Collision handling on failed save (toast + refresh offer)
-- [ ] Keep explicit SAVE optional or hidden on mobile after auto-save ships
+- [x] Debounced `autoSaveAndExecute` on mobile PA mutations (v368)
+- [x] Explicit SAVE hidden on mobile (explicit-save mode off)
+- [ ] Collision handling on failed save (toast + refresh offer) — ties to the no-collision-check gap above
 
 See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.md).
 

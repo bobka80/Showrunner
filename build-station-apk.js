@@ -2,11 +2,18 @@
  * Build Showrunner Station APK and copy to Firebase Hosting downloads/.
  * Requires: Android SDK + JDK 17 (Android Studio is the easiest install).
  *
- * Usage: node build-station-apk.js
+ * Usage: node build-station-apk.js "What changed" "Another fix"
+ *   - Release notes are REQUIRED (each arg = one bullet; a single arg may use
+ *     ';' or newlines to separate bullets). They appear on the /station-app
+ *     download page so the field knows what shipped without asking.
+ *   - versionCode auto-increments every build; versionName drops the -dev
+ *     suffix then bumps patch (0.1.0-dev -> 0.1.0 -> 0.1.1 -> 0.1.2 ...).
  */
 const { execSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+const os = require('os');
 
 const root = __dirname;
 const androidDir = path.join(root, 'station-android');
@@ -23,14 +30,57 @@ function fail(msg) {
   process.exit(1);
 }
 
+const gradlePath = path.join(androidDir, 'app', 'build.gradle.kts');
+
 function readVersionFromGradle() {
-  const gradle = fs.readFileSync(path.join(androidDir, 'app', 'build.gradle.kts'), 'utf8');
+  const gradle = fs.readFileSync(gradlePath, 'utf8');
   const name = gradle.match(/versionName\s*=\s*"([^"]+)"/);
   const code = gradle.match(/versionCode\s*=\s*(\d+)/);
   return {
     versionName: name ? name[1] : '0.0.0',
     versionCode: code ? parseInt(code[1], 10) : 1,
   };
+}
+
+// Beta convention: drop any -dev/suffix; bump patch only when there was no
+// suffix (so the first clean build is 0.1.0, then 0.1.1, 0.1.2 ...).
+function nextVersionName(current) {
+  const hadSuffix = current.includes('-');
+  const base = current.split('-')[0];
+  const parts = base.split('.').map((n) => parseInt(n, 10) || 0);
+  while (parts.length < 3) parts.push(0);
+  if (!hadSuffix) parts[2] += 1;
+  return parts.join('.');
+}
+
+function writeVersionToGradle(newName, newCode) {
+  let gradle = fs.readFileSync(gradlePath, 'utf8');
+  gradle = gradle.replace(/versionCode\s*=\s*\d+/, 'versionCode = ' + newCode);
+  gradle = gradle.replace(/versionName\s*=\s*"[^"]+"/, 'versionName = "' + newName + '"');
+  fs.writeFileSync(gradlePath, gradle);
+}
+
+function readReleaseNotes() {
+  const args = process.argv.slice(2).filter((a) => a !== '--no-bump');
+  const bullets = [];
+  args.forEach((a) => {
+    String(a)
+      .split(/[;\n]+/)
+      .forEach((s) => {
+        const t = s.trim();
+        if (t) bullets.push(t);
+      });
+  });
+  return bullets;
+}
+
+function readExistingHistory() {
+  try {
+    const prev = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    return Array.isArray(prev.history) ? prev.history : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 function findGradlew() {
@@ -74,24 +124,27 @@ function buildApk() {
 
   log('\n=== Building Showrunner Station (debug APK) ===\n');
   const args = ['assembleDebug', '--no-daemon'];
+  const env = buildEnv();
   const result = process.platform === 'win32'
-    ? spawnSync('cmd.exe', ['/d', '/s', '/c', `"${gradlew}" ${args.join(' ')}`], {
-        cwd: androidDir,
-        stdio: 'inherit',
-        env: buildEnv(),
-      })
-    : spawnSync(gradlew, args, {
-        cwd: androidDir,
-        stdio: 'inherit',
-        env: buildEnv(),
-      });
+    ? (() => {
+        try {
+          execSync(`"${gradlew}" ${args.join(' ')}`, { cwd: androidDir, stdio: 'inherit', env });
+          return { status: 0 };
+        } catch (e) {
+          return { status: e.status || 1 };
+        }
+      })()
+    : spawnSync(gradlew, args, { cwd: androidDir, stdio: 'inherit', env });
   if (result.status !== 0) {
     fail('Gradle build failed. Open station-android in Android Studio and fix build errors.');
   }
 
-  const apkSrc = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+  const apkSrcDefault = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+  const localAppData = process.env.LOCALAPPDATA || os.tmpdir();
+  const apkSrcLocal = path.join(localAppData, 'ShowrunnerStationBuild', 'app', 'outputs', 'apk', 'debug', 'app-debug.apk');
+  const apkSrc = fs.existsSync(apkSrcLocal) ? apkSrcLocal : apkSrcDefault;
   if (!fs.existsSync(apkSrc)) {
-    fail('Build finished but APK not found at: ' + apkSrc);
+    fail('Build finished but APK not found at: ' + apkSrcLocal + ' or ' + apkSrcDefault);
   }
   return apkSrc;
 }
@@ -102,28 +155,63 @@ function main() {
     fail('Chainway AAR missing. Copy DeviceAPI_ver20251103_release.aar into station-android/app/libs/');
   }
 
+  const noBump = process.argv.includes('--no-bump');
+
+  const notes = readReleaseNotes();
+  if (!notes.length) {
+    fail(
+      'Release notes are required so the download page shows what shipped.\n' +
+      '  Example: node build-station-apk.js "Fixed gun pairing" "Fixed install screen"\n' +
+      '  (one arg per bullet, or separate bullets with ; )'
+    );
+  }
+
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+
+  // Bump version BEFORE building so the APK embeds the new version.
+  const current = readVersionFromGradle();
+  let newName = current.versionName;
+  let newCode = current.versionCode;
+  if (!noBump) {
+    newName = nextVersionName(current.versionName);
+    newCode = current.versionCode + 1;
+    writeVersionToGradle(newName, newCode);
+    log(`Version: ${current.versionName} (build ${current.versionCode}) -> ${newName} (build ${newCode})`);
+  } else {
+    log(`Version: ${newName} (build ${newCode}) — no bump (--no-bump)`);
+  }
 
   ensureGradleWrapper();
   const apkSrc = buildApk();
-  const ver = readVersionFromGradle();
 
   fs.copyFileSync(apkSrc, apkDest);
   const stat = fs.statSync(apkDest);
+  const builtAt = new Date().toISOString();
+
+  const entry = {
+    versionName: newName,
+    versionCode: newCode,
+    date: builtAt,
+    notes: notes,
+  };
+  const history = [entry].concat(readExistingHistory()).slice(0, 20);
 
   const manifest = {
-    versionName: ver.versionName,
-    versionCode: ver.versionCode,
+    versionName: newName,
+    versionCode: newCode,
     apkFile: 'showrunner-station.bin',
     published: true,
-    updatedAt: new Date().toISOString(),
+    updatedAt: builtAt,
     sizeBytes: stat.size,
+    notes: notes,
+    history: history,
   };
   fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 
   log('\n=== Station APK ready ===');
   log('  ' + apkDest);
   log('  ' + (stat.size / 1024 / 1024).toFixed(2) + ' MB');
+  log('  v' + newName + ' (build ' + newCode + ') — ' + notes.length + ' note(s)');
   log('\nNext: node deploy-hosting.js\n');
 }
 

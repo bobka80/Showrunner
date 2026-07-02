@@ -49,7 +49,7 @@ This document describes how the **Software Director** (project owner) collaborat
 2. State which fragile zones apply (plain language)
 3. Make the smallest correct change
 4. Update docs if behavior or schema changed
-5. **`node build.js`** then **`node milestone.js "<note>"`** — ship to production automatically (see [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md)). Report the new **GAS version** (e.g. v336). Do **not** ask the director to deploy.
+5. **`node build.js`** then **`node milestone.js "<note>"`** — ship to production automatically (see [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md)). Report the new **GAS version** (e.g. v411). Do **not** ask the director to deploy.
 6. Give the director a **test checklist** on **web.app** (below)
 
 ---
@@ -179,6 +179,6 @@ When starting a **new major update** on top of tested production, the director c
 | *Milestone now* | Milestone only |
 | *Milestone now — then build the Database tab* | Milestone → then implement Database tab |
 | *Milestone* / *OK ship* | Milestone only (same as before) |
-| *OK go* (no milestone) | Dev work only — no production snapshot |
+| *OK go* / *OK do it* | AI implements, then **auto-runs `node milestone.js`** on completion (production snapshot → web.app test). Not "dev-only". |
 
 Quick reference for the director: root **[MILESTONE_NOW.md](../../MILESTONE_NOW.md)**.

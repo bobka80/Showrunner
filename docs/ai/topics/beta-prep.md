@@ -1,6 +1,6 @@
 # Beta prep — payroll, transport, security audit
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Last swept:** 2026-06-28 · **Status:** Partial — RBAC 1–5 + fin globals shipped; full beta payroll/transport pending
 

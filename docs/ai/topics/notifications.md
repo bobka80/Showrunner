@@ -1,6 +1,6 @@
 # Push notifications — architecture & deploy
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Scenario checklist (have / need):** **[notifications-catalog.md](notifications-catalog.md)** — canonical inventory; do not duplicate checklists here.
 

@@ -69,7 +69,7 @@ window.onStationRfidScan('epc-hex-here')
 
 **`RfidManager.kt`** uses Chainway `RFIDWithUHFBLE`:
 
-- Auto-scan / connect to BLE name **`Nordic_UART_CW`** (MAC cached in app prefs)
+- Connect order: **cached MAC** → **device already paired in Android Bluetooth settings** (`findBondedGunMac()`) → **BLE advertisement scan** (fallback). Name match is broadened (`Nordic` / `UART` / `Nordic_UART_CW`) and no longer skips scan hits with a null advertised name.
 - EU band **`0x04`** (865–868 MHz) after connect
 - Gun trigger → single tag read; forwards EPC to the WebView:
 
@@ -78,7 +78,13 @@ window.onStationRfidScan('epc-hex-here')
 webView.evaluateJavascript("window.onStationRfidScan('${epc}')", null)
 ```
 
-Pair R6 in the app (BLE), not only in Android Settings — follow the demo pattern.
+Pairing the R6 in **Android Bluetooth settings is enough** — the app now connects to the bonded gun by MAC (a BLE scan alone often reports a null name and misses it).
+
+### Troubleshooting
+
+- **"Gun not found" but it's paired in Android:** fixed — the app now reads bonded devices first. Rebuild + reinstall the APK.
+- **WebView stuck on "add Showrunner to your home screen":** the hosting shell used to show the PWA install nag to the WebView. The app sends UA `ShowrunnerStation/<ver>` and `host-boot.js` now treats that as installed (`isNativeStationApp()`), skipping the nag. Requires a **hosting redeploy** (`node deploy-hosting.js`).
+- **Gradle `AccessDeniedException` on Google Drive:** `app/build.gradle.kts` redirects compile output to `%LOCALAPPDATA%/ShowrunnerStationBuild/app` so Drive sync does not lock build files.
 
 ---
 
@@ -97,14 +103,37 @@ On the Showrunner **login screen**, tap **Warehouse gun — install station app*
 
 That opens `https://sm-showrunner-97405.web.app/station-app?install=1`, downloads the APK, then follow on-screen install steps.
 
-**Ops — publish a new APK:**
+**Ops — publish a new APK (release notes REQUIRED):**
 
 ```bash
-node build-station-apk.js
+node build-station-apk.js "Fixed gun pairing" "Fixed install screen"
 node deploy-hosting.js
 ```
 
 First build needs Android Studio (or Android SDK + JDK 17) on a PC once.
+
+### Versioning & changelog (mandatory process)
+
+Every published station APK must be traceable from the download page alone — no need to open a chat or the repo to know what shipped.
+
+- **`versionCode` auto-increments** every build (written back to `app/build.gradle.kts`). **`versionName`** drops the `-dev` suffix, then bumps patch: `0.1.0-dev → 0.1.0 → 0.1.1 → 0.1.2 …`.
+- **Release notes are required** — each CLI arg is one bullet (or separate bullets in one arg with `;`). `build-station-apk.js` **fails** if none are given. Write plain, field-readable notes (what a warehouse user would understand).
+- The build writes `versionName`, `versionCode`, **`updatedAt`** (build timestamp), `notes`, and a rolling **`history`** (last 20 builds) into `push-hosting/public/downloads/station-manifest.json`.
+- The install page (`/station-app`) shows the **version + build number**, the **upload timestamp**, a **"What's fixed in this build"** list, and a **"Show previous builds"** history — all straight from the manifest.
+
+So: **never build the station APK without notes**, and the download page is the single source of truth for "where is the app right now."
+
+---
+
+## App icon
+
+Adaptive launcher icon (vector, no PNGs — `minSdk 26`): the **Stage Masters stylized "A"** (brand red `#EB1C24`, same path as the desktop lock hero) on a dark brand gradient, with three white **RFID broadcast waves** rising from the apex.
+
+- `res/drawable/ic_launcher_background.xml` — dark diagonal gradient
+- `res/drawable/ic_launcher_foreground.xml` — red "A" + broadcast waves
+- `res/drawable/ic_launcher_monochrome.xml` — single-colour silhouette (Android 13+ themed icons)
+- `res/mipmap-anydpi-v26/ic_launcher.xml` + `ic_launcher_round.xml` — adaptive icon
+- Referenced from `AndroidManifest.xml` (`android:icon` / `android:roundIcon`)
 
 ---
 

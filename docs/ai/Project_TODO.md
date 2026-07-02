@@ -18,7 +18,8 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| *(none)* | Post-v330 recovery closed @ v376 | [archive/recovery-after-v330.md](archive/recovery-after-v330.md) |
+| **RFID scanning & station device profiles** | Active — shell/profiles/idle-eject/gun app/APK shipped; hardware verification + gate next | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| *(closed)* | Post-v330 recovery closed @ v376 | [archive/recovery-after-v330.md](archive/recovery-after-v330.md) |
 
 ---
 
@@ -28,14 +29,14 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 |-------|--------|------|
 | Notifications | Catalog + infra @ v359; see catalog for test matrix | [topics/notifications-catalog.md](topics/notifications-catalog.md) · [notifications.md](topics/notifications.md) |
 | Global tasks | Visibility rules + `task_view_all` IAM v345 | [topics/tasks.md](topics/tasks.md) |
-| Mobile crew UX | Shipped v314; mobile PA auto-save planned | [topics/mobile-crew.md](topics/mobile-crew.md) |
+| Mobile crew UX | Shipped v314; mobile PA auto-save shipped v368 | [topics/mobile-crew.md](topics/mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [topics/financials.md](topics/financials.md) |
-| Logistics & warehouse RFID | Partial — checkout bar; gate + station profile planned | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
+| Logistics & warehouse RFID | Partial — checkout bar; station shell + host idle eject + native gun app + APK install page (v411); gate planned | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |
 | Availability & fleet tracker | Partial — equipment tracker matrix | [topics/availability-fleet.md](topics/availability-fleet.md) |
-| UX & platform | Partial — desktop lock @ v388; Personal Hub profile TBD | [topics/ux-platform.md](topics/ux-platform.md) |
+| UX & platform | Partial — desktop lock @ v388 (polish → v409); Personal Hub profile TBD | [topics/ux-platform.md](topics/ux-platform.md) |
 | Beta prep (payroll, transport, audit) | Partial — RBAC 1–5, fin globals | [topics/beta-prep.md](topics/beta-prep.md) |
 | Training manuals | Backlog | [topics/training-manuals.md](topics/training-manuals.md) |
 | Google Workspace migration | Done — in-place host upgrade verified | [topics/workspace-migration.md](topics/workspace-migration.md) |

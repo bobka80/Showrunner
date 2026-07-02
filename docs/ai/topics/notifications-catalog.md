@@ -1,6 +1,6 @@
 # Notification catalog — have / need
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Canonical checklist** of notification **scenarios** only (what exists vs what to build).
 

@@ -1,6 +1,6 @@
 # Milestone Now (quick reference)
 
-**Default:** After every **OK go** implementation, the AI runs **`node milestone.js`** automatically and reports the GAS version (e.g. **v336**). You test on web.app — you do not deploy yourself.
+**Default:** After every **OK go** implementation, the AI runs **`node milestone.js`** automatically and reports the GAS version (e.g. **v411**). You test on web.app — you do not deploy yourself.
 
 Tell the AI: **"Milestone now"** when you want a **production snapshot before new work** (same script, explicit trigger).
 

@@ -221,6 +221,7 @@ function buildRoleDirectory(roleData, rMap) {
 
 function authenticateUser(crewName, passcode) {
   return executeWithRetry(() => {
+    let debugLog = [];
     const sheets = verifyVaultSchema(true); 
     const crewData = getSheetData(sheets.crew);
     let roleData = getSheetData(sheets.roles);

@@ -1,6 +1,7 @@
 package com.showrider.station
 
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.os.Handler
@@ -39,6 +40,7 @@ class RfidManager(
     private var activeDisconnect = false
     private var lastEpc = ""
     private var lastEpcAt = 0L
+    private var lastBondedNames = ""
     private val initialized = AtomicBoolean(false)
 
     private val connectionCallback = ConnectionStatusCallback<Any> { status, device ->
@@ -63,6 +65,15 @@ class RfidManager(
                     return@execute
                 }
 
+                // Prefer a gun already paired in Android Bluetooth settings — a BLE
+                // advertisement scan often reports a null name and misses bonded devices.
+                val bondedMac = findBondedGunMac()
+                if (bondedMac != null) {
+                    postStatus("Connecting to paired gun…")
+                    mainHandler.post { uhf.connect(bondedMac, connectionCallback) }
+                    return@execute
+                }
+
                 scanAndConnect()
             } catch (e: Exception) {
                 Log.e(TAG, "connect failed", e)
@@ -72,14 +83,43 @@ class RfidManager(
     }
 
     @SuppressLint("MissingPermission")
+    private fun findBondedGunMac(): String? {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return null
+        val bonded = try {
+            adapter.bondedDevices
+        } catch (e: SecurityException) {
+            null
+        } ?: return null
+        if (bonded.isEmpty()) {
+            lastBondedNames = ""
+            return null
+        }
+
+        // 1. A paired device whose name looks like the gun.
+        val named = bonded.firstOrNull { isGunName(it.name) }
+        if (named != null) return named.address
+
+        // 2. Dedicated station phone: if exactly one device is paired, it's the gun.
+        if (bonded.size == 1) return bonded.first().address
+
+        // 3. Can't tell — remember the names so we can show them on screen.
+        lastBondedNames = bonded.joinToString(", ") { (it.name ?: "?") + " (" + it.address + ")" }
+        return null
+    }
+
+    private fun isGunName(name: String?): Boolean {
+        if (name.isNullOrBlank()) return false
+        return GUN_NAME_HINTS.any { name.contains(it, ignoreCase = true) }
+    }
+
+    @SuppressLint("MissingPermission")
     private fun scanAndConnect() {
         postStatus("Scanning for $TARGET_BT_NAME…")
         var bestMac: String? = null
         var bestRssi = Int.MIN_VALUE
 
         uhf.startScanBTDevices(ScanBTCallback { device, rssi, _ ->
-            val name = device.name ?: return@ScanBTCallback
-            if (!name.contains(TARGET_BT_NAME, ignoreCase = true)) return@ScanBTCallback
+            if (!isGunName(device.name)) return@ScanBTCallback
             if (rssi > bestRssi) {
                 bestRssi = rssi
                 bestMac = device.address
@@ -90,7 +130,11 @@ class RfidManager(
 
         val mac = bestMac
         if (mac.isNullOrBlank()) {
-            postStatus("Gun not found — power on R6 and pair $TARGET_BT_NAME")
+            if (lastBondedNames.isNotBlank()) {
+                postStatus("Gun name not recognised. Paired: $lastBondedNames — tell setup which is the gun")
+            } else {
+                postStatus("Gun not found — power on the R6 and pair it in Android Bluetooth settings")
+            }
             scheduleReconnect()
             return
         }
@@ -232,6 +276,10 @@ class RfidManager(
         private const val PREFS_NAME = "showrunner_station"
         private const val PREF_BT_MAC = "bt_mac"
         private const val TARGET_BT_NAME = "Nordic_UART_CW"
+        // Chainway UHF guns pair under varied names — match any of these tokens.
+        private val GUN_NAME_HINTS = listOf(
+            "Nordic_UART_CW", "Nordic", "UART", "Chainway", "R6", "RFID", "UHF", "CW",
+        )
         private const val FREQUENCY_EUROPE = 0x04
         private const val SCAN_MS = 4000L
         private const val RECONNECT_MS = 5000L

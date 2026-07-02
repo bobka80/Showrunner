@@ -2,34 +2,36 @@
 
 One file per feature area. **Read only the topic you need.**
 
-**Index:** [Project_TODO.md](../Project_TODO.md) · **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md)
+**Index:** [Project_TODO.md](../Project_TODO.md) · **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md)
 
 **Stable reference (how the system works — not backlog):** see the parent [README.md](../README.md). Topics here are **what to build**; stable docs are **how things work** and **what not to break**.
 
-**Last index sweep:** 2026-06-30 (production @ GAS **v388**)
+**Last index sweep:** 2026-07-02 (production @ GAS **v411**)
 
-| Topic | Status | File |
-|-------|--------|------|
-| Notifications | Catalog @ v359 — crew/manager checklist | [notifications-catalog.md](notifications-catalog.md) · [notifications.md](notifications.md) |
-| Global tasks | Manager vs crew visibility + `task_view_all` v345 | [tasks.md](tasks.md) |
-| Mobile crew UX | Shipped v314; PA auto-save + shift confirm planned | [mobile-crew.md](mobile-crew.md) |
-| Database operations | Partial — backup/restore + push admin | [database-ops.md](database-ops.md) |
-| Financials & quoting | Partial — offer tab + print studio | [financials.md](financials.md) |
-| Logistics & warehouse RFID | Partial — checkout bar; gate + station profile planned | [logistics-warehouse.md](logistics-warehouse.md) |
-| Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [project-assets-concurrency.md](project-assets-concurrency.md) |
-| Compliance & H&S | Backlog (nothing shipped) | [compliance.md](compliance.md) |
-| Availability & fleet tracker | Partial — equipment tracker matrix | [availability-fleet.md](availability-fleet.md) |
-| UX & platform | Partial — desktop lock @ v388; Personal Hub profile TBD | [ux-platform.md](ux-platform.md) |
-| Beta prep | Partial — RBAC 1–5, fin globals | [beta-prep.md](beta-prep.md) |
-| Training manuals | Backlog (product exists; manual pack not started) | [training-manuals.md](training-manuals.md) |
-| Google Workspace migration | Done — in-place host upgrade verified | [workspace-migration.md](workspace-migration.md) |
-| Drive → NAS year archive | Backlog — Workspace host ready | [drive-nas-year-archive.md](drive-nas-year-archive.md) |
-| Session fork platform | Backlog — shared Firebase buffer + router | [session-fork-platform.md](session-fork-platform.md) |
-| Unified data cache engine | Backlog — one API, per-screen policies | [data-cache-engine.md](data-cache-engine.md) |
-| Warehouse prep session | Backlog — PA + ledger + trucks on fork | [warehouse-prep-session.md](warehouse-prep-session.md) |
-| Timeline collab session | Backlog — multi-user timeline room | [timeline-collab-session.md](timeline-collab-session.md) |
-| Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [timeline-shift-field-crew.md](timeline-shift-field-crew.md) |
+> **Status lives in one place:** the single canonical status table is **[Project_TODO.md](../Project_TODO.md)**. This page is only a **directory of topic files** — do **not** re-add a status column here (it will drift out of sync).
+
+## Topic files
+
+- [notifications-catalog.md](notifications-catalog.md) · [notifications.md](notifications.md) — push checklist + architecture
+- [tasks.md](tasks.md) — global tasks visibility + IAM
+- [mobile-crew.md](mobile-crew.md) — mobile crew UX
+- [database-ops.md](database-ops.md) — backup/restore + push admin
+- [financials.md](financials.md) — financials & quoting
+- [logistics-warehouse.md](logistics-warehouse.md) — warehouse RFID, station gun, gate
+- [project-assets-concurrency.md](project-assets-concurrency.md) — multi-user Project Assets
+- [compliance.md](compliance.md) — compliance & H&S
+- [availability-fleet.md](availability-fleet.md) — availability & fleet tracker
+- [ux-platform.md](ux-platform.md) — UX, Personal Hub, desktop lock
+- [beta-prep.md](beta-prep.md) — beta prep (payroll, transport, audit)
+- [training-manuals.md](training-manuals.md) — training manuals
+- [workspace-migration.md](workspace-migration.md) — Google Workspace migration (done)
+- [drive-nas-year-archive.md](drive-nas-year-archive.md) — Drive → NAS year archive
+- [session-fork-platform.md](session-fork-platform.md) — session fork platform
+- [data-cache-engine.md](data-cache-engine.md) — unified data cache engine
+- [warehouse-prep-session.md](warehouse-prep-session.md) — warehouse prep session fork
+- [timeline-collab-session.md](timeline-collab-session.md) — multi-user timeline room
+- [timeline-shift-field-crew.md](timeline-shift-field-crew.md) — shift confirm & field actuals
 
 **Build order:** ~~[workspace-migration.md](workspace-migration.md)~~ ✓ → [drive-nas-year-archive.md](drive-nas-year-archive.md) → [data-cache-engine.md](data-cache-engine.md) (Phase A) + [session-fork-platform.md](session-fork-platform.md) → [warehouse-prep-session.md](warehouse-prep-session.md) → [timeline-collab-session.md](timeline-collab-session.md). **Shift confirm** may start early; **field actuals** after confirm.
 
-When adding a new area: create a topic file here, add one line to `Project_TODO.md` index. **Do not** put canonical “how it works” docs in this folder — use [drawer placement rules](../README.md#where-to-put-new-documentation) in the parent README.
+When adding a new area: create a topic file here, add one line to `Project_TODO.md` index (the only status table). **Do not** put canonical “how it works” docs in this folder — use [drawer placement rules](../README.md#where-to-put-new-documentation) in the parent README.

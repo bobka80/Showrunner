@@ -65,7 +65,7 @@ This JSON payload is stored in the calendar's `extendedProps.rawDbData.readiness
 ```
 
 ## 4. Role Matrix (Security & IAM)
-Defines granular permissions and the overarching system access tier. Stored in the `Role` database sheet.
+Defines granular permissions and the overarching system access tier. Stored in the **`IAM Roles`** sheet (legacy `Role_Permissions` is ignored — see `Resources_Core.js`).
 ```json
 {
   "Role_ID": "uuid-string",
@@ -78,7 +78,7 @@ Defines granular permissions and the overarching system access tier. Stored in t
 ```
 
 ## 5. Crew Member (IAM Profile)
-Users do NOT have a direct system access tier. They inherit it strictly from their assigned `Role_ID`. Stored in the `Crew` database sheet.
+Users do NOT have a direct system access tier. They inherit it strictly from their assigned `Role_ID`. Stored in the `Crew_Roster` database sheet.
 ```json
 {
   "uid": "uuid-string",
@@ -94,7 +94,7 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 
 ## Appendix: 30-Table Index (One-Line Reference)
 
-**THE VAULT (Master Data):** `Crew_Roster`, `Role_Permissions`, `System_Config`, `System_Departments`, `Asset_Tags`, `Clients`, `Vehicles`, `Vendors`, `Warehouses`, `Subzones`, `Storage_Areas`, `Assets`, …
+**THE VAULT (Master Data):** `Crew_Roster`, `Role_Permissions` (live sheet: `IAM Roles`), `System_Config`, `System_Departments`, `Asset_Tags`, `Clients`, `Vehicles`, `Vendors`, `Warehouses`, `Subzones`, `Storage_Areas`, `Assets`, …
 
 **Note on Cases / Kits / Presets:** The 30-table target model lists separate `Cases`, `Kits`, and `Presets` sheets. **Current implementation:** kit/case/preset logic is largely consolidated in the **`Assets`** sheet plus `GeneralizationEngine.generateBlueprint()` (`07c_Generalization_Engine.html`). Separate Cases/Kits/Presets tables are **planned**, not separate cached sheets in `Resources_Core.js` today.
 

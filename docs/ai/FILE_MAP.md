@@ -57,6 +57,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`01f_Mobile_Phase_Rail.html`**: Deconstructed mini calendar (phase segments from `fragments`).
 - **`01g_Mobile_Tasks.html`**: MY TASKS view in Mobile Command Center.
 - **`01h_Mobile_Assets.html`**: Compact Project Assets on phone (`mobile-pa-compact`).
+- **`01i_Desktop_Lock.html`**: **Desktop lock screen / screensaver** — post-login overlay (session stays valid), Stage Masters bus lanes + hero A, Bahnschrift clock, quick-unlock prefix + full PIN. Server: `Security.js` (`verifyDesktopLockUnlock`, `getDesktopLockPrefix`). Styles: `Styles.html` `.desktop-lock-*`. Full behavior → [topics/ux-platform.md](topics/ux-platform.md).
 
 **Mobile handoff doc:** [MOBILE_CREW_UX.md](MOBILE_CREW_UX.md)
 
@@ -96,8 +97,10 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`06_System_Admin.html`**: Core admin resource hub router.
 - **`06a_Admin_IAM.html`**: User access and role configuration (office crew roles).
 - **`06h_Admin_Station_Profiles.html`**: **Warehouse device IAM** — gun/tablet station profiles (Chainway handheld, TL dock). Separate from office Role Editor. Backend: **`Station_Security.js`**.
-- **`11_Station_Shell.html`**: **Warehouse gun UI** — station login takeover, crew badge host inherit, `window.onStationRfidScan` SDK hook. APIs: `getStationShellBootstrap`, `processStationRfidScan`.
-- **`station-android/`**: **Native gun app** (WebView + Chainway `API_Ver20251103` AAR). See `station-android/README.md`.
+- **`11_Station_Shell.html`**: **Warehouse gun UI** — station login takeover, crew badge host inherit, `window.onStationRfidScan` SDK hook. APIs: `getStationShellBootstrap`, `processStationRfidScan`. **Host idle auto-eject** after `STATION_HOST_IDLE_MS` (10 min) — resets on touch/scan, ejects host only (device stays logged in).
+- **`station-android/`**: **Native gun app** (WebView + Chainway `API_Ver20251103` AAR — `RfidManager.kt`, `StationWebActivity.kt`). See `station-android/README.md`.
+- **`build-station-apk.js`** (repo root, Node-only via `gas-node-only.js`): Builds the station APK (`station-android` Gradle `assembleDebug`) and copies it to `push-hosting/public/downloads/showrunner-station.bin` + writes `station-manifest.json`. **Release notes are required args** (`node build-station-apk.js "fix a" "fix b"`) — it fails without them. **Auto-bumps** `versionCode` (+1) and `versionName` (`-dev` dropped → patch bump) back into `app/build.gradle.kts`, and records `updatedAt` (build time), `notes`, and a rolling `history` (last 20) in the manifest. Then `node deploy-hosting.js`. Needs Android Studio SDK + JBR on the PC.
+- **Station app install page** — login screen link **"Warehouse gun — install station app"** → `getStationAppUrl_()` in `Main.js` → `/station-app?install=1` on Firebase Hosting (`push-hosting/public/station-app.html`). Shows **version + build number, upload timestamp, "What's fixed" notes, and previous-build history** (from `station-manifest.json`) so field staff see app state without asking. APK is served as **`.bin`** because Firebase Spark blocks `.apk` uploads; hosting header re-labels it `application/vnd.android.package-archive`.
 - **`06b1_Admin_Assets_Core.html`** to **`06b4_Admin_Assets_QR.html`**: The Equipment Vault. Covers bulk review, asset provisioning, smart merges, and the QR print generator.
 - **`06c_Admin_Visuals.html`**: Real-time theme application engine.
 - **`06d_Admin_Fleet.html`**: Vehicle database CRUD.
@@ -143,10 +146,15 @@ Deployed separately: `node deploy-hosting.js` (runs `push-hosting/prepare-hostin
 | Path | Role |
 |------|------|
 | `push-hosting/public/index.html` | Hosting shell page (iframe + push dock) |
-| `push-hosting/public/host-boot.js` | Parent: **`sessioncheck` then `sessionboot`**; load GAS iframe **before** FCM; `SHOWRUNNER_SESSION_TOKEN` sync; foreground push handler; PWA install; `SW_BUILD` cache-bust |
+| `push-hosting/public/host-boot.js` | Parent: **`sessioncheck` then `sessionboot`**; load GAS iframe **before** FCM; `SHOWRUNNER_SESSION_TOKEN` sync; foreground push handler; PWA install; `SW_BUILD` cache-bust. **Native station app** (UA contains `ShowrunnerStation`) is treated as standalone → **PWA install nag suppressed** (`isNativeStationApp()`), otherwise the gun WebView gets stuck on "add to home screen". |
 | `push-hosting/public/firebase-messaging-sw.js` | Service worker — background data messages |
 | `push-hosting/public/manifest.json` | PWA manifest |
+| `push-hosting/public/station-app.html` | **Station gun APK install page** (`/station-app` rewrite); reads `station-manifest.json`, downloads `showrunner-station.bin` as `.apk` |
+| `push-hosting/public/downloads/station-manifest.json` | Published APK version/size/flag (written by `build-station-apk.js`) |
+| `push-hosting/public/downloads/*.bin` | Built APK (gitignored; `.bin` because Spark forbids `.apk`) |
 | `deploy-hosting.js` | Firebase deploy wrapper (repo root) |
+
+**Firebase plan note:** Spark (free) **blocks `.apk` on Hosting** — the station APK ships as `showrunner-station.bin` with a `Content-Type: application/vnd.android.package-archive` + `Content-Disposition` header (see `push-hosting/firebase.json`) so Android still installs it.
 
 ---
 

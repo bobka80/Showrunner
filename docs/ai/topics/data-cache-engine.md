@@ -1,6 +1,6 @@
 # Unified data cache engine (one API, many policies)
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Related:** [session-fork-platform.md](session-fork-platform.md) · [project-assets-concurrency.md](project-assets-concurrency.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
 

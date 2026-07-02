@@ -1,8 +1,8 @@
 # Logistics, warehouse & operations
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-28 · **Status:** Partial — RFID checkout bar + backend ops shipped; gate + station profile + PA concurrency backlog planned
+**Last swept:** 2026-07-02 · **Production:** GAS **v411** · **Status:** Partial — RFID checkout bar, station shell + host idle auto-eject, native gun app + APK install page shipped; gate + PA concurrency backlog planned
 
 ---
 
@@ -55,7 +55,7 @@ A **device RBAC profile** for tablets locked to RFID guns — **not** a crew “
 This removes “scan hygiene” (accidental badge wave during checkout): empty station ignores gear; hosted station ignores host tags.
 
 **Session UX:**
-- Host idle timeout ~5 minutes after last action (TBD)
+- [x] **Host idle auto-eject — 10 min** (shipped v411). Resets on touch/tap/key/RFID scan; ejects the **host only** (device stays logged in, no device passcode re-entry). Constant: `STATION_HOST_IDLE_MS` in `11_Station_Shell.html`. Not yet per-profile configurable.
 - Large **Log out** control at bottom of station screen
 - Ledger actor = hosted user; device identity = station profile
 
@@ -66,8 +66,12 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 - [ ] Crew `rfid_tag` in admin UI (deferred — sheet paste until station SDK host flow ships)
 - [x] **Station profile editor** — `06h_Admin_Station_Profiles.html` + `Station_Security.js` (separate from office `06a` / `Security.js`)
 - [x] Host-empty scan API (`processStationRfidScan` — crew badge → host session)
+- [x] **Host idle auto-eject** (10 min, `STATION_HOST_IDLE_MS` — v411)
+- [x] **Native gun app** (`station-android/` — Chainway BLE `RfidManager.kt` + WebView `StationWebActivity.kt`)
+- [x] **APK distribution via web app** — login link "Warehouse gun — install station app" → `/station-app` install page. Build: `node build-station-apk.js` → `node deploy-hosting.js`. APK served as `.bin` (Spark blocks `.apk`). Details → [FILE_MAP.md](../FILE_MAP.md) §8 / §11.
 - [ ] Gate integration (bulk door read — hardware TBD)
 - [ ] Tag-map / new-equipment RFID provisioning UX on station
+- [ ] Remove `stationDevHostAsBogdan` DEV bypass + button once real badge host flow is verified on hardware
 
 **IAM split:** Office crew permissions → **ROLE EDITOR** (`06a`). Fixed gun/tablet logins → **STATION PROFILES** (`06h`). Tamper each independently.
 

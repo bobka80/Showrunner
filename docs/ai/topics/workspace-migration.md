@@ -1,6 +1,6 @@
 # Google Workspace migration (host account)
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Status:** **Host in-place upgrade verified** (2026) — same Google account, no Drive/script migration required. NAS + Chat backlog still apply.
 

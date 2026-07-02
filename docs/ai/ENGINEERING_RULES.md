@@ -56,7 +56,7 @@ In Cursor Agent mode, use read/search tools proactively rather than assuming con
 ## 6. THE 30-TABLE ARCHITECTURE (VAULT VS. ENGINE)
 
 **THE VAULT (Master Data — 15 Tables)** — backend: `Resources_*.js`  
-`Crew_Roster`, `Role_Permissions`, `System_Config`, `System_Departments`, `Asset_Tags`, `Clients`, `Vehicles`, `Vendors`, `Warehouses`, `Subzones`, `Storage_Areas`, `Assets`, plus target **`Cases`**, **`Kits`**, **`Presets`** (latter three **planned** — kit logic today lives in `Assets` + `generateBlueprint`)
+`Crew_Roster`, `Role_Permissions` (live sheet: **`IAM Roles`**; legacy name ignored), `System_Config`, `System_Departments`, `Asset_Tags`, `Clients`, `Vehicles`, `Vendors`, `Warehouses`, `Subzones`, `Storage_Areas`, `Assets`, plus target **`Cases`**, **`Kits`**, **`Presets`** (latter three **planned** — kit logic today lives in `Assets` + `generateBlueprint`)
 
 **THE ENGINE (Transactional — 15 Tables)** — backend: `Logistics_*.js`  
 `Projects_Index`, `Project_Timelines`, `Shift_Assignments`, `Phase_Blocks`, `Dept_Overrides`, `Leave_Tracker`, `Global_Tasks`, `Task_Assignees`, `Task_Todos`, `Task_Assets`, `Project_Checklists`, `Notifications`, `Project_Assets`, `Conflict_Overrides`, `Operations_Ledger`

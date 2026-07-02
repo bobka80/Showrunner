@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Google Drive sync locks files under app/build — compile on local disk instead.
+val stationLocalBuild = file(
+    "${System.getenv("LOCALAPPDATA") ?: System.getProperty("java.io.tmpdir")}/ShowrunnerStationBuild/app",
+)
+layout.buildDirectory.set(stationLocalBuild)
+
 android {
     namespace = "com.showrider.station"
     compileSdk = 35
@@ -11,8 +17,8 @@ android {
         applicationId = "com.showrider.station"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-dev"
+        versionCode = 2
+        versionName = "0.1.0"
     }
 
     buildTypes {

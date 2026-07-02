@@ -34,7 +34,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [File_Splitting_Guide.md](File_Splitting_Guide.md) | Safe file splits |
 | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) | This works / milestone / rollback |
 | [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) | Google Drive — `STAGE_MASTERS_SYSTEM_ROOT`, `05_DATABASE`, Showrunner Sync |
-| [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now protocol |
+| [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now **full protocol** (the root `../../MILESTONE_NOW.md` is the director's quick card that points here) |
 
 **Intentional pairs (same truth, different job):** `FRAGILE_ZONES` = checklist; `ARCHITECTURE` = explanation; `EQUIPMENT_MODEL` = how gear works on projects. Link, do not copy.
 
@@ -70,7 +70,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 |------|---------|
 | `RELEASES.md` | GAS production milestones (auto-updated) |
 | `WORKS_LOG.md` | Git "this works" saves (auto-updated) |
-| `MILESTONE_NOW.md` | Director quick card → full protocol in `MILESTONE_NOW.md` here |
+| `MILESTONE_NOW.md` (repo root) | Director **quick card** → links to the full protocol at [docs/ai/MILESTONE_NOW.md](MILESTONE_NOW.md) |
 
 ---
 

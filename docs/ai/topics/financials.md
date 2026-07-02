@@ -1,6 +1,6 @@
 # Financials engine & quoting
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
 **Last swept:** 2026-06-28 · **Status:** Partial — offer tab + print studio shipped; labor/fleet/ROI pending
 

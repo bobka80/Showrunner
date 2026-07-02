@@ -41,6 +41,22 @@
       margin-top: 16px; padding: 12px; border-radius: 8px; background: #111114;
       border: 1px solid #27272a; font-size: 11px; color: var(--muted); line-height: 1.5;
     }
+    .build-line { font-size: 11px; color: var(--muted); margin: -12px 0 18px; }
+    .build-line strong { color: var(--text); }
+    .changelog { margin-top: 20px; border-top: 1px solid #27272a; padding-top: 16px; }
+    .changelog h2 {
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text); margin: 0 0 8px;
+    }
+    .changelog ul { margin: 0; padding-left: 18px; color: #a1a1aa; font-size: 12px; line-height: 1.55; }
+    .hist-btn {
+      margin-top: 14px; width: 100%; padding: 9px; border-radius: 6px;
+      background: transparent; border: 1px solid #333; color: var(--muted);
+      font-size: 11px; font-weight: 700; cursor: pointer; letter-spacing: 0.03em;
+    }
+    .hist-entry { margin-top: 14px; }
+    .hist-entry .hist-head { font-size: 11px; font-weight: 800; color: var(--muted); }
+    .hist-entry ul { margin: 5px 0 0; }
   </style>
 </head>
 <body>
@@ -48,6 +64,7 @@
     <h1>Showrunner Station</h1>
     <p class="sub">Warehouse gun app — RFID badge login for Chainway R6 devices. Install once, then open <strong>Showrunner Station</strong> instead of Chrome.</p>
     <p class="ver" id="version-line">Checking release…</p>
+    <p class="build-line hidden" id="build-line"></p>
 
     <button type="button" class="btn btn-primary" id="download-btn" disabled>Download &amp; install</button>
     <a class="btn btn-ghost" id="back-login" href="/">Back to Showrunner login</a>
@@ -61,6 +78,13 @@
       <li>Tap <strong>Install</strong>, then open <strong>Showrunner Station</strong> from the app drawer.</li>
       <li>Log in as your warehouse gun account (e.g. WH-GUN-01).</li>
     </ol>
+
+    <div id="changelog" class="changelog hidden">
+      <h2>What's fixed in this build</h2>
+      <ul id="changelog-list"></ul>
+      <button type="button" class="hist-btn hidden" id="history-toggle">Show previous builds</button>
+      <div id="history" class="hidden"></div>
+    </div>
 
     <div id="desktop-note" class="desktop-note hidden">
       Open this page on the gun phone (or scan a QR code to this URL). Desktop browsers cannot install Android apps.
@@ -77,13 +101,69 @@
       var btn = document.getElementById('download-btn');
       var statusEl = document.getElementById('status');
       var verLine = document.getElementById('version-line');
+      var buildLine = document.getElementById('build-line');
       var steps = document.getElementById('steps-android');
       var desktopNote = document.getElementById('desktop-note');
+      var changelogEl = document.getElementById('changelog');
+      var changelogList = document.getElementById('changelog-list');
+      var historyToggle = document.getElementById('history-toggle');
+      var historyEl = document.getElementById('history');
 
       function setStatus(msg, kind) {
         statusEl.textContent = msg || '';
         statusEl.className = kind || '';
         statusEl.classList.toggle('hidden', !msg);
+      }
+
+      function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+      function formatBuildTime(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return iso;
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) +
+          ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+      }
+
+      function renderNotesList(target, notes) {
+        target.innerHTML = '';
+        (notes || []).forEach(function (n) {
+          var li = document.createElement('li');
+          li.textContent = n;
+          target.appendChild(li);
+        });
+      }
+
+      function renderChangelog(m) {
+        if (m && m.updatedAt) {
+          buildLine.innerHTML = 'Uploaded <strong>' + formatBuildTime(m.updatedAt) + '</strong>';
+          buildLine.classList.remove('hidden');
+        }
+        if (m && m.notes && m.notes.length) {
+          renderNotesList(changelogList, m.notes);
+          changelogEl.classList.remove('hidden');
+        }
+        var history = (m && m.history) ? m.history.slice(1) : [];
+        if (history.length) {
+          historyToggle.classList.remove('hidden');
+          historyToggle.addEventListener('click', function () {
+            var open = !historyEl.classList.contains('hidden');
+            historyEl.classList.toggle('hidden', open);
+            historyToggle.textContent = open ? 'Show previous builds' : 'Hide previous builds';
+          });
+          history.forEach(function (h) {
+            var wrap = document.createElement('div');
+            wrap.className = 'hist-entry';
+            var head = document.createElement('div');
+            head.className = 'hist-head';
+            head.textContent = 'v' + h.versionName + ' (build ' + h.versionCode + ') — ' + formatBuildTime(h.date);
+            wrap.appendChild(head);
+            var ul = document.createElement('ul');
+            renderNotesList(ul, h.notes);
+            wrap.appendChild(ul);
+            historyEl.appendChild(wrap);
+          });
+        }
       }
 
       function startDownload() {
@@ -115,6 +195,7 @@
           var name = (m && m.versionName) ? m.versionName : '0.1.0-dev';
           var code = (m && m.versionCode) ? (' (build ' + m.versionCode + ')') : '';
           verLine.textContent = 'Version ' + name + code;
+          renderChangelog(m);
 
           return fetch(APK_URL, { method: 'HEAD', cache: 'no-store' })
             .then(function (head) {

@@ -137,8 +137,15 @@
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   }
 
+  function isNativeStationApp() {
+    // Native Chainway gun app sets " ShowrunnerStation/<ver>" on the WebView UA.
+    return /ShowrunnerStation/i.test(navigator.userAgent || '');
+  }
+
   function isStandalonePwa() {
-    return window.matchMedia('(display-mode: standalone)').matches ||
+    // The native station app is already "installed" — never nag it to add-to-home-screen.
+    return isNativeStationApp() ||
+      window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
   }
 
