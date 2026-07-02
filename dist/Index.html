@@ -1917,6 +1917,13 @@
         0% { transform: translateX(4vw) scale(1); opacity: 0.06; }
         100% { transform: translateX(4vw) scale(14); opacity: 0.10; }
     }
+    .desktop-lock-filters {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        pointer-events: none;
+    }
     .desktop-lock-bus-lanes {
         position: absolute;
         inset: 0;
@@ -1937,8 +1944,18 @@
         display: block;
     }
     .desktop-lock-bus--blur svg {
-        filter: blur(2px);
-        -webkit-filter: blur(2px);
+        filter: blur(var(--bus-blur, 2px)) url(#desktop-lock-sandy);
+        -webkit-filter: blur(var(--bus-blur, 2px)) url(#desktop-lock-sandy);
+    }
+    .desktop-lock-bus--blur::after {
+        content: "";
+        position: absolute;
+        inset: -3% -1%;
+        pointer-events: none;
+        opacity: calc(0.06 + var(--bus-sand, 1.5) * 0.03);
+        mix-blend-mode: soft-light;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='48'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.55'/%3E%3C/svg%3E");
+        background-size: 140px 38px;
     }
     .desktop-lock-bus--ltr {
         animation-name: desktop-lock-bus-ltr;
@@ -2005,13 +2022,10 @@
         color: #8a939f;
         letter-spacing: 2px;
         font-variant-numeric: tabular-nums;
-        text-shadow: 0 0 1px rgba(138, 147, 159, 0.9), 0 0 10px rgba(138, 147, 159, 0.22);
         line-height: 1;
         margin: 0;
         padding: 0;
         white-space: nowrap;
-        filter: blur(0.4px);
-        -webkit-filter: blur(0.4px);
     }
     .desktop-lock-clock-slot {
         position: relative;
@@ -2022,17 +2036,31 @@
     }
     .desktop-lock-clock-sep {
         display: inline-block;
-        text-shadow: 0 0 1px rgba(138, 147, 159, 0.85), 0 0 8px rgba(138, 147, 159, 0.2);
+        filter: blur(0.65px);
+        -webkit-filter: blur(0.65px);
+        text-shadow:
+            0 0 2px rgba(138, 147, 159, 0.55),
+            0 0 10px rgba(138, 147, 159, 0.16),
+            0 0 18px rgba(138, 147, 159, 0.08);
     }
     .desktop-lock-clock-slot--accent .desktop-lock-clock-digit {
-        color: #eb1c24;
-        text-shadow: 0 0 1px rgba(235, 28, 36, 0.95), 0 0 12px rgba(235, 28, 36, 0.28);
+        color: #a68a8e;
+        text-shadow:
+            0 0 2px rgba(166, 138, 142, 0.45),
+            0 0 10px rgba(166, 138, 142, 0.12),
+            0 0 18px rgba(166, 138, 142, 0.06);
     }
     .desktop-lock-clock-digit {
         display: block;
         line-height: 1;
         width: 100%;
         text-align: center;
+        filter: blur(0.65px);
+        -webkit-filter: blur(0.65px);
+        text-shadow:
+            0 0 2px rgba(138, 147, 159, 0.55),
+            0 0 10px rgba(138, 147, 159, 0.16),
+            0 0 18px rgba(138, 147, 159, 0.08);
     }
     .desktop-lock-clock-digit.is-leaving,
     .desktop-lock-clock-digit.is-entering {
@@ -5513,6 +5541,17 @@ html.station-device-root #station-shell {
 
 
 <div id="desktop-lock-overlay" class="desktop-lock-overlay" style="display:none;" aria-hidden="true">
+  <svg class="desktop-lock-filters" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="desktop-lock-sandy" x="-12%" y="-30%" width="124%" height="160%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="8" result="noise"/>
+        <feColorMatrix in="noise" type="saturate" values="0" result="grain"/>
+        <feDisplacementMap in="SourceGraphic" in2="grain" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
+        <feGaussianBlur in="displaced" stdDeviation="0.35" result="soft"/>
+        <feBlend in="soft" in2="SourceGraphic" mode="normal"/>
+      </filter>
+    </defs>
+  </svg>
   <div class="desktop-lock-hero" aria-hidden="true">
     <svg class="desktop-lock-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
   </div>

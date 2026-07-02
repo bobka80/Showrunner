@@ -1,4 +1,15 @@
 <div id="desktop-lock-overlay" class="desktop-lock-overlay" style="display:none;" aria-hidden="true">
+  <svg class="desktop-lock-filters" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="desktop-lock-sandy" x="-12%" y="-30%" width="124%" height="160%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="8" result="noise"/>
+        <feColorMatrix in="noise" type="saturate" values="0" result="grain"/>
+        <feDisplacementMap in="SourceGraphic" in2="grain" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
+        <feGaussianBlur in="displaced" stdDeviation="0.35" result="soft"/>
+        <feBlend in="soft" in2="SourceGraphic" mode="normal"/>
+      </filter>
+    </defs>
+  </svg>
   <div class="desktop-lock-hero" aria-hidden="true">
     <svg class="desktop-lock-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
   </div>
@@ -153,8 +164,8 @@
 
   function buildDesktopLockBuses() {
     let lanes = document.getElementById('desktop-lock-bus-lanes');
-    if (!lanes || lanes.dataset.built === 'v8') return;
-    lanes.dataset.built = 'v8';
+    if (!lanes || lanes.dataset.built === 'v9') return;
+    lanes.dataset.built = 'v9';
     let html = '';
     const configs = [
       { top: '6%',  width: '250vw', dur: 56,  delay: 0,   dir: 'ltr' },
@@ -172,10 +183,15 @@
     ];
     configs.forEach(function(cfg) {
       const op = busOpacityForWidth(cfg.width);
-      const blurCls = Math.random() < 0.42 ? ' desktop-lock-bus--blur' : '';
+      const blurred = Math.random() < 0.45;
+      const blurCls = blurred ? ' desktop-lock-bus--blur' : '';
+      const blurPx = blurred ? (0.7 + Math.random() * 4.8).toFixed(2) : '0';
+      const sandScale = blurred ? (1.2 + Math.random() * 2.8).toFixed(2) : '0';
       html += '<div class="desktop-lock-bus desktop-lock-bus--' + cfg.dir + blurCls + '" style="' +
         'top:' + cfg.top + ';width:' + cfg.width + ';' +
         '--bus-o:' + op + ';' +
+        '--bus-blur:' + blurPx + 'px;' +
+        '--bus-sand:' + sandScale + ';' +
         'animation-duration:' + cfg.dur + 's;animation-delay:' + cfg.delay + 's;">' +
         STAGE_MASTERS_LOGO_SVG_LOCK + '</div>';
     });
