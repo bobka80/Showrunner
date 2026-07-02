@@ -1,16 +1,24 @@
 {
-  "versionName": "0.1.1",
-  "versionCode": 3,
+  "versionName": "0.1.2",
+  "versionCode": 4,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-02T15:20:15.686Z",
+  "updatedAt": "2026-07-02T16:09:54.049Z",
   "sizeBytes": 12040229,
   "notes": [
-    "RFID: connect to gun paired under any name (not just Nordic_UART_CW)",
-    "Shows paired device names on screen when the gun name is unrecognised",
-    "Uses the only paired device on a dedicated station phone"
+    "Trigger now does a SINGLE read (one pull = one tag) instead of continuous machine-gun scanning",
+    "Gun echoes 'Read: <EPC>' on the status bar so we can see reads even if the top strip is empty"
   ],
   "history": [
+    {
+      "versionName": "0.1.2",
+      "versionCode": 4,
+      "date": "2026-07-02T16:09:54.049Z",
+      "notes": [
+        "Trigger now does a SINGLE read (one pull = one tag) instead of continuous machine-gun scanning",
+        "Gun echoes 'Read: <EPC>' on the status bar so we can see reads even if the top strip is empty"
+      ]
+    },
     {
       "versionName": "0.1.1",
       "versionCode": 3,

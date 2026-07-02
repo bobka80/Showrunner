@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-02 · **Production:** GAS **v413** · **Status:** Partial — RFID checkout bar, station shell + host idle auto-eject + live scan strip + self-serve badge enrollment, native gun app + APK install page shipped; gate + PA concurrency backlog planned
+**Last swept:** 2026-07-02 · **Production:** GAS **v414** · **Status:** Partial — RFID checkout bar, station shell + configurable host auto-eject + live scan strip + self-serve badge enrollment + station setup view (power/mode/beeper), iframe scan-bridge fix, native gun app + APK install page shipped; gate + PA concurrency backlog planned
 
 ---
 
@@ -55,7 +55,10 @@ A **device RBAC profile** for tablets locked to RFID guns — **not** a crew “
 This removes “scan hygiene” (accidental badge wave during checkout): empty station ignores gear; hosted station ignores host tags.
 
 **Session UX:**
-- [x] **Host idle auto-eject — 10 min** (shipped v411). Resets on touch/tap/key/RFID scan; ejects the **host only** (device stays logged in, no device passcode re-entry). Constant: `STATION_HOST_IDLE_MS` in `11_Station_Shell.html`. Not yet per-profile configurable.
+- [x] **Host idle auto-eject** (shipped v411). Resets on touch/tap/key/RFID scan; ejects the **host only** (device stays logged in, no device passcode re-entry). **Timeout is device-configurable (1–120 min, default 10)** via the setup view — `stationEjectMinutes_()` / localStorage `sm_station_eject_min` in `11_Station_Shell.html`.
+- [x] **Gun trigger = single read** by default; **scan mode selectable** (single vs continuous) in the setup view.
+- [x] **Scan-bridge fix (v414):** Showrunner runs in an **iframe** on the hosting shell — native scan delivery now relays via `showrunnerStationDeliverScan` (host-boot.js) → `postMessage SHOWRUNNER_RFID_SCAN` → station shell listener. This is why "gun beeps but nothing reached the software" happened (calls hit the wrong frame).
+- [x] **Station setup view (⚙ on the "CHAINWAY HANDHELD" pill):** device-local, anyone can change — read **power/sensitivity** (`setPower` 5–30 dBm, shrinks radius), **scan mode**, **beeper on/off** (`setBeep`), **eject timer**, + read-only battery/firmware. Web→native via `AndroidStation` `@JavascriptInterface` + `SHOWRUNNER_STATION_CONFIG_GET/SET` relay. Settings persist in Android prefs.
 - Large **Log out** control at bottom of station screen
 - Ledger actor = hosted user; device identity = station profile
 
@@ -68,7 +71,7 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 - [ ] Crew `rfid_tag` in office admin UI (deferred — station self-enroll + sheet paste cover it for now)
 - [x] **Station profile editor** — `06h_Admin_Station_Profiles.html` + `Station_Security.js` (separate from office `06a` / `Security.js`)
 - [x] Host-empty scan API (`processStationRfidScan` — crew badge → host session)
-- [x] **Host idle auto-eject** (10 min, `STATION_HOST_IDLE_MS` — v411)
+- [x] **Host idle auto-eject** (configurable 1–120 min, default 10 — v411, timer configurable v414)
 - [x] **Native gun app** (`station-android/` — Chainway BLE `RfidManager.kt` + WebView `StationWebActivity.kt`)
 - [x] **APK distribution via web app** — login link "Warehouse gun — install station app" → `/station-app` install page. Build: `node build-station-apk.js` → `node deploy-hosting.js`. APK served as `.bin` (Spark blocks `.apk`). Details → [FILE_MAP.md](../FILE_MAP.md) §8 / §11.
 - [ ] Gate integration (bulk door read — hardware TBD)

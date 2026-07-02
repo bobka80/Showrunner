@@ -10,6 +10,40 @@
   const dockStatusEl = document.getElementById('push-dock-status');
   const frame = document.getElementById('app-frame');
   const installPanel = document.getElementById('install-pwa-panel');
+
+  // --- Native station bridge (RFID gun) --------------------------------------
+  // The native app injects `AndroidStation` and calls `showrunnerStationDeliverScan`
+  // in THIS (top) frame; Showrunner itself runs in the iframe, so we relay by postMessage.
+  window.showrunnerStationDeliverScan = function(tag) {
+    try {
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage({ type: 'SHOWRUNNER_RFID_SCAN', tag: String(tag == null ? '' : tag) }, '*');
+      }
+    } catch (e) { /* ignore */ }
+  };
+
+  function relayStationConfigToIframe() {
+    if (!frame || !frame.contentWindow) return;
+    var cfg = null;
+    try {
+      if (window.AndroidStation && typeof AndroidStation.getConfig === 'function') {
+        cfg = JSON.parse(AndroidStation.getConfig());
+      }
+    } catch (e) { cfg = null; }
+    try { frame.contentWindow.postMessage({ type: 'SHOWRUNNER_STATION_CONFIG', config: cfg }, '*'); } catch (e) { /* ignore */ }
+  }
+
+  function applyStationConfig(key, value) {
+    try {
+      if (window.AndroidStation) {
+        if (key === 'power' && typeof AndroidStation.setPower === 'function') AndroidStation.setPower(parseInt(value, 10));
+        else if (key === 'scanMode' && typeof AndroidStation.setScanMode === 'function') AndroidStation.setScanMode(String(value));
+        else if (key === 'beep' && typeof AndroidStation.setBeep === 'function') AndroidStation.setBeep(!!value);
+      }
+    } catch (e) { /* ignore */ }
+    relayStationConfigToIframe();
+  }
+  // ---------------------------------------------------------------------------
   const installBtn = document.getElementById('install-pwa-btn-install');
   const installDoneBtn = document.getElementById('install-pwa-btn-done');
   const installSkipBtn = document.getElementById('install-pwa-btn-skip');
@@ -1004,6 +1038,14 @@
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_BRIDGE') {
       registerTokenViaBridgeJsonp(ev.data);
+    }
+    if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_GET') {
+      relayStationConfigToIframe();
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_SET') {
+      applyStationConfig(ev.data.key, ev.data.value);
+      return;
     }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN' && fcmToken && ev.source) {
       try {

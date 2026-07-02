@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -44,6 +45,9 @@ class StationWebActivity : AppCompatActivity() {
             databaseEnabled = true
             userAgentString = userAgentString + " ShowrunnerStation/0.1"
         }
+
+        // Web setup view -> native gun controls (injected into the hosting shell frame).
+        webView.addJavascriptInterface(StationBridge(), "AndroidStation")
 
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
@@ -100,8 +104,29 @@ class StationWebActivity : AppCompatActivity() {
 
     private fun deliverEpcToShowrunner(epc: String) {
         val safe = epc.replace("\\", "\\\\").replace("'", "\\'")
-        val js = "if (typeof window.onStationRfidScan === 'function') { window.onStationRfidScan('$safe'); }"
+        // Showrunner runs inside an iframe on the hosting shell, so onStationRfidScan lives in the
+        // child frame. Prefer the shell relay (posts into the iframe); fall back to a direct call
+        // when the app is pointed straight at the GAS URL.
+        val js = "(function(t){try{" +
+            "if(typeof window.showrunnerStationDeliverScan==='function'){window.showrunnerStationDeliverScan(t);}" +
+            "else if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t);}" +
+            "}catch(e){}})('$safe');"
         runOnUiThread { webView.evaluateJavascript(js, null) }
+    }
+
+    /** Exposed to JS as `AndroidStation` (hosting-shell frame). Runs on a binder thread. */
+    inner class StationBridge {
+        @JavascriptInterface
+        fun getConfig(): String = rfid.currentConfigJson()
+
+        @JavascriptInterface
+        fun setPower(power: Int) { rfid.setPowerLevel(power) }
+
+        @JavascriptInterface
+        fun setScanMode(mode: String?) { rfid.setScanMode(mode ?: RfidManager.SCAN_MODE_SINGLE) }
+
+        @JavascriptInterface
+        fun setBeep(enabled: Boolean) { rfid.setBeepEnabled(enabled) }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

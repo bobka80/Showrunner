@@ -43,6 +43,13 @@ class RfidManager(
     private var lastBondedNames = ""
     private val initialized = AtomicBoolean(false)
 
+    // Device-configurable gun settings (persisted in prefs, editable from the web setup view).
+    @Volatile private var powerDbm = prefs.getInt(PREF_POWER, DEFAULT_POWER)
+    @Volatile private var scanMode = prefs.getString(PREF_SCAN_MODE, SCAN_MODE_SINGLE) ?: SCAN_MODE_SINGLE
+    @Volatile private var beepEnabled = prefs.getBoolean(PREF_BEEP, true)
+    @Volatile private var battery = -1
+    @Volatile private var firmware = ""
+
     private val connectionCallback = ConnectionStatusCallback<Any> { status, device ->
         mainHandler.post { handleConnectionStatus(status, device as? BluetoothDevice) }
     }
@@ -160,6 +167,7 @@ class RfidManager(
                     postStatus("RFID connected ($name) — set EU band in gun settings if reads fail")
                 }
                 installGunTriggerHandler()
+                applyConfigToGun()
             }
 
             ConnectionStatus.DISCONNECTED -> {
@@ -184,14 +192,18 @@ class RfidManager(
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
                 if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
-                when (keycode) {
-                    1 -> if (inventoryRunning) stopInventory() else startInventory()
-                    2, 3 -> performSingleRead()
+                if (scanMode == SCAN_MODE_CONTINUOUS) {
+                    // Continuous: one pull starts the burst, next pull stops it.
+                    if (inventoryRunning) stopInventory() else startInventory()
+                } else {
+                    // Single (default station mode): one pull = one tag.
+                    if (inventoryRunning) stopInventory()
+                    performSingleRead()
                 }
             }
 
             override fun onKeyUp(keycode: Int) {
-                if (keycode == 4 && inventoryRunning) stopInventory()
+                if (inventoryRunning) stopInventory()
             }
         })
     }
@@ -242,6 +254,8 @@ class RfidManager(
         lastEpc = epc
         lastEpcAt = now
 
+        // Native echo: proves the phone received the EPC even if the web bridge fails.
+        postStatus("Read: ${epc.uppercase()}")
         mainHandler.post { onTagScanned(epc.uppercase()) }
     }
 
@@ -260,6 +274,59 @@ class RfidManager(
         }
     }
 
+    /** Push the persisted settings to the connected gun (called after connect + after each change). */
+    private fun applyConfigToGun() {
+        worker.execute {
+            try {
+                if (uhf.connectStatus != ConnectionStatus.CONNECTED) return@execute
+                uhf.setPower(powerDbm.coerceIn(POWER_MIN, POWER_MAX))
+                uhf.setBeep(beepEnabled)
+                battery = try { uhf.getBattery() } catch (e: Exception) { -1 }
+                firmware = try { uhf.getSTM32Version() ?: "" } catch (e: Exception) { "" }
+            } catch (e: Exception) {
+                Log.e(TAG, "applyConfigToGun failed", e)
+            }
+        }
+    }
+
+    /** Reduce/raise read radius. Lower dBm = shorter range (badge-tap); higher = across the room. */
+    fun setPowerLevel(power: Int) {
+        powerDbm = power.coerceIn(POWER_MIN, POWER_MAX)
+        prefs.edit().putInt(PREF_POWER, powerDbm).apply()
+        worker.execute {
+            try { if (connected) uhf.setPower(powerDbm) } catch (e: Exception) { Log.e(TAG, "setPower failed", e) }
+        }
+    }
+
+    fun setScanMode(mode: String) {
+        scanMode = if (mode == SCAN_MODE_CONTINUOUS) SCAN_MODE_CONTINUOUS else SCAN_MODE_SINGLE
+        prefs.edit().putString(PREF_SCAN_MODE, scanMode).apply()
+        if (scanMode == SCAN_MODE_SINGLE && inventoryRunning) stopInventory()
+    }
+
+    fun setBeepEnabled(enabled: Boolean) {
+        beepEnabled = enabled
+        prefs.edit().putBoolean(PREF_BEEP, enabled).apply()
+        worker.execute {
+            try { if (connected) uhf.setBeep(enabled) } catch (e: Exception) { Log.e(TAG, "setBeep failed", e) }
+        }
+    }
+
+    /** Snapshot for the web setup view. Cached values only — safe to call synchronously. */
+    fun currentConfigJson(): String {
+        val fw = firmware.replace("\"", "").replace("\\", "")
+        return "{" +
+            "\"connected\":$connected," +
+            "\"power\":$powerDbm," +
+            "\"powerMin\":$POWER_MIN," +
+            "\"powerMax\":$POWER_MAX," +
+            "\"scanMode\":\"$scanMode\"," +
+            "\"beep\":$beepEnabled," +
+            "\"battery\":$battery," +
+            "\"firmware\":\"$fw\"" +
+            "}"
+    }
+
     private fun scheduleReconnect() {
         if (activeDisconnect) return
         mainHandler.postDelayed({
@@ -275,6 +342,14 @@ class RfidManager(
         private const val TAG = "ShowrunnerRfid"
         private const val PREFS_NAME = "showrunner_station"
         private const val PREF_BT_MAC = "bt_mac"
+        private const val PREF_POWER = "gun_power"
+        private const val PREF_SCAN_MODE = "gun_scan_mode"
+        private const val PREF_BEEP = "gun_beep"
+        const val SCAN_MODE_SINGLE = "single"
+        const val SCAN_MODE_CONTINUOUS = "continuous"
+        private const val POWER_MIN = 5
+        private const val POWER_MAX = 30
+        private const val DEFAULT_POWER = 20
         private const val TARGET_BT_NAME = "Nordic_UART_CW"
         // Chainway UHF guns pair under varied names — match any of these tokens.
         private val GUN_NAME_HINTS = listOf(

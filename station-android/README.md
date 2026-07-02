@@ -71,7 +71,13 @@ window.onStationRfidScan('epc-hex-here')
 
 - Connect order: **cached MAC** → **device already paired in Android Bluetooth settings** (`findBondedGunMac()`) → **BLE advertisement scan** (fallback). Name match is broadened (`Nordic` / `UART` / `Nordic_UART_CW`) and no longer skips scan hits with a null advertised name.
 - EU band **`0x04`** (865–868 MHz) after connect
-- Gun trigger → single tag read; forwards EPC to the WebView:
+- **Gun trigger → single read** by default (`performSingleRead()` → `inventorySingleTag()`): one pull = one tag. **Scan mode is user-selectable** (single vs continuous) in the web setup view; continuous re-binds the trigger to start/stop a burst.
+- The native status bar echoes `Read: <EPC>` on every read — a diagnostic so you can tell a **SDK read failure** (no `Read:` line) from a **web-bridge failure** (`Read:` shows but the top strip stays empty).
+- **Device settings** (`RfidManager`): read **power/sensitivity** (`setPower`, 5–30 dBm), **scan mode**, **beeper** (`setBeep`) — persisted in Android prefs, reapplied on reconnect; battery/firmware read on connect.
+- **Web ↔ native bridge:**
+  - Scans: Showrunner runs inside an **iframe** on the hosting shell, so `deliverEpcToShowrunner` calls `showrunnerStationDeliverScan` in the shell (host-boot.js), which `postMessage`s `SHOWRUNNER_RFID_SCAN` into the iframe. (Falls back to a direct `onStationRfidScan` when the app points straight at the GAS URL.) **This was the fix for "gun beeps but nothing reaches the software."**
+  - Settings: `AndroidStation` `@JavascriptInterface` (`getConfig`/`setPower`/`setScanMode`/`setBeep`) is driven from the web setup view via `SHOWRUNNER_STATION_CONFIG_GET/SET` relayed through the hosting shell.
+- Forwards EPC to the WebView:
 
 
 ```kotlin
@@ -85,6 +91,7 @@ Pairing the R6 in **Android Bluetooth settings is enough** — the app now conne
 - **"Gun not found" but it's paired in Android:** fixed — the app now reads bonded devices first. Rebuild + reinstall the APK.
 - **WebView stuck on "add Showrunner to your home screen":** the hosting shell used to show the PWA install nag to the WebView. The app sends UA `ShowrunnerStation/<ver>` and `host-boot.js` now treats that as installed (`isNativeStationApp()`), skipping the nag. Requires a **hosting redeploy** (`node deploy-hosting.js`).
 - **Gradle `AccessDeniedException` on Google Drive:** `app/build.gradle.kts` redirects compile output to `%LOCALAPPDATA%/ShowrunnerStationBuild/app` so Drive sync does not lock build files.
+- **Gun beeps continuously ("machine gun") but nothing appears in the top strip:** old builds bound the trigger to continuous inventory. Fixed — the trigger is now a single read. If a tag still doesn't reach the web strip, watch the native status bar: `Read: <EPC>` present → web-bridge issue; absent → SDK read issue.
 
 ---
 

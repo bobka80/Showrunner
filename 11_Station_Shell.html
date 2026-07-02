@@ -198,6 +198,126 @@ html.station-device-root #station-shell {
   border-color: #10b981;
   color: #10b981;
 }
+/* Station setup / settings view */
+#station-settings {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50001;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+#station-settings.is-open { display: flex; }
+.station-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #111114;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+.station-settings-header__title {
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+}
+.station-settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.station-settings-section {
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 14px 14px 16px;
+  background: #111114;
+}
+.station-settings-section__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f97316;
+  margin-bottom: 12px;
+}
+.station-field { margin-bottom: 16px; }
+.station-field:last-child { margin-bottom: 0; }
+.station-field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e4e7;
+  margin-bottom: 6px;
+}
+.station-field__hint {
+  font-size: 11px;
+  color: #71717a;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.station-field input[type="number"],
+.station-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #f4f4f5;
+  font-size: 15px;
+  font-weight: 600;
+}
+.station-field input[type="range"] { width: 100%; }
+.station-range-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.station-range-row output {
+  font-family: monospace;
+  font-size: 15px;
+  font-weight: 800;
+  color: #10b981;
+  min-width: 60px;
+  text-align: right;
+}
+.station-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.station-device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.station-device-info div {
+  display: flex;
+  justify-content: space-between;
+}
+.station-device-info span:last-child {
+  font-family: monospace;
+  color: #a1a1aa;
+}
+.station-settings-note {
+  font-size: 12px;
+  color: #eab308;
+  line-height: 1.4;
+}
+.station-settings-saved {
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+  min-height: 16px;
+}
 </style>
 
 <div id="station-shell" aria-label="Warehouse station">
@@ -207,7 +327,7 @@ html.station-device-root #station-shell {
       <div id="station-shell-device-name" class="station-shell-brand__device">—</div>
       <div id="station-shell-profile-name" class="station-shell-brand__profile">—</div>
     </div>
-    <div id="station-shell-layout-pill" style="font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#71717a; border:1px solid #333; border-radius:999px; padding:6px 10px;">HANDHELD</div>
+    <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="cursor:pointer; background:transparent; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#a1a1aa; border:1px solid #3f3f46; border-radius:999px; padding:6px 12px; display:flex; align-items:center; gap:6px;"><span id="station-shell-layout-text">HANDHELD</span><span aria-hidden="true" style="color:#f97316;">&#9881;</span></button>
   </div>
 
   <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans">
@@ -244,6 +364,69 @@ html.station-device-root #station-shell {
   </div>
 </div>
 
+<div id="station-settings" aria-label="Station setup">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Station setup</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseSettings()">Done</button>
+  </div>
+  <div class="station-settings-body">
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Session</div>
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-eject">Sign the host out after (minutes of inactivity)</label>
+        <input type="number" id="station-set-eject" min="1" max="120" step="1" onchange="stationSaveEjectMinutes()">
+        <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected. 1–120 min.</div>
+      </div>
+      <div id="station-eject-saved" class="station-settings-saved"></div>
+    </div>
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Scanner (gun)</div>
+
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-power">Read power / sensitivity</label>
+        <div class="station-range-row">
+          <input type="range" id="station-set-power" min="5" max="30" step="1" oninput="stationOnPowerInput()" onchange="stationSavePower()">
+          <output id="station-set-power-out">—</output>
+        </div>
+        <div class="station-field__hint">Lower = shorter range (badge tap only). Higher = reads across the room. Test a value that reads a badge held to the gun but not tags on the shelf.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-mode">Scan mode</label>
+        <select id="station-set-mode" onchange="stationSaveScanMode()">
+          <option value="single">Single — one pull, one tag</option>
+          <option value="continuous">Continuous — pull to start/stop a burst</option>
+        </select>
+        <div class="station-field__hint">Single is best for badge and one-at-a-time equipment scans.</div>
+      </div>
+
+      <div class="station-field">
+        <div class="station-toggle-row">
+          <label class="station-field__label" for="station-set-beep" style="margin:0;">Gun beeper</label>
+          <input type="checkbox" id="station-set-beep" onchange="stationSaveBeep()" style="width:22px; height:22px;">
+        </div>
+        <div class="station-field__hint">Turn off to silence the gun's own beep on every read.</div>
+      </div>
+
+      <div id="station-gun-unavailable" class="station-settings-note" style="display:none;">
+        Gun controls appear here when the station app is connected to the RFID gun. (Not available in a plain browser.)
+      </div>
+    </div>
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Device info</div>
+      <div class="station-device-info">
+        <div><span>Gun connection</span><span id="station-info-conn">—</span></div>
+        <div><span>Battery</span><span id="station-info-battery">—</span></div>
+        <div><span>Firmware</span><span id="station-info-fw">—</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
 <script>
 /**
  * 11_Station_Shell.html
@@ -263,7 +446,21 @@ window.stationRecentScans = [];
 var STATION_SCAN_FEED_MAX = 8;
 
 /** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
-var STATION_HOST_IDLE_MS = 10 * 60 * 1000;
+var STATION_HOST_IDLE_DEFAULT_MIN = 10;
+var STATION_EJECT_STORAGE_KEY = 'sm_station_eject_min';
+
+/** Configurable per-device eject timeout (minutes) — set in the station setup view. */
+function stationEjectMinutes_() {
+  try {
+    var v = parseInt(localStorage.getItem(STATION_EJECT_STORAGE_KEY), 10);
+    if (!isNaN(v) && v >= 1 && v <= 120) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_HOST_IDLE_DEFAULT_MIN;
+}
+
+function stationHostIdleMs_() {
+  return stationEjectMinutes_() * 60 * 1000;
+}
 
 function stationClearHostIdleTimer_() {
   if (window.stationHostIdleTimer) {
@@ -276,7 +473,7 @@ function stationResetHostIdleTimer_() {
   stationClearHostIdleTimer_();
   if (!window.IS_STATION_DEVICE) return;
   if (!stationReadHostSession_()) return;
-  window.stationHostIdleTimer = setTimeout(stationHostIdleExpired_, STATION_HOST_IDLE_MS);
+  window.stationHostIdleTimer = setTimeout(stationHostIdleExpired_, stationHostIdleMs_());
 }
 
 function stationHostIdleExpired_() {
@@ -284,7 +481,7 @@ function stationHostIdleExpired_() {
   if (!stationReadHostSession_()) return;
   stationWriteHostSession_(null);
   stationRenderShellState_();
-  var mins = Math.max(1, Math.round(STATION_HOST_IDLE_MS / 60000));
+  var mins = stationEjectMinutes_();
   stationSetStatus_('Signed out after ' + mins + ' min of inactivity. Scan your badge.', 'error');
   stationSetLastScan_('');
 }
@@ -446,7 +643,7 @@ function stationApplyBootstrap_(data) {
   window.stationShellBootstrap = data;
   const devEl = document.getElementById('station-shell-device-name');
   const profEl = document.getElementById('station-shell-profile-name');
-  const layoutEl = document.getElementById('station-shell-layout-pill');
+  const layoutEl = document.getElementById('station-shell-layout-text');
   if (devEl) devEl.textContent = data.deviceName || ACTIVE_USER_NAME || '—';
   if (profEl) profEl.textContent = data.profileName || 'Station profile';
   if (layoutEl) {
@@ -575,6 +772,118 @@ window.stationDeviceSignOut = function() {
   else window.top.location.reload();
 };
 
+function stationPostToHosting_(payload) {
+  try { if (window.parent && window.parent !== window) window.parent.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+  try { if (window.top && window.top !== window && window.top !== window.parent) window.top.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+}
+
+window.stationOpenSettings = function() {
+  const panel = document.getElementById('station-settings');
+  if (!panel) return;
+  panel.classList.add('is-open');
+  const ejectEl = document.getElementById('station-set-eject');
+  if (ejectEl) ejectEl.value = stationEjectMinutes_();
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) savedEl.textContent = '';
+  stationRequestGunConfig_();
+};
+
+window.stationCloseSettings = function() {
+  const panel = document.getElementById('station-settings');
+  if (panel) panel.classList.remove('is-open');
+};
+
+function stationRequestGunConfig_() {
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_GET' });
+}
+
+function stationApplyGunConfig_(cfg) {
+  const unavailable = document.getElementById('station-gun-unavailable');
+  const powerEl = document.getElementById('station-set-power');
+  const powerOut = document.getElementById('station-set-power-out');
+  const modeEl = document.getElementById('station-set-mode');
+  const beepEl = document.getElementById('station-set-beep');
+  const connEl = document.getElementById('station-info-conn');
+  const battEl = document.getElementById('station-info-battery');
+  const fwEl = document.getElementById('station-info-fw');
+  const gunControls = [powerEl, modeEl, beepEl];
+
+  if (!cfg) {
+    if (unavailable) unavailable.style.display = 'block';
+    gunControls.forEach(function(el) { if (el) el.disabled = true; });
+    if (connEl) connEl.textContent = 'App not detected';
+    return;
+  }
+  if (unavailable) unavailable.style.display = 'none';
+  gunControls.forEach(function(el) { if (el) el.disabled = false; });
+
+  if (powerEl) {
+    if (cfg.powerMin != null) powerEl.min = cfg.powerMin;
+    if (cfg.powerMax != null) powerEl.max = cfg.powerMax;
+    if (cfg.power != null) powerEl.value = cfg.power;
+  }
+  if (powerOut && cfg.power != null) powerOut.textContent = cfg.power + ' dBm';
+  if (modeEl && cfg.scanMode) modeEl.value = cfg.scanMode;
+  if (beepEl) beepEl.checked = cfg.beep !== false;
+  if (connEl) connEl.textContent = cfg.connected ? 'Connected' : 'Not connected';
+  if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
+  if (fwEl) fwEl.textContent = cfg.firmware || '—';
+}
+
+window.stationOnPowerInput = function() {
+  const powerEl = document.getElementById('station-set-power');
+  const powerOut = document.getElementById('station-set-power-out');
+  if (powerEl && powerOut) powerOut.textContent = powerEl.value + ' dBm';
+};
+
+window.stationSavePower = function() {
+  const powerEl = document.getElementById('station-set-power');
+  if (!powerEl) return;
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'power', value: parseInt(powerEl.value, 10) });
+};
+
+window.stationSaveScanMode = function() {
+  const modeEl = document.getElementById('station-set-mode');
+  if (!modeEl) return;
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'scanMode', value: modeEl.value });
+};
+
+window.stationSaveBeep = function() {
+  const beepEl = document.getElementById('station-set-beep');
+  if (!beepEl) return;
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: 'beep', value: !!beepEl.checked });
+};
+
+window.stationSaveEjectMinutes = function() {
+  const ejectEl = document.getElementById('station-set-eject');
+  const savedEl = document.getElementById('station-eject-saved');
+  if (!ejectEl) return;
+  let mins = parseInt(ejectEl.value, 10);
+  if (isNaN(mins) || mins < 1) mins = 1;
+  if (mins > 120) mins = 120;
+  ejectEl.value = mins;
+  try { localStorage.setItem(STATION_EJECT_STORAGE_KEY, String(mins)); } catch (e) { /* ignore */ }
+  if (stationReadHostSession_()) stationResetHostIdleTimer_();
+  if (savedEl) {
+    savedEl.textContent = 'Saved — host ejects after ' + mins + ' min.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
+function stationBindMessageListener_() {
+  if (window.stationMessageListenerBound) return;
+  window.stationMessageListenerBound = true;
+  window.addEventListener('message', function(ev) {
+    const d = ev && ev.data;
+    if (!d) return;
+    if (d.type === 'SHOWRUNNER_RFID_SCAN') {
+      if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag);
+    } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
+      stationApplyGunConfig_(d.config || null);
+    }
+  });
+}
+
 function initStationShell_() {
   if (!window.IS_STATION_DEVICE) return;
 
@@ -583,6 +892,7 @@ function initStationShell_() {
   if (shell) shell.style.display = 'flex';
 
   stationBindHostIdleListeners_();
+  stationBindMessageListener_();
   stationRenderShellState_();
   stationSetStatus_('Loading station profile…', '');
 
