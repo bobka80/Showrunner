@@ -1927,13 +1927,9 @@
         height: auto;
         display: block;
     }
-    .desktop-lock-bus--soft svg {
-        filter: blur(1.25px);
-        -webkit-filter: blur(1.25px);
-    }
-    .desktop-lock-bus--soft {
-        -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
-        mask-image: linear-gradient(to right, transparent 0%, #000 6%, #000 94%, transparent 100%);
+    .desktop-lock-bus--blur svg {
+        filter: blur(2px);
+        -webkit-filter: blur(2px);
     }
     .desktop-lock-bus--ltr {
         animation-name: desktop-lock-bus-ltr;
@@ -2000,11 +1996,13 @@
         color: #8a939f;
         letter-spacing: 2px;
         font-variant-numeric: tabular-nums;
-        text-shadow: none;
+        text-shadow: 0 0 1px rgba(138, 147, 159, 0.9), 0 0 10px rgba(138, 147, 159, 0.22);
         line-height: 1;
         margin: 0;
         padding: 0;
         white-space: nowrap;
+        filter: blur(0.4px);
+        -webkit-filter: blur(0.4px);
     }
     .desktop-lock-clock-slot {
         position: relative;
@@ -2015,6 +2013,11 @@
     }
     .desktop-lock-clock-sep {
         display: inline-block;
+        text-shadow: 0 0 1px rgba(138, 147, 159, 0.85), 0 0 8px rgba(138, 147, 159, 0.2);
+    }
+    .desktop-lock-clock-slot--accent .desktop-lock-clock-digit {
+        color: #eb1c24;
+        text-shadow: 0 0 1px rgba(235, 28, 36, 0.95), 0 0 12px rgba(235, 28, 36, 0.28);
     }
     .desktop-lock-clock-digit {
         display: block;

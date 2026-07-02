@@ -1,2 +1,4 @@
-# Built station APK — publish via build-station-apk.js + deploy-hosting.js
+# Built station package — publish via build-station-apk.js + deploy-hosting.js
+# (.bin extension: Firebase Spark blocks .apk on Hosting)
+public/downloads/*.bin
 public/downloads/*.apk

@@ -17,6 +17,14 @@
         ]
       },
       {
+        "source": "**/*.bin",
+        "headers": [
+          { "key": "Content-Type", "value": "application/vnd.android.package-archive" },
+          { "key": "Content-Disposition", "value": "attachment; filename=\"showrunner-station.apk\"" },
+          { "key": "Cache-Control", "value": "no-cache" }
+        ]
+      },
+      {
         "source": "**/*.apk",
         "headers": [
           { "key": "Content-Type", "value": "application/vnd.android.package-archive" },

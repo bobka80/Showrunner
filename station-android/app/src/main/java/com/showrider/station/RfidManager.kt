@@ -41,8 +41,8 @@ class RfidManager(
     private var lastEpcAt = 0L
     private val initialized = AtomicBoolean(false)
 
-    private val connectionCallback = ConnectionStatusCallback<BluetoothDevice> { status, device ->
-        mainHandler.post { handleConnectionStatus(status, device) }
+    private val connectionCallback = ConnectionStatusCallback<Any> { status, device ->
+        mainHandler.post { handleConnectionStatus(status, device as? BluetoothDevice) }
     }
 
     fun connect() {

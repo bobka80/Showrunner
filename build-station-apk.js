@@ -11,7 +11,7 @@ const path = require('path');
 const root = __dirname;
 const androidDir = path.join(root, 'station-android');
 const outDir = path.join(root, 'push-hosting', 'public', 'downloads');
-const apkDest = path.join(outDir, 'showrunner-station.apk');
+const apkDest = path.join(outDir, 'showrunner-station.bin');
 const manifestPath = path.join(outDir, 'station-manifest.json');
 
 function log(msg) {
@@ -41,6 +41,20 @@ function findGradlew() {
   return null;
 }
 
+function buildEnv() {
+  const env = { ...process.env };
+  if (process.platform === 'win32') {
+    const jbr = 'C:\\Program Files\\Android\\Android Studio\\jbr';
+    if (fs.existsSync(jbr)) env.JAVA_HOME = jbr;
+    const sdk = path.join(process.env.LOCALAPPDATA || '', 'Android', 'Sdk');
+    if (fs.existsSync(sdk)) {
+      env.ANDROID_HOME = sdk;
+      env.ANDROID_SDK_ROOT = sdk;
+    }
+  }
+  return env;
+}
+
 function ensureGradleWrapper() {
   if (findGradlew()) return;
   log('Gradle wrapper missing — generating via system gradle…');
@@ -59,11 +73,18 @@ function buildApk() {
   if (!gradlew) fail('gradlew not found after wrapper generation.');
 
   log('\n=== Building Showrunner Station (debug APK) ===\n');
-  const result = spawnSync(gradlew, ['assembleDebug', '--no-daemon'], {
-    cwd: androidDir,
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-  });
+  const args = ['assembleDebug', '--no-daemon'];
+  const result = process.platform === 'win32'
+    ? spawnSync('cmd.exe', ['/d', '/s', '/c', `"${gradlew}" ${args.join(' ')}`], {
+        cwd: androidDir,
+        stdio: 'inherit',
+        env: buildEnv(),
+      })
+    : spawnSync(gradlew, args, {
+        cwd: androidDir,
+        stdio: 'inherit',
+        env: buildEnv(),
+      });
   if (result.status !== 0) {
     fail('Gradle build failed. Open station-android in Android Studio and fix build errors.');
   }
@@ -93,7 +114,7 @@ function main() {
   const manifest = {
     versionName: ver.versionName,
     versionCode: ver.versionCode,
-    apkFile: 'showrunner-station.apk',
+    apkFile: 'showrunner-station.bin',
     published: true,
     updatedAt: new Date().toISOString(),
     sizeBytes: stat.size,

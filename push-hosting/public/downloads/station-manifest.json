@@ -1,8 +1,8 @@
-{
+﻿{
   "versionName": "0.1.0-dev",
   "versionCode": 1,
-  "apkFile": "showrunner-station.apk",
-  "published": false,
-  "updatedAt": null,
-  "notes": "Run node build-station-apk.js then node deploy-hosting.js to publish."
+  "apkFile": "showrunner-station.bin",
+  "published": true,
+  "updatedAt": "2026-07-01T14:05:00.000Z",
+  "sizeBytes": 12035825
 }
