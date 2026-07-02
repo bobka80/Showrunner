@@ -370,6 +370,60 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
   });
 }
 
+// @INDEX: STATION_SHELL -> Enroll crew RFID badge (from hosted/root session)
+function enrollStationCrewRfidTag(deviceActor, crewRef, rfidTag) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'PERMISSION DENIED: Station device login only.' };
+    }
+    const tag = normalizeStationRfidTag(rfidTag);
+    if (!tag) return { success: false, error: 'Empty scan — pull the trigger on the badge.' };
+
+    const ref = String(crewRef || '').toLowerCase().trim();
+    if (!ref) return { success: false, error: 'No crew member specified for enrollment.' };
+
+    const sheets = verifyVaultSchema();
+    const crewSheet = sheets.crew;
+    const crewData = crewSheet.getDataRange().getValues();
+    const cMap = getHeaderMap(crewData);
+    if (cMap['rfid_tag'] === undefined) {
+      return { success: false, error: 'Crew roster has no rfid_tag column — run a vault sync first.' };
+    }
+
+    // Refuse to steal a badge already linked to a different crew member.
+    for (let i = 1; i < crewData.length; i++) {
+      const rowTag = normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]);
+      if (!rowTag || rowTag !== tag) continue;
+      const ownerUid = (getSheetCell(crewData[i], cMap, 'uid') || '').toString().toLowerCase().trim();
+      const ownerName = (getSheetCell(crewData[i], cMap, 'Name') || '').toString().toLowerCase().trim();
+      if (ownerUid !== ref && ownerName !== ref) {
+        return { success: false, error: 'That badge is already linked to ' + getSheetCell(crewData[i], cMap, 'Name') + '.' };
+      }
+    }
+
+    for (let i = 1; i < crewData.length; i++) {
+      const uid = (getSheetCell(crewData[i], cMap, 'uid') || '').toString().toLowerCase().trim();
+      const nm = (getSheetCell(crewData[i], cMap, 'Name') || '').toString().toLowerCase().trim();
+      if (uid !== ref && nm !== ref) continue;
+      crewSheet.getRange(i + 1, cMap['rfid_tag'] + 1).setValue(tag);
+      flushCache();
+      const name = getSheetCell(crewData[i], cMap, 'Name');
+      writeToAuditLog(deviceActor, 'STATION_ENROLL', 'STATION', 'GLOBAL',
+        getSheetCell(crewData[i], cMap, 'uid') || name,
+        'Enrolled RFID badge for ' + name + ' (' + tag + ').');
+      return {
+        success: true,
+        host: {
+          uid: getSheetCell(crewData[i], cMap, 'uid'),
+          name: name,
+          rfidTag: tag
+        }
+      };
+    }
+    return { success: false, error: 'Crew member not found for enrollment.' };
+  });
+}
+
 function lookupCrewMemberByName_(crewName, crewData, cMap) {
   const target = String(crewName || '').toLowerCase().trim();
   if (!target || !crewData || crewData.length < 2) return null;

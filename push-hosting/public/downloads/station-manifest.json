@@ -1,16 +1,26 @@
 {
-  "versionName": "0.1.0",
-  "versionCode": 2,
+  "versionName": "0.1.1",
+  "versionCode": 3,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-02T14:59:38.288Z",
+  "updatedAt": "2026-07-02T15:20:15.686Z",
   "sizeBytes": 12040229,
   "notes": [
-    "Connects to gun already paired in Bluetooth",
-    "App opens directly (no add-to-home-screen screen)",
-    "New Stage Masters app icon"
+    "RFID: connect to gun paired under any name (not just Nordic_UART_CW)",
+    "Shows paired device names on screen when the gun name is unrecognised",
+    "Uses the only paired device on a dedicated station phone"
   ],
   "history": [
+    {
+      "versionName": "0.1.1",
+      "versionCode": 3,
+      "date": "2026-07-02T15:20:15.686Z",
+      "notes": [
+        "RFID: connect to gun paired under any name (not just Nordic_UART_CW)",
+        "Shows paired device names on screen when the gun name is unrecognised",
+        "Uses the only paired device on a dedicated station phone"
+      ]
+    },
     {
       "versionName": "0.1.0",
       "versionCode": 2,

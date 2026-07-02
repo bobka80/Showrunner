@@ -5500,6 +5500,61 @@ html.station-device-root #station-shell {
   width: 100%;
   margin: 0;
 }
+/* Always-on live RFID scan strip (top of the station shell) */
+.station-scan-feed {
+  flex-shrink: 0;
+  padding: 10px 16px 12px;
+  background: #0d0d10;
+  border-bottom: 1px solid #27272a;
+}
+.station-scan-feed__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f97316;
+  margin-bottom: 6px;
+}
+.station-scan-feed__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow-y: auto;
+}
+.station-scan-feed__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #e4e4e7;
+}
+.station-scan-feed__row:first-child {
+  color: #10b981;
+  font-weight: 700;
+}
+.station-scan-feed__row .tag {
+  word-break: break-all;
+}
+.station-scan-feed__row .time {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #52525b;
+}
+.station-scan-feed__empty {
+  font-size: 12px;
+  color: #52525b;
+}
+#station-btn-enroll {
+  width: 100%;
+  margin: 0;
+}
+#station-btn-enroll.is-active {
+  border-color: #10b981;
+  color: #10b981;
+}
 </style>
 
 <div id="station-shell" aria-label="Warehouse station">
@@ -5510,6 +5565,13 @@ html.station-device-root #station-shell {
       <div id="station-shell-profile-name" class="station-shell-brand__profile">—</div>
     </div>
     <div id="station-shell-layout-pill" style="font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#71717a; border:1px solid #333; border-radius:999px; padding:6px 10px;">HANDHELD</div>
+  </div>
+
+  <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans">
+    <div class="station-scan-feed__label">Live RFID scans</div>
+    <div id="station-scan-feed-list" class="station-scan-feed__list">
+      <span class="station-scan-feed__empty">Waiting for scans…</span>
+    </div>
   </div>
 
   <div class="station-shell-main">
@@ -5533,6 +5595,7 @@ html.station-device-root #station-shell {
 
   <div class="station-shell-footer">
     <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
+    <button type="button" id="station-btn-enroll" class="btn-outline btn-sm" style="display:none;" onclick="stationToggleEnroll()">LINK MY RFID BADGE</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>

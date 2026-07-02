@@ -143,6 +143,61 @@ html.station-device-root #station-shell {
   width: 100%;
   margin: 0;
 }
+/* Always-on live RFID scan strip (top of the station shell) */
+.station-scan-feed {
+  flex-shrink: 0;
+  padding: 10px 16px 12px;
+  background: #0d0d10;
+  border-bottom: 1px solid #27272a;
+}
+.station-scan-feed__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f97316;
+  margin-bottom: 6px;
+}
+.station-scan-feed__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow-y: auto;
+}
+.station-scan-feed__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #e4e4e7;
+}
+.station-scan-feed__row:first-child {
+  color: #10b981;
+  font-weight: 700;
+}
+.station-scan-feed__row .tag {
+  word-break: break-all;
+}
+.station-scan-feed__row .time {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #52525b;
+}
+.station-scan-feed__empty {
+  font-size: 12px;
+  color: #52525b;
+}
+#station-btn-enroll {
+  width: 100%;
+  margin: 0;
+}
+#station-btn-enroll.is-active {
+  border-color: #10b981;
+  color: #10b981;
+}
 </style>
 
 <div id="station-shell" aria-label="Warehouse station">
@@ -153,6 +208,13 @@ html.station-device-root #station-shell {
       <div id="station-shell-profile-name" class="station-shell-brand__profile">—</div>
     </div>
     <div id="station-shell-layout-pill" style="font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#71717a; border:1px solid #333; border-radius:999px; padding:6px 10px;">HANDHELD</div>
+  </div>
+
+  <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans">
+    <div class="station-scan-feed__label">Live RFID scans</div>
+    <div id="station-scan-feed-list" class="station-scan-feed__list">
+      <span class="station-scan-feed__empty">Waiting for scans…</span>
+    </div>
   </div>
 
   <div class="station-shell-main">
@@ -176,6 +238,7 @@ html.station-device-root #station-shell {
 
   <div class="station-shell-footer">
     <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
+    <button type="button" id="station-btn-enroll" class="btn-outline btn-sm" style="display:none;" onclick="stationToggleEnroll()">LINK MY RFID BADGE</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
@@ -193,6 +256,11 @@ window.stationHostSession = null;
 window.stationScanBusy = false;
 window.stationHostIdleTimer = null;
 window.stationHostIdleListenersBound = false;
+window.stationEnrollMode = false;
+window.stationRecentScans = [];
+
+/** How many recent scans to keep in the always-on top strip. */
+var STATION_SCAN_FEED_MAX = 8;
 
 /** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
 var STATION_HOST_IDLE_MS = 10 * 60 * 1000;
@@ -275,6 +343,35 @@ function stationSetLastScan_(tag) {
   el.textContent = tag ? ('Last scan: ' + tag) : '';
 }
 
+function stationRenderScanFeed_() {
+  const list = document.getElementById('station-scan-feed-list');
+  if (!list) return;
+  const scans = window.stationRecentScans || [];
+  if (!scans.length) {
+    list.innerHTML = '<span class="station-scan-feed__empty">Waiting for scans…</span>';
+    return;
+  }
+  const rows = scans.map(function(s) {
+    const time = new Date(s.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const safeTag = String(s.tag).replace(/[<&>]/g, function(c) {
+      return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
+    });
+    return '<div class="station-scan-feed__row"><span class="tag">' + safeTag + '</span><span class="time">' + time + '</span></div>';
+  });
+  list.innerHTML = rows.join('');
+}
+
+function stationPushScanFeed_(tag) {
+  const clean = String(tag || '').trim();
+  if (!clean) return;
+  window.stationRecentScans = window.stationRecentScans || [];
+  window.stationRecentScans.unshift({ tag: clean, ts: Date.now() });
+  if (window.stationRecentScans.length > STATION_SCAN_FEED_MAX) {
+    window.stationRecentScans.length = STATION_SCAN_FEED_MAX;
+  }
+  stationRenderScanFeed_();
+}
+
 function stationRenderShellState_() {
   const host = stationReadHostSession_();
   window.stationHostSession = host;
@@ -282,6 +379,7 @@ function stationRenderShellState_() {
   const prompt = document.getElementById('station-shell-prompt');
   const hostNameEl = document.getElementById('station-shell-host-name');
   const logoutHostBtn = document.getElementById('station-btn-logout-host');
+  const enrollBtn = document.getElementById('station-btn-enroll');
   const laneProject = document.getElementById('station-lane-project');
   const laneVault = document.getElementById('station-lane-vault');
 
@@ -293,9 +391,12 @@ function stationRenderShellState_() {
       hostNameEl.textContent = host.name;
     }
     if (logoutHostBtn) logoutHostBtn.style.display = 'block';
+    if (enrollBtn) enrollBtn.style.display = 'block';
     if (laneProject) laneProject.classList.add('is-ready');
     if (laneVault) laneVault.classList.add('is-ready');
-    stationSetStatus_('Ready for warehouse scans.', 'ok');
+    stationSetStatus_(host.rfidTag
+      ? ('Ready. Badge on file: ' + host.rfidTag)
+      : 'Ready. No badge linked yet — tap “Link my RFID badge”.', 'ok');
     stationResetHostIdleTimer_();
   } else {
     if (stateLabel) stateLabel.textContent = 'Waiting for host';
@@ -305,12 +406,41 @@ function stationRenderShellState_() {
     }
     if (hostNameEl) hostNameEl.style.display = 'none';
     if (logoutHostBtn) logoutHostBtn.style.display = 'none';
+    if (enrollBtn) enrollBtn.style.display = 'none';
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
     if (laneProject) laneProject.classList.remove('is-ready');
     if (laneVault) laneVault.classList.remove('is-ready');
     stationSetStatus_('', '');
     stationClearHostIdleTimer_();
   }
 }
+
+function stationSetEnrollButton_(mode) {
+  const btn = document.getElementById('station-btn-enroll');
+  if (!btn) return;
+  if (mode === 'active') {
+    btn.textContent = 'CANCEL — scan the badge now…';
+    btn.classList.add('is-active');
+  } else {
+    btn.textContent = 'LINK MY RFID BADGE';
+    btn.classList.remove('is-active');
+  }
+}
+
+window.stationToggleEnroll = function() {
+  const host = stationReadHostSession_();
+  if (!host) return;
+  if (window.stationEnrollMode) {
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    stationSetStatus_('Enrollment cancelled.', '');
+    return;
+  }
+  window.stationEnrollMode = true;
+  stationSetEnrollButton_('active');
+  stationSetStatus_('Pull the trigger on the badge to link it to ' + host.name + '.', '');
+};
 
 function stationApplyBootstrap_(data) {
   window.stationShellBootstrap = data;
@@ -331,6 +461,38 @@ function stationHandleRfidScan_(rawTag) {
   if (!window.IS_STATION_DEVICE) return;
 
   const host = stationReadHostSession_();
+
+  if (window.stationEnrollMode) {
+    if (!host) {
+      window.stationEnrollMode = false;
+      stationSetEnrollButton_('idle');
+      return;
+    }
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    window.stationScanBusy = true;
+    stationResetHostIdleTimer_();
+    stationSetLastScan_(tag);
+    stationSetStatus_('Linking badge to ' + host.name + '…', '');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        window.stationScanBusy = false;
+        if (!res || !res.success) {
+          stationSetStatus_((res && res.error) ? res.error : 'Enrollment failed.', 'error');
+          return;
+        }
+        stationWriteHostSession_(res.host);
+        stationRenderShellState_();
+        stationSetStatus_('Badge linked to ' + res.host.name + '. Scan it next time to sign in.', 'ok');
+      })
+      .withFailureHandler(function(err) {
+        window.stationScanBusy = false;
+        stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
+      })
+      .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.uid || host.name, tag);
+    return;
+  }
+
   if (host) {
     stationResetHostIdleTimer_();
     stationSetLastScan_(tag);
@@ -366,6 +528,8 @@ function stationHandleRfidScan_(rawTag) {
 
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag) {
+  const tag = String(rawTag || '').trim();
+  if (tag) stationPushScanFeed_(tag);
   stationHandleRfidScan_(rawTag);
 };
 

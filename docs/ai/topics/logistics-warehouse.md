@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-02 · **Production:** GAS **v411** · **Status:** Partial — RFID checkout bar, station shell + host idle auto-eject, native gun app + APK install page shipped; gate + PA concurrency backlog planned
+**Last swept:** 2026-07-02 · **Production:** GAS **v413** · **Status:** Partial — RFID checkout bar, station shell + host idle auto-eject + live scan strip + self-serve badge enrollment, native gun app + APK install page shipped; gate + PA concurrency backlog planned
 
 ---
 
@@ -63,7 +63,9 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 
 - [x] Dedicated scan home / kiosk shell (`11_Station_Shell.html` — host badge first)
 - [x] Crew `rfid_tag` on `Crew_Roster` (sheet column; paste from Chainway scan — no interim UI)
-- [ ] Crew `rfid_tag` in admin UI (deferred — sheet paste until station SDK host flow ships)
+- [x] **Live RFID scan strip** — station shell shows every incoming EPC at the top in any state (debug/visibility; `STATION_SCAN_FEED_MAX`=8)
+- [x] **Self-serve crew badge enrollment on the station** — while hosted, "Link my RFID badge" captures the next scan → `enrollStationCrewRfidTag` writes it to the host's `rfid_tag` (collision-guarded)
+- [ ] Crew `rfid_tag` in office admin UI (deferred — station self-enroll + sheet paste cover it for now)
 - [x] **Station profile editor** — `06h_Admin_Station_Profiles.html` + `Station_Security.js` (separate from office `06a` / `Security.js`)
 - [x] Host-empty scan API (`processStationRfidScan` — crew badge → host session)
 - [x] **Host idle auto-eject** (10 min, `STATION_HOST_IDLE_MS` — v411)
