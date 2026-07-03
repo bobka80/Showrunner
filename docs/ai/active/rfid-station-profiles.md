@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v420**
+**Opened:** 2026-07-02 · **Production:** GAS **v421**
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -69,6 +69,9 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
   - **Cascade tagging** — arming record on a **logical parent** queues the parent then each **unique** child (`containerType == parent.id && !isBulk`); the record banner advances one scan at a time (`stationVaultRecord.queue`, busy-guarded so rapid scans don't double-write).
   - Scans route to recording only while armed (`stationVaultConsumeScan_` intercepts in `onStationRfidScan`); host idle-timer now resets on activity anywhere (overlays included) and hosted-only overlays close on eject/logout.
 - [x] **Screen cleanup (v421, director quirks).** Removed the big center host name (host shows top-left green), the bottom "Last scan" line, and the on-device `#station-debug` breadcrumb overlay. **Live strip now also resolves crew badges to the person's name** (`getStationEquipmentRfidMap` includes `Crew_Roster.rfid_tag` with `kind:'crew'`), so an unrecognised badge no longer shows as a raw "Unknown tag".
+- [x] **Project open fix + Vault line restyle (v422, director quirks).**
+  - **PROJECT wouldn't open on the station.** `openProjectAssetsModal` aborts on an empty `edit-folder-id`, and the station has no calendar for `resolveMobileProject` to fall back on. Fix: `stationPickProject_` now caches the picked project (`stationProjectsCache`), pre-seeds `window.mobileCrewHubProject` + `syncProjectEditorHiddenFields(proj, pId)` before `openMobileProjectAssets`, and surfaces any error instead of failing silently.
+  - **Vault rows restyled to match the real vault.** Dropped the bespoke cards with clunky double-height buttons. Vault lines now mirror the real Equipment Vault row style (`06b1` `renderSingleAssetRow`): name white/bold, `#unit` muted, a `parent` marker, and a bordered **status pill** in the vault's colours (Active #10b981 / Maintenance #f59e0b / Broken #ef4444). **Tap a line → a bottom action sheet** with Maintenance / Broken / Repaired (anyone hosted) and **Record RFID** (managers; shows cascade child count). Lines stay clean.
 - [ ] **Cleanup build:** remove the diagnostic `postStatus` lines in `RfidManager.kt` once we've had a day of stable field use. *(The web `#station-debug` overlay is already removed.)*
 - [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).

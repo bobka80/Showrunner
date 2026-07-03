@@ -208,46 +208,78 @@ html.station-device-root #station-shell {
 .station-vault__list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 16px 16px;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
-.station-vault-item {
-  border: 1px solid #27272a;
-  border-radius: 10px;
-  background: #111114;
-  padding: 12px 14px;
-}
-.station-vault-item__head {
+/* Lines styled like the real Equipment Vault rows (name white/bold, muted meta, status pill). */
+.station-vault-row {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 10px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #1a1a1d;
+  cursor: pointer;
+  user-select: none;
 }
-.station-vault-item__name { font-size: 15px; font-weight: 800; }
-.station-vault-item__unit { font-family: monospace; font-size: 11px; color: #a1a1aa; flex-shrink: 0; }
-.station-vault-item__badge {
-  display: inline-block;
-  margin-top: 4px;
-  font-size: 10px;
+.station-vault-row:active { background: #161619; }
+.station-vault-row__name {
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.station-vault-row__unit {
+  color: #a1a1aa;
+  font-weight: bold;
+  font-family: monospace;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.station-vault-row__parent {
+  color: #a5b4fc;
+  font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 999px;
+  flex-shrink: 0;
 }
-.station-vault-item__badge.s-active { background: #064e3b; color: #6ee7b7; }
-.station-vault-item__badge.s-maintenance { background: #422006; color: #fcd34d; }
-.station-vault-item__badge.s-broken { background: #450a0a; color: #fca5a5; }
-.station-vault-item__badge.s-parent { background: #1e1b4b; color: #a5b4fc; margin-left: 6px; }
-.station-vault-item__actions {
+.station-vault-row__status {
+  flex-shrink: 0;
+  border: 1px solid;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+/* Action sheet (tap a line) */
+.station-vault-sheet { display: none; position: absolute; inset: 0; z-index: 5; }
+.station-vault-sheet.is-open { display: block; }
+.station-vault-sheet__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
+.station-vault-sheet__panel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: #111114;
+  border-top: 1px solid #3f3f46;
+  border-radius: 14px 14px 0 0;
+  padding: 16px 16px 22px;
+}
+.station-vault-sheet__head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 10px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
 }
-.station-vault-item__actions .btn-sm { margin: 0; padding: 8px 10px; font-size: 12px; }
+.station-vault-sheet__title { font-size: 17px; font-weight: 900; color: #fff; }
+.station-vault-sheet__meta { font-size: 12px; color: #a1a1aa; margin-bottom: 14px; line-height: 1.5; }
+.station-vault-sheet__actions { display: flex; flex-direction: column; gap: 8px; }
+.station-vault-sheet__actions button { width: 100%; margin: 0; }
 .station-vault-record-bar {
   flex-shrink: 0;
   display: flex;
@@ -672,6 +704,24 @@ html.station-device-root #station-shell {
   <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
     <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
     <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>
+  </div>
+
+  <!-- Tap a line → action sheet (keeps the lines clean, like the real vault). -->
+  <div id="station-vault-sheet" class="station-vault-sheet" aria-hidden="true">
+    <div class="station-vault-sheet__backdrop" onclick="stationVaultCloseSheet_()"></div>
+    <div class="station-vault-sheet__panel">
+      <div class="station-vault-sheet__head">
+        <div class="station-vault-sheet__title" id="station-vault-sheet-title">Item</div>
+        <button type="button" class="btn-close" style="width:auto; margin:0; padding:6px 12px;" onclick="stationVaultCloseSheet_()">Close</button>
+      </div>
+      <div class="station-vault-sheet__meta" id="station-vault-sheet-meta"></div>
+      <div class="station-vault-sheet__actions">
+        <button type="button" class="btn-outline" id="station-vault-act-maint" onclick="stationVaultSheetStatus_('Maintenance')">Maintenance</button>
+        <button type="button" class="btn-outline" id="station-vault-act-broken" style="border-color:#ef4444;color:#ef4444;" onclick="stationVaultSheetStatus_('Broken')">Broken</button>
+        <button type="button" class="btn-outline" id="station-vault-act-repaired" style="border-color:#10b981;color:#10b981;" onclick="stationVaultSheetStatus_('Repaired')">Repaired</button>
+        <button type="button" class="btn-main" id="station-vault-act-record" style="display:none;" onclick="stationVaultSheetRecord_()">Record RFID</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1164,6 +1214,7 @@ window.stationOpenVault = function() {
 
 window.stationCloseVault = function() {
   stationVaultCancelRecord_();
+  if (typeof window.stationVaultCloseSheet_ === 'function') window.stationVaultCloseSheet_();
   const panel = document.getElementById('station-vault');
   if (panel) panel.classList.remove('is-open');
 };
@@ -1201,11 +1252,12 @@ function stationVaultEsc_(v) {
   });
 }
 
-function stationVaultStatusClass_(status) {
+/** Same status colours the real vault uses. */
+function stationVaultStatusColor_(status) {
   const s = String(status || '').toLowerCase();
-  if (s.indexOf('maintenance') !== -1) return 's-maintenance';
-  if (s.indexOf('broken') !== -1) return 's-broken';
-  return 's-active';
+  if (s.indexOf('maintenance') !== -1) return '#f59e0b';
+  if (s.indexOf('broken') !== -1 || s.indexOf('retired') !== -1) return '#ef4444';
+  return '#10b981';
 }
 
 /** Unique (non-bulk) children of a logical parent, for cascade tagging. */
@@ -1235,33 +1287,67 @@ function stationVaultRenderList_() {
     return;
   }
   if (statusEl) statusEl.style.display = 'none';
-  const canRec = window.stationVaultCanRecord;
   listEl.innerHTML = items.map(function(it) {
-    const kids = stationVaultChildrenOf_(it.id);
-    const isParent = kids.length > 0;
-    const unit = it.unitNumber || it.id || '';
+    const isParent = stationVaultChildrenOf_(it.id).length > 0;
     const statusLabel = it.status || 'Active';
+    const color = stationVaultStatusColor_(statusLabel);
     const idAttr = stationVaultEsc_(it.id);
-    let actions = ''
-      + '<button type="button" class="btn-outline btn-sm" onclick="stationVaultSetStatus_(\'' + idAttr + '\',\'Maintenance\')">Maintenance</button>'
-      + '<button type="button" class="btn-outline btn-sm" style="border-color:#ef4444;color:#ef4444;" onclick="stationVaultSetStatus_(\'' + idAttr + '\',\'Broken\')">Broken</button>'
-      + '<button type="button" class="btn-outline btn-sm" style="border-color:#10b981;color:#10b981;" onclick="stationVaultSetStatus_(\'' + idAttr + '\',\'Repaired\')">Repaired</button>';
-    if (canRec) {
-      actions += '<button type="button" class="btn-main btn-sm" onclick="stationVaultStartRecord_(\'' + idAttr + '\')">Record RFID' + (isParent ? ' + ' + kids.length + ' child' + (kids.length > 1 ? 'ren' : '') : '') + '</button>';
-    }
-    return '<div class="station-vault-item">'
-      + '<div class="station-vault-item__head">'
-      + '<span class="station-vault-item__name">' + stationVaultEsc_(it.name || 'Unnamed')
-      + (isParent ? '<span class="station-vault-item__badge s-parent">parent</span>' : '')
-      + '</span>'
-      + '<span class="station-vault-item__unit">' + stationVaultEsc_(unit) + '</span>'
-      + '</div>'
-      + '<span class="station-vault-item__badge ' + stationVaultStatusClass_(statusLabel) + '">' + stationVaultEsc_(statusLabel) + '</span>'
-      + (it.rfidTag ? '<span class="station-vault-item__unit" style="margin-left:8px;">tag: ' + stationVaultEsc_(it.rfidTag) + '</span>' : '')
-      + '<div class="station-vault-item__actions">' + actions + '</div>'
+    return '<div class="station-vault-row" onclick="stationVaultOpenSheet_(\'' + idAttr + '\')">'
+      + '<span class="station-vault-row__name">' + stationVaultEsc_(it.name || 'Unnamed') + '</span>'
+      + (isParent ? '<span class="station-vault-row__parent">parent</span>' : '')
+      + (it.unitNumber ? '<span class="station-vault-row__unit">#' + stationVaultEsc_(it.unitNumber) + '</span>' : '')
+      + '<span class="station-vault-row__status" style="color:' + color + '; border-color:' + color + ';">' + stationVaultEsc_(statusLabel) + '</span>'
       + '</div>';
   }).join('');
 }
+
+/* ---- Vault action sheet (tap a line) ---- */
+window.stationVaultActiveId = null;
+
+window.stationVaultOpenSheet_ = function(assetId) {
+  const it = (window.stationVaultItems || []).find(function(x) { return String(x.id) === String(assetId); });
+  if (!it) return;
+  window.stationVaultActiveId = String(assetId);
+  const kids = stationVaultChildrenOf_(assetId);
+  const titleEl = document.getElementById('station-vault-sheet-title');
+  const metaEl = document.getElementById('station-vault-sheet-meta');
+  const recBtn = document.getElementById('station-vault-act-record');
+  if (titleEl) titleEl.textContent = it.name || 'Unnamed';
+  if (metaEl) {
+    const bits = [];
+    if (it.unitNumber) bits.push('Unit #' + it.unitNumber);
+    bits.push('Status: ' + (it.status || 'Active'));
+    bits.push(it.rfidTag ? ('Tag: ' + it.rfidTag) : 'No tag yet');
+    if (kids.length) bits.push(kids.length + ' unique child' + (kids.length > 1 ? 'ren' : '') + ' (cascade)');
+    metaEl.textContent = bits.join('  ·  ');
+  }
+  if (recBtn) {
+    recBtn.style.display = window.stationVaultCanRecord ? 'block' : 'none';
+    recBtn.textContent = 'Record RFID' + (kids.length ? ' + ' + kids.length + ' child' + (kids.length > 1 ? 'ren' : '') : '');
+  }
+  const sheet = document.getElementById('station-vault-sheet');
+  if (sheet) sheet.classList.add('is-open');
+};
+
+window.stationVaultCloseSheet_ = function() {
+  window.stationVaultActiveId = null;
+  const sheet = document.getElementById('station-vault-sheet');
+  if (sheet) sheet.classList.remove('is-open');
+};
+
+window.stationVaultSheetStatus_ = function(status) {
+  const id = window.stationVaultActiveId;
+  if (!id) return;
+  stationVaultSetStatus_(id, status);
+  stationVaultCloseSheet_();
+};
+
+window.stationVaultSheetRecord_ = function() {
+  const id = window.stationVaultActiveId;
+  if (!id) return;
+  stationVaultCloseSheet_();
+  stationVaultStartRecord_(id);
+};
 
 window.stationVaultSetStatus_ = function(assetId, status) {
   const host = stationReadHostSession_();
@@ -1380,6 +1466,7 @@ function stationOpenProjectPicker_() {
         if (payload && payload.notifs) phantom.notifs = payload.notifs;
         localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
       } catch (e) { /* ignore */ }
+      window.stationProjectsCache = projects;
       stationRenderProjectList_(projects);
     })
     .withFailureHandler(function(err) {
@@ -1419,6 +1506,20 @@ window.stationPickProject_ = function(pId) {
   if (typeof window.openMobileProjectAssets !== 'function') {
     stationSetStatus_('Project view unavailable.', 'error');
     return;
+  }
+  // Pre-seed the project object + hidden fields so openProjectAssetsModal never bails on an
+  // empty edit-folder-id (the station has no calendar to fall back on like phones do).
+  const proj = (window.stationProjectsCache || []).find(function(p) { return String(p.id) === String(pId); });
+  if (proj) {
+    window.mobileCrewHubProject = proj;
+    window.mobileCrewHubProjectId = pId;
+    window.isProjectDirty = false;
+    if (typeof window.syncProjectEditorHiddenFields === 'function') {
+      try { window.syncProjectEditorHiddenFields(proj, pId); } catch (e) { /* ignore */ }
+    } else {
+      const fid = document.getElementById('edit-folder-id');
+      if (fid) fid.value = pId;
+    }
   }
   // Hide the station shell so the (lower z-index) PA modal is visible; restore on close.
   const shell = document.getElementById('station-shell');
