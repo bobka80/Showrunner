@@ -221,7 +221,6 @@ function buildRoleDirectory(roleData, rMap) {
 
 function authenticateUser(crewName, passcode) {
   return executeWithRetry(() => {
-    let debugLog = [];
     const sheets = verifyVaultSchema(true); 
     const crewData = getSheetData(sheets.crew);
     let roleData = getSheetData(sheets.roles);
@@ -256,18 +255,14 @@ function authenticateUser(crewName, passcode) {
       let sysAccess = crewData[i][cMap['System_Access']] ? crewData[i][cMap['System_Access']].toString().toUpperCase().trim() : "";
       let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
       let dbPass = dbPassRaw ? dbPassRaw.toString().trim() : "";
-      
-      if (i === 1 || i === 0) {
-          debugLog.push(`Row ${i} Name: '${dbName}', Pass: '${dbPass}'`);
-      }
-      
+
       if (dbName === crewName.toLowerCase().trim() && dbPass === passcode.trim()) {
         return buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap);
       }
     }
-    
-    let headerKeys = Object.keys(cMap).filter(k => k.length > 0 && !k.includes(' ')).join(', ');
-    return { success: false, error: `Login Failed. Checked ${crewData.length - 1} rows. Input: '${crewName}'/'${passcode}'. Headers: [${headerKeys}]. ` + debugLog.join(' | ') };
+
+    // Never echo the input, the roster, headers, or any stored passcode back to the client.
+    return { success: false, error: 'Incorrect crew name or passcode.' };
   });
 }
 
