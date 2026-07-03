@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-02 · **Production:** GAS **v421** · **Status:** Partial — RFID checkout bar, station shell + configurable host auto-eject + live scan strip (**equipment name/unit resolved**) + self-serve badge enrollment + station setup view (power/mode/speed/beeper) with **direct native bridge + live apply**, **station main-screen redesign + PROJECT reuse of phone PA (Pass A)**, iframe scan-bridge fix, native gun app + APK install page shipped; **station Vault (Pass B)** + gate + PA concurrency backlog planned
+**Last swept:** 2026-07-02 · **Production:** GAS **v422** · **Status:** Partial — RFID checkout bar, station shell + configurable host auto-eject + live scan strip (**equipment name/unit resolved**) + self-serve badge enrollment + station setup view (power/mode/speed/beeper) with **direct native bridge + live apply**, **station main-screen redesign + PROJECT reuse of phone PA (Pass A)**, iframe scan-bridge fix, native gun app + APK install page shipped; **station Vault (Pass B)** + gate + PA concurrency backlog planned
 
 ---
 

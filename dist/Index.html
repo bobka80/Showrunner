@@ -5614,6 +5614,34 @@ html.station-device-root #station-shell {
   font-weight: bold;
   text-transform: uppercase;
 }
+/* Rollup folder line (identical units collapse under a logical parent, like the real vault). */
+.station-vault-row.is-group { background: #151518; }
+.station-vault-row__caret {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  color: #e4e4e7;
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+.station-vault-row__caret.is-open { transform: rotate(90deg); }
+.station-vault-row__count {
+  flex-shrink: 0;
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  background: #27272a;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+/* Indented children container + child rows. */
+.station-vault-children {
+  border-left: 2px solid #3f3f46;
+  margin-left: 15px;
+  background: rgba(255,255,255,0.03);
+}
+.station-vault-children .station-vault-row { padding-left: 20px; }
+.station-vault-children .station-vault-row__name { font-weight: 600; color: #e4e4e7; }
 /* Action sheet (tap a line) */
 .station-vault-sheet { display: none; position: absolute; inset: 0; z-index: 5; }
 .station-vault-sheet.is-open { display: block; }

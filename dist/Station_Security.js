@@ -400,6 +400,10 @@ function getStationVaultList(deviceActor, hostName) {
     const cContainer = col(['containertype', 'container']) ?? map['container_type'];
     const cNesting = col(['nestinglevel', 'level', 'nesting']) ?? map['nesting_level'];
     const cConsum = col(['isconsumable', 'consumable']) ?? map['is_consumable'];
+    // Manufacturer + length drive the "logical parent" rollup (identical units collapse into a
+    // folder keyed by name|manufacturer|length — mirrors renderAssetRegistry in the real vault).
+    const cManu = col(['manufacturer', 'brand', 'make']) ?? map['manufacturer'];
+    const cLength = col(['length', 'lengthm', 'cablelength']) ?? map['length'];
 
     const items = [];
     for (let i = 1; i < data.length; i++) {
@@ -412,6 +416,8 @@ function getStationVaultList(deviceActor, hostName) {
         status: cStatus !== undefined ? String(data[i][cStatus] || '') : '',
         containerType: cContainer !== undefined ? String(data[i][cContainer] || '') : '',
         nestingLevel: cNesting !== undefined ? String(data[i][cNesting] || '') : '',
+        manufacturer: cManu !== undefined ? String(data[i][cManu] || '') : '',
+        length: cLength !== undefined ? String(data[i][cLength] || '') : '',
         isBulk: cConsum !== undefined ? isStationTruthyCell(data[i][cConsum]) : false
       });
     }
