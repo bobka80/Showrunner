@@ -4,56 +4,56 @@ Created only on **Milestone** / **OK ship** / **Milestone now** — not on every
 
 | # | Date | GAS version | Deployment | Note |
 |---|------|-------------|------------|------|
-| 1 | 2026-07-03 | 424 | `AKfycbxy…` | v424 Station PROJECT open: preload on init/badge, phantom fallback for picked project, detect+recover the silent 'equipment list unavailable' bail, status breadcrumbs |
-| 2 | 2026-07-03 | 423 | `AKfycbxy…` | v423 Station Vault logical-parent rollup (identical units collapse under ▶ folder, cascade tags untagged units) + PROJECT picker fetches host-scoped projects and preloads on badge-in |
-| 3 | 2026-07-03 | 422 | `AKfycbxy…` | Milestone |
-| 4 | 2026-07-02 | 421 | `AKfycbxy…` | Milestone |
-| 5 | 2026-07-02 | 420 | `AKfycbxy…` | Milestone |
-| 6 | 2026-07-02 | 419 | `AKfycbxy…` | Milestone |
-| 7 | 2026-07-02 | 418 | `AKfycbxy…` | Milestone |
-| 8 | 2026-07-02 | 417 | `AKfycbxy…` | Milestone |
-| 9 | 2026-07-02 | 416 | `AKfycbxy…` | Milestone |
-| 10 | 2026-07-02 | 415 | `AKfycbxy…` | Station setup: beeper checkbox defaults ON (reflects gun default). Paired with hosting cache-buster bump so the RFID scan + settings bridge (host-boot.js) actually refreshes on devices. |
-| 11 | 2026-07-02 | 414 | `AKfycbxy…` | Station: fix RFID scan bridge (iframe postMessage relay so gun reads reach the app) + station setup view (configurable eject timer, gun power/sensitivity, scan mode, beeper) + configurable host-eject timeout |
-| 12 | 2026-07-02 | 413 | `AKfycbxy…` | Station shell: always-on live RFID scan strip (top) + self-serve crew badge enrollment (Link my RFID badge -> enrollStationCrewRfidTag writes host rfid_tag) |
-| 13 | 2026-07-02 | 412 | `AKfycbxy…` | Fix login crash: debugLog undefined in authenticateUser (Database Read Timeout) |
-| 14 | 2026-07-02 | 411 | `AKfycbxy…` | Milestone |
-| 15 | 2026-07-02 | 410 | `AKfycbxy…` | Milestone |
-| 16 | 2026-07-02 | 409 | `AKfycbxy…` | Milestone |
-| 17 | 2026-07-02 | 408 | `AKfycbxy…` | Milestone |
-| 18 | 2026-07-01 | 407 | `AKfycbxy…` | Milestone |
-| 19 | 2026-07-01 | 406 | `AKfycbxy…` | Milestone |
-| 20 | 2026-07-01 | 405 | `AKfycbxy…` | Milestone |
-| 21 | 2026-07-01 | 404 | `AKfycbxy…` | Milestone |
-| 22 | 2026-07-01 | 403 | `AKfycbxy…` | Milestone |
-| 23 | 2026-07-01 | 402 | `AKfycbxy…` | Milestone |
-| 24 | 2026-07-01 | 401 | `AKfycbxy…` | Milestone |
-| 25 | 2026-07-01 | 400 | `AKfycbxy…` | Milestone |
-| 26 | 2026-07-01 | 399 | `AKfycbxy…` | Milestone |
-| 27 | 2026-07-01 | 398 | `AKfycbxy…` | Milestone |
-| 28 | 2026-07-01 | 397 | `AKfycbxy…` | Milestone |
-| 29 | 2026-07-01 | 396 | `AKfycbxy…` | Milestone |
-| 30 | 2026-07-01 | 395 | `AKfycbxy…` | Milestone |
-| 31 | 2026-07-01 | 394 | `AKfycbxy…` | Milestone |
-| 32 | 2026-07-01 | 393 | `AKfycbxy…` | Crew edit: allow name change by uid in Resources |
-| 33 | 2026-07-01 | 392 | `AKfycbxy…` | Desktop auto-login opt-out; lock timer Disabled label; no emoji UI rule |
-| 34 | 2026-07-01 | 391 | `AKfycbxy…` | Desktop lock: optional auto-lock Off in Personal Hub |
-| 35 | 2026-07-01 | 390 | `AKfycbxy…` | Desktop lock digit fade-out 2x slower |
-| 36 | 2026-07-01 | 389 | `AKfycbxy…` | Desktop lock dim: rounded blur fade, 50px tighter, vertical center |
-| 37 | 2026-06-30 | 388 | `AKfycbxy…` | Desktop lock dim radius one-third height |
-| 38 | 2026-06-30 | 387 | `AKfycbxy…` | Desktop lock dim rounded rectangle |
-| 39 | 2026-06-30 | 386 | `AKfycbxy…` | Desktop lock dim outer fade 50px |
-| 40 | 2026-06-30 | 385 | `AKfycbxy…` | Desktop lock dim resize sync |
-| 41 | 2026-06-30 | 384 | `AKfycbxy…` | Desktop lock perimeter dim 50+100px + soft buses |
-| 42 | 2026-06-30 | 383 | `AKfycbxy…` | Desktop lock clock crossfade + tighter glow |
-| 43 | 2026-06-30 | 382 | `AKfycbxy…` | Desktop lock clock digit tick fade |
-| 44 | 2026-06-30 | 381 | `AKfycbxy…` | Desktop lock clock soft glow no contour |
-| 45 | 2026-06-30 | 380 | `AKfycbxy…` | Desktop lock clock gradient fade + bold Bahnschrift |
-| 46 | 2026-06-30 | 379 | `AKfycbxy…` | Desktop lock clock panel + Bahnschrift |
-| 47 | 2026-06-30 | 378 | `AKfycbxy…` | Exclude git-push-backup from GAS deploy |
-| 48 | 2026-06-30 | 377 | `AKfycbxy…` | Desktop lock: fuzzy fade + instant prefix unlock + whiter clock |
-| 49 | 2026-06-29 | 376 | `AKfycbxy…` | Milestone |
-| 50 | 2026-06-29 | 375 | `AKfycbxy…` | Milestone |
+| 1 | 2026-07-03 | 425 | `AKfycbxy…` | v425 — Station host-inherit RBAC: hosted user's real tier/permissions drive Project Assets (Design/Packing/Checkout); any-host checkout baseline (operate-only); ROOT-only Vault Crew tab for badge provisioning; enrollStationCrewRfidTag ROOT-gated + blocks device profiles; pristine device reset on eject/logout |
+| 2 | 2026-07-03 | 424 | `AKfycbxy…` | v424 Station PROJECT open: preload on init/badge, phantom fallback for picked project, detect+recover the silent 'equipment list unavailable' bail, status breadcrumbs |
+| 3 | 2026-07-03 | 423 | `AKfycbxy…` | v423 Station Vault logical-parent rollup (identical units collapse under ▶ folder, cascade tags untagged units) + PROJECT picker fetches host-scoped projects and preloads on badge-in |
+| 4 | 2026-07-03 | 422 | `AKfycbxy…` | Milestone |
+| 5 | 2026-07-02 | 421 | `AKfycbxy…` | Milestone |
+| 6 | 2026-07-02 | 420 | `AKfycbxy…` | Milestone |
+| 7 | 2026-07-02 | 419 | `AKfycbxy…` | Milestone |
+| 8 | 2026-07-02 | 418 | `AKfycbxy…` | Milestone |
+| 9 | 2026-07-02 | 417 | `AKfycbxy…` | Milestone |
+| 10 | 2026-07-02 | 416 | `AKfycbxy…` | Milestone |
+| 11 | 2026-07-02 | 415 | `AKfycbxy…` | Station setup: beeper checkbox defaults ON (reflects gun default). Paired with hosting cache-buster bump so the RFID scan + settings bridge (host-boot.js) actually refreshes on devices. |
+| 12 | 2026-07-02 | 414 | `AKfycbxy…` | Station: fix RFID scan bridge (iframe postMessage relay so gun reads reach the app) + station setup view (configurable eject timer, gun power/sensitivity, scan mode, beeper) + configurable host-eject timeout |
+| 13 | 2026-07-02 | 413 | `AKfycbxy…` | Station shell: always-on live RFID scan strip (top) + self-serve crew badge enrollment (Link my RFID badge -> enrollStationCrewRfidTag writes host rfid_tag) |
+| 14 | 2026-07-02 | 412 | `AKfycbxy…` | Fix login crash: debugLog undefined in authenticateUser (Database Read Timeout) |
+| 15 | 2026-07-02 | 411 | `AKfycbxy…` | Milestone |
+| 16 | 2026-07-02 | 410 | `AKfycbxy…` | Milestone |
+| 17 | 2026-07-02 | 409 | `AKfycbxy…` | Milestone |
+| 18 | 2026-07-02 | 408 | `AKfycbxy…` | Milestone |
+| 19 | 2026-07-01 | 407 | `AKfycbxy…` | Milestone |
+| 20 | 2026-07-01 | 406 | `AKfycbxy…` | Milestone |
+| 21 | 2026-07-01 | 405 | `AKfycbxy…` | Milestone |
+| 22 | 2026-07-01 | 404 | `AKfycbxy…` | Milestone |
+| 23 | 2026-07-01 | 403 | `AKfycbxy…` | Milestone |
+| 24 | 2026-07-01 | 402 | `AKfycbxy…` | Milestone |
+| 25 | 2026-07-01 | 401 | `AKfycbxy…` | Milestone |
+| 26 | 2026-07-01 | 400 | `AKfycbxy…` | Milestone |
+| 27 | 2026-07-01 | 399 | `AKfycbxy…` | Milestone |
+| 28 | 2026-07-01 | 398 | `AKfycbxy…` | Milestone |
+| 29 | 2026-07-01 | 397 | `AKfycbxy…` | Milestone |
+| 30 | 2026-07-01 | 396 | `AKfycbxy…` | Milestone |
+| 31 | 2026-07-01 | 395 | `AKfycbxy…` | Milestone |
+| 32 | 2026-07-01 | 394 | `AKfycbxy…` | Milestone |
+| 33 | 2026-07-01 | 393 | `AKfycbxy…` | Crew edit: allow name change by uid in Resources |
+| 34 | 2026-07-01 | 392 | `AKfycbxy…` | Desktop auto-login opt-out; lock timer Disabled label; no emoji UI rule |
+| 35 | 2026-07-01 | 391 | `AKfycbxy…` | Desktop lock: optional auto-lock Off in Personal Hub |
+| 36 | 2026-07-01 | 390 | `AKfycbxy…` | Desktop lock digit fade-out 2x slower |
+| 37 | 2026-07-01 | 389 | `AKfycbxy…` | Desktop lock dim: rounded blur fade, 50px tighter, vertical center |
+| 38 | 2026-06-30 | 388 | `AKfycbxy…` | Desktop lock dim radius one-third height |
+| 39 | 2026-06-30 | 387 | `AKfycbxy…` | Desktop lock dim rounded rectangle |
+| 40 | 2026-06-30 | 386 | `AKfycbxy…` | Desktop lock dim outer fade 50px |
+| 41 | 2026-06-30 | 385 | `AKfycbxy…` | Desktop lock dim resize sync |
+| 42 | 2026-06-30 | 384 | `AKfycbxy…` | Desktop lock perimeter dim 50+100px + soft buses |
+| 43 | 2026-06-30 | 383 | `AKfycbxy…` | Desktop lock clock crossfade + tighter glow |
+| 44 | 2026-06-30 | 382 | `AKfycbxy…` | Desktop lock clock digit tick fade |
+| 45 | 2026-06-30 | 381 | `AKfycbxy…` | Desktop lock clock soft glow no contour |
+| 46 | 2026-06-30 | 380 | `AKfycbxy…` | Desktop lock clock gradient fade + bold Bahnschrift |
+| 47 | 2026-06-30 | 379 | `AKfycbxy…` | Desktop lock clock panel + Bahnschrift |
+| 48 | 2026-06-30 | 378 | `AKfycbxy…` | Exclude git-push-backup from GAS deploy |
+| 49 | 2026-06-30 | 377 | `AKfycbxy…` | Desktop lock: fuzzy fade + instant prefix unlock + whiter clock |
+| 50 | 2026-06-29 | 376 | `AKfycbxy…` | Milestone |
 
 ---
 

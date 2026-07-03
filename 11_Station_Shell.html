@@ -23,6 +23,12 @@ html.station-device-root body {
 html.station-device-root #station-shell {
   display: flex;
 }
+/* Station "operate-only" host: can run check-in/out but not edit gear — hide design/add controls,
+   keep the operation (checkout) button. Managers/root hosts don't get this class (full edit). */
+body.station-operate-only #pa-search-cli,
+body.station-operate-only #mode-toggle-btn,
+body.station-operate-only #pa-new-sublist-btn,
+body.station-operate-only #pa-add-container-btn { display: none !important; }
 .station-shell-header {
   display: flex;
   align-items: center;
@@ -189,6 +195,50 @@ html.station-device-root #station-shell {
   font-family: Inter, sans-serif;
 }
 #station-vault.is-open { display: flex; }
+.station-vault-tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #27272a;
+  background: #0d0d10;
+}
+.station-vault-tab {
+  flex: 1;
+  margin: 0;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #a1a1aa;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.station-vault-tab.is-active { color: #fff; border-bottom-color: #10b981; }
+/* Panes grow so their inner list scrolls (vault is a flex column). */
+#station-vault-pane-equip,
+#station-vault-pane-crew {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.station-vault-crew-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #1a1a1d;
+  cursor: pointer;
+  user-select: none;
+}
+.station-vault-crew-row:active { background: #161619; }
+.station-vault-crew-row__name { color: #fff; font-weight: bold; font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.station-vault-crew-row__tag { flex-shrink: 0; font-family: monospace; font-size: 11px; }
+.station-vault-crew-row__tag.has-tag { color: #10b981; }
+.station-vault-crew-row__tag.no-tag { color: #71717a; }
 .station-vault__search {
   flex-shrink: 0;
   padding: 12px 16px;
@@ -623,7 +673,6 @@ html.station-device-root #station-shell {
     <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
     <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
     <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
-    <button type="button" id="station-btn-enroll" class="btn-outline btn-sm" style="display:none;" onclick="stationToggleEnroll()">LINK MY RFID BADGE</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
@@ -722,13 +771,31 @@ html.station-device-root #station-shell {
     <div class="station-settings-header__title">Vault</div>
     <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseVault()">Done</button>
   </div>
-  <div class="station-vault__search">
-    <input type="text" id="station-vault-search" placeholder="Search equipment by name, unit or tag…" autocomplete="off" oninput="stationVaultRenderList_()">
+  <!-- Tabs: Equipment (all hosts) | Crew (ROOT only — badge provisioning) -->
+  <div id="station-vault-tabs" class="station-vault-tabs">
+    <button type="button" id="station-vault-tab-btn-equip" class="station-vault-tab is-active" onclick="stationVaultSwitchTab_('equip')">Equipment</button>
+    <button type="button" id="station-vault-tab-btn-crew" class="station-vault-tab" style="display:none;" onclick="stationVaultSwitchTab_('crew')">Crew</button>
   </div>
-  <div id="station-vault-status" class="station-shell-status" style="text-align:center;">Loading vault…</div>
-  <div id="station-vault-list" class="station-vault__list"></div>
 
-  <!-- Record-mode banner: armed while a manager records equipment tags (with cascade). -->
+  <!-- EQUIPMENT tab -->
+  <div id="station-vault-pane-equip">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-search" placeholder="Search equipment by name, unit or tag…" autocomplete="off" oninput="stationVaultRenderList_()">
+    </div>
+    <div id="station-vault-status" class="station-shell-status" style="text-align:center;">Loading vault…</div>
+    <div id="station-vault-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- CREW tab (ROOT only): assign/overwrite crew badge RFIDs -->
+  <div id="station-vault-pane-crew" style="display:none;">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-crew-search" placeholder="Search crew by name…" autocomplete="off" oninput="stationVaultRenderCrew_()">
+    </div>
+    <div id="station-vault-crew-status" class="station-shell-status" style="text-align:center;">Loading crew…</div>
+    <div id="station-vault-crew-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- Record-mode banner: armed while recording equipment OR crew tags (with cascade). -->
   <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
     <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
     <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>
@@ -767,6 +834,71 @@ window.stationHostIdleTimer = null;
 window.stationHostIdleListenersBound = false;
 window.stationEnrollMode = false;
 window.stationRecentScans = [];
+
+/**
+ * Host-inherit RBAC. While a crew member is hosted at this station, the whole app evaluates
+ * permissions as the HOST (their real tier + IAM keys) — a warehouse computer/gun is a surface,
+ * not a stripped-down role. `stationHostRbac` is set in stationWriteHostSession_ from the host
+ * payload and cleared on eject/logout. Guarded so a non-station page or host-less state is
+ * untouched. Plus a station BASELINE: any host can check-in/out + set status even if their own
+ * tier normally can't (warehouse-context grant). Design/packing add-remove stays on real creds.
+ */
+window.stationHostRbac = null; // { access:'MANAGER', permissions:{event_assets_window:true,...} }
+var STATION_TIER_ORDER = ['CREW', 'EDITOR', 'MANAGER', 'ADMIN', 'ROOT'];
+var STATION_IMPLICIT_MANAGER_KEYS = [
+  'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
+  'event_view_pricing', 'task_manage_global', 'task_manage_personal'
+];
+
+function stationTierRank_(tier) {
+  var i = STATION_TIER_ORDER.indexOf(String(tier || 'CREW').toUpperCase());
+  return i === -1 ? 1 : i + 1;
+}
+window.stationHostActive_ = function() {
+  return !!(window.IS_STATION_DEVICE && window.stationHostRbac);
+};
+
+(function installStationRbacOverride_() {
+  if (!window.IS_STATION_DEVICE) return;
+  var _userHasPerm = window.userHasPerm;
+  var _effectiveHasPerm = window.effectiveHasPerm;
+  var _accessTierAtLeast = window.accessTierAtLeast;
+  var _canUseAssetCheckout = window.canUseAssetCheckout;
+
+  window.userHasPerm = function(key) {
+    if (window.stationHostActive_()) {
+      var p = window.stationHostRbac.permissions || {};
+      return p[key] === true || p[key] === 'true';
+    }
+    return _userHasPerm ? _userHasPerm(key) : false;
+  };
+
+  window.accessTierAtLeast = function(minTier) {
+    if (window.stationHostActive_()) {
+      return stationTierRank_(window.stationHostRbac.access) >= stationTierRank_(minTier);
+    }
+    return _accessTierAtLeast ? _accessTierAtLeast(minTier) : false;
+  };
+
+  window.effectiveHasPerm = function(key) {
+    if (window.stationHostActive_()) {
+      if (!key) return false;
+      if (key === 'task_manage_personal') return true;
+      if (String(window.stationHostRbac.access || '').toUpperCase() === 'ROOT') return true;
+      if (window.userHasPerm(key)) return true;
+      if (STATION_IMPLICIT_MANAGER_KEYS.indexOf(key) !== -1 && window.accessTierAtLeast('MANAGER')) return true;
+      return false;
+    }
+    return _effectiveHasPerm ? _effectiveHasPerm(key) : false;
+  };
+
+  // Station baseline: ANY host can run check-in/out (equipment status lives in the Vault, already
+  // any-host). Design/packing editing still follows canEditAssets() = host's real event_assets_window.
+  window.canUseAssetCheckout = function() {
+    if (window.stationHostActive_()) return true;
+    return _canUseAssetCheckout ? _canUseAssetCheckout() : false;
+  };
+})();
 
 /** How many recent scans to keep in the always-on top strip. */
 var STATION_SCAN_FEED_MAX = 8;
@@ -911,10 +1043,42 @@ function stationWriteHostSession_(host) {
     if (host) sessionStorage.setItem(stationHostStorageKey_(), JSON.stringify(host));
     else sessionStorage.removeItem(stationHostStorageKey_());
   } catch (e) { /* ignore */ }
+  // Host-inherit RBAC: while hosted, the app evaluates permissions as the HOST (their real tier +
+  // IAM), not the low-tier device account. Cleared on eject/logout. See stationHostRbac override.
+  if (host && (host.access || host.permissions)) {
+    window.stationHostRbac = { access: host.access || 'CREW', permissions: host.permissions || {} };
+  } else {
+    window.stationHostRbac = null;
+  }
   // Warm the project list for THIS host in the background so pressing PROJECT opens instantly
-  // (same list their personal profile sees). Clearing the host drops the cache.
-  if (host && host.name) stationPreloadProjects_(host.name);
-  else { window.stationProjectsCache = null; window.stationProjectsFor = null; }
+  // (same list their personal profile sees). Clearing the host drops the cache + wipes the device.
+  if (host && host.name) {
+    stationPreloadProjects_(host.name);
+  } else {
+    window.stationProjectsCache = null; window.stationProjectsFor = null;
+    stationResetDeviceToPristine_();
+  }
+}
+
+/**
+ * Eject/logout returns the gun to a never-used state so the next person sees nothing of the last
+ * session: clear the live scan strip, cancel any armed vault record, drop cached lists, close
+ * overlays, and reset status/last-scan.
+ */
+function stationResetDeviceToPristine_() {
+  window.stationRecentScans = [];
+  try { if (typeof stationRenderScanFeed_ === 'function') stationRenderScanFeed_(); } catch (e) {}
+  window.stationLastScanTag = null;
+  window.stationLastScanAt = 0;
+  try { if (typeof stationVaultCancelRecord_ === 'function') stationVaultCancelRecord_(); } catch (e) {}
+  window.stationVaultItems = [];
+  window.stationVaultCrew = null;
+  window.stationVaultExpanded = {};
+  window.stationEnrollMode = false;
+  try { if (typeof stationSetEnrollButton_ === 'function') stationSetEnrollButton_('idle'); } catch (e) {}
+  try { if (typeof stationCloseVault === 'function') stationCloseVault(); } catch (e) {}
+  try { if (typeof stationCloseProjectPicker === 'function') stationCloseProjectPicker(); } catch (e) {}
+  try { if (typeof stationSetLastScan_ === 'function') stationSetLastScan_(''); } catch (e) {}
 }
 
 /** Background-fetch the host's projects (getRefreshPayload scoped to the person, not the device). */
@@ -1035,12 +1199,10 @@ function stationRenderShellState_() {
       hostInline.textContent = '— ' + host.name;
     }
     if (logoutHostBtn) logoutHostBtn.style.display = 'block';
-    if (enrollBtn) enrollBtn.style.display = 'block';
+    if (enrollBtn) enrollBtn.style.display = 'none';
     if (projectBtn) projectBtn.classList.remove('is-disabled');
     if (vaultBtn) vaultBtn.classList.remove('is-disabled');
-    stationSetStatus_(host.rfidTag
-      ? ('Ready. Badge on file: ' + host.rfidTag)
-      : 'Ready. No badge linked yet — tap “Link my RFID badge”.', 'ok');
+    stationSetStatus_('Ready — ' + host.name + ' hosting.', 'ok');
     stationResetHostIdleTimer_();
   } else {
     if (stateLabel) stateLabel.textContent = 'Waiting for host';
@@ -1110,41 +1272,11 @@ function stationHandleRfidScan_(rawTag) {
 
   const host = stationReadHostSession_();
 
-  if (window.stationEnrollMode) {
-    if (!host) {
-      window.stationEnrollMode = false;
-      stationSetEnrollButton_('idle');
-      return;
-    }
-    window.stationEnrollMode = false;
-    stationSetEnrollButton_('idle');
-    window.stationScanBusy = true;
-    stationResetHostIdleTimer_();
-    stationSetLastScan_(tag);
-    stationSetStatus_('Linking badge to ' + host.name + '…', '');
-    google.script.run
-      .withSuccessHandler(function(res) {
-        window.stationScanBusy = false;
-        if (!res || !res.success) {
-          stationSetStatus_((res && res.error) ? res.error : 'Enrollment failed.', 'error');
-          return;
-        }
-        stationWriteHostSession_(res.host);
-        stationRenderShellState_();
-        stationSetStatus_('Badge linked to ' + res.host.name + '. Scan it next time to sign in.', 'ok');
-      })
-      .withFailureHandler(function(err) {
-        window.stationScanBusy = false;
-        stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
-      })
-      .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.uid || host.name, tag);
-    return;
-  }
-
   if (host) {
+    // Hosted + a loose scan that wasn't consumed by a Vault/Crew record: just note it. Equipment
+    // check-in/out happens inside the Project Assets operation flow, not here.
     stationResetHostIdleTimer_();
     stationSetLastScan_(tag);
-    stationSetStatus_('Equipment scans coming soon. Log out host to scan another badge.', 'error');
     return;
   }
 
@@ -1186,7 +1318,11 @@ window.onStationRfidScan = function(rawTag) {
   }
   stationDebug_('scan IN: ' + (tag || '(empty)'));
   if (tag) stationPushScanFeed_(tag);
-  // Manager recording a tag onto equipment (Vault) takes priority over host/enroll routing.
+  // ROOT recording a crew badge (Vault → Crew tab) takes top priority.
+  if (tag && window.stationCrewRecord) {
+    if (stationCrewConsumeScan_(tag)) return;
+  }
+  // Manager recording a tag onto equipment (Vault) is next.
   if (tag && window.stationVaultRecord && window.stationVaultRecord.queue && window.stationVaultRecord.queue.length) {
     if (stationVaultConsumeScan_(tag)) return;
   }
@@ -1271,8 +1407,27 @@ window.stationOpenVault = function() {
   panel.classList.add('is-open');
   const searchEl = document.getElementById('station-vault-search');
   if (searchEl) searchEl.value = '';
+  // Crew tab is a ROOT-only badge-provisioning surface.
+  const isRoot = (window.stationHostRbac && String(window.stationHostRbac.access || '').toUpperCase() === 'ROOT');
+  const crewTabBtn = document.getElementById('station-vault-tab-btn-crew');
+  if (crewTabBtn) crewTabBtn.style.display = isRoot ? 'block' : 'none';
   stationVaultCancelRecord_();
+  stationVaultSwitchTab_('equip');
   stationVaultLoad_();
+};
+
+/** Toggle between the Equipment and Crew panes inside the Vault overlay. */
+window.stationVaultSwitchTab_ = function(tab) {
+  const paneEquip = document.getElementById('station-vault-pane-equip');
+  const paneCrew = document.getElementById('station-vault-pane-crew');
+  const btnEquip = document.getElementById('station-vault-tab-btn-equip');
+  const btnCrew = document.getElementById('station-vault-tab-btn-crew');
+  const isCrew = (tab === 'crew');
+  if (paneEquip) paneEquip.style.display = isCrew ? 'none' : 'flex';
+  if (paneCrew) paneCrew.style.display = isCrew ? 'flex' : 'none';
+  if (btnEquip) btnEquip.classList.toggle('is-active', !isCrew);
+  if (btnCrew) btnCrew.classList.toggle('is-active', isCrew);
+  if (isCrew) stationVaultLoadCrew_();
 };
 
 window.stationCloseVault = function() {
@@ -1545,6 +1700,7 @@ function stationVaultRenderRecordBar_() {
 
 window.stationVaultCancelRecord_ = function() {
   window.stationVaultRecord = null;
+  window.stationCrewRecord = null;
   stationVaultRenderRecordBar_();
 };
 
@@ -1586,6 +1742,104 @@ function stationVaultConsumeScan_(tag) {
       if (txt) txt.textContent = 'Error: ' + (err && err.message ? err.message : String(err)) + ' — Cancel to stop.';
     })
     .recordStationAssetRfid(ACTIVE_USER_NAME, host.name, assetId, tag);
+  return true;
+}
+
+/* ==========================================================================
+   VAULT → CREW TAB (ROOT only): assign / overwrite crew badge RFIDs
+   ========================================================================== */
+window.stationVaultCrew = null;   // cached crew list [{uid,name,rfidTag}]
+window.stationCrewRecord = null;  // { ref, name } while armed for a crew badge scan
+
+function stationVaultLoadCrew_() {
+  const host = stationReadHostSession_();
+  const statusEl = document.getElementById('station-vault-crew-status');
+  const listEl = document.getElementById('station-vault-crew-list');
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading crew…'; }
+  if (listEl) listEl.innerHTML = '';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = (res && res.error) ? res.error : 'Could not load crew.'; }
+        return;
+      }
+      window.stationVaultCrew = res.crew || [];
+      stationVaultRenderCrew_();
+    })
+    .withFailureHandler(function(err) {
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); }
+    })
+    .getStationCrewRfidList(ACTIVE_USER_NAME, host ? host.name : '');
+}
+
+window.stationVaultRenderCrew_ = function() {
+  const listEl = document.getElementById('station-vault-crew-list');
+  const statusEl = document.getElementById('station-vault-crew-status');
+  if (!listEl) return;
+  const all = window.stationVaultCrew || [];
+  const q = (document.getElementById('station-vault-crew-search') || {}).value || '';
+  const needle = q.toLowerCase().trim();
+  const rows = needle ? all.filter(function(c) { return String(c.name).toLowerCase().indexOf(needle) !== -1; }) : all;
+  if (statusEl) statusEl.style.display = 'none';
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="station-shell-status" style="text-align:center;padding:20px;">No crew match.</div>';
+    return;
+  }
+  listEl.innerHTML = rows.map(function(c) {
+    const ref = stationVaultEsc_(c.uid || c.name);
+    const nm = stationVaultEsc_(c.name);
+    const tag = c.rfidTag
+      ? '<span class="station-vault-crew-row__tag has-tag">' + stationVaultEsc_(c.rfidTag) + '</span>'
+      : '<span class="station-vault-crew-row__tag no-tag">no badge</span>';
+    return '<div class="station-vault-crew-row" onclick="stationVaultStartCrewRecord_(\'' + ref + '\',\'' + nm.replace(/'/g, "\\'") + '\')">'
+      + '<span class="station-vault-crew-row__name">' + nm + '</span>' + tag + '</div>';
+  }).join('');
+};
+
+window.stationVaultStartCrewRecord_ = function(ref, name) {
+  const host = stationReadHostSession_();
+  if (!host) { stationSetStatus_('Scan your badge first.', 'error'); return; }
+  window.stationVaultRecord = null; // never mix with equipment recording
+  window.stationCrewRecord = { ref: ref, name: name };
+  const bar = document.getElementById('station-vault-record-bar');
+  const txt = document.getElementById('station-vault-record-text');
+  if (bar) bar.style.display = 'flex';
+  if (txt) txt.textContent = 'Pull the trigger on ' + name + '’s badge…';
+  stationResetHostIdleTimer_();
+};
+
+/** Consume a scan onto the armed crew member. Returns true if used. */
+function stationCrewConsumeScan_(tag) {
+  const rec = window.stationCrewRecord;
+  if (!rec) return false;
+  if (window.stationCrewRecordBusy) return true;
+  const host = stationReadHostSession_();
+  if (!host) { stationVaultCancelRecord_(); return true; }
+  window.stationCrewRecordBusy = true;
+  stationResetHostIdleTimer_();
+  const txt = document.getElementById('station-vault-record-text');
+  if (txt) txt.textContent = 'Linking badge to ' + rec.name + '…';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationCrewRecordBusy = false;
+      if (!res || !res.success) {
+        if (txt) txt.textContent = ((res && res.error) ? res.error : 'Enrollment failed.') + ' Try again or Cancel.';
+        return;
+      }
+      // Reflect the new tag in the cached crew row + refresh the live-strip resolver.
+      const c = (window.stationVaultCrew || []).find(function(x) { return String(x.uid || x.name) === String(rec.ref) || String(x.name) === String(rec.name); });
+      if (c) c.rfidTag = tag;
+      stationVaultRenderCrew_();
+      stationRefreshEquipMap_();
+      window.stationCrewRecord = null;
+      stationVaultRenderRecordBar_();
+      stationSetStatus_('Badge linked to ' + rec.name + '.', 'ok');
+    })
+    .withFailureHandler(function(err) {
+      window.stationCrewRecordBusy = false;
+      if (txt) txt.textContent = 'Error: ' + (err && err.message ? err.message : String(err)) + ' — Cancel to stop.';
+    })
+    .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.name, rec.ref, tag);
   return true;
 }
 

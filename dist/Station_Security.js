@@ -430,6 +430,49 @@ function getStationVaultList(deviceActor, hostName) {
   });
 }
 
+// @INDEX: STATION_SHELL -> Crew RFID list for the Vault "Crew" tab (ROOT host only)
+// Lists real crew members + their current badge tag so ROOT can assign/overwrite from the station.
+// Station device profiles are excluded — they must never carry an RFID tag.
+function getStationCrewRfidList(deviceActor, hostName) {
+  return executeWithRetry(() => {
+    if (!actorUsesStationShell(deviceActor)) {
+      return { success: false, error: 'Station device login only.' };
+    }
+    if (!verifyBackendPrivilege(hostName, 'ROOT')) {
+      return { success: false, error: 'Only ROOT can manage crew badges.' };
+    }
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+    const rMap = ensureStationRoleColumns(sheets.roles);
+    const roleData = sheets.roles.getDataRange().getValues();
+
+    // Collect the role refs that are station device profiles, to filter those crew rows out.
+    const deviceRoleIds = {};
+    for (let r = 1; r < roleData.length; r++) {
+      if (isStationDeviceProfileRow(roleData[r], rMap)) {
+        const rid = getSheetCell(roleData[r], rMap, 'Role_ID');
+        if (rid) deviceRoleIds[String(rid).toLowerCase().trim()] = true;
+      }
+    }
+
+    const list = [];
+    for (let i = 1; i < crewData.length; i++) {
+      const name = getSheetCell(crewData[i], cMap, 'Name');
+      if (!name) continue;
+      const roleId = (getSheetCell(crewData[i], cMap, 'Role_ID') || '').toString().toLowerCase().trim();
+      if (roleId && deviceRoleIds[roleId]) continue; // skip station device profiles
+      list.push({
+        uid: getSheetCell(crewData[i], cMap, 'uid'),
+        name: name,
+        rfidTag: cMap['rfid_tag'] !== undefined ? normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]) : ''
+      });
+    }
+    list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return { success: true, crew: list, ts: Date.now() };
+  });
+}
+
 // @INDEX: STATION_SHELL -> Set asset lifecycle status (anyone hosted at a vault-enabled station)
 function setStationAssetStatus(deviceActor, hostName, assetId, status) {
   return executeWithRetry(() => {
@@ -517,6 +560,30 @@ function recordStationAssetRfid(deviceActor, hostName, assetId, rfidTag) {
 }
 
 // @INDEX: STATION_SHELL -> RFID scan router (host badge first)
+/**
+ * Host-inherit RBAC: resolve a hosted crew member's real tier + IAM permission bundle so the
+ * station shell can evaluate the app as that person (not the low-tier device account). Uses the
+ * plain resolvers from Security.js (no nested executeWithRetry). Station device profiles never
+ * host (they're rejected upstream), so this is always a real person.
+ */
+function resolveHostRbacBundle_(crewName, crewData, cMap) {
+  const fallback = { access: 'CREW', permissions: {} };
+  try {
+    const sheets = verifyVaultSchema(true);
+    const roleData = getSheetData(sheets.roles);
+    const rMap = getHeaderMap(roleData);
+    const access = (typeof resolveCrewSysAccess === 'function')
+      ? (resolveCrewSysAccess(crewName, crewData, roleData, cMap, rMap) || 'CREW')
+      : 'CREW';
+    const permissions = (typeof resolveCrewPermissionBundle === 'function')
+      ? (resolveCrewPermissionBundle(crewName, crewData, roleData, cMap, rMap) || {})
+      : {};
+    return { access: access, permissions: permissions };
+  } catch (e) {
+    return fallback;
+  }
+}
+
 function processStationRfidScan(deviceActor, rfidTag, options) {
   return executeWithRetry(() => {
     if (!actorUsesStationShell(deviceActor)) {
@@ -538,13 +605,16 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
       }
       writeToAuditLog(deviceActor, 'STATION_HOST', 'STATION', 'GLOBAL', crew.uid || crew.name,
         'Crew badge host: ' + crew.name + ' (' + tag + ').');
+      const rbac = resolveHostRbacBundle_(crew.name, crewData, cMap);
       return {
         success: true,
         scanType: 'host',
         host: {
           uid: crew.uid,
           name: crew.name,
-          rfidTag: crew.rfidTag
+          rfidTag: crew.rfidTag,
+          access: rbac.access,
+          permissions: rbac.permissions
         }
       };
     }
@@ -560,17 +630,27 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
   });
 }
 
-// @INDEX: STATION_SHELL -> Enroll crew RFID badge (from hosted/root session)
-function enrollStationCrewRfidTag(deviceActor, crewRef, rfidTag) {
+// @INDEX: STATION_SHELL -> Enroll crew RFID badge (ROOT host only; via Vault → Crew tab)
+// Signature note: hostName is the ROOT-tier person hosting the station (their badge established
+// the session). Crew-badge provisioning is a ROOT-only admin task per the agreed model.
+function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag) {
   return executeWithRetry(() => {
     if (!actorUsesStationShell(deviceActor)) {
       return { success: false, error: 'PERMISSION DENIED: Station device login only.' };
+    }
+    if (!verifyBackendPrivilege(hostName, 'ROOT')) {
+      return { success: false, error: 'Only ROOT can record crew badge RFIDs.' };
     }
     const tag = normalizeStationRfidTag(rfidTag);
     if (!tag) return { success: false, error: 'Empty scan — pull the trigger on the badge.' };
 
     const ref = String(crewRef || '').toLowerCase().trim();
     if (!ref) return { success: false, error: 'No crew member specified for enrollment.' };
+
+    // Station device profiles must never carry an RFID tag — refuse to tag one.
+    if (actorUsesStationShell(ref)) {
+      return { success: false, error: 'Station device profiles cannot be given an RFID tag.' };
+    }
 
     const sheets = verifyVaultSchema();
     const crewSheet = sheets.crew;
@@ -645,11 +725,12 @@ function stationDevHostAsBogdan(deviceActor) {
     if (!crew) return { success: false, error: 'Crew member Bogdan not found in vault.' };
     writeToAuditLog(deviceActor, 'STATION_HOST', 'STATION', 'GLOBAL', crew.uid || crew.name,
       'DEV host bypass: ' + crew.name + '.');
+    const rbac = resolveHostRbacBundle_(crew.name, crewData, cMap);
     return {
       success: true,
       scanType: 'host',
       devBypass: true,
-      host: crew
+      host: Object.assign({}, crew, { access: rbac.access, permissions: rbac.permissions })
     };
   });
 }

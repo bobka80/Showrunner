@@ -5380,6 +5380,12 @@ html.station-device-root body {
 html.station-device-root #station-shell {
   display: flex;
 }
+/* Station "operate-only" host: can run check-in/out but not edit gear — hide design/add controls,
+   keep the operation (checkout) button. Managers/root hosts don't get this class (full edit). */
+body.station-operate-only #pa-search-cli,
+body.station-operate-only #mode-toggle-btn,
+body.station-operate-only #pa-new-sublist-btn,
+body.station-operate-only #pa-add-container-btn { display: none !important; }
 .station-shell-header {
   display: flex;
   align-items: center;
@@ -5546,6 +5552,50 @@ html.station-device-root #station-shell {
   font-family: Inter, sans-serif;
 }
 #station-vault.is-open { display: flex; }
+.station-vault-tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #27272a;
+  background: #0d0d10;
+}
+.station-vault-tab {
+  flex: 1;
+  margin: 0;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #a1a1aa;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.station-vault-tab.is-active { color: #fff; border-bottom-color: #10b981; }
+/* Panes grow so their inner list scrolls (vault is a flex column). */
+#station-vault-pane-equip,
+#station-vault-pane-crew {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.station-vault-crew-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #1a1a1d;
+  cursor: pointer;
+  user-select: none;
+}
+.station-vault-crew-row:active { background: #161619; }
+.station-vault-crew-row__name { color: #fff; font-weight: bold; font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.station-vault-crew-row__tag { flex-shrink: 0; font-family: monospace; font-size: 11px; }
+.station-vault-crew-row__tag.has-tag { color: #10b981; }
+.station-vault-crew-row__tag.no-tag { color: #71717a; }
 .station-vault__search {
   flex-shrink: 0;
   padding: 12px 16px;
@@ -5980,7 +6030,6 @@ html.station-device-root #station-shell {
     <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
     <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
     <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
-    <button type="button" id="station-btn-enroll" class="btn-outline btn-sm" style="display:none;" onclick="stationToggleEnroll()">LINK MY RFID BADGE</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
@@ -6079,13 +6128,31 @@ html.station-device-root #station-shell {
     <div class="station-settings-header__title">Vault</div>
     <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseVault()">Done</button>
   </div>
-  <div class="station-vault__search">
-    <input type="text" id="station-vault-search" placeholder="Search equipment by name, unit or tag…" autocomplete="off" oninput="stationVaultRenderList_()">
+  <!-- Tabs: Equipment (all hosts) | Crew (ROOT only — badge provisioning) -->
+  <div id="station-vault-tabs" class="station-vault-tabs">
+    <button type="button" id="station-vault-tab-btn-equip" class="station-vault-tab is-active" onclick="stationVaultSwitchTab_('equip')">Equipment</button>
+    <button type="button" id="station-vault-tab-btn-crew" class="station-vault-tab" style="display:none;" onclick="stationVaultSwitchTab_('crew')">Crew</button>
   </div>
-  <div id="station-vault-status" class="station-shell-status" style="text-align:center;">Loading vault…</div>
-  <div id="station-vault-list" class="station-vault__list"></div>
 
-  <!-- Record-mode banner: armed while a manager records equipment tags (with cascade). -->
+  <!-- EQUIPMENT tab -->
+  <div id="station-vault-pane-equip">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-search" placeholder="Search equipment by name, unit or tag…" autocomplete="off" oninput="stationVaultRenderList_()">
+    </div>
+    <div id="station-vault-status" class="station-shell-status" style="text-align:center;">Loading vault…</div>
+    <div id="station-vault-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- CREW tab (ROOT only): assign/overwrite crew badge RFIDs -->
+  <div id="station-vault-pane-crew" style="display:none;">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-crew-search" placeholder="Search crew by name…" autocomplete="off" oninput="stationVaultRenderCrew_()">
+    </div>
+    <div id="station-vault-crew-status" class="station-shell-status" style="text-align:center;">Loading crew…</div>
+    <div id="station-vault-crew-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- Record-mode banner: armed while recording equipment OR crew tags (with cascade). -->
   <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
     <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
     <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>

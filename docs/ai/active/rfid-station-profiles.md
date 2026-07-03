@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v423**
+**Opened:** 2026-07-02 · **Production:** GAS **v425**
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -77,11 +77,13 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
   - **Station Vault now replicates it.** `stationVaultBuildGroups_` groups by the same key; multi-unit groups render a **▶ folder + count badge** (`stationVaultToggleGroup_` expands `#station-vault-grp-N`), singletons/Bulk render plain lines. Backend `getStationVaultList` now returns **`manufacturer` + `length`** for the key.
   - **Cascade = per unit inside the group.** Tap a folder → sheet offers **Record RFID** which queues the group's **still-untagged** units (one scan each), and **Maintenance/Broken/Repaired apply to all units in the group** (`stationVaultSetStatusMany_`). Expand + tap a single unit → that unit only. A single-unit line records/sets itself.
   - **PROJECT stopped hanging on "Loading projects…".** Root cause: the picker fetched `getRefreshPayload(<device account>)` (slow/empty on the station). Now it fetches for the **host** (`getRefreshPayload(host.name)` — the same list the person sees on their phone) and **preloads in the background on badge-in** (`stationPreloadProjects_`, warmed from `stationWriteHostSession_`), so pressing PROJECT is instant; failures surface an error instead of sticking.
+- [x] **PROJECT open hardening (v424).** After v423 the picker loaded but tapping a project could still show nothing. Fixes in `stationPickProject_`: (1) resolve the picked project from `stationProjectsCache` **or** the phantom payload, and if it's genuinely missing, say so + force a fresh fetch instead of silently bailing; (2) `openMobileProjectAssets` can **bail with only a toast** (no throw) when it can't resolve a project — the shell was hidden so the screen went blank — so we now **detect the still-hidden `#project-assets-modal-overlay` after ~250 ms, restore the shell, and report** "equipment list unavailable"; (3) **status breadcrumbs** ("Opening <project>…" → open / error) so any remaining failure is pinpointed; (4) **preload also runs on shell init** when a host session was restored from a reload (not just on `stationWriteHostSession_`).
 - [ ] **Cleanup build:** remove the diagnostic `postStatus` lines in `RfidManager.kt` once we've had a day of stable field use. *(The web `#station-debug` overlay is already removed.)*
 - [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).
 - [ ] **Remove the DEV bypass** `stationDevHostAsBogdan` (+ its button) once badge host is verified on hardware
-- [ ] **Crew `rfid_tag` admin UI** (deferred — sheet paste until station SDK host flow is proven)
+- [x] **Host-inherit RBAC + Vault Crew tab + eject reset (v425)** — agreed spec 2026-07-03, now built (see Implementation checklist below). Credentialed hosts get PA Design/Packing/Checkout; any host gets a checkout baseline; ROOT-only crew badge provisioning; pristine device on eject. **QR-at-gate** remains the one deferred item.
+- [ ] **Crew `rfid_tag` admin UI** — superseded by **Vault → Crew tab** (ROOT only) in agreed spec; remove self-serve "Link my RFID badge" when built
 - [ ] **Tag-map / new-equipment RFID provisioning UX** on the station
 - [ ] **Gate-at-door** bulk read + exception re-scan path (hardware TBD)
 
@@ -89,8 +91,8 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 The path the director just proved on hardware, and every place it can silently break. Backend: `Station_Security.js`. Client: `11_Station_Shell.html`.
 
-**The flow:**
-1. **Enroll** — while hosted (root/DEV), "Link my RFID badge" captures the next scan → `enrollStationCrewRfidTag(deviceActor, crewRef, tag)` writes `tag` to that crew member's `Crew_Roster.rfid_tag`, then `flushCache()`.
+**The flow (today vs target):**
+1. **Enroll (v425)** — ROOT hosts open **Vault → Crew tab**, tap a crew member, then scan the badge → `enrollStationCrewRfidTag(deviceActor, hostName, crewRef, tag)` (ROOT-gated, refuses station device profiles) writes `tag` to that member's `Crew_Roster.rfid_tag`. Self-serve "Link my RFID badge" is gone.
 2. **Login/host** — a later badge scan → `processStationRfidScan(deviceActor, tag, {hostOnly:true})` → `lookupCrewMemberByRfidTag` → returns the crew identity → the shell writes a **host session** and inherits.
 
 **Fragile points (all of these must hold or the badge silently won't work):**
@@ -103,16 +105,83 @@ The path the director just proved on hardware, and every place it can silently b
 - **What "RFID login" actually is**: `processStationRfidScan` returns `scanType:'host'` and the client creates a **station host-inherit session on that device** — *not* a full authenticated token session. Blast radius is limited to the station profile's permissions. Equipment scans still require an active host (`hostOnly`).
 - **Read selectivity**: at high power the gun may read a nearby/shelf tag instead of the badge — you could enroll or host the **wrong** tag. Tune power so only a badge at the gun reads (see "dial in real values").
 
+## Agreed spec — Station host permission model (director 2026-07-03)
+
+**Status:** Approved for implementation. **Not built yet** (today PA on station is still gated on the **device account**, not the host — see "In progress" below).
+
+### Guiding principle
+
+The station (gun **or** warehouse computer at the RFID gate) is a **surface**, not a separate permission universe. While a crew member is **hosted** (badge scan), what they can do follows their **own crew credentials** — the same rights they'd have on their phone or an office desktop. Rationale: warehouse computers will run station profiles; cross-rental and gate work must be doable **in the warehouse** without walking to the office or fumbling on a personal phone.
+
+**No schema refactor required.** Crew tiers and IAM keys already live on `Crew_Roster` / roles; `verifyBackendPrivilege(hostName, tier)` already resolves a person by name. Implementation = **host session carries the host's tier + permission set** (fetched at badge-in) and client `effectiveHasPerm` / `canEditAssets` / `canUseAssetCheckout` **prefer the host while `IS_STATION_DEVICE && host active`**. Backend endpoints verify the **host**, not the device account, for writes. Optional future: a station-profile toggle for "view-only guns" — not required for v1.
+
+### Permission matrix (while hosted)
+
+| Action | Who |
+|--------|-----|
+| **Check-in / Check-out** (operation mode) | **Any** hosted crew (station baseline) |
+| **Mark Maintenance / Broken / Repaired** | **Any** hosted crew (station baseline) |
+| **Add/remove project assets, Design, Packing** (full PA) | Host's real credentials — e.g. `event_assets_window` / manager tier. A manager doing cross-rental gets full PA; plain crew does not. |
+| **Record / overwrite equipment RFID** | Host is **MANAGER+** (`recordStationAssetRfid` — already enforced server-side) |
+| **Add / overwrite crew badge RFID** | Host is **ROOT only** — via **Vault → Crew tab** (see below); **not** self-serve |
+
+**Station device profiles must never receive an RFID tag** — excluded from crew-RFID assignment UI and blocked server-side.
+
+### Station baseline vs delicate writes
+
+- **Baseline (any host):** check-in/out + equipment status. Granted because hosting at a warehouse device is the context — not because every crew member has those rights globally in the office app.
+- **Everything else:** host's tier + IAM keys, evaluated as if they logged in personally.
+- **Delicate RFID:** equipment = MANAGER+, crew = ROOT only (server-enforced on `hostName`).
+
+### Check-in/out is input-agnostic
+
+Checkout/checkin is **operation mode inside Project Assets** — not gun-only. Must work when:
+- **Manual tap** on buttons (phone at gate, desktop hub, station computer — no gun, dead battery, no power).
+- **RFID EPC** scan (gun).
+- **QR scan** (future / maybe soon): QR encodes the asset **UID**; same confirm path as RFID.
+
+Bulk cables checkout via **container case**: in design mode (manager credentials) add a cable case to the project, name it, assign case RFID/QR; bulk inside is married to that case (`containerUid`). At packing/checkout, scanning the **case** checks out the bulk inside — no per-cable RFID.
+
+### Vault → Crew tab (ROOT only)
+
+Replace today's **"Link my RFID badge"** self-enroll with a **Crew tab** inside the station **Vault** overlay (mirrors original desktop crew-RFID admin):
+- Visible only when hosted host is **ROOT**.
+- Crew list; root assigns/overwrites each person's `rfid_tag`.
+- **Station device accounts filtered out** — never assignable.
+- Backend: tighten `enrollStationCrewRfidTag` (or successor) to **ROOT** + reject station-profile rows.
+
+### Host eject = pristine device
+
+On host logout, idle eject, or sign-out: return to **"waiting for badge"** main view and **wipe session UI** so the next person sees an unused device:
+- Clear live scan strip (`stationRecentScans` → "Waiting for scans…").
+- Cancel Vault record queue; close Vault/Project overlays.
+- Clear status line, cached project list for picker.
+- *(Built v425 — `stationResetDeviceToPristine_` clears scan strip + Vault/Crew/project caches + records and closes overlays on both idle eject and manual logout.)*
+
+### Implementation checklist (next build)
+
+- [x] **Host-inherit RBAC (v425)** — `processStationRfidScan` (+ DEV bypass) now returns the host's real `access` tier + `permissions` bundle (`resolveHostRbacBundle_` → `resolveCrewSysAccess`/`resolveCrewPermissionBundle`, no nested `executeWithRetry`). Client `installStationRbacOverride_` in `11_Station_Shell.html` wraps `userHasPerm`/`accessTierAtLeast`/`effectiveHasPerm` so that **while `stationHostRbac` is set** the whole app evaluates as the host (their tier + IAM), not the low-tier device account. `canEditAssets()` (design/packing) therefore follows the host's real `event_assets_window`. Guarded by `IS_STATION_DEVICE` + host presence so office/non-hosted states are untouched.
+- [x] **Station baseline override (v425)** — `canUseAssetCheckout()` returns true for **any** active host. `openProjectAssetsModal` flips a baseline-only host (checkout yes, edit no) out of full read-only into **operate-only**: `body.station-operate-only` hides `#pa-search-cli`/`#mode-toggle-btn`/`#pa-new-sublist-btn`/`#pa-add-container-btn` (design/add controls) but keeps the check-out button + operation flow. Managers/root pass `canEditAssets()` → full toggle. Status (Maintenance/Broken/Repaired) is already any-host in the Vault.
+- [x] **Vault Crew tab (v425)** — Vault overlay now has **Equipment | Crew** tabs; the **Crew** tab is shown only when `stationHostRbac.access === 'ROOT'`. New backend `getStationCrewRfidList(deviceActor, hostName)` (ROOT-gated, excludes station device profiles). Tapping a crew row arms `stationCrewRecord`; the next scan is consumed by `stationCrewConsumeScan_` → `enrollStationCrewRfidTag`. Self-serve "Link my RFID badge" footer button removed.
+- [x] **`enrollStationCrewRfidTag` → ROOT gate (v425)** — signature is now `(deviceActor, hostName, crewRef, rfidTag)`; requires `verifyBackendPrivilege(hostName, 'ROOT')` and **refuses to tag a station device profile** (`actorUsesStationShell(ref)`).
+- [x] **Eject reset (v425)** — `stationWriteHostSession_(null)` (idle eject **and** logout) calls `stationResetDeviceToPristine_`: clears the live scan strip, cancels armed Vault/Crew records, drops cached vault/crew/project lists + expanded state, closes overlays, resets status/last-scan. Next person sees a pristine gun.
+- [ ] **QR at gate** (when ready) — camera scan UID → same checkout confirm as RFID EPC.
+
+### Known fragilities (carry forward)
+
+- Manager/ROOT checks trust client-passed `hostName` on some endpoints — harden by binding writes to the badge that established the host session.
+- `saveProjectAssetsDelta` has no collision check — risk with multiple guns on one project.
+- "Repaired" writes `Active` in the sheet; audit log distinguishes the action.
+
+---
+
 ## Parked / queued modifications (piling up before we build)
 
-Director is batching changes; implement together when ready. **Not started.**
+Director is batching changes; implement together when ready.
 
 - **Sleep mode = wake-on-trigger, battery device (director's pick).** Dedicated unlocked phone, on **battery** (not always charging). Wake the screen on a trigger pull. Needs: foreground service holding the gun's BLE connection + wake lock through Doze, **battery-optimization exemption** (whitelist), and `turnScreenOn`/`ACQUIRE_CAUSES_WAKEUP` on scan. **Caveat recorded:** reliability varies by OEM (Samsung/Xiaomi/Huawei battery killers); worst case the first press after deep Doze is missed — revisit dim-don't-sleep if flaky in the field.
 - **Preload personnel RFIDs into the app for faster login (director's idea — needs security review).** Cache the roster's `rfid_tag`→identity map on the device so a badge scan resolves **locally** without a DB round-trip. Faster, works offline. **Security notes to resolve before building:** UHF EPCs are readable/clonable by any UHF reader unless tag memory is locked, so a badge is a weak secret — a local map is only as safe as the (limited) station host-inherit scope it grants. Mitigations to weigh: store a **hash** of the EPC not the raw value; bind **EPC+TID** (TID is factory-immutable) to defeat clones; **lock** tag EPC memory at provisioning; short cache TTL + signed roster snapshot so a stolen device can't mint new mappings; keep station host strictly low-privilege. Decision pending.
-- **Project + Vault on the station shell (big feature — director spec 2026-07-02).** *For v1 there is intentionally no difference from the phone; per-device differences come later.*
-  - **Project — DONE (Pass A + v423 fix, above).** PROJECT button → project picker → `openMobileProjectAssets(pId)` (shared mobile PA). Project list fetched via `getRefreshPayload(host.name)` — **scoped to the host, not the device account** — cached to `sm_phantom_payload` and **preloaded on badge-in**.
-  - **Vault — DONE (Pass B + v423 rollup, above).** Compact list + search, **identical-unit rollup (▶ folder → units)**, status setters (anyone hosted; group applies to all units), manager-gated RFID recording with **per-unit cascade** through a group's untagged units. Backend: `getStationVaultList` / `setStationAssetStatus` / `recordStationAssetRfid`.
-  - **Remaining fragilities / open decisions:** (1) **manager check trusts the client-passed `hostName`** — the station host is a lightweight inherit session, not a token, so `recordStationAssetRfid` verifies the *name's* tier via `verifyBackendPrivilege`; a tampered client could pass a manager name. Harden later (bind the write to the host badge scan / re-verify). (2) Status write is a direct cell `setValue` (bypasses the heavy asset form) — fine for lifecycle, but doesn't run any asset-form side effects. (3) `saveProjectAssetsDelta` has **no collision check** — risk with multiple guns on one project. (4) group status applies via N sequential `setStationAssetStatus` calls (no batch endpoint) — fine for small groups. (5) "Repaired" collapses to `Active` in the sheet (only the audit log distinguishes it).
+- **Project + Vault on the station shell** — **Project + equipment Vault: DONE** (Pass A/B + v423/v424, above). **Host-inherit RBAC + Crew tab + eject reset: DONE (v425).** Only **QR-at-gate** remains deferred.
 
 ## When this closes
 
