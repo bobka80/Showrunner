@@ -2286,59 +2286,72 @@ function stationBindMessageListener_() {
 function initStationShell_() {
   if (!window.IS_STATION_DEVICE) return;
 
-  document.documentElement.classList.add('station-device-root');
-  const shell = document.getElementById('station-shell');
-  if (shell) shell.style.display = 'flex';
+  // Show the shell and tell the native app to drop its splash FIRST, so a later error can never
+  // strand the initial screen. Everything after this is wrapped so boot failures surface on-screen
+  // instead of leaving a blank kiosk.
+  try {
+    document.documentElement.classList.add('station-device-root');
+    const shell = document.getElementById('station-shell');
+    if (shell) shell.style.display = 'flex';
+  } catch (e) { /* ignore */ }
+  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' }); } catch (e) { /* ignore */ }
 
-  stationBindHostIdleListeners_();
-  stationBindMessageListener_();
-  stationRenderShellState_();
-  stationSetStatus_('Loading station profile…', '');
+  try {
+    stationBindHostIdleListeners_();
+    stationBindMessageListener_();
+    stationRenderShellState_();
+    stationSetStatus_('Loading station profile…', '');
 
-  // Retire the removed "hold" mode on any device that stored it during testing.
-  if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
+    // Retire the removed "hold" mode on any device that stored it during testing.
+    if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
 
-  // Diagnostic badge: the two facts that decide the whole pipeline.
-  var badge = document.getElementById('station-debug-badge');
-  if (badge) badge.textContent = 'station=' + (!!window.IS_STATION_DEVICE) + '  native=' + (!!stationNativeBridge_());
-  stationDebug_('shell init');
+    // Diagnostic badge: the two facts that decide the whole pipeline.
+    var badge = document.getElementById('station-debug-badge');
+    if (badge) badge.textContent = 'station=' + (!!window.IS_STATION_DEVICE) + '  native=' + (!!stationNativeBridge_());
+    stationDebug_('shell init');
 
-  // Tell the native host shell we're mounted so it can drop the startup splash.
-  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' });
-  // Push device-local gun settings down so the screen and the gun agree on boot.
-  stationSyncSettingsToGun_();
-  // Seed the on-screen sensitivity bar from the stored (source-of-truth) power value.
-  stationSyncPowerControls_(stationStoredSetting_(STATION_POWER_KEY));
-  // Pull scans directly from the gun (reliable path; relay stays as fallback).
-  stationStartScanPoll_();
+    // Push device-local gun settings down so the screen and the gun agree on boot.
+    stationSyncSettingsToGun_();
+    // Seed the on-screen sensitivity bar from the stored (source-of-truth) power value.
+    stationSyncPowerControls_(stationStoredSetting_(STATION_POWER_KEY));
+    // Pull scans directly from the gun (reliable path; relay stays as fallback).
+    stationStartScanPoll_();
 
-  // Equipment name/unit resolution for the live scan strip: show cache instantly, then refresh.
-  stationLoadEquipMapCache_();
-  stationRenderScanFeed_();
-  stationRefreshEquipMap_();
-  if (!window.stationEquipMapTimer) {
-    window.stationEquipMapTimer = setInterval(stationRefreshEquipMap_, STATION_EQUIP_MAP_REFRESH_MS);
+    // Equipment name/unit resolution for the live scan strip: show cache instantly, then refresh.
+    stationLoadEquipMapCache_();
+    stationRenderScanFeed_();
+    stationRefreshEquipMap_();
+    if (!window.stationEquipMapTimer) {
+      window.stationEquipMapTimer = setInterval(stationRefreshEquipMap_, STATION_EQUIP_MAP_REFRESH_MS);
+    }
+  } catch (bootErr) {
+    try { stationSetStatus_('Boot error: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr)), 'error'); } catch (e) {}
+    try { stationDebug_('BOOT ERROR: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr))); } catch (e) {}
   }
 
   google.script.run
     .withSuccessHandler(function(res) {
-      if (!res || !res.success) {
-        stationSetStatus_((res && res.error) ? res.error : 'Station bootstrap failed.', 'error');
-        return;
-      }
-      stationApplyBootstrap_(res);
-      if (!res.hostInheritEnabled) {
-        stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
-        return;
-      }
-      const bootHost = stationReadHostSession_();
-      if (bootHost) {
-        // Re-run the full write so the reload restores the host globals AND stationHostRbac
-        // (host-inherit) + warms projects — not just the rendered chrome.
-        stationWriteHostSession_(bootHost);
-        stationRenderShellState_();
-      } else {
-        stationSetStatus_('Pull trigger and scan your crew badge.', '');
+      try {
+        if (!res || !res.success) {
+          stationSetStatus_((res && res.error) ? res.error : 'Station bootstrap failed.', 'error');
+          return;
+        }
+        stationApplyBootstrap_(res);
+        if (!res.hostInheritEnabled) {
+          stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
+          return;
+        }
+        const bootHost = stationReadHostSession_();
+        if (bootHost) {
+          // Re-run the full write so the reload restores the host globals AND stationHostRbac
+          // (host-inherit) + warms projects — not just the rendered chrome.
+          stationWriteHostSession_(bootHost);
+          stationRenderShellState_();
+        } else {
+          stationSetStatus_('Pull trigger and scan your crew badge.', '');
+        }
+      } catch (e) {
+        stationSetStatus_('Profile load error: ' + (e && e.message ? e.message : String(e)), 'error');
       }
     })
     .withFailureHandler(function(err) {
