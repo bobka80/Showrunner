@@ -1658,34 +1658,60 @@ function stationRenderProjectList_(projects) {
 window.stationPickProject_ = function(pId) {
   stationCloseProjectPicker();
   if (typeof window.openMobileProjectAssets !== 'function') {
-    stationSetStatus_('Project view unavailable.', 'error');
+    stationSetStatus_('Project view unavailable on this build.', 'error');
     return;
   }
-  // Pre-seed the project object + hidden fields so openProjectAssetsModal never bails on an
-  // empty edit-folder-id (the station has no calendar to fall back on like phones do).
-  const proj = (window.stationProjectsCache || []).find(function(p) { return String(p.id) === String(pId); });
-  if (proj) {
-    window.mobileCrewHubProject = proj;
-    window.mobileCrewHubProjectId = pId;
-    window.isProjectDirty = false;
-    if (typeof window.syncProjectEditorHiddenFields === 'function') {
-      try { window.syncProjectEditorHiddenFields(proj, pId); } catch (e) { /* ignore */ }
-    } else {
-      const fid = document.getElementById('edit-folder-id');
-      if (fid) fid.value = pId;
-    }
+  // Resolve the picked project from our cache (fall back to the phantom payload the phone uses).
+  let proj = (window.stationProjectsCache || []).find(function(p) { return String(p.id) === String(pId); });
+  if (!proj) {
+    try {
+      const ph = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+      if (ph && ph.projects) proj = ph.projects.find(function(p) { return String(p.id) === String(pId); });
+    } catch (e) { /* ignore */ }
   }
-  // Hide the station shell so the (lower z-index) PA modal is visible; restore on close.
+  if (!proj) {
+    // No project object anywhere → openMobileProjectAssets would just toast and bail. Say so.
+    stationSetStatus_('Could not open: project data missing. Reopen the list and try again.', 'error');
+    window.stationProjectsCache = null; window.stationProjectsFor = null; // force a fresh fetch next time
+    return;
+  }
+  // Pre-seed the project object + hidden fields so openProjectAssetsModal doesn't bail on an
+  // empty edit-folder-id (the station has no calendar for resolveMobileProject to fall back on).
+  window.mobileCrewHubProject = proj;
+  window.mobileCrewHubProjectId = pId;
+  window.isProjectDirty = false;
+  if (typeof window.syncProjectEditorHiddenFields === 'function') {
+    try { window.syncProjectEditorHiddenFields(proj, pId); } catch (e) { /* ignore */ }
+  } else {
+    const fid = document.getElementById('edit-folder-id');
+    if (fid) fid.value = pId;
+  }
+
   const shell = document.getElementById('station-shell');
   if (shell) shell.style.display = 'none';
+  stationSetStatus_('Opening ' + (proj.title || proj.name || 'project') + '…', '');
   try {
     window.openMobileProjectAssets(pId);
   } catch (e) {
     if (shell) shell.style.display = 'flex';
+    document.body.classList.remove('mobile-pa-compact');
     stationSetStatus_('Could not open project: ' + (e && e.message ? e.message : String(e)), 'error');
     return;
   }
-  stationWatchPaExit_();
+  // openMobileProjectAssets can bail *silently* (a toast, no throw) if it can't resolve the
+  // project — the overlay stays hidden and the user sees a blank screen. Detect that, recover
+  // the shell, and report it instead of getting stuck.
+  setTimeout(function() {
+    const ov = document.getElementById('project-assets-modal-overlay');
+    const opened = ov && ov.style.display !== 'none';
+    if (opened) {
+      stationWatchPaExit_();
+    } else {
+      if (shell) shell.style.display = 'flex';
+      document.body.classList.remove('mobile-pa-compact');
+      stationSetStatus_('Project didn’t open (equipment list unavailable for it). Try again.', 'error');
+    }
+  }, 250);
 };
 
 /** Restore the station shell once the phone PA compact view is closed (any exit path). */
@@ -2061,8 +2087,14 @@ function initStationShell_() {
         stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
         return;
       }
-      if (stationReadHostSession_()) stationRenderShellState_();
-      else stationSetStatus_('Pull trigger and scan your crew badge.', '');
+      const bootHost = stationReadHostSession_();
+      if (bootHost) {
+        stationRenderShellState_();
+        // Reload restored a host without re-running stationWriteHostSession_ — warm projects now.
+        if (bootHost.name) stationPreloadProjects_(bootHost.name);
+      } else {
+        stationSetStatus_('Pull trigger and scan your crew badge.', '');
+      }
     })
     .withFailureHandler(function(err) {
       stationSetStatus_('Bootstrap error: ' + (err && err.message ? err.message : String(err)), 'error');
