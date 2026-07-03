@@ -515,7 +515,95 @@ function setStationAssetStatus(deviceActor, hostName, assetId, status) {
 }
 
 // @INDEX: STATION_SHELL -> Record RFID onto equipment (MANAGERS only), mirror of crew enroll
-function recordStationAssetRfid(deviceActor, hostName, assetId, rfidTag) {
+/**
+ * Whole-database RFID owner lookup — scans BOTH the Assets sheet and the Crew roster for a tag so a
+ * record/enroll can warn before it steals a tag that's already in use anywhere. Returns
+ * { kind:'equipment'|'crew', id, name } for the first owner found, or null. Read-only (cached).
+ * `excl` lets the caller ignore the row it's writing to: { excludeAssetId, excludeCrewRef }.
+ */
+function findStationRfidOwner_(rfidTag, excl) {
+  excl = excl || {};
+  const needle = normalizeStationRfidTag(rfidTag);
+  if (!needle) return null;
+  const sheets = verifyVaultSchema(true);
+
+  const aData = getSheetData(sheets.assets);
+  const aMap = aData.hMap || getHeaderMap(aData);
+  const aCol = (arr) => {
+    const k = Object.keys(aMap).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+    return k !== undefined ? aMap[k] : undefined;
+  };
+  const aUid = aCol(['uid', 'id', 'assetuid']) ?? aMap['uid'];
+  const aRfid = aCol(['rfidtag', 'rfid']) ?? aMap['rfid_tag'];
+  const aName = aCol(['name', 'assetname', 'itemname']) ?? aMap['name'];
+  const aUnit = aCol(['unitnumber', 'unit']) ?? aMap['unit_number'];
+  if (aRfid !== undefined) {
+    for (let i = 1; i < aData.length; i++) {
+      if (normalizeStationRfidTag(aData[i][aRfid]) !== needle) continue;
+      const uid = String(aData[i][aUid] || '').trim();
+      if (excl.excludeAssetId && uid === String(excl.excludeAssetId).trim()) continue;
+      let nm = aName !== undefined ? String(aData[i][aName] || 'asset') : 'asset';
+      const un = aUnit !== undefined ? String(aData[i][aUnit] || '').trim() : '';
+      if (un) nm += ' #' + un;
+      return { kind: 'equipment', id: uid, name: nm };
+    }
+  }
+
+  const cData = getSheetData(sheets.crew);
+  const cMap = getHeaderMap(cData);
+  if (cMap['rfid_tag'] !== undefined) {
+    for (let i = 1; i < cData.length; i++) {
+      if (normalizeStationRfidTag(cData[i][cMap['rfid_tag']]) !== needle) continue;
+      const uid = (getSheetCell(cData[i], cMap, 'uid') || '').toString().trim();
+      const nm = (getSheetCell(cData[i], cMap, 'Name') || '').toString().trim();
+      if (excl.excludeCrewRef) {
+        const ref = String(excl.excludeCrewRef).toLowerCase().trim();
+        if ((uid && uid.toLowerCase() === ref) || (nm && nm.toLowerCase() === ref)) continue;
+      }
+      return { kind: 'crew', id: uid || nm, name: nm || 'crew member' };
+    }
+  }
+  return null;
+}
+
+/** Blank the rfid_tag on whichever row currently owns a tag (used when overwriting/stealing it). */
+function clearStationRfidOwner_(owner) {
+  if (!owner || !owner.kind) return;
+  const sheets = verifyVaultSchema();
+  if (owner.kind === 'equipment') {
+    const data = sheets.assets.getDataRange().getValues();
+    const map = {};
+    data[0].forEach((h, i) => { map[h.toString().trim()] = i; });
+    const col = (arr) => {
+      const k = Object.keys(map).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return k !== undefined ? map[k] : undefined;
+    };
+    const cUid = col(['uid', 'id', 'assetuid']) ?? map['uid'];
+    const cRfid = col(['rfidtag', 'rfid']) ?? map['rfid_tag'];
+    if (cUid === undefined || cRfid === undefined) return;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][cUid] || '').trim() === String(owner.id).trim()) {
+        sheets.assets.getRange(i + 1, cRfid + 1).setValue('');
+        return;
+      }
+    }
+  } else if (owner.kind === 'crew') {
+    const data = sheets.crew.getDataRange().getValues();
+    const map = getHeaderMap(data);
+    if (map['rfid_tag'] === undefined) return;
+    const ref = String(owner.id).toLowerCase().trim();
+    for (let i = 1; i < data.length; i++) {
+      const uid = (getSheetCell(data[i], map, 'uid') || '').toString().toLowerCase().trim();
+      const nm = (getSheetCell(data[i], map, 'Name') || '').toString().toLowerCase().trim();
+      if ((uid && uid === ref) || (nm && nm === ref)) {
+        sheets.crew.getRange(i + 1, map['rfid_tag'] + 1).setValue('');
+        return;
+      }
+    }
+  }
+}
+
+function recordStationAssetRfid(deviceActor, hostName, assetId, rfidTag, force) {
   return executeWithRetry(() => {
     if (!actorUsesStationShell(deviceActor)) {
       return { success: false, error: 'Station device login only.' };
@@ -543,19 +631,25 @@ function recordStationAssetRfid(deviceActor, hostName, assetId, rfidTag) {
     const target = String(assetId).trim();
     let targetRow = -1;
     for (let i = 1; i < data.length; i++) {
-      const rowTag = normalizeStationRfidTag(data[i][cRfid]);
-      if (rowTag && rowTag === tag && String(data[i][cUid]).trim() !== target) {
-        const owner = cName !== undefined ? String(data[i][cName] || 'another asset') : 'another asset';
-        return { success: false, error: 'That tag is already on ' + owner + '.' };
-      }
-      if (String(data[i][cUid]).trim() === target) targetRow = i;
+      if (String(data[i][cUid]).trim() === target) { targetRow = i; break; }
     }
     if (targetRow === -1) return { success: false, error: 'Asset not found.' };
+
+    // Whole-DB duplicate guard: if the tag is already on ANY other asset or crew member, ask the
+    // operator to overwrite (steal it) or cancel — unless they've already confirmed (force).
+    const owner = findStationRfidOwner_(tag, { excludeAssetId: target });
+    if (owner && !force) {
+      return { success: false, duplicate: owner };
+    }
+    if (owner && force) clearStationRfidOwner_(owner);
+
     sheets.assets.getRange(targetRow + 1, cRfid + 1).setValue(tag);
     if (typeof flushCache !== 'undefined') flushCache();
     const nm = cName !== undefined ? String(data[targetRow][cName] || '') : target;
-    writeToAuditLog(deviceActor, 'STATION_VAULT_RFID', 'ASSETS', 'GLOBAL', target, (hostName || 'manager') + ' tagged ' + nm + ' (' + tag + ').');
-    return { success: true, id: target, rfidTag: tag, name: nm };
+    let msg = (hostName || 'manager') + ' tagged ' + nm + ' (' + tag + ').';
+    if (owner && force) msg += ' Overwrote ' + owner.kind + ' ' + owner.name + '.';
+    writeToAuditLog(deviceActor, 'STATION_VAULT_RFID', 'ASSETS', 'GLOBAL', target, msg);
+    return { success: true, id: target, rfidTag: tag, name: nm, overwrote: owner && force ? owner : null };
   });
 }
 
@@ -633,7 +727,7 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
 // @INDEX: STATION_SHELL -> Enroll crew RFID badge (ROOT host only; via Vault → Crew tab)
 // Signature note: hostName is the ROOT-tier person hosting the station (their badge established
 // the session). Crew-badge provisioning is a ROOT-only admin task per the agreed model.
-function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag) {
+function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force) {
   return executeWithRetry(() => {
     if (!actorUsesStationShell(deviceActor)) {
       return { success: false, error: 'PERMISSION DENIED: Station device login only.' };
@@ -660,16 +754,13 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag) {
       return { success: false, error: 'Crew roster has no rfid_tag column — run a vault sync first.' };
     }
 
-    // Refuse to steal a badge already linked to a different crew member.
-    for (let i = 1; i < crewData.length; i++) {
-      const rowTag = normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]);
-      if (!rowTag || rowTag !== tag) continue;
-      const ownerUid = (getSheetCell(crewData[i], cMap, 'uid') || '').toString().toLowerCase().trim();
-      const ownerName = (getSheetCell(crewData[i], cMap, 'Name') || '').toString().toLowerCase().trim();
-      if (ownerUid !== ref && ownerName !== ref) {
-        return { success: false, error: 'That badge is already linked to ' + getSheetCell(crewData[i], cMap, 'Name') + '.' };
-      }
+    // Whole-DB duplicate guard: if the badge is already on another crew member OR any asset, ask to
+    // overwrite (steal it) or cancel — unless already confirmed (force).
+    const owner = findStationRfidOwner_(tag, { excludeCrewRef: ref });
+    if (owner && !force) {
+      return { success: false, duplicate: owner };
     }
+    if (owner && force) clearStationRfidOwner_(owner);
 
     for (let i = 1; i < crewData.length; i++) {
       const uid = (getSheetCell(crewData[i], cMap, 'uid') || '').toString().toLowerCase().trim();
@@ -678,11 +769,13 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag) {
       crewSheet.getRange(i + 1, cMap['rfid_tag'] + 1).setValue(tag);
       flushCache();
       const name = getSheetCell(crewData[i], cMap, 'Name');
+      let msg = 'Enrolled RFID badge for ' + name + ' (' + tag + ').';
+      if (owner && force) msg += ' Overwrote ' + owner.kind + ' ' + owner.name + '.';
       writeToAuditLog(deviceActor, 'STATION_ENROLL', 'STATION', 'GLOBAL',
-        getSheetCell(crewData[i], cMap, 'uid') || name,
-        'Enrolled RFID badge for ' + name + ' (' + tag + ').');
+        getSheetCell(crewData[i], cMap, 'uid') || name, msg);
       return {
         success: true,
+        overwrote: owner && force ? owner : null,
         host: {
           uid: getSheetCell(crewData[i], cMap, 'uid'),
           name: name,

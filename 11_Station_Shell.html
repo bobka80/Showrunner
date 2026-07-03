@@ -792,6 +792,7 @@ html.station-device-root #station-shell {
   <!-- Record-mode banner: armed while recording equipment OR crew tags (with cascade). -->
   <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
     <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
+    <button type="button" id="station-vault-record-overwrite" class="btn-main" style="display:none; margin:0;" onclick="stationVaultConfirmOverwrite_()">Overwrite</button>
     <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>
   </div>
 
@@ -1691,7 +1692,32 @@ function stationVaultRenderRecordBar_() {
 window.stationVaultCancelRecord_ = function() {
   window.stationVaultRecord = null;
   window.stationCrewRecord = null;
+  window.stationPendingOverwrite_ = null;
+  const ow = document.getElementById('station-vault-record-overwrite');
+  if (ow) ow.style.display = 'none';
   stationVaultRenderRecordBar_();
+};
+
+/**
+ * A scanned tag came back already-owned. Reconfigure the record bar into an Overwrite / Cancel
+ * confirm, stashing the retry (which re-issues the same write with force=true = steal the tag).
+ */
+function stationShowOverwritePrompt_(owner, retryFn) {
+  window.stationPendingOverwrite_ = retryFn;
+  const bar = document.getElementById('station-vault-record-bar');
+  const txt = document.getElementById('station-vault-record-text');
+  const ow = document.getElementById('station-vault-record-overwrite');
+  if (bar) bar.style.display = 'flex';
+  if (txt) txt.textContent = 'Tag already on ' + (owner.kind === 'crew' ? 'crew: ' : '') + (owner.name || 'another record') + '. Overwrite (move it here) or Cancel?';
+  if (ow) ow.style.display = 'inline-block';
+}
+
+window.stationVaultConfirmOverwrite_ = function() {
+  const fn = window.stationPendingOverwrite_;
+  window.stationPendingOverwrite_ = null;
+  const ow = document.getElementById('station-vault-record-overwrite');
+  if (ow) ow.style.display = 'none';
+  if (typeof fn === 'function') fn();
 };
 
 /** Consume a scan into the current record target. Returns true if the scan was used. */
@@ -1702,13 +1728,27 @@ function stationVaultConsumeScan_(tag) {
   const host = stationReadHostSession_();
   if (!host) { stationVaultCancelRecord_(); return true; }
   const assetId = rec.queue[0];
+  stationVaultRecordCall_(assetId, tag, false);
+  return true;
+}
+
+/** The actual record write, split out so the Overwrite button can re-issue it with force=true. */
+function stationVaultRecordCall_(assetId, tag, force) {
+  const host = stationReadHostSession_();
+  if (!host) { stationVaultCancelRecord_(); return; }
   window.stationVaultRecordBusy = true;
   stationResetHostIdleTimer_();
+  const rec = window.stationVaultRecord;
+  const label = (rec && rec.names && rec.names[assetId]) ? rec.names[assetId] : assetId;
   const txt = document.getElementById('station-vault-record-text');
-  if (txt) txt.textContent = 'Saving tag for ' + (rec.names[assetId] || assetId) + '…';
+  if (txt) txt.textContent = (force ? 'Overwriting tag for ' : 'Saving tag for ') + label + '…';
   google.script.run
     .withSuccessHandler(function(res) {
       window.stationVaultRecordBusy = false;
+      if (res && res.duplicate) {
+        stationShowOverwritePrompt_(res.duplicate, function() { stationVaultRecordCall_(assetId, tag, true); });
+        return;
+      }
       if (!res || !res.success) {
         if (txt) txt.textContent = ((res && res.error) ? res.error : 'Record failed.') + ' Try again or Cancel.';
         return;
@@ -1720,19 +1760,14 @@ function stationVaultConsumeScan_(tag) {
       const cur = window.stationVaultRecord;
       if (cur && cur.queue.length) cur.queue.shift();
       stationVaultRenderList_();
-      if (cur && cur.queue.length) {
-        stationVaultRenderRecordBar_();
-      } else {
-        window.stationVaultRecord = null;
-        stationVaultRenderRecordBar_();
-      }
+      window.stationVaultRecord = (cur && cur.queue.length) ? cur : null;
+      stationVaultRenderRecordBar_();
     })
     .withFailureHandler(function(err) {
       window.stationVaultRecordBusy = false;
       if (txt) txt.textContent = 'Error: ' + (err && err.message ? err.message : String(err)) + ' — Cancel to stop.';
     })
-    .recordStationAssetRfid(ACTIVE_USER_NAME, host.name, assetId, tag);
-  return true;
+    .recordStationAssetRfid(ACTIVE_USER_NAME, host.name, assetId, tag, !!force);
 }
 
 /* ==========================================================================
@@ -1805,13 +1840,25 @@ function stationCrewConsumeScan_(tag) {
   if (window.stationCrewRecordBusy) return true;
   const host = stationReadHostSession_();
   if (!host) { stationVaultCancelRecord_(); return true; }
+  stationCrewRecordCall_(rec, tag, false);
+  return true;
+}
+
+/** Crew enroll write, split out so the Overwrite button can re-issue it with force=true. */
+function stationCrewRecordCall_(rec, tag, force) {
+  const host = stationReadHostSession_();
+  if (!host) { stationVaultCancelRecord_(); return; }
   window.stationCrewRecordBusy = true;
   stationResetHostIdleTimer_();
   const txt = document.getElementById('station-vault-record-text');
-  if (txt) txt.textContent = 'Linking badge to ' + rec.name + '…';
+  if (txt) txt.textContent = (force ? 'Overwriting badge for ' : 'Linking badge to ') + rec.name + '…';
   google.script.run
     .withSuccessHandler(function(res) {
       window.stationCrewRecordBusy = false;
+      if (res && res.duplicate) {
+        stationShowOverwritePrompt_(res.duplicate, function() { stationCrewRecordCall_(rec, tag, true); });
+        return;
+      }
       if (!res || !res.success) {
         if (txt) txt.textContent = ((res && res.error) ? res.error : 'Enrollment failed.') + ' Try again or Cancel.';
         return;
@@ -1829,8 +1876,7 @@ function stationCrewConsumeScan_(tag) {
       window.stationCrewRecordBusy = false;
       if (txt) txt.textContent = 'Error: ' + (err && err.message ? err.message : String(err)) + ' — Cancel to stop.';
     })
-    .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.name, rec.ref, tag);
-  return true;
+    .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.name, rec.ref, tag, !!force);
 }
 
 window.stationCloseProjectPicker = function() {

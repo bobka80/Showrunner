@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v426**
+**Opened:** 2026-07-02 · **Production:** GAS **v428**
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -25,6 +25,8 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [x] **APK distribution via web app** — login link → `/station-app` install page; build `node build-station-apk.js` → `node deploy-hosting.js`; served as `.bin` (Spark blocks `.apk`)
 - [x] **App launcher icon** — vector adaptive icon: Stage Masters red "A" + RFID broadcast waves on dark gradient (`station-android/app/src/main/res/…/ic_launcher*`)
 - [x] **App versioning + changelog** — `build-station-apk.js` auto-bumps `versionCode`/`versionName`, requires release notes, records build timestamp + history; `/station-app` page shows version, upload time, "What's fixed", and previous builds. Doctrine Rule 6 + [station-android README](../../../station-android/README.md).
+
+- [x] **Duplicate-tag guard with overwrite/cancel (v428)** — recording an equipment tag (`recordStationAssetRfid`) or crew badge (`enrollStationCrewRfidTag`) now checks the scanned tag against the **whole database** — every asset **and** every crew badge — via `findStationRfidOwner_`. If the tag already belongs to a different record, the backend returns `{ duplicate:{ kind, id, name } }` instead of writing; the station record bar shows **"Tag already on X — Overwrite / Cancel"**. Overwrite re-issues the write with `force=true`, which blanks the previous owner's tag (`clearStationRfidOwner_`) before assigning — so a tag is only ever on one thing. Audit log records the steal.
 
 ## In progress / next
 
@@ -77,6 +79,7 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
   - **Station Vault now replicates it.** `stationVaultBuildGroups_` groups by the same key; multi-unit groups render a **▶ folder + count badge** (`stationVaultToggleGroup_` expands `#station-vault-grp-N`), singletons/Bulk render plain lines. Backend `getStationVaultList` now returns **`manufacturer` + `length`** for the key.
   - **Cascade = per unit inside the group.** Tap a folder → sheet offers **Record RFID** which queues the group's **still-untagged** units (one scan each), and **Maintenance/Broken/Repaired apply to all units in the group** (`stationVaultSetStatusMany_`). Expand + tap a single unit → that unit only. A single-unit line records/sets itself.
   - **PROJECT stopped hanging on "Loading projects…".** Root cause: the picker fetched `getRefreshPayload(<device account>)` (slow/empty on the station). Now it fetches for the **host** (`getRefreshPayload(host.name)` — the same list the person sees on their phone) and **preloads in the background on badge-in** (`stationPreloadProjects_`, warmed from `stationWriteHostSession_`), so pressing PROJECT is instant; failures surface an error instead of sticking.
+- [x] **Boot hardening (v427).** After v426 the station stopped loading its initial screen — a throw somewhere between showing the shell and sending the native `SHOWRUNNER_STATION_READY` left the kiosk splash stranded. `initStationShell_` now (1) shows `#station-shell` and posts `SHOWRUNNER_STATION_READY` **first**, then (2) wraps the rest of init **and** the bootstrap success callback in `try/catch`, surfacing any boot error in the status line + `stationDebug_` instead of blanking the screen. So no future boot-time error can strand the initial screen.
 - [x] **PROJECT open hardening (v424).** After v423 the picker loaded but tapping a project could still show nothing. Fixes in `stationPickProject_`: (1) resolve the picked project from `stationProjectsCache` **or** the phantom payload, and if it's genuinely missing, say so + force a fresh fetch instead of silently bailing; (2) `openMobileProjectAssets` can **bail with only a toast** (no throw) when it can't resolve a project — the shell was hidden so the screen went blank — so we now **detect the still-hidden `#project-assets-modal-overlay` after ~250 ms, restore the shell, and report** "equipment list unavailable"; (3) **status breadcrumbs** ("Opening <project>…" → open / error) so any remaining failure is pinpointed; (4) **preload also runs on shell init** when a host session was restored from a reload (not just on `stationWriteHostSession_`).
 - [ ] **Cleanup build:** remove the diagnostic `postStatus` lines in `RfidManager.kt` once we've had a day of stable field use. *(The web `#station-debug` overlay is already removed.)*
 - [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.

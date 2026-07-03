@@ -6149,6 +6149,7 @@ html.station-device-root #station-shell {
   <!-- Record-mode banner: armed while recording equipment OR crew tags (with cascade). -->
   <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
     <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
+    <button type="button" id="station-vault-record-overwrite" class="btn-main" style="display:none; margin:0;" onclick="stationVaultConfirmOverwrite_()">Overwrite</button>
     <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>
   </div>
 
