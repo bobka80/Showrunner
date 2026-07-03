@@ -223,21 +223,8 @@ function openProjectAssetsModal() {
         return;
     }
 
-    let assetsReadOnly = (typeof isBriefingMode === 'function' && isBriefingMode(projectId))
+    const assetsReadOnly = (typeof isBriefingMode === 'function' && isBriefingMode(projectId))
       || (typeof canEditAssets === 'function' && !canEditAssets());
-    // Station baseline: a hosted user who can check-out but whose own credentials don't allow
-    // asset editing gets OPERATION mode (not full read-only), with design/add-remove controls
-    // hidden via .station-operate-only. Managers/root hosts pass canEditAssets() → full flow.
-    window.stationOperateOnly = false;
-    document.body.classList.remove('station-operate-only');
-    if (assetsReadOnly
-        && typeof window.stationHostActive_ === 'function' && window.stationHostActive_()
-        && !(typeof isBriefingMode === 'function' && isBriefingMode(projectId))
-        && typeof canUseAssetCheckout === 'function' && canUseAssetCheckout()) {
-      assetsReadOnly = false;
-      window.stationOperateOnly = true;
-      document.body.classList.add('station-operate-only');
-    }
     window.projectAssetsReadOnly = assetsReadOnly;
     
     if (window.isProjectDirty && !assetsReadOnly) {

@@ -101,6 +101,21 @@ window.canUseAssetCheckout = function() {
   return canEditAssets();
 };
 
+/**
+ * Actor to send with asset-operation / project-assets writes. On a station device the web app runs
+ * as the low-tier DEVICE account, so passing ACTIVE_USER_NAME makes the backend deny edits. While a
+ * crew member is hosted we send the HOST's name so backend perms (assertActorCanEditProjectAssets /
+ * assertActorCanPerformAssetOperations) evaluate as the real person who badged in. Everywhere else
+ * this is just ACTIVE_USER_NAME. (Same client-trust model as every other actor arg today.)
+ */
+window.assetOpsActor = function() {
+  if (typeof window.stationHostActive_ === 'function' && window.stationHostActive_()
+      && window.stationHostSession && window.stationHostSession.name) {
+    return window.stationHostSession.name;
+  }
+  return (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'System UI';
+};
+
 window.canViewLogistics = function() {
   return userHasPerm('view_logistics');
 };

@@ -23,12 +23,6 @@ html.station-device-root body {
 html.station-device-root #station-shell {
   display: flex;
 }
-/* Station "operate-only" host: can run check-in/out but not edit gear — hide design/add controls,
-   keep the operation (checkout) button. Managers/root hosts don't get this class (full edit). */
-body.station-operate-only #pa-search-cli,
-body.station-operate-only #mode-toggle-btn,
-body.station-operate-only #pa-new-sublist-btn,
-body.station-operate-only #pa-add-container-btn { display: none !important; }
 .station-shell-header {
   display: flex;
   align-items: center;
@@ -863,7 +857,6 @@ window.stationHostActive_ = function() {
   var _userHasPerm = window.userHasPerm;
   var _effectiveHasPerm = window.effectiveHasPerm;
   var _accessTierAtLeast = window.accessTierAtLeast;
-  var _canUseAssetCheckout = window.canUseAssetCheckout;
 
   window.userHasPerm = function(key) {
     if (window.stationHostActive_()) {
@@ -891,13 +884,10 @@ window.stationHostActive_ = function() {
     }
     return _effectiveHasPerm ? _effectiveHasPerm(key) : false;
   };
-
-  // Station baseline: ANY host can run check-in/out (equipment status lives in the Vault, already
-  // any-host). Design/packing editing still follows canEditAssets() = host's real event_assets_window.
-  window.canUseAssetCheckout = function() {
-    if (window.stationHostActive_()) return true;
-    return _canUseAssetCheckout ? _canUseAssetCheckout() : false;
-  };
+  // NOTE: canEditAssets()/canUseAssetCheckout() intentionally follow the host's REAL credentials
+  // (via the effectiveHasPerm override above) so the client and the backend
+  // (assertActorCanPerformAssetOperations) agree — no misleading buttons. Equipment status changes
+  // (Maintenance/Broken/Repaired) are the true any-host baseline, handled in the Vault backend.
 })();
 
 /** How many recent scans to keep in the always-on top strip. */
@@ -2343,9 +2333,10 @@ function initStationShell_() {
       }
       const bootHost = stationReadHostSession_();
       if (bootHost) {
+        // Re-run the full write so the reload restores the host globals AND stationHostRbac
+        // (host-inherit) + warms projects — not just the rendered chrome.
+        stationWriteHostSession_(bootHost);
         stationRenderShellState_();
-        // Reload restored a host without re-running stationWriteHostSession_ — warm projects now.
-        if (bootHost.name) stationPreloadProjects_(bootHost.name);
       } else {
         stationSetStatus_('Pull trigger and scan your crew badge.', '');
       }

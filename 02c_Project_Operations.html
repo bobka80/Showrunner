@@ -62,7 +62,7 @@ window.startOperationUI = function(type, e) {
     .withFailureHandler(err => {
         btn.innerText = origText; btn.disabled = false;
         alert("Error: " + err.message);
-    }).startEventOperation(projectId, type, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+    }).startEventOperation(projectId, type, (typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI')));
 };
 
 // @INDEX: OPERATIONS -> RFID Scan Handler
@@ -139,7 +139,7 @@ window.handleRfidScan = function() {
         input.value = ""; input.disabled = false; input.focus();
         input.style.backgroundColor = 'rgba(239,68,68,0.2)';
         setTimeout(() => input.style.backgroundColor = '#0a0a0c', 300);
-    }).processRfidScan(projectId, tag, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+    }).processRfidScan(projectId, tag, (typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI')));
 };
 
 // @INDEX: OPERATIONS -> Trigger Manual Scan
@@ -170,7 +170,7 @@ window.triggerContainerInstanceCheckout = function(uniqueCid) {
                 alert('Failed to auto-save equipment: ' + err.message);
             }
             if (input) { input.value = ''; input.disabled = false; input.focus(); }
-        }).saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+        }).saveProjectAssetsDelta(projectId, deltas, (typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System')));
     } else {
         runScan();
     }
@@ -193,7 +193,7 @@ window.triggerManualScan = function(assetId, scanQtyOverride) {
         .withFailureHandler(err => {
             alert("Failed to auto-save equipment: " + err.message);
             input.value = ""; input.disabled = false; input.focus();
-        }).saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+        }).saveProjectAssetsDelta(projectId, deltas, (typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System')));
     } else {
         executeManualScanCall(projectId, assetId, input, scanQty);
     }
@@ -359,7 +359,7 @@ function commitOpsBatch(projectId) {
         alert("Background Save Failed: " + err.message + "\\n\\nResyncing to actual database state...");
         startOperationUI(window.currentOperationType, { currentTarget: document.getElementById('btn-stop-operation') });
     })
-    .batchProcessOperations(projectId, batch, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+    .batchProcessOperations(projectId, batch, (typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI')));
 };
 
 window.stopOperationUI = function(e) {
@@ -395,6 +395,6 @@ window.finalizeOperationUI = function(e) {
     .withFailureHandler(err => {
         btn.innerText = origText; btn.disabled = false;
         alert("Error: " + err.message);
-    }).finalizeEventOperation(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+    }).finalizeEventOperation(projectId, (typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI')));
 };
 </script>
