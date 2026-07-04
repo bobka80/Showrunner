@@ -5431,11 +5431,15 @@ html.station-device-root #station-shell {
   top: calc(10px + env(safe-area-inset-top));
   right: 12px;
   z-index: 60050;
-  flex-direction: row;
+  flex-direction: column;
+  align-items: flex-end;
+}
+html.station-device-root #station-device-controls { display: flex; }
+.station-device-controls__row {
+  display: flex;
   align-items: center;
   gap: 8px;
 }
-html.station-device-root #station-device-controls { display: flex; }
 .station-ctrl-scan {
   min-width: 72px;
   padding: 10px 14px;
@@ -5448,6 +5452,10 @@ html.station-device-root #station-device-controls { display: flex; }
   background: rgba(249, 115, 22, 0.15);
   color: #fb923c;
   cursor: pointer;
+}
+.station-ctrl-scan.is-panel-open {
+  border-radius: 10px 10px 0 0;
+  border-bottom-color: transparent;
 }
 .station-ctrl-cog {
   width: 40px;
@@ -5463,55 +5471,28 @@ html.station-device-root #station-device-controls { display: flex; }
   font-size: 18px;
   cursor: pointer;
 }
-/* Scan panel — large overlay; works over project PA too */
+/* Scan panel — dropdown tab under Scan button */
 #station-scan-panel {
   display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 60040;
-  align-items: flex-end;
-  justify-content: center;
-}
-#station-scan-panel.is-open { display: flex; }
-.station-scan-panel__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-}
-.station-scan-panel__sheet {
   position: relative;
-  width: 100%;
-  max-height: 88vh;
-  display: flex;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(72vh, 520px);
   flex-direction: column;
   background: #0d0d10;
-  border-top: 2px solid #f97316;
-  border-radius: 16px 16px 0 0;
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid #f97316;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
   overflow: hidden;
 }
-.station-scan-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid #27272a;
-  flex-shrink: 0;
-}
-.station-scan-panel__title {
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #f97316;
-}
+#station-scan-panel.is-open { display: flex; }
 .station-scan-panel__body {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 16px 20px;
+  padding: 12px 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 .station-scan-panel__presets {
   display: flex;
@@ -5524,6 +5505,51 @@ html.station-device-root #station-device-controls { display: flex; }
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.06em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.station-scan-panel__presets button.station-preset-saved {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #10b981;
+  color: #10b981;
+}
+.station-read-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.station-read-mode-row__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-read-mode-toggle {
+  flex: 1;
+  display: flex;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.station-read-mode-toggle button {
+  flex: 1;
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 0;
+  background: #111114;
+  color: #71717a;
+  cursor: pointer;
+}
+.station-read-mode-toggle button + button { border-left: 1px solid #3f3f46; }
+.station-read-mode-toggle button.is-active {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
 }
 .station-scan-panel__last {
   background: #111114;
@@ -6018,7 +6044,7 @@ html.station-device-root #station-device-controls { display: flex; }
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 50001;
+  z-index: 60100;
   flex-direction: column;
   background: var(--bg-dark, #0a0a0c);
   color: var(--text-main, #f4f4f5);
@@ -6162,17 +6188,11 @@ html.station-device-root #station-device-controls { display: flex; }
 </div>
 
 <div id="station-device-controls" aria-label="Gun controls">
-  <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationOpenScanPanel()" title="Scan panel">Scan</button>
-  <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
-</div>
-
-<div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
-  <div class="station-scan-panel__backdrop" onclick="stationCloseScanPanel()"></div>
-  <div class="station-scan-panel__sheet" onclick="event.stopPropagation()">
-    <div class="station-scan-panel__header">
-      <div class="station-scan-panel__title">RFID scan</div>
-      <button type="button" class="btn-close btn-sm" style="margin:0;" onclick="stationCloseScanPanel()">Close</button>
-    </div>
+  <div class="station-device-controls__row">
+    <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationToggleScanPanel()" title="Scan panel">Scan</button>
+    <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
+  </div>
+  <div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
     <div class="station-scan-panel__body">
       <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
         <div class="station-scan-feed__label">Live RFID scans</div>
@@ -6185,12 +6205,19 @@ html.station-device-root #station-device-controls { display: flex; }
         <input type="range" id="station-main-power" min="5" max="30" step="1" oninput="stationOnMainPowerInput()" onchange="stationSaveMainPower()">
         <output id="station-main-power-out">—</output>
       </div>
+      <div class="station-read-mode-row" aria-label="Tags per trigger pull">
+        <span class="station-read-mode-row__label">Per pull</span>
+        <div class="station-read-mode-toggle">
+          <button type="button" id="station-panel-mode-single" onclick="stationSetPanelReadMode('single')">Single</button>
+          <button type="button" id="station-panel-mode-multi" onclick="stationSetPanelReadMode('multi')">Multi</button>
+        </div>
+      </div>
       <div class="station-scan-panel__presets">
         <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
         <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
         <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
       </div>
-      <div class="station-scan-panel__hint">Tap preset to load · hold 0.6s to save current sensitivity</div>
+      <div class="station-scan-panel__hint">Tap preset to load · hold 1s to save current sensitivity</div>
       <div class="station-scan-panel__last" id="station-panel-last">
         <div class="station-scan-panel__last-name" id="station-panel-last-name">Scan equipment to select</div>
         <div class="station-scan-panel__last-meta" id="station-panel-last-meta"></div>
@@ -6242,9 +6269,10 @@ html.station-device-root #station-device-controls { display: flex; }
         <label class="station-field__label" for="station-set-mode">Scan mode</label>
         <select id="station-set-mode" onchange="stationSaveScanMode()">
           <option value="single">Single — one pull, one tag</option>
+          <option value="multi">Multi — one pull, many tags</option>
           <option value="continuous">Continuous — pull to start/stop a burst</option>
         </select>
-        <div class="station-field__hint">Single is best for badge and one-at-a-time scans. Continuous toggles a hands-free burst (pull to start, pull again to stop).</div>
+        <div class="station-field__hint">Single reads one tag per trigger pull. Multi reads every tag in range on one pull. Continuous toggles a hands-free burst (pull to start, pull again to stop).</div>
       </div>
 
       <div class="station-field" id="station-speed-field" style="display:none;">

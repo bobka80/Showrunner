@@ -1,16 +1,26 @@
 {
-  "versionName": "0.1.10",
-  "versionCode": 12,
+  "versionName": "0.1.12",
+  "versionCode": 14,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-03T14:37:22.148Z",
-  "sizeBytes": 12040673,
+  "updatedAt": "2026-07-04T14:02:08.390Z",
+  "sizeBytes": 12040689,
   "notes": [
-    "Screen may now sleep to save power/screen wear",
-    "the gun stays connected in the background",
-    "Pull the gun trigger to wake the tablet (SDK only, no keyboard/power button) — first pull wakes, next pull scans"
+    "BLE reconnect no longer reloads WebView (save/restore state, singleTask)",
+    "Scan panel: live feed, sensitivity presets, Damaged/Broken status with notes",
+    "Assets sheet: status_note column + Damaged lifecycle"
   ],
   "history": [
+    {
+      "versionName": "0.1.12",
+      "versionCode": 14,
+      "date": "2026-07-04T14:02:08.390Z",
+      "notes": [
+        "BLE reconnect no longer reloads WebView (save/restore state, singleTask)",
+        "Scan panel: live feed, sensitivity presets, Damaged/Broken status with notes",
+        "Assets sheet: status_note column + Damaged lifecycle"
+      ]
+    },
     {
       "versionName": "0.1.10",
       "versionCode": 12,

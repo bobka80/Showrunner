@@ -257,6 +257,10 @@ class RfidManager(
                     SCAN_MODE_HOLD ->
                         // Hold: read repeatedly while the trigger is held down.
                         startInventory()
+                    SCAN_MODE_MULTI -> {
+                        if (inventoryRunning) stopInventory()
+                        performMultiReadBurst()
+                    }
                     else -> {
                         // Single (default station mode): one pull = one tag.
                         if (inventoryRunning) stopInventory()
@@ -316,6 +320,26 @@ class RfidManager(
             } catch (e: Exception) {
                 Log.e(TAG, "single read failed", e)
             }
+        }
+    }
+
+    /** One trigger pull: rapid single reads to collect every tag in range. */
+    private fun performMultiReadBurst() {
+        if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
+        worker.execute {
+            val deadline = SystemClock.elapsedRealtime() + MULTI_BURST_MS
+            var attempts = 0
+            while (SystemClock.elapsedRealtime() < deadline && attempts < MULTI_BURST_MAX_READS) {
+                try {
+                    val info = uhf.inventorySingleTag()
+                    if (info != null) deliverTag(info)
+                } catch (e: Exception) {
+                    Log.e(TAG, "multi read failed", e)
+                }
+                attempts++
+                if (SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(MULTI_READ_GAP_MS)
+            }
+            mainHandler.post { postStatus("Multi read done ($attempts attempts)") }
         }
     }
 
@@ -409,10 +433,11 @@ class RfidManager(
         scanMode = when (mode) {
             SCAN_MODE_CONTINUOUS -> SCAN_MODE_CONTINUOUS
             SCAN_MODE_HOLD -> SCAN_MODE_HOLD
+            SCAN_MODE_MULTI -> SCAN_MODE_MULTI
             else -> SCAN_MODE_SINGLE
         }
         prefs.edit().putString(PREF_SCAN_MODE, scanMode).apply()
-        if (scanMode == SCAN_MODE_SINGLE && inventoryRunning) stopInventory()
+        if ((scanMode == SCAN_MODE_SINGLE || scanMode == SCAN_MODE_MULTI) && inventoryRunning) stopInventory()
         postStatus("Gun set: mode=$scanMode")
     }
 
@@ -463,8 +488,12 @@ class RfidManager(
         private const val PREF_BEEP = "gun_beep"
         private const val PREF_POLL_MS = "gun_poll_ms"
         const val SCAN_MODE_SINGLE = "single"
+        const val SCAN_MODE_MULTI = "multi"
         const val SCAN_MODE_CONTINUOUS = "continuous"
         const val SCAN_MODE_HOLD = "hold"
+        private const val MULTI_BURST_MS = 700L
+        private const val MULTI_BURST_MAX_READS = 20
+        private const val MULTI_READ_GAP_MS = 40L
         private const val POWER_MIN = 5
         private const val POWER_MAX = 30
         // Default to full power so reads are guaranteed on first run; the operator dials the
