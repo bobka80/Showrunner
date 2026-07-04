@@ -291,6 +291,20 @@ html.station-device-root #station-device-controls { display: flex; }
   color: #a1a1aa;
   flex-shrink: 0;
 }
+.station-scan-feed__status {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__status.is-damaged { color: #eab308; }
+.station-scan-feed__status.is-broken { color: #ef4444; }
+.station-scan-feed__status.is-maintenance { color: #f59e0b; }
 .station-scan-feed__row.is-unknown .name { color: #eab308; font-weight: 600; }
 .station-scan-feed__row.is-unknown .unit { color: #71717a; }
 .station-scan-feed__row.is-crew .name { color: #38bdf8; }
@@ -822,7 +836,6 @@ html.station-device-root #station-device-controls { display: flex; }
   <div class="station-shell-footer">
     <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
     <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
-    <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
@@ -1135,6 +1148,64 @@ function stationResolveEpc_(epc) {
   var m = window.stationEquipMap || {};
   return m[key] || null;
 }
+window.stationResolveEpc = stationResolveEpc_;
+window.stationNormalizeEpc = stationNormalizeEpc_;
+
+function stationScanFeedStatusHtml_(hit, esc) {
+  if (!hit || !hit.status || String(hit.status).toLowerCase() === 'active') return '';
+  var st = String(hit.status);
+  var note = hit.statusNote ? (' · ' + String(hit.statusNote).substring(0, 36)) : '';
+  var cls = 'station-scan-feed__status';
+  var low = st.toLowerCase();
+  if (low.indexOf('damage') !== -1) cls += ' is-damaged';
+  else if (low.indexOf('broken') !== -1) cls += ' is-broken';
+  else if (low.indexOf('maintenance') !== -1) cls += ' is-maintenance';
+  return '<span class="' + cls + '">' + esc(st + note) + '</span>';
+}
+
+function stationPaOperationActive_() {
+  var overlay = document.getElementById('project-assets-modal-overlay');
+  if (!overlay || overlay.style.display === 'none') return false;
+  return document.body.classList.contains('mobile-pa-mode-operation');
+}
+
+/** Forward a gun scan into the open Project Assets checkout/check-in session. */
+function stationForwardCheckoutScan_(tag) {
+  if (!stationPaOperationActive_()) return false;
+  var projectEl = document.getElementById('edit-folder-id');
+  var input = document.getElementById('pa-rfid-scanner');
+  if (!projectEl || !projectEl.value || !input) return false;
+
+  var hit = stationResolveEpc_(tag);
+  if (hit && hit.unitId && hit.kind !== 'crew' && typeof executeManualScanCall === 'function') {
+    var assetId = hit.unitId;
+    if (typeof currentProjectAssets !== 'undefined') {
+      var onProj = currentProjectAssets.some(function(p) { return String(p.assetId) === String(assetId); });
+      if (!onProj) return false;
+    } else if (typeof globalAssets !== 'undefined' && globalAssets.length) {
+      var ga = globalAssets.find(function(a) { return String(a.id) === String(assetId); });
+      if (!ga) return false;
+      assetId = ga.id;
+    }
+
+    var st = String(hit.status || 'Active').toLowerCase();
+    if (st.indexOf('broken') !== -1 && typeof window.showMobilePaToast === 'function') {
+      window.showMobilePaToast('Broken unit', (hit.name || 'Asset') + ' is marked Broken — still scanning.');
+    }
+
+    executeManualScanCall(projectEl.value, assetId, input, 1);
+    stationSetStatus_('Checkout: ' + (hit.name || assetId), 'ok');
+    return true;
+  }
+
+  if (typeof handleRfidScan === 'function') {
+    input.value = stationNormalizeEpc_(tag);
+    handleRfidScan();
+    stationSetStatus_('Checkout scan…', '');
+    return true;
+  }
+  return false;
+}
 
 function stationLoadEquipMapCache_() {
   try {
@@ -1349,8 +1420,10 @@ function stationRenderScanFeed_() {
           + '<span class="time">' + time + '</span></div>';
       }
       const unit = hit.unitNumber || hit.unitId || '';
+      const statusHtml = stationScanFeedStatusHtml_(hit, esc);
       return '<div class="station-scan-feed__row">'
         + '<span class="name">' + esc(hit.name) + '</span>'
+        + statusHtml
         + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '')
         + '<span class="time">' + time + '</span></div>';
     }
@@ -1471,10 +1544,9 @@ function stationHandleRfidScan_(rawTag) {
   const host = stationReadHostSession_();
 
   if (host) {
-    // Hosted + a loose scan that wasn't consumed by a Vault/Crew record: just note it. Equipment
-    // check-in/out happens inside the Project Assets operation flow, not here.
     stationResetHostIdleTimer_();
     stationSetLastScan_(tag);
+    if (stationForwardCheckoutScan_(tag)) return;
     return;
   }
 
@@ -1553,28 +1625,6 @@ function stationStartScanPoll_() {
     }
   }, 300);
 }
-
-window.stationDevHostAsBogdan = function() {
-  if (!window.IS_STATION_DEVICE || window.stationScanBusy) return;
-  window.stationScanBusy = true;
-  stationSetStatus_('Dev host…', '');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      window.stationScanBusy = false;
-      if (!res || !res.success || !res.host) {
-        stationSetStatus_((res && res.error) ? res.error : 'Dev host failed.', 'error');
-        return;
-      }
-      stationWriteHostSession_(res.host);
-      stationRenderShellState_();
-      stationSetStatus_('DEV hosted as ' + res.host.name, 'ok');
-    })
-    .withFailureHandler(function(err) {
-      window.stationScanBusy = false;
-      stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
-    })
-    .stationDevHostAsBogdan(ACTIVE_USER_NAME);
-};
 
 window.stationLogoutHost = function() {
   stationWriteHostSession_(null);
@@ -2619,18 +2669,9 @@ function stationApplyGunSetting_(key, value) {
 }
 
 /**
- * Lightweight on-screen breadcrumb log so the whole scan/settings pipeline is VISIBLE on the
- * device (after 8 blind tries). Keeps the last few events; harmless in a plain browser.
+ * Retired diagnostic hook — kept as no-op so old cached shells don't throw.
  */
-window.stationDebugLog = window.stationDebugLog || [];
-function stationDebug_(msg) {
-  try {
-    window.stationDebugLog.unshift(new Date().toLocaleTimeString([], { hour12: false }) + '  ' + msg);
-    if (window.stationDebugLog.length > 6) window.stationDebugLog.length = 6;
-    var el = document.getElementById('station-debug-log');
-    if (el) el.textContent = window.stationDebugLog.join('\n');
-  } catch (e) { /* ignore */ }
-}
+function stationDebug_(msg) { /* retired */ }
 
 window.stationOpenSettings = function() {
   const panel = document.getElementById('station-settings');
@@ -2916,11 +2957,6 @@ function initStationShell_() {
 
     // Retire the removed "hold" mode on any device that stored it during testing.
     if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
-
-    // Diagnostic badge: the two facts that decide the whole pipeline.
-    var badge = document.getElementById('station-debug-badge');
-    if (badge) badge.textContent = 'station=' + (!!window.IS_STATION_DEVICE) + '  native=' + (!!stationNativeBridge_());
-    stationDebug_('shell init');
 
     // Push device-local gun settings down so the screen and the gun agree on boot.
     stationSyncSettingsToGun_();

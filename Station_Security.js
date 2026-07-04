@@ -867,26 +867,3 @@ function lookupCrewMemberByName_(crewName, crewData, cMap) {
   }
   return null;
 }
-
-/** TEMP: dev host bypass until Chainway SDK is wired — station guns only. */
-function stationDevHostAsBogdan(deviceActor) {
-  return executeWithRetry(() => {
-    if (!actorUsesStationShell(deviceActor)) {
-      return { success: false, error: 'Station device login only.' };
-    }
-    const sheets = verifyVaultSchema(true);
-    const crewData = getSheetData(sheets.crew);
-    const cMap = getHeaderMap(crewData);
-    const crew = lookupCrewMemberByName_('Bogdan', crewData, cMap);
-    if (!crew) return { success: false, error: 'Crew member Bogdan not found in vault.' };
-    writeToAuditLog(deviceActor, 'STATION_HOST', 'STATION', 'GLOBAL', crew.uid || crew.name,
-      'DEV host bypass: ' + crew.name + '.');
-    const rbac = resolveHostRbacBundle_(crew.name, crewData, cMap);
-    return {
-      success: true,
-      scanType: 'host',
-      devBypass: true,
-      host: Object.assign({}, crew, { access: rbac.access, permissions: rbac.permissions })
-    };
-  });
-}

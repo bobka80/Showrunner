@@ -248,8 +248,6 @@ class RfidManager(
                     postStatus("Screen on — pull again to scan")
                     return
                 }
-                // Diagnostic breadcrumb: proves the R6 delivers a key-DOWN, and which mode is live.
-                postStatus("Trigger DOWN [$scanMode]")
                 when (scanMode) {
                     SCAN_MODE_CONTINUOUS ->
                         // Continuous: one pull starts the repeat, next pull stops it.
@@ -270,11 +268,6 @@ class RfidManager(
             }
 
             override fun onKeyUp(keycode: Int) {
-                // Diagnostic breadcrumb: if this NEVER fires on the R6, hold-to-scan can't stop on
-                // release and behaves like a toggle — which is exactly what we're testing for.
-                postStatus("Trigger UP [$scanMode]")
-                // Hold mode stops the moment the trigger is released; the other modes
-                // already handled the read on key-down (single) or toggle (continuous).
                 if (scanMode == SCAN_MODE_HOLD) stopInventory()
             }
         })
@@ -300,7 +293,6 @@ class RfidManager(
         }
         if (inventoryRunning) return
         inventoryRunning = true
-        postStatus("Scanning tags…")
         mainHandler.post(continuousRunnable)
     }
 
@@ -308,7 +300,6 @@ class RfidManager(
         if (!inventoryRunning) return
         inventoryRunning = false
         mainHandler.removeCallbacks(continuousRunnable)
-        if (connected) postStatus("RFID ready")
     }
 
     fun performSingleRead() {
@@ -339,7 +330,6 @@ class RfidManager(
                 attempts++
                 if (SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(MULTI_READ_GAP_MS)
             }
-            mainHandler.post { postStatus("Multi read done ($attempts attempts)") }
         }
     }
 
@@ -353,9 +343,6 @@ class RfidManager(
         lastEpcAt = now
 
         val upper = epc.uppercase()
-        // Native echo: proves the phone received the EPC even if the web bridge fails.
-        postStatus("Read: $upper")
-        // Queue for the iframe to pull directly (primary path), and also fire the relay (fallback).
         pendingScans.add(upper)
         if (pendingScans.size > 32) pendingScans.poll()
         mainHandler.post { onTagScanned(upper) }
@@ -426,7 +413,6 @@ class RfidManager(
         configWorker.execute {
             try { if (connected) uhf.setPower(powerDbm) } catch (e: Exception) { Log.e(TAG, "setPower failed", e) }
         }
-        postStatus("Gun set: ${powerDbm} dBm")
     }
 
     fun setScanMode(mode: String) {
@@ -438,14 +424,12 @@ class RfidManager(
         }
         prefs.edit().putString(PREF_SCAN_MODE, scanMode).apply()
         if ((scanMode == SCAN_MODE_SINGLE || scanMode == SCAN_MODE_MULTI) && inventoryRunning) stopInventory()
-        postStatus("Gun set: mode=$scanMode")
     }
 
     /** Continuous/hold repeat interval in ms. Lower = faster machine-gun repeat. */
     fun setPollMs(ms: Int) {
         pollMs = ms.coerceIn(POLL_MIN, POLL_MAX)
         prefs.edit().putInt(PREF_POLL_MS, pollMs).apply()
-        postStatus("Gun set: speed=${pollMs}ms")
     }
 
     fun setBeepEnabled(enabled: Boolean) {
@@ -454,7 +438,6 @@ class RfidManager(
         configWorker.execute {
             try { if (connected) uhf.setBeep(enabled) } catch (e: Exception) { Log.e(TAG, "setBeep failed", e) }
         }
-        postStatus("Gun set: beep=$enabled")
     }
 
     /** Snapshot for the web setup view. Cached values only — safe to call synchronously. */

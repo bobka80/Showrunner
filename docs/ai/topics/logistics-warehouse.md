@@ -84,7 +84,7 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 - [x] **APK distribution via web app** — login link "Warehouse gun — install station app" → `/station-app` install page. Build: `node build-station-apk.js` → `node deploy-hosting.js`. APK served as `.bin` (Spark blocks `.apk`). Details → [FILE_MAP.md](../FILE_MAP.md) §8 / §11.
 - [ ] Gate integration (bulk door read — hardware TBD)
 - [ ] Tag-map / new-equipment RFID provisioning UX on station
-- [ ] Remove `stationDevHostAsBogdan` DEV bypass + button once real badge host flow is verified on hardware
+- [x] Remove `stationDevHostAsBogdan` DEV bypass + button (v432 — badge host verified on hardware)
 
 **IAM split:** Office crew permissions → **ROLE EDITOR** (`06a`). Fixed gun/tablet logins → **STATION PROFILES** (`06h`). Tamper each independently.
 

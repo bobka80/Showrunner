@@ -1,16 +1,22 @@
 {
-  "versionName": "0.1.12",
-  "versionCode": 14,
+  "versionName": "0.1.13",
+  "versionCode": 15,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-04T14:02:08.390Z",
+  "updatedAt": "2026-07-04T14:31:43.719Z",
   "sizeBytes": 12040689,
   "notes": [
-    "BLE reconnect no longer reloads WebView (save/restore state, singleTask)",
-    "Scan panel: live feed, sensitivity presets, Damaged/Broken status with notes",
-    "Assets sheet: status_note column + Damaged lifecycle"
+    "Multi-scan mode (one pull, many tags)"
   ],
   "history": [
+    {
+      "versionName": "0.1.13",
+      "versionCode": 15,
+      "date": "2026-07-04T14:31:43.719Z",
+      "notes": [
+        "Multi-scan mode (one pull, many tags)"
+      ]
+    },
     {
       "versionName": "0.1.12",
       "versionCode": 14,

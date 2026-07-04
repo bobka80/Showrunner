@@ -74,6 +74,19 @@ window.handleRfidScan = function() {
     let projectId = document.getElementById('edit-folder-id').value;
 
     let targetAsset = null;
+
+    // Station: resolve via preloaded equip map before scanning globalAssets / server round-trip.
+    if (window.IS_STATION_DEVICE && typeof window.stationResolveEpc === 'function') {
+        let hit = window.stationResolveEpc(tag);
+        if (hit && hit.unitId && hit.kind !== 'crew' && typeof globalAssets !== 'undefined') {
+            targetAsset = globalAssets.find(function(a) { return String(a.id) === String(hit.unitId); }) || null;
+            if (targetAsset) {
+                executeManualScanCall(projectId, targetAsset.id, input, 1);
+                return;
+            }
+        }
+    }
+
     for (let i = 0; i < globalAssets.length; i++) {
         let a = globalAssets[i];
         let rfid = (a.rfidTag || "").toLowerCase();

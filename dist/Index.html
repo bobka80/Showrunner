@@ -5650,6 +5650,20 @@ html.station-device-root #station-device-controls { display: flex; }
   color: #a1a1aa;
   flex-shrink: 0;
 }
+.station-scan-feed__status {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__status.is-damaged { color: #eab308; }
+.station-scan-feed__status.is-broken { color: #ef4444; }
+.station-scan-feed__status.is-maintenance { color: #f59e0b; }
 .station-scan-feed__row.is-unknown .name { color: #eab308; font-weight: 600; }
 .station-scan-feed__row.is-unknown .unit { color: #71717a; }
 .station-scan-feed__row.is-crew .name { color: #38bdf8; }
@@ -6181,7 +6195,6 @@ html.station-device-root #station-device-controls { display: flex; }
   <div class="station-shell-footer">
     <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
     <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
-    <button type="button" id="station-btn-dev-bogdan" class="btn-outline btn-sm" style="margin:0; border-color:#a855f7; color:#a855f7;" onclick="stationDevHostAsBogdan()">DEV: HOST AS BOGDAN</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
