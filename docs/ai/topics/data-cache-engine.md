@@ -6,7 +6,7 @@
 
 **Status:** Backlog — consolidate fragmented caches; tune per-screen UX without rewriting modules.
 
-**Last swept:** 2026-06-30
+**Last swept:** 2026-07-04
 
 ---
 
@@ -15,6 +15,16 @@
 **One cache coordinator** for the whole app — not one undifferentiated blob. Every module registers a **policy** (freshness, strategy, invalidation, backend). Tuning how a screen feels = change policy, not hunt ad hoc `localStorage` keys across HTML files.
 
 Cache sits **inside the data router** (same layer as session fork): normal mode → GAS/Sheets; session mode → Firebase; cache rules follow the active backend.
+
+### Director restate — 2026-07-03
+
+Two linked pillars, reaffirmed:
+
+1. **One smart cache engine, many per-view policies.** It must **never nuke everything** on a change — invalidation is **surgical/tag-scoped** (`project:123`, `vault`, one row), not a global flush. It must stay **fast but never mask new information**: the pattern is **stale-while-revalidate** — show cached instantly, refresh in the background, swap in fresh data + a subtle "syncing…" cue. (Already modelled below via the policy schema + invalidation tags — this restate just pins it as a hard requirement.)
+
+2. **One backend-abstraction layer (the "single layer that speaks to the whole database").** See new section [Data access layer](#data-access-layer-backend-abstraction) — the goal is to reroute to a paid DB (SQL / Postgres / higher-tier Firebase) from **one place**, without touching feature code.
+
+The cache engine sits **on top of** the data access layer: the DAL says *where the data lives and how to read/write it*; the cache says *how fresh each view needs it to feel*. Build the DAL seam first (or alongside) so the cache has one clean thing to wrap.
 
 ---
 
@@ -50,6 +60,42 @@ Stores (layered — not one bucket)
 ```
 
 **Not:** one global TTL, one store, cache-through to Sheets during active fork.
+
+---
+
+## Data access layer (backend abstraction)
+
+**What it's called:** a **Data Access Layer (DAL)** — implemented with the **Repository pattern** (a.k.a. **DAO**, Data Access Object) — where each concrete backend is a swappable **adapter/driver**. Collectively: a **persistence / database-abstraction layer**. Being able to re-point to another database "from one place" is exactly the payoff of a **backend-agnostic repository with pluggable adapters**.
+
+**Intent (director, 2026-07-03):** every feature talks to **domain repositories** (`AssetsRepo.getForProject(id)`, `CrewRepo.setRfid(...)`, `LedgerRepo.append(...)`), never directly to `SpreadsheetApp` / raw sheets / Firebase. Behind the repository interface sits one active **adapter**: `SheetsAdapter` today; tomorrow `PostgresAdapter`, `SqlAdapter`, or `FirebasePaidAdapter`. Swap the adapter in **one registration point** → the whole app reroutes.
+
+```text
+Feature code (GAS + client)
+    ↓  (domain methods only)
+Repositories  (AssetsRepo, CrewRepo, ProjectRepo, LedgerRepo, DirectoryRepo …)
+    ↓
+Backend adapter (ONE active)
+    ├─ SheetsAdapter      ← today
+    ├─ PostgresAdapter    ← future paid DB
+    ├─ SqlAdapter         ← future
+    └─ FirebaseAdapter    ← session fork / paid tier
+```
+
+**Design rules so the port isn't leaky:**
+- Repository methods are **domain operations**, not raw rows (return typed records, take deltas) — Sheets' whole-sheet reads / row indexes must not leak into the interface, or a SQL port stays painful.
+- **Writes go through the repo** (so Optimistic-Healing merge, audit, and cache invalidation all hook in one place).
+- Cache invalidation **tags are emitted by the repo**, not by feature code.
+- Keep the interface small and stable; adapters absorb backend quirks (GAS runtime limits, Sheets quotas, SQL transactions).
+
+**Reality check (see answers in chat):** *possible* — yes; *smart* — yes, it's the standard way to stay portable and testable; *hard* — **moderate**, and the cost is mostly **untangling the many direct sheet calls** scattered across GAS files into the gateway, plus designing domain-shaped methods that fit both Sheets and SQL. Do it **incrementally**, one domain (repo) at a time, starting with the noisiest (Assets / Vault).
+
+**Checklist:**
+- [ ] Define repository interfaces per domain (Assets, Crew, Project, Directory, Ledger, Config)
+- [ ] Extract current `SpreadsheetApp` / `getSheetData` / `verifyVaultSchema` calls behind `SheetsAdapter`
+- [ ] One **adapter registry** / factory — the single reroute point
+- [ ] Route the cache coordinator through repos (repos emit invalidation tags)
+- [ ] Migrate one domain end-to-end as the proof (recommend **Assets/Vault**), then the rest
+- [ ] Only then consider a real second adapter (Postgres) — interface must be proven first
 
 ---
 

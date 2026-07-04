@@ -6,7 +6,7 @@ One file per feature area. **Read only the topic you need.**
 
 **Stable reference (how the system works — not backlog):** see the parent [README.md](../README.md). Topics here are **what to build**; stable docs are **how things work** and **what not to break**.
 
-**Last index sweep:** 2026-07-02 (production @ GAS **v411**)
+**Last index sweep:** 2026-07-04 (production @ GAS **v429**)
 
 > **Status lives in one place:** the single canonical status table is **[Project_TODO.md](../Project_TODO.md)**. This page is only a **directory of topic files** — do **not** re-add a status column here (it will drift out of sync).
 

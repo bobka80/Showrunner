@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-03 · **Production:** GAS **v424** · **Status:** Partial — station shell + Vault rollup + PROJECT (v423/v424); **host-inherit RBAC** (agreed spec, not built) — see [active campaign](../active/rfid-station-profiles.md) § "Agreed spec — Station host permission model"
+**Last swept:** 2026-07-04 · **Production:** GAS **v429** · **Status:** Partial — station shell through **v429** (host-inherit RBAC v425–426, Vault Crew tab, duplicate-tag guard v428, security fix v429); APK **v0.1.10** (sleep/wake). Open: checkout cache speed, QR gate, field dial-in — see [active campaign](../active/rfid-station-profiles.md).
 
 ---
 
@@ -43,7 +43,7 @@ Portable guns on personal phones are **not** the primary model.
 
 A **device RBAC profile** for tablets locked to RFID guns — **not** a crew “freelancer” type.
 
-**Capabilities (when hosted):** RFID operations — check-in/out, pack, tag gear (tier-gated), maintenance/broken/repair. **Full project asset editing** when the **host's crew credentials** allow it (same as phone/desktop) — station is a surface, not a stripped-down role. **Agreed model (2026-07-03):** any host gets checkout + status baseline; add/remove/design/packing follows host IAM; equipment RFID = MANAGER+; crew RFID = ROOT via Vault Crew tab. Details → [active campaign](../active/rfid-station-profiles.md).
+**Capabilities (when hosted):** RFID operations — check-in/out, pack, tag gear (tier-gated), maintenance/broken/repair. **Full project asset editing** when the **host's crew credentials** allow it (same as phone/desktop) — station is a surface, not a stripped-down role. **Agreed model (2026-07-03, built v425–426):** checkout + design/packing follow **host IAM**; **any host** gets equipment **status** baseline in Vault; equipment RFID = MANAGER+; crew RFID = ROOT via Vault Crew tab. Details → [active campaign](../active/rfid-station-profiles.md).
 
 **Host nesting (state machine):**
 
@@ -64,7 +64,7 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 - Large **Log out** control at bottom of station screen
 - Ledger actor = hosted user; device identity = station profile
 
-### Software — not yet built
+### Software — station shell (mostly shipped; see active campaign for open items)
 
 - [x] Dedicated scan home / kiosk shell (`11_Station_Shell.html` — host badge first)
 - [x] Crew `rfid_tag` on `Crew_Roster` (sheet column; paste from Chainway scan — no interim UI)
@@ -74,8 +74,8 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 - [x] **Screen cleanup + crew names on strip (v421):** removed the big center host name, bottom "Last scan" line, and the `#station-debug` overlay; the **live strip resolves crew badges to the person's name** (`getStationEquipmentRfidMap` now includes `Crew_Roster.rfid_tag`, `kind:'crew'`).
 - [x] **Project open fix + Vault line restyle (v422):** fixed PROJECT not opening on the station (pre-seed the picked project + hidden fields before `openMobileProjectAssets`). **Vault lines now match the real Equipment Vault row style** (name/unit/status pill, `06b1` look) instead of bespoke cards; **tap a line → action sheet** (status for anyone hosted; manager Record-RFID with cascade).
 - [x] **"Logical parent" rollup + host-scoped projects (v423):** station Vault now **collapses identical unique units** (`name|manufacturer|length`, Bulk standalone) under a **▶ folder that expands to the units** — the real vault's rollup mechanic (`06b1` `renderAssetRegistry`), not `container_type`. Folder → Record cascades through the group's **untagged** units; folder status applies to all units. **PROJECT** now fetches `getRefreshPayload(host.name)` (host-scoped, not the device account) and **preloads on badge-in**, so it opens instantly instead of hanging on "Loading projects…".
-- [x] **Self-serve crew badge enrollment on the station (interim)** — "Link my RFID badge" → `enrollStationCrewRfidTag`. **Target:** replace with **Vault → Crew tab** (ROOT only); see active campaign agreed spec.
-- [ ] **Host-inherit RBAC** — PA/checkout gated on **host** credentials + station baseline; Vault Crew tab; eject resets scan strip. Agreed 2026-07-03 — [rfid-station-profiles.md](../active/rfid-station-profiles.md).
+- [x] **Vault → Crew tab (v425)** — supersedes interim self-serve "Link my RFID badge" enrollment (removed).
+- [x] **Host-inherit RBAC (v425–427)** — PA/checkout/design/packing follow **host** credentials + `assetOpsActor()` (v426); Vault Crew tab; eject resets scan strip; boot hardening. Agreed 2026-07-03 — [rfid-station-profiles.md](../active/rfid-station-profiles.md).
 - [ ] Crew `rfid_tag` in office admin UI — superseded on station by Vault Crew tab; office path TBD
 - [x] **Station profile editor** — `06h_Admin_Station_Profiles.html` + `Station_Security.js` (separate from office `06a` / `Security.js`)
 - [x] Host-empty scan API (`processStationRfidScan` — crew badge → host session)

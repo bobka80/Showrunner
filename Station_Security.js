@@ -15,6 +15,7 @@ const STATION_IAM_PERMISSION_KEYS = [
   'station_vault_maintenance',
   'station_vault_repair',
   'station_vault_broken',
+  'station_vault_damaged',
   'station_project_checkout',
   'station_project_checkin',
   'station_pack_floor',
@@ -176,8 +177,42 @@ function assertActorCanUseStationVaultOps(actor) {
   if (!effectiveStationPermission(actor, 'station_vault_maintenance')
       && !effectiveStationPermission(actor, 'station_vault_repair')
       && !effectiveStationPermission(actor, 'station_vault_broken')
+      && !effectiveStationPermission(actor, 'station_vault_damaged')
       && !verifyBackendPrivilege(actor, 'MANAGER')) {
     throw new Error('PERMISSION DENIED: Station vault ops not enabled for this device profile.');
+  }
+}
+
+/** Gate each lifecycle write by the station device profile (not the hosted crew). */
+function assertStationStatusPermission_(deviceActor, statusLabel) {
+  const label = String(statusLabel || '').trim();
+  if (!label || label === 'Repaired') {
+    if (!effectiveStationPermission(deviceActor, 'station_vault_repair')
+        && !verifyBackendPrivilege(deviceActor, 'MANAGER')) {
+      throw new Error('PERMISSION DENIED: Repair not enabled for this station profile.');
+    }
+    return;
+  }
+  if (label === 'Maintenance') {
+    if (!effectiveStationPermission(deviceActor, 'station_vault_maintenance')
+        && !verifyBackendPrivilege(deviceActor, 'MANAGER')) {
+      throw new Error('PERMISSION DENIED: Maintenance not enabled for this station profile.');
+    }
+    return;
+  }
+  if (label === 'Broken') {
+    if (!effectiveStationPermission(deviceActor, 'station_vault_broken')
+        && !verifyBackendPrivilege(deviceActor, 'MANAGER')) {
+      throw new Error('PERMISSION DENIED: Mark broken not enabled for this station profile.');
+    }
+    return;
+  }
+  if (label === 'Damaged') {
+    if (!effectiveStationPermission(deviceActor, 'station_vault_damaged')
+        && !verifyBackendPrivilege(deviceActor, 'MANAGER')) {
+      throw new Error('PERMISSION DENIED: Mark damaged not enabled for this station profile.');
+    }
+    return;
   }
 }
 
@@ -345,6 +380,8 @@ function getStationEquipmentRfidMap(deviceActor) {
     const cName = getCol(['name', 'assetname', 'itemname']) ?? map['name'];
     const cUnit = getCol(['unitnumber', 'unit']) ?? map['unit_number'];
     const cRfid = getCol(['rfidtag', 'rfid']) ?? map['rfid_tag'];
+    const cStatus = getCol(['status', 'lifecycle']) ?? map['status'];
+    const cStatusNote = getCol(['statusnote', 'issuenote', 'defectnote']) ?? map['status_note'];
 
     const out = {};
     let count = 0;
@@ -356,7 +393,9 @@ function getStationEquipmentRfidMap(deviceActor) {
           kind: 'equipment',
           name: cName !== undefined ? String(data[i][cName] || '') : '',
           unitId: cUid !== undefined ? String(data[i][cUid] || '') : '',
-          unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : ''
+          unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : '',
+          status: cStatus !== undefined ? String(data[i][cStatus] || '') : '',
+          statusNote: cStatusNote !== undefined ? String(data[i][cStatusNote] || '') : ''
         };
         count++;
       }
@@ -397,6 +436,7 @@ function getStationVaultList(deviceActor, hostName) {
     const cUnit = col(['unitnumber', 'unit']) ?? map['unit_number'];
     const cRfid = col(['rfidtag', 'rfid']) ?? map['rfid_tag'];
     const cStatus = col(['status', 'lifecycle']) ?? map['status'];
+    const cStatusNote = col(['statusnote', 'issuenote', 'defectnote']) ?? map['status_note'];
     const cContainer = col(['containertype', 'container']) ?? map['container_type'];
     const cNesting = col(['nestinglevel', 'level', 'nesting']) ?? map['nesting_level'];
     const cConsum = col(['isconsumable', 'consumable']) ?? map['is_consumable'];
@@ -414,6 +454,7 @@ function getStationVaultList(deviceActor, hostName) {
         unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : '',
         rfidTag: cRfid !== undefined ? String(data[i][cRfid] || '') : '',
         status: cStatus !== undefined ? String(data[i][cStatus] || '') : '',
+        statusNote: cStatusNote !== undefined ? String(data[i][cStatusNote] || '') : '',
         containerType: cContainer !== undefined ? String(data[i][cContainer] || '') : '',
         nestingLevel: cNesting !== undefined ? String(data[i][cNesting] || '') : '',
         manufacturer: cManu !== undefined ? String(data[i][cManu] || '') : '',
@@ -474,18 +515,28 @@ function getStationCrewRfidList(deviceActor, hostName) {
 }
 
 // @INDEX: STATION_SHELL -> Set asset lifecycle status (anyone hosted at a vault-enabled station)
-function setStationAssetStatus(deviceActor, hostName, assetId, status) {
+function setStationAssetStatus(deviceActor, hostName, assetId, status, note) {
   return executeWithRetry(() => {
     if (!actorUsesStationShell(deviceActor)) {
       return { success: false, error: 'Station device login only.' };
     }
     if (!hostName) return { success: false, error: 'Scan your badge to host a session first.' };
-    const allowed = ['Active', 'Maintenance', 'Broken', 'Repaired'];
+    const allowed = ['Active', 'Maintenance', 'Damaged', 'Broken', 'Repaired'];
     const want = String(status || '').trim();
     const label = allowed.find(a => a.toLowerCase() === want.toLowerCase());
     if (!label) return { success: false, error: 'Unknown status.' };
+    try {
+      assertStationStatusPermission_(deviceActor, label);
+    } catch (permErr) {
+      return { success: false, error: permErr.message || 'Permission denied.' };
+    }
+    const noteText = String(note == null ? '' : note).trim();
+    if (label === 'Damaged' && !noteText) {
+      return { success: false, error: 'Describe what is wrong (required for Damaged).' };
+    }
     // "Repaired" is an action that returns an item to service; store it as Active.
     const writeStatus = (label === 'Repaired') ? 'Active' : label;
+    const writeNote = (label === 'Repaired' || writeStatus === 'Active') ? '' : noteText;
 
     const sheets = verifyVaultSchema();
     const data = sheets.assets.getDataRange().getValues();
@@ -497,6 +548,7 @@ function setStationAssetStatus(deviceActor, hostName, assetId, status) {
     };
     const cUid = col(['uid', 'id', 'assetuid']) ?? map['uid'];
     const cStatus = col(['status', 'lifecycle']) ?? map['status'];
+    const cStatusNote = col(['statusnote', 'issuenote', 'defectnote']) ?? map['status_note'];
     const cName = col(['name', 'assetname', 'itemname']) ?? map['name'];
     if (cUid === undefined || cStatus === undefined) {
       return { success: false, error: 'Assets sheet missing uid/status column.' };
@@ -505,10 +557,21 @@ function setStationAssetStatus(deviceActor, hostName, assetId, status) {
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][cUid]).trim() !== target) continue;
       sheets.assets.getRange(i + 1, cStatus + 1).setValue(writeStatus);
+      if (cStatusNote !== undefined) {
+        sheets.assets.getRange(i + 1, cStatusNote + 1).setValue(writeNote);
+      }
       if (typeof flushCache !== 'undefined') flushCache();
       const nm = cName !== undefined ? String(data[i][cName] || '') : target;
-      writeToAuditLog(deviceActor, 'STATION_VAULT_STATUS', 'ASSETS', 'GLOBAL', target, (hostName || 'host') + ' set ' + nm + ' → ' + label + '.');
-      return { success: true, id: target, status: writeStatus, label: label };
+      const auditDetail = (hostName || 'host') + ' set ' + nm + ' → ' + label
+        + (writeNote ? (' ("' + writeNote.slice(0, 120) + '")') : '') + '.';
+      writeToAuditLog(deviceActor, 'STATION_VAULT_STATUS', 'ASSETS', 'GLOBAL', target, auditDetail);
+      return {
+        success: true,
+        id: target,
+        status: writeStatus,
+        statusNote: writeNote,
+        label: label
+      };
     }
     return { success: false, error: 'Asset not found.' };
   });

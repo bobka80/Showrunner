@@ -56,6 +56,7 @@ const STATION_PROFILE_FORM_KEYS = [
   { key: 'station_vault_maintenance', label: 'Vault: maintenance (no project)' },
   { key: 'station_vault_repair', label: 'Vault: repair (no project)' },
   { key: 'station_vault_broken', label: 'Vault: mark broken (no project)' },
+  { key: 'station_vault_damaged', label: 'Vault: mark damaged — usable defect (no project)' },
   { key: 'station_project_checkout', label: 'Project: check-out' },
   { key: 'station_project_checkin', label: 'Project: check-in' },
   { key: 'station_pack_floor', label: 'Pack on floor (later)' },
@@ -107,6 +108,7 @@ function populateStationProfileForm(profile) {
     setStationProfileCheckbox('station_vault_maintenance', true);
     setStationProfileCheckbox('station_vault_repair', true);
     setStationProfileCheckbox('station_vault_broken', true);
+    setStationProfileCheckbox('station_vault_damaged', true);
     setStationProfileCheckbox('station_project_checkout', true);
     setStationProfileCheckbox('station_project_checkin', true);
     return;

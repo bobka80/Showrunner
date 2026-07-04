@@ -4315,6 +4315,8 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
                     <select id="asset-lifecycle" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;">
                         <option value="Active">Active</option>
                         <option value="Maintenance">Maintenance</option>
+                        <option value="Damaged">Damaged (usable defect)</option>
+                        <option value="Broken">Broken (unusable)</option>
                         <option value="Retired">Retired</option>
                     </select>
                 </div>
@@ -5422,7 +5424,151 @@ html.station-device-root #station-shell {
   font-weight: 900;
   color: #10b981;
 }
-/* Read-power / sensitivity bar on the main screen (above the live scans) */
+/* Fixed gun controls — visible on station device even inside project PA */
+#station-device-controls {
+  display: none;
+  position: fixed;
+  top: calc(10px + env(safe-area-inset-top));
+  right: 12px;
+  z-index: 60050;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+html.station-device-root #station-device-controls { display: flex; }
+.station-ctrl-scan {
+  min-width: 72px;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 10px;
+  border: 1px solid #f97316;
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  cursor: pointer;
+}
+.station-ctrl-cog {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #f97316;
+  font-size: 18px;
+  cursor: pointer;
+}
+/* Scan panel — large overlay; works over project PA too */
+#station-scan-panel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60040;
+  align-items: flex-end;
+  justify-content: center;
+}
+#station-scan-panel.is-open { display: flex; }
+.station-scan-panel__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+}
+.station-scan-panel__sheet {
+  position: relative;
+  width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #0d0d10;
+  border-top: 2px solid #f97316;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.station-scan-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+.station-scan-panel__title {
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f97316;
+}
+.station-scan-panel__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.station-scan-panel__presets {
+  display: flex;
+  gap: 8px;
+}
+.station-scan-panel__presets button {
+  flex: 1;
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.station-scan-panel__last {
+  background: #111114;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 12px;
+}
+.station-scan-panel__last-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+.station-scan-panel__last-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #71717a;
+}
+.station-scan-panel__last-status {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.station-scan-panel__note {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 10px;
+  background: #0a0a0c;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  color: #e4e4e7;
+  font-size: 14px;
+}
+.station-scan-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.station-scan-panel__actions button { margin: 0; flex: 1 1 calc(50% - 4px); min-width: 120px; }
+.station-scan-panel__hint {
+  font-size: 11px;
+  color: #71717a;
+  line-height: 1.4;
+}
 .station-sens-bar {
   flex-shrink: 0;
   display: flex;
@@ -5463,7 +5609,6 @@ html.station-device-root #station-shell {
   opacity: 0.4;
   pointer-events: none;
 }
-/* Equipment-resolved scan rows (name + unit instead of raw tag) */
 .station-scan-feed__row .name {
   font-family: Inter, sans-serif;
   font-weight: 700;
@@ -5813,7 +5958,7 @@ html.station-device-root #station-shell {
   width: 100%;
   margin: 0;
 }
-/* Always-on live RFID scan strip (top of the station shell) */
+/* Live RFID scan strip (scan panel) */
 .station-scan-feed {
   flex-shrink: 0;
   padding: 10px 16px 12px;
@@ -5998,20 +6143,7 @@ html.station-device-root #station-shell {
         <span id="station-shell-host-inline" class="station-shell-brand__host" style="display:none;"></span>
       </div>
     </div>
-    <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="cursor:pointer; background:transparent; font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:#a1a1aa; border:1px solid #3f3f46; border-radius:999px; padding:6px 12px; display:flex; align-items:center; gap:6px;"><span id="station-shell-layout-text">HANDHELD</span><span aria-hidden="true" style="color:#f97316;">&#9881;</span></button>
-  </div>
-
-  <div id="station-sens-bar" class="station-sens-bar" aria-label="Read power / sensitivity">
-    <span class="station-sens-bar__label">Sensitivity</span>
-    <input type="range" id="station-main-power" min="5" max="30" step="1" oninput="stationOnMainPowerInput()" onchange="stationSaveMainPower()">
-    <output id="station-main-power-out">—</output>
-  </div>
-
-  <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans">
-    <div class="station-scan-feed__label">Live RFID scans</div>
-    <div id="station-scan-feed-list" class="station-scan-feed__list">
-      <span class="station-scan-feed__empty">Waiting for scans…</span>
-    </div>
+    <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="display:none;"></button>
   </div>
 
   <div class="station-shell-main">
@@ -6028,6 +6160,49 @@ html.station-device-root #station-shell {
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
 </div>
+
+<div id="station-device-controls" aria-label="Gun controls">
+  <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationOpenScanPanel()" title="Scan panel">Scan</button>
+  <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
+</div>
+
+<div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
+  <div class="station-scan-panel__backdrop" onclick="stationCloseScanPanel()"></div>
+  <div class="station-scan-panel__sheet" onclick="event.stopPropagation()">
+    <div class="station-scan-panel__header">
+      <div class="station-scan-panel__title">RFID scan</div>
+      <button type="button" class="btn-close btn-sm" style="margin:0;" onclick="stationCloseScanPanel()">Close</button>
+    </div>
+    <div class="station-scan-panel__body">
+      <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
+        <div class="station-scan-feed__label">Live RFID scans</div>
+        <div id="station-scan-feed-list" class="station-scan-feed__list">
+          <span class="station-scan-feed__empty">Waiting for scans…</span>
+        </div>
+      </div>
+      <div id="station-sens-bar" class="station-sens-bar" aria-label="Read power / sensitivity" style="display:flex;">
+        <span class="station-sens-bar__label">Sensitivity</span>
+        <input type="range" id="station-main-power" min="5" max="30" step="1" oninput="stationOnMainPowerInput()" onchange="stationSaveMainPower()">
+        <output id="station-main-power-out">—</output>
+      </div>
+      <div class="station-scan-panel__presets">
+        <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
+        <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
+        <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
+      </div>
+      <div class="station-scan-panel__hint">Tap preset to load · hold 0.6s to save current sensitivity</div>
+      <div class="station-scan-panel__last" id="station-panel-last">
+        <div class="station-scan-panel__last-name" id="station-panel-last-name">Scan equipment to select</div>
+        <div class="station-scan-panel__last-meta" id="station-panel-last-meta"></div>
+        <div class="station-scan-panel__last-status" id="station-panel-last-status"></div>
+        <textarea id="station-panel-note" class="station-scan-panel__note" rows="2" placeholder="What's wrong? (required for Damaged)" style="display:none;"></textarea>
+        <div class="station-scan-panel__actions" id="station-panel-actions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<span id="station-shell-layout-text" style="display:none;">HANDHELD</span>
 
 <div id="station-settings" aria-label="Station setup">
   <div class="station-settings-header">
@@ -6164,6 +6339,7 @@ html.station-device-root #station-shell {
       <div class="station-vault-sheet__meta" id="station-vault-sheet-meta"></div>
       <div class="station-vault-sheet__actions">
         <button type="button" class="btn-outline" id="station-vault-act-maint" onclick="stationVaultSheetStatus_('Maintenance')">Maintenance</button>
+        <button type="button" class="btn-outline" id="station-vault-act-damaged" style="border-color:#eab308;color:#eab308;" onclick="stationVaultSheetStatus_('Damaged')">Damaged</button>
         <button type="button" class="btn-outline" id="station-vault-act-broken" style="border-color:#ef4444;color:#ef4444;" onclick="stationVaultSheetStatus_('Broken')">Broken</button>
         <button type="button" class="btn-outline" id="station-vault-act-repaired" style="border-color:#10b981;color:#10b981;" onclick="stationVaultSheetStatus_('Repaired')">Repaired</button>
         <button type="button" class="btn-main" id="station-vault-act-record" style="display:none;" onclick="stationVaultSheetRecord_()">Record RFID</button>

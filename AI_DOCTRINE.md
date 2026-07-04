@@ -50,6 +50,11 @@ The director may dictate by voice — match **terminology lock** in [EQUIPMENT_M
 
 4b. **Summarize (understanding only):** When the director says **"summarize"**, restate what you understood in plain language and **wait for explicit approval** before editing code or docs. Do **not** implement, deploy, or update doctrine unless the director approves (e.g. **OK go**, **yes to everything**, **go**). If the director also asks to record a workflow rule, update doctrine **after** that approval.
 
+4c. **Hygiene sweep (docs report-first):** When the director says **"hygiene sweep"** (alias: **"doc hygiene"**), audit the documentation corpus for consistency and stale TODOs — **report only until approved**. **Do not** edit application code, run `milestone.js`, or change any markdown until the director approves the sweep report (**OK go**, **go**, etc.). **Scope:** everything under `docs/ai/` (active, topics, archive index rows, hub links), plus root `AI_DOCTRINE.md`, `AGENTS.md`, and cross-checks against `RELEASES.md` / `WORKS_LOG.md` headers. **How to run (one coherent pass — do not split into parallel sub-agents per folder; contradictions span drawers):**
+   1. **Mechanical scan** (grep or a single focused sub-agent is OK): hunt objective mismatches — GAS version / `Production:` / `Last swept:` headers vs `RELEASES.md`; shipped work still `[ ]`; finished campaigns still in `active/`; stale URGENT rows; duplicate status one-liners; same fact stated two ways.
+   2. **Read flagged files** and build **one sweep report** with these sections: **(a) Proposed doc fixes** (unambiguous stale items — list file + change, do not apply yet); **(b) Contradictions** (two docs disagree — state both sides, recommend which wins, **require director pick**); **(c) TODO / index gaps** (index rows out of sync with topic/active files); **(d) Already OK** (optional brief note). End with: *"Say OK go to apply proposed doc fixes (and any contradiction resolutions you confirmed)."*
+   3. **After OK go only:** apply the approved doc edits; re-run a quick sanity check; give a one-line "sweep applied" summary. Still **no feature code** unless the director starts a separate build request.
+
 5. **Structural UI Compliance:** Follow **[UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md)**. Reuse `Styles.html` classes.
 
 6. **Plain-Language Handoff After Fixes:** What was wrong, what changed, how to test, what to report if it fails. Ask before adding to FRAGILE_ZONES incident log.
@@ -62,10 +67,10 @@ The director may dictate by voice — match **terminology lock** in [EQUIPMENT_M
    - **Contradiction** (opposite instructions, conflicting status): **stop and ask the director** which wins before editing or deleting.
    - **Unambiguous stale doc** (e.g. shipped step still unchecked): fix to match production/`RELEASES.md`.
 
-9. **Doc Hygiene (autonomous):**
+9. **Doc Hygiene (autonomous between sweeps):**
    - **Every build session:** update relevant active/topic file + index row when you finish work. **When you edit any doc that carries a `Last swept:` / `Production:` header, bump that header** to today's date and the current `RELEASES.md` GAS version — do not leave a stale header above content you just changed.
    - **Status table is singular:** `Project_TODO.md` is the **only** status table. `topics/README.md` is a link directory — never re-add a status column there.
-   - **Trigger "doc hygiene":** full pass on `active/`, `topics/`, `Project_TODO.md` index, and hub links; move finished campaigns to `archive/`; align all GAS version + sweep-date mentions with `RELEASES.md`.
+   - **Full corpus pass:** director trigger **"hygiene sweep"** — see **Rule 4c** (report-first; no doc edits until **OK go**). Alias **"doc hygiene"** means the same thing.
    - **Close campaign:** when director confirms done, move `active/*.md` → `archive/` and update index.
 
 10. **Drawer placement (mandatory):** When creating or moving documentation, follow [Where to put new documentation](docs/ai/README.md#where-to-put-new-documentation). One canonical home per fact; topics = backlog only; stable reference = how things work. Update `AI_DOCTRINE.md` task routing when adding a new stable domain doc.
@@ -84,7 +89,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 
 | Doc | Purpose |
 |-----|---------|
-| [Director Workflow](docs/ai/DIRECTOR_WORKFLOW.md) | Brainstorm vs build |
+| [Director Workflow](docs/ai/DIRECTOR_WORKFLOW.md) | Brainstorm · summarize · hygiene sweep vs build |
 | [Fragile Zones](docs/ai/FRAGILE_ZONES.md) | Pre-change checklist |
 | [Engineering Rules](docs/ai/ENGINEERING_RULES.md) | Deep mandates |
 | [UI Doctrine](docs/ai/UI_DOCTRINE.md) | Structural UI |

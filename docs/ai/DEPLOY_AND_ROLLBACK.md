@@ -81,6 +81,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 |--------|-------|--------|
 | **OK go** (completed implementation) | Production milestone | `build.js` → `milestone.js` (automatic) |
 | **Summarize** | Understanding only — no code until approved | Wait for **OK go** / **go** |
+| **Hygiene sweep** / **doc hygiene** | Docs audit — report only until approved | Sweep report → wait for **OK go** → apply doc fixes only (no feature code) |
 | **This works** | Git save + GitHub push | `works-save.js` |
 | **Milestone** / **OK ship** | Apps Script production + GitHub push | `milestone.js` |
 | **Milestone now** (+ optional follow-up) | Apps Script production **first**, then dev/build | `milestone.js` → then other work |

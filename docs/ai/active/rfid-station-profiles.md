@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v428**
+**Opened:** 2026-07-02 · **Production:** GAS **v429** · **Last swept:** 2026-07-04
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -20,19 +20,21 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [x] **Host idle auto-eject** — resets on touch/scan; ejects host only, device stays logged in (v411). Timeout is now **device-configurable** (1–120 min) in the setup view; default 10 min (`stationEjectMinutes_`, localStorage `sm_station_eject_min`).
 - [x] **Crew `rfid_tag`** on `Crew_Roster` (sheet-paste from Chainway scan; no interim admin UI)
 - [x] **Live scan strip** — station shell shows every incoming EPC at the top in any state (`stationPushScanFeed_`, keeps last `STATION_SCAN_FEED_MAX`=8)
-- [x] **Self-serve badge enrollment** — while hosted (root/DEV login), "Link my RFID badge" captures the next scan → `enrollStationCrewRfidTag` writes it to the host's `Crew_Roster.rfid_tag` (collision-guarded); scanning it afterwards hosts via `processStationRfidScan`
+- [x] **Vault → Crew tab (v425)** — ROOT-only crew badge provisioning via **Vault → Equipment | Crew**; supersedes interim self-serve "Link my RFID badge" (removed v425).
 - [x] **Native gun app** — `station-android/` (Chainway BLE `RfidManager.kt` + WebView `StationWebActivity.kt`, EU 865–868 MHz)
 - [x] **APK distribution via web app** — login link → `/station-app` install page; build `node build-station-apk.js` → `node deploy-hosting.js`; served as `.bin` (Spark blocks `.apk`)
 - [x] **App launcher icon** — vector adaptive icon: Stage Masters red "A" + RFID broadcast waves on dark gradient (`station-android/app/src/main/res/…/ic_launcher*`)
 - [x] **App versioning + changelog** — `build-station-apk.js` auto-bumps `versionCode`/`versionName`, requires release notes, records build timestamp + history; `/station-app` page shows version, upload time, "What's fixed", and previous builds. Doctrine Rule 6 + [station-android README](../../../station-android/README.md).
 
+- [x] **SECURITY — login error leaked passcodes (v429):** `authenticateUser` had a leftover debug diagnostic that echoed the input, the crew headers, and stored **names + passcodes** (e.g. `bogdan / 66ab26`) into the failed-login error shown on the lock screen. Removed the `debugLog` capture entirely; failed logins now return only `"Incorrect crew name or passcode."` — no roster, headers, input, or passcodes ever go to the client. **Rotate any passcode that was visible on-screen.**
 - [x] **Duplicate-tag guard with overwrite/cancel (v428)** — recording an equipment tag (`recordStationAssetRfid`) or crew badge (`enrollStationCrewRfidTag`) now checks the scanned tag against the **whole database** — every asset **and** every crew badge — via `findStationRfidOwner_`. If the tag already belongs to a different record, the backend returns `{ duplicate:{ kind, id, name } }` instead of writing; the station record bar shows **"Tag already on X — Overwrite / Cancel"**. Overwrite re-issues the write with `force=true`, which blanks the previous owner's tag (`clearStationRfidOwner_`) before assigning — so a tag is only ever on one thing. Audit log records the steal.
+- [x] **Screen sleep + wake-on-trigger (APK v0.1.10, build 12):** tablet **may sleep** (screen off) on normal system timeout — app + BLE gun stay alive in background. **Gun trigger wakes** via SDK `KeyEventCallback` only (no keyboard/power button): **first pull wakes** ("Screen on — pull again to scan"), **next pull scans**. `WAKE_LOCK` + `turnScreenOn`/`setShowWhenLocked` in `StationWebActivity`; removed `FLAG_KEEP_SCREEN_ON`. **Caveat:** on battery + long idle, Android Doze may delay the BLE callback — reliable on charger; foreground-service upgrade remains an option if flaky in the field.
+- [x] **Host-inherit RBAC + Vault Crew tab + eject reset (v425–427)** — host session carries real tier + IAM; `assetOpsActor()` sends host to backend ops (v426); checkout/design/packing follow **host credentials** (not any-host); ROOT Crew tab; pristine reset on eject; boot hardening (v427). See **Agreed spec** below.
 
-## In progress / next
+## Shipped (field-fix chronology)
 
 - [x] **Field bug — WebView stuck on PWA "add to home screen":** hosting shell now treats the native app (UA `ShowrunnerStation`) as standalone and skips the install nag (`host-boot.js` `isNativeStationApp()`). Needs `node deploy-hosting.js`.
 - [x] **Field bug — "Gun not found" though paired in Android:** `RfidManager` now connects to the bonded gun by MAC first and no longer drops scan hits with a null name. Needs APK rebuild.
-- [ ] **Gun name still unrecognised (build 3):** first fix guessed the BT name `Nordic_UART_CW`; broadened hints (Nordic/UART/Chainway/R6/RFID/UHF/CW) + single-paired-device fallback + on-screen paired-device names for diagnosis (v0.1.1 build 3). **Waiting on the gun's real Bluetooth name from the field** to lock the match.
 - [x] **Login crash — `debugLog is not defined`** in `authenticateUser` (surfaced as "Database Read Timeout after 5 attempts"): declared `debugLog` (GAS v412).
 - [x] **Trigger = single read** (station mode): one pull = one tag, no continuous "machine-gun" inventory. `performSingleRead()`; scan mode is now user-selectable (see below). Native status bar echoes `Read: <EPC>`.
 - [x] **Scan-bridge fix (root cause of "reads don't reach the software")** — Showrunner runs inside an **iframe** on the hosting shell, so `evaluateJavascript("onStationRfidScan…")` was hitting the wrong frame. Native now calls `showrunnerStationDeliverScan` (host-boot.js), which `postMessage`s `SHOWRUNNER_RFID_SCAN` into the iframe; the station shell listens and dispatches. Falls back to a direct call when pointed straight at GAS.
@@ -55,7 +57,7 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [x] **Build-10 breadcrumbs read on hardware (the breakthrough).** Field result: **`station=true native=true`** (shell mounts, direct iframe→gun bridge works — confirms settings are reliable) but **scans still never reached the top strip**, and **`Trigger UP` never fired**. Two conclusions:
 - [x] **Scans reach the strip via direct poll, not the relay (v419/build 11).** Root cause isolated: native `evaluateJavascript` can only execute in the **top frame**, so scans depended on the host-boot→iframe `postMessage` relay — the one hop that stayed lossy. Since the iframe can call native directly (`native=true`), we flipped it: `RfidManager` queues EPCs (`pendingScans`), exposes `drainPendingScans()` via `AndroidStation.pollScans()`, and the shell **pulls** every 300 ms (`stationStartScanPoll_`) → `onStationRfidScan`. The old relay stays as a fallback; a 1.5 s client dedup (`stationLastScanTag`) stops one physical scan being processed twice.
 - [x] **Hold mode removed (v419).** The R6 fires **no key-up** on trigger release (`Trigger UP` never logged), so hold-to-scan can't stop on release — it degrades to a toggle. Dropped from the setup dropdown (Single / Continuous only); stored `hold` migrates to `single` on boot; speed slider is Continuous-only again. Native `SCAN_MODE_HOLD` left inert.
-- [x] **Full loop confirmed on hardware (v419/build 11).** Field-verified: scans now land on the **top strip**, self-serve **badge enrollment** wrote to the roster, and **badge login** hosted the crew member on a second scan. End-to-end gun→EPC→strip→host/enroll proven. (Debug overlay + `Gun set:`/`Trigger` echoes can now be retired in a cleanup build.)
+- [x] **Full loop confirmed on hardware (v419/build 11).** Field-verified: scans now land on the **top strip**, **Vault → Crew tab** badge enrollment wrote to the roster, and **badge login** hosted the crew member on a second scan. End-to-end gun→EPC→strip→host/enroll proven. (Debug overlay + `Gun set:`/`Trigger` echoes can now be retired in a cleanup build.)
 - [x] **Station main-screen redesign + Project reuse (Pass A, director spec 2026-07-02).** Reworked `11_Station_Shell.html`:
   - **Header cleaned** — dropped the static "Warehouse station" title and the device-account name; header now shows the **device profile** (e.g. "CW1 Chainway") **—** host name in **green** (`#station-shell-host-inline`, set in `stationRenderShellState_`).
   - **Live scan strip shows equipment, not raw EPC** — each scanned tag resolves to **equipment name + unit** via a preloaded map; unknown tags show the raw EPC + "Unknown tag". A single multi-tag pull lists **every** tag (each EPC from `pollScans` becomes a row).
@@ -81,14 +83,17 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
   - **PROJECT stopped hanging on "Loading projects…".** Root cause: the picker fetched `getRefreshPayload(<device account>)` (slow/empty on the station). Now it fetches for the **host** (`getRefreshPayload(host.name)` — the same list the person sees on their phone) and **preloads in the background on badge-in** (`stationPreloadProjects_`, warmed from `stationWriteHostSession_`), so pressing PROJECT is instant; failures surface an error instead of sticking.
 - [x] **Boot hardening (v427).** After v426 the station stopped loading its initial screen — a throw somewhere between showing the shell and sending the native `SHOWRUNNER_STATION_READY` left the kiosk splash stranded. `initStationShell_` now (1) shows `#station-shell` and posts `SHOWRUNNER_STATION_READY` **first**, then (2) wraps the rest of init **and** the bootstrap success callback in `try/catch`, surfacing any boot error in the status line + `stationDebug_` instead of blanking the screen. So no future boot-time error can strand the initial screen.
 - [x] **PROJECT open hardening (v424).** After v423 the picker loaded but tapping a project could still show nothing. Fixes in `stationPickProject_`: (1) resolve the picked project from `stationProjectsCache` **or** the phantom payload, and if it's genuinely missing, say so + force a fresh fetch instead of silently bailing; (2) `openMobileProjectAssets` can **bail with only a toast** (no throw) when it can't resolve a project — the shell was hidden so the screen went blank — so we now **detect the still-hidden `#project-assets-modal-overlay` after ~250 ms, restore the shell, and report** "equipment list unavailable"; (3) **status breadcrumbs** ("Opening <project>…" → open / error) so any remaining failure is pinpointed; (4) **preload also runs on shell init** when a host session was restored from a reload (not just on `stationWriteHostSession_`).
+
+## In progress / next
+
+- [ ] **Gun name still unrecognised (build 3):** first fix guessed the BT name `Nordic_UART_CW`; broadened hints (Nordic/UART/Chainway/R6/RFID/UHF/CW) + single-paired-device fallback + on-screen paired-device names for diagnosis (v0.1.1 build 3). **Waiting on the gun's real Bluetooth name from the field** to lock the match.
 - [ ] **Cleanup build:** remove the diagnostic `postStatus` lines in `RfidManager.kt` once we've had a day of stable field use. *(The web `#station-debug` overlay is already removed.)*
 - [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).
 - [ ] **Remove the DEV bypass** `stationDevHostAsBogdan` (+ its button) once badge host is verified on hardware
-- [x] **Host-inherit RBAC + Vault Crew tab + eject reset (v425)** — agreed spec 2026-07-03, now built (see Implementation checklist below). Credentialed hosts get PA Design/Packing/Checkout; any host gets a checkout baseline; ROOT-only crew badge provisioning; pristine device on eject. **QR-at-gate** remains the one deferred item.
-- [ ] **Crew `rfid_tag` admin UI** — superseded by **Vault → Crew tab** (ROOT only) in agreed spec; remove self-serve "Link my RFID badge" when built
+- [ ] **Checkout scan speed** — live strip uses preloaded `stationEquipMap` (local, fast); checkout `processRfidScan` still round-trips per scan. Next: resolve tag→uid locally, batch writes.
 - [ ] **Tag-map / new-equipment RFID provisioning UX** on the station
-- [ ] **Gate-at-door** bulk read + exception re-scan path (hardware TBD)
+- [ ] **QR at gate / Gate-at-door** (when ready) — camera scan UID or bulk door read → same checkout confirm as RFID EPC; exception re-scan path (hardware TBD)
 
 ## RFID badge lifecycle & fragile points (enrollment → DB → login)
 
@@ -110,7 +115,7 @@ The path the director just proved on hardware, and every place it can silently b
 
 ## Agreed spec — Station host permission model (director 2026-07-03)
 
-**Status:** Approved for implementation. **Not built yet** (today PA on station is still gated on the **device account**, not the host — see "In progress" below).
+**Status:** **Built v425–427** (see Implementation checklist below). Checkout/design/packing follow **host IAM**; equipment **status** (Maintenance/Broken/Repaired) is the any-host station baseline.
 
 ### Guiding principle
 
@@ -122,7 +127,7 @@ The station (gun **or** warehouse computer at the RFID gate) is a **surface**, n
 
 | Action | Who |
 |--------|-----|
-| **Check-in / Check-out** (operation mode) | **Any** hosted crew (station baseline) |
+| **Check-in / Check-out** (operation mode) | Host's real credentials — same `event_assets_window` / IAM as on phone or desktop (v426). Sub-credential hosts do **not** get checkout the device account didn't grant them. |
 | **Mark Maintenance / Broken / Repaired** | **Any** hosted crew (station baseline) |
 | **Add/remove project assets, Design, Packing** (full PA) | Host's real credentials — e.g. `event_assets_window` / manager tier. A manager doing cross-rental gets full PA; plain crew does not. |
 | **Record / overwrite equipment RFID** | Host is **MANAGER+** (`recordStationAssetRfid` — already enforced server-side) |
@@ -132,8 +137,8 @@ The station (gun **or** warehouse computer at the RFID gate) is a **surface**, n
 
 ### Station baseline vs delicate writes
 
-- **Baseline (any host):** check-in/out + equipment status. Granted because hosting at a warehouse device is the context — not because every crew member has those rights globally in the office app.
-- **Everything else:** host's tier + IAM keys, evaluated as if they logged in personally.
+- **Baseline (any host):** equipment **status** in Vault (Maintenance/Broken/Repaired). Hosting at a warehouse device is the context — not because every crew member has those rights globally in the office app.
+- **Check-in/out + full PA:** host's tier + IAM keys, evaluated as if they logged in personally (client + backend agree via `stationHostRbac` + `assetOpsActor()`).
 - **Delicate RFID:** equipment = MANAGER+, crew = ROOT only (server-enforced on `hostName`).
 
 ### Check-in/out is input-agnostic
@@ -145,9 +150,9 @@ Checkout/checkin is **operation mode inside Project Assets** — not gun-only. M
 
 Bulk cables checkout via **container case**: in design mode (manager credentials) add a cable case to the project, name it, assign case RFID/QR; bulk inside is married to that case (`containerUid`). At packing/checkout, scanning the **case** checks out the bulk inside — no per-cable RFID.
 
-### Vault → Crew tab (ROOT only)
+### Vault → Crew tab (ROOT only) — shipped v425
 
-Replace today's **"Link my RFID badge"** self-enroll with a **Crew tab** inside the station **Vault** overlay (mirrors original desktop crew-RFID admin):
+**Vault → Crew tab** inside the station **Vault** overlay (mirrors original desktop crew-RFID admin):
 - Visible only when hosted host is **ROOT**.
 - Crew list; root assigns/overwrites each person's `rfid_tag`.
 - **Station device accounts filtered out** — never assignable.
@@ -169,7 +174,6 @@ On host logout, idle eject, or sign-out: return to **"waiting for badge"** main 
 - [x] **Vault Crew tab (v425)** — Vault overlay now has **Equipment | Crew** tabs; the **Crew** tab is shown only when `stationHostRbac.access === 'ROOT'`. New backend `getStationCrewRfidList(deviceActor, hostName)` (ROOT-gated, excludes station device profiles). Tapping a crew row arms `stationCrewRecord`; the next scan is consumed by `stationCrewConsumeScan_` → `enrollStationCrewRfidTag`. Self-serve "Link my RFID badge" footer button removed.
 - [x] **`enrollStationCrewRfidTag` → ROOT gate (v425)** — signature is now `(deviceActor, hostName, crewRef, rfidTag)`; requires `verifyBackendPrivilege(hostName, 'ROOT')` and **refuses to tag a station device profile** (`actorUsesStationShell(ref)`).
 - [x] **Eject reset (v425)** — `stationWriteHostSession_(null)` (idle eject **and** logout) calls `stationResetDeviceToPristine_`: clears the live scan strip, cancels armed Vault/Crew records, drops cached vault/crew/project lists + expanded state, closes overlays, resets status/last-scan. Next person sees a pristine gun.
-- [ ] **QR at gate** (when ready) — camera scan UID → same checkout confirm as RFID EPC.
 
 ### Known fragilities (carry forward)
 
@@ -183,9 +187,7 @@ On host logout, idle eject, or sign-out: return to **"waiting for badge"** main 
 
 Director is batching changes; implement together when ready.
 
-- **Sleep mode = wake-on-trigger, battery device (director's pick).** Dedicated unlocked phone, on **battery** (not always charging). Wake the screen on a trigger pull. Needs: foreground service holding the gun's BLE connection + wake lock through Doze, **battery-optimization exemption** (whitelist), and `turnScreenOn`/`ACQUIRE_CAUSES_WAKEUP` on scan. **Caveat recorded:** reliability varies by OEM (Samsung/Xiaomi/Huawei battery killers); worst case the first press after deep Doze is missed — revisit dim-don't-sleep if flaky in the field.
 - **Preload personnel RFIDs into the app for faster login (director's idea — needs security review).** Cache the roster's `rfid_tag`→identity map on the device so a badge scan resolves **locally** without a DB round-trip. Faster, works offline. **Security notes to resolve before building:** UHF EPCs are readable/clonable by any UHF reader unless tag memory is locked, so a badge is a weak secret — a local map is only as safe as the (limited) station host-inherit scope it grants. Mitigations to weigh: store a **hash** of the EPC not the raw value; bind **EPC+TID** (TID is factory-immutable) to defeat clones; **lock** tag EPC memory at provisioning; short cache TTL + signed roster snapshot so a stolen device can't mint new mappings; keep station host strictly low-privilege. Decision pending.
-- **Project + Vault on the station shell** — **Project + equipment Vault: DONE** (Pass A/B + v423/v424, above). **Host-inherit RBAC + Crew tab + eject reset: DONE (v425).** Only **QR-at-gate** remains deferred.
 
 ## When this closes
 

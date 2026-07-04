@@ -29,6 +29,10 @@ class RfidManager(
     private val context: Context,
     private val onTagScanned: (String) -> Unit,
     private val onStatus: (String) -> Unit,
+    // Called on every trigger DOWN. Returns true if the tablet screen was asleep and this pull was
+    // consumed to WAKE it (so we skip the read this once — the next pull scans). Returns false when
+    // the screen is already awake, i.e. a normal scan should happen.
+    private val onTriggerWake: () -> Boolean = { false },
 ) {
     private val uhf = RFIDWithUHFBLE.getInstance()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -64,39 +68,76 @@ class RfidManager(
         mainHandler.post { handleConnectionStatus(status, device as? BluetoothDevice) }
     }
 
-    fun connect() {
+    private fun scheduleReconnect() {
+        if (activeDisconnect) return
+        mainHandler.postDelayed({
+            if (!connected && !activeDisconnect) reconnect()
+        }, RECONNECT_MS)
+    }
+
+    /** Drop a stale BLE session before opening a new one (avoids SDK churn that felt like an app restart). */
+    private fun reconnect() {
         worker.execute {
             try {
-                if (!initialized.getAndSet(true)) {
-                    if (!uhf.init(context.applicationContext)) {
-                        postStatus("RFID init failed")
-                        initialized.set(false)
-                        return@execute
+                if (activeDisconnect || connected) return@execute
+                try {
+                    if (uhf.connectStatus != ConnectionStatus.DISCONNECTED) {
+                        uhf.disconnect()
                     }
+                } catch (e: Exception) {
+                    Log.w(TAG, "reconnect: pre-disconnect", e)
                 }
-
-                val savedMac = prefs.getString(PREF_BT_MAC, null)?.trim().orEmpty()
-                if (savedMac.isNotEmpty()) {
-                    postStatus("Connecting to gun…")
-                    mainHandler.post { uhf.connect(savedMac, connectionCallback) }
-                    return@execute
-                }
-
-                // Prefer a gun already paired in Android Bluetooth settings — a BLE
-                // advertisement scan often reports a null name and misses bonded devices.
-                val bondedMac = findBondedGunMac()
-                if (bondedMac != null) {
-                    postStatus("Connecting to paired gun…")
-                    mainHandler.post { uhf.connect(bondedMac, connectionCallback) }
-                    return@execute
-                }
-
-                scanAndConnect()
+                connectInternal()
             } catch (e: Exception) {
-                Log.e(TAG, "connect failed", e)
-                postStatus("RFID error: ${e.message ?: "unknown"}")
+                Log.e(TAG, "reconnect failed", e)
+                postStatus("RFID reconnect failed")
+                scheduleReconnect()
             }
         }
+    }
+
+    /** Idempotent entry — safe from onCreate and onResume. */
+    fun connectIfNeeded() {
+        if (connected || activeDisconnect) return
+        worker.execute {
+            if (connected || activeDisconnect) return@execute
+            connectInternal()
+        }
+    }
+
+    private fun connectInternal() {
+        try {
+            if (!initialized.getAndSet(true)) {
+                if (!uhf.init(context.applicationContext)) {
+                    postStatus("RFID init failed")
+                    initialized.set(false)
+                    return
+                }
+            }
+
+            val savedMac = prefs.getString(PREF_BT_MAC, null)?.trim().orEmpty()
+            if (savedMac.isNotEmpty()) {
+                postStatus("Connecting to gun…")
+                mainHandler.post { uhf.connect(savedMac, connectionCallback) }
+                return
+            }
+
+            val bondedMac = findBondedGunMac()
+            if (bondedMac != null) {
+                postStatus("Connecting to paired gun…")
+                mainHandler.post { uhf.connect(bondedMac, connectionCallback) }
+                return
+            }
+
+            scanAndConnect()
+        } catch (e: Exception) {
+            Log.e(TAG, "connect failed", e)
+            postStatus("RFID error: ${e.message ?: "unknown"}")
+        }
+    }
+
+    fun connect() {
+        worker.execute { connectInternal() }
     }
 
     @SuppressLint("MissingPermission")
@@ -202,6 +243,11 @@ class RfidManager(
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
                 if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
+                // If the tablet was asleep, this pull only wakes the screen — don't also scan.
+                if (onTriggerWake()) {
+                    postStatus("Screen on — pull again to scan")
+                    return
+                }
                 // Diagnostic breadcrumb: proves the R6 delivers a key-DOWN, and which mode is live.
                 postStatus("Trigger DOWN [$scanMode]")
                 when (scanMode) {
@@ -402,13 +448,6 @@ class RfidManager(
             "\"battery\":$battery," +
             "\"firmware\":\"$fw\"" +
             "}"
-    }
-
-    private fun scheduleReconnect() {
-        if (activeDisconnect) return
-        mainHandler.postDelayed({
-            if (!connected && !activeDisconnect) connect()
-        }, RECONNECT_MS)
     }
 
     private fun postStatus(msg: String) {

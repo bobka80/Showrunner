@@ -79,4 +79,4 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 - **One canonical home** per fact — other files link only.
 - **Duplicate, same meaning:** merge silently; stub old path.
 - **Contradiction:** ask director before changing either source.
-- **Hygiene:** update active/topic/index when completing work; `"doc hygiene"` = full pass.
+- **Hygiene:** update active/topic/index when completing work; **"hygiene sweep"** (alias **"doc hygiene"**) = full doc pass — **report first, OK go to apply** ([AI_DOCTRINE.md](../../AI_DOCTRINE.md) Rule 4c).

@@ -401,7 +401,7 @@ function renderAssetRegistry() {
     
     const renderSingleAssetRow = (a, isChild = false) => {
         let brand = a.manufacturer ? a.manufacturer : '-';
-        let color = a.status === 'Active' ? '#10b981' : (a.status === 'Maintenance' ? '#f59e0b' : '#ef4444');
+        let color = a.status === 'Active' ? '#10b981' : (a.status === 'Maintenance' ? '#f59e0b' : (String(a.status || '').toLowerCase() === 'damaged' ? '#eab308' : '#ef4444'));
         let whName = '-';
         if (a.whId && typeof globalWhRoots !== 'undefined') { 
             let wh = globalWhRoots.find(w => w.id === a.whId); 
@@ -536,7 +536,7 @@ function renderAssetRegistry() {
                 
                 let isMixedStatus = !items.every(x => x.status === a.status);
                 let pStatus = isMixedStatus ? 'Mixed' : (a.status || 'Active');
-                let pColor = pStatus === 'Active' ? '#10b981' : (pStatus === 'Maintenance' ? '#f59e0b' : (pStatus === 'Mixed' ? '#888' : '#ef4444'));
+                let pColor = pStatus === 'Active' ? '#10b981' : (pStatus === 'Maintenance' ? '#f59e0b' : (pStatus === 'Damaged' ? '#eab308' : (pStatus === 'Mixed' ? '#888' : '#ef4444')));
 
                 let isMixedLoc = !items.every(x => x.whId === a.whId && x.zoneId === a.zoneId);
                 let whName = isMixedLoc ? 'Mixed Locations' : '-';

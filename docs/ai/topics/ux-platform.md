@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-02 · **Production:** GAS **v411** · **Status:** Partial — Personal Hub + **desktop lock shipped** (lock polish through v409)
+**Last swept:** 2026-07-04 · **Production:** GAS **v429** · **Status:** Partial — Personal Hub + **desktop lock shipped** (lock polish through v409)
 
 ## Backlog
 

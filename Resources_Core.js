@@ -507,7 +507,7 @@ function verifyVaultSchema(readOnly = false) {
   }
 
   let assetSheet = sm["Assets"];
-  const assetHeaders = ["uid", "kit_uid", "case_uid", "area_uid", "name", "manufacturer", "type", "weight_kg", "power_w", "rfid_tag", "status", "container_type", "nesting_level", "department", "wh_uid", "zone_uid", "dims", "price", "rental", "date_bought", "last_service", "service_interval", "tags", "unit_number", "total_quantity", "length_m", "capacity", "Serial_Number", "vendor_uid", "components"];
+  const assetHeaders = ["uid", "kit_uid", "case_uid", "area_uid", "name", "manufacturer", "type", "weight_kg", "power_w", "rfid_tag", "status", "status_note", "container_type", "nesting_level", "department", "wh_uid", "zone_uid", "dims", "price", "rental", "date_bought", "last_service", "service_interval", "tags", "unit_number", "total_quantity", "length_m", "capacity", "Serial_Number", "vendor_uid", "components"];
   if (!assetSheet) {
       assetSheet = ss.insertSheet("Assets");
       assetSheet.appendRow(assetHeaders);

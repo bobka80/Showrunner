@@ -38,6 +38,23 @@ This document describes how the **Software Director** (project owner) collaborat
 - **Do not** edit code, run milestones, or change documentation.
 - End with an explicit wait: director must approve before work starts (**OK go**, **yes**, **go**, etc.).
 
+### Mode 1c: Hygiene sweep
+
+**Trigger:** Director says **"hygiene sweep"** (alias: **"doc hygiene"**).
+
+**AI behavior:**
+- Audit `docs/ai/` (+ root doctrine cross-checks vs `RELEASES.md`) for consistency, stale TODOs, and contradictions.
+- **Do not** edit code, run milestones, or change any markdown during the sweep.
+- Run one coherent pass (mechanical grep/scan OK; **do not** split into parallel sub-agents per folder — cross-drawer contradictions are the point).
+- Deliver a **sweep report** with: **(a) proposed doc fixes**, **(b) contradictions needing director pick**, **(c) TODO/index gaps**, **(d) optional all-clear notes**.
+- End with: *"Say OK go to apply proposed doc fixes (and any contradiction resolutions you confirmed)."*
+- **After OK go only:** apply approved doc edits; still no feature code unless the director starts a separate build request.
+
+| Mode | Trigger | Agent does | Agent does NOT (until OK go) |
+|------|---------|------------|------------------------------|
+| **Summarize** | "summarize" | Restate upcoming work | Code, docs, deploy |
+| **Hygiene sweep** | "hygiene sweep" / "doc hygiene" | Sweep + report | Code, deploy, doc edits |
+
 ---
 
 ### Mode 2: Build
