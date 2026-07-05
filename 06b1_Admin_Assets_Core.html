@@ -5,6 +5,12 @@
  */
 
 let currentAssetFilter = 'ALL';
+window.assetNeedsCareOnly = false;
+
+function assetStatusNeedsCare_(status) {
+    const s = String(status || 'Active').toLowerCase();
+    return s.indexOf('maintenance') !== -1 || s.indexOf('damage') !== -1 || s.indexOf('broken') !== -1;
+}
 let currentAssetSort = [{ col: 'tags', asc: true }, { col: 'name', asc: true }, { col: 'length', asc: true }];
 let selectedAssetIds = new Set();
 let lastSelectedAssetId = null;
@@ -186,6 +192,10 @@ function renderAssetRegistry() {
     else if (currentAssetFilter === 'Kits') filtered = globalAssets.filter(a => a.nestingLevel == 3 && (a.components && a.components.trim() !== ''));
     else if (currentAssetFilter === 'Cases') filtered = globalAssets.filter(a => a.nestingLevel == 3 && (!a.components || a.components.trim() === ''));
     else if (currentAssetFilter === 'Presets') filtered = globalAssets.filter(a => a.nestingLevel == 2);
+
+    if (window.assetNeedsCareOnly) {
+        filtered = filtered.filter(a => assetStatusNeedsCare_(a.status));
+    }
     
     if (filtered.length === 0) {
         container.innerHTML = '<div style="text-align:center; padding: 40px; color: #888;">No assets match this filter.</div>';
@@ -463,7 +473,14 @@ function renderAssetRegistry() {
             else if (key === 'interval') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.serviceInterval ? a.serviceInterval+' Mo' : '-'}</div>`;
             else if (key === 'dept') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${getDeptObj(a.department).name || '-'}</div>`;
         else if (key === 'vendor') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.vendorUid || 'Internal'}</div>`;
-            else if (key === 'status') rowHtml += `<div style="${widthStyle} text-align:center;"><span style="color:${color}; border:1px solid ${color}; padding:2px 4px; border-radius:4px; font-size:${badgeFs}px; font-weight:bold;">${(a.status || 'Active').toUpperCase()}</span></div>`;
+            else if (key === 'status') {
+                const stLabel = (a.status || 'Active');
+                const note = a.statusNote || a.status_note || '';
+                const tip = (String(stLabel).toLowerCase().indexOf('damage') !== -1 && note)
+                    ? String(note).replace(/"/g, '&quot;').replace(/</g, '&lt;')
+                    : stLabel;
+                rowHtml += `<div style="${widthStyle} text-align:center;"><span style="color:${color}; border:1px solid ${color}; padding:2px 4px; border-radius:4px; font-size:${badgeFs}px; font-weight:bold; cursor:${note ? 'help' : 'default'};" title="${tip}">${stLabel.toUpperCase()}</span></div>`;
+            }
             else if (key === 'action') {
                 let reviewedDot = '';
                 if (window.isInlineAuditMode) {
@@ -865,6 +882,23 @@ function setAssetFilter(filter) {
             }
         }
     });
+    if (typeof renderAssetRegistry === 'function') renderAssetRegistry();
+}
+
+function toggleAssetNeedsCareFilter() {
+    window.assetNeedsCareOnly = !window.assetNeedsCareOnly;
+    const btn = document.getElementById('btn-filter-needs-care');
+    if (btn) {
+        if (window.assetNeedsCareOnly) {
+            btn.style.setProperty('background', 'rgba(234, 179, 8, 0.18)', 'important');
+            btn.style.setProperty('color', '#eab308', 'important');
+            btn.style.setProperty('border-color', '#eab308', 'important');
+        } else {
+            btn.style.setProperty('background', 'transparent', 'important');
+            btn.style.setProperty('color', '#a1a1aa', 'important');
+            btn.style.setProperty('border-color', 'transparent', 'important');
+        }
+    }
     if (typeof renderAssetRegistry === 'function') renderAssetRegistry();
 }
 </script>

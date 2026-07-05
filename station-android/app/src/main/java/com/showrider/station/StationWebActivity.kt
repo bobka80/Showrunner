@@ -18,6 +18,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 
@@ -53,6 +54,7 @@ class StationWebActivity : AppCompatActivity() {
 
         webView = findViewById(R.id.station_webview)
         statusBar = findViewById(R.id.station_status)
+        statusBar.isVisible = false
         splash = findViewById(R.id.station_splash)
         // Safety net: never let the splash trap the operator if the shell never reports in.
         splashHandler.postDelayed({ hideSplash() }, SPLASH_TIMEOUT_MS)
@@ -60,12 +62,10 @@ class StationWebActivity : AppCompatActivity() {
         rfid = RfidManager(
             context = this,
             onTagScanned = { epc -> deliverEpcToShowrunner(epc) },
-            onStatus = { msg ->
-                statusBar.text = msg
-                statusBar.isVisible = msg.isNotBlank()
-            },
+            onStatus = { msg -> postGunStatus(msg) },
             onTriggerWake = { maybeWakeForTrigger() },
         )
+        rfid.startWatchdog()
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -108,8 +108,7 @@ class StationWebActivity : AppCompatActivity() {
         }
         val adapter = BluetoothAdapter.getDefaultAdapter()
         if (adapter == null) {
-            statusBar.text = "Bluetooth not available on this device"
-            statusBar.isVisible = true
+            postGunStatus("Bluetooth not available on this device")
             return
         }
         if (!adapter.isEnabled) {
@@ -130,8 +129,7 @@ class StationWebActivity : AppCompatActivity() {
             if (BlePermissions.hasAll(this)) {
                 ensureBleReady()
             } else {
-                statusBar.text = "Bluetooth permissions required for the RFID gun"
-                statusBar.isVisible = true
+                postGunStatus("Bluetooth permissions required for the RFID gun")
             }
         }
     }
@@ -214,6 +212,18 @@ class StationWebActivity : AppCompatActivity() {
         runOnUiThread { webView.evaluateJavascript(js, null) }
     }
 
+    private fun postGunStatus(msg: String) {
+        if (msg.isBlank()) return
+        runOnUiThread {
+            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            val safe = msg.replace("\\", "\\\\").replace("'", "\\'")
+            webView.evaluateJavascript(
+                "try{if(typeof window.stationOnGunStatus_==='function')window.stationOnGunStatus_('$safe');}catch(e){}",
+                null,
+            )
+        }
+    }
+
     /** Exposed to JS as `AndroidStation` (hosting-shell frame). Runs on a binder thread. */
     inner class StationBridge {
         @JavascriptInterface
@@ -234,6 +244,12 @@ class StationWebActivity : AppCompatActivity() {
         /** Iframe pulls queued scans directly (bypasses the top-frame relay). */
         @JavascriptInterface
         fun pollScans(): String = rfid.drainPendingScans()
+
+        /** Force disconnect + reconnect (Settings → Reconnect gun). */
+        @JavascriptInterface
+        fun reconnectGun() {
+            rfid.forceReconnect()
+        }
 
         /** Station shell mounted inside the WebView — drop the kiosk splash. */
         @JavascriptInterface

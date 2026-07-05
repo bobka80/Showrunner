@@ -25,9 +25,9 @@ html.station-device-root #station-shell {
 }
 .station-shell-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   padding: 14px 16px;
   background: #111114;
   border-bottom: 1px solid #27272a;
@@ -37,7 +37,6 @@ html.station-device-root #station-shell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
   min-width: 0;
 }
 .station-shell-brand__title {
@@ -83,13 +82,13 @@ html.station-device-root #station-device-controls { display: flex; }
   gap: 8px;
 }
 .station-ctrl-scan {
-  min-width: 72px;
-  padding: 10px 14px;
-  font-size: 11px;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid #f97316;
   background: rgba(249, 115, 22, 0.15);
   color: #fb923c;
@@ -100,17 +99,17 @@ html.station-device-root #station-device-controls { display: flex; }
   border-bottom-color: transparent;
 }
 .station-ctrl-cog {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid #3f3f46;
   background: #18181b;
   color: #f97316;
-  font-size: 18px;
+  font-size: 15px;
   cursor: pointer;
 }
 /* Scan panel — dropdown tab under Scan button */
@@ -306,8 +305,16 @@ html.station-device-root #station-device-controls { display: flex; }
 .station-scan-feed__status.is-damaged { color: #eab308; }
 .station-scan-feed__status.is-broken { color: #ef4444; }
 .station-scan-feed__status.is-maintenance { color: #f59e0b; }
-.station-scan-feed__row.is-unknown .name { color: #eab308; font-weight: 600; }
-.station-scan-feed__row.is-unknown .unit { color: #71717a; }
+.station-scan-feed__row.is-unknown .name {
+  color: #eab308;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__row.is-unknown .time { margin-left: 8px; }
 .station-scan-feed__row.is-crew .name { color: #38bdf8; }
 .station-scan-feed__row.is-crew .unit {
   color: #0ea5e9;
@@ -581,13 +588,34 @@ html.station-device-root #station-device-controls { display: flex; }
   word-break: break-word;
 }
 .station-shell-status {
-  min-height: 20px;
+  display: none;
+}
+.station-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(12px);
+  z-index: 65000;
+  max-width: min(92vw, 360px);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(17, 17, 20, 0.94);
+  border: 1px solid #3f3f46;
+  color: #e4e4e7;
   font-size: 12px;
   font-weight: 700;
-  color: #a1a1aa;
+  text-align: center;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.station-shell-status.is-error { color: #ef4444; }
-.station-shell-status.is-ok { color: #10b981; }
+.station-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.station-toast.is-ok { border-color: #10b981; color: #10b981; }
+.station-toast.is-error { border-color: #ef4444; color: #fca5a5; }
 .station-shell-last-scan {
   font-family: monospace;
   font-size: 11px;
@@ -854,8 +882,9 @@ html.station-device-root #station-device-controls { display: flex; }
   <div class="station-shell-main">
     <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
     <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>
-    <div id="station-shell-status" class="station-shell-status"></div>
+    <div id="station-shell-status" class="station-shell-status" aria-hidden="true"></div>
   </div>
+  <div id="station-toast" class="station-toast" aria-live="polite" aria-atomic="true"></div>
 
   <div class="station-shell-footer">
     <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
@@ -958,6 +987,10 @@ html.station-device-root #station-device-controls { display: flex; }
         <div><span>Gun connection</span><span id="station-info-conn">—</span></div>
         <div><span>Battery</span><span id="station-info-battery">—</span></div>
         <div><span>Firmware</span><span id="station-info-fw">—</span></div>
+      </div>
+      <div class="station-field" style="margin-top:12px;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f97316; color:#fb923c;" onclick="stationReconnectGun_()">Reconnect gun</button>
+        <div class="station-field__hint">Use when Bluetooth shows connected but scans do not work — forces a fresh driver handshake.</div>
       </div>
     </div>
 
@@ -1386,14 +1419,55 @@ function stationCacheProjectsPayload_(payload, projects) {
   } catch (e) { /* ignore */ }
 }
 
-function stationSetStatus_(msg, kind) {
-  const el = document.getElementById('station-shell-status');
-  if (!el) return;
-  el.textContent = msg || '';
-  el.classList.remove('is-error', 'is-ok');
-  if (kind === 'error') el.classList.add('is-error');
-  if (kind === 'ok') el.classList.add('is-ok');
+function stationFormatTime24_(ts) {
+  var d = new Date(ts);
+  var h = d.getHours();
+  var m = d.getMinutes();
+  var s = d.getSeconds();
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  return pad(h) + ':' + pad(m) + ':' + pad(s);
 }
+
+var stationToastTimer_ = null;
+function stationToast_(msg, kind) {
+  if (!msg) return;
+  var el = document.getElementById('station-toast');
+  if (!el) return;
+  if (stationToastTimer_) clearTimeout(stationToastTimer_);
+  el.textContent = msg;
+  el.classList.remove('is-ok', 'is-error', 'is-visible');
+  if (kind === 'error') el.classList.add('is-error');
+  else if (kind === 'ok') el.classList.add('is-ok');
+  requestAnimationFrame(function() { el.classList.add('is-visible'); });
+  stationToastTimer_ = setTimeout(function() {
+    el.classList.remove('is-visible');
+  }, kind === 'error' ? 4500 : 2800);
+}
+
+function stationSetStatus_(msg, kind) {
+  if (msg) stationToast_(msg, kind);
+}
+
+/** Native APK forwards BLE status strings here (replaces the old bottom status bar). */
+window.stationOnGunStatus_ = function(msg) {
+  if (!msg) return;
+  var low = String(msg).toLowerCase();
+  var kind = '';
+  if (low.indexOf('fail') !== -1 || low.indexOf('error') !== -1 || low.indexOf('not found') !== -1) kind = 'error';
+  else if (low.indexOf('connected') !== -1 && low.indexOf('disconnect') === -1) kind = 'ok';
+  stationToast_(msg, kind);
+};
+
+window.stationReconnectGun_ = function() {
+  var b = stationNativeBridge_();
+  if (b && typeof b.reconnectGun === 'function') {
+    stationToast_('Reconnecting gun…', '');
+    try { b.reconnectGun(); } catch (e) { stationToast_('Reconnect failed.', 'error'); return; }
+    setTimeout(function() { stationRequestGunConfig_(); }, 2500);
+    return;
+  }
+  stationToast_('Reconnect works in the station app with the RFID gun.', 'error');
+};
 
 function stationSetLastScan_(tag) {
   const el = document.getElementById('station-shell-last-scan');
@@ -1415,7 +1489,7 @@ function stationRenderScanFeed_() {
     });
   };
   const rows = scans.map(function(s) {
-    const time = new Date(s.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const time = stationFormatTime24_(s.ts);
     const hit = stationResolveEpc_(s.tag);
     if (hit && hit.name) {
       if (hit.kind === 'crew') {
@@ -1432,9 +1506,8 @@ function stationRenderScanFeed_() {
         + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '')
         + '<span class="time">' + time + '</span></div>';
     }
-    return '<div class="station-scan-feed__row is-unknown">'
+    return '<div class="station-scan-feed__row is-unknown" title="' + esc(s.tag) + '">'
       + '<span class="name">' + esc(s.tag) + '</span>'
-      + '<span class="unit">Unknown tag</span>'
       + '<span class="time">' + time + '</span></div>';
   });
   list.innerHTML = rows.join('');
@@ -2857,6 +2930,11 @@ function stationApplyGunConfig_(cfg) {
   }
 
   if (connEl) connEl.textContent = cfg.connected ? 'Connected' : 'Not connected';
+  if (typeof window.stationLastGunConnected === 'undefined') window.stationLastGunConnected = null;
+  if (window.stationLastGunConnected !== null && window.stationLastGunConnected !== !!cfg.connected) {
+    stationToast_(cfg.connected ? 'RFID gun connected' : 'RFID gun disconnected', cfg.connected ? 'ok' : 'error');
+  }
+  window.stationLastGunConnected = !!cfg.connected;
   if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
   if (fwEl) fwEl.textContent = cfg.firmware || '—';
   stationSyncPanelReadModeUI_();

@@ -76,17 +76,25 @@ class RfidManager(
     }
 
     /** Drop a stale BLE session before opening a new one (avoids SDK churn that felt like an app restart). */
-    private fun reconnect() {
+    private fun reconnect(force: Boolean = false) {
         worker.execute {
             try {
-                if (activeDisconnect || connected) return@execute
+                if (activeDisconnect) return@execute
+                if (!force && connected) return@execute
+                connected = false
+                inventoryRunning = false
                 try {
+                    mainHandler.post {
+                        uhf.setKeyEventCallback(null)
+                        uhf.setInventoryCallback(null)
+                    }
                     if (uhf.connectStatus != ConnectionStatus.DISCONNECTED) {
                         uhf.disconnect()
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "reconnect: pre-disconnect", e)
                 }
+                Thread.sleep(350)
                 connectInternal()
             } catch (e: Exception) {
                 Log.e(TAG, "reconnect failed", e)
@@ -96,11 +104,60 @@ class RfidManager(
         }
     }
 
+    /** Operator-triggered hard reset — use when BLE says connected but reads fail. */
+    fun forceReconnect() {
+        activeDisconnect = false
+        stopInventory()
+        postStatus("Reconnecting gun…")
+        reconnect(force = true)
+    }
+
+    private var watchdogStarted = false
+    private val watchdogRunnable = Runnable {
+        if (!activeDisconnect) {
+            worker.execute {
+                if (activeDisconnect) return@execute
+                val sdk = try {
+                    uhf.connectStatus
+                } catch (_: Exception) {
+                    ConnectionStatus.DISCONNECTED
+                }
+                if (sdk != ConnectionStatus.CONNECTED && connected) {
+                    connected = false
+                    inventoryRunning = false
+                    postStatus("RFID link lost — reconnecting…")
+                    reconnect(force = true)
+                } else if (sdk != ConnectionStatus.CONNECTED && !connected) {
+                    connectInternal()
+                }
+            }
+        }
+        scheduleWatchdog()
+    }
+
+    private fun scheduleWatchdog() {
+        mainHandler.removeCallbacks(watchdogRunnable)
+        mainHandler.postDelayed(watchdogRunnable, WATCHDOG_MS)
+    }
+
+    fun startWatchdog() {
+        if (watchdogStarted) return
+        watchdogStarted = true
+        scheduleWatchdog()
+    }
+
     /** Idempotent entry — safe from onCreate and onResume. */
     fun connectIfNeeded() {
-        if (connected || activeDisconnect) return
+        if (activeDisconnect) return
         worker.execute {
-            if (connected || activeDisconnect) return@execute
+            if (activeDisconnect) return@execute
+            val sdk = try {
+                uhf.connectStatus
+            } catch (_: Exception) {
+                ConnectionStatus.DISCONNECTED
+            }
+            if (sdk == ConnectionStatus.CONNECTED && connected) return@execute
+            if (sdk != ConnectionStatus.CONNECTED) connected = false
             connectInternal()
         }
     }
@@ -488,8 +545,9 @@ class RfidManager(
             "Nordic_UART_CW", "Nordic", "UART", "Chainway", "R6", "RFID", "UHF", "CW",
         )
         private const val FREQUENCY_EUROPE = 0x04
-        private const val SCAN_MS = 4000L
-        private const val RECONNECT_MS = 5000L
+        private const val SCAN_MS = 5000L
+        private const val RECONNECT_MS = 3000L
+        private const val WATCHDOG_MS = 20000L
         private const val DEBOUNCE_MS = 2000L
         private const val DEFAULT_POLL_MS = 500
         private const val POLL_MIN = 100

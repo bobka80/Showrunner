@@ -3947,6 +3947,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
         <button id="btn-filter-kits" class="btn-outline" style="margin:0; border-color: transparent; color: #a1a1aa; background: transparent !important;" onclick="setAssetFilter('Kits')">KITS</button>
         <button id="btn-filter-cases" class="btn-outline" style="margin:0; border-color: transparent; color: #a1a1aa; background: transparent !important;" onclick="setAssetFilter('Cases')">CASES</button>
         <button id="btn-filter-presets" class="btn-outline" style="margin:0; border-color: transparent; color: #a1a1aa; background: transparent !important;" onclick="setAssetFilter('Presets')">PRESETS</button>
+        <button id="btn-filter-needs-care" class="btn-outline" style="margin:0; border-color: transparent; color: #a1a1aa; background: transparent !important;" onclick="toggleAssetNeedsCareFilter()" title="Show only Maintenance, Damaged, and Broken">NEEDS CARE</button>
         <div style="width: 10px;"></div>
         <button id="btn-tag-dictionary" class="btn-outline req-root-only" style="margin:0; border-color: #a855f7; color: #a855f7;" onclick="openTagManager()">TAG DICTIONARY</button>
         <button id="btn-inline-audit" class="btn-outline req-db_edit_assets" style="margin:0; margin-left:100px; border-color: #f59e0b; color: #f59e0b; transition:0.2s;" onclick="toggleInlineAuditMode()">INLINE AUDIT MODE</button>
@@ -5388,9 +5389,9 @@ html.station-device-root #station-shell {
 }
 .station-shell-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   padding: 14px 16px;
   background: #111114;
   border-bottom: 1px solid #27272a;
@@ -5400,7 +5401,6 @@ html.station-device-root #station-shell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
   min-width: 0;
 }
 .station-shell-brand__title {
@@ -5446,13 +5446,13 @@ html.station-device-root #station-device-controls { display: flex; }
   gap: 8px;
 }
 .station-ctrl-scan {
-  min-width: 72px;
-  padding: 10px 14px;
-  font-size: 11px;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-radius: 10px;
+  border-radius: 8px;
   border: 1px solid #f97316;
   background: rgba(249, 115, 22, 0.15);
   color: #fb923c;
@@ -5463,17 +5463,17 @@ html.station-device-root #station-device-controls { display: flex; }
   border-bottom-color: transparent;
 }
 .station-ctrl-cog {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid #3f3f46;
   background: #18181b;
   color: #f97316;
-  font-size: 18px;
+  font-size: 15px;
   cursor: pointer;
 }
 /* Scan panel — dropdown tab under Scan button */
@@ -5669,8 +5669,16 @@ html.station-device-root #station-device-controls { display: flex; }
 .station-scan-feed__status.is-damaged { color: #eab308; }
 .station-scan-feed__status.is-broken { color: #ef4444; }
 .station-scan-feed__status.is-maintenance { color: #f59e0b; }
-.station-scan-feed__row.is-unknown .name { color: #eab308; font-weight: 600; }
-.station-scan-feed__row.is-unknown .unit { color: #71717a; }
+.station-scan-feed__row.is-unknown .name {
+  color: #eab308;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__row.is-unknown .time { margin-left: 8px; }
 .station-scan-feed__row.is-crew .name { color: #38bdf8; }
 .station-scan-feed__row.is-crew .unit {
   color: #0ea5e9;
@@ -5944,13 +5952,34 @@ html.station-device-root #station-device-controls { display: flex; }
   word-break: break-word;
 }
 .station-shell-status {
-  min-height: 20px;
+  display: none;
+}
+.station-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(12px);
+  z-index: 65000;
+  max-width: min(92vw, 360px);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(17, 17, 20, 0.94);
+  border: 1px solid #3f3f46;
+  color: #e4e4e7;
   font-size: 12px;
   font-weight: 700;
-  color: #a1a1aa;
+  text-align: center;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.station-shell-status.is-error { color: #ef4444; }
-.station-shell-status.is-ok { color: #10b981; }
+.station-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.station-toast.is-ok { border-color: #10b981; color: #10b981; }
+.station-toast.is-error { border-color: #ef4444; color: #fca5a5; }
 .station-shell-last-scan {
   font-family: monospace;
   font-size: 11px;
@@ -6217,8 +6246,9 @@ html.station-device-root #station-device-controls { display: flex; }
   <div class="station-shell-main">
     <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
     <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>
-    <div id="station-shell-status" class="station-shell-status"></div>
+    <div id="station-shell-status" class="station-shell-status" aria-hidden="true"></div>
   </div>
+  <div id="station-toast" class="station-toast" aria-live="polite" aria-atomic="true"></div>
 
   <div class="station-shell-footer">
     <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
@@ -6321,6 +6351,10 @@ html.station-device-root #station-device-controls { display: flex; }
         <div><span>Gun connection</span><span id="station-info-conn">—</span></div>
         <div><span>Battery</span><span id="station-info-battery">—</span></div>
         <div><span>Firmware</span><span id="station-info-fw">—</span></div>
+      </div>
+      <div class="station-field" style="margin-top:12px;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f97316; color:#fb923c;" onclick="stationReconnectGun_()">Reconnect gun</button>
+        <div class="station-field__hint">Use when Bluetooth shows connected but scans do not work — forces a fresh driver handshake.</div>
       </div>
     </div>
 
