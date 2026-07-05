@@ -14,9 +14,12 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ---
 
-## Next up (director, 2026-07-04)
+## Next up (director, 2026-07-05)
 
-After the RFID station campaign pauses: **ledgers** work + **Google Chat update**. Ledgers → [topics/financials.md](topics/financials.md), [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md), `Operations.js`. Google Chat → [topics/workspace-migration.md](topics/workspace-migration.md) (Chat backlog). Create an active campaign file when work starts.
+1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
+2. **Data access layer (DAL)** — Phase 0 discovery sweep → design lock → incremental router/repos **before** Firebase prep ledger or timeline fork. Campaign: [active/data-access-layer.md](active/data-access-layer.md). Say **OK go** to start Phase 0.
+3. **After DAL Phase 3A+:** warehouse prep session (Firebase PA + ledger), expanded ledger, timeline collab — all via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)).
+4. **Parallel when ready:** Google Chat update → [topics/workspace-migration.md](topics/workspace-migration.md).
 
 ---
 
@@ -24,7 +27,8 @@ After the RFID station campaign pauses: **ledgers** work + **Google Chat update*
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station device profiles** | Active — GAS **v429**, APK **0.1.10**; host-inherit + Vault shipped; open: checkout cache speed, QR gate, field verify | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **RFID scanning & station device profiles** | Active — station shell + gun; see file for GAS/APK versions | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **Data access layer (DAL + router)** | **Planned — not executing**; phone app first; blocks Firebase prep/timeline fork until Phase 3 | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---
 
@@ -47,12 +51,12 @@ After the RFID station campaign pauses: **ledgers** work + **Google Chat update*
 | Google Workspace migration | Done — in-place host upgrade verified | [topics/workspace-migration.md](topics/workspace-migration.md) |
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
 | Session fork platform | Backlog — Firebase buffer + router | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
-| Unified data cache engine **+ data access layer (backend abstraction)** | Backlog — one cache API w/ per-view policies & surgical (never flush-all) invalidation; **one DAL/repository seam to reroute to SQL/Postgres/paid Firebase from a single place** | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
-| Warehouse prep session | Backlog — PA + ledger on fork | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) |
-| Timeline collab session | Backlog — multi-user timeline room | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
+| Unified data cache engine **+ data access layer (backend abstraction)** | **Active campaign (planned)** — DAL/router first; cache Phase D after repos — [active/data-access-layer.md](active/data-access-layer.md) · target arch [topics/data-cache-engine.md](topics/data-cache-engine.md) | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
+| Warehouse prep session | **Blocked on DAL** — PA + ledger on Firebase fork via repos | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) |
+| Timeline collab session | **Blocked on DAL** — timeline room on Firebase fork via repos | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
 
-**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **NAS year archive** → **data cache engine (Phase A)** + **session fork platform** (parallel) → warehouse prep → timeline collab. **Shift confirm** can start early; **field actuals** after confirm.
+**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → **DAL campaign** ([active/data-access-layer.md](active/data-access-layer.md): Phase 0 sweep → Sheets repos → session router → Firebase adapters) → **warehouse prep** → **timeline collab** → **cache coordinator (Phase D)** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. Do **not** start Firebase prep/timeline fork before DAL Phase 3 shell.
 
 ---
 

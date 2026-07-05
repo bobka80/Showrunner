@@ -6,7 +6,7 @@
 
 **Related:** [project-assets-concurrency.md](project-assets-concurrency.md) · [logistics-warehouse.md](logistics-warehouse.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Status:** Backlog
+**Status:** Backlog — **blocked on DAL campaign** ([../active/data-access-layer.md](../active/data-access-layer.md)). Firebase PA + ledger fork ships through repos/router, not ad hoc `Operations.js` branches.
 
 **Last swept:** 2026-06-30
 

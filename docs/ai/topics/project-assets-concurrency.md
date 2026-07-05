@@ -95,7 +95,7 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 4. Desktop auto-save + merge improvements  
 5. Checkout/list status closure  
 
-**Floor / prep mode (multi-user at scale):** When **Start preparation** ships, PA + expanded ledger move to the Firebase fork — see [warehouse-prep-session.md](warehouse-prep-session.md). **Cache policies** flip to `session-live` backend — [data-cache-engine.md](data-cache-engine.md). This doc stays authoritative for **normal-day** Sheets concurrency until then.
+**Floor / prep mode (multi-user at scale):** When **Start preparation** ships, PA + expanded ledger move to the Firebase fork — see [warehouse-prep-session.md](warehouse-prep-session.md). **Prerequisite:** [active/data-access-layer.md](../active/data-access-layer.md) (repos + router before Firebase). **Cache policies** flip to `session-live` backend — [data-cache-engine.md](data-cache-engine.md). This doc stays authoritative for **normal-day** Sheets concurrency until then.
 
 ---
 

@@ -6,7 +6,7 @@ Do not begin implementation until you have read the doctrine and opened the draw
 
 | Drawer | Path | When |
 |--------|------|------|
-| **Active campaigns** | [docs/ai/active/](docs/ai/active/) | Work in flight now — **RFID scanning + station device profiles**; urgent fixes |
+| **Active campaigns** | [docs/ai/active/](docs/ai/active/) | Work in flight now — **RFID station**; **DAL/router (planned, not executing)** — see [data-access-layer.md](docs/ai/active/data-access-layer.md) |
 | **Topic backlogs** | [docs/ai/topics/](docs/ai/topics/) | Feature area checklists (read one topic, not the whole roadmap) |
 | **Stable reference** | [docs/ai/README.md](docs/ai/README.md) | Architecture, schema, file map, deploy, **[Drive layout](docs/ai/DRIVE_LAYOUT.md)** |
 | **Equipment / PA / warehouse** | [docs/ai/EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) | Bulk vs unique, two packing engines — **before** packing/checkout/cable work |

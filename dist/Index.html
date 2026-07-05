@@ -4312,7 +4312,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
             <div style="display:flex; gap:10px; width:100%;">
                 <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Date Bought</div><input type="date" id="asset-date-bought" onclick="this.showPicker()" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
                 <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Lifecycle State</div>
-                    <select id="asset-lifecycle" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;">
+                    <select id="asset-lifecycle" onchange="if(typeof syncAssetStatusNoteVisibility_==='function') syncAssetStatusNoteVisibility_()" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;">
                         <option value="Active">Active</option>
                         <option value="Maintenance">Maintenance</option>
                         <option value="Damaged">Damaged (usable defect)</option>
@@ -4320,6 +4320,10 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
                         <option value="Retired">Retired</option>
                     </select>
                 </div>
+            </div>
+            <div id="asset-status-note-wrap" style="display:none;">
+                <div class="input-label" style="margin-bottom:4px;">Problem / defect (required for Damaged)</div>
+                <textarea id="asset-status-note" rows="2" placeholder="e.g. gobo rotation error, zoom sticky…" style="width:100%; margin:0; box-sizing:border-box; padding:10px; resize:vertical;"></textarea>
             </div>
         </div>
 
@@ -5384,8 +5388,9 @@ html.station-device-root #station-shell {
 }
 .station-shell-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
   padding: 14px 16px;
   background: #111114;
   border-bottom: 1px solid #27272a;
@@ -5395,6 +5400,8 @@ html.station-device-root #station-shell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 .station-shell-brand__title {
   font-size: 11px;
@@ -5424,15 +5431,13 @@ html.station-device-root #station-shell {
   font-weight: 900;
   color: #10b981;
 }
-/* Fixed gun controls — visible on station device even inside project PA */
+/* Gun controls — in header bar beside device / host name */
 #station-device-controls {
   display: none;
-  position: fixed;
-  top: calc(10px + env(safe-area-inset-top));
-  right: 12px;
-  z-index: 60050;
+  position: relative;
   flex-direction: column;
   align-items: flex-end;
+  flex-shrink: 0;
 }
 html.station-device-root #station-device-controls { display: flex; }
 .station-device-controls__row {
@@ -6183,6 +6188,29 @@ html.station-device-root #station-device-controls { display: flex; }
         <span id="station-shell-host-inline" class="station-shell-brand__host" style="display:none;"></span>
       </div>
     </div>
+    <div id="station-device-controls" aria-label="Gun controls">
+      <div class="station-device-controls__row">
+        <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationToggleScanPanel()" title="Scan panel">Scan</button>
+        <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
+      </div>
+      <div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
+        <div class="station-scan-panel__body">
+          <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
+            <div class="station-scan-feed__label">Live RFID scans</div>
+            <div id="station-scan-feed-list" class="station-scan-feed__list">
+              <span class="station-scan-feed__empty">Waiting for scans…</span>
+            </div>
+          </div>
+          <div class="station-scan-panel__last" id="station-panel-last">
+            <div class="station-scan-panel__last-name" id="station-panel-last-name">Scan equipment to select</div>
+            <div class="station-scan-panel__last-meta" id="station-panel-last-meta"></div>
+            <div class="station-scan-panel__last-status" id="station-panel-last-status"></div>
+            <textarea id="station-panel-note" class="station-scan-panel__note" rows="2" placeholder="Describe the problem (required) — e.g. gobo rotation error" style="display:none;"></textarea>
+            <div class="station-scan-panel__actions" id="station-panel-actions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="display:none;"></button>
   </div>
 
@@ -6197,48 +6225,6 @@ html.station-device-root #station-device-controls { display: flex; }
     <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
-  </div>
-</div>
-
-<div id="station-device-controls" aria-label="Gun controls">
-  <div class="station-device-controls__row">
-    <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationToggleScanPanel()" title="Scan panel">Scan</button>
-    <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
-  </div>
-  <div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
-    <div class="station-scan-panel__body">
-      <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
-        <div class="station-scan-feed__label">Live RFID scans</div>
-        <div id="station-scan-feed-list" class="station-scan-feed__list">
-          <span class="station-scan-feed__empty">Waiting for scans…</span>
-        </div>
-      </div>
-      <div id="station-sens-bar" class="station-sens-bar" aria-label="Read power / sensitivity" style="display:flex;">
-        <span class="station-sens-bar__label">Sensitivity</span>
-        <input type="range" id="station-main-power" min="5" max="30" step="1" oninput="stationOnMainPowerInput()" onchange="stationSaveMainPower()">
-        <output id="station-main-power-out">—</output>
-      </div>
-      <div class="station-read-mode-row" aria-label="Tags per trigger pull">
-        <span class="station-read-mode-row__label">Per pull</span>
-        <div class="station-read-mode-toggle">
-          <button type="button" id="station-panel-mode-single" onclick="stationSetPanelReadMode('single')">Single</button>
-          <button type="button" id="station-panel-mode-multi" onclick="stationSetPanelReadMode('multi')">Multi</button>
-        </div>
-      </div>
-      <div class="station-scan-panel__presets">
-        <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
-        <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
-        <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
-      </div>
-      <div class="station-scan-panel__hint">Tap preset to load · hold 1s to save current sensitivity</div>
-      <div class="station-scan-panel__last" id="station-panel-last">
-        <div class="station-scan-panel__last-name" id="station-panel-last-name">Scan equipment to select</div>
-        <div class="station-scan-panel__last-meta" id="station-panel-last-meta"></div>
-        <div class="station-scan-panel__last-status" id="station-panel-last-status"></div>
-        <textarea id="station-panel-note" class="station-scan-panel__note" rows="2" placeholder="What's wrong? (required for Damaged)" style="display:none;"></textarea>
-        <div class="station-scan-panel__actions" id="station-panel-actions"></div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -6276,6 +6262,25 @@ html.station-device-root #station-device-controls { display: flex; }
           <output id="station-set-power-out">—</output>
         </div>
         <div class="station-field__hint">Lower = shorter range (badge tap only). Higher = reads across the room. Test a value that reads a badge held to the gun but not tags on the shelf.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Per trigger pull</label>
+        <div class="station-read-mode-toggle">
+          <button type="button" id="station-panel-mode-single" onclick="stationSetPanelReadMode('single')">Single</button>
+          <button type="button" id="station-panel-mode-multi" onclick="stationSetPanelReadMode('multi')">Multi</button>
+        </div>
+        <div class="station-field__hint">Single = one tag per pull. Multi = every tag in range on one pull.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Sensitivity presets</label>
+        <div class="station-scan-panel__presets">
+          <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
+        </div>
+        <div class="station-field__hint">Tap preset to load · hold 1s to save current sensitivity</div>
       </div>
 
       <div class="station-field">
@@ -6378,6 +6383,7 @@ html.station-device-root #station-device-controls { display: flex; }
         <button type="button" class="btn-close" style="width:auto; margin:0; padding:6px 12px;" onclick="stationVaultCloseSheet_()">Close</button>
       </div>
       <div class="station-vault-sheet__meta" id="station-vault-sheet-meta"></div>
+      <textarea id="station-vault-sheet-note" class="station-scan-panel__note" rows="2" placeholder="Describe the problem (required for Damaged) — e.g. gobo rotation error" style="display:none; margin:0 16px 12px;"></textarea>
       <div class="station-vault-sheet__actions">
         <button type="button" class="btn-outline" id="station-vault-act-maint" onclick="stationVaultSheetStatus_('Maintenance')">Maintenance</button>
         <button type="button" class="btn-outline" id="station-vault-act-damaged" style="border-color:#eab308;color:#eab308;" onclick="stationVaultSheetStatus_('Damaged')">Damaged</button>

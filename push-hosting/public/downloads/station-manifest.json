@@ -1,14 +1,22 @@
 {
-  "versionName": "0.1.13",
-  "versionCode": 15,
+  "versionName": "0.1.14",
+  "versionCode": 16,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-04T14:31:43.719Z",
+  "updatedAt": "2026-07-04T14:43:42.873Z",
   "sizeBytes": 12040689,
   "notes": [
-    "Multi-scan mode (one pull, many tags)"
+    "Cleanup build — retire native diagnostic status spam"
   ],
   "history": [
+    {
+      "versionName": "0.1.14",
+      "versionCode": 16,
+      "date": "2026-07-04T14:43:42.873Z",
+      "notes": [
+        "Cleanup build — retire native diagnostic status spam"
+      ]
+    },
     {
       "versionName": "0.1.13",
       "versionCode": 15,

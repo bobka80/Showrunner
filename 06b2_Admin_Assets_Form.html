@@ -157,6 +157,8 @@ function openAssetModal(editId = null) {
     if (document.getElementById('kit-builder-mode')) document.getElementById('kit-builder-mode').value = 'fluid';
     document.getElementById('asset-type').value = 'Physical';
     document.getElementById('asset-lifecycle').value = 'Active';
+    if (document.getElementById('asset-status-note')) document.getElementById('asset-status-note').value = '';
+    if (typeof syncAssetStatusNoteVisibility_ === 'function') syncAssetStatusNoteVisibility_();
     if (document.getElementById('asset-service-interval')) document.getElementById('asset-service-interval').value = '12';
     
     // Populate Departments
@@ -358,7 +360,11 @@ function finishOpeningAssetModal() {
                     document.getElementById('asset-price').value = a.price || '';
                     document.getElementById('asset-rental').value = a.rental || '';
                     document.getElementById('asset-date-bought').value = a.dateBought || '';
-                    document.getElementById('asset-lifecycle').value = a.lifecycle || 'Active';
+                    document.getElementById('asset-lifecycle').value = a.lifecycle || a.status || 'Active';
+                    if (document.getElementById('asset-status-note')) {
+                        document.getElementById('asset-status-note').value = a.statusNote || a.status_note || '';
+                    }
+                    if (typeof syncAssetStatusNoteVisibility_ === 'function') syncAssetStatusNoteVisibility_();
                     document.getElementById('asset-last-service').value = a.lastService || '';
                     document.getElementById('asset-service-interval').value = a.serviceInterval || '12';
                     document.getElementById('asset-tags-hidden').value = a.tags || '[]';
@@ -456,8 +462,15 @@ function updateAssetAreas() {
     }
 }
 
+function syncAssetStatusNoteVisibility_() {
+    const lifeEl = document.getElementById('asset-lifecycle');
+    const wrap = document.getElementById('asset-status-note-wrap');
+    if (!lifeEl || !wrap) return;
+    const life = String(lifeEl.value || '').trim();
+    wrap.style.display = (life === 'Damaged') ? 'block' : 'none';
+}
+
 function saveAsset() {
-    let isBulk = Array.isArray(currentEditAssetId) && currentEditAssetId.length > 1;
     
     if (!isBulk) {
         const name = document.getElementById('asset-name').value;
@@ -513,6 +526,16 @@ function saveAsset() {
     if (!isBulk || window.dirtyAssetFields.has('asset-rental')) payload.rental = document.getElementById('asset-rental').value;
     if (!isBulk || window.dirtyAssetFields.has('asset-date-bought')) payload.dateBought = document.getElementById('asset-date-bought').value;
     if (!isBulk || window.dirtyAssetFields.has('asset-lifecycle')) payload.lifecycle = document.getElementById('asset-lifecycle').value;
+    const statusNoteEl = document.getElementById('asset-status-note');
+    const statusNoteVal = statusNoteEl ? statusNoteEl.value.trim() : '';
+    if (payload.lifecycle === 'Damaged' && !statusNoteVal) {
+        btn.innerText = origText;
+        btn.disabled = false;
+        return alert('Describe the problem for Damaged assets (e.g. gobo rotation error).');
+    }
+    if (!isBulk || window.dirtyAssetFields.has('asset-status-note') || window.dirtyAssetFields.has('asset-lifecycle')) {
+        payload.statusNote = statusNoteVal;
+    }
     if (!isBulk || window.dirtyAssetFields.has('asset-last-service')) payload.lastService = document.getElementById('asset-last-service').value;
     if (!isBulk || window.dirtyAssetFields.has('asset-service-interval')) payload.serviceInterval = document.getElementById('asset-service-interval').value;
     if (!isBulk || window.dirtyAssetFields.has('asset-tags-hidden')) payload.tags = document.getElementById('asset-tags-hidden').value;
@@ -600,7 +623,11 @@ function saveAsset() {
                             if (payload.hasOwnProperty('price')) a.price = payload.price;
                             if (payload.hasOwnProperty('rental')) a.rental = payload.rental;
                             if (payload.hasOwnProperty('dateBought')) a.dateBought = payload.dateBought;
-                            if (payload.hasOwnProperty('lifecycle')) a.status = payload.lifecycle;
+                            if (payload.hasOwnProperty('lifecycle')) {
+                                a.status = payload.lifecycle;
+                                a.lifecycle = payload.lifecycle;
+                            }
+                            if (payload.hasOwnProperty('statusNote')) a.statusNote = payload.statusNote;
                             if (payload.hasOwnProperty('lastService')) a.lastService = payload.lastService;
                             if (payload.hasOwnProperty('serviceInterval')) a.serviceInterval = payload.serviceInterval;
                             if (payload.hasOwnProperty('tags')) a.tags = payload.tags;

@@ -269,7 +269,7 @@
             <div style="display:flex; gap:10px; width:100%;">
                 <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Date Bought</div><input type="date" id="asset-date-bought" onclick="this.showPicker()" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;"></div>
                 <div style="flex:1; min-width:0;"><div class="input-label" style="margin-bottom:4px;">Lifecycle State</div>
-                    <select id="asset-lifecycle" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;">
+                    <select id="asset-lifecycle" onchange="if(typeof syncAssetStatusNoteVisibility_==='function') syncAssetStatusNoteVisibility_()" style="width: 100%; margin:0; box-sizing: border-box; padding:10px;">
                         <option value="Active">Active</option>
                         <option value="Maintenance">Maintenance</option>
                         <option value="Damaged">Damaged (usable defect)</option>
@@ -277,6 +277,10 @@
                         <option value="Retired">Retired</option>
                     </select>
                 </div>
+            </div>
+            <div id="asset-status-note-wrap" style="display:none;">
+                <div class="input-label" style="margin-bottom:4px;">Problem / defect (required for Damaged)</div>
+                <textarea id="asset-status-note" rows="2" placeholder="e.g. gobo rotation error, zoom sticky…" style="width:100%; margin:0; box-sizing:border-box; padding:10px; resize:vertical;"></textarea>
             </div>
         </div>
 

@@ -4,9 +4,9 @@
 
 **Related:** [session-fork-platform.md](session-fork-platform.md) · [project-assets-concurrency.md](project-assets-concurrency.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
 
-**Status:** Backlog — consolidate fragmented caches; tune per-screen UX without rewriting modules.
+**Status:** Backlog — consolidate fragmented caches; tune per-screen UX without rewriting modules. **Execution blocked until [active/data-access-layer.md](../active/data-access-layer.md) Phase 3D** (repos + router first).
 
-**Last swept:** 2026-07-04
+**Active campaign (planned, not executing yet):** [../active/data-access-layer.md](../active/data-access-layer.md)
 
 ---
 

@@ -164,7 +164,15 @@ function effectiveStationPermission(crewName, permissionKey) {
     for (let r = 1; r < roleData.length; r++) {
       if (!crewRoleRefMatchesRow(roleId, roleData[r], rMap)) continue;
       if (!isStationDeviceProfileRow(roleData[r], rMap)) return false;
-      return isStationTruthyCell(roleData[r][rMap[permissionKey]]);
+      const cell = roleData[r][rMap[permissionKey]];
+      if (isStationTruthyCell(cell)) return true;
+      // Legacy station profiles: station_vault_damaged column added later — inherit broken baseline.
+      if (permissionKey === 'station_vault_damaged'
+          && rMap['station_vault_broken'] !== undefined
+          && isStationTruthyCell(roleData[r][rMap['station_vault_broken']])) {
+        return true;
+      }
+      return false;
     }
   }
   return false;

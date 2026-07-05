@@ -25,8 +25,9 @@ html.station-device-root #station-shell {
 }
 .station-shell-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
   padding: 14px 16px;
   background: #111114;
   border-bottom: 1px solid #27272a;
@@ -36,6 +37,8 @@ html.station-device-root #station-shell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 .station-shell-brand__title {
   font-size: 11px;
@@ -65,15 +68,13 @@ html.station-device-root #station-shell {
   font-weight: 900;
   color: #10b981;
 }
-/* Fixed gun controls — visible on station device even inside project PA */
+/* Gun controls — in header bar beside device / host name */
 #station-device-controls {
   display: none;
-  position: fixed;
-  top: calc(10px + env(safe-area-inset-top));
-  right: 12px;
-  z-index: 60050;
+  position: relative;
   flex-direction: column;
   align-items: flex-end;
+  flex-shrink: 0;
 }
 html.station-device-root #station-device-controls { display: flex; }
 .station-device-controls__row {
@@ -824,6 +825,29 @@ html.station-device-root #station-device-controls { display: flex; }
         <span id="station-shell-host-inline" class="station-shell-brand__host" style="display:none;"></span>
       </div>
     </div>
+    <div id="station-device-controls" aria-label="Gun controls">
+      <div class="station-device-controls__row">
+        <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationToggleScanPanel()" title="Scan panel">Scan</button>
+        <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
+      </div>
+      <div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
+        <div class="station-scan-panel__body">
+          <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
+            <div class="station-scan-feed__label">Live RFID scans</div>
+            <div id="station-scan-feed-list" class="station-scan-feed__list">
+              <span class="station-scan-feed__empty">Waiting for scans…</span>
+            </div>
+          </div>
+          <div class="station-scan-panel__last" id="station-panel-last">
+            <div class="station-scan-panel__last-name" id="station-panel-last-name">Scan equipment to select</div>
+            <div class="station-scan-panel__last-meta" id="station-panel-last-meta"></div>
+            <div class="station-scan-panel__last-status" id="station-panel-last-status"></div>
+            <textarea id="station-panel-note" class="station-scan-panel__note" rows="2" placeholder="Describe the problem (required) — e.g. gobo rotation error" style="display:none;"></textarea>
+            <div class="station-scan-panel__actions" id="station-panel-actions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="display:none;"></button>
   </div>
 
@@ -838,48 +862,6 @@ html.station-device-root #station-device-controls { display: flex; }
     <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
     <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
-  </div>
-</div>
-
-<div id="station-device-controls" aria-label="Gun controls">
-  <div class="station-device-controls__row">
-    <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationToggleScanPanel()" title="Scan panel">Scan</button>
-    <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
-  </div>
-  <div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
-    <div class="station-scan-panel__body">
-      <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
-        <div class="station-scan-feed__label">Live RFID scans</div>
-        <div id="station-scan-feed-list" class="station-scan-feed__list">
-          <span class="station-scan-feed__empty">Waiting for scans…</span>
-        </div>
-      </div>
-      <div id="station-sens-bar" class="station-sens-bar" aria-label="Read power / sensitivity" style="display:flex;">
-        <span class="station-sens-bar__label">Sensitivity</span>
-        <input type="range" id="station-main-power" min="5" max="30" step="1" oninput="stationOnMainPowerInput()" onchange="stationSaveMainPower()">
-        <output id="station-main-power-out">—</output>
-      </div>
-      <div class="station-read-mode-row" aria-label="Tags per trigger pull">
-        <span class="station-read-mode-row__label">Per pull</span>
-        <div class="station-read-mode-toggle">
-          <button type="button" id="station-panel-mode-single" onclick="stationSetPanelReadMode('single')">Single</button>
-          <button type="button" id="station-panel-mode-multi" onclick="stationSetPanelReadMode('multi')">Multi</button>
-        </div>
-      </div>
-      <div class="station-scan-panel__presets">
-        <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
-        <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
-        <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
-      </div>
-      <div class="station-scan-panel__hint">Tap preset to load · hold 1s to save current sensitivity</div>
-      <div class="station-scan-panel__last" id="station-panel-last">
-        <div class="station-scan-panel__last-name" id="station-panel-last-name">Scan equipment to select</div>
-        <div class="station-scan-panel__last-meta" id="station-panel-last-meta"></div>
-        <div class="station-scan-panel__last-status" id="station-panel-last-status"></div>
-        <textarea id="station-panel-note" class="station-scan-panel__note" rows="2" placeholder="What's wrong? (required for Damaged)" style="display:none;"></textarea>
-        <div class="station-scan-panel__actions" id="station-panel-actions"></div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -917,6 +899,25 @@ html.station-device-root #station-device-controls { display: flex; }
           <output id="station-set-power-out">—</output>
         </div>
         <div class="station-field__hint">Lower = shorter range (badge tap only). Higher = reads across the room. Test a value that reads a badge held to the gun but not tags on the shelf.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Per trigger pull</label>
+        <div class="station-read-mode-toggle">
+          <button type="button" id="station-panel-mode-single" onclick="stationSetPanelReadMode('single')">Single</button>
+          <button type="button" id="station-panel-mode-multi" onclick="stationSetPanelReadMode('multi')">Multi</button>
+        </div>
+        <div class="station-field__hint">Single = one tag per pull. Multi = every tag in range on one pull.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Sensitivity presets</label>
+        <div class="station-scan-panel__presets">
+          <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
+        </div>
+        <div class="station-field__hint">Tap preset to load · hold 1s to save current sensitivity</div>
       </div>
 
       <div class="station-field">
@@ -1019,6 +1020,7 @@ html.station-device-root #station-device-controls { display: flex; }
         <button type="button" class="btn-close" style="width:auto; margin:0; padding:6px 12px;" onclick="stationVaultCloseSheet_()">Close</button>
       </div>
       <div class="station-vault-sheet__meta" id="station-vault-sheet-meta"></div>
+      <textarea id="station-vault-sheet-note" class="station-scan-panel__note" rows="2" placeholder="Describe the problem (required for Damaged) — e.g. gobo rotation error" style="display:none; margin:0 16px 12px;"></textarea>
       <div class="station-vault-sheet__actions">
         <button type="button" class="btn-outline" id="station-vault-act-maint" onclick="stationVaultSheetStatus_('Maintenance')">Maintenance</button>
         <button type="button" class="btn-outline" id="station-vault-act-damaged" style="border-color:#eab308;color:#eab308;" onclick="stationVaultSheetStatus_('Damaged')">Damaged</button>
@@ -1189,7 +1191,10 @@ function stationForwardCheckoutScan_(tag) {
     }
 
     var st = String(hit.status || 'Active').toLowerCase();
-    if (st.indexOf('broken') !== -1 && typeof window.showMobilePaToast === 'function') {
+    if (st.indexOf('damage') !== -1 && typeof window.showMobilePaToast === 'function') {
+      var dmgNote = hit.statusNote ? (' — ' + hit.statusNote) : '';
+      window.showMobilePaToast('Damaged unit', (hit.name || 'Asset') + dmgNote + ' — still OK to check out.');
+    } else if (st.indexOf('broken') !== -1 && typeof window.showMobilePaToast === 'function') {
       window.showMobilePaToast('Broken unit', (hit.name || 'Asset') + ' is marked Broken — still scanning.');
     }
 
@@ -1438,8 +1443,15 @@ function stationRenderScanFeed_() {
 function stationPushScanFeed_(tag) {
   const clean = String(tag || '').trim();
   if (!clean) return;
+  const norm = stationNormalizeEpc_(clean);
+  const now = Date.now();
   window.stationRecentScans = window.stationRecentScans || [];
-  window.stationRecentScans.unshift({ tag: clean, ts: Date.now() });
+  if (window.stationRecentScans.length) {
+    const last = window.stationRecentScans[0];
+    const lastNorm = last.norm || stationNormalizeEpc_(last.tag);
+    if (lastNorm === norm && (now - (last.ts || 0)) < 1500) return;
+  }
+  window.stationRecentScans.unshift({ tag: clean, norm: norm, ts: now });
   if (window.stationRecentScans.length > STATION_SCAN_FEED_MAX) {
     window.stationRecentScans.length = STATION_SCAN_FEED_MAX;
   }
@@ -1527,9 +1539,8 @@ function stationApplyBootstrap_(data) {
   window.stationShellBootstrap = data;
   const profEl = document.getElementById('station-shell-profile-name');
   const layoutEl = document.getElementById('station-shell-layout-text');
-  // Header now shows only the device PROFILE (e.g. "CW1 Chainway"); the host name is
-  // appended in green by stationRenderShellState_(). "Warehouse station" is gone.
-  if (profEl) profEl.textContent = data.profileName || data.deviceName || ACTIVE_USER_NAME || 'Station';
+  // Device account name (e.g. CW1) — not the hardware profile label (e.g. Chainway).
+  if (profEl) profEl.textContent = data.deviceName || ACTIVE_USER_NAME || data.profileName || 'Station';
   if (layoutEl) {
     const layout = (data.layout || 'chainway_handheld').replace(/_/g, ' ');
     layoutEl.textContent = layout.toUpperCase();
@@ -1579,10 +1590,12 @@ function stationHandleRfidScan_(rawTag) {
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag) {
   const tag = String(rawTag || '').trim();
-  // Dedup: one physical scan can arrive via BOTH the direct poll and the relay fallback.
-  if (tag) {
+  const norm = stationNormalizeEpc_(tag);
+  // Dedup: one physical scan can arrive via BOTH poll and relay (case/format may differ).
+  if (norm) {
     var now = Date.now();
-    if (tag === window.stationLastScanTag && (now - (window.stationLastScanAt || 0)) < 1500) return;
+    if (norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500) return;
+    window.stationLastScanNorm = norm;
     window.stationLastScanTag = tag;
     window.stationLastScanAt = now;
   }
@@ -1735,6 +1748,8 @@ function stationVaultStatusColor_(status) {
 function stationPanelPerm_(key) {
   const boot = window.stationShellBootstrap;
   if (boot && boot.permissions && boot.permissions[key] === true) return true;
+  // Legacy profiles: damaged permission column may be empty while broken is on.
+  if (key === 'station_vault_damaged' && boot && boot.permissions && boot.permissions.station_vault_broken === true) return true;
   return false;
 }
 
@@ -1819,24 +1834,24 @@ function stationPanelApplyPreset_(slot) {
     stationSetStatus_('No saved preset for ' + slot + ' — hold the button to save.', 'error');
     return;
   }
-  const mainEl = document.getElementById('station-main-power');
-  if (mainEl) mainEl.value = val;
-  stationSaveMainPower();
+  const powerEl = document.getElementById('station-set-power');
+  if (powerEl) powerEl.value = val;
+  stationSavePower();
   stationSetStatus_('Loaded ' + slot + ' preset (' + val + ' dBm).', 'ok');
 }
 
 function stationPanelSavePreset_(slot) {
-  const mainEl = document.getElementById('station-main-power');
-  if (!mainEl || !mainEl.value) return;
+  const powerEl = document.getElementById('station-set-power');
+  if (!powerEl || !powerEl.value) return;
   const presets = stationPanelReadPresets_();
-  presets[slot] = parseInt(mainEl.value, 10);
+  presets[slot] = parseInt(powerEl.value, 10);
   stationPanelWritePresets_(presets);
   const btn = document.getElementById('station-preset-' + slot);
   if (btn) {
     btn.classList.add('station-preset-saved');
     setTimeout(function() { btn.classList.remove('station-preset-saved'); }, 1200);
   }
-  stationSetStatus_('Saved ' + slot + ' preset (' + mainEl.value + ' dBm).', 'ok');
+  stationSetStatus_('Saved ' + slot + ' preset (' + powerEl.value + ' dBm).', 'ok');
 }
 
 function stationBindPresetButtons_() {
@@ -1889,7 +1904,6 @@ function stationPanelUpdateEquipEntry_(unitId, status, statusNote) {
 }
 
 function stationPanelHandleScan_(tag) {
-  stationPushScanFeed_(tag);
   stationResetHostIdleTimer_();
   const hit = stationResolveEpc_(tag);
   if (hit && hit.kind === 'crew') {
@@ -1980,6 +1994,7 @@ function stationPanelRenderActions_() {
     if (stationPanelPerm_('station_vault_broken')) add('Broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
   } else if (st.indexOf('damaged') !== -1) {
     if (stationPanelPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+    if (stationPanelPerm_('station_vault_damaged')) add('Edit problem', 'Damaged', 'border-color:#eab308;color:#eab308;');
     if (stationPanelPerm_('station_vault_broken')) add('Mark broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
     if (stationPanelPerm_('station_vault_maintenance')) add('Maintenance', 'Maintenance', 'border-color:#f59e0b;color:#f59e0b;');
   } else if (st.indexOf('broken') !== -1 || st.indexOf('maintenance') !== -1) {
@@ -2168,6 +2183,7 @@ window.stationVaultOpenSheet_ = function(assetId) {
   const bits = [];
   if (it.unitNumber) bits.push('Unit #' + it.unitNumber);
   bits.push('Status: ' + (it.status || 'Active'));
+  if (it.statusNote) bits.push('Problem: ' + it.statusNote);
   bits.push(it.rfidTag ? ('Tag: ' + it.rfidTag) : (it.isBulk ? 'Bulk — no per-piece tag' : 'No tag yet'));
   stationVaultShowSheet_(it.name || 'Unnamed', bits.join('  ·  '), canRec ? 'Record RFID' : '');
 };
@@ -2190,8 +2206,11 @@ function stationVaultShowSheet_(title, meta, recordLabel) {
   const titleEl = document.getElementById('station-vault-sheet-title');
   const metaEl = document.getElementById('station-vault-sheet-meta');
   const recBtn = document.getElementById('station-vault-act-record');
+  const noteEl = document.getElementById('station-vault-sheet-note');
+  window.stationVaultPendingDamaged = false;
   if (titleEl) titleEl.textContent = title;
   if (metaEl) metaEl.textContent = meta;
+  if (noteEl) { noteEl.style.display = 'none'; noteEl.value = ''; }
   if (recBtn) {
     recBtn.style.display = recordLabel ? 'block' : 'none';
     recBtn.textContent = recordLabel || 'Record RFID';
@@ -2210,13 +2229,26 @@ window.stationVaultSheetStatus_ = function(status) {
   const act = window.stationVaultActive;
   if (!act || !act.unitIds.length) return;
   if (status === 'Damaged') {
-    const note = prompt('What is wrong? (required — usable but faulty)');
-    if (note === null) return;
-    if (!String(note).trim()) { alert('Describe what is wrong.'); return; }
+    const noteEl = document.getElementById('station-vault-sheet-note');
+    if (!window.stationVaultPendingDamaged) {
+      window.stationVaultPendingDamaged = true;
+      if (noteEl) {
+        noteEl.style.display = 'block';
+        const first = (window.stationVaultItems || []).find(function(x) { return String(x.id) === String(act.unitIds[0]); });
+        noteEl.value = (first && first.statusNote) ? first.statusNote : '';
+        noteEl.focus();
+      }
+      stationSetStatus_('Describe the problem, then tap Damaged again to save.', '');
+      return;
+    }
+    const note = noteEl ? noteEl.value.trim() : '';
+    if (!note) { alert('Describe what is wrong (e.g. gobo rotation error).'); if (noteEl) noteEl.focus(); return; }
+    window.stationVaultPendingDamaged = false;
     stationVaultCloseSheet_();
-    stationVaultSetStatusMany_(act.unitIds, status, String(note).trim());
+    stationVaultSetStatusMany_(act.unitIds, status, note);
     return;
   }
+  window.stationVaultPendingDamaged = false;
   stationVaultCloseSheet_();
   stationVaultSetStatusMany_(act.unitIds, status);
 };
@@ -2830,24 +2862,13 @@ function stationApplyGunConfig_(cfg) {
   stationSyncPanelReadModeUI_();
 }
 
-/** Keep the Settings power slider and the on-screen sensitivity bar showing the same value. */
+/** Keep the Settings power slider in sync with the gun. */
 function stationSyncPowerControls_(val) {
   const setEl = document.getElementById('station-set-power');
   const setOut = document.getElementById('station-set-power-out');
-  const mainEl = document.getElementById('station-main-power');
-  const mainOut = document.getElementById('station-main-power-out');
-  if (val != null) {
-    if (setEl) setEl.value = val;
-    if (mainEl) mainEl.value = val;
-  }
-  const shown = (mainEl && mainEl.value) || (setEl && setEl.value) || '';
+  if (val != null && setEl) setEl.value = val;
+  const shown = (setEl && setEl.value) || val || '';
   if (setOut) setOut.textContent = shown ? (shown + ' dBm') : '—';
-  if (mainOut) mainOut.textContent = shown ? (shown + ' dBm') : '—';
-  // Mirror the min/max bounds the gun reported (seeded onto the settings slider).
-  if (setEl && mainEl) {
-    if (setEl.min) mainEl.min = setEl.min;
-    if (setEl.max) mainEl.max = setEl.max;
-  }
 }
 
 window.stationOnPowerInput = function() {
@@ -2861,19 +2882,6 @@ window.stationSavePower = function() {
   stationSetStoredSetting_(STATION_POWER_KEY, powerEl.value);
   stationSyncPowerControls_(powerEl.value);
   stationApplyGunSetting_('power', parseInt(powerEl.value, 10));
-};
-
-window.stationOnMainPowerInput = function() {
-  const mainEl = document.getElementById('station-main-power');
-  if (mainEl) stationSyncPowerControls_(mainEl.value);
-};
-
-window.stationSaveMainPower = function() {
-  const mainEl = document.getElementById('station-main-power');
-  if (!mainEl) return;
-  stationSetStoredSetting_(STATION_POWER_KEY, mainEl.value);
-  stationSyncPowerControls_(mainEl.value);
-  stationApplyGunSetting_('power', parseInt(mainEl.value, 10));
 };
 
 window.stationSaveScanMode = function() {

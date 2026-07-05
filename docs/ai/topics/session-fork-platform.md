@@ -2,9 +2,9 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Status:** Backlog — shared architecture for branched session types below.
+**Status:** Backlog — shared architecture for branched session types below. **Do not implement fork until [active/data-access-layer.md](../active/data-access-layer.md) Phase 3B+** (router + session lifecycle).
 
-**Related:** [session-fork-platform.md](session-fork-platform.md) · [data-cache-engine.md](data-cache-engine.md)
+**Prerequisite campaign:** [../active/data-access-layer.md](../active/data-access-layer.md)
 
 **Branches:**
 

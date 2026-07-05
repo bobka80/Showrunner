@@ -6,9 +6,7 @@
 
 **Replaces/enhances:** current timeline **single-editor** presence lock (`reportProjectPresence`, `🔒 NAME EDITING` in `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`).
 
-**Status:** Backlog
-
-**Last swept:** 2026-06-30
+**Status:** Backlog — **blocked on DAL campaign** ([../active/data-access-layer.md](../active/data-access-layer.md)).
 
 ---
 
