@@ -471,6 +471,7 @@ function syncAssetStatusNoteVisibility_() {
 }
 
 function saveAsset() {
+    let isBulk = Array.isArray(currentEditAssetId) && currentEditAssetId.length > 1;
     
     if (!isBulk) {
         const name = document.getElementById('asset-name').value;
