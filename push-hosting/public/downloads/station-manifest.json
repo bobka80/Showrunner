@@ -1,14 +1,28 @@
 {
-  "versionName": "0.1.14",
-  "versionCode": 16,
+  "versionName": "0.1.15",
+  "versionCode": 17,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-04T14:43:42.873Z",
-  "sizeBytes": 12040689,
+  "updatedAt": "2026-07-05T14:05:27.996Z",
+  "sizeBytes": 12057073,
   "notes": [
-    "Cleanup build — retire native diagnostic status spam"
+    "BLE forceReconnect + watchdog",
+    "native toasts replace status bar",
+    "Settings Reconnect gun bridge (AndroidStation.reconnectGun)",
+    "Gun-late connect: faster retry + SDK status sync"
   ],
   "history": [
+    {
+      "versionName": "0.1.15",
+      "versionCode": 17,
+      "date": "2026-07-05T14:05:27.996Z",
+      "notes": [
+        "BLE forceReconnect + watchdog",
+        "native toasts replace status bar",
+        "Settings Reconnect gun bridge (AndroidStation.reconnectGun)",
+        "Gun-late connect: faster retry + SDK status sync"
+      ]
+    },
     {
       "versionName": "0.1.14",
       "versionCode": 16,

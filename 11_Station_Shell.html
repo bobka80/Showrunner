@@ -28,7 +28,9 @@ html.station-device-root #station-shell {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 14px 16px;
+  padding: 8px 12px;
+  min-height: 46px;
+  box-sizing: border-box;
   background: #111114;
   border-bottom: 1px solid #27272a;
   flex-shrink: 0;
@@ -72,31 +74,37 @@ html.station-device-root #station-shell {
   display: none;
   position: relative;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: stretch;
   flex-shrink: 0;
 }
 html.station-device-root #station-device-controls { display: flex; }
 .station-device-controls__row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .station-ctrl-scan {
   min-width: 0;
-  padding: 6px 10px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px solid #f97316;
   background: rgba(249, 115, 22, 0.15);
   color: #fb923c;
   cursor: pointer;
 }
 .station-ctrl-scan.is-panel-open {
-  border-radius: 10px 10px 0 0;
-  border-bottom-color: transparent;
+  border-color: #fb923c;
+  background: rgba(249, 115, 22, 0.28);
 }
 .station-ctrl-cog {
   width: 30px;
@@ -112,28 +120,49 @@ html.station-device-root #station-device-controls { display: flex; }
   font-size: 15px;
   cursor: pointer;
 }
-/* Scan panel — dropdown tab under Scan button */
+/* Scan panel — full height below header when open */
 #station-scan-panel {
   display: none;
-  position: relative;
-  width: min(380px, calc(100vw - 24px));
-  max-height: min(72vh, 520px);
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
   flex-direction: column;
   background: #0d0d10;
-  border: 1px solid #f97316;
-  border-top: none;
-  border-radius: 0 0 12px 12px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  border: none;
+  border-top: 1px solid #f97316;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   overflow: hidden;
+  z-index: 60040;
 }
 #station-scan-panel.is-open { display: flex; }
 .station-scan-panel__body {
   flex: 1;
-  overflow-y: auto;
-  padding: 12px 14px 16px;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+}
+#station-scan-panel.is-open .station-scan-feed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
+}
+#station-scan-panel.is-open .station-scan-feed__list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+#station-scan-panel.is-open .station-scan-panel__last {
+  flex-shrink: 0;
 }
 .station-scan-panel__presets {
   display: flex;
@@ -890,7 +919,6 @@ html.station-device-root #station-device-controls { display: flex; }
     <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
     <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
     <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
-    <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" onclick="stationDeviceSignOut()">Sign out device</button>
   </div>
 </div>
 
@@ -991,6 +1019,10 @@ html.station-device-root #station-device-controls { display: flex; }
       <div class="station-field" style="margin-top:12px;">
         <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f97316; color:#fb923c;" onclick="stationReconnectGun_()">Reconnect gun</button>
         <div class="station-field__hint">Use when Bluetooth shows connected but scans do not work — forces a fresh driver handshake.</div>
+      </div>
+      <div class="station-field" style="margin-top:8px;">
+        <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="stationDeviceSignOut()">Sign out device</button>
+        <div class="station-field__hint">Signs out this station profile (e.g. CW1) from Showrunner — not the hosted crew member.</div>
       </div>
     </div>
 
@@ -1837,6 +1869,19 @@ function stationScanPanelOutsideClick_(e) {
   stationCloseScanPanel();
 }
 
+function stationPositionScanPanel_() {
+  var header = document.querySelector('.station-shell-header');
+  var panel = document.getElementById('station-scan-panel');
+  if (!header || !panel) return;
+  var top = header.getBoundingClientRect().bottom;
+  panel.style.top = top + 'px';
+  panel.style.bottom = '0';
+}
+
+function stationScanPanelResize_() {
+  if (window.stationScanPanelOpen) stationPositionScanPanel_();
+}
+
 window.stationOpenScanPanel = function() {
   window.stationScanPanelOpen = true;
   const panel = document.getElementById('station-scan-panel');
@@ -1844,10 +1889,12 @@ window.stationOpenScanPanel = function() {
   if (panel) {
     panel.classList.add('is-open');
     panel.setAttribute('aria-hidden', 'false');
+    stationPositionScanPanel_();
   }
   if (btn) btn.classList.add('is-panel-open');
   stationSyncPanelReadModeUI_();
   stationPanelRenderLast_();
+  window.addEventListener('resize', stationScanPanelResize_);
   setTimeout(function() {
     document.addEventListener('pointerdown', stationScanPanelOutsideClick_, true);
   }, 0);
@@ -1857,11 +1904,14 @@ window.stationCloseScanPanel = function() {
   window.stationScanPanelOpen = false;
   window.stationPanelPendingStatus = null;
   document.removeEventListener('pointerdown', stationScanPanelOutsideClick_, true);
+  window.removeEventListener('resize', stationScanPanelResize_);
   const panel = document.getElementById('station-scan-panel');
   const btn = document.getElementById('station-btn-scan-panel');
   if (panel) {
     panel.classList.remove('is-open');
     panel.setAttribute('aria-hidden', 'true');
+    panel.style.top = '';
+    panel.style.bottom = '';
   }
   if (btn) btn.classList.remove('is-panel-open');
   const noteEl = document.getElementById('station-panel-note');
@@ -2727,6 +2777,8 @@ function stationWatchPaExit_() {
 
 window.stationDeviceSignOut = function() {
   if (!confirm('Sign this warehouse device out of Showrunner?')) return;
+  stationCloseSettings();
+  stationCloseScanPanel();
   stationWriteHostSession_(null);
   try {
     localStorage.removeItem('sm_session_token');
