@@ -95,6 +95,7 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).
 - [ ] **Tag-map / new-equipment RFID provisioning UX** on the station
 - [ ] **QR at gate / Gate-at-door** (when ready) — camera scan UID or bulk door read → same checkout confirm as RFID EPC; exception re-scan path (hardware TBD)
+- [x] **Phone QR scan panel (v437+)** — mobile header Scan dropdown + camera; vault status (Maintenance/Damaged/Broken/Repaired) via `setMobileAssetStatus`; profile-tier permissions; PA checkout forward **deferred**
 
 ## RFID badge lifecycle & fragile points (enrollment → DB → login)
 

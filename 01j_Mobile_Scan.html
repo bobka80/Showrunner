@@ -1,0 +1,453 @@
+<script>
+/**
+ * 01j_Mobile_Scan.html
+ * Phone QR scan panel — gun-parity dropdown from mobile header (not station shell).
+ * @INDEX: MOBILE -> QR scan panel
+ */
+
+window.mobileScanBootstrap = null;
+window.mobileScanEquipMap = window.mobileScanEquipMap || {};
+window.mobileScanPanelOpen = false;
+window.mobileScanSelection = null;
+window.mobileScanPendingStatus = null;
+window.mobileScanRecent = window.mobileScanRecent || [];
+
+var MOBILE_SCAN_MAP_KEY = 'sm_mobile_scan_map_v1';
+var MOBILE_SCAN_FEED_MAX = 8;
+var MOBILE_SCAN_DEDUPE_MS = 2000;
+var MOBILE_SCAN_LAST_KEY = '';
+var MOBILE_SCAN_LAST_TS = 0;
+var mobileQrEngine = null;
+var mobileQrStarting = false;
+
+function mobileScanNormalize_(raw) {
+  return String(raw == null ? '' : raw).trim().toLowerCase();
+}
+
+function mobileScanPerm_(key) {
+  var boot = window.mobileScanBootstrap;
+  if (boot && boot.permissions && boot.permissions[key] === true) return true;
+  if (key === 'station_vault_damaged' && boot && boot.permissions && boot.permissions.station_vault_broken === true) return true;
+  return false;
+}
+
+function mobileScanStatusColor_(status) {
+  var s = String(status || 'Active').toLowerCase();
+  if (s.indexOf('maintenance') !== -1) return '#f59e0b';
+  if (s.indexOf('damaged') !== -1) return '#eab308';
+  if (s.indexOf('broken') !== -1 || s.indexOf('retired') !== -1) return '#ef4444';
+  return '#10b981';
+}
+
+function mobileScanEsc_(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function mobileScanTimeLabel_() {
+  var d = new Date();
+  var h = d.getHours();
+  var m = d.getMinutes();
+  return h + ':' + (m < 10 ? '0' : '') + m;
+}
+
+function mobileScanToast_(msg, isError) {
+  var el = document.getElementById('mobile-scan-toast');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'mobile-scan-toast' + (isError ? ' is-error' : ' is-ok');
+  el.style.display = 'block';
+  clearTimeout(window._mobileScanToastTimer);
+  window._mobileScanToastTimer = setTimeout(function() {
+    el.style.display = 'none';
+  }, 2800);
+}
+
+function mobileScanResolve_(raw) {
+  var key = mobileScanNormalize_(raw);
+  if (!key) return null;
+  var m = window.mobileScanEquipMap || {};
+  if (m[key]) return m[key];
+  if (m['uid:' + key]) return m['uid:' + key];
+  if (typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length) {
+    for (var i = 0; i < globalAssets.length; i++) {
+      var a = globalAssets[i];
+      var uid = mobileScanNormalize_(a.id);
+      var rfid = mobileScanNormalize_(a.rfidTag || a.rfid_tag || '');
+      if (uid === key || rfid === key) {
+        return {
+          kind: 'equipment',
+          name: a.name || '',
+          unitId: a.id,
+          unitNumber: a.unitNumber || a.unit_number || '',
+          status: a.status || 'Active',
+          statusNote: a.statusNote || a.status_note || ''
+        };
+      }
+    }
+  }
+  return null;
+}
+
+function mobileScanUpdateEquipEntry_(unitId, status, statusNote) {
+  if (!unitId) return;
+  var map = window.mobileScanEquipMap || {};
+  Object.keys(map).forEach(function(k) {
+    var e = map[k];
+    if (e && String(e.unitId) === String(unitId)) {
+      e.status = status;
+      e.statusNote = statusNote || '';
+    }
+  });
+  try {
+    localStorage.setItem(MOBILE_SCAN_MAP_KEY, JSON.stringify({ map: map, ts: Date.now() }));
+  } catch (e) { /* ignore */ }
+  if (typeof globalAssets !== 'undefined' && globalAssets) {
+    globalAssets.forEach(function(a) {
+      if (String(a.id) === String(unitId)) {
+        a.status = status;
+        a.statusNote = statusNote || '';
+        a.status_note = statusNote || '';
+      }
+    });
+  }
+}
+
+function mobileScanPushFeed_(raw, hit) {
+  var key = mobileScanNormalize_(raw);
+  var now = Date.now();
+  if (key && key === MOBILE_SCAN_LAST_KEY && (now - MOBILE_SCAN_LAST_TS) < MOBILE_SCAN_DEDUPE_MS) return;
+  MOBILE_SCAN_LAST_KEY = key;
+  MOBILE_SCAN_LAST_TS = now;
+
+  var label = 'Unknown';
+  if (hit && hit.kind === 'crew') label = hit.name || 'Crew badge';
+  else if (hit && hit.name) label = hit.name + (hit.unitNumber ? (' #' + hit.unitNumber) : '');
+  else label = raw || 'Unknown';
+
+  window.mobileScanRecent.unshift({ raw: raw, label: label, hit: hit, time: mobileScanTimeLabel_() });
+  if (window.mobileScanRecent.length > MOBILE_SCAN_FEED_MAX) {
+    window.mobileScanRecent.length = MOBILE_SCAN_FEED_MAX;
+  }
+  mobileScanRenderFeed_();
+}
+
+function mobileScanRenderFeed_() {
+  var list = document.getElementById('mobile-scan-feed-list');
+  if (!list) return;
+  var rows = window.mobileScanRecent || [];
+  if (!rows.length) {
+    list.innerHTML = '<span class="mobile-scan-feed__empty">Point camera at asset QR…</span>';
+    return;
+  }
+  list.innerHTML = rows.map(function(r) {
+    var name = mobileScanEsc_(r.label);
+    return '<div class="mobile-scan-feed__row"><span class="name">' + name + '</span><span class="time">' + mobileScanEsc_(r.time) + '</span></div>';
+  }).join('');
+}
+
+function mobileScanHandleDecode_(raw) {
+  if (!raw) return;
+  var hit = mobileScanResolve_(raw);
+  mobileScanPushFeed_(raw, hit);
+  if (hit && hit.kind === 'crew') {
+    window.mobileScanSelection = { kind: 'crew', tag: raw, name: hit.name };
+  } else if (hit && hit.unitId) {
+    window.mobileScanSelection = {
+      kind: 'equipment',
+      tag: raw,
+      unitId: hit.unitId,
+      name: hit.name,
+      unitNumber: hit.unitNumber,
+      status: hit.status || 'Active',
+      statusNote: hit.statusNote || ''
+    };
+  } else {
+    window.mobileScanSelection = { kind: 'unknown', tag: raw };
+  }
+  mobileScanRenderLast_();
+  if (navigator.vibrate) {
+    try { navigator.vibrate(40); } catch (e) { /* ignore */ }
+  }
+}
+
+function mobileScanRenderLast_() {
+  var nameEl = document.getElementById('mobile-panel-last-name');
+  var metaEl = document.getElementById('mobile-panel-last-meta');
+  var statusEl = document.getElementById('mobile-panel-last-status');
+  var noteEl = document.getElementById('mobile-panel-note');
+  var sel = window.mobileScanSelection;
+  if (!nameEl) return;
+  if (!sel) {
+    nameEl.textContent = 'Scan equipment to select';
+    if (metaEl) metaEl.textContent = '';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) { noteEl.style.display = 'none'; noteEl.value = ''; }
+    mobileScanRenderActions_();
+    return;
+  }
+  if (sel.kind === 'crew') {
+    nameEl.textContent = sel.name || 'Crew badge';
+    if (metaEl) metaEl.textContent = 'Crew badge — status actions apply to equipment only';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) noteEl.style.display = 'none';
+    mobileScanRenderActions_();
+    return;
+  }
+  if (sel.kind === 'unknown') {
+    nameEl.textContent = 'Unknown code';
+    if (metaEl) metaEl.textContent = sel.tag || '';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) noteEl.style.display = 'none';
+    mobileScanRenderActions_();
+    return;
+  }
+  nameEl.textContent = sel.name || 'Equipment';
+  if (metaEl) metaEl.textContent = (sel.unitNumber ? ('Unit ' + sel.unitNumber + ' · ') : '') + (sel.tag || '');
+  var st = sel.status || 'Active';
+  var color = mobileScanStatusColor_(st);
+  if (statusEl) {
+    statusEl.innerHTML = '<span style="color:' + color + '; font-weight:800;">' + mobileScanEsc_(String(st).toUpperCase()) + '</span>'
+      + (sel.statusNote ? (' — ' + mobileScanEsc_(sel.statusNote)) : '');
+  }
+  if (noteEl && window.mobileScanPendingStatus !== 'Damaged') {
+    noteEl.style.display = 'none';
+    noteEl.value = sel.statusNote || '';
+  }
+  mobileScanRenderActions_();
+}
+
+function mobileScanRenderActions_() {
+  var wrap = document.getElementById('mobile-panel-actions');
+  if (!wrap) return;
+  var sel = window.mobileScanSelection;
+  if (!sel || sel.kind !== 'equipment') {
+    wrap.innerHTML = '<div class="mobile-scan-panel__hint">' + (sel && sel.kind === 'crew'
+      ? 'Scan a tagged piece of equipment.'
+      : 'Scan a tagged piece of equipment.') + '</div>';
+    return;
+  }
+  var st = String(sel.status || 'Active').toLowerCase();
+  var btns = [];
+  function add(label, status, style) {
+    btns.push('<button type="button" class="btn-outline btn-sm" style="margin:0;' + (style || '') + '" onclick="mobileScanAskStatus_(\'' + status + '\')">' + label + '</button>');
+  }
+  if (st === 'active' || st === '') {
+    if (mobileScanPerm_('station_vault_maintenance')) add('Maintenance', 'Maintenance', 'border-color:#f59e0b;color:#f59e0b;');
+    if (mobileScanPerm_('station_vault_damaged')) add('Damaged', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (mobileScanPerm_('station_vault_broken')) add('Broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+  } else if (st.indexOf('damaged') !== -1) {
+    if (mobileScanPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+    if (mobileScanPerm_('station_vault_damaged')) add('Edit problem', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (mobileScanPerm_('station_vault_broken')) add('Mark broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+    if (mobileScanPerm_('station_vault_maintenance')) add('Maintenance', 'Maintenance', 'border-color:#f59e0b;color:#f59e0b;');
+  } else if (st.indexOf('broken') !== -1 || st.indexOf('maintenance') !== -1) {
+    if (mobileScanPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+    if (st.indexOf('maintenance') !== -1 && mobileScanPerm_('station_vault_damaged')) add('Damaged', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (st.indexOf('maintenance') !== -1 && mobileScanPerm_('station_vault_broken')) add('Broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+  } else {
+    if (mobileScanPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+  }
+  if (window.mobileScanPendingStatus === 'Damaged') {
+    btns.push('<button type="button" class="btn-main btn-sm" style="margin:0; flex:1 1 100%;" onclick="mobileScanConfirmDamaged_()">Save damaged</button>');
+    btns.push('<button type="button" class="btn-close btn-sm" style="margin:0;" onclick="mobileScanCancelNote_()">Cancel</button>');
+  }
+  wrap.innerHTML = btns.join('');
+}
+
+window.mobileScanAskStatus_ = function(status) {
+  var sel = window.mobileScanSelection;
+  if (!sel || sel.kind !== 'equipment') return;
+  if (status === 'Damaged') {
+    window.mobileScanPendingStatus = 'Damaged';
+    var noteEl = document.getElementById('mobile-panel-note');
+    if (noteEl) {
+      noteEl.style.display = 'block';
+      noteEl.value = sel.statusNote || '';
+      noteEl.focus();
+    }
+    mobileScanRenderActions_();
+    return;
+  }
+  var noteEl = document.getElementById('mobile-panel-note');
+  var note = (noteEl && noteEl.value) ? noteEl.value.trim() : '';
+  mobileScanCommitStatus_(status, note);
+};
+
+window.mobileScanConfirmDamaged_ = function() {
+  var noteEl = document.getElementById('mobile-panel-note');
+  var note = (noteEl && noteEl.value) ? noteEl.value.trim() : '';
+  if (!note) {
+    mobileScanToast_('Describe the problem (required for Damaged).', true);
+    if (noteEl) noteEl.focus();
+    return;
+  }
+  mobileScanCommitStatus_('Damaged', note);
+};
+
+window.mobileScanCancelNote_ = function() {
+  window.mobileScanPendingStatus = null;
+  var noteEl = document.getElementById('mobile-panel-note');
+  if (noteEl) noteEl.style.display = 'none';
+  mobileScanRenderActions_();
+};
+
+function mobileScanCommitStatus_(status, note) {
+  var sel = window.mobileScanSelection;
+  if (!sel || !sel.unitId) return;
+  mobileScanToast_('Saving…', false);
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.mobileScanPendingStatus = null;
+      if (!res || !res.success) {
+        mobileScanToast_((res && res.error) ? res.error : 'Could not update status.', true);
+        return;
+      }
+      sel.status = res.status;
+      sel.statusNote = res.statusNote || '';
+      mobileScanUpdateEquipEntry_(sel.unitId, res.status, res.statusNote);
+      mobileScanRenderLast_();
+      mobileScanToast_('Updated → ' + (res.label || res.status), false);
+    })
+    .withFailureHandler(function(err) {
+      mobileScanToast_('Error: ' + (err && err.message ? err.message : String(err)), true);
+    })
+    .setMobileAssetStatus(ACTIVE_USER_NAME, sel.unitId, status, note || '');
+}
+
+function mobileScanPositionPanel_() {
+  var wrap = document.getElementById('mobile-header-wrap');
+  var panel = document.getElementById('mobile-scan-panel');
+  if (!wrap || !panel) return;
+  var top = wrap.getBoundingClientRect().bottom;
+  panel.style.top = top + 'px';
+  panel.style.bottom = '0';
+}
+
+function mobileScanPanelResize_() {
+  if (window.mobileScanPanelOpen) mobileScanPositionPanel_();
+}
+
+function mobileScanPanelOutsideClick_(e) {
+  var ctrls = document.getElementById('mobile-scan-controls');
+  var tools = document.getElementById('mobile-header-tools');
+  if ((ctrls && ctrls.contains(e.target)) || (tools && tools.contains(e.target))) return;
+  mobileCloseScanPanel();
+}
+
+window.mobileToggleScanPanel = function() {
+  if (window.mobileScanPanelOpen) mobileCloseScanPanel();
+  else mobileOpenScanPanel();
+};
+
+window.mobileOpenScanPanel = function() {
+  if (window.IS_STATION_DEVICE) return;
+  window.mobileScanPanelOpen = true;
+  var panel = document.getElementById('mobile-scan-panel');
+  var btn = document.getElementById('mobile-btn-scan-panel');
+  if (panel) {
+    panel.classList.add('is-open');
+    panel.setAttribute('aria-hidden', 'false');
+    mobileScanPositionPanel_();
+  }
+  if (btn) btn.classList.add('is-panel-open');
+  document.body.classList.add('mobile-scan-panel-open');
+  mobileScanRenderLast_();
+  window.addEventListener('resize', mobileScanPanelResize_);
+  setTimeout(function() {
+    document.addEventListener('click', mobileScanPanelOutsideClick_, true);
+  }, 0);
+  mobileScanStartCamera_();
+};
+
+window.mobileCloseScanPanel = function() {
+  window.mobileScanPanelOpen = false;
+  var panel = document.getElementById('mobile-scan-panel');
+  var btn = document.getElementById('mobile-btn-scan-panel');
+  if (panel) {
+    panel.classList.remove('is-open');
+    panel.setAttribute('aria-hidden', 'true');
+  }
+  if (btn) btn.classList.remove('is-panel-open');
+  document.body.classList.remove('mobile-scan-panel-open');
+  window.removeEventListener('resize', mobileScanPanelResize_);
+  document.removeEventListener('click', mobileScanPanelOutsideClick_, true);
+  mobileScanStopCamera_();
+};
+
+function mobileScanStartCamera_() {
+  if (typeof Html5Qrcode === 'undefined') {
+    mobileScanToast_('Camera scanner failed to load.', true);
+    return;
+  }
+  if (mobileQrStarting || mobileQrEngine) return;
+  mobileQrStarting = true;
+  var readerId = 'mobile-qr-reader';
+  mobileQrEngine = new Html5Qrcode(readerId);
+  mobileQrEngine.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
+    function(decoded) { mobileScanHandleDecode_(decoded); },
+    function() { /* frame miss */ }
+  ).then(function() {
+    mobileQrStarting = false;
+  }).catch(function(err) {
+    mobileQrStarting = false;
+    mobileQrEngine = null;
+    mobileScanToast_('Camera: ' + (err && err.message ? err.message : String(err)), true);
+  });
+}
+
+function mobileScanStopCamera_() {
+  if (!mobileQrEngine) return;
+  var engine = mobileQrEngine;
+  mobileQrEngine = null;
+  engine.stop().then(function() {
+    try { engine.clear(); } catch (e) { /* ignore */ }
+  }).catch(function() {
+    try { engine.clear(); } catch (e2) { /* ignore */ }
+  });
+}
+
+function mobileScanLoadMapCache_() {
+  try {
+    var raw = localStorage.getItem(MOBILE_SCAN_MAP_KEY);
+    if (!raw) return;
+    var parsed = JSON.parse(raw);
+    if (parsed && parsed.map) window.mobileScanEquipMap = parsed.map;
+  } catch (e) { /* ignore */ }
+}
+
+function mobileScanRefreshBootstrap_() {
+  if (window.IS_STATION_DEVICE) return;
+  if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+  mobileScanLoadMapCache_();
+  try {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) return;
+        window.mobileScanBootstrap = res;
+        if (res.map) {
+          window.mobileScanEquipMap = res.map;
+          try { localStorage.setItem(MOBILE_SCAN_MAP_KEY, JSON.stringify({ map: res.map, ts: Date.now() })); } catch (e) { /* ignore */ }
+        }
+      })
+      .withFailureHandler(function() { /* ignore */ })
+      .getMobileScanBootstrap(ACTIVE_USER_NAME);
+  } catch (e) { /* ignore */ }
+}
+
+(function mobileScanInit_() {
+  if (window.IS_STATION_DEVICE) return;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mobileScanRefreshBootstrap_);
+  } else {
+    mobileScanRefreshBootstrap_();
+  }
+})();
+</script>
+
+<div id="mobile-scan-toast" class="mobile-scan-toast" aria-live="polite" aria-atomic="true" style="display:none;"></div>

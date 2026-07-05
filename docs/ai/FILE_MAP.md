@@ -57,6 +57,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`01f_Mobile_Phase_Rail.html`**: Deconstructed mini calendar (phase segments from `fragments`).
 - **`01g_Mobile_Tasks.html`**: MY TASKS view in Mobile Command Center.
 - **`01h_Mobile_Assets.html`**: Compact Project Assets on phone (`mobile-pa-compact`).
+- **`01j_Mobile_Scan.html`**: Phone QR scan panel — header Scan dropdown, camera decode, vault status actions (`getMobileScanBootstrap`, `setMobileAssetStatus` in `Station_Security.js`). Styles: `Styles_Mobile.html`. PA checkout forward deferred.
 - **`01i_Desktop_Lock.html`**: **Desktop lock screen / screensaver** — post-login overlay (session stays valid), Stage Masters bus lanes + hero A, Bahnschrift clock, quick-unlock prefix + full PIN. Server: `Security.js` (`verifyDesktopLockUnlock`, `getDesktopLockPrefix`). Styles: `Styles.html` `.desktop-lock-*`. Full behavior → [topics/ux-platform.md](topics/ux-platform.md).
 
 **Mobile handoff doc:** [MOBILE_CREW_UX.md](MOBILE_CREW_UX.md)

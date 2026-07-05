@@ -5,6 +5,7 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   
   <style>
@@ -2171,12 +2172,17 @@
     background: #1a1a1e !important;
 }
 
-/* --- Mobile header (brand + notifications) --- */
+/* --- Mobile header (brand + profile + scan tools row) --- */
+.mobile-header-wrap {
+    flex-shrink: 0;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid #333;
+}
+
 .mobile-header {
     height: 56px;
     min-height: 56px;
     background: var(--bg-sidebar);
-    border-bottom: 1px solid #333;
     display: flex;
     align-items: center;
     padding: 0 12px;
@@ -2185,9 +2191,258 @@
     box-sizing: border-box;
 }
 
+.mobile-header-top {
+    border-bottom: 1px solid #27272a;
+}
+
+.mobile-header-tools {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    min-height: 40px;
+    padding: 6px 12px;
+    box-sizing: border-box;
+    background: var(--bg-sidebar);
+}
+
+.mobile-header-tools__row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.mobile-scan-controls {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.mobile-ctrl-scan {
+    min-width: 0;
+    height: 30px;
+    box-sizing: border-box;
+    padding: 0 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: 6px;
+    border: 1px solid #f97316;
+    background: rgba(249, 115, 22, 0.15);
+    color: #fb923c;
+    cursor: pointer;
+}
+
+.mobile-ctrl-scan.is-panel-open {
+    border-color: #fb923c;
+    background: rgba(249, 115, 22, 0.28);
+}
+
+.mobile-scan-panel {
+    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    width: 100%;
+    flex-direction: column;
+    background: #0d0d10;
+    border: none;
+    border-top: 1px solid #f97316;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    z-index: 60040;
+}
+
+.mobile-scan-panel.is-open {
+    display: flex;
+}
+
+.mobile-scan-panel__body {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: 10px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mobile-qr-reader-wrap {
+    flex: 1;
+    min-height: 160px;
+    max-height: 42vh;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #111114;
+    border: 1px solid #27272a;
+}
+
+#mobile-qr-reader {
+    width: 100%;
+    height: 100%;
+}
+
+.mobile-qr-reader-wrap video {
+    object-fit: cover;
+}
+
+.mobile-scan-feed {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mobile-scan-feed__label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #71717a;
+}
+
+.mobile-scan-feed__list {
+    max-height: 72px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mobile-scan-feed__row {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 11px;
+    color: #a1a1aa;
+}
+
+.mobile-scan-feed__row:first-child {
+    color: #10b981;
+    font-weight: 700;
+}
+
+.mobile-scan-feed__row .name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mobile-scan-feed__row .time {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: #52525b;
+}
+
+.mobile-scan-feed__empty {
+    font-size: 12px;
+    color: #52525b;
+}
+
+.mobile-scan-panel__last {
+    flex-shrink: 0;
+    border-top: 1px solid #27272a;
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mobile-scan-panel__last-name {
+    font-size: 15px;
+    font-weight: 900;
+    color: #fff;
+}
+
+.mobile-scan-panel__last-meta {
+    font-size: 11px;
+    color: #71717a;
+    word-break: break-all;
+}
+
+.mobile-scan-panel__last-status {
+    font-size: 12px;
+}
+
+.mobile-scan-panel__note {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #3f3f46;
+    background: #18181b;
+    color: #f4f4f5;
+    font-size: 13px;
+    resize: vertical;
+}
+
+.mobile-scan-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.mobile-scan-panel__actions button {
+    margin: 0;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 120px;
+}
+
+.mobile-scan-panel__hint {
+    font-size: 11px;
+    color: #71717a;
+    line-height: 1.4;
+}
+
+.mobile-scan-feed__status {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.mobile-scan-feed__status.is-damaged { color: #eab308; }
+.mobile-scan-feed__status.is-broken { color: #ef4444; }
+.mobile-scan-feed__status.is-maintenance { color: #f59e0b; }
+
+body.mobile-scan-panel-open {
+    overflow: hidden;
+}
+
+.mobile-scan-toast {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: 24px;
+    z-index: 60100;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+}
+
+.mobile-scan-toast.is-ok {
+    background: rgba(16, 185, 129, 0.92);
+    color: #fff;
+}
+
+.mobile-scan-toast.is-error {
+    background: rgba(239, 68, 68, 0.92);
+    color: #fff;
+}
+
 .mobile-header-back {
     display: none;
     flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
     background: transparent;
     border: none;
     color: var(--accent);
@@ -2224,7 +2479,7 @@
 #push-toast-container {
     left: 12px;
     right: 12px;
-    top: 64px;
+    top: 108px;
 }
 
 .mobile-header-title {
@@ -2240,9 +2495,9 @@
 
 .mobile-header-notif-btn {
     flex-shrink: 0;
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
     padding: 0 !important;
     margin: 0 !important;
     border-left: none !important;
@@ -3498,22 +3753,54 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
 <!-- @INDEX: SHELL -> Mobile Dashboard -->
 <!-- MOBILE DASHBOARD SHELL (Takes over on phones) -->
 <div id="mobile-dashboard" style="display:none;">
-    <div id="mobile-header" class="mobile-header">
-        <button type="button" id="mobile-back-btn" class="mobile-header-back" onclick="goMobileHome()">⬅ BACK</button>
-        <div id="mobile-header-brand" class="mobile-header-brand">
-            <svg class="mobile-header-logo" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
-            <span class="mobile-header-wordmark">SHOWRUNNER</span>
+    <div id="mobile-header-wrap" class="mobile-header-wrap">
+        <div id="mobile-header" class="mobile-header mobile-header-top">
+            <button type="button" id="mobile-back-btn" class="mobile-header-back" onclick="goMobileHome()" title="Back">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span>BACK</span>
+            </button>
+            <div id="mobile-header-brand" class="mobile-header-brand">
+                <svg class="mobile-header-logo" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
+                <span class="mobile-header-wordmark">SHOWRUNNER</span>
+            </div>
+            <div id="mobile-title" class="mobile-header-title">HOME</div>
+            <button type="button" id="mobile-header-person-btn" class="nav-icon-btn mobile-header-person-btn" onclick="openMobilePersonalHub()" title="Personal Hub">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </button>
         </div>
-        <div id="mobile-title" class="mobile-header-title">HOME</div>
-        <button type="button" id="mobile-header-person-btn" class="nav-icon-btn mobile-header-person-btn" onclick="openMobilePersonalHub()" title="Personal Hub">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-        </button>
-        <button type="button" id="mobile-header-notif-btn" class="nav-icon-btn mobile-header-notif-btn" onclick="openMobileNotifs()" title="Notifications">
-            <span class="mobile-header-notif-wrap">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                <span id="mobile-notif-badge" class="mobile-header-notif-badge">0</span>
-            </span>
-        </button>
+        <div id="mobile-header-tools" class="mobile-header-tools">
+            <div class="mobile-header-tools__row">
+                <div id="mobile-scan-controls" class="mobile-scan-controls">
+                    <button type="button" id="mobile-btn-scan-panel" class="mobile-ctrl-scan" onclick="mobileToggleScanPanel()" title="Scan panel">Scan</button>
+                    <div id="mobile-scan-panel" class="mobile-scan-panel" aria-label="QR scan panel" aria-hidden="true">
+                        <div class="mobile-scan-panel__body">
+                            <div id="mobile-qr-reader-wrap" class="mobile-qr-reader-wrap">
+                                <div id="mobile-qr-reader"></div>
+                            </div>
+                            <div id="mobile-scan-feed" class="mobile-scan-feed" aria-label="Recent scans">
+                                <div class="mobile-scan-feed__label">Recent scans</div>
+                                <div id="mobile-scan-feed-list" class="mobile-scan-feed__list">
+                                    <span class="mobile-scan-feed__empty">Point camera at asset QR…</span>
+                                </div>
+                            </div>
+                            <div class="mobile-scan-panel__last" id="mobile-panel-last">
+                                <div class="mobile-scan-panel__last-name" id="mobile-panel-last-name">Scan equipment to select</div>
+                                <div class="mobile-scan-panel__last-meta" id="mobile-panel-last-meta"></div>
+                                <div class="mobile-scan-panel__last-status" id="mobile-panel-last-status"></div>
+                                <textarea id="mobile-panel-note" class="mobile-scan-panel__note" rows="2" placeholder="Describe the problem (required) — e.g. gobo rotation error" style="display:none;"></textarea>
+                                <div class="mobile-scan-panel__actions" id="mobile-panel-actions"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="mobile-header-notif-btn" class="nav-icon-btn mobile-header-notif-btn" onclick="openMobileNotifs()" title="Notifications">
+                    <span class="mobile-header-notif-wrap">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        <span id="mobile-notif-badge" class="mobile-header-notif-badge">0</span>
+                    </span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <div id="mobile-view-home" class="mobile-view mobile-view-home">
@@ -6617,6 +6904,10 @@ html.station-device-root #station-device-controls { display: flex; }
 </div>
 
 
+
+
+
+<div id="mobile-scan-toast" class="mobile-scan-toast" aria-live="polite" aria-atomic="true" style="display:none;"></div>
 
 <div id="edit-modal-overlay" class="modal-overlay">
   <div class="modal">

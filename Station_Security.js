@@ -372,57 +372,202 @@ function getStationShellBootstrap(deviceActor) {
 // @INDEX: STATION_SHELL -> Equipment RFID map (epc -> equipment name/unit)
 // Preloaded on the station shell so scanned tags resolve to a human name/unit
 // instantly and offline. Same fragile trim/lowercase matching contract as crew tags.
+function buildEquipmentScanMapFromSheets_(sheets) {
+  const data = getSheetData(sheets.assets);
+  const map = data.hMap || getHeaderMap(data);
+  const getCol = (matchStrs) => {
+    const key = Object.keys(map).find(k => matchStrs.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+    return key !== undefined ? map[key] : undefined;
+  };
+  const cUid = getCol(['uid', 'id', 'assetuid']) ?? map['uid'];
+  const cName = getCol(['name', 'assetname', 'itemname']) ?? map['name'];
+  const cUnit = getCol(['unitnumber', 'unit']) ?? map['unit_number'];
+  const cRfid = getCol(['rfidtag', 'rfid']) ?? map['rfid_tag'];
+  const cStatus = getCol(['status', 'lifecycle']) ?? map['status'];
+  const cStatusNote = getCol(['statusnote', 'issuenote', 'defectnote']) ?? map['status_note'];
+
+  const out = {};
+  if (cUid !== undefined) {
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][cUid]) continue;
+      const entry = {
+        kind: 'equipment',
+        name: cName !== undefined ? String(data[i][cName] || '') : '',
+        unitId: String(data[i][cUid] || '').trim(),
+        unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : '',
+        status: cStatus !== undefined ? String(data[i][cStatus] || '') : '',
+        statusNote: cStatusNote !== undefined ? String(data[i][cStatusNote] || '') : ''
+      };
+      const uidKey = normalizeStationRfidTag(entry.unitId);
+      if (uidKey) out['uid:' + uidKey] = entry;
+      if (cRfid !== undefined) {
+        const tag = normalizeStationRfidTag(data[i][cRfid]);
+        if (tag) out[tag] = entry;
+      }
+    }
+  }
+
+  const crewData = getSheetData(sheets.crew);
+  const crewMap = getHeaderMap(crewData);
+  if (crewMap['rfid_tag'] !== undefined) {
+    for (let i = 1; i < crewData.length; i++) {
+      const tag = normalizeStationRfidTag(crewData[i][crewMap['rfid_tag']]);
+      if (!tag || out[tag]) continue;
+      const nm = getSheetCell(crewData[i], crewMap, 'Name');
+      if (!nm) continue;
+      out[tag] = { kind: 'crew', name: String(nm) };
+    }
+  }
+  return out;
+}
+
+function getMobileScanStatusPermissions_(crewName) {
+  const out = {
+    station_vault_maintenance: false,
+    station_vault_repair: false,
+    station_vault_broken: false,
+    station_vault_damaged: false
+  };
+  if (!crewName) return out;
+  if (crewName.toLowerCase().trim() === 'bogdan') {
+    Object.keys(out).forEach(k => { out[k] = true; });
+    return out;
+  }
+  if (verifyBackendPrivilege(crewName, 'MANAGER')) {
+    Object.keys(out).forEach(k => { out[k] = true; });
+    return out;
+  }
+  // Warehouse baseline — any signed-in crew can mark equipment status from the scan panel.
+  out.station_vault_maintenance = true;
+  out.station_vault_broken = true;
+  out.station_vault_damaged = true;
+  out.station_vault_repair = true;
+  return out;
+}
+
+function assertMobileScanStatusPermission_(crewName, statusLabel) {
+  const perms = getMobileScanStatusPermissions_(crewName);
+  const label = String(statusLabel || '').trim();
+  if (!label || label === 'Repaired') {
+    if (!perms.station_vault_repair) {
+      throw new Error('PERMISSION DENIED: Repair not enabled for your profile.');
+    }
+    return;
+  }
+  if (label === 'Maintenance') {
+    if (!perms.station_vault_maintenance) {
+      throw new Error('PERMISSION DENIED: Maintenance not enabled for your profile.');
+    }
+    return;
+  }
+  if (label === 'Broken') {
+    if (!perms.station_vault_broken) {
+      throw new Error('PERMISSION DENIED: Mark broken not enabled for your profile.');
+    }
+    return;
+  }
+  if (label === 'Damaged') {
+    if (!perms.station_vault_damaged) {
+      throw new Error('PERMISSION DENIED: Mark damaged not enabled for your profile.');
+    }
+    return;
+  }
+}
+
 function getStationEquipmentRfidMap(deviceActor) {
   return executeWithRetry(() => {
     if (!actorUsesStationShell(deviceActor)) {
       return { success: false, error: 'Not a station device login.' };
     }
     const sheets = verifyVaultSchema(true);
-    const data = getSheetData(sheets.assets);
-    const map = data.hMap || getHeaderMap(data);
-    const getCol = (matchStrs) => {
-      const key = Object.keys(map).find(k => matchStrs.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
-      return key !== undefined ? map[key] : undefined;
-    };
-    const cUid = getCol(['uid', 'id', 'assetuid']) ?? map['uid'];
-    const cName = getCol(['name', 'assetname', 'itemname']) ?? map['name'];
-    const cUnit = getCol(['unitnumber', 'unit']) ?? map['unit_number'];
-    const cRfid = getCol(['rfidtag', 'rfid']) ?? map['rfid_tag'];
-    const cStatus = getCol(['status', 'lifecycle']) ?? map['status'];
-    const cStatusNote = getCol(['statusnote', 'issuenote', 'defectnote']) ?? map['status_note'];
+    const out = buildEquipmentScanMapFromSheets_(sheets);
+    return { success: true, map: out, count: Object.keys(out).length, ts: Date.now() };
+  });
+}
 
-    const out = {};
-    let count = 0;
-    if (cRfid !== undefined) {
-      for (let i = 1; i < data.length; i++) {
-        const tag = normalizeStationRfidTag(data[i][cRfid]);
-        if (!tag) continue;
-        out[tag] = {
-          kind: 'equipment',
-          name: cName !== undefined ? String(data[i][cName] || '') : '',
-          unitId: cUid !== undefined ? String(data[i][cUid] || '') : '',
-          unitNumber: cUnit !== undefined ? String(data[i][cUnit] || '') : '',
-          status: cStatus !== undefined ? String(data[i][cStatus] || '') : '',
-          statusNote: cStatusNote !== undefined ? String(data[i][cStatusNote] || '') : ''
-        };
-        count++;
-      }
+// @INDEX: MOBILE_SCAN -> Bootstrap (phone QR scan panel)
+function getMobileScanBootstrap(crewName) {
+  return executeWithRetry(() => {
+    if (!crewName) return { success: false, error: 'Not signed in.' };
+    if (actorUsesStationShell(crewName)) {
+      return { success: false, error: 'Use station scan on warehouse devices.' };
     }
-
-    // Crew badges too, so the live strip shows the PERSON's name instead of a raw/unknown tag.
+    const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const crewMap = getHeaderMap(crewData);
-    if (crewMap['rfid_tag'] !== undefined) {
-      for (let i = 1; i < crewData.length; i++) {
-        const tag = normalizeStationRfidTag(crewData[i][crewMap['rfid_tag']]);
-        if (!tag || out[tag]) continue;
-        const nm = getSheetCell(crewData[i], crewMap, 'Name');
-        if (!nm) continue;
-        out[tag] = { kind: 'crew', name: String(nm) };
-        count++;
-      }
+    const cMap = getHeaderMap(crewData);
+    const rbac = resolveHostRbacBundle_(crewName, crewData, cMap);
+    const permissions = getMobileScanStatusPermissions_(crewName);
+    const equipMap = buildEquipmentScanMapFromSheets_(sheets);
+    return {
+      success: true,
+      access: rbac.access || 'CREW',
+      permissions: permissions,
+      map: equipMap,
+      count: Object.keys(equipMap).length,
+      ts: Date.now()
+    };
+  });
+}
+
+// @INDEX: MOBILE_SCAN -> Set asset lifecycle status from phone scan panel
+function setMobileAssetStatus(crewName, assetId, status, note) {
+  return executeWithRetry(() => {
+    if (!crewName) return { success: false, error: 'Not signed in.' };
+    if (actorUsesStationShell(crewName)) {
+      return { success: false, error: 'Use station scan on warehouse devices.' };
     }
-    return { success: true, map: out, count: count, ts: Date.now() };
+    const allowed = ['Active', 'Maintenance', 'Damaged', 'Broken', 'Repaired'];
+    const want = String(status || '').trim();
+    const label = allowed.find(a => a.toLowerCase() === want.toLowerCase());
+    if (!label) return { success: false, error: 'Unknown status.' };
+    try {
+      assertMobileScanStatusPermission_(crewName, label);
+    } catch (permErr) {
+      return { success: false, error: permErr.message || 'Permission denied.' };
+    }
+    const noteText = String(note == null ? '' : note).trim();
+    if (label === 'Damaged' && !noteText) {
+      return { success: false, error: 'Describe what is wrong (required for Damaged).' };
+    }
+    const writeStatus = (label === 'Repaired') ? 'Active' : label;
+    const writeNote = (label === 'Repaired' || writeStatus === 'Active') ? '' : noteText;
+
+    const sheets = verifyVaultSchema();
+    const data = sheets.assets.getDataRange().getValues();
+    const map = {};
+    data[0].forEach((h, i) => { map[h.toString().trim()] = i; });
+    const col = (arr) => {
+      const k = Object.keys(map).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return k !== undefined ? map[k] : undefined;
+    };
+    const cUid = col(['uid', 'id', 'assetuid']) ?? map['uid'];
+    const cStatus = col(['status', 'lifecycle']) ?? map['status'];
+    const cStatusNote = col(['statusnote', 'issuenote', 'defectnote']) ?? map['status_note'];
+    const cName = col(['name', 'assetname', 'itemname']) ?? map['name'];
+    if (cUid === undefined || cStatus === undefined) {
+      return { success: false, error: 'Assets sheet missing uid/status column.' };
+    }
+    const target = String(assetId).trim();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][cUid]).trim() !== target) continue;
+      sheets.assets.getRange(i + 1, cStatus + 1).setValue(writeStatus);
+      if (cStatusNote !== undefined) {
+        sheets.assets.getRange(i + 1, cStatusNote + 1).setValue(writeNote);
+      }
+      if (typeof flushCache !== 'undefined') flushCache();
+      const nm = cName !== undefined ? String(data[i][cName] || '') : target;
+      const auditDetail = crewName + ' set ' + nm + ' → ' + label
+        + (writeNote ? (' ("' + writeNote.slice(0, 120) + '")') : '') + ' [mobile scan].';
+      writeToAuditLog(crewName, 'MOBILE_SCAN_STATUS', 'ASSETS', 'GLOBAL', target, auditDetail);
+      return {
+        success: true,
+        id: target,
+        status: writeStatus,
+        statusNote: writeNote,
+        label: label
+      };
+    }
+    return { success: false, error: 'Asset not found.' };
   });
 }
 

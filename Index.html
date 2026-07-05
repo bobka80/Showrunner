@@ -7,6 +7,7 @@
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   
   <?!= include('Styles'); ?>
@@ -131,22 +132,54 @@
 <!-- @INDEX: SHELL -> Mobile Dashboard -->
 <!-- MOBILE DASHBOARD SHELL (Takes over on phones) -->
 <div id="mobile-dashboard" style="display:none;">
-    <div id="mobile-header" class="mobile-header">
-        <button type="button" id="mobile-back-btn" class="mobile-header-back" onclick="goMobileHome()">⬅ BACK</button>
-        <div id="mobile-header-brand" class="mobile-header-brand">
-            <svg class="mobile-header-logo" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
-            <span class="mobile-header-wordmark">SHOWRUNNER</span>
+    <div id="mobile-header-wrap" class="mobile-header-wrap">
+        <div id="mobile-header" class="mobile-header mobile-header-top">
+            <button type="button" id="mobile-back-btn" class="mobile-header-back" onclick="goMobileHome()" title="Back">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                <span>BACK</span>
+            </button>
+            <div id="mobile-header-brand" class="mobile-header-brand">
+                <svg class="mobile-header-logo" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
+                <span class="mobile-header-wordmark">SHOWRUNNER</span>
+            </div>
+            <div id="mobile-title" class="mobile-header-title">HOME</div>
+            <button type="button" id="mobile-header-person-btn" class="nav-icon-btn mobile-header-person-btn" onclick="openMobilePersonalHub()" title="Personal Hub">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            </button>
         </div>
-        <div id="mobile-title" class="mobile-header-title">HOME</div>
-        <button type="button" id="mobile-header-person-btn" class="nav-icon-btn mobile-header-person-btn" onclick="openMobilePersonalHub()" title="Personal Hub">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-        </button>
-        <button type="button" id="mobile-header-notif-btn" class="nav-icon-btn mobile-header-notif-btn" onclick="openMobileNotifs()" title="Notifications">
-            <span class="mobile-header-notif-wrap">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                <span id="mobile-notif-badge" class="mobile-header-notif-badge">0</span>
-            </span>
-        </button>
+        <div id="mobile-header-tools" class="mobile-header-tools">
+            <div class="mobile-header-tools__row">
+                <div id="mobile-scan-controls" class="mobile-scan-controls">
+                    <button type="button" id="mobile-btn-scan-panel" class="mobile-ctrl-scan" onclick="mobileToggleScanPanel()" title="Scan panel">Scan</button>
+                    <div id="mobile-scan-panel" class="mobile-scan-panel" aria-label="QR scan panel" aria-hidden="true">
+                        <div class="mobile-scan-panel__body">
+                            <div id="mobile-qr-reader-wrap" class="mobile-qr-reader-wrap">
+                                <div id="mobile-qr-reader"></div>
+                            </div>
+                            <div id="mobile-scan-feed" class="mobile-scan-feed" aria-label="Recent scans">
+                                <div class="mobile-scan-feed__label">Recent scans</div>
+                                <div id="mobile-scan-feed-list" class="mobile-scan-feed__list">
+                                    <span class="mobile-scan-feed__empty">Point camera at asset QR…</span>
+                                </div>
+                            </div>
+                            <div class="mobile-scan-panel__last" id="mobile-panel-last">
+                                <div class="mobile-scan-panel__last-name" id="mobile-panel-last-name">Scan equipment to select</div>
+                                <div class="mobile-scan-panel__last-meta" id="mobile-panel-last-meta"></div>
+                                <div class="mobile-scan-panel__last-status" id="mobile-panel-last-status"></div>
+                                <textarea id="mobile-panel-note" class="mobile-scan-panel__note" rows="2" placeholder="Describe the problem (required) — e.g. gobo rotation error" style="display:none;"></textarea>
+                                <div class="mobile-scan-panel__actions" id="mobile-panel-actions"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" id="mobile-header-notif-btn" class="nav-icon-btn mobile-header-notif-btn" onclick="openMobileNotifs()" title="Notifications">
+                    <span class="mobile-header-notif-wrap">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        <span id="mobile-notif-badge" class="mobile-header-notif-badge">0</span>
+                    </span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <div id="mobile-view-home" class="mobile-view mobile-view-home">
@@ -464,6 +497,7 @@
 <?!= include('01e_Mobile_Crew_Hub'); ?>
 <?!= include('01g_Mobile_Tasks'); ?>
 <?!= include('01h_Mobile_Assets'); ?>
+<?!= include('01j_Mobile_Scan'); ?>
 <?!= include('02_Project_Editor_Core'); ?>
 <?!= include('02_Project_Editor_Map'); ?>
 <?!= include('02_Project_Editor_Logistics'); ?>
