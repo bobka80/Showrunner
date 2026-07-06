@@ -252,18 +252,19 @@
     #sr-mobile-qr-perm-btn {
       display: none;
       position: fixed;
-      z-index: 2147483646;
-      width: 36px;
-      height: 36px;
+      z-index: 2147483647;
+      min-width: 44px;
+      min-height: 44px;
       padding: 0;
       border-radius: 8px;
       border: 1px solid #f97316;
-      background: rgba(24, 24, 27, 0.92);
+      background: rgba(24, 24, 27, 0.95);
       color: #fb923c;
       align-items: center;
       justify-content: center;
       touch-action: manipulation;
       cursor: pointer;
+      pointer-events: auto;
       box-shadow: 0 4px 12px rgba(0,0,0,0.45);
     }
     #sr-mobile-qr-perm-btn.is-pulse {
@@ -277,17 +278,18 @@
       display: none;
       position: absolute;
       inset: 0;
-      z-index: 4;
+      z-index: 5;
       border: none;
-      background: rgba(24, 24, 27, 0.88);
+      background: rgba(24, 24, 27, 0.92);
       color: #fb923c;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 900;
       letter-spacing: 0.06em;
       text-align: center;
-      padding: 12px;
+      padding: 16px;
       touch-action: manipulation;
       cursor: pointer;
+      pointer-events: auto;
     }
     #sr-host-qr-inline-start.is-visible { display: flex; align-items: center; justify-content: center; }
 
@@ -376,7 +378,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <script src="/host-boot.js?v=446"></script>
+  <script src="/host-boot.js?v=447"></script>
 
 </body>
 

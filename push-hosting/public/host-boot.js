@@ -44,6 +44,19 @@
   var hostMobileQrInlineStart = null;
   var hostMobileQrOpen = false;
   var hostMobileQrCameraRect = null;
+  var hostMobileQrStartTimer = null;
+
+  function hostMobileScanClearStartTimer_() {
+    if (hostMobileQrStartTimer) {
+      clearTimeout(hostMobileQrStartTimer);
+      hostMobileQrStartTimer = null;
+    }
+  }
+
+  function hostMobileScanUnlockStarting_() {
+    hostMobileQrStarting = false;
+    hostMobileScanClearStartTimer_();
+  }
 
   function hostMobileScanRelay_(payload) {
     if (!frame || !frame.contentWindow) return;
@@ -186,7 +199,7 @@
   }
 
   function hostMobileScanStopEngine_() {
-    hostMobileQrStarting = false;
+    hostMobileScanUnlockStarting_();
     if (!hostMobileQrEngine) return;
     var eng = hostMobileQrEngine;
     hostMobileQrEngine = null;
@@ -198,10 +211,11 @@
   }
 
   function hostMobileScanPermRetry_() {
+    hostMobileScanUnlockStarting_();
     hostMobileScanStopEngine_();
     hostMobileScanShowInlineStart_(true);
     hostMobileScanPulsePermBtn_();
-    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Tap TAP TO START CAMERA on the preview, or the camera icon top-left.' });
+    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_READY' });
   }
 
   function hostMobileScanWirePermBtn_() {
@@ -210,7 +224,9 @@
     hostMobileQrPermBtn.dataset.bound = '1';
     function onPerm(ev) {
       if (ev) { ev.preventDefault(); ev.stopPropagation(); }
-      hostMobileScanPermRetry_();
+      hostMobileScanUnlockStarting_();
+      hostMobileScanStopEngine_();
+      hostMobileScanShowInlineStart_(false);
       hostMobileScanStartEngine_();
     }
     hostMobileQrPermBtn.addEventListener('click', onPerm);
@@ -222,13 +238,17 @@
 
   function hostMobileScanOpen_(data) {
     hostMobileQrOpen = true;
+    hostMobileScanUnlockStarting_();
     hostMobileScanStopEngine_();
     hostMobileScanPositionOverlay_(data);
     var overlay = hostMobileScanEnsureOverlay();
     overlay.style.display = 'block';
     hostMobileScanShowInlineStart_(true);
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' });
-    hostMobileScanStartEngine_();
+    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_READY' });
+    setTimeout(function() {
+      if (hostMobileQrOpen) hostMobileScanPositionOverlay_(data);
+    }, 150);
   }
 
   function hostMobileScanStartEngine_() {
@@ -239,9 +259,17 @@
     }
     if (hostMobileQrEngine || hostMobileQrStarting) return;
     hostMobileQrStarting = true;
+    hostMobileScanClearStartTimer_();
+    hostMobileQrStartTimer = setTimeout(function() {
+      if (!hostMobileQrStarting) return;
+      hostMobileScanUnlockStarting_();
+      hostMobileScanShowInlineStart_(true);
+      hostMobileScanPulsePermBtn_();
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Camera timed out — tap TAP TO START CAMERA or the camera icon.' });
+    }, 8000);
 
     function onFail(err) {
-      hostMobileQrStarting = false;
+      hostMobileScanUnlockStarting_();
       hostMobileScanStopEngine_();
       hostMobileScanShowInlineStart_(true);
       hostMobileScanPulsePermBtn_();
@@ -268,13 +296,18 @@
     }
 
     function afterOk() {
-      hostMobileQrStarting = false;
+      hostMobileScanUnlockStarting_();
       hostMobileScanShowInlineStart_(false);
       if (hostMobileQrPermBtn) hostMobileQrPermBtn.classList.remove('is-pulse');
       hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE' });
     }
 
-    if (typeof Html5Qrcode.getCameras === 'function') {
+    // User gesture path: skip getCameras (can hang on Android) and open rear camera directly.
+    startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(function() {
+      if (typeof Html5Qrcode.getCameras !== 'function') {
+        onFail(new Error('Camera not available'));
+        return;
+      }
       Html5Qrcode.getCameras().then(function(cams) {
         if (!cams || !cams.length) return startWithConfig({ facingMode: 'environment' });
         var back = null;
@@ -286,13 +319,8 @@
           }
         }
         return startWithConfig((back || cams[cams.length - 1]).id);
-      }).then(afterOk).catch(function() {
-        startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
-      });
-      return;
-    }
-
-    startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
+      }).then(afterOk).catch(onFail);
+    });
   }
 
   function hostMobileScanStop() {

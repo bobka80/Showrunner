@@ -76,9 +76,18 @@ function mobileScanSyncShellCamera_() {
   if (!mobileScanInHostingIframe_()) return;
   mobileQrUsesParent_ = true;
   window.mobileScanGateAck_ = false;
-  requestAnimationFrame(function() {
+  function send() {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', mobileScanShellPayload_());
+  }
+  requestAnimationFrame(function() {
+    requestAnimationFrame(send);
   });
+  setTimeout(send, 120);
+  setTimeout(function() {
+    if (!window.mobileScanGateAck_) {
+      mobileScanSetPlaceholder_('Tap TAP TO START CAMERA on the orange preview above', 'error');
+    }
+  }, 900);
 }
 
 window.mobileScanRequestShellPerm_ = function() {
@@ -88,8 +97,8 @@ window.mobileScanRequestShellPerm_ = function() {
   }
   var permBtn = document.getElementById('mobile-scan-perm-btn');
   if (permBtn) permBtn.classList.add('is-pulse');
+  mobileScanSetPlaceholder_('Allow camera — tap the orange preview or camera icon again', 'error');
   mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_PERM_RETRY', mobileScanShellPayload_());
-  mobileScanToast_('Tap the camera icon or TAP TO START CAMERA on the preview.', false);
 };
 
 function mobileScanShowEnableRetry_() {
@@ -112,6 +121,9 @@ function mobileScanRestoreReaderDiv_() {
       mobileScanHandleDecode_(ev.data.text);
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK') {
       window.mobileScanGateAck_ = true;
+    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_READY') {
+      window.mobileScanGateAck_ = true;
+      mobileScanSetPlaceholder_('Tap TAP TO START CAMERA on the orange preview', 'error');
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE') {
       mobileScanSetPlaceholder_('Camera active — point at QR', 'live');
       var permBtn = document.getElementById('mobile-scan-perm-btn');
@@ -482,7 +494,7 @@ window.mobileOpenScanPanel = function() {
   }
   if (btn) btn.classList.add('is-panel-open');
   document.body.classList.add('mobile-scan-panel-open');
-  mobileScanSetPlaceholder_('Starting camera…');
+  mobileScanSetPlaceholder_('Tap TAP TO START CAMERA on the orange preview');
   mobileScanRenderLast_();
   window.addEventListener('resize', mobileScanPanelResize_);
   setTimeout(function() {
