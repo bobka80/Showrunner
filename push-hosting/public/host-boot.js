@@ -426,12 +426,9 @@
     hostMobileQrOpen = true;
     hostMobileScanUnlockStarting_();
     hostMobileScanStopEngine_();
-    hostMobileScanHideEmbedFrame_();
     if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
     hostMobileScanShowInlineStart_(false);
-    hostMobileScanLaunchStage_();
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' });
-    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN' });
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_READY' });
     hostMobileScanScheduleReposition_();
   }

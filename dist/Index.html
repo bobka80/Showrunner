@@ -2355,8 +2355,19 @@
     text-align: center;
     align-items: center;
     justify-content: center;
+    flex-direction: column;
+    gap: 6px;
     touch-action: manipulation;
     cursor: pointer;
+}
+
+.mobile-scan-launch-cam-btn::after {
+    content: 'Opens camera scanner';
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #a1a1aa;
 }
 
 .mobile-scan-panel.is-open .mobile-scan-launch-cam-btn {
@@ -4001,7 +4012,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
                                 </button>
                                 <div id="mobile-qr-reader-wrap" class="mobile-qr-reader-wrap">
-                                    <button type="button" id="mobile-scan-launch-cam-btn" class="mobile-scan-launch-cam-btn" onclick="mobileScanLaunchShellCamera_()">START CAMERA</button>
+                                    <button type="button" id="mobile-scan-launch-cam-btn" class="mobile-scan-launch-cam-btn" onclick="mobileScanLaunchShellCamera_(); event.stopPropagation();">OPEN CAMERA</button>
                                     <button type="button" id="mobile-qr-start-btn" class="mobile-qr-start-btn" onclick="mobileScanLaunchShellCamera_()">TAP TO START CAMERA</button>
                                     <iframe id="mobile-qr-camera-embed" class="mobile-qr-camera-embed" title="QR camera" allow="camera; microphone" style="display:none;"></iframe>
                                     <div id="mobile-qr-reader-placeholder" class="mobile-qr-reader-placeholder" style="display:none;"></div>

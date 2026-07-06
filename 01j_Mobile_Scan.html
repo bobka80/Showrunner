@@ -36,7 +36,6 @@ function mobileScanStartShellEmbed_() {
   }
   requestAnimationFrame(function() { requestAnimationFrame(send); });
   setTimeout(send, 120);
-  setTimeout(send, 400);
   return true;
 }
 
@@ -55,14 +54,20 @@ function mobileScanInHostingIframe_() {
 
 function mobileScanParentPost_(type, extra) {
   try {
-    if (window.parent && window.parent !== window) {
-      var msg = { type: type };
-      if (extra && typeof extra === 'object') {
-        Object.keys(extra).forEach(function(k) { msg[k] = extra[k]; });
-      }
-      window.parent.postMessage(msg, '*');
-      return true;
+    var msg = { type: type };
+    if (extra && typeof extra === 'object') {
+      Object.keys(extra).forEach(function(k) { msg[k] = extra[k]; });
     }
+    var posted = false;
+    if (window.top && window.top !== window) {
+      window.top.postMessage(msg, '*');
+      posted = true;
+    }
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage(msg, '*');
+      posted = true;
+    }
+    return posted;
   } catch (e) { /* ignore */ }
   return false;
 }
@@ -116,7 +121,8 @@ window.mobileScanLaunchShellCamera_ = function() {
     mobileScanStartCamera_();
     return;
   }
-  mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_LAUNCH', mobileScanShellPayload_());
+  try { sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1'); } catch (e) { /* ignore */ }
+  mobileGoToScanCameraPage_();
 };
 
 window.mobileScanUserTapShell_ = function() {
@@ -171,9 +177,7 @@ window.mobileScanRequestEmbedPerm_ = function() {
     mobileScanStartCamera_();
     return;
   }
-  var permBtn = document.getElementById('mobile-scan-perm-btn');
-  if (permBtn) permBtn.classList.add('is-pulse');
-  mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_PERM_RETRY', mobileScanShellPayload_());
+  mobileScanLaunchShellCamera_();
 };
 
 function mobileScanSyncShellCamera_() {
@@ -195,14 +199,7 @@ function mobileScanSyncShellCamera_() {
 }
 
 window.mobileScanRequestShellPerm_ = function() {
-  if (!mobileScanInHostingIframe_()) {
-    mobileScanStartCamera_();
-    return;
-  }
-  var permBtn = document.getElementById('mobile-scan-perm-btn');
-  if (permBtn) permBtn.classList.add('is-pulse');
-  mobileScanSetPlaceholder_('Allow camera — tap the orange preview or camera icon again', 'error');
-  mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_PERM_RETRY', mobileScanShellPayload_());
+  mobileScanLaunchShellCamera_();
 };
 
 function mobileScanShowEnableRetry_() {
@@ -612,11 +609,18 @@ window.mobileToggleScanPanel = function() {
   mobileOpenScanPanel();
 };
 
-/** Last-resort fallback if shell camera bridge is unavailable. */
+/** Opens same-origin camera page (top-level — only reliable path on Android + GAS). */
 window.mobileGoToScanCameraPage_ = function() {
+  var url = MOBILE_SCAN_HOST + '/mobile-scan.html?scan=1';
   try {
-    window.top.location.href = MOBILE_SCAN_HOST + '/mobile-scan.html?scan=1';
-  } catch (e) {
+    if (window.top && window.top !== window) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch (e) { /* ignore */ }
+  try {
+    window.location.href = url;
+  } catch (e2) {
     mobileScanToast_('Could not open camera page.', true);
   }
 };
@@ -815,12 +819,28 @@ function mobileScanRefreshBootstrap_() {
   } catch (e) { /* ignore */ }
 }
 
+function mobileScanReopenPanelIfNeeded_() {
+  try {
+    if (sessionStorage.getItem('sm_mobile_scan_reopen_panel') !== '1') return;
+    sessionStorage.removeItem('sm_mobile_scan_reopen_panel');
+    setTimeout(function() {
+      if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+        mobileOpenScanPanel();
+      }
+    }, 500);
+  } catch (e) { /* ignore */ }
+}
+
 (function mobileScanInit_() {
   if (window.IS_STATION_DEVICE) return;
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', mobileScanRefreshBootstrap_);
-  } else {
+  function boot() {
     mobileScanRefreshBootstrap_();
+    mobileScanReopenPanelIfNeeded_();
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
   }
 })();
 </script>

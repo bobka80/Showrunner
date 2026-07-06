@@ -200,8 +200,19 @@
     text-align: center;
     align-items: center;
     justify-content: center;
+    flex-direction: column;
+    gap: 6px;
     touch-action: manipulation;
     cursor: pointer;
+}
+
+.mobile-scan-launch-cam-btn::after {
+    content: 'Opens camera scanner';
+    display: block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #a1a1aa;
 }
 
 .mobile-scan-panel.is-open .mobile-scan-launch-cam-btn {
