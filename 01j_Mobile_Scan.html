@@ -222,51 +222,36 @@ function mobileScanRestoreReaderDiv_() {
 
 (function mobileScanBridgeInit_() {
   window.addEventListener('message', function(ev) {
-    if (!ev.data) return;
-    if (mobileScanIsEmbedOrigin_(ev.origin)) {
-      if (ev.data.type === 'SHOWRUNNER_EMBED_QR_SCAN') {
-        if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
-          mobileOpenScanPanel();
-        }
-        mobileScanHandleDecode_(ev.data.text);
-      } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_READY') {
-        mobileScanShowEmbed_(true);
-      } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_ACTIVE') {
-        var permBtn = document.getElementById('mobile-scan-perm-btn');
-        if (permBtn) permBtn.classList.remove('is-pulse');
-      } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_ERROR') {
-        var emsg = ev.data.message || 'Camera blocked.';
-        if (/not allowed|permission denied/i.test(emsg)) {
-          emsg = 'Tap TAP TO START CAMERA in the preview, or the camera icon.';
-        }
-        mobileScanToast_(emsg, true);
-        var permBtn2 = document.getElementById('mobile-scan-perm-btn');
-        if (permBtn2) permBtn2.classList.add('is-pulse');
-      }
-      return;
-    }
-    if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN') {
-      var scanText = ev.data.text;
-      if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+    if (!ev.data || !ev.data.type) return;
+    var t = ev.data.type;
+    if (t === 'SHOWRUNNER_MOBILE_QR_SCAN') {
+      if (ev.data.reopenPanel && !window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+        mobileOpenScanPanel();
+      } else if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
       }
-      setTimeout(function() { mobileScanHandleDecode_(scanText); }, 0);
-    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN') {
+      setTimeout(function() { mobileScanHandleDecode_(ev.data.text); }, 0);
+      return;
+    }
+    if (t === 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN') {
       mobileScanShowLaunchBtn_(false);
       mobileScanSetPlaceholder_('Allow camera on the full-screen prompt…', 'error');
-    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK') {
+      return;
+    }
+    if (t === 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' || t === 'SHOWRUNNER_MOBILE_SCAN_READY') {
       window.mobileScanGateAck_ = true;
       mobileScanPrepareShellHole_();
-    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_READY') {
-      window.mobileScanGateAck_ = true;
-      mobileScanPrepareShellHole_();
-    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE') {
+      return;
+    }
+    if (t === 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE') {
       document.body.classList.add('mobile-scan-camera-live');
       mobileScanShowLaunchBtn_(false);
       mobileScanSetPlaceholder_('Camera active — point at QR', 'live');
       var permBtn = document.getElementById('mobile-scan-perm-btn');
       if (permBtn) permBtn.classList.remove('is-pulse');
-    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR') {
+      return;
+    }
+    if (t === 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR') {
       document.body.classList.remove('mobile-scan-camera-live');
       mobileScanShowLaunchBtn_(true);
       var msg = ev.data.message || 'Camera permission denied.';
@@ -275,8 +260,36 @@ function mobileScanRestoreReaderDiv_() {
       }
       mobileScanToast_(msg, true);
       mobileScanShowEnableRetry_();
-      var permBtn = document.getElementById('mobile-scan-perm-btn');
-      if (permBtn) permBtn.classList.add('is-pulse');
+      var permBtn2 = document.getElementById('mobile-scan-perm-btn');
+      if (permBtn2) permBtn2.classList.add('is-pulse');
+      return;
+    }
+    if (t === 'SHOWRUNNER_MOBILE_SCAN_REOPEN') {
+      if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+        mobileOpenScanPanel();
+      }
+      return;
+    }
+    if (mobileScanIsEmbedOrigin_(ev.origin) && t.indexOf('SHOWRUNNER_EMBED_') === 0) {
+      if (t === 'SHOWRUNNER_EMBED_QR_SCAN') {
+        if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+          mobileOpenScanPanel();
+        }
+        mobileScanHandleDecode_(ev.data.text);
+      } else if (t === 'SHOWRUNNER_EMBED_CAM_READY') {
+        mobileScanShowEmbed_(true);
+      } else if (t === 'SHOWRUNNER_EMBED_CAM_ACTIVE') {
+        var permBtn3 = document.getElementById('mobile-scan-perm-btn');
+        if (permBtn3) permBtn3.classList.remove('is-pulse');
+      } else if (t === 'SHOWRUNNER_EMBED_CAM_ERROR') {
+        var emsg = ev.data.message || 'Camera blocked.';
+        if (/not allowed|permission denied/i.test(emsg)) {
+          emsg = 'Tap TAP TO START CAMERA in the preview, or the camera icon.';
+        }
+        mobileScanToast_(emsg, true);
+        var permBtn4 = document.getElementById('mobile-scan-perm-btn');
+        if (permBtn4) permBtn4.classList.add('is-pulse');
+      }
     }
   });
 })();
@@ -998,6 +1011,11 @@ function mobileScanAckParent_() {
 }
 
 function mobileScanFinalizePendingDelivery_(raw) {
+  if (mobileScanInHostingIframe_()) {
+    mobileScanAckParent_();
+    window.mobileScanPendingConsumeKey_ = '';
+    return;
+  }
   var tag = mobileScanExtractTag_(raw);
   var pending = mobileScanReadPendingRaw_();
   var pendingTag = mobileScanExtractTag_(pending);
@@ -1011,6 +1029,7 @@ function mobileScanFinalizePendingDelivery_(raw) {
 var mobileScanPendingPollTimer_ = null;
 
 function mobileScanTryConsumePending_() {
+  if (mobileScanInHostingIframe_()) return;
   var raw = mobileScanReadPendingRaw_();
   if (!raw) return;
   if (mobileScanShouldReopenPanel_()) {
@@ -1038,6 +1057,7 @@ function mobileScanConsumePendingStorage_() {
 }
 
 function mobileScanReopenPanelIfNeeded_() {
+  if (mobileScanInHostingIframe_()) return;
   if (!mobileScanShouldReopenPanel_()) return;
   if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
     mobileOpenScanPanel();
@@ -1048,11 +1068,13 @@ function mobileScanReopenPanelIfNeeded_() {
   if (window.IS_STATION_DEVICE) return;
   function boot() {
     mobileScanRefreshBootstrap_();
-    mobileScanReopenPanelIfNeeded_();
-    mobileScanTryConsumePending_();
-    mobileScanStartPendingPoll_();
-    setTimeout(mobileScanTryConsumePending_, 800);
-    setTimeout(mobileScanTryConsumePending_, 2000);
+    if (!mobileScanInHostingIframe_()) {
+      mobileScanReopenPanelIfNeeded_();
+      mobileScanTryConsumePending_();
+      mobileScanStartPendingPoll_();
+      setTimeout(mobileScanTryConsumePending_, 800);
+      setTimeout(mobileScanTryConsumePending_, 2000);
+    }
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

@@ -123,11 +123,10 @@
       } catch (e) { /* ignore */ }
       document.getElementById('qr-last').textContent = 'Scanned — returning…';
       setTimeout(function() {
-        if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          window.location.href = HOST + '/?srScan=' + encodeURIComponent(raw);
-        }
+        try {
+          if (engine) engine.stop().catch(function() {});
+        } catch (e) { /* ignore */ }
+        window.location.href = HOST + '/?srScan=' + encodeURIComponent(raw);
       }, 400);
     }
 

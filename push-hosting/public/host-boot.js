@@ -650,16 +650,47 @@
     }, 500);
   }
 
+  function hostMobileScanClearReopen_() {
+    try {
+      sessionStorage.removeItem('sm_mobile_scan_reopen_panel');
+      localStorage.removeItem('sm_mobile_scan_reopen_panel');
+    } catch (e) { /* ignore */ }
+  }
+
+  function hostMobileScanShouldReopen_() {
+    try {
+      return sessionStorage.getItem('sm_mobile_scan_reopen_panel') === '1' ||
+        localStorage.getItem('sm_mobile_scan_reopen_panel') === '1';
+    } catch (e) { return false; }
+  }
+
   function hostMobileScanFlushPending_() {
     try {
       var raw = hostMobileScanReadPending_();
+      var reopen = hostMobileScanShouldReopen_();
+      if (!raw && reopen) {
+        if (!hostMobileScanRelayReady_()) {
+          hostMobileScanSchedulePendingRetry_();
+          return;
+        }
+        try {
+          frame.contentWindow.postMessage({ type: 'SHOWRUNNER_MOBILE_SCAN_REOPEN' }, '*');
+        } catch (e) {
+          hostMobileScanSchedulePendingRetry_();
+        }
+        return;
+      }
       if (!raw) return;
       if (!hostMobileScanRelayReady_()) {
         hostMobileScanSchedulePendingRetry_();
         return;
       }
       try {
-        frame.contentWindow.postMessage({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: raw }, '*');
+        frame.contentWindow.postMessage({
+          type: 'SHOWRUNNER_MOBILE_QR_SCAN',
+          text: raw,
+          reopenPanel: reopen
+        }, '*');
       } catch (e) {
         hostMobileScanSchedulePendingRetry_();
       }
@@ -681,6 +712,7 @@
     } catch (e) { /* ignore */ }
   }
   hostMobileScanIngestUrlScan_();
+  if (hostMobileScanReadPending_()) hostMobileScanSchedulePendingRetry_();
 
   hostMobileScanWireTapGate_();
   hostMobileScanWirePermBtn_();
@@ -1736,6 +1768,7 @@
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ACK') {
       hostMobileScanClearPending_();
+      hostMobileScanClearReopen_();
       if (hostMobileQrPendingRetryTimer) {
         clearInterval(hostMobileQrPendingRetryTimer);
         hostMobileQrPendingRetryTimer = null;
