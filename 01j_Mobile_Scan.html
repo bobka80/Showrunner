@@ -49,14 +49,14 @@ function mobileScanGetReaderRect_() {
 function mobileScanShowShellCameraPrompt_() {
   var wrap = document.getElementById('mobile-qr-reader-wrap');
   if (!wrap) return;
-  wrap.innerHTML = '<div class="mobile-qr-shell-prompt">Tap <strong>START CAMERA</strong> on the preview</div>';
+  wrap.innerHTML = '<div class="mobile-qr-shell-prompt">Tap the orange <strong>START CAMERA</strong> button on screen</div>';
 }
 
 function mobileScanShowEnableRetry_() {
   var wrap = document.getElementById('mobile-qr-reader-wrap');
   if (!wrap) return;
   if (mobileQrUsesParent_) {
-    wrap.innerHTML = '<div class="mobile-qr-shell-prompt">Tap <strong>START CAMERA</strong> on the preview above</div>';
+    wrap.innerHTML = '<div class="mobile-qr-shell-prompt">Tap the orange <strong>START CAMERA</strong> button on screen</div>';
     return;
   }
   wrap.innerHTML = '<button type="button" class="mobile-qr-retry-btn" onclick="mobileScanStartCamera_()">Tap to open camera</button>';

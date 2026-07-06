@@ -40,6 +40,7 @@
   var hostMobileQrEngine = null;
   var hostMobileQrStarting = false;
   var hostMobileQrOverlay = null;
+  var hostMobileQrTapGate = null;
   var hostMobileQrOpen = false;
 
   function hostMobileScanRelay_(payload) {
@@ -65,17 +66,7 @@
     tapBtn.id = 'sr-host-qr-tap';
     tapBtn.type = 'button';
     tapBtn.textContent = 'TAP TO START CAMERA';
-    tapBtn.setAttribute('style', [
-      'position:absolute', 'inset:0', 'width:100%', 'height:100%',
-      'border:none', 'background:#18181b', 'color:#fb923c',
-      'font-size:11px', 'font-weight:900', 'letter-spacing:0.08em',
-      'cursor:pointer', 'z-index:3', 'touch-action:manipulation'
-    ].join(';'));
-    tapBtn.addEventListener('click', function(ev) {
-      ev.preventDefault();
-      ev.stopPropagation();
-      hostMobileScanStartEngine_();
-    });
+    tapBtn.setAttribute('style', 'display:none;');
 
     el.appendChild(reader);
     el.appendChild(tapBtn);
@@ -86,7 +77,14 @@
       st.id = 'sr-host-qr-styles';
       st.textContent = [
         '#sr-host-qr-reader video { display:block !important; width:100% !important; height:100% !important; object-fit:cover !important; }',
-        '#sr-host-qr-reader__dashboard_section_csr span, #sr-host-qr-reader__dashboard_section_swaplink { display:none !important; }'
+        '#sr-host-qr-reader__dashboard_section_csr span, #sr-host-qr-reader__dashboard_section_swaplink { display:none !important; }',
+        '#sr-mobile-qr-tap-gate { display:none; position:fixed; inset:0; z-index:2147483647;',
+        'align-items:center; justify-content:center; background:rgba(0,0,0,0.72);',
+        'padding:24px; box-sizing:border-box; touch-action:manipulation; }',
+        '#sr-mobile-qr-tap-gate.is-open { display:flex; }',
+        '#sr-host-qr-tap-gate-btn { width:100%; max-width:340px; padding:22px 18px;',
+        'border:2px solid #f97316; border-radius:12px; background:#18181b; color:#fb923c;',
+        'font-size:15px; font-weight:900; letter-spacing:0.06em; touch-action:manipulation; cursor:pointer; }'
       ].join('\n');
       document.head.appendChild(st);
     }
@@ -95,17 +93,56 @@
     return el;
   }
 
+  function hostMobileScanEnsureTapGate() {
+    if (hostMobileQrTapGate) return hostMobileQrTapGate;
+    var gate = document.createElement('div');
+    gate.id = 'sr-mobile-qr-tap-gate';
+    var btn = document.createElement('button');
+    btn.id = 'sr-host-qr-tap-gate-btn';
+    btn.type = 'button';
+    btn.textContent = 'TAP TO START CAMERA';
+    function onTap(ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      hostMobileScanHideTapGate_();
+      hostMobileScanStartEngine_();
+    }
+    btn.addEventListener('click', onTap);
+    btn.addEventListener('touchend', onTap, { passive: false });
+    gate.appendChild(btn);
+    document.body.appendChild(gate);
+    hostMobileQrTapGate = gate;
+    return gate;
+  }
+
+  function hostMobileScanShowTapGate_() {
+    if (frame) frame.style.pointerEvents = 'none';
+    var gate = hostMobileScanEnsureTapGate();
+    gate.classList.add('is-open');
+  }
+
+  function hostMobileScanHideTapGate_() {
+    if (frame) frame.style.pointerEvents = '';
+    if (hostMobileQrTapGate) hostMobileQrTapGate.classList.remove('is-open');
+  }
+
+  function hostMobileScanFrameRect_() {
+    if (!frame) return { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight };
+    var r = frame.getBoundingClientRect();
+    return { top: r.top, left: r.left, width: r.width, height: r.height };
+  }
+
   function hostMobileScanPositionOverlay_(rect) {
     var overlay = hostMobileScanEnsureOverlay();
-    if (!rect || !rect.width || !rect.height) {
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.width = '100%';
-      overlay.style.height = '42vh';
+    var fr = hostMobileScanFrameRect_();
+    if (!rect || !rect.width || rect.height < 40) {
+      overlay.style.top = fr.top + 'px';
+      overlay.style.left = fr.left + 'px';
+      overlay.style.width = fr.width + 'px';
+      overlay.style.height = Math.max(200, Math.round(window.innerHeight * 0.38)) + 'px';
       return;
     }
-    overlay.style.top = Math.max(0, Math.round(rect.top)) + 'px';
-    overlay.style.left = Math.max(0, Math.round(rect.left)) + 'px';
+    overlay.style.top = (fr.top + rect.top) + 'px';
+    overlay.style.left = (fr.left + rect.left) + 'px';
     overlay.style.width = Math.round(rect.width) + 'px';
     overlay.style.height = Math.round(rect.height) + 'px';
   }
@@ -128,8 +165,7 @@
     hostMobileScanPositionOverlay_(rect);
     var overlay = hostMobileScanEnsureOverlay();
     overlay.style.display = 'block';
-    var tapBtn = document.getElementById('sr-host-qr-tap');
-    if (tapBtn) tapBtn.style.display = 'block';
+    hostMobileScanShowTapGate_();
   }
 
   function hostMobileScanStartEngine_() {
@@ -143,8 +179,7 @@
     function onFail(err) {
       hostMobileQrStarting = false;
       hostMobileScanStopEngine_();
-      var tapBtn = document.getElementById('sr-host-qr-tap');
-      if (tapBtn) tapBtn.style.display = 'block';
+      hostMobileScanShowTapGate_();
       hostMobileScanRelay_({
         type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR',
         message: String(err && err.message ? err.message : err)
@@ -171,8 +206,7 @@
 
     function afterOk() {
       hostMobileQrStarting = false;
-      var tapBtn = document.getElementById('sr-host-qr-tap');
-      if (tapBtn) tapBtn.style.display = 'none';
+      hostMobileScanHideTapGate_();
       hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE' });
     }
 
@@ -202,10 +236,10 @@
 
   function hostMobileScanStop() {
     hostMobileQrOpen = false;
+    hostMobileScanHideTapGate_();
+    if (frame) frame.style.pointerEvents = '';
     hostMobileScanStopEngine_();
     if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
-    var tapBtn = document.getElementById('sr-host-qr-tap');
-    if (tapBtn) tapBtn.style.display = 'block';
   }
 
   function applyStationConfig(key, value) {
