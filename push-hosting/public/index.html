@@ -224,6 +224,8 @@
       padding: 24px;
       box-sizing: border-box;
       touch-action: manipulation;
+      -webkit-transition: opacity 0.01s;
+      transition: opacity 0.01s;
     }
     #sr-mobile-qr-tap-gate.is-open { display: flex; }
     #sr-mobile-qr-tap-gate.is-band {
@@ -304,6 +306,82 @@
     body.sr-mobile-scan-cam-open #sr-mobile-cam-embed {
       pointer-events: auto !important;
     }
+
+    /* Full-screen camera stage — app iframe hidden (Android ignores z-index over iframes) */
+    #sr-mobile-scan-stage {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      flex-direction: column;
+      gap: 12px;
+      background: #0a0a0c;
+      color: #f4f4f5;
+      font-family: Inter, system-ui, sans-serif;
+      padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      touch-action: manipulation;
+      -webkit-transform: translateZ(0);
+      transform: translateZ(0);
+    }
+    #sr-mobile-scan-stage.is-open { display: flex; }
+    #sr-mobile-scan-stage.is-docked {
+      display: block;
+      position: fixed;
+      padding: 0;
+      background: transparent;
+      pointer-events: none;
+      z-index: 2147483647;
+    }
+    #sr-mobile-scan-stage.is-docked .sr-scan-stage-header,
+    #sr-mobile-scan-stage.is-docked .sr-scan-stage-hint { display: none; }
+    #sr-mobile-scan-stage.is-docked #sr-mobile-scan-stage-cam {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      pointer-events: auto;
+      border-radius: 8px;
+    }
+    .sr-scan-stage-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .sr-scan-stage-title {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: #fb923c;
+    }
+    #sr-mobile-scan-stage-cancel {
+      border: 1px solid #444;
+      background: transparent;
+      color: #a1a1aa;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 10px 12px;
+      border-radius: 8px;
+      touch-action: manipulation;
+    }
+    #sr-mobile-scan-stage-cam {
+      flex: 1;
+      min-height: 45vh;
+      width: 100%;
+      border: 2px solid #f97316;
+      border-radius: 10px;
+      background: #000;
+    }
+    .sr-scan-stage-hint {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #a1a1aa;
+      text-align: center;
+    }
+    .sr-scan-stage-hint strong { color: #fb923c; }
     #sr-host-qr-inline-start {
       display: none;
       position: absolute;
@@ -369,6 +447,15 @@
 
   </div>
 
+  <div id="sr-mobile-scan-stage" aria-hidden="true">
+    <div class="sr-scan-stage-header">
+      <span class="sr-scan-stage-title">SHOWRUNNER SCAN</span>
+      <button type="button" id="sr-mobile-scan-stage-cancel">CANCEL</button>
+    </div>
+    <iframe id="sr-mobile-scan-stage-cam" title="QR camera" allow="camera; microphone" src="/camera-embed.html?v=4"></iframe>
+    <p class="sr-scan-stage-hint">Tap <strong>TAP TO START CAMERA</strong> in the box above. Allow camera when Android asks — then you return to the scan panel.</p>
+  </div>
+
   <iframe id="app-frame" title="SM Showrunner" allow="camera *; microphone *; clipboard-read; clipboard-write"></iframe>
 
   <div id="sr-mobile-qr-tap-gate" aria-hidden="true">
@@ -408,7 +495,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <script src="/host-boot.js?v=451"></script>
+  <script src="/host-boot.js?v=452"></script>
 
 </body>
 

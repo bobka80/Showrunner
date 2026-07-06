@@ -47,14 +47,110 @@
   var hostMobileQrStartTimer = null;
   var hostMobileQrEmbedFrame = null;
   var hostMobileQrLastOpenData = null;
-  var HOST_CAM_EMBED_PATH = '/camera-embed.html?v=3';
+  var HOST_CAM_EMBED_PATH = '/camera-embed.html?v=4';
+  var hostMobileScanStageOpen = false;
+  var hostMobileScanDocked = false;
+
+  function hostMobileScanHideAppFrame_() {
+    if (!frame) return;
+    frame.dataset.srPrevDisplay = frame.style.display || '';
+    frame.style.display = 'none';
+  }
+
+  function hostMobileScanRestoreAppFrame_() {
+    if (!frame) return;
+    frame.style.display = frame.dataset.srPrevDisplay || 'block';
+  }
+
+  function hostMobileScanGetStage_() {
+    return document.getElementById('sr-mobile-scan-stage');
+  }
+
+  function hostMobileScanGetStageCam_() {
+    return document.getElementById('sr-mobile-scan-stage-cam');
+  }
+
+  function hostMobileScanWireStage_() {
+    var cancel = document.getElementById('sr-mobile-scan-stage-cancel');
+    if (!cancel || cancel.dataset.bound === '1') return;
+    cancel.dataset.bound = '1';
+    function onCancel(ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      hostMobileScanStop();
+    }
+    cancel.addEventListener('click', onCancel);
+    cancel.addEventListener('touchend', onCancel, { passive: false });
+  }
+
+  function hostMobileScanLaunchStage_() {
+    hostMobileScanWireStage_();
+    hostMobileScanResetStage_();
+    hostMobileScanHideAppFrame_();
+    hostMobileScanHideEmbedFrame_();
+    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+    hostMobileScanHideTapGate_();
+    var stage = hostMobileScanGetStage_();
+    if (stage) {
+      stage.classList.add('is-open');
+      stage.setAttribute('aria-hidden', 'false');
+    }
+    hostMobileScanStageOpen = true;
+    hostMobileScanDocked = false;
+    document.body.classList.add('sr-mobile-scan-stage-open');
+    var stageCam = hostMobileScanGetStageCam_();
+    if (stageCam && !stageCam.src) stageCam.src = HOST_CAM_EMBED_PATH;
+  }
+
+  /** Camera granted — restore app iframe; shrink stage iframe over panel camera square. */
+  function hostMobileScanDockStage_() {
+    hostMobileScanStageOpen = false;
+    hostMobileScanDocked = true;
+    document.body.classList.remove('sr-mobile-scan-stage-open');
+    hostMobileScanRestoreAppFrame_();
+    var stage = hostMobileScanGetStage_();
+    if (!stage) return;
+    stage.classList.remove('is-open');
+    stage.classList.add('is-docked');
+    stage.setAttribute('aria-hidden', 'false');
+    hostMobileScanPositionStageCam_();
+  }
+
+  function hostMobileScanPositionStageCam_() {
+    if (!hostMobileScanDocked || !hostMobileQrLastOpenData) return;
+    var payload = hostMobileScanParsePayload_(hostMobileQrLastOpenData);
+    hostMobileQrCameraRect = hostMobileScanGlobalRect_(payload.rect);
+    var g = hostMobileQrCameraRect;
+    var stage = hostMobileScanGetStage_();
+    if (stage) {
+      stage.style.top = Math.round(g.top) + 'px';
+      stage.style.left = Math.round(g.left) + 'px';
+      stage.style.width = Math.round(g.width) + 'px';
+      stage.style.height = Math.round(g.height) + 'px';
+    }
+    hostMobileScanPositionPermBtn_(payload.permRect);
+  }
+
+  function hostMobileScanResetStage_() {
+    var stage = hostMobileScanGetStage_();
+    if (stage) {
+      stage.classList.remove('is-open', 'is-docked');
+      stage.setAttribute('aria-hidden', 'true');
+      stage.style.top = '';
+      stage.style.left = '';
+      stage.style.width = '';
+      stage.style.height = '';
+    }
+    document.body.classList.remove('sr-mobile-scan-stage-open');
+  }
 
   function hostMobileScanIsEmbedMsg_(ev) {
     if (!ev || !ev.data) return false;
     var t = ev.data.type;
     if (t !== 'SHOWRUNNER_EMBED_QR_SCAN' && t !== 'SHOWRUNNER_EMBED_CAM_ACTIVE' &&
         t !== 'SHOWRUNNER_EMBED_CAM_ERROR' && t !== 'SHOWRUNNER_EMBED_CAM_READY') return false;
-    if (hostMobileQrEmbedFrame && ev.source === hostMobileQrEmbedFrame.contentWindow) return true;
+    var stageCam = hostMobileScanGetStageCam_();
+    if (stageCam && stageCam.contentWindow && ev.source === stageCam.contentWindow) return true;
+    if (hostMobileQrEmbedFrame && hostMobileQrEmbedFrame.contentWindow && ev.source === hostMobileQrEmbedFrame.contentWindow) return true;
     try {
       var o = String(ev.origin || '');
       return o.indexOf('sm-showrunner-97405.web.app') !== -1 || o.indexOf('web.app') !== -1;
@@ -292,12 +388,11 @@
 
   function hostMobileScanRepositionOpen_() {
     if (hostMobileQrOpen && hostMobileQrLastOpenData) {
-      hostMobileScanPositionEmbedFrame_(hostMobileQrLastOpenData);
+      if (hostMobileScanDocked) {
+        hostMobileScanPositionStageCam_();
+      }
       if (hostMobileQrEngine && hostMobileQrOverlay) {
         hostMobileScanPositionOverlay_(hostMobileQrLastOpenData);
-      }
-      if (hostMobileQrTapGate && hostMobileQrTapGate.classList.contains('is-open')) {
-        hostMobileScanShowTapGateBand_();
       }
     }
   }
@@ -312,10 +407,18 @@
     hostMobileScanUnlockStarting_();
     hostMobileScanStopEngine_();
     if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
-    hostMobileScanPostToEmbed_({ type: 'SHOWRUNNER_EMBED_CAM_PERM_RETRY' });
-    hostMobileScanPostToEmbed_({ type: 'SHOWRUNNER_EMBED_CAM_START' });
+    hostMobileScanHideEmbedFrame_();
+    hostMobileScanDocked = false;
+    hostMobileScanLaunchStage_();
+    hostMobileScanPostToStageCam_({ type: 'SHOWRUNNER_EMBED_CAM_PERM_RETRY' });
     hostMobileScanPulsePermBtn_();
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_READY' });
+  }
+
+  function hostMobileScanPostToStageCam_(msg) {
+    var stageCam = hostMobileScanGetStageCam_();
+    if (!stageCam || !stageCam.contentWindow) return;
+    try { stageCam.contentWindow.postMessage(msg, '*'); } catch (e) { /* ignore */ }
   }
 
   function hostMobileScanOpen_(data) {
@@ -323,12 +426,12 @@
     hostMobileQrOpen = true;
     hostMobileScanUnlockStarting_();
     hostMobileScanStopEngine_();
-    hostMobileScanHideTapGate_();
+    hostMobileScanHideEmbedFrame_();
     if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
     hostMobileScanShowInlineStart_(false);
-    hostMobileScanPositionEmbedFrame_(data);
-    hostMobileScanShowEmbedFrame_(true);
+    hostMobileScanLaunchStage_();
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' });
+    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN' });
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_READY' });
     hostMobileScanScheduleReposition_();
   }
@@ -342,7 +445,13 @@
       hostMobileScanUnlockStarting_();
       hostMobileScanStopEngine_();
       hostMobileScanShowInlineStart_(false);
-      hostMobileScanPostToEmbed_({ type: 'SHOWRUNNER_EMBED_CAM_START' });
+      if (hostMobileScanStageOpen) {
+        hostMobileScanPostToStageCam_({ type: 'SHOWRUNNER_EMBED_CAM_START' });
+      } else if (hostMobileQrOpen) {
+        hostMobileScanLaunchStage_();
+      } else {
+        hostMobileScanPostToEmbed_({ type: 'SHOWRUNNER_EMBED_CAM_START' });
+      }
     }
     hostMobileQrPermBtn.addEventListener('click', onPerm);
     hostMobileQrPermBtn.addEventListener('touchend', function(ev) {
@@ -434,10 +543,15 @@
     hostMobileQrOpen = false;
     hostMobileQrLastOpenData = null;
     hostMobileQrCameraRect = null;
+    hostMobileScanStageOpen = false;
+    hostMobileScanDocked = false;
     hostMobileScanHideOverlay_();
     hostMobileScanStopEngine_();
     hostMobileScanPostToEmbed_({ type: 'SHOWRUNNER_EMBED_CAM_STOP' });
+    hostMobileScanPostToStageCam_({ type: 'SHOWRUNNER_EMBED_CAM_STOP' });
     hostMobileScanHideEmbedFrame_();
+    hostMobileScanResetStage_();
+    hostMobileScanRestoreAppFrame_();
     hostMobileScanHideTapGate_();
   }
 
@@ -519,6 +633,7 @@
   hostMobileScanWireTapGate_();
   hostMobileScanWirePermBtn_();
   hostMobileScanWireInlineStart_();
+  hostMobileScanWireStage_();
   hostMobileScanFlushPending_();
   window.addEventListener('resize', hostMobileScanRepositionOpen_, { passive: true });
   window.addEventListener('scroll', hostMobileScanRepositionOpen_, { passive: true });
@@ -1592,9 +1707,18 @@
       if (ev.data.type === 'SHOWRUNNER_EMBED_QR_SCAN') {
         hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: ev.data.text });
       } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_ACTIVE') {
+        if (hostMobileScanStageOpen) hostMobileScanDockStage_();
         hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE' });
       } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_ERROR') {
         hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: ev.data.message });
+      }
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_LAUNCH') {
+      if (!hostMobileQrOpen) hostMobileScanOpen_(ev.data);
+      else {
+        hostMobileQrLastOpenData = ev.data;
+        hostMobileScanLaunchStage_();
       }
       return;
     }
@@ -1614,7 +1738,7 @@
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_REPOSITION') {
       if (hostMobileQrOpen) {
         hostMobileQrLastOpenData = ev.data;
-        hostMobileScanPositionEmbedFrame_(ev.data);
+        if (hostMobileScanDocked) hostMobileScanPositionStageCam_();
       }
       return;
     }
