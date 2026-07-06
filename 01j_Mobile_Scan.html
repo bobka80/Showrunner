@@ -19,6 +19,48 @@ var MOBILE_SCAN_LAST_KEY = '';
 var MOBILE_SCAN_LAST_TS = 0;
 var mobileQrEngine = null;
 var mobileQrStarting = false;
+var mobileQrUsesParent_ = false;
+
+function mobileScanInHostingIframe_() {
+  try { return window.self !== window.top; } catch (e) { return true; }
+}
+
+function mobileScanParentPost_(type) {
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: type }, '*');
+      return true;
+    }
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+function mobileScanShowParentCameraHint_() {
+  var wrap = document.getElementById('mobile-qr-reader-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="mobile-qr-parent-hint">Camera active above — point at asset QR</div>';
+}
+
+function mobileScanRestoreReaderDiv_() {
+  var wrap = document.getElementById('mobile-qr-reader-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div id="mobile-qr-reader"></div>';
+}
+
+(function mobileScanBridgeInit_() {
+  window.addEventListener('message', function(ev) {
+    if (!ev.data) return;
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN') {
+      mobileScanHandleDecode_(ev.data.text);
+    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR') {
+      var msg = ev.data.message || 'Camera permission denied.';
+      if (/not allowed|permission denied/i.test(msg)) {
+        msg = 'Camera blocked — allow camera for this site in browser settings, then try again.';
+      }
+      mobileScanToast_(msg, true);
+    }
+  });
+})();
 
 function mobileScanNormalize_(raw) {
   return String(raw == null ? '' : raw).trim().toLowerCase();
@@ -379,11 +421,20 @@ window.mobileCloseScanPanel = function() {
 };
 
 function mobileScanStartCamera_() {
+  mobileQrUsesParent_ = mobileScanInHostingIframe_();
+  if (mobileQrUsesParent_) {
+    mobileScanShowParentCameraHint_();
+    if (!mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_START')) {
+      mobileScanToast_('Camera unavailable in this browser shell.', true);
+    }
+    return;
+  }
   if (typeof Html5Qrcode === 'undefined') {
     mobileScanToast_('Camera scanner failed to load.', true);
     return;
   }
   if (mobileQrStarting || mobileQrEngine) return;
+  mobileScanRestoreReaderDiv_();
   mobileQrStarting = true;
   var readerId = 'mobile-qr-reader';
   mobileQrEngine = new Html5Qrcode(readerId);
@@ -397,11 +448,21 @@ function mobileScanStartCamera_() {
   }).catch(function(err) {
     mobileQrStarting = false;
     mobileQrEngine = null;
-    mobileScanToast_('Camera: ' + (err && err.message ? err.message : String(err)), true);
+    var msg = (err && err.message) ? err.message : String(err);
+    if (/not allowed|permission denied/i.test(msg)) {
+      msg = 'Camera blocked — allow camera for this site in browser settings, then try again.';
+    }
+    mobileScanToast_('Camera: ' + msg, true);
   });
 }
 
 function mobileScanStopCamera_() {
+  if (mobileQrUsesParent_) {
+    mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_STOP');
+    mobileQrUsesParent_ = false;
+    mobileScanRestoreReaderDiv_();
+    return;
+  }
   if (!mobileQrEngine) return;
   var engine = mobileQrEngine;
   mobileQrEngine = null;

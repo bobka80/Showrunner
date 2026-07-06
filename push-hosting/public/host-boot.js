@@ -33,6 +33,79 @@
     try { frame.contentWindow.postMessage({ type: 'SHOWRUNNER_STATION_CONFIG', config: cfg }, '*'); } catch (e) { /* ignore */ }
   }
 
+  // --- Mobile QR camera (hosting shell) --------------------------------------
+  // Showrunner runs in an iframe; getUserMedia is blocked unless the iframe has
+  // allow="camera" AND the browser permits it. Parent-frame camera is the reliable
+  // path (same idea as showrunnerStationDeliverScan for RFID).
+  var hostMobileQrEngine = null;
+  var hostMobileQrStarting = false;
+  var hostMobileQrOverlay = null;
+
+  function hostMobileScanEnsureOverlay() {
+    if (hostMobileQrOverlay) return hostMobileQrOverlay;
+    var el = document.createElement('div');
+    el.id = 'sr-mobile-qr-overlay';
+    el.setAttribute('style', [
+      'position:fixed', 'left:0', 'right:0', 'top:0', 'height:48vh',
+      'z-index:2147483640', 'background:#0d0d10',
+      'border-bottom:1px solid #f97316', 'display:none', 'overflow:hidden'
+    ].join(';'));
+    var inner = document.createElement('div');
+    inner.id = 'sr-host-qr-reader';
+    inner.setAttribute('style', 'width:100%;height:100%;');
+    el.appendChild(inner);
+    document.body.appendChild(el);
+    hostMobileQrOverlay = el;
+    return el;
+  }
+
+  function hostMobileScanRelay_(payload) {
+    if (!frame || !frame.contentWindow) return;
+    try { frame.contentWindow.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+  }
+
+  function hostMobileScanStart() {
+    var overlay = hostMobileScanEnsureOverlay();
+    overlay.style.display = 'block';
+    if (typeof Html5Qrcode === 'undefined') {
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Camera scanner failed to load.' });
+      return;
+    }
+    if (hostMobileQrEngine || hostMobileQrStarting) return;
+    hostMobileQrStarting = true;
+    hostMobileQrEngine = new Html5Qrcode('sr-host-qr-reader');
+    hostMobileQrEngine.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
+      function(decoded) {
+        hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: String(decoded == null ? '' : decoded) });
+      },
+      function() { /* frame miss */ }
+    ).then(function() {
+      hostMobileQrStarting = false;
+    }).catch(function(err) {
+      hostMobileQrStarting = false;
+      hostMobileQrEngine = null;
+      overlay.style.display = 'none';
+      hostMobileScanRelay_({
+        type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR',
+        message: String(err && err.message ? err.message : err)
+      });
+    });
+  }
+
+  function hostMobileScanStop() {
+    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+    if (!hostMobileQrEngine) return;
+    var eng = hostMobileQrEngine;
+    hostMobileQrEngine = null;
+    eng.stop().then(function() {
+      try { eng.clear(); } catch (e) { /* ignore */ }
+    }).catch(function() {
+      try { eng.clear(); } catch (e2) { /* ignore */ }
+    });
+  }
+
   function applyStationConfig(key, value) {
     try {
       if (window.AndroidStation) {
@@ -1092,6 +1165,14 @@
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_SET') {
       applyStationConfig(ev.data.key, ev.data.value);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_START') {
+      hostMobileScanStart();
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_STOP') {
+      hostMobileScanStop();
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN' && fcmToken && ev.source) {
