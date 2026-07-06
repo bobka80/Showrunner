@@ -210,6 +210,50 @@
 
     }
 
+    /* Mobile QR — shell camera gate (PWA must tap here, not iframe text) */
+    #sr-mobile-qr-tap-gate {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      background: rgba(0, 0, 0, 0.88);
+      padding: 24px;
+      box-sizing: border-box;
+      touch-action: manipulation;
+    }
+    #sr-mobile-qr-tap-gate.is-open { display: flex; }
+    #sr-host-qr-tap-gate-btn {
+      width: 100%;
+      max-width: 340px;
+      padding: 22px 18px;
+      border: 2px solid #f97316;
+      border-radius: 12px;
+      background: #18181b;
+      color: #fb923c;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      touch-action: manipulation;
+      cursor: pointer;
+      -webkit-tap-highlight-color: rgba(249, 115, 22, 0.35);
+    }
+    #sr-mobile-qr-tap-gate-hint {
+      max-width: 340px;
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #a1a1aa;
+      text-align: center;
+    }
+    body.sr-mobile-scan-gate-open #app-frame {
+      pointer-events: none !important;
+      opacity: 0.08 !important;
+    }
+
   </style>
 
 </head>
@@ -258,6 +302,11 @@
 
   <iframe id="app-frame" title="SM Showrunner" allow="camera *; microphone *; clipboard-read; clipboard-write"></iframe>
 
+  <div id="sr-mobile-qr-tap-gate" aria-hidden="true">
+    <button type="button" id="sr-host-qr-tap-gate-btn">TAP TO START CAMERA</button>
+    <p id="sr-mobile-qr-tap-gate-hint">Allow camera when Android asks. Required once for the Showrunner app.</p>
+  </div>
+
   <div id="push-mobile-dock">
 
     <div class="dock-title">SCHEDULE ALERTS</div>
@@ -286,7 +335,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <script src="/host-boot.js?v=441"></script>
+  <script src="/host-boot.js?v=442"></script>
 
 </body>
 
