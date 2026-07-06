@@ -274,6 +274,10 @@
       0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
       50% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
     }
+    #sr-mobile-qr-overlay {
+      pointer-events: auto !important;
+      touch-action: manipulation;
+    }
     #sr-host-qr-inline-start {
       display: none;
       position: absolute;
@@ -378,7 +382,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <script src="/host-boot.js?v=448"></script>
+  <script src="/host-boot.js?v=449"></script>
 
 </body>
 

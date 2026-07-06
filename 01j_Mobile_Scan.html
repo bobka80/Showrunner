@@ -28,7 +28,7 @@ function mobileScanStartShellEmbed_() {
   mobileQrUsesParent_ = true;
   mobileQrUsesEmbed_ = false;
   mobileScanShowEmbed_(false);
-  mobileScanSetPlaceholder_('Tap TAP TO START CAMERA in the preview above', 'error');
+  mobileScanSetPlaceholder_('Tap the orange TAP TO START CAMERA button on the preview');
   window.mobileScanGateAck_ = false;
   function send() {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', mobileScanShellPayload_());
@@ -85,6 +85,17 @@ function mobileScanShellPayload_() {
 }
 
 var MOBILE_SCAN_HOST = 'https://sm-showrunner-97405.web.app';
+
+function mobileScanSetShellHolePlaceholder_() {
+  var ph = document.getElementById('mobile-qr-reader-placeholder');
+  var wrap = document.getElementById('mobile-qr-reader-wrap');
+  if (wrap) wrap.style.background = 'transparent';
+  if (ph) {
+    ph.textContent = '';
+    ph.style.opacity = '0';
+    ph.style.pointerEvents = 'none';
+  }
+}
 
 function mobileScanSetPlaceholder_(text, state) {
   var ph = document.getElementById('mobile-qr-reader-placeholder');
@@ -204,9 +215,10 @@ function mobileScanRestoreReaderDiv_() {
       mobileScanHandleDecode_(ev.data.text);
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK') {
       window.mobileScanGateAck_ = true;
+      mobileScanSetShellHolePlaceholder_();
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_READY') {
       window.mobileScanGateAck_ = true;
-      mobileScanSetPlaceholder_('Tap TAP TO START CAMERA on the orange preview', 'error');
+      mobileScanSetShellHolePlaceholder_();
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE') {
       mobileScanSetPlaceholder_('Camera active — point at QR', 'live');
       var permBtn = document.getElementById('mobile-scan-perm-btn');
