@@ -20,6 +20,13 @@ var MOBILE_SCAN_LAST_TS = 0;
 var mobileQrEngine = null;
 var mobileQrStarting = false;
 var mobileQrUsesParent_ = false;
+var mobileQrUsesEmbed_ = false;
+var MOBILE_CAM_EMBED_VER = '1';
+
+function mobileScanIsEmbedOrigin_(origin) {
+  if (!origin) return false;
+  return origin.indexOf('sm-showrunner-97405.web.app') !== -1 || origin.indexOf('web.app') !== -1;
+}
 
 function mobileScanInHostingIframe_() {
   try { return window.self !== window.top; } catch (e) { return true; }
@@ -72,6 +79,65 @@ function mobileScanSetPlaceholder_(text, state) {
   ph.className = 'mobile-qr-reader-placeholder' + (state ? (' mobile-qr-reader-placeholder--' + state) : '');
 }
 
+function mobileScanEnsureEmbed_() {
+  var embed = document.getElementById('mobile-qr-camera-embed');
+  if (!embed) {
+    var wrap = document.getElementById('mobile-qr-reader-wrap');
+    if (!wrap) return null;
+    embed = document.createElement('iframe');
+    embed.id = 'mobile-qr-camera-embed';
+    embed.className = 'mobile-qr-camera-embed';
+    embed.title = 'QR camera';
+    embed.setAttribute('allow', 'camera; microphone');
+    wrap.insertBefore(embed, wrap.firstChild);
+  }
+  return embed;
+}
+
+function mobileScanShowEmbed_(show) {
+  var embed = mobileScanEnsureEmbed_();
+  var ph = document.getElementById('mobile-qr-reader-placeholder');
+  var permBtn = document.getElementById('mobile-scan-perm-btn');
+  if (embed) embed.style.display = show ? 'block' : 'none';
+  if (ph) ph.style.display = show ? 'none' : 'flex';
+  if (permBtn) permBtn.style.display = show ? 'none' : 'flex';
+}
+
+function mobileScanStartEmbedCamera_() {
+  if (!mobileScanInHostingIframe_()) return false;
+  var embed = mobileScanEnsureEmbed_();
+  if (!embed) return false;
+  mobileQrUsesParent_ = false;
+  mobileQrUsesEmbed_ = true;
+  mobileScanShowEmbed_(true);
+  var url = MOBILE_SCAN_HOST + '/camera-embed.html?v=' + MOBILE_CAM_EMBED_VER;
+  if (!embed.src || embed.src.indexOf('camera-embed') === -1) {
+    embed.src = url;
+  } else {
+    try {
+      embed.contentWindow.postMessage({ type: 'SHOWRUNNER_EMBED_CAM_PERM_RETRY' }, '*');
+    } catch (e) { /* ignore */ }
+  }
+  return true;
+}
+
+window.mobileScanRequestEmbedPerm_ = function() {
+  if (mobileQrUsesEmbed_) {
+    var embed = document.getElementById('mobile-qr-camera-embed');
+    if (embed && embed.contentWindow) {
+      try {
+        embed.contentWindow.postMessage({ type: 'SHOWRUNNER_EMBED_CAM_PERM_RETRY' }, '*');
+      } catch (e) { /* ignore */ }
+    }
+    return;
+  }
+  if (!mobileScanInHostingIframe_()) {
+    mobileScanStartCamera_();
+    return;
+  }
+  mobileScanRequestShellPerm_();
+};
+
 function mobileScanSyncShellCamera_() {
   if (!mobileScanInHostingIframe_()) return;
   mobileQrUsesParent_ = true;
@@ -114,6 +180,28 @@ function mobileScanRestoreReaderDiv_() {
 (function mobileScanBridgeInit_() {
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
+    if (mobileScanIsEmbedOrigin_(ev.origin)) {
+      if (ev.data.type === 'SHOWRUNNER_EMBED_QR_SCAN') {
+        if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+          mobileOpenScanPanel();
+        }
+        mobileScanHandleDecode_(ev.data.text);
+      } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_READY') {
+        mobileScanShowEmbed_(true);
+      } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_ACTIVE') {
+        var permBtn = document.getElementById('mobile-scan-perm-btn');
+        if (permBtn) permBtn.classList.remove('is-pulse');
+      } else if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_ERROR') {
+        var emsg = ev.data.message || 'Camera blocked.';
+        if (/not allowed|permission denied/i.test(emsg)) {
+          emsg = 'Tap TAP TO START CAMERA in the preview, or the camera icon.';
+        }
+        mobileScanToast_(emsg, true);
+        var permBtn2 = document.getElementById('mobile-scan-perm-btn');
+        if (permBtn2) permBtn2.classList.add('is-pulse');
+      }
+      return;
+    }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN') {
       if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
@@ -494,14 +582,15 @@ window.mobileOpenScanPanel = function() {
   }
   if (btn) btn.classList.add('is-panel-open');
   document.body.classList.add('mobile-scan-panel-open');
-  mobileScanSetPlaceholder_('Tap TAP TO START CAMERA on the orange preview');
   mobileScanRenderLast_();
   window.addEventListener('resize', mobileScanPanelResize_);
   setTimeout(function() {
     document.addEventListener('click', mobileScanPanelOutsideClick_, true);
   }, 0);
   if (mobileScanInHostingIframe_()) {
-    mobileScanSyncShellCamera_();
+    if (!mobileScanStartEmbedCamera_()) {
+      mobileScanSetPlaceholder_('Camera failed to load', 'error');
+    }
   } else {
     mobileScanStartCamera_();
   }
@@ -524,6 +613,7 @@ window.mobileCloseScanPanel = function() {
 
 function mobileScanStartCamera_() {
   if (mobileScanInHostingIframe_()) {
+    if (mobileScanStartEmbedCamera_()) return;
     mobileScanSyncShellCamera_();
     return;
   }
@@ -616,6 +706,17 @@ function mobileScanStartCameraInner_() {
 }
 
 function mobileScanStopCamera_() {
+  if (mobileQrUsesEmbed_) {
+    var embed = document.getElementById('mobile-qr-camera-embed');
+    if (embed && embed.contentWindow) {
+      try { embed.contentWindow.postMessage({ type: 'SHOWRUNNER_EMBED_CAM_STOP' }, '*'); } catch (e) { /* ignore */ }
+    }
+    mobileQrUsesEmbed_ = false;
+    mobileScanShowEmbed_(false);
+    var permBtn = document.getElementById('mobile-scan-perm-btn');
+    if (permBtn) permBtn.classList.remove('is-pulse');
+    return;
+  }
   if (mobileQrUsesParent_) {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_STOP');
     mobileQrUsesParent_ = false;

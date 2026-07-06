@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0c">
+  <title>Showrunner camera</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      color: #f4f4f5;
+      font-family: Inter, system-ui, sans-serif;
+      overflow: hidden;
+    }
+    #qr-reader {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    #qr-reader video {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    #qr-start {
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: rgba(24, 24, 27, 0.92);
+      color: #fb923c;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      text-align: center;
+      padding: 16px;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+    #qr-start.is-hidden { display: none; }
+    #qr-perm {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 5;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border-radius: 8px;
+      border: 1px solid #f97316;
+      background: rgba(24, 24, 27, 0.95);
+      color: #fb923c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+    #qr-perm.is-pulse {
+      animation: permPulse 1s ease-in-out infinite;
+    }
+    @keyframes permPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
+      50% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
+    }
+  </style>
+</head>
+<body>
+  <div id="qr-reader"></div>
+  <button type="button" id="qr-perm" title="Allow camera" aria-label="Camera permission">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+  </button>
+  <button type="button" id="qr-start">TAP TO START CAMERA</button>
+  <script>
+  (function() {
+    var engine = null;
+    var starting = false;
+
+    function relay(type, extra) {
+      try {
+        var msg = { type: type };
+        if (extra && typeof extra === 'object') {
+          Object.keys(extra).forEach(function(k) { msg[k] = extra[k]; });
+        }
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(msg, '*');
+        }
+      } catch (e) { /* ignore */ }
+    }
+
+    function showStart(show) {
+      var btn = document.getElementById('qr-start');
+      if (!btn) return;
+      if (show) btn.classList.remove('is-hidden');
+      else btn.classList.add('is-hidden');
+    }
+
+    function pulsePerm(on) {
+      var p = document.getElementById('qr-perm');
+      if (!p) return;
+      if (on) p.classList.add('is-pulse');
+      else p.classList.remove('is-pulse');
+    }
+
+    function stopEngine() {
+      starting = false;
+      if (!engine) return;
+      var eng = engine;
+      engine = null;
+      eng.stop().then(function() {
+        try { eng.clear(); } catch (e) { /* ignore */ }
+      }).catch(function() {
+        try { eng.clear(); } catch (e2) { /* ignore */ }
+      });
+    }
+
+    function onFail(err) {
+      starting = false;
+      stopEngine();
+      showStart(true);
+      pulsePerm(true);
+      var msg = String(err && err.message ? err.message : err);
+      relay('SHOWRUNNER_EMBED_CAM_ERROR', { message: msg });
+    }
+
+    function startCamera() {
+      if (typeof Html5Qrcode === 'undefined') {
+        onFail(new Error('Scanner failed to load.'));
+        return;
+      }
+      if (engine || starting) return;
+      starting = true;
+      showStart(false);
+      pulsePerm(false);
+
+      function startCfg(cfg) {
+        engine = new Html5Qrcode('qr-reader');
+        return engine.start(
+          cfg,
+          {
+            fps: 10,
+            qrbox: function(w, h) {
+              var edge = Math.floor(Math.min(w, h) * 0.72);
+              return { width: Math.max(edge, 120), height: Math.max(edge, 120) };
+            }
+          },
+          function(decoded) {
+            relay('SHOWRUNNER_EMBED_QR_SCAN', { text: String(decoded == null ? '' : decoded) });
+          },
+          function() { /* frame miss */ }
+        );
+      }
+
+      function afterOk() {
+        starting = false;
+        relay('SHOWRUNNER_EMBED_CAM_ACTIVE');
+      }
+
+      startCfg({ facingMode: 'environment' }).then(afterOk).catch(function() {
+        if (typeof Html5Qrcode.getCameras !== 'function') {
+          onFail(new Error('Camera not available'));
+          return;
+        }
+        Html5Qrcode.getCameras().then(function(cams) {
+          if (!cams || !cams.length) return startCfg({ facingMode: 'environment' });
+          var back = null;
+          for (var i = 0; i < cams.length; i++) {
+            var lab = String(cams[i].label || '').toLowerCase();
+            if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
+              back = cams[i];
+              break;
+            }
+          }
+          return startCfg((back || cams[cams.length - 1]).id);
+        }).then(afterOk).catch(onFail);
+      });
+    }
+
+    function onTapStart(ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      stopEngine();
+      startCamera();
+    }
+
+    document.getElementById('qr-start').addEventListener('click', onTapStart);
+    document.getElementById('qr-start').addEventListener('touchend', onTapStart, { passive: false });
+    document.getElementById('qr-perm').addEventListener('click', onTapStart);
+    document.getElementById('qr-perm').addEventListener('touchend', function(ev) {
+      ev.preventDefault();
+      onTapStart(ev);
+    }, { passive: false });
+
+    window.addEventListener('message', function(ev) {
+      if (!ev.data) return;
+      if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_PERM_RETRY') {
+        stopEngine();
+        showStart(true);
+        pulsePerm(true);
+      }
+      if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_STOP') {
+        stopEngine();
+        showStart(true);
+        pulsePerm(false);
+      }
+    });
+
+    relay('SHOWRUNNER_EMBED_CAM_READY');
+  })();
+  </script>
+</body>
+</html>
