@@ -240,6 +240,10 @@
         showStart(true);
         pulsePerm(true);
       }
+      if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_START') {
+        stopEngine();
+        startCamera();
+      }
       if (ev.data.type === 'SHOWRUNNER_EMBED_CAM_STOP') {
         stopEngine();
         showStart(true);
