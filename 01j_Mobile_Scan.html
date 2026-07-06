@@ -21,7 +21,27 @@ var mobileQrEngine = null;
 var mobileQrStarting = false;
 var mobileQrUsesParent_ = false;
 var mobileQrUsesEmbed_ = false;
-var MOBILE_CAM_EMBED_VER = '1';
+var MOBILE_CAM_EMBED_VER = '2';
+
+function mobileScanStartShellEmbed_() {
+  if (!mobileScanInHostingIframe_()) return false;
+  mobileQrUsesParent_ = true;
+  mobileQrUsesEmbed_ = false;
+  mobileScanShowEmbed_(false);
+  mobileScanSetPlaceholder_('Tap TAP TO START CAMERA in the preview above', 'error');
+  window.mobileScanGateAck_ = false;
+  function send() {
+    mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', mobileScanShellPayload_());
+  }
+  requestAnimationFrame(function() { requestAnimationFrame(send); });
+  setTimeout(send, 120);
+  setTimeout(send, 400);
+  return true;
+}
+
+function mobileScanStartEmbedCamera_() {
+  return mobileScanStartShellEmbed_();
+}
 
 function mobileScanIsEmbedOrigin_(origin) {
   if (!origin) return false;
@@ -103,39 +123,14 @@ function mobileScanShowEmbed_(show) {
   if (permBtn) permBtn.style.display = show ? 'none' : 'flex';
 }
 
-function mobileScanStartEmbedCamera_() {
-  if (!mobileScanInHostingIframe_()) return false;
-  var embed = mobileScanEnsureEmbed_();
-  if (!embed) return false;
-  mobileQrUsesParent_ = false;
-  mobileQrUsesEmbed_ = true;
-  mobileScanShowEmbed_(true);
-  var url = MOBILE_SCAN_HOST + '/camera-embed.html?v=' + MOBILE_CAM_EMBED_VER;
-  if (!embed.src || embed.src.indexOf('camera-embed') === -1) {
-    embed.src = url;
-  } else {
-    try {
-      embed.contentWindow.postMessage({ type: 'SHOWRUNNER_EMBED_CAM_PERM_RETRY' }, '*');
-    } catch (e) { /* ignore */ }
-  }
-  return true;
-}
-
 window.mobileScanRequestEmbedPerm_ = function() {
-  if (mobileQrUsesEmbed_) {
-    var embed = document.getElementById('mobile-qr-camera-embed');
-    if (embed && embed.contentWindow) {
-      try {
-        embed.contentWindow.postMessage({ type: 'SHOWRUNNER_EMBED_CAM_PERM_RETRY' }, '*');
-      } catch (e) { /* ignore */ }
-    }
-    return;
-  }
   if (!mobileScanInHostingIframe_()) {
     mobileScanStartCamera_();
     return;
   }
-  mobileScanRequestShellPerm_();
+  var permBtn = document.getElementById('mobile-scan-perm-btn');
+  if (permBtn) permBtn.classList.add('is-pulse');
+  mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_PERM_RETRY', mobileScanShellPayload_());
 };
 
 function mobileScanSyncShellCamera_() {
