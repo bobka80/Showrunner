@@ -142,8 +142,13 @@
   function hostMobileScanShowInlineStart_(show) {
     hostMobileScanWireInlineStart_();
     if (!hostMobileQrInlineStart) return;
-    if (show) hostMobileQrInlineStart.classList.add('is-visible');
-    else hostMobileQrInlineStart.classList.remove('is-visible');
+    if (show) {
+      hostMobileQrInlineStart.classList.add('is-visible');
+      hostMobileQrInlineStart.style.display = 'flex';
+    } else {
+      hostMobileQrInlineStart.classList.remove('is-visible');
+      hostMobileQrInlineStart.style.display = 'none';
+    }
   }
 
   function hostMobileScanParsePayload_(data) {
@@ -230,6 +235,9 @@
   function hostMobileScanRepositionOpen_() {
     if (hostMobileQrOpen && hostMobileQrLastOpenData) {
       hostMobileScanPositionOverlay_(hostMobileQrLastOpenData);
+      if (hostMobileQrTapGate && hostMobileQrTapGate.classList.contains('is-open')) {
+        hostMobileScanShowTapGateBand_();
+      }
     }
   }
 
@@ -243,7 +251,8 @@
     hostMobileScanHideEmbedFrame_();
     hostMobileScanUnlockStarting_();
     hostMobileScanStopEngine_();
-    hostMobileScanShowInlineStart_(true);
+    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+    hostMobileScanShowTapGateBand_();
     hostMobileScanPulsePermBtn_();
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_READY' });
   }
@@ -255,9 +264,9 @@
     hostMobileScanStopEngine_();
     hostMobileScanHideEmbedFrame_();
     hostMobileScanPositionOverlay_(data);
-    var overlay = hostMobileScanEnsureOverlay();
-    overlay.style.display = 'block';
-    hostMobileScanShowInlineStart_(true);
+    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+    hostMobileScanShowInlineStart_(false);
+    hostMobileScanShowTapGateBand_();
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' });
     hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_READY' });
     hostMobileScanScheduleReposition_();
@@ -273,6 +282,8 @@
       hostMobileScanUnlockStarting_();
       hostMobileScanStopEngine_();
       hostMobileScanShowInlineStart_(false);
+      var overlay = hostMobileScanEnsureOverlay();
+      overlay.style.display = 'block';
       hostMobileScanStartEngine_();
     }
     hostMobileQrPermBtn.addEventListener('click', onPerm);
@@ -294,7 +305,7 @@
     hostMobileQrStartTimer = setTimeout(function() {
       if (!hostMobileQrStarting) return;
       hostMobileScanUnlockStarting_();
-      hostMobileScanShowInlineStart_(true);
+      hostMobileScanShowTapGateBand_();
       hostMobileScanPulsePermBtn_();
       hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Camera timed out — tap TAP TO START CAMERA or the camera icon.' });
     }, 8000);
@@ -302,7 +313,8 @@
     function onFail(err) {
       hostMobileScanUnlockStarting_();
       hostMobileScanStopEngine_();
-      hostMobileScanShowInlineStart_(true);
+      if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+      hostMobileScanShowTapGateBand_();
       hostMobileScanPulsePermBtn_();
       var msg = String(err && err.message ? err.message : err);
       hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: msg });
@@ -328,7 +340,9 @@
 
     function afterOk() {
       hostMobileScanUnlockStarting_();
+      hostMobileScanHideTapGate_();
       hostMobileScanShowInlineStart_(false);
+      if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'block';
       if (hostMobileQrPermBtn) hostMobileQrPermBtn.classList.remove('is-pulse');
       hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE' });
     }
@@ -377,6 +391,8 @@
     function onTap(ev) {
       if (ev) { ev.preventDefault(); ev.stopPropagation(); }
       hostMobileScanHideTapGate_();
+      var overlay = hostMobileScanEnsureOverlay();
+      overlay.style.display = 'block';
       hostMobileScanStartEngine_();
     }
     hostMobileQrTapBtn.addEventListener('click', onTap);
@@ -400,10 +416,26 @@
     if (frame) frame.style.display = frame.dataset.srPrevDisplay || 'block';
   }
 
+  function hostMobileScanShowTapGateBand_() {
+    hostMobileScanEnsureTapGate();
+    if (!hostMobileQrTapGate || !hostMobileQrCameraRect) return;
+    var g = hostMobileQrCameraRect;
+    hostMobileQrTapGate.classList.add('is-open', 'is-band');
+    hostMobileQrTapGate.setAttribute('aria-hidden', 'false');
+    hostMobileQrTapGate.style.top = Math.round(g.top) + 'px';
+    hostMobileQrTapGate.style.left = Math.round(g.left) + 'px';
+    hostMobileQrTapGate.style.width = Math.round(g.width) + 'px';
+    hostMobileQrTapGate.style.height = Math.round(g.height) + 'px';
+  }
+
   function hostMobileScanHideTapGate_() {
     if (hostMobileQrTapGate) {
-      hostMobileQrTapGate.classList.remove('is-open');
+      hostMobileQrTapGate.classList.remove('is-open', 'is-band');
       hostMobileQrTapGate.setAttribute('aria-hidden', 'true');
+      hostMobileQrTapGate.style.top = '';
+      hostMobileQrTapGate.style.left = '';
+      hostMobileQrTapGate.style.width = '';
+      hostMobileQrTapGate.style.height = '';
     }
     document.body.classList.remove('sr-mobile-scan-gate-open');
     hostMobileScanRestoreFrame_();
@@ -1488,6 +1520,15 @@
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_SET') {
       applyStationConfig(ev.data.key, ev.data.value);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_USER_TAP') {
+      if (!hostMobileQrOpen) hostMobileScanOpen_(ev.data);
+      else {
+        hostMobileQrLastOpenData = ev.data;
+        hostMobileScanPositionOverlay_(ev.data);
+        hostMobileScanShowTapGateBand_();
+      }
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN') {

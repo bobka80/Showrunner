@@ -1,0 +1,116 @@
+# Cursor workflow — Showrunner + IDE integration
+
+**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Director:** [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md)
+
+This doc maps **Cursor IDE features** (rules, skills, subagents, review agents) onto the doctrine you already use. It does not replace `AI_DOCTRINE.md` — it is the stable reference for *how to run sessions in Cursor*.
+
+`Last swept:` 2026-07-06 · `Production:` GAS v449 (see root `RELEASES.md`)
+
+---
+
+## What lives where
+
+| Layer | Location | Role |
+|-------|----------|------|
+| **Doctrine** | `AI_DOCTRINE.md`, `docs/ai/**` | Single source of truth — drawers, ship rules, fragile zones |
+| **Cursor entry** | root `AGENTS.md` | Cursor loads this automatically |
+| **Cursor rules** | `.cursor/rules/*.mdc` | Short, file-scoped hints — **link to doctrine**, do not duplicate it |
+| **Terminal allowlist** | `.cursor/permissions.json` | Auto-approve `node milestone.js`, `build.js`, clasp, etc. |
+| **User rules** | Cursor Settings → Rules | Commit policy, prose style (global to your account) |
+
+---
+
+## Project rules (`.cursor/rules/`)
+
+| Rule file | When it applies |
+|-----------|-----------------|
+| `showrunner-core.mdc` | **Always** — doctrine entry, modes, ship |
+| `mobile-pwa-hosting.mdc` | `push-hosting/**`, `01j_Mobile_Scan.html`, mobile styles |
+| `equipment-fragile.mdc` | Formula, PA, packing, `Operations.js` |
+| `session-bridge.mdc` | `host-boot.js`, `Login.html`, `Security.js`, `Main.js` |
+
+Rules are intentionally short. Full detail stays in `docs/ai/`.
+
+---
+
+## Session routine (director)
+
+### 1. Pick a mode
+
+| You say | Agent does | Agent does NOT (until OK go) |
+|---------|------------|------------------------------|
+| **brainstorm** / planning mode | Discuss tradeoffs | Code, deploy, doc edits |
+| **summarize** | Restate understanding | Code, deploy, docs |
+| **hygiene sweep** / **doc hygiene** | Audit docs, one report | Edit docs or code |
+| **OK go** / **fix this** | Build per drawer + FRAGILE_ZONES | Scope creep |
+
+### 2. Name the drawer
+
+Examples: *"Active drawer: RFID station"* · *"Read mobile-crew topic"* · *"FRAGILE_ZONES first — this touches formulas"*
+
+### 3. One task per OK go
+
+One clear outcome per build session (e.g. scan panel camera, not camera + notifications + warehouse).
+
+### 4. Ship
+
+- Source change → `node build.js` if needed → `node milestone.js "<descriptive note>"`
+- `push-hosting/public/**` → bump `host-boot.js?v=` if needed → `node deploy-hosting.js`
+- Report **GAS version** and plain-language **test steps on web.app**
+
+### 5. Optional gates (larger changes)
+
+| When | Director says |
+|------|----------------|
+| 5+ files or risky mobile/hosting diff | **"Bugbot review on uncommitted changes"** (or branch diff) |
+| Auth, session, FCM, station bridge | **"Security review before ship"** |
+| Stuck after two fix attempts | **"Use heavier reasoning"** |
+| PWA UI verification | **"Verify on web.app with the browser tool"** |
+
+Do **not** run Bugbot + security + explore on every small fix — cost and noise.
+
+### 6. Periodic hygiene
+
+Every few weeks or when closing a campaign: **hygiene sweep** → review report → **OK go** to apply doc fixes only.
+
+---
+
+## Cursor features (plain language)
+
+| Feature | What it is | Showrunner use |
+|---------|------------|----------------|
+| **Rules** | Context injected into chat | `.cursor/rules/*.mdc` — already wired |
+| **Skills** | Reusable agent playbooks | Global skills (create-rule, Bugbot, security review) — agent picks when relevant |
+| **Subagents** | Background specialists | **explore** for broad codebase search; **shell** for git/deploy; avoid for one-file fixes |
+| **Bugbot** | Automated diff review | Before merge / after large mobile or equipment changes |
+| **Security review** | Auth/session-focused review | Before `host-boot.js`, `Security.js`, login changes |
+| **MCP browser** | Agent can open web.app | Mobile/PWA test steps without you being the only tester |
+| **Plugins** | Cursor extensions | Optional; doctrine + rules are the main guardrails |
+
+---
+
+## Cost-conscious defaults
+
+From [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md):
+
+1. **Brainstorm** new features before **OK go**
+2. **Default model** for routine UI fixes; escalate for fragile zones
+3. **One OK go** per session
+4. Monthly spend cap in Cursor billing (director setting)
+
+---
+
+## What not to do
+
+- Duplicate full checklists from `docs/ai/` into Cursor rules
+- Run multiple review agents on every typo fix
+- Skip **summarize** on ambiguous multi-screen UX (e.g. integrated scan panel vs full-page camera)
+- Edit `dist/` manually or deploy with bare `clasp push` (see [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md))
+
+---
+
+## Related
+
+- [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md) — brainstorm, bug template, handoff
+- [FRAGILE_ZONES.md](FRAGILE_ZONES.md) — pre-flight before dangerous edits
+- [FILE_MAP.md](FILE_MAP.md) — module index including hosting and mobile scan

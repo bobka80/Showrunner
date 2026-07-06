@@ -2332,6 +2332,37 @@
     color: #fb923c;
 }
 
+.mobile-qr-start-btn {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 16px;
+    border: 2px solid #f97316;
+    border-radius: 8px;
+    background: #18181b;
+    color: #fb923c;
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    text-align: center;
+    touch-action: manipulation;
+    cursor: pointer;
+}
+
+.mobile-scan-panel.is-open .mobile-qr-start-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-scan-panel.is-open.mobile-scan-camera-live .mobile-qr-start-btn {
+    display: none;
+}
+
 .mobile-qr-camera-embed {
     width: 100%;
     height: 100%;
@@ -3966,8 +3997,9 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
                                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
                                 </button>
                                 <div id="mobile-qr-reader-wrap" class="mobile-qr-reader-wrap">
+                                    <button type="button" id="mobile-qr-start-btn" class="mobile-qr-start-btn" onclick="mobileScanUserTapShell_()">TAP TO START CAMERA</button>
                                     <iframe id="mobile-qr-camera-embed" class="mobile-qr-camera-embed" title="QR camera" allow="camera; microphone" style="display:none;"></iframe>
-                                    <div id="mobile-qr-reader-placeholder" class="mobile-qr-reader-placeholder">Camera loads here…</div>
+                                    <div id="mobile-qr-reader-placeholder" class="mobile-qr-reader-placeholder" style="display:none;"></div>
                                 </div>
                             </div>
                             <div id="mobile-scan-feed" class="mobile-scan-feed" aria-label="Recent scans">

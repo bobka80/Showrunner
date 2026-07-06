@@ -155,6 +155,28 @@ The Incident Log is not a diary — each entry is one **lesson** so future AI se
 
 ---
 
+## Cursor IDE (rules, agents, review gates)
+
+Full reference: **[CURSOR_WORKFLOW.md](CURSOR_WORKFLOW.md)**.
+
+| Piece | Location |
+|-------|----------|
+| Always-on rule | `.cursor/rules/showrunner-core.mdc` |
+| File-scoped rules | `mobile-pwa-hosting`, `equipment-fragile`, `session-bridge` in `.cursor/rules/` |
+| Terminal auto-approve | `.cursor/permissions.json` (milestone, build, clasp) |
+
+**Optional gates** (not every session):
+
+| When | Director says |
+|------|----------------|
+| Large or risky diff before merge | **"Bugbot review on uncommitted changes"** |
+| Auth / session / `host-boot.js` | **"Security review before ship"** |
+| PWA UI check | **"Verify on web.app with the browser tool"** |
+
+Session routine is unchanged: **brainstorm → summarize → OK go** · one task per OK go · name the drawer.
+
+---
+
 ## Escalation Guide (For the Director)
 
 You do not pick models — but you can say:

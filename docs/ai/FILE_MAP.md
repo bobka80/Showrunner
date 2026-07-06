@@ -390,6 +390,17 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 
 ---
 
+## Cursor IDE & agent entry
+
+| Path | Purpose |
+|------|---------|
+| **`AGENTS.md`** (repo root) | Cursor auto-entry — points to doctrine |
+| **`.cursor/rules/*.mdc`** | Short rules: `showrunner-core` (always), `mobile-pwa-hosting`, `equipment-fragile`, `session-bridge` (file-scoped) |
+| **`.cursor/permissions.json`** | Terminal allowlist: `milestone.js`, `build.js`, clasp, etc. |
+| **`docs/ai/CURSOR_WORKFLOW.md`** | Session routine, Bugbot/security gates, subagent usage |
+
+---
+
 ## CSS / Structural UI
 
 **Full specification:** [UI_DOCTRINE.md](UI_DOCTRINE.md) — mandatory for new buttons, modals, hubs, and tabs.

@@ -28,7 +28,7 @@ function mobileScanStartShellEmbed_() {
   mobileQrUsesParent_ = true;
   mobileQrUsesEmbed_ = false;
   mobileScanShowEmbed_(false);
-  mobileScanSetPlaceholder_('Tap the orange TAP TO START CAMERA button on the preview');
+  mobileScanShowStartBtn_(true);
   window.mobileScanGateAck_ = false;
   function send() {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', mobileScanShellPayload_());
@@ -86,15 +86,26 @@ function mobileScanShellPayload_() {
 
 var MOBILE_SCAN_HOST = 'https://sm-showrunner-97405.web.app';
 
+function mobileScanShowStartBtn_(show) {
+  var btn = document.getElementById('mobile-qr-start-btn');
+  if (!btn) return;
+  btn.style.display = show ? 'flex' : 'none';
+  if (show) document.body.classList.remove('mobile-scan-camera-live');
+}
+
+window.mobileScanUserTapShell_ = function() {
+  if (!mobileScanInHostingIframe_()) {
+    mobileScanStartCamera_();
+    return;
+  }
+  mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_USER_TAP', mobileScanShellPayload_());
+  mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', mobileScanShellPayload_());
+};
+
 function mobileScanSetShellHolePlaceholder_() {
-  var ph = document.getElementById('mobile-qr-reader-placeholder');
+  mobileScanShowStartBtn_(false);
   var wrap = document.getElementById('mobile-qr-reader-wrap');
   if (wrap) wrap.style.background = 'transparent';
-  if (ph) {
-    ph.textContent = '';
-    ph.style.opacity = '0';
-    ph.style.pointerEvents = 'none';
-  }
 }
 
 function mobileScanSetPlaceholder_(text, state) {
@@ -174,7 +185,8 @@ window.mobileScanRequestShellPerm_ = function() {
 };
 
 function mobileScanShowEnableRetry_() {
-  mobileScanSetPlaceholder_('Camera blocked — tap the camera icon top-left or the preview to allow access', 'error');
+  document.body.classList.remove('mobile-scan-camera-live');
+  mobileScanShowStartBtn_(true);
 }
 
 function mobileScanRestoreReaderDiv_() {
@@ -215,15 +227,18 @@ function mobileScanRestoreReaderDiv_() {
       mobileScanHandleDecode_(ev.data.text);
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK') {
       window.mobileScanGateAck_ = true;
-      mobileScanSetShellHolePlaceholder_();
+      mobileScanShowStartBtn_(false);
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_READY') {
       window.mobileScanGateAck_ = true;
-      mobileScanSetShellHolePlaceholder_();
+      mobileScanShowStartBtn_(false);
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE') {
-      mobileScanSetPlaceholder_('Camera active — point at QR', 'live');
+      document.body.classList.add('mobile-scan-camera-live');
+      mobileScanShowStartBtn_(false);
       var permBtn = document.getElementById('mobile-scan-perm-btn');
       if (permBtn) permBtn.classList.remove('is-pulse');
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR') {
+      document.body.classList.remove('mobile-scan-camera-live');
+      mobileScanShowStartBtn_(true);
       var msg = ev.data.message || 'Camera permission denied.';
       if (/not allowed|permission denied/i.test(msg)) {
         msg = 'Camera blocked — tap the camera icon top-left or TAP TO START CAMERA on the preview.';
@@ -613,6 +628,7 @@ window.mobileCloseScanPanel = function() {
   }
   if (btn) btn.classList.remove('is-panel-open');
   document.body.classList.remove('mobile-scan-panel-open');
+  document.body.classList.remove('mobile-scan-camera-live');
   window.removeEventListener('resize', mobileScanPanelResize_);
   document.removeEventListener('click', mobileScanPanelOutsideClick_, true);
   mobileScanStopCamera_();
