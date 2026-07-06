@@ -34,19 +34,39 @@
   }
 
   // --- Mobile QR camera (hosting shell / PWA) ---------------------------------
-  // Camera must run on web.app (top window), not inside the GAS iframe — Android
-  // PWAs never register camera permission for nested cross-origin frames.
-  // User taps START on this overlay (valid gesture) → getUserMedia on shell origin.
+  // Camera runs on web.app aligned to the iframe scan-panel square; panel UI stays in iframe.
   var hostMobileQrEngine = null;
   var hostMobileQrStarting = false;
   var hostMobileQrOverlay = null;
   var hostMobileQrTapGate = null;
   var hostMobileQrTapBtn = null;
+  var hostMobileQrPermBtn = null;
+  var hostMobileQrInlineStart = null;
   var hostMobileQrOpen = false;
+  var hostMobileQrCameraRect = null;
 
   function hostMobileScanRelay_(payload) {
     if (!frame || !frame.contentWindow) return;
     try { frame.contentWindow.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+  }
+
+  function hostMobileScanFrameRect_() {
+    if (!frame) return { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight };
+    var r = frame.getBoundingClientRect();
+    return { top: r.top, left: r.left, width: r.width, height: r.height };
+  }
+
+  function hostMobileScanGlobalRect_(rect) {
+    var fr = hostMobileScanFrameRect_();
+    if (!rect || !rect.width) {
+      return { top: fr.top, left: fr.left, width: fr.width, height: Math.max(200, Math.round(window.innerHeight * 0.32)) };
+    }
+    return {
+      top: fr.top + rect.top,
+      left: fr.left + rect.left,
+      width: rect.width,
+      height: rect.height
+    };
   }
 
   function hostMobileScanEnsureOverlay() {
@@ -63,14 +83,13 @@
     reader.id = 'sr-host-qr-reader';
     reader.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;');
 
-    var tapBtn = document.createElement('button');
-    tapBtn.id = 'sr-host-qr-tap';
-    tapBtn.type = 'button';
-    tapBtn.textContent = 'TAP TO START CAMERA';
-    tapBtn.setAttribute('style', 'display:none;');
+    var inlineStart = document.createElement('button');
+    inlineStart.id = 'sr-host-qr-inline-start';
+    inlineStart.type = 'button';
+    inlineStart.textContent = 'TAP TO START CAMERA';
 
     el.appendChild(reader);
-    el.appendChild(tapBtn);
+    el.appendChild(inlineStart);
     document.body.appendChild(el);
 
     if (!document.getElementById('sr-host-qr-styles')) {
@@ -84,7 +103,206 @@
     }
 
     hostMobileQrOverlay = el;
+    hostMobileQrInlineStart = inlineStart;
     return el;
+  }
+
+  function hostMobileScanWireInlineStart_() {
+    if (!hostMobileQrInlineStart) hostMobileQrInlineStart = document.getElementById('sr-host-qr-inline-start');
+    if (!hostMobileQrInlineStart || hostMobileQrInlineStart.dataset.bound === '1') return;
+    hostMobileQrInlineStart.dataset.bound = '1';
+    function onTap(ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      hostMobileScanShowInlineStart_(false);
+      hostMobileScanStartEngine_();
+    }
+    hostMobileQrInlineStart.addEventListener('click', onTap);
+    hostMobileQrInlineStart.addEventListener('touchend', onTap, { passive: false });
+  }
+
+  function hostMobileScanShowInlineStart_(show) {
+    hostMobileScanWireInlineStart_();
+    if (!hostMobileQrInlineStart) return;
+    if (show) hostMobileQrInlineStart.classList.add('is-visible');
+    else hostMobileQrInlineStart.classList.remove('is-visible');
+  }
+
+  function hostMobileScanParsePayload_(data) {
+    if (!data) return { rect: null, permRect: null };
+    if (data.rect) return { rect: data.rect, permRect: data.permRect || null };
+    return { rect: data, permRect: null };
+  }
+
+  function hostMobileScanPositionOverlay_(data) {
+    var payload = hostMobileScanParsePayload_(data);
+    hostMobileQrCameraRect = hostMobileScanGlobalRect_(payload.rect);
+    var g = hostMobileQrCameraRect;
+    var overlay = hostMobileScanEnsureOverlay();
+    overlay.style.top = Math.round(g.top) + 'px';
+    overlay.style.left = Math.round(g.left) + 'px';
+    overlay.style.width = Math.round(g.width) + 'px';
+    overlay.style.height = Math.round(g.height) + 'px';
+    hostMobileScanPositionPermBtn_(payload.permRect);
+  }
+
+  function hostMobileScanPositionPermBtn_(permRect) {
+    if (!hostMobileQrPermBtn) hostMobileQrPermBtn = document.getElementById('sr-mobile-qr-perm-btn');
+    if (!hostMobileQrPermBtn) return;
+    var fr = hostMobileScanFrameRect_();
+    var top;
+    var left;
+    var w = 36;
+    var h = 36;
+    if (permRect && permRect.width) {
+      top = fr.top + permRect.top;
+      left = fr.left + permRect.left;
+      w = Math.max(permRect.width, 32);
+      h = Math.max(permRect.height, 32);
+    } else if (hostMobileQrCameraRect) {
+      top = hostMobileQrCameraRect.top + 8;
+      left = hostMobileQrCameraRect.left + 8;
+    } else {
+      return;
+    }
+    hostMobileQrPermBtn.style.top = Math.round(top) + 'px';
+    hostMobileQrPermBtn.style.left = Math.round(left) + 'px';
+    hostMobileQrPermBtn.style.width = Math.round(w) + 'px';
+    hostMobileQrPermBtn.style.height = Math.round(h) + 'px';
+    hostMobileQrPermBtn.style.display = 'flex';
+    hostMobileQrPermBtn.setAttribute('aria-hidden', 'false');
+  }
+
+  function hostMobileScanHidePermBtn_() {
+    if (!hostMobileQrPermBtn) hostMobileQrPermBtn = document.getElementById('sr-mobile-qr-perm-btn');
+    if (!hostMobileQrPermBtn) return;
+    hostMobileQrPermBtn.style.display = 'none';
+    hostMobileQrPermBtn.classList.remove('is-pulse');
+    hostMobileQrPermBtn.setAttribute('aria-hidden', 'true');
+  }
+
+  function hostMobileScanPulsePermBtn_() {
+    if (!hostMobileQrPermBtn) hostMobileQrPermBtn = document.getElementById('sr-mobile-qr-perm-btn');
+    if (hostMobileQrPermBtn) hostMobileQrPermBtn.classList.add('is-pulse');
+  }
+
+  function hostMobileScanStopEngine_() {
+    hostMobileQrStarting = false;
+    if (!hostMobileQrEngine) return;
+    var eng = hostMobileQrEngine;
+    hostMobileQrEngine = null;
+    eng.stop().then(function() {
+      try { eng.clear(); } catch (e) { /* ignore */ }
+    }).catch(function() {
+      try { eng.clear(); } catch (e2) { /* ignore */ }
+    });
+  }
+
+  function hostMobileScanPermRetry_() {
+    hostMobileScanStopEngine_();
+    hostMobileScanShowInlineStart_(true);
+    hostMobileScanPulsePermBtn_();
+    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Tap TAP TO START CAMERA on the preview, or the camera icon top-left.' });
+  }
+
+  function hostMobileScanWirePermBtn_() {
+    if (!hostMobileQrPermBtn) hostMobileQrPermBtn = document.getElementById('sr-mobile-qr-perm-btn');
+    if (!hostMobileQrPermBtn || hostMobileQrPermBtn.dataset.bound === '1') return;
+    hostMobileQrPermBtn.dataset.bound = '1';
+    function onPerm(ev) {
+      if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+      hostMobileScanPermRetry_();
+      hostMobileScanStartEngine_();
+    }
+    hostMobileQrPermBtn.addEventListener('click', onPerm);
+    hostMobileQrPermBtn.addEventListener('touchend', function(ev) {
+      ev.preventDefault();
+      onPerm(ev);
+    }, { passive: false });
+  }
+
+  function hostMobileScanOpen_(data) {
+    hostMobileQrOpen = true;
+    hostMobileScanStopEngine_();
+    hostMobileScanPositionOverlay_(data);
+    var overlay = hostMobileScanEnsureOverlay();
+    overlay.style.display = 'block';
+    hostMobileScanShowInlineStart_(true);
+    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' });
+    hostMobileScanStartEngine_();
+  }
+
+  function hostMobileScanStartEngine_() {
+    if (typeof Html5Qrcode === 'undefined') {
+      hostMobileScanShowInlineStart_(true);
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Camera scanner failed to load.' });
+      return;
+    }
+    if (hostMobileQrEngine || hostMobileQrStarting) return;
+    hostMobileQrStarting = true;
+
+    function onFail(err) {
+      hostMobileQrStarting = false;
+      hostMobileScanStopEngine_();
+      hostMobileScanShowInlineStart_(true);
+      hostMobileScanPulsePermBtn_();
+      var msg = String(err && err.message ? err.message : err);
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: msg });
+    }
+
+    function startWithConfig(cameraCfg) {
+      hostMobileQrEngine = new Html5Qrcode('sr-host-qr-reader');
+      return hostMobileQrEngine.start(
+        cameraCfg,
+        {
+          fps: 10,
+          qrbox: function(w, h) {
+            var edge = Math.floor(Math.min(w, h) * 0.72);
+            return { width: Math.max(edge, 120), height: Math.max(edge, 120) };
+          }
+        },
+        function(decoded) {
+          hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: String(decoded == null ? '' : decoded) });
+        },
+        function() { /* frame miss */ }
+      );
+    }
+
+    function afterOk() {
+      hostMobileQrStarting = false;
+      hostMobileScanShowInlineStart_(false);
+      if (hostMobileQrPermBtn) hostMobileQrPermBtn.classList.remove('is-pulse');
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE' });
+    }
+
+    if (typeof Html5Qrcode.getCameras === 'function') {
+      Html5Qrcode.getCameras().then(function(cams) {
+        if (!cams || !cams.length) return startWithConfig({ facingMode: 'environment' });
+        var back = null;
+        for (var i = 0; i < cams.length; i++) {
+          var lab = String(cams[i].label || '').toLowerCase();
+          if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
+            back = cams[i];
+            break;
+          }
+        }
+        return startWithConfig((back || cams[cams.length - 1]).id);
+      }).then(afterOk).catch(function() {
+        startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
+      });
+      return;
+    }
+
+    startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
+  }
+
+  function hostMobileScanStop() {
+    hostMobileQrOpen = false;
+    hostMobileQrCameraRect = null;
+    hostMobileScanHidePermBtn_();
+    hostMobileScanShowInlineStart_(false);
+    hostMobileScanStopEngine_();
+    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+    hostMobileScanHideTapGate_();
   }
 
   function hostMobileScanEnsureTapGate() {
@@ -120,9 +338,7 @@
   }
 
   function hostMobileScanRestoreFrame_() {
-    if (frame) {
-      frame.style.display = frame.dataset.srPrevDisplay || 'block';
-    }
+    if (frame) frame.style.display = frame.dataset.srPrevDisplay || 'block';
   }
 
   function hostMobileScanHideTapGate_() {
@@ -143,124 +359,9 @@
     } catch (e) { /* ignore */ }
   }
 
-  function hostMobileScanFrameRect_() {
-    if (!frame) return { top: 0, left: 0, width: window.innerWidth, height: window.innerHeight };
-    var r = frame.getBoundingClientRect();
-    return { top: r.top, left: r.left, width: r.width, height: r.height };
-  }
-
-  function hostMobileScanPositionOverlay_(rect) {
-    var overlay = hostMobileScanEnsureOverlay();
-    var fr = hostMobileScanFrameRect_();
-    if (!rect || !rect.width || rect.height < 40) {
-      overlay.style.top = fr.top + 'px';
-      overlay.style.left = fr.left + 'px';
-      overlay.style.width = fr.width + 'px';
-      overlay.style.height = Math.max(200, Math.round(window.innerHeight * 0.38)) + 'px';
-      return;
-    }
-    overlay.style.top = (fr.top + rect.top) + 'px';
-    overlay.style.left = (fr.left + rect.left) + 'px';
-    overlay.style.width = Math.round(rect.width) + 'px';
-    overlay.style.height = Math.round(rect.height) + 'px';
-  }
-
-  function hostMobileScanStopEngine_() {
-    hostMobileQrStarting = false;
-    if (!hostMobileQrEngine) return;
-    var eng = hostMobileQrEngine;
-    hostMobileQrEngine = null;
-    eng.stop().then(function() {
-      try { eng.clear(); } catch (e) { /* ignore */ }
-    }).catch(function() {
-      try { eng.clear(); } catch (e2) { /* ignore */ }
-    });
-  }
-
-  function hostMobileScanOpen_(rect) {
-    hostMobileQrOpen = true;
-    hostMobileScanStopEngine_();
-    hostMobileScanPositionOverlay_(rect);
-    var overlay = hostMobileScanEnsureOverlay();
-    overlay.style.display = 'block';
-    hostMobileScanShowTapGate_();
-    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' });
-  }
-
-  function hostMobileScanStartEngine_() {
-    if (typeof Html5Qrcode === 'undefined') {
-      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Camera scanner failed to load.' });
-      return;
-    }
-    if (hostMobileQrEngine || hostMobileQrStarting) return;
-    hostMobileQrStarting = true;
-
-    function onFail(err) {
-      hostMobileQrStarting = false;
-      hostMobileScanStopEngine_();
-      hostMobileScanShowTapGate_();
-      hostMobileScanRelay_({
-        type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR',
-        message: String(err && err.message ? err.message : err)
-      });
-    }
-
-    function startWithConfig(cameraCfg) {
-      hostMobileQrEngine = new Html5Qrcode('sr-host-qr-reader');
-      return hostMobileQrEngine.start(
-        cameraCfg,
-        {
-          fps: 10,
-          qrbox: function(w, h) {
-            var edge = Math.floor(Math.min(w, h) * 0.72);
-            return { width: Math.max(edge, 120), height: Math.max(edge, 120) };
-          }
-        },
-        function(decoded) {
-          hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: String(decoded == null ? '' : decoded) });
-        },
-        function() { /* frame miss */ }
-      );
-    }
-
-    function afterOk() {
-      hostMobileQrStarting = false;
-      hostMobileScanHideTapGate_();
-      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE' });
-    }
-
-    if (typeof Html5Qrcode.getCameras === 'function') {
-      Html5Qrcode.getCameras().then(function(cams) {
-        if (!cams || !cams.length) {
-          return startWithConfig({ facingMode: 'environment' });
-        }
-        var back = null;
-        for (var i = 0; i < cams.length; i++) {
-          var lab = String(cams[i].label || '').toLowerCase();
-          if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
-            back = cams[i];
-            break;
-          }
-        }
-        var pick = back || cams[cams.length - 1];
-        return startWithConfig(pick.id);
-      }).then(afterOk).catch(function() {
-        startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
-      });
-      return;
-    }
-
-    startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
-  }
-
-  function hostMobileScanStop() {
-    hostMobileQrOpen = false;
-    hostMobileScanHideTapGate_();
-    hostMobileScanStopEngine_();
-    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
-  }
-
   hostMobileScanWireTapGate_();
+  hostMobileScanWirePermBtn_();
+  hostMobileScanWireInlineStart_();
   hostMobileScanFlushPending_();
 
   function applyStationConfig(key, value) {
@@ -1325,15 +1426,24 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN') {
-      hostMobileScanOpen_(ev.data.rect || null);
+      hostMobileScanOpen_(ev.data);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_REPOSITION') {
-      if (hostMobileQrOpen) hostMobileScanPositionOverlay_(ev.data.rect || null);
+      if (hostMobileQrOpen) hostMobileScanPositionOverlay_(ev.data);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_STOP') {
       hostMobileScanStop();
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_PERM_RETRY') {
+      if (!hostMobileQrOpen) {
+        hostMobileScanOpen_(ev.data);
+      } else {
+        hostMobileScanPositionOverlay_(ev.data);
+        hostMobileScanPermRetry_();
+      }
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_REQUEST_FCM_TOKEN' && fcmToken && ev.source) {

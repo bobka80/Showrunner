@@ -116,10 +116,72 @@
     gap: 10px;
 }
 
-.mobile-qr-reader-wrap {
+.mobile-scan-panel__cam-row {
+    position: relative;
     flex: 1;
     min-height: 200px;
     max-height: 42vh;
+}
+
+.mobile-scan-perm-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid #f97316;
+    background: rgba(24, 24, 27, 0.92);
+    color: #fb923c;
+    cursor: pointer;
+    touch-action: manipulation;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+}
+
+.mobile-scan-perm-btn.is-pulse {
+    animation: mobileScanPermPulse 1s ease-in-out infinite;
+}
+
+@keyframes mobileScanPermPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
+    50% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
+}
+
+.mobile-qr-reader-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
+    padding: 40px 16px 16px;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #a1a1aa;
+    line-height: 1.45;
+}
+
+.mobile-qr-reader-placeholder--live {
+    color: #10b981;
+}
+
+.mobile-qr-reader-placeholder--error {
+    color: #fb923c;
+}
+
+.mobile-qr-reader-wrap {
+    width: 100%;
+    height: 100%;
+    min-height: 200px;
     border-radius: 8px;
     overflow: hidden;
     background: #000;

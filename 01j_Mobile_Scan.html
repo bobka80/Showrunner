@@ -46,39 +46,54 @@ function mobileScanGetReaderRect_() {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
-var MOBILE_SCAN_HOST = 'https://sm-showrunner-97405.web.app';
-
-function mobileScanShowShellCameraPrompt_() {
-  var wrap = document.getElementById('mobile-qr-reader-wrap');
-  if (!wrap) return;
-  wrap.innerHTML =
-    '<a class="mobile-qr-shell-btn mobile-qr-shell-btn--link" href="' + MOBILE_SCAN_HOST + '/mobile-scan.html" target="_top">OPEN CAMERA PAGE</a>'
-    + '<div class="mobile-qr-shell-note">Opens the camera on the Showrunner app (not inside Google). After scan you return here automatically.</div>'
-    + '<button type="button" class="mobile-qr-shell-btn mobile-qr-shell-btn--secondary" onclick="mobileScanNudgeShellGate_()">TRY IN-APP PROMPT</button>';
+function mobileScanGetPermBtnRect_() {
+  var btn = document.getElementById('mobile-scan-perm-btn');
+  if (!btn) return null;
+  var r = btn.getBoundingClientRect();
+  return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
-window.mobileScanNudgeShellGate_ = function() {
+function mobileScanShellPayload_() {
+  return { rect: mobileScanGetReaderRect_(), permRect: mobileScanGetPermBtnRect_() };
+}
+
+var MOBILE_SCAN_HOST = 'https://sm-showrunner-97405.web.app';
+
+function mobileScanSetPlaceholder_(text, state) {
+  var ph = document.getElementById('mobile-qr-reader-placeholder');
+  if (!ph) {
+    var wrap = document.getElementById('mobile-qr-reader-wrap');
+    if (!wrap) return;
+    wrap.innerHTML = '<div id="mobile-qr-reader-placeholder" class="mobile-qr-reader-placeholder"></div>';
+    ph = document.getElementById('mobile-qr-reader-placeholder');
+  }
+  if (!ph) return;
+  ph.textContent = text || 'Camera loads here…';
+  ph.className = 'mobile-qr-reader-placeholder' + (state ? (' mobile-qr-reader-placeholder--' + state) : '');
+}
+
+function mobileScanSyncShellCamera_() {
   if (!mobileScanInHostingIframe_()) return;
   mobileQrUsesParent_ = true;
   window.mobileScanGateAck_ = false;
   requestAnimationFrame(function() {
-    mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', { rect: mobileScanGetReaderRect_() });
+    mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', mobileScanShellPayload_());
   });
-  setTimeout(function() {
-    if (!window.mobileScanGateAck_) {
-      mobileScanToast_('In-app prompt unavailable — use OPEN CAMERA PAGE', true);
-    }
-  }, 500);
+}
+
+window.mobileScanRequestShellPerm_ = function() {
+  if (!mobileScanInHostingIframe_()) {
+    mobileScanStartCamera_();
+    return;
+  }
+  var permBtn = document.getElementById('mobile-scan-perm-btn');
+  if (permBtn) permBtn.classList.add('is-pulse');
+  mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_PERM_RETRY', mobileScanShellPayload_());
+  mobileScanToast_('Tap the camera icon or TAP TO START CAMERA on the preview.', false);
 };
 
 function mobileScanShowEnableRetry_() {
-  var wrap = document.getElementById('mobile-qr-reader-wrap');
-  if (!wrap) return;
-  if (mobileQrUsesParent_) {
-    wrap.innerHTML = '<a class="mobile-qr-shell-btn mobile-qr-shell-btn--link" href="' + MOBILE_SCAN_HOST + '/mobile-scan.html" target="_top">OPEN CAMERA PAGE</a>';
-    return;
-  }
-  wrap.innerHTML = '<button type="button" class="mobile-qr-retry-btn" onclick="mobileScanStartCamera_()">Tap to open camera</button>';
+  mobileScanSetPlaceholder_('Camera blocked — tap the camera icon top-left or the preview to allow access', 'error');
 }
 
 function mobileScanRestoreReaderDiv_() {
@@ -98,15 +113,18 @@ function mobileScanRestoreReaderDiv_() {
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK') {
       window.mobileScanGateAck_ = true;
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE') {
-      var wrap = document.getElementById('mobile-qr-reader-wrap');
-      if (wrap) wrap.innerHTML = '<div class="mobile-qr-shell-prompt mobile-qr-shell-prompt--live">Camera active — point at QR</div>';
+      mobileScanSetPlaceholder_('Camera active — point at QR', 'live');
+      var permBtn = document.getElementById('mobile-scan-perm-btn');
+      if (permBtn) permBtn.classList.remove('is-pulse');
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR') {
       var msg = ev.data.message || 'Camera permission denied.';
       if (/not allowed|permission denied/i.test(msg)) {
-        msg = 'Allow camera for Showrunner in browser settings, then tap Scan again.';
+        msg = 'Camera blocked — tap the camera icon top-left or TAP TO START CAMERA on the preview.';
       }
       mobileScanToast_(msg, true);
       mobileScanShowEnableRetry_();
+      var permBtn = document.getElementById('mobile-scan-perm-btn');
+      if (permBtn) permBtn.classList.add('is-pulse');
     }
   });
 })();
@@ -422,7 +440,7 @@ function mobileScanPanelResize_() {
   if (window.mobileScanPanelOpen) {
     mobileScanPositionPanel_();
     if (mobileQrUsesParent_) {
-      mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_REPOSITION', { rect: mobileScanGetReaderRect_() });
+      mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_REPOSITION', mobileScanShellPayload_());
     }
   }
 }
@@ -440,14 +458,10 @@ window.mobileToggleScanPanel = function() {
     return;
   }
   if (window.IS_STATION_DEVICE) return;
-  if (mobileScanInHostingIframe_()) {
-    mobileGoToScanCameraPage_();
-    return;
-  }
   mobileOpenScanPanel();
 };
 
-/** PWA shell — camera must run on web.app (mobile-scan.html), not in the GAS iframe. */
+/** Last-resort fallback if shell camera bridge is unavailable. */
 window.mobileGoToScanCameraPage_ = function() {
   try {
     window.top.location.href = MOBILE_SCAN_HOST + '/mobile-scan.html?scan=1';
@@ -468,18 +482,15 @@ window.mobileOpenScanPanel = function() {
   }
   if (btn) btn.classList.add('is-panel-open');
   document.body.classList.add('mobile-scan-panel-open');
-  if (mobileScanInHostingIframe_()) {
-    var wrap = document.getElementById('mobile-qr-reader-wrap');
-    if (wrap) {
-      wrap.innerHTML = '<button type="button" class="mobile-qr-shell-btn" onclick="mobileGoToScanCameraPage_()">SCAN ANOTHER QR</button>';
-    }
-  }
+  mobileScanSetPlaceholder_('Starting camera…');
   mobileScanRenderLast_();
   window.addEventListener('resize', mobileScanPanelResize_);
   setTimeout(function() {
     document.addEventListener('click', mobileScanPanelOutsideClick_, true);
   }, 0);
-  if (!mobileScanInHostingIframe_()) {
+  if (mobileScanInHostingIframe_()) {
+    mobileScanSyncShellCamera_();
+  } else {
     mobileScanStartCamera_();
   }
 };
@@ -501,7 +512,7 @@ window.mobileCloseScanPanel = function() {
 
 function mobileScanStartCamera_() {
   if (mobileScanInHostingIframe_()) {
-    mobileGoToScanCameraPage_();
+    mobileScanSyncShellCamera_();
     return;
   }
   if (typeof Html5Qrcode === 'undefined') {
@@ -596,7 +607,9 @@ function mobileScanStopCamera_() {
   if (mobileQrUsesParent_) {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_STOP');
     mobileQrUsesParent_ = false;
-    mobileScanRestoreReaderDiv_();
+    mobileScanSetPlaceholder_('Camera loads here…');
+    var permBtn = document.getElementById('mobile-scan-perm-btn');
+    if (permBtn) permBtn.classList.remove('is-pulse');
     return;
   }
   if (!mobileQrEngine) return;
