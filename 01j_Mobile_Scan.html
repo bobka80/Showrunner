@@ -35,10 +35,10 @@ function mobileScanParentPost_(type) {
   return false;
 }
 
-function mobileScanShowParentCameraHint_() {
+function mobileScanShowEnableRetry_() {
   var wrap = document.getElementById('mobile-qr-reader-wrap');
   if (!wrap) return;
-  wrap.innerHTML = '<div class="mobile-qr-parent-hint">Camera active above — point at asset QR</div>';
+  wrap.innerHTML = '<button type="button" class="mobile-qr-retry-btn" onclick="mobileScanStartCamera_()">Tap to open camera</button>';
 }
 
 function mobileScanRestoreReaderDiv_() {
@@ -55,9 +55,10 @@ function mobileScanRestoreReaderDiv_() {
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR') {
       var msg = ev.data.message || 'Camera permission denied.';
       if (/not allowed|permission denied/i.test(msg)) {
-        msg = 'Camera blocked — allow camera for this site in browser settings, then try again.';
+        msg = 'Allow camera for Showrunner in browser settings, then tap Scan again.';
       }
       mobileScanToast_(msg, true);
+      mobileScanShowEnableRetry_();
     }
   });
 })();
@@ -421,39 +422,92 @@ window.mobileCloseScanPanel = function() {
 };
 
 function mobileScanStartCamera_() {
-  mobileQrUsesParent_ = mobileScanInHostingIframe_();
-  if (mobileQrUsesParent_) {
-    mobileScanShowParentCameraHint_();
-    if (!mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_START')) {
-      mobileScanToast_('Camera unavailable in this browser shell.', true);
-    }
-    return;
-  }
   if (typeof Html5Qrcode === 'undefined') {
     mobileScanToast_('Camera scanner failed to load.', true);
+    mobileScanShowEnableRetry_();
     return;
   }
   if (mobileQrStarting || mobileQrEngine) return;
+  mobileQrUsesParent_ = false;
   mobileScanRestoreReaderDiv_();
   mobileQrStarting = true;
+
+  requestAnimationFrame(function() {
+    requestAnimationFrame(mobileScanStartCameraInner_);
+  });
+}
+
+function mobileScanStartCameraInner_() {
   var readerId = 'mobile-qr-reader';
-  mobileQrEngine = new Html5Qrcode(readerId);
-  mobileQrEngine.start(
-    { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
-    function(decoded) { mobileScanHandleDecode_(decoded); },
-    function() { /* frame miss */ }
-  ).then(function() {
+  if (!document.getElementById(readerId)) {
+    mobileScanRestoreReaderDiv_();
+  }
+
+  function onFail(err) {
     mobileQrStarting = false;
-  }).catch(function(err) {
-    mobileQrStarting = false;
-    mobileQrEngine = null;
+    if (mobileQrEngine) {
+      var eng = mobileQrEngine;
+      mobileQrEngine = null;
+      eng.stop().catch(function() {}).finally(function() {
+        try { eng.clear(); } catch (e) { /* ignore */ }
+      });
+    } else {
+      mobileQrEngine = null;
+    }
     var msg = (err && err.message) ? err.message : String(err);
     if (/not allowed|permission denied/i.test(msg)) {
-      msg = 'Camera blocked — allow camera for this site in browser settings, then try again.';
+      msg = 'Allow camera for Showrunner in browser settings, then tap Scan again.';
     }
-    mobileScanToast_('Camera: ' + msg, true);
-  });
+    mobileScanToast_(msg, true);
+    mobileScanShowEnableRetry_();
+  }
+
+  function startWithConfig(cameraCfg) {
+    mobileQrEngine = new Html5Qrcode(readerId);
+    return mobileQrEngine.start(
+      cameraCfg,
+      {
+        fps: 10,
+        qrbox: function(w, h) {
+          var edge = Math.floor(Math.min(w, h) * 0.72);
+          return { width: Math.max(edge, 180), height: Math.max(edge, 180) };
+        }
+      },
+      function(decoded) { mobileScanHandleDecode_(decoded); },
+      function() { /* frame miss */ }
+    );
+  }
+
+  function afterStart(promise) {
+    promise.then(function() {
+      mobileQrStarting = false;
+    }).catch(onFail);
+  }
+
+  if (typeof Html5Qrcode.getCameras === 'function') {
+    Html5Qrcode.getCameras().then(function(cams) {
+      if (!cams || !cams.length) {
+        return startWithConfig({ facingMode: 'environment' });
+      }
+      var back = null;
+      for (var i = 0; i < cams.length; i++) {
+        var lab = String(cams[i].label || '').toLowerCase();
+        if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
+          back = cams[i];
+          break;
+        }
+      }
+      var pick = back || cams[cams.length - 1];
+      return startWithConfig(pick.id);
+    }).then(function() {
+      mobileQrStarting = false;
+    }).catch(function(err) {
+      afterStart(startWithConfig({ facingMode: 'environment' }));
+    });
+    return;
+  }
+
+  afterStart(startWithConfig({ facingMode: 'environment' }));
 }
 
 function mobileScanStopCamera_() {
