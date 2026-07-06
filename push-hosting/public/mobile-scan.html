@@ -122,7 +122,13 @@
         localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
       } catch (e) { /* ignore */ }
       document.getElementById('qr-last').textContent = 'Scanned — returning…';
-      setTimeout(goBack, 400);
+      setTimeout(function() {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          window.location.href = HOST + '/?srScan=' + encodeURIComponent(raw);
+        }
+      }, 400);
     }
 
     function onFail(err) {

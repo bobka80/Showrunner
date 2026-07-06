@@ -348,6 +348,7 @@ function mobileScanApplyHit_(raw, hit) {
   } else if (!hit) {
     mobileScanToast_('Unknown code — not in equipment vault', true);
   }
+  mobileScanFinalizePendingDelivery_(raw);
 }
 
 var mobileScanUserWaitTimer = null;
@@ -532,6 +533,11 @@ function mobileScanHandleDecode_(raw) {
   if (!raw) return;
   var tag = mobileScanExtractTag_(raw);
   if (!tag) return;
+  var sel = window.mobileScanSelection;
+  if (sel && mobileScanNormalize_(sel.tag) === mobileScanNormalize_(tag) && sel.kind === 'equipment') {
+    mobileScanFinalizePendingDelivery_(tag);
+    return;
+  }
   window.mobileScanPendingRaw = tag;
 
   if (typeof stationForwardCheckoutScan_ === 'function' && stationForwardCheckoutScan_(tag)) {
@@ -539,6 +545,7 @@ function mobileScanHandleDecode_(raw) {
     mobileScanPushFeed_(tag, fwdHit);
     window.mobileScanPendingRaw = '';
     mobileScanToast_('Added to project checkout', false);
+    mobileScanFinalizePendingDelivery_(tag);
     return;
   }
 
@@ -778,6 +785,7 @@ window.mobileOpenScanPanel = function() {
   } else {
     mobileScanStartCamera_();
   }
+  mobileScanTryConsumePending_();
 };
 
 window.mobileCloseScanPanel = function() {
@@ -956,36 +964,84 @@ function mobileScanRefreshBootstrap_() {
   } catch (e) { /* ignore */ }
 }
 
-function mobileScanConsumePendingStorage_() {
+function mobileScanReadPendingRaw_() {
   try {
-    var raw = sessionStorage.getItem('sm_mobile_qr_pending') || localStorage.getItem('sm_mobile_qr_pending');
-    if (!raw) return false;
-    if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
-      mobileOpenScanPanel();
-    }
-    setTimeout(function() {
-      sessionStorage.removeItem('sm_mobile_qr_pending');
-      localStorage.removeItem('sm_mobile_qr_pending');
-      mobileScanHandleDecode_(raw);
-    }, 100);
-    return true;
+    return sessionStorage.getItem('sm_mobile_qr_pending') || localStorage.getItem('sm_mobile_qr_pending') || '';
+  } catch (e) { return ''; }
+}
+
+function mobileScanClearPendingStorage_() {
+  try {
+    sessionStorage.removeItem('sm_mobile_qr_pending');
+    localStorage.removeItem('sm_mobile_qr_pending');
+  } catch (e) { /* ignore */ }
+}
+
+function mobileScanShouldReopenPanel_() {
+  try {
+    return sessionStorage.getItem('sm_mobile_scan_reopen_panel') === '1' ||
+      localStorage.getItem('sm_mobile_scan_reopen_panel') === '1';
   } catch (e) { return false; }
 }
 
-function mobileScanReopenPanelIfNeeded_() {
+function mobileScanClearReopenFlag_() {
   try {
-    var reopen = sessionStorage.getItem('sm_mobile_scan_reopen_panel') === '1' ||
-      localStorage.getItem('sm_mobile_scan_reopen_panel') === '1';
-    if (!reopen) return;
     sessionStorage.removeItem('sm_mobile_scan_reopen_panel');
     localStorage.removeItem('sm_mobile_scan_reopen_panel');
-    setTimeout(function() {
-      if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
-        mobileOpenScanPanel();
-      }
-      mobileScanConsumePendingStorage_();
-    }, 300);
   } catch (e) { /* ignore */ }
+}
+
+function mobileScanAckParent_() {
+  if (mobileScanInHostingIframe_()) {
+    mobileScanParentPost_('SHOWRUNNER_MOBILE_QR_SCAN_ACK');
+  }
+}
+
+function mobileScanFinalizePendingDelivery_(raw) {
+  var tag = mobileScanExtractTag_(raw);
+  var pending = mobileScanReadPendingRaw_();
+  var pendingTag = mobileScanExtractTag_(pending);
+  if (pending && tag && mobileScanNormalize_(pendingTag) !== mobileScanNormalize_(tag)) return;
+  mobileScanClearPendingStorage_();
+  mobileScanClearReopenFlag_();
+  mobileScanAckParent_();
+  window.mobileScanPendingConsumeKey_ = '';
+}
+
+var mobileScanPendingPollTimer_ = null;
+
+function mobileScanTryConsumePending_() {
+  var raw = mobileScanReadPendingRaw_();
+  if (!raw) return;
+  if (mobileScanShouldReopenPanel_()) {
+    if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+      mobileOpenScanPanel();
+    }
+  }
+  var tag = mobileScanExtractTag_(raw);
+  if (!tag) return;
+  if (window.mobileScanPendingRaw === tag && (mobileScanUserWaitTimer || mobileScanServerResolveBusy_)) return;
+  if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+    mobileOpenScanPanel();
+  }
+  window.mobileScanPendingConsumeKey_ = tag;
+  mobileScanHandleDecode_(tag);
+}
+
+function mobileScanStartPendingPoll_() {
+  if (mobileScanPendingPollTimer_) return;
+  mobileScanPendingPollTimer_ = setInterval(mobileScanTryConsumePending_, 600);
+}
+
+function mobileScanConsumePendingStorage_() {
+  mobileScanTryConsumePending_();
+}
+
+function mobileScanReopenPanelIfNeeded_() {
+  if (!mobileScanShouldReopenPanel_()) return;
+  if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+    mobileOpenScanPanel();
+  }
 }
 
 (function mobileScanInit_() {
@@ -993,8 +1049,10 @@ function mobileScanReopenPanelIfNeeded_() {
   function boot() {
     mobileScanRefreshBootstrap_();
     mobileScanReopenPanelIfNeeded_();
-    setTimeout(mobileScanConsumePendingStorage_, 800);
-    setTimeout(mobileScanConsumePendingStorage_, 2000);
+    mobileScanTryConsumePending_();
+    mobileScanStartPendingPoll_();
+    setTimeout(mobileScanTryConsumePending_, 800);
+    setTimeout(mobileScanTryConsumePending_, 2000);
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

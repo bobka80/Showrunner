@@ -662,15 +662,25 @@
         frame.contentWindow.postMessage({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: raw }, '*');
       } catch (e) {
         hostMobileScanSchedulePendingRetry_();
-        return;
-      }
-      hostMobileScanClearPending_();
-      if (hostMobileQrPendingRetryTimer) {
-        clearInterval(hostMobileQrPendingRetryTimer);
-        hostMobileQrPendingRetryTimer = null;
       }
     } catch (e) { /* ignore */ }
   }
+
+  function hostMobileScanIngestUrlScan_() {
+    try {
+      var p = new URLSearchParams(window.location.search);
+      var raw = p.get('srScan');
+      if (!raw) return;
+      sessionStorage.setItem('sm_mobile_qr_pending', raw);
+      localStorage.setItem('sm_mobile_qr_pending', raw);
+      sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+      localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+      if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname + (window.location.hash || ''));
+      }
+    } catch (e) { /* ignore */ }
+  }
+  hostMobileScanIngestUrlScan_();
 
   hostMobileScanWireTapGate_();
   hostMobileScanWirePermBtn_();
@@ -1723,6 +1733,14 @@
     if (ev.data.type === 'SHOWRUNNER_APP_READY') {
       handleIframeSession({ crewName: ev.data.crewName || '', regKey: ev.data.regKey || '' });
       hostMobileScanFlushPending_();
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ACK') {
+      hostMobileScanClearPending_();
+      if (hostMobileQrPendingRetryTimer) {
+        clearInterval(hostMobileQrPendingRetryTimer);
+        hostMobileQrPendingRetryTimer = null;
+      }
+      return;
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_AUTH') {
       handleIframeSession(ev.data);
