@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a0c">
+  <title>Showrunner — Scan QR</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #0a0a0c;
+      color: #f4f4f5;
+      font-family: Inter, system-ui, sans-serif;
+    }
+    .wrap {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      box-sizing: border-box;
+      padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+      gap: 12px;
+    }
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .title {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: #fb923c;
+    }
+    .btn-back {
+      border: 1px solid #444;
+      background: transparent;
+      color: #a1a1aa;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 10px 12px;
+      border-radius: 8px;
+      touch-action: manipulation;
+    }
+    #qr-reader {
+      flex: 1;
+      min-height: 240px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid #f97316;
+    }
+    #qr-reader video {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    #qr-start {
+      width: 100%;
+      padding: 20px 16px;
+      border: 2px solid #f97316;
+      border-radius: 12px;
+      background: #18181b;
+      color: #fb923c;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      touch-action: manipulation;
+    }
+    #qr-status {
+      font-size: 12px;
+      color: #a1a1aa;
+      text-align: center;
+      min-height: 18px;
+    }
+    #qr-last {
+      font-size: 13px;
+      font-weight: 700;
+      color: #10b981;
+      text-align: center;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <span class="title">SHOWRUNNER SCAN</span>
+      <button type="button" class="btn-back" id="btn-back">BACK</button>
+    </div>
+    <div id="qr-reader"></div>
+    <button type="button" id="qr-start">TAP TO START CAMERA</button>
+    <div id="qr-status">Point at an asset QR label.</div>
+    <div id="qr-last"></div>
+  </div>
+  <script>
+  (function() {
+    var engine = null;
+    var starting = false;
+    var HOST = 'https://sm-showrunner-97405.web.app';
+
+    function goBack() {
+      try {
+        if (engine) engine.stop().catch(function() {});
+      } catch (e) { /* ignore */ }
+      window.location.href = HOST + '/';
+    }
+
+    function saveAndReturn(text) {
+      try { sessionStorage.setItem('sm_mobile_qr_pending', String(text || '')); } catch (e) { /* ignore */ }
+      document.getElementById('qr-last').textContent = 'Scanned — returning…';
+      setTimeout(goBack, 400);
+    }
+
+    function onFail(err) {
+      starting = false;
+      document.getElementById('qr-status').textContent = String(err && err.message ? err.message : err);
+      document.getElementById('qr-start').style.display = 'block';
+    }
+
+    function startCamera() {
+      if (typeof Html5Qrcode === 'undefined') {
+        onFail(new Error('Scanner failed to load.'));
+        return;
+      }
+      if (engine || starting) return;
+      starting = true;
+      document.getElementById('qr-start').style.display = 'none';
+      document.getElementById('qr-status').textContent = 'Starting camera…';
+
+      function startCfg(cfg) {
+        engine = new Html5Qrcode('qr-reader');
+        return engine.start(
+          cfg,
+          {
+            fps: 10,
+            qrbox: function(w, h) {
+              var edge = Math.floor(Math.min(w, h) * 0.72);
+              return { width: Math.max(edge, 160), height: Math.max(edge, 160) };
+            }
+          },
+          function(decoded) { saveAndReturn(decoded); },
+          function() {}
+        );
+      }
+
+      if (typeof Html5Qrcode.getCameras === 'function') {
+        Html5Qrcode.getCameras().then(function(cams) {
+          if (!cams || !cams.length) return startCfg({ facingMode: 'environment' });
+          var back = null;
+          for (var i = 0; i < cams.length; i++) {
+            var lab = String(cams[i].label || '').toLowerCase();
+            if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
+              back = cams[i];
+              break;
+            }
+          }
+          return startCfg((back || cams[cams.length - 1]).id);
+        }).then(function() {
+          starting = false;
+          document.getElementById('qr-status').textContent = 'Camera active';
+        }).catch(function() {
+          startCfg({ facingMode: 'environment' }).then(function() {
+            starting = false;
+            document.getElementById('qr-status').textContent = 'Camera active';
+          }).catch(onFail);
+        });
+        return;
+      }
+
+      startCfg({ facingMode: 'environment' }).then(function() {
+        starting = false;
+        document.getElementById('qr-status').textContent = 'Camera active';
+      }).catch(onFail);
+    }
+
+    document.getElementById('qr-start').addEventListener('click', startCamera);
+    document.getElementById('qr-start').addEventListener('touchend', function(e) {
+      e.preventDefault();
+      startCamera();
+    }, { passive: false });
+    document.getElementById('btn-back').addEventListener('click', goBack);
+  })();
+  </script>
+</body>
+</html>

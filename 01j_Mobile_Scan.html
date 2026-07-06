@@ -46,27 +46,36 @@ function mobileScanGetReaderRect_() {
   return { top: r.top, left: r.left, width: r.width, height: r.height };
 }
 
+var MOBILE_SCAN_HOST = 'https://sm-showrunner-97405.web.app';
+
 function mobileScanShowShellCameraPrompt_() {
   var wrap = document.getElementById('mobile-qr-reader-wrap');
   if (!wrap) return;
-  wrap.innerHTML = '<button type="button" class="mobile-qr-shell-btn" onclick="mobileScanNudgeShellGate_()">SHOW CAMERA PROMPT</button>'
-    + '<div class="mobile-qr-shell-note">A full-screen prompt should cover the app. Tap the button above if you only see this box.</div>';
+  wrap.innerHTML =
+    '<a class="mobile-qr-shell-btn mobile-qr-shell-btn--link" href="' + MOBILE_SCAN_HOST + '/mobile-scan.html" target="_top">OPEN CAMERA PAGE</a>'
+    + '<div class="mobile-qr-shell-note">Opens the camera on the Showrunner app (not inside Google). After scan you return here automatically.</div>'
+    + '<button type="button" class="mobile-qr-shell-btn mobile-qr-shell-btn--secondary" onclick="mobileScanNudgeShellGate_()">TRY IN-APP PROMPT</button>';
 }
 
 window.mobileScanNudgeShellGate_ = function() {
   if (!mobileScanInHostingIframe_()) return;
   mobileQrUsesParent_ = true;
+  window.mobileScanGateAck_ = false;
   requestAnimationFrame(function() {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', { rect: mobileScanGetReaderRect_() });
   });
-  mobileScanToast_('Look for the full-screen TAP TO START CAMERA button', false);
+  setTimeout(function() {
+    if (!window.mobileScanGateAck_) {
+      mobileScanToast_('In-app prompt unavailable — use OPEN CAMERA PAGE', true);
+    }
+  }, 500);
 };
 
 function mobileScanShowEnableRetry_() {
   var wrap = document.getElementById('mobile-qr-reader-wrap');
   if (!wrap) return;
   if (mobileQrUsesParent_) {
-    wrap.innerHTML = '<button type="button" class="mobile-qr-shell-btn" onclick="mobileScanNudgeShellGate_()">SHOW CAMERA PROMPT</button>';
+    wrap.innerHTML = '<a class="mobile-qr-shell-btn mobile-qr-shell-btn--link" href="' + MOBILE_SCAN_HOST + '/mobile-scan.html" target="_top">OPEN CAMERA PAGE</a>';
     return;
   }
   wrap.innerHTML = '<button type="button" class="mobile-qr-retry-btn" onclick="mobileScanStartCamera_()">Tap to open camera</button>';
@@ -82,7 +91,12 @@ function mobileScanRestoreReaderDiv_() {
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN') {
+      if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+        mobileOpenScanPanel();
+      }
       mobileScanHandleDecode_(ev.data.text);
+    } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK') {
+      window.mobileScanGateAck_ = true;
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE') {
       var wrap = document.getElementById('mobile-qr-reader-wrap');
       if (wrap) wrap.innerHTML = '<div class="mobile-qr-shell-prompt mobile-qr-shell-prompt--live">Camera active — point at QR</div>';

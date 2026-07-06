@@ -108,11 +108,21 @@
 
   function hostMobileScanShowTapGate_() {
     hostMobileScanEnsureTapGate();
+    if (frame) {
+      frame.dataset.srPrevDisplay = frame.style.display || '';
+      frame.style.display = 'none';
+    }
     if (hostMobileQrTapGate) {
       hostMobileQrTapGate.classList.add('is-open');
       hostMobileQrTapGate.setAttribute('aria-hidden', 'false');
     }
     document.body.classList.add('sr-mobile-scan-gate-open');
+  }
+
+  function hostMobileScanRestoreFrame_() {
+    if (frame) {
+      frame.style.display = frame.dataset.srPrevDisplay || 'block';
+    }
   }
 
   function hostMobileScanHideTapGate_() {
@@ -121,6 +131,16 @@
       hostMobileQrTapGate.setAttribute('aria-hidden', 'true');
     }
     document.body.classList.remove('sr-mobile-scan-gate-open');
+    hostMobileScanRestoreFrame_();
+  }
+
+  function hostMobileScanFlushPending_() {
+    try {
+      var raw = sessionStorage.getItem('sm_mobile_qr_pending');
+      if (!raw) return;
+      sessionStorage.removeItem('sm_mobile_qr_pending');
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: raw });
+    } catch (e) { /* ignore */ }
   }
 
   function hostMobileScanFrameRect_() {
@@ -164,6 +184,7 @@
     var overlay = hostMobileScanEnsureOverlay();
     overlay.style.display = 'block';
     hostMobileScanShowTapGate_();
+    hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_GATE_ACK' });
   }
 
   function hostMobileScanStartEngine_() {
@@ -240,6 +261,7 @@
   }
 
   hostMobileScanWireTapGate_();
+  hostMobileScanFlushPending_();
 
   function applyStationConfig(key, value) {
     try {
@@ -1329,6 +1351,7 @@
 
   if (frame) {
     frame.addEventListener('load', function() {
+      hostMobileScanFlushPending_();
       burstRequestAuthFromIframe();
       if (serverSaveConfirmed) return;
       if (fcmToken) {
