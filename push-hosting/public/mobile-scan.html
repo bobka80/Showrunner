@@ -106,11 +106,21 @@
       try {
         if (engine) engine.stop().catch(function() {});
       } catch (e) { /* ignore */ }
+      if (window.history.length > 1) {
+        window.history.back();
+        return;
+      }
       window.location.href = HOST + '/';
     }
 
     function saveAndReturn(text) {
-      try { sessionStorage.setItem('sm_mobile_qr_pending', String(text || '')); } catch (e) { /* ignore */ }
+      var raw = String(text == null ? '' : text);
+      try {
+        sessionStorage.setItem('sm_mobile_qr_pending', raw);
+        localStorage.setItem('sm_mobile_qr_pending', raw);
+        sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+        localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+      } catch (e) { /* ignore */ }
       document.getElementById('qr-last').textContent = 'Scanned — returning…';
       setTimeout(goBack, 400);
     }

@@ -121,7 +121,10 @@ window.mobileScanLaunchShellCamera_ = function() {
     mobileScanStartCamera_();
     return;
   }
-  try { sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1'); } catch (e) { /* ignore */ }
+  try {
+    sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+    localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+  } catch (e) { /* ignore */ }
   mobileGoToScanCameraPage_();
 };
 
@@ -819,15 +822,33 @@ function mobileScanRefreshBootstrap_() {
   } catch (e) { /* ignore */ }
 }
 
+function mobileScanConsumePendingStorage_() {
+  try {
+    var raw = sessionStorage.getItem('sm_mobile_qr_pending') || localStorage.getItem('sm_mobile_qr_pending');
+    if (!raw) return false;
+    sessionStorage.removeItem('sm_mobile_qr_pending');
+    localStorage.removeItem('sm_mobile_qr_pending');
+    if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+      mobileOpenScanPanel();
+    }
+    mobileScanHandleDecode_(raw);
+    return true;
+  } catch (e) { return false; }
+}
+
 function mobileScanReopenPanelIfNeeded_() {
   try {
-    if (sessionStorage.getItem('sm_mobile_scan_reopen_panel') !== '1') return;
+    var reopen = sessionStorage.getItem('sm_mobile_scan_reopen_panel') === '1' ||
+      localStorage.getItem('sm_mobile_scan_reopen_panel') === '1';
+    if (!reopen) return;
     sessionStorage.removeItem('sm_mobile_scan_reopen_panel');
+    localStorage.removeItem('sm_mobile_scan_reopen_panel');
     setTimeout(function() {
       if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
       }
-    }, 500);
+      mobileScanConsumePendingStorage_();
+    }, 300);
   } catch (e) { /* ignore */ }
 }
 
@@ -836,6 +857,8 @@ function mobileScanReopenPanelIfNeeded_() {
   function boot() {
     mobileScanRefreshBootstrap_();
     mobileScanReopenPanelIfNeeded_();
+    setTimeout(mobileScanConsumePendingStorage_, 800);
+    setTimeout(mobileScanConsumePendingStorage_, 2000);
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
