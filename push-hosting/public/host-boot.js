@@ -33,69 +33,85 @@
     try { frame.contentWindow.postMessage({ type: 'SHOWRUNNER_STATION_CONFIG', config: cfg }, '*'); } catch (e) { /* ignore */ }
   }
 
-  // --- Mobile QR camera (hosting shell) --------------------------------------
-  // Showrunner runs in an iframe; getUserMedia is blocked unless the iframe has
-  // allow="camera" AND the browser permits it. Parent-frame camera is the reliable
-  // path (same idea as showrunnerStationDeliverScan for RFID).
+  // --- Mobile QR camera (hosting shell / PWA) ---------------------------------
+  // Camera must run on web.app (top window), not inside the GAS iframe — Android
+  // PWAs never register camera permission for nested cross-origin frames.
+  // User taps START on this overlay (valid gesture) → getUserMedia on shell origin.
   var hostMobileQrEngine = null;
   var hostMobileQrStarting = false;
   var hostMobileQrOverlay = null;
-
-  function hostMobileScanEnsureOverlay() {
-    if (hostMobileQrOverlay) return hostMobileQrOverlay;
-    var el = document.createElement('div');
-    el.id = 'sr-mobile-qr-overlay';
-    el.setAttribute('style', [
-      'position:fixed', 'left:0', 'right:0', 'top:0', 'height:48vh',
-      'z-index:2147483640', 'background:#0d0d10',
-      'border-bottom:1px solid #f97316', 'display:none', 'overflow:hidden'
-    ].join(';'));
-    var inner = document.createElement('div');
-    inner.id = 'sr-host-qr-reader';
-    inner.setAttribute('style', 'width:100%;height:100%;');
-    el.appendChild(inner);
-    document.body.appendChild(el);
-    hostMobileQrOverlay = el;
-    return el;
-  }
+  var hostMobileQrOpen = false;
 
   function hostMobileScanRelay_(payload) {
     if (!frame || !frame.contentWindow) return;
     try { frame.contentWindow.postMessage(payload, '*'); } catch (e) { /* ignore */ }
   }
 
-  function hostMobileScanStart() {
-    var overlay = hostMobileScanEnsureOverlay();
-    overlay.style.display = 'block';
-    if (typeof Html5Qrcode === 'undefined') {
-      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Camera scanner failed to load.' });
-      return;
-    }
-    if (hostMobileQrEngine || hostMobileQrStarting) return;
-    hostMobileQrStarting = true;
-    hostMobileQrEngine = new Html5Qrcode('sr-host-qr-reader');
-    hostMobileQrEngine.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1.0 },
-      function(decoded) {
-        hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: String(decoded == null ? '' : decoded) });
-      },
-      function() { /* frame miss */ }
-    ).then(function() {
-      hostMobileQrStarting = false;
-    }).catch(function(err) {
-      hostMobileQrStarting = false;
-      hostMobileQrEngine = null;
-      overlay.style.display = 'none';
-      hostMobileScanRelay_({
-        type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR',
-        message: String(err && err.message ? err.message : err)
-      });
+  function hostMobileScanEnsureOverlay() {
+    if (hostMobileQrOverlay) return hostMobileQrOverlay;
+    var el = document.createElement('div');
+    el.id = 'sr-mobile-qr-overlay';
+    el.setAttribute('style', [
+      'position:fixed', 'display:none', 'box-sizing:border-box',
+      'z-index:2147483640', 'background:#000',
+      'border:1px solid #f97316', 'overflow:hidden'
+    ].join(';'));
+
+    var reader = document.createElement('div');
+    reader.id = 'sr-host-qr-reader';
+    reader.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;');
+
+    var tapBtn = document.createElement('button');
+    tapBtn.id = 'sr-host-qr-tap';
+    tapBtn.type = 'button';
+    tapBtn.textContent = 'TAP TO START CAMERA';
+    tapBtn.setAttribute('style', [
+      'position:absolute', 'inset:0', 'width:100%', 'height:100%',
+      'border:none', 'background:#18181b', 'color:#fb923c',
+      'font-size:11px', 'font-weight:900', 'letter-spacing:0.08em',
+      'cursor:pointer', 'z-index:3', 'touch-action:manipulation'
+    ].join(';'));
+    tapBtn.addEventListener('click', function(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      hostMobileScanStartEngine_();
     });
+
+    el.appendChild(reader);
+    el.appendChild(tapBtn);
+    document.body.appendChild(el);
+
+    if (!document.getElementById('sr-host-qr-styles')) {
+      var st = document.createElement('style');
+      st.id = 'sr-host-qr-styles';
+      st.textContent = [
+        '#sr-host-qr-reader video { display:block !important; width:100% !important; height:100% !important; object-fit:cover !important; }',
+        '#sr-host-qr-reader__dashboard_section_csr span, #sr-host-qr-reader__dashboard_section_swaplink { display:none !important; }'
+      ].join('\n');
+      document.head.appendChild(st);
+    }
+
+    hostMobileQrOverlay = el;
+    return el;
   }
 
-  function hostMobileScanStop() {
-    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+  function hostMobileScanPositionOverlay_(rect) {
+    var overlay = hostMobileScanEnsureOverlay();
+    if (!rect || !rect.width || !rect.height) {
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.width = '100%';
+      overlay.style.height = '42vh';
+      return;
+    }
+    overlay.style.top = Math.max(0, Math.round(rect.top)) + 'px';
+    overlay.style.left = Math.max(0, Math.round(rect.left)) + 'px';
+    overlay.style.width = Math.round(rect.width) + 'px';
+    overlay.style.height = Math.round(rect.height) + 'px';
+  }
+
+  function hostMobileScanStopEngine_() {
+    hostMobileQrStarting = false;
     if (!hostMobileQrEngine) return;
     var eng = hostMobileQrEngine;
     hostMobileQrEngine = null;
@@ -104,6 +120,92 @@
     }).catch(function() {
       try { eng.clear(); } catch (e2) { /* ignore */ }
     });
+  }
+
+  function hostMobileScanOpen_(rect) {
+    hostMobileQrOpen = true;
+    hostMobileScanStopEngine_();
+    hostMobileScanPositionOverlay_(rect);
+    var overlay = hostMobileScanEnsureOverlay();
+    overlay.style.display = 'block';
+    var tapBtn = document.getElementById('sr-host-qr-tap');
+    if (tapBtn) tapBtn.style.display = 'block';
+  }
+
+  function hostMobileScanStartEngine_() {
+    if (typeof Html5Qrcode === 'undefined') {
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR', message: 'Camera scanner failed to load.' });
+      return;
+    }
+    if (hostMobileQrEngine || hostMobileQrStarting) return;
+    hostMobileQrStarting = true;
+
+    function onFail(err) {
+      hostMobileQrStarting = false;
+      hostMobileScanStopEngine_();
+      var tapBtn = document.getElementById('sr-host-qr-tap');
+      if (tapBtn) tapBtn.style.display = 'block';
+      hostMobileScanRelay_({
+        type: 'SHOWRUNNER_MOBILE_QR_SCAN_ERROR',
+        message: String(err && err.message ? err.message : err)
+      });
+    }
+
+    function startWithConfig(cameraCfg) {
+      hostMobileQrEngine = new Html5Qrcode('sr-host-qr-reader');
+      return hostMobileQrEngine.start(
+        cameraCfg,
+        {
+          fps: 10,
+          qrbox: function(w, h) {
+            var edge = Math.floor(Math.min(w, h) * 0.72);
+            return { width: Math.max(edge, 120), height: Math.max(edge, 120) };
+          }
+        },
+        function(decoded) {
+          hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_SCAN', text: String(decoded == null ? '' : decoded) });
+        },
+        function() { /* frame miss */ }
+      );
+    }
+
+    function afterOk() {
+      hostMobileQrStarting = false;
+      var tapBtn = document.getElementById('sr-host-qr-tap');
+      if (tapBtn) tapBtn.style.display = 'none';
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_QR_CAMERA_ACTIVE' });
+    }
+
+    if (typeof Html5Qrcode.getCameras === 'function') {
+      Html5Qrcode.getCameras().then(function(cams) {
+        if (!cams || !cams.length) {
+          return startWithConfig({ facingMode: 'environment' });
+        }
+        var back = null;
+        for (var i = 0; i < cams.length; i++) {
+          var lab = String(cams[i].label || '').toLowerCase();
+          if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
+            back = cams[i];
+            break;
+          }
+        }
+        var pick = back || cams[cams.length - 1];
+        return startWithConfig(pick.id);
+      }).then(afterOk).catch(function() {
+        startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
+      });
+      return;
+    }
+
+    startWithConfig({ facingMode: 'environment' }).then(afterOk).catch(onFail);
+  }
+
+  function hostMobileScanStop() {
+    hostMobileQrOpen = false;
+    hostMobileScanStopEngine_();
+    if (hostMobileQrOverlay) hostMobileQrOverlay.style.display = 'none';
+    var tapBtn = document.getElementById('sr-host-qr-tap');
+    if (tapBtn) tapBtn.style.display = 'block';
   }
 
   function applyStationConfig(key, value) {
@@ -1167,8 +1269,12 @@
       applyStationConfig(ev.data.key, ev.data.value);
       return;
     }
-    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_START') {
-      hostMobileScanStart();
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN') {
+      hostMobileScanOpen_(ev.data.rect || null);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_REPOSITION') {
+      if (hostMobileQrOpen) hostMobileScanPositionOverlay_(ev.data.rect || null);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_STOP') {
