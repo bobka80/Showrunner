@@ -246,10 +246,11 @@ function mobileScanRestoreReaderDiv_() {
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN') {
+      var scanText = ev.data.text;
       if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
       }
-      mobileScanHandleDecode_(ev.data.text);
+      setTimeout(function() { mobileScanHandleDecode_(scanText); }, 0);
     } else if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN') {
       mobileScanShowLaunchBtn_(false);
       mobileScanSetPlaceholder_('Allow camera on the full-screen prompt…', 'error');
@@ -282,6 +283,123 @@ function mobileScanRestoreReaderDiv_() {
 
 function mobileScanNormalize_(raw) {
   return String(raw == null ? '' : raw).trim().toLowerCase();
+}
+
+function mobileScanExtractTag_(raw) {
+  var s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      var u = new URL(s);
+      var q = u.searchParams.get('uid') || u.searchParams.get('id') || u.searchParams.get('tag');
+      if (q) return String(q).trim();
+      var parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length) return String(parts[parts.length - 1]).trim();
+    } catch (e) { /* ignore */ }
+  }
+  if (s.charAt(0) === '{') {
+    try {
+      var o = JSON.parse(s);
+      if (o && (o.uid || o.id || o.tag)) return String(o.uid || o.id || o.tag).trim();
+    } catch (e2) { /* ignore */ }
+  }
+  return s;
+}
+
+function mobileScanMergeHitIntoMap_(raw, hit) {
+  if (!hit || !raw) return;
+  var key = mobileScanNormalize_(raw);
+  if (!key) return;
+  window.mobileScanEquipMap = window.mobileScanEquipMap || {};
+  window.mobileScanEquipMap[key] = hit;
+  if (hit.unitId) {
+    var uidKey = mobileScanNormalize_(hit.unitId);
+    if (uidKey) window.mobileScanEquipMap['uid:' + uidKey] = hit;
+  }
+  try {
+    localStorage.setItem(MOBILE_SCAN_MAP_KEY, JSON.stringify({ map: window.mobileScanEquipMap, ts: Date.now() }));
+  } catch (e) { /* ignore */ }
+}
+
+function mobileScanApplyHit_(raw, hit) {
+  mobileScanPushFeed_(raw, hit);
+  if (hit && hit.kind === 'crew') {
+    window.mobileScanSelection = { kind: 'crew', tag: raw, name: hit.name };
+  } else if (hit && hit.unitId) {
+    window.mobileScanSelection = {
+      kind: 'equipment',
+      tag: raw,
+      unitId: hit.unitId,
+      name: hit.name,
+      unitNumber: hit.unitNumber,
+      status: hit.status || 'Active',
+      statusNote: hit.statusNote || ''
+    };
+    mobileScanMergeHitIntoMap_(raw, hit);
+  } else {
+    window.mobileScanSelection = { kind: 'unknown', tag: raw };
+  }
+  mobileScanRenderLast_();
+  if (navigator.vibrate) {
+    try { navigator.vibrate(hit ? 40 : [30, 40, 30]); } catch (e) { /* ignore */ }
+  }
+  if (hit && hit.name) {
+    mobileScanToast_('Scanned: ' + hit.name, false);
+  } else if (!hit) {
+    mobileScanToast_('Unknown code — not in equipment vault', true);
+  }
+}
+
+var mobileScanUserWaitTimer = null;
+var mobileScanServerResolveBusy_ = false;
+
+function mobileScanWaitForUserThenDecode_() {
+  if (mobileScanUserWaitTimer) return;
+  var n = 0;
+  mobileScanUserWaitTimer = setInterval(function() {
+    n += 1;
+    if (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) {
+      clearInterval(mobileScanUserWaitTimer);
+      mobileScanUserWaitTimer = null;
+      mobileScanRefreshBootstrap_();
+      if (window.mobileScanPendingRaw) mobileScanHandleDecode_(window.mobileScanPendingRaw);
+    } else if (n >= 60) {
+      clearInterval(mobileScanUserWaitTimer);
+      mobileScanUserWaitTimer = null;
+      if (window.mobileScanPendingRaw) mobileScanApplyHit_(window.mobileScanPendingRaw, null);
+      window.mobileScanPendingRaw = '';
+    }
+  }, 500);
+}
+
+function mobileScanResolveFromServer_(raw) {
+  if (mobileScanServerResolveBusy_) return;
+  if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
+    mobileScanWaitForUserThenDecode_();
+    return;
+  }
+  mobileScanServerResolveBusy_ = true;
+  try {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        mobileScanServerResolveBusy_ = false;
+        var hit = (res && res.hit) ? res.hit : null;
+        var tag = (res && res.tag) ? res.tag : raw;
+        if (hit) mobileScanMergeHitIntoMap_(tag, hit);
+        mobileScanApplyHit_(tag, hit);
+        window.mobileScanPendingRaw = '';
+      })
+      .withFailureHandler(function() {
+        mobileScanServerResolveBusy_ = false;
+        mobileScanApplyHit_(raw, null);
+        window.mobileScanPendingRaw = '';
+      })
+      .resolveMobileScanTag(ACTIVE_USER_NAME, raw);
+  } catch (e) {
+    mobileScanServerResolveBusy_ = false;
+    mobileScanApplyHit_(raw, null);
+    window.mobileScanPendingRaw = '';
+  }
 }
 
 function mobileScanPerm_(key) {
@@ -327,7 +445,8 @@ function mobileScanToast_(msg, isError) {
 }
 
 function mobileScanResolve_(raw) {
-  var key = mobileScanNormalize_(raw);
+  var tag = mobileScanExtractTag_(raw);
+  var key = mobileScanNormalize_(tag);
   if (!key) return null;
   var m = window.mobileScanEquipMap || {};
   if (m[key]) return m[key];
@@ -411,27 +530,34 @@ function mobileScanRenderFeed_() {
 
 function mobileScanHandleDecode_(raw) {
   if (!raw) return;
-  var hit = mobileScanResolve_(raw);
-  mobileScanPushFeed_(raw, hit);
-  if (hit && hit.kind === 'crew') {
-    window.mobileScanSelection = { kind: 'crew', tag: raw, name: hit.name };
-  } else if (hit && hit.unitId) {
-    window.mobileScanSelection = {
-      kind: 'equipment',
-      tag: raw,
-      unitId: hit.unitId,
-      name: hit.name,
-      unitNumber: hit.unitNumber,
-      status: hit.status || 'Active',
-      statusNote: hit.statusNote || ''
-    };
-  } else {
-    window.mobileScanSelection = { kind: 'unknown', tag: raw };
+  var tag = mobileScanExtractTag_(raw);
+  if (!tag) return;
+  window.mobileScanPendingRaw = tag;
+
+  if (typeof stationForwardCheckoutScan_ === 'function' && stationForwardCheckoutScan_(tag)) {
+    var fwdHit = mobileScanResolve_(tag);
+    mobileScanPushFeed_(tag, fwdHit);
+    window.mobileScanPendingRaw = '';
+    mobileScanToast_('Added to project checkout', false);
+    return;
   }
-  mobileScanRenderLast_();
-  if (navigator.vibrate) {
-    try { navigator.vibrate(40); } catch (e) { /* ignore */ }
+
+  var hit = mobileScanResolve_(tag);
+  if (hit) {
+    mobileScanApplyHit_(tag, hit);
+    window.mobileScanPendingRaw = '';
+    return;
   }
+
+  var mapSize = Object.keys(window.mobileScanEquipMap || {}).length;
+  if (mapSize === 0 || !window.mobileScanBootstrap) {
+    if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
+      mobileScanWaitForUserThenDecode_();
+      return;
+    }
+    mobileScanRefreshBootstrap_();
+  }
+  mobileScanResolveFromServer_(tag);
 }
 
 function mobileScanRenderLast_() {
@@ -816,6 +942,14 @@ function mobileScanRefreshBootstrap_() {
           window.mobileScanEquipMap = res.map;
           try { localStorage.setItem(MOBILE_SCAN_MAP_KEY, JSON.stringify({ map: res.map, ts: Date.now() })); } catch (e) { /* ignore */ }
         }
+        if (window.mobileScanPendingRaw) {
+          var pending = window.mobileScanPendingRaw;
+          var hit = mobileScanResolve_(pending);
+          if (hit) {
+            mobileScanApplyHit_(pending, hit);
+            window.mobileScanPendingRaw = '';
+          }
+        }
       })
       .withFailureHandler(function() { /* ignore */ })
       .getMobileScanBootstrap(ACTIVE_USER_NAME);
@@ -826,12 +960,14 @@ function mobileScanConsumePendingStorage_() {
   try {
     var raw = sessionStorage.getItem('sm_mobile_qr_pending') || localStorage.getItem('sm_mobile_qr_pending');
     if (!raw) return false;
-    sessionStorage.removeItem('sm_mobile_qr_pending');
-    localStorage.removeItem('sm_mobile_qr_pending');
     if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
       mobileOpenScanPanel();
     }
-    mobileScanHandleDecode_(raw);
+    setTimeout(function() {
+      sessionStorage.removeItem('sm_mobile_qr_pending');
+      localStorage.removeItem('sm_mobile_qr_pending');
+      mobileScanHandleDecode_(raw);
+    }, 100);
     return true;
   } catch (e) { return false; }
 }

@@ -509,6 +509,45 @@ function getMobileScanBootstrap(crewName) {
   });
 }
 
+/** Extract asset uid/tag from QR payload (plain id, URL, or JSON). */
+function extractMobileScanTag_(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      const q = u.searchParams.get('uid') || u.searchParams.get('id') || u.searchParams.get('tag');
+      if (q) return String(q).trim();
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length) return String(parts[parts.length - 1]).trim();
+    } catch (e) { /* ignore */ }
+  }
+  if (s.charAt(0) === '{') {
+    try {
+      const o = JSON.parse(s);
+      if (o && (o.uid || o.id || o.tag)) return String(o.uid || o.id || o.tag).trim();
+    } catch (e2) { /* ignore */ }
+  }
+  return s;
+}
+
+// @INDEX: MOBILE_SCAN -> Resolve one scanned tag against vault (when client map not ready)
+function resolveMobileScanTag(crewName, raw) {
+  return executeWithRetry(() => {
+    if (!crewName) return { success: false, error: 'Not signed in.' };
+    if (actorUsesStationShell(crewName)) {
+      return { success: false, error: 'Use station scan on warehouse devices.' };
+    }
+    const tag = extractMobileScanTag_(raw);
+    if (!tag) return { success: false, error: 'Empty tag.' };
+    const sheets = verifyVaultSchema(true);
+    const map = buildEquipmentScanMapFromSheets_(sheets);
+    const key = normalizeStationRfidTag(tag);
+    const hit = map[key] || map['uid:' + key] || null;
+    return { success: true, hit: hit, tag: tag };
+  });
+}
+
 // @INDEX: MOBILE_SCAN -> Set asset lifecycle status from phone scan panel
 function setMobileAssetStatus(crewName, assetId, status, note) {
   return executeWithRetry(() => {
