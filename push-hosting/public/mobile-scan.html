@@ -183,6 +183,11 @@
       startCamera();
     }, { passive: false });
     document.getElementById('btn-back').addEventListener('click', goBack);
+
+    if (new URLSearchParams(window.location.search).get('scan') === '1') {
+      document.getElementById('qr-status').textContent = 'Starting camera…';
+      requestAnimationFrame(function() { startCamera(); });
+    }
   })();
   </script>
 </body>

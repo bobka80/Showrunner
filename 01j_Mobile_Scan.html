@@ -435,8 +435,25 @@ function mobileScanPanelOutsideClick_(e) {
 }
 
 window.mobileToggleScanPanel = function() {
-  if (window.mobileScanPanelOpen) mobileCloseScanPanel();
-  else mobileOpenScanPanel();
+  if (window.mobileScanPanelOpen) {
+    mobileCloseScanPanel();
+    return;
+  }
+  if (window.IS_STATION_DEVICE) return;
+  if (mobileScanInHostingIframe_()) {
+    mobileGoToScanCameraPage_();
+    return;
+  }
+  mobileOpenScanPanel();
+};
+
+/** PWA shell — camera must run on web.app (mobile-scan.html), not in the GAS iframe. */
+window.mobileGoToScanCameraPage_ = function() {
+  try {
+    window.top.location.href = MOBILE_SCAN_HOST + '/mobile-scan.html?scan=1';
+  } catch (e) {
+    mobileScanToast_('Could not open camera page.', true);
+  }
 };
 
 window.mobileOpenScanPanel = function() {
@@ -451,12 +468,20 @@ window.mobileOpenScanPanel = function() {
   }
   if (btn) btn.classList.add('is-panel-open');
   document.body.classList.add('mobile-scan-panel-open');
+  if (mobileScanInHostingIframe_()) {
+    var wrap = document.getElementById('mobile-qr-reader-wrap');
+    if (wrap) {
+      wrap.innerHTML = '<button type="button" class="mobile-qr-shell-btn" onclick="mobileGoToScanCameraPage_()">SCAN ANOTHER QR</button>';
+    }
+  }
   mobileScanRenderLast_();
   window.addEventListener('resize', mobileScanPanelResize_);
   setTimeout(function() {
     document.addEventListener('click', mobileScanPanelOutsideClick_, true);
   }, 0);
-  mobileScanStartCamera_();
+  if (!mobileScanInHostingIframe_()) {
+    mobileScanStartCamera_();
+  }
 };
 
 window.mobileCloseScanPanel = function() {
@@ -476,15 +501,7 @@ window.mobileCloseScanPanel = function() {
 
 function mobileScanStartCamera_() {
   if (mobileScanInHostingIframe_()) {
-    mobileQrUsesParent_ = true;
-    mobileScanShowShellCameraPrompt_();
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        if (!mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN', { rect: mobileScanGetReaderRect_() })) {
-          mobileScanToast_('Camera shell unavailable.', true);
-        }
-      });
-    });
+    mobileGoToScanCameraPage_();
     return;
   }
   if (typeof Html5Qrcode === 'undefined') {
