@@ -399,7 +399,10 @@ function buildEquipmentScanMapFromSheets_(sheets) {
         statusNote: cStatusNote !== undefined ? String(data[i][cStatusNote] || '') : ''
       };
       const uidKey = normalizeStationRfidTag(entry.unitId);
-      if (uidKey) out['uid:' + uidKey] = entry;
+      if (uidKey) {
+        out['uid:' + uidKey] = entry;
+        out[uidKey] = entry;
+      }
       if (cRfid !== undefined) {
         const tag = normalizeStationRfidTag(data[i][cRfid]);
         if (tag) out[tag] = entry;
@@ -542,9 +545,63 @@ function resolveMobileScanTag(crewName, raw) {
     if (!tag) return { success: false, error: 'Empty tag.' };
     const sheets = verifyVaultSchema(true);
     const map = buildEquipmentScanMapFromSheets_(sheets);
-    const key = normalizeStationRfidTag(tag);
-    const hit = map[key] || map['uid:' + key] || null;
+    const hit = lookupEquipmentScanHit_(map, tag);
     return { success: true, hit: hit, tag: tag };
+  });
+}
+
+/** Match scanned primary key / RFID tag against equipment scan map. */
+function lookupEquipmentScanHit_(map, rawTag) {
+  const tag = extractMobileScanTag_(rawTag);
+  if (!tag || !map) return null;
+  const key = normalizeStationRfidTag(tag);
+  if (!key) return null;
+  return map[key] || map['uid:' + key] || null;
+}
+
+const MOBILE_SCAN_PENDING_TTL_SEC = 300;
+
+function mobileScanPendingCacheKey_(sessionToken) {
+  return 'mobscan_' + String(sessionToken || '').trim().slice(0, 80);
+}
+
+/** Shell / hosting stages a scan when postMessage to iframe may race (PWA handoff). */
+function stageMobileScanPending_(sessionToken, rawTag) {
+  const token = String(sessionToken || '').trim();
+  const tag = extractMobileScanTag_(rawTag);
+  if (!token || token.length < 20 || !tag) return { success: false, error: 'Bad input.' };
+  const crewName = validateUserSession_(token);
+  if (!crewName) return { success: false, error: 'Invalid session.' };
+  try {
+    CacheService.getScriptCache().put(mobileScanPendingCacheKey_(token), tag, MOBILE_SCAN_PENDING_TTL_SEC);
+    return { success: true, tag: tag };
+  } catch (e) {
+    return { success: false, error: (e && e.message) ? e.message : 'Cache error.' };
+  }
+}
+
+// @INDEX: MOBILE_SCAN -> Pull shell-staged scan (phone panel after camera return)
+function pullStagedMobileScan(crewName, sessionToken) {
+  return executeWithRetry(() => {
+    if (!crewName) return { success: false, error: 'Not signed in.' };
+    if (actorUsesStationShell(crewName)) {
+      return { success: false, error: 'Use station scan on warehouse devices.' };
+    }
+    const token = String(sessionToken || '').trim();
+    if (!token || token.length < 20) return { success: false, error: 'No session.' };
+    const validated = validateUserSession_(token);
+    if (!validated || validated.toLowerCase().trim() !== String(crewName).toLowerCase().trim()) {
+      return { success: false, error: 'Session mismatch.' };
+    }
+    const cacheKey = mobileScanPendingCacheKey_(token);
+    const cache = CacheService.getScriptCache();
+    const staged = cache.get(cacheKey);
+    if (!staged) return { success: true, pending: false };
+    cache.remove(cacheKey);
+    const sheets = verifyVaultSchema(true);
+    const map = buildEquipmentScanMapFromSheets_(sheets);
+    const hit = lookupEquipmentScanHit_(map, staged);
+    return { success: true, pending: true, tag: staged, hit: hit };
   });
 }
 

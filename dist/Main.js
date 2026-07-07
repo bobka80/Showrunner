@@ -143,6 +143,17 @@ function doGet(e) {
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'mobscanstage') {
+    const result = stageMobileScanPending_(e.parameter.token || '', e.parameter.tag || '');
+    const json = JSON.stringify(result);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'fcmping') {
     const result = pingFcmDeviceForCrew_(e.parameter.crew || '', e.parameter.tp || '');
     const json = JSON.stringify(result);

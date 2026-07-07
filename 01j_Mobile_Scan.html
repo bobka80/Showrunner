@@ -232,10 +232,12 @@ function mobileScanRestoreReaderDiv_() {
     if (!ev.data || !ev.data.type) return;
     var t = ev.data.type;
     if (t === 'SHOWRUNNER_MOBILE_QR_SCAN') {
+      mobileScanSetStatus_('relay: ' + String(ev.data.text || '').slice(0, 40));
       if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
       }
       mobileScanHandleDecode_(ev.data.text);
+      setTimeout(function() { mobileScanTryPullStaged_('relay-backup'); }, 400);
       return;
     }
     if (t === 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN') {
@@ -273,6 +275,7 @@ function mobileScanRestoreReaderDiv_() {
       if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
       }
+      mobileScanTryPullStaged_('reopen');
       return;
     }
     if (mobileScanIsEmbedOrigin_(ev.origin) && t.indexOf('SHOWRUNNER_EMBED_') === 0) {
@@ -332,12 +335,73 @@ function mobileScanMergeHitIntoMap_(raw, hit) {
   window.mobileScanEquipMap[key] = hit;
   if (hit.unitId) {
     var uidKey = mobileScanNormalize_(hit.unitId);
-    if (uidKey) window.mobileScanEquipMap['uid:' + uidKey] = hit;
+    if (uidKey) {
+      window.mobileScanEquipMap['uid:' + uidKey] = hit;
+      window.mobileScanEquipMap[uidKey] = hit;
+    }
   }
   try {
     localStorage.setItem(MOBILE_SCAN_MAP_KEY, JSON.stringify({ map: window.mobileScanEquipMap, ts: Date.now() }));
   } catch (e) { /* ignore */ }
 }
+
+function mobileScanGetSessionToken_() {
+  try {
+    var t = document.querySelector('meta[name="session-token"]');
+    if (t && t.content) return String(t.content).trim();
+    return localStorage.getItem('sm_session_token') || '';
+  } catch (e) { return ''; }
+}
+
+function mobileScanSetStatus_(msg) {
+  var el = document.getElementById('mobile-scan-status');
+  if (el) el.textContent = msg || '';
+}
+
+var mobileScanPullStagedBusy_ = false;
+
+function mobileScanTryPullStaged_(reason) {
+  if (!mobileScanInHostingIframe_()) return;
+  if (mobileScanPullStagedBusy_) return;
+  if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) return;
+  var token = mobileScanGetSessionToken_();
+  if (!token || token.length < 20) return;
+  mobileScanPullStagedBusy_ = true;
+  mobileScanSetStatus_((reason || 'pull') + '…');
+  try {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        mobileScanPullStagedBusy_ = false;
+        if (!res || !res.success) {
+          mobileScanSetStatus_('pull err: ' + ((res && res.error) ? res.error : 'fail'));
+          return;
+        }
+        if (!res.pending || !res.tag) {
+          mobileScanSetStatus_('pull: none');
+          return;
+        }
+        mobileScanSetStatus_('pull: ' + res.tag + (res.hit ? (' → ' + (res.hit.name || res.hit.unitId)) : ' → miss'));
+        if (res.hit) mobileScanMergeHitIntoMap_(res.tag, res.hit);
+        mobileScanApplyHit_(res.tag, res.hit || null);
+      })
+      .withFailureHandler(function(err) {
+        mobileScanPullStagedBusy_ = false;
+        mobileScanSetStatus_('pull fail');
+      })
+      .pullStagedMobileScan(ACTIVE_USER_NAME, token);
+  } catch (e) {
+    mobileScanPullStagedBusy_ = false;
+  }
+}
+
+window.mobileScanSimulateTest_ = function(tag) {
+  tag = String(tag == null ? 'RW-1000-20' : tag).trim();
+  mobileScanSetStatus_('simulate: ' + tag);
+  if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+    mobileOpenScanPanel();
+  }
+  mobileScanHandleDecode_(tag);
+};
 
 function mobileScanApplyHit_(raw, hit) {
   mobileScanPushFeed_(raw, hit);
@@ -404,6 +468,7 @@ function mobileScanResolveFromServer_(raw) {
         mobileScanServerResolveBusy_ = false;
         var hit = (res && res.hit) ? res.hit : null;
         var tag = (res && res.tag) ? res.tag : raw;
+        mobileScanSetStatus_('server: ' + tag + (hit ? (' → ' + (hit.name || hit.unitId)) : ' → miss'));
         if (hit) mobileScanMergeHitIntoMap_(tag, hit);
         mobileScanApplyHit_(tag, hit);
         window.mobileScanPendingRaw = '';
@@ -550,6 +615,7 @@ function mobileScanRenderFeed_() {
 function mobileScanHandleDecode_(raw) {
   if (!raw) return;
   var tag = mobileScanExtractTag_(raw);
+  mobileScanSetStatus_('decode: ' + (tag || '(empty)'));
   if (!tag) return;
   var sel = window.mobileScanSelection;
   if (sel && mobileScanNormalize_(sel.tag) === mobileScanNormalize_(tag) && sel.kind === 'equipment') {
@@ -569,6 +635,7 @@ function mobileScanHandleDecode_(raw) {
 
   var hit = mobileScanResolve_(tag);
   if (hit) {
+    mobileScanSetStatus_('map: ' + (hit.name || hit.unitId || tag));
     mobileScanApplyHit_(tag, hit);
     window.mobileScanPendingRaw = '';
     return;
@@ -582,6 +649,7 @@ function mobileScanHandleDecode_(raw) {
     }
     mobileScanRefreshBootstrap_();
   }
+  mobileScanSetStatus_('server: ' + tag);
   mobileScanResolveFromServer_(tag);
 }
 
@@ -803,6 +871,9 @@ window.mobileOpenScanPanel = function() {
     mobileScanShowLaunchBtn_(true);
   }
   mobileScanTryConsumePending_();
+  if (mobileScanInHostingIframe_()) {
+    setTimeout(function() { mobileScanTryPullStaged_('panel'); }, 300);
+  }
 };
 
 window.mobileCloseScanPanel = function() {
@@ -1078,6 +1149,8 @@ function mobileScanReopenPanelIfNeeded_() {
       mobileScanStartPendingPoll_();
       setTimeout(mobileScanTryConsumePending_, 800);
       setTimeout(mobileScanTryConsumePending_, 2000);
+    } else {
+      setTimeout(function() { mobileScanTryPullStaged_('boot'); }, 1200);
     }
   }
   if (document.readyState === 'loading') {

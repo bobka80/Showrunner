@@ -2633,6 +2633,32 @@
     line-height: 1.4;
 }
 
+.mobile-scan-sim-row {
+    margin-top: 8px;
+}
+
+.mobile-scan-sim-btn {
+    width: 100%;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px dashed #52525b;
+    background: #18181b;
+    color: #a1a1aa;
+    touch-action: manipulation;
+}
+
+.mobile-scan-status {
+    margin-top: 6px;
+    font-size: 9px;
+    line-height: 1.35;
+    color: #71717a;
+    word-break: break-all;
+    min-height: 14px;
+}
+
 .mobile-scan-feed__status {
     font-size: 10px;
     font-weight: 700;
@@ -4024,6 +4050,10 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
                                     <span class="mobile-scan-feed__empty">Point camera at asset QR…</span>
                                 </div>
                             </div>
+                            <div class="mobile-scan-sim-row">
+                                <button type="button" class="mobile-scan-sim-btn" onclick="mobileScanSimulateTest_('RW-1000-20')">Simulate RW-1000-20</button>
+                            </div>
+                            <div id="mobile-scan-status" class="mobile-scan-status" aria-live="polite">scan idle</div>
                             <div class="mobile-scan-panel__last" id="mobile-panel-last">
                                 <div class="mobile-scan-panel__last-name" id="mobile-panel-last-name">Scan equipment to select</div>
                                 <div class="mobile-scan-panel__last-meta" id="mobile-panel-last-meta"></div>

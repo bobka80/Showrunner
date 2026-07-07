@@ -109,9 +109,29 @@
     return ev.origin.indexOf('sm-showrunner-97405.web.app') !== -1 || ev.origin.indexOf('web.app') !== -1;
   }
 
+  function hostMobileScanStageOnServer_(tag) {
+    var raw = String(tag == null ? '' : tag).trim();
+    if (!raw) return;
+    var sess = readParentSession();
+    if (!sess || !sess.token) return;
+    var cb = 'srMobScanStage_' + Date.now();
+    window[cb] = function() {
+      try { delete window[cb]; } catch (e) { /* ignore */ }
+    };
+    try {
+      var s = document.createElement('script');
+      s.src = PROD_GAS_EXEC + '?action=mobscanstage&token=' + encodeURIComponent(sess.token) +
+        '&tag=' + encodeURIComponent(raw) + '&callback=' + encodeURIComponent(cb);
+      s.onerror = function() { try { delete window[cb]; } catch (e) { /* ignore */ } };
+      document.head.appendChild(s);
+      setTimeout(function() { try { s.remove(); } catch (e) { /* ignore */ } }, 8000);
+    } catch (e) { /* ignore */ }
+  }
+
   function hostMobileScanDeliverScan_(text, reopen) {
     var raw = String(text == null ? '' : text);
     if (!raw) return;
+    hostMobileScanStageOnServer_(raw);
     try {
       sessionStorage.setItem('sm_mobile_qr_pending', raw);
       localStorage.setItem('sm_mobile_qr_pending', raw);
@@ -241,9 +261,9 @@
       if (raw === hostMobileShellCamLastDecode && (now - hostMobileShellCamLastDecodeTs) < 2000) return;
       hostMobileShellCamLastDecode = raw;
       hostMobileShellCamLastDecodeTs = now;
+      hostMobileScanDeliverScan_(raw, true);
       hostMobileScanStopShellCamEngine_();
       hostMobileScanCloseShellCam_();
-      hostMobileScanDeliverScan_(raw, true);
     }
 
     function startCfg(cfg) {
@@ -926,6 +946,7 @@
         return;
       }
       try {
+        hostMobileScanStageOnServer_(raw);
         frame.contentWindow.postMessage({
           type: 'SHOWRUNNER_MOBILE_QR_SCAN',
           text: raw,
