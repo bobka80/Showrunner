@@ -364,20 +364,35 @@
       background: #0a0a0c;
     }
 
-    /* Shell-native fullscreen QR (camera on web.app document — same as proven mobile-scan.html) */
-    #sr-mobile-shell-cam {
+    /* Shell QR camera — anchored overlay (camera stays on web.app document) */
+    #sr-mobile-shell-cam-backdrop {
       display: none;
       position: fixed;
       inset: 0;
+      z-index: 2147483646;
+      background: rgba(0, 0, 0, 0.55);
+      touch-action: none;
+    }
+    #sr-mobile-shell-cam-backdrop.is-open { display: block; }
+
+    #sr-mobile-shell-cam {
+      display: none;
+      position: fixed;
+      left: 8px;
+      right: 8px;
       z-index: 2147483647;
       flex-direction: column;
-      gap: 12px;
+      gap: 8px;
       background: #0a0a0c;
       color: #f4f4f5;
       font-family: Inter, system-ui, sans-serif;
-      padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+      padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
       box-sizing: border-box;
       touch-action: manipulation;
+      border: 1px solid #f97316;
+      border-radius: 12px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+      max-height: calc(100vh - 16px);
     }
     #sr-mobile-shell-cam.is-open { display: flex; }
     .sr-shell-cam-header {
@@ -387,8 +402,36 @@
       gap: 10px;
       flex-shrink: 0;
     }
+    .sr-shell-cam-header__left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    #sr-shell-cam-perm {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid #f97316;
+      background: rgba(24, 24, 27, 0.92);
+      color: #fb923c;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+    #sr-shell-cam-perm.is-pulse {
+      animation: srShellCamPermPulse 1s ease-in-out infinite;
+    }
+    @keyframes srShellCamPermPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.5); }
+      50% { box-shadow: 0 0 0 8px rgba(249, 115, 22, 0); }
+    }
     .sr-shell-cam-title {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 900;
       letter-spacing: 0.08em;
       color: #fb923c;
@@ -402,10 +445,11 @@
       padding: 10px 12px;
       border-radius: 8px;
       touch-action: manipulation;
+      flex-shrink: 0;
     }
     #sr-shell-cam-reader {
       flex: 1;
-      min-height: 240px;
+      min-height: 160px;
       border-radius: 10px;
       overflow: hidden;
       background: #000;
@@ -419,26 +463,27 @@
       object-fit: cover !important;
     }
     #sr-shell-cam-start {
+      display: none;
       width: 100%;
-      padding: 20px 16px;
+      padding: 14px 16px;
       border: 2px solid #f97316;
       border-radius: 12px;
       background: #18181b;
       color: #fb923c;
-      font-size: 15px;
+      font-size: 13px;
       font-weight: 900;
       letter-spacing: 0.06em;
       touch-action: manipulation;
       flex-shrink: 0;
     }
     #sr-shell-cam-status {
-      font-size: 12px;
+      font-size: 11px;
       color: #a1a1aa;
       text-align: center;
-      min-height: 18px;
+      min-height: 16px;
       flex-shrink: 0;
     }
-    body.sr-shell-cam-active #app-frame { display: none !important; }
+    body.sr-shell-cam-active { overflow: hidden; }
 
     .sr-scan-stage-header {
       display: flex;
@@ -543,14 +588,21 @@
 
   </div>
 
+  <div id="sr-mobile-shell-cam-backdrop" aria-hidden="true"></div>
+
   <div id="sr-mobile-shell-cam" aria-hidden="true">
     <div class="sr-shell-cam-header">
-      <span class="sr-shell-cam-title">SHOWRUNNER SCAN</span>
+      <div class="sr-shell-cam-header__left">
+        <button type="button" id="sr-shell-cam-perm" title="Allow camera" aria-label="Camera permission">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </button>
+        <span class="sr-shell-cam-title">SCAN QR</span>
+      </div>
       <button type="button" id="sr-shell-cam-cancel">CANCEL</button>
     </div>
     <div id="sr-shell-cam-reader"></div>
-    <button type="button" id="sr-shell-cam-start">TAP TO START CAMERA</button>
-    <p id="sr-shell-cam-status">Point at an asset QR label.</p>
+    <button type="button" id="sr-shell-cam-start">TAP TO ALLOW CAMERA</button>
+    <p id="sr-shell-cam-status">Starting camera…</p>
   </div>
 
   <div id="sr-mobile-scan-page" aria-hidden="true">
@@ -605,7 +657,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <script src="/host-boot.js?v=468"></script>
+  <script src="/host-boot.js?v=469"></script>
 
 </body>
 

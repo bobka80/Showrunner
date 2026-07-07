@@ -57,7 +57,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`01f_Mobile_Phase_Rail.html`**: Deconstructed mini calendar (phase segments from `fragments`).
 - **`01g_Mobile_Tasks.html`**: MY TASKS view in Mobile Command Center.
 - **`01h_Mobile_Assets.html`**: Compact Project Assets on phone (`mobile-pa-compact`).
-- **`01j_Mobile_Scan.html`**: Phone QR scan panel — header Scan dropdown, camera decode, vault status actions (`getMobileScanBootstrap`, `setMobileAssetStatus` in `Station_Security.js`). Styles: `Styles_Mobile.html`. PA checkout forward deferred.
+- **`01j_Mobile_Scan.html`**: Phone QR scan panel — header Scan dropdown, shell camera via `SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA`, boot consume `pending-mobile-scan-b64`, vault resolve (`resolveMobileScanTag`, `pullStagedMobileScan`), status actions (`setMobileAssetStatus` in `Station_Security.js`). **Handoff:** see [FRAGILE_ZONES.md](FRAGILE_ZONES.md) § Mobile QR. Styles: `Styles_Mobile.html`.
 - **`01i_Desktop_Lock.html`**: **Desktop lock screen / screensaver** — post-login overlay (session stays valid), Stage Masters bus lanes + hero A, Bahnschrift clock, quick-unlock prefix + full PIN. Server: `Security.js` (`verifyDesktopLockUnlock`, `getDesktopLockPrefix`). Styles: `Styles.html` `.desktop-lock-*`. Full behavior → [topics/ux-platform.md](topics/ux-platform.md).
 
 **Mobile handoff doc:** [MOBILE_CREW_UX.md](MOBILE_CREW_UX.md)
@@ -133,7 +133,8 @@ Users must open **Firebase Hosting** (`https://sm-showrunner-97405.web.app`) for
 |--------|---------|
 | `fcfg` | Firebase public web config + VAPID + hosting URL |
 | `sessioncheck` | JSONP — validate `sm_session_token` before `sessionboot` (parent + Login) |
-| `sessionboot` | Serve `Index.html` for valid session token (stay signed in) |
+| `sessionboot` | Serve `Index.html` for valid session token; optional `srScan` → `pending-mobile-scan-b64` meta (phone QR handoff) |
+| `mobscanstage` | JSONP — shell stages decoded QR tag in CacheService before iframe reload (`stageMobileScanPending_`) |
 | `fcmreg` / `fcmregkey` | Token registration via reg key (hosting shell) |
 | `fcmcheck` / `fcmping` | Token prefix verify + last-seen touch |
 | `fcmrefreshkey` | Rotate registration key |
@@ -147,9 +148,9 @@ Deployed separately: `node deploy-hosting.js` (runs `push-hosting/prepare-hostin
 | Path | Role |
 |------|------|
 | `push-hosting/public/index.html` | Hosting shell page (iframe + push dock) |
-| `push-hosting/public/host-boot.js` | Parent: **`sessioncheck` then `sessionboot`**; load GAS iframe **before** FCM; `SHOWRUNNER_SESSION_TOKEN` sync; foreground push handler; PWA install; `SW_BUILD` cache-bust. **Native station app** (UA contains `ShowrunnerStation`) is treated as standalone → **PWA install nag suppressed** (`isNativeStationApp()`), otherwise the gun WebView gets stuck on "add to home screen". **Station RFID bridge:** `showrunnerStationDeliverScan()` relays native scans into the iframe as `SHOWRUNNER_RFID_SCAN`; `SHOWRUNNER_STATION_CONFIG_GET/SET` relays gun settings to/from the native `AndroidStation` interface. **Mobile QR:** `SHOWRUNNER_MOBILE_SCAN_*` shell camera gate; pending scans via `sessionStorage` from [`mobile-scan.html`](push-hosting/public/mobile-scan.html). |
-| `push-hosting/public/camera-embed.html` | Same-origin camera iframe embedded in mobile scan panel (inside GAS iframe). Tap-to-start + perm retry; `postMessage` scans to parent (`01j`). |
-| `push-hosting/public/mobile-scan.html` | Same-origin PWA camera page (Android/HyperOS). Scan → `sessionStorage sm_mobile_qr_pending` → return to `/`; host-boot flushes into iframe. Fallback full-screen scan. |
+| `push-hosting/public/host-boot.js` | Parent: **`sessioncheck` then `sessionboot`**; load GAS iframe **before** FCM; `SHOWRUNNER_SESSION_TOKEN` sync; foreground push handler; PWA install; `SW_BUILD` cache-bust. **Native station app** (UA contains `ShowrunnerStation`) is treated as standalone → **PWA install nag suppressed** (`isNativeStationApp()`). **Station RFID:** `showrunnerStationDeliverScan` → `postMessage SHOWRUNNER_RFID_SCAN` (fallback); station shell **primary** = `AndroidStation.pollScans()`. **Mobile QR:** shell camera `#sr-mobile-shell-cam`; **primary handoff** = iframe reload `sessionboot&srScan=` + `mobscanstage` backup; 20s dedupe — see [FRAGILE_ZONES.md](FRAGILE_ZONES.md) § Two-layer shell bridge. **Bump `index.html` `host-boot.js?v=` on every hosting change.** |
+| `push-hosting/public/camera-embed.html` | Legacy same-origin camera embed (inside GAS iframe) — **not reliable** on phones; shell camera replaced it. |
+| `push-hosting/public/mobile-scan.html` | Top-level PWA camera fallback (`mobile-scan.html?scan=1`). Camera works here but director wants integrated panel as primary UX. |
 | `push-hosting/public/firebase-messaging-sw.js` | Service worker — background data messages |
 | `push-hosting/public/manifest.json` | PWA manifest |
 | `push-hosting/public/station-app.html` | **Station gun APK install page** (`/station-app` rewrite); reads `station-manifest.json`, downloads `showrunner-station.bin` as `.apk` |

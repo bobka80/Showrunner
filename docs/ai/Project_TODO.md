@@ -27,7 +27,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station device profiles** | Active — EPC+TID host login, BLE reconnect, kiosk boot approved; see file | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **RFID scanning, station profiles & phone QR** | Active — phone QR core handoff v467; RFID EPC+TID, BLE, kiosk; see file | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | **Planned — not executing**; phone app first; blocks Firebase prep/timeline fork until Phase 3 | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---
@@ -41,7 +41,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Mobile crew UX | Shipped v314; mobile PA auto-save shipped v368 | [topics/mobile-crew.md](topics/mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [topics/financials.md](topics/financials.md) |
-| Logistics & warehouse RFID | Partial — station v437+; approved: EPC+TID, optimistic login, BLE/kiosk | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
+| Logistics & warehouse RFID | Partial — station v419+ poll; phone QR panel v467; see FRAGILE_ZONES § bridge | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |
 | Availability & fleet tracker | Partial — equipment tracker matrix | [topics/availability-fleet.md](topics/availability-fleet.md) |

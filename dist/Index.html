@@ -2271,11 +2271,28 @@
     gap: 10px;
 }
 
+.mobile-scan-go-cam-btn {
+    flex-shrink: 0;
+    width: 100%;
+    margin: 0;
+    padding: 14px 16px;
+    border: 2px solid #f97316;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #27272a 0%, #18181b 100%);
+    color: #fb923c;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    touch-action: manipulation;
+    cursor: pointer;
+}
+
+.mobile-scan-go-cam-btn:active {
+    background: rgba(249, 115, 22, 0.22);
+}
+
 .mobile-scan-panel__cam-row {
-    position: relative;
-    flex: 1;
-    min-height: 200px;
-    max-height: 42vh;
+    display: none !important;
 }
 
 .mobile-scan-perm-btn {
@@ -2524,13 +2541,16 @@
 }
 
 .mobile-scan-feed {
-    flex-shrink: 0;
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
+    overflow: hidden;
 }
 
 .mobile-scan-feed__label {
+    flex-shrink: 0;
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.08em;
@@ -2539,19 +2559,33 @@
 }
 
 .mobile-scan-feed__list {
-    max-height: 72px;
+    flex: 1;
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+    -webkit-overflow-scrolling: touch;
 }
 
 .mobile-scan-feed__row {
     display: flex;
     align-items: baseline;
-    gap: 6px;
-    font-size: 11px;
+    gap: 8px;
+    font-size: 12px;
     color: #a1a1aa;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: rgba(24, 24, 27, 0.6);
+    touch-action: manipulation;
+    cursor: pointer;
+}
+
+.mobile-scan-feed__row.is-selected {
+    background: rgba(249, 115, 22, 0.18);
+    border: 1px solid rgba(249, 115, 22, 0.45);
+    color: #f4f4f5;
 }
 
 .mobile-scan-feed__row:first-child {
@@ -4035,27 +4069,13 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
                     <button type="button" id="mobile-btn-scan-panel" class="mobile-ctrl-scan" onclick="mobileToggleScanPanel()" title="Scan QR">Scan</button>
                     <div id="mobile-scan-panel" class="mobile-scan-panel" aria-label="QR scan panel" aria-hidden="true">
                         <div class="mobile-scan-panel__body">
-                            <div class="mobile-scan-panel__cam-row">
-                                <button type="button" id="mobile-scan-perm-btn" class="mobile-scan-perm-btn" onclick="mobileScanRequestEmbedPerm_()" title="Allow camera" aria-label="Camera permission">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
-                                </button>
-                                <div id="mobile-qr-reader-wrap" class="mobile-qr-reader-wrap">
-                                    <button type="button" id="mobile-scan-launch-cam-btn" class="mobile-scan-launch-cam-btn" onclick="mobileScanLaunchShellCamera_(); event.stopPropagation();">OPEN CAMERA</button>
-                                    <button type="button" id="mobile-qr-start-btn" class="mobile-qr-start-btn" onclick="mobileScanLaunchShellCamera_()">TAP TO START CAMERA</button>
-                                    <iframe id="mobile-qr-camera-embed" class="mobile-qr-camera-embed" title="QR camera" allow="camera; microphone" style="display:none;"></iframe>
-                                    <div id="mobile-qr-reader-placeholder" class="mobile-qr-reader-placeholder" style="display:none;"></div>
-                                </div>
-                            </div>
+                            <button type="button" id="mobile-scan-go-cam-btn" class="mobile-scan-go-cam-btn" onclick="mobileScanLaunchShellCamera_()">SCAN</button>
                             <div id="mobile-scan-feed" class="mobile-scan-feed" aria-label="Recent scans">
                                 <div class="mobile-scan-feed__label" id="mobile-scan-feed-label">Recent scans</div>
                                 <div id="mobile-scan-feed-list" class="mobile-scan-feed__list">
-                                    <span class="mobile-scan-feed__empty">Point camera at asset QR…</span>
+                                    <span class="mobile-scan-feed__empty">No scans yet — tap SCAN above</span>
                                 </div>
                             </div>
-                            <div class="mobile-scan-sim-row">
-                                <button type="button" class="mobile-scan-sim-btn" onclick="mobileScanSimulateTest_('RW-1000-20')">Simulate RW-1000-20</button>
-                            </div>
-                            <div id="mobile-scan-status" class="mobile-scan-status" aria-live="polite">scan idle</div>
                             <div class="mobile-scan-panel__last" id="mobile-panel-last">
                                 <div class="mobile-scan-panel__last-name" id="mobile-panel-last-name">Scan equipment to select</div>
                                 <div class="mobile-scan-panel__last-meta" id="mobile-panel-last-meta"></div>

@@ -28,7 +28,8 @@ When the director reports a bug in these areas, state the risk in plain language
 | **Node-only files on GAS (white screen)** | `gas-node-only.js`, `build.js`, `gas-push-sync.js`, `check-google-account.js` | Ship `milestone.js`, `check-google-account.js`, `git-push-backup.js`, etc. to Apps Script; rely on clasp push alone to remove them | Keep PC-only list in `gas-node-only.js`; milestone uses `gas-push-sync`; check #3 in `check-google-account.js` |
 | **RBAC boot payload** | `Main.js`, `Index.html`, `Security.js` | Inject raw JSON permissions into HTML without Base64 | Keep `userPermissionsB64` + `atob()` pattern |
 | **PWA session + login boot** | `push-hosting/public/host-boot.js`, `Login.html`, `Index.html` (session `postMessage`), `Main.js` (`sessionboot`, `sessioncheck`), `Security.js` | Change iframe load order; skip `sessioncheck` before `sessionboot`; clear parent session on every login screen paint; single-token login that kicks other devices without director approval | Token sync only via `SHOWRUNNER_SESSION_TOKEN`; validate server-side before `sessionboot`; multi-device sessions in `Security.js` |
-| **Mobile QR camera (PWA)** | `push-hosting/public/host-boot.js`, `01j_Mobile_Scan.html`, `camera-embed.html`, `mobile-scan.html` | `getUserMedia` inside GAS iframe or nested `web.app` iframe in GAS; auto-start camera without user tap; forget `host-boot.js?v=` bump | Camera on **shell document** (top-level `web.app`); user tap → permission; panel UI stays in GAS iframe; see [CURSOR_WORKFLOW.md](CURSOR_WORKFLOW.md) + `mobile-pwa-hosting` rule |
+| **Mobile QR camera (PWA)** | `push-hosting/public/host-boot.js`, `01j_Mobile_Scan.html`, `Main.js` (`sessionboot`/`mobscanstage`), `Station_Security.js`, `Index.html` | `getUserMedia` in GAS iframe; **`postMessage` as sole handoff**; parallel retry loops (relay + pending flush + burst pull + reload); forget `host-boot.js?v=` bump | Camera on **shell** (`#sr-mobile-shell-cam`); **primary handoff = iframe reload** `sessionboot&srScan=`; 20s dedupe; see § Two-layer shell bridge + § Mobile QR handoff |
+| **Station RFID / native gun bridge** | `host-boot.js`, `11_Station_Shell.html`, `station-android/RfidManager.kt` | Rely on **`postMessage` or `evaluateJavascript` alone** for scan delivery; remove `pollScans()` pull path; share BLE read/config workers | **Primary = iframe `AndroidStation.pollScans()`** (~300 ms); relay + `showrunnerStationDeliverScan` = fallback; direct `AndroidStation` for settings; see § Two-layer shell bridge + § Station RFID delivery |
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
 | **Warehouse ledger** | `Operations.js` | Mutate assignments directly during RFID chaos | Append to `Operations_Ledger` |
 
@@ -83,6 +84,143 @@ Showrunner on crew phones is **two layers**:
 5. **Every milestone smoke test** — After `node milestone.js`, director or AI verifies: open `web.app` (PWA path) **and** GAS URL on desktop → login or auto-boot → calendar/mobile home visible. Mobile-only notes still redeploy **the entire** `Index.html` payload.
 
 **Deploy pairing:** Session logic spans GAS **and** hosting. If you change `host-boot.js`, run `node deploy-hosting.js` as well as `milestone.js`. GAS-only mobile UI changes do not require hosting — unless you also touched `push-hosting/`.
+
+---
+
+## Two-layer shell bridge (shared — PWA + station)
+
+Showrunner on phones and warehouse guns uses the **same architecture**:
+
+| Layer | Where | Owns |
+|-------|--------|------|
+| **Hosting shell** | `https://sm-showrunner-97405.web.app` — `push-hosting/public/host-boot.js` | Parent `localStorage`, push dock, **hardware** (camera, native BLE gun SDK), `#app-frame` iframe |
+| **GAS app** | `script.google.com/.../exec` inside `#app-frame` | Login, calendar, mobile scan panel, station shell, vault, project assets |
+
+```
+web.app (host-boot.js)                 GAS iframe (Index / station shell)
+        │                                       │
+        │  postMessage often LOST ─────────────►│  (GAS sandbox nesting)
+        │                                       │
+        ├─ Camera: MUST run here                ├─ Scan panel UI + status actions
+        ├─ Native gun → top frame only          ├─ pollScans() pull (RFID, primary)
+        └─ Reliable handoff ≠ postMessage only  └─ boot meta / server cache (QR, primary)
+```
+
+**Proven on hardware (2026-07):**
+
+| Capability | Works on | Fails on |
+|------------|----------|----------|
+| Phone QR camera | Top-level `web.app` shell (`#sr-mobile-shell-cam`) | `getUserMedia` inside GAS iframe; nested `web.app` iframe inside GAS |
+| Scan result → app UI | Iframe reload with `srScan` (QR); server cache pull (backup) | Shell `postMessage` alone into `#app-frame` |
+| Gun EPC → station strip | Iframe `AndroidStation.pollScans()` every ~300 ms | `evaluateJavascript('onStationRfidScan')` into iframe; lossy `postMessage` relay |
+
+**Shared AI rules (both bridges):**
+
+1. **Top frame owns hardware** — camera permission and BLE SDK calls run in the shell or native app, not inside the GAS document.
+2. **Iframe owns business UI** — equipment name, status buttons, vault, checkout.
+3. **`postMessage` is best-effort only** — never the sole delivery path for scan results.
+4. **Dedupe is mandatory** — QR: 20 s (`hostMobileScanLastDeliveredTag_` / `MOBILE_SCAN_DELIVERED_KEY`); RFID: ~1.5 s (`stationLastScanTag`).
+5. **One primary path** — do not stack relay burst + pending retry loop + burst pull + reload; that caused the v466 QR infinite re-read loop.
+6. **`host-boot.js?v=` bump** — bump `push-hosting/public/index.html` cache-buster on every hosting change (v415 lesson: stale shell = “fix shipped but field unchanged”).
+7. **Deploy pairing** — `host-boot.js` changes need `node deploy-hosting.js` **and** GAS milestone when `01j` / `Main.js` / `Station_Security.js` also change.
+8. **`host-boot.js` is shared** — mobile QR camera paths and station RFID relay live in the same file; read both sections below before editing either.
+
+**Active campaign (in flight):** phone QR polish — [active/rfid-station-profiles.md](active/rfid-station-profiles.md) § Phone QR scan panel.
+
+---
+
+## Mobile QR scan handoff (shipped v466–467)
+
+**Goal:** Crew phone PWA — header **Scan** → integrated panel → **OPEN CAMERA** → read asset QR → show equipment + status actions **without** navigating away to a separate scan page.
+
+**QR format:** Labels encode vault identity (e.g. **Robin WashBeam 1000 #20** → `RW-1000-20`). Lookup: `resolveMobileScanTag` / `findAssetByScanTagInVault_` in `Station_Security.js`.
+
+### End-to-end flow (working path)
+
+```
+1. User opens scan panel (01j_Mobile_Scan.html in GAS iframe)
+2. OPEN CAMERA → postMessage SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA { sessionToken }
+3. Shell opens #sr-mobile-shell-cam on web.app (user tap → getUserMedia)
+4. On decode → hostMobileScanDeliverScan_(tag):
+     a. Stage once: GET ?action=mobscanstage&token=&tag=  (CacheService, 5 min TTL)
+     b. PRIMARY: reload iframe → sessionboot&token=…&srScan=TAG
+     c. Clear parent pending storage immediately (no retry loop)
+5. Iframe boots → meta pending-mobile-scan-b64 → mobileScanConsumeBootPending_()
+6. mobileScanHandleDecode_ → server/map lookup → panel shows equipment
+7. mobileScanAckParent_ → SHOWRUNNER_MOBILE_QR_SCAN_ACK (parent stops any stale state)
+```
+
+**Backup only (do not make primary):** `pullStagedMobileScan` via `google.script.run` + short campoll after OPEN CAMERA; `mobile-scan.html` full-page fallback if shell camera unavailable.
+
+### File map
+
+| File | Role |
+|------|------|
+| `push-hosting/public/host-boot.js` | Shell camera, `hostMobileScanDeliverScan_`, `hostMobileScanNavigateIframeWithScan_`, dedupe, `showrunnerStationDeliverScan` (RFID — separate section) |
+| `push-hosting/public/index.html` | `#sr-mobile-shell-cam`, `#app-frame`, `host-boot.js?v=` cache-buster |
+| `01j_Mobile_Scan.html` | Panel UI, decode, vault resolve, `mobileScanConsumeBootPending_`, campoll, dedupe |
+| `Index.html` | `hostingMobileScanRelay_` forwarder (best-effort); scan panel DOM |
+| `Main.js` | `sessionboot` passes `srScan` → `pendingMobileScanB64`; `mobscanstage` JSONP |
+| `Station_Security.js` | `stageMobileScanPending_`, `pullStagedMobileScan`, `resolveMobileScanTag` |
+| `push-hosting/public/mobile-scan.html` | Fallback top-level camera page (director dislikes as primary UX) |
+
+### Never do
+
+- Call `getUserMedia` inside the GAS iframe or embed a `web.app` camera iframe inside GAS.
+- Use **`postMessage` relay burst** as the only handoff after camera decode (proven lost on HyperOS / iPhone PWA).
+- Keep `sm_mobile_qr_pending` in parent storage **and** run a 24 s flush/retry loop **after** reload delivery — re-stages and re-injects the same tag (v466 loop bug).
+- Run **relay + flush + burst pull + reload** simultaneously — pick **reload as primary**, others backup or remove.
+- Remove **20 s dedupe** on shell and iframe (`hostMobileScanShouldIgnoreDeliver_`, `mobileScanShouldIgnoreDelivered_`).
+- Ship `host-boot.js` without bumping `?v=` in `push-hosting/public/index.html`.
+- “Simplify” by navigating parent to `/?srScan=` — caused re-auth loop (v458).
+
+### Safe changes
+
+- Panel copy, status line, simulate button, vault lookup rules (server-side).
+- Shell camera UI (`#sr-mobile-shell-cam` styles, tap gate copy).
+- Post-scan status actions (`setMobileAssetStatus`) — not the handoff layer.
+
+### Test checklist (after any touch)
+
+1. Force-refresh PWA (new `host-boot.js?v=`).
+2. **Simulate RW-1000-20** — resolves without camera (proves lookup path).
+3. **Real camera** — one scan → one result → **no loop**; second different QR updates selection.
+4. Desktop `web.app` login still works (unrelated but mandatory on milestone).
+
+---
+
+## Station RFID scan delivery (shipped v419+)
+
+**Goal:** Chainway gun on warehouse tablet — EPC reaches station live strip and host/vault flows.
+
+### End-to-end flow (working path)
+
+```
+1. RfidManager.kt reads tag on BLE trigger
+2. Native queues EPC in pendingScans
+3. Station shell (11_Station_Shell.html) polls AndroidStation.pollScans() ~every 300 ms
+4. onStationRfidScan(epc) → strip / host login / vault record / checkout
+```
+
+**Fallback (keep, do not rely on):**
+
+- Top frame `showrunnerStationDeliverScan(tag)` → `postMessage SHOWRUNNER_RFID_SCAN` into iframe (`host-boot.js`).
+- Direct `evaluateJavascript('onStationRfidScan…')` — only hits top frame, not station listeners.
+
+**Gun settings:** prefer **direct** `window.AndroidStation.setPower/setScanMode/setBeep/setPollMs` when `native=true`; `SHOWRUNNER_STATION_CONFIG_GET/SET` via `host-boot.js` relay only when interface absent.
+
+### Never do
+
+- Remove **`pollScans()` pull** while “fixing” the relay — relay alone was the v414 “gun beeps, nothing in app” bug.
+- Share BLE **read worker** with config/device-info SDK calls — hung trigger reads (v412).
+- Ship `host-boot.js` RFID handlers without `?v=` bump.
+- Assume `postMessage` from shell always reaches `11_Station_Shell.html` listeners.
+
+### Dedupe
+
+`stationLastScanTag` + ~1.5 s window — one physical pull must not enqueue duplicate strip rows (poll + relay both active).
+
+**Full field chronology:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) · [topics/logistics-warehouse.md](topics/logistics-warehouse.md).
 
 ---
 
@@ -193,4 +331,16 @@ CAUSE: 02g_Project_Reports.html existed but was not included in Index.html build
 FRAGILE ZONE: Build pipeline / Index.html wiring
 FILES TOUCHED: Index.html (added include for 02g)
 LESSON: Never document a module as live without verifying <?!= include(...) ?> in Index.html. After adding HTML modules, run node build.js and test PRINT.
+```
+
+#### 2026-07-07 — Mobile QR camera: many versions, postMessage dead, reload + dedupe (fixed v466–467)
+
+```
+DATE: 2026-07-07
+SYMPTOM: Integrated phone scan panel — Simulate RW-1000-20 worked (equipment resolved) but real camera closed with no result; after reload fix (v466) camera worked but same tag re-fired in an infinite loop without rescanning.
+CAUSE: (1) Hard constraint: getUserMedia works on top-level web.app only — fails inside GAS iframe (proven on director HyperOS device). (2) Shell → iframe handoff via postMessage never reliably reached 01j listeners (GAS sandbox nesting) — camera decoded fine, app never got the tag. (3) v437–465 stacked mitigations that all fired at once: relay burst, parent sm_mobile_qr_pending + 24s flush loop re-staging mobscanstage, burst pull, visibility handlers, iframe forwarder in Index.html — simulate bypassed this (same-document JS). (4) v464 fixed vault lookup (composite RW-1000-20) — proved backend path OK. (5) v466 primary fix: hostMobileScanNavigateIframeWithScan_ reloads GAS iframe with sessionboot&srScan=TAG; server embeds pending-mobile-scan-b64 meta; boot consumes on load. (6) v466 loop: deliver still left pending in parent storage AND kept retry/relay/burst paths alive — each flush re-staged the same tag; campoll pulled it again; user saw endless re-reads. (7) v467: single primary path (reload only), clear pending on deliver, 20s dedupe both sides, stop campoll/burst after apply, ACK on boot consume, skip APP_READY flush while reload in flight. Side quests: v460 diagnostics froze app; v461 orphaned return killed entire scan script; v458 parent ?srScan= caused re-auth.
+FRAGILE ZONE: Two-layer shell bridge; Mobile QR camera (PWA); host-boot.js (shared with station RFID)
+FILES TOUCHED: host-boot.js, 01j_Mobile_Scan.html, Index.html, Main.js (sessionboot srScan, mobscanstage), Station_Security.js (stage/pull/resolve), push-hosting/public/index.html (?v=), FRAGILE_ZONES.md
+LESSON: For shell↔iframe scan delivery, never use postMessage as sole path — use iframe reload with server-embedded tag (QR) or native poll pull (RFID). Never run parallel handoff mechanisms without dedupe. Simulate working + camera not = lookup bug — split “decode/handoff” from “vault resolve”. Always bump host-boot.js?v= on hosting deploy. Read FRAGILE_ZONES § Two-layer bridge before touching host-boot.js.
+VERSION TRAIL (GAS unless noted): v437–455 panel + shell bridges; v457 embed-origin; v458 srScan nav reverted; v459 shell fullscreen cam; v460 diagnostics removed v461; v463 server stage + simulate; v464 vault lookup; v465 relay burst + forwarder; v466 reload handoff (hosting v466–467); v467 loop fix (hosting v468).
 ```

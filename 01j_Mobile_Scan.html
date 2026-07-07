@@ -751,12 +751,15 @@ function mobileScanRenderFeed_() {
   if (!list) return;
   var rows = window.mobileScanRecent || [];
   if (!rows.length) {
-    list.innerHTML = '<span class="mobile-scan-feed__empty">Point camera at asset QR…</span>';
+    list.innerHTML = '<span class="mobile-scan-feed__empty">No scans yet — tap SCAN above</span>';
     return;
   }
+  var sel = window.mobileScanSelection;
+  var selKey = sel && sel.tag ? mobileScanNormalize_(sel.tag) : '';
   list.innerHTML = rows.map(function(r) {
     var name = mobileScanEsc_(r.label);
-    return '<div class="mobile-scan-feed__row"><span class="name">' + name + '</span><span class="time">' + mobileScanEsc_(r.time) + '</span></div>';
+    var selCls = (selKey && mobileScanNormalize_(r.raw) === selKey) ? ' is-selected' : '';
+    return '<div class="mobile-scan-feed__row' + selCls + '" data-raw="' + mobileScanEsc_(r.raw) + '"><span class="name">' + name + '</span><span class="time">' + mobileScanEsc_(r.time) + '</span></div>';
   }).join('');
 }
 
@@ -999,13 +1002,28 @@ function mobileScanStartCameraReturnPoll_() {
   }, 500);
 }
 
+function mobileScanGetCamAnchorRect_() {
+  var btn = document.getElementById('mobile-scan-go-cam-btn');
+  if (btn) {
+    var r = btn.getBoundingClientRect();
+    return { top: r.top, left: r.left, width: r.width, height: r.height, bottom: r.bottom };
+  }
+  var hdr = document.getElementById('mobile-btn-scan-panel');
+  if (hdr) {
+    var h = hdr.getBoundingClientRect();
+    return { top: h.top, left: h.left, width: h.width, height: h.height, bottom: h.bottom };
+  }
+  return null;
+}
+
 window.mobileGoToScanCameraPage_ = function() {
   if (mobileScanInHostingIframe_()) {
     try { sessionStorage.removeItem('sm_mobile_scan_boot_tag'); } catch (e) { /* ignore */ }
     mobileScanStartCameraReturnPoll_();
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA', {
       sessionToken: mobileScanGetSessionToken_(),
-      crewName: (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '')
+      crewName: (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : ''),
+      anchorRect: mobileScanGetCamAnchorRect_()
     });
     return;
   }
@@ -1037,9 +1055,6 @@ window.mobileOpenScanPanel = function() {
   }
   if (!mobileScanInHostingIframe_()) {
     mobileScanStartCamera_();
-  } else {
-    mobileScanSetPlaceholder_('Tap OPEN CAMERA for full-screen scan', 'live');
-    mobileScanShowLaunchBtn_(true);
   }
   mobileScanTryConsumePending_();
   if (mobileScanInHostingIframe_()) {

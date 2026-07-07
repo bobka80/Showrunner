@@ -1,14 +1,40 @@
-# Active — RFID scanning & station device profiles
+# Active — RFID scanning, station device profiles & phone QR scan
 
-**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v465** · APK **v0.1.15 (build 17)** · **Last swept:** 2026-07-07
+**Opened:** 2026-07-02 · **Production:** GAS **v467** · APK **v0.1.15 (build 17)** · **Last swept:** 2026-07-07
 
-This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
+This is the work **in flight right now**: RFID gun scanning end-to-end, fixed warehouse tablet/gun **device profiles** (station RBAC), and **phone QR scan panel polish**. The durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
+
+> **`host-boot.js` is shared** between station RFID relay and phone QR shell camera. Before editing either path, read [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge — do not “fix” one bridge by breaking the other.
 
 ---
 
-## Goal
+## Phone QR scan panel (in flight — core handoff shipped v467)
+
+**Fragile reference:** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Mobile QR scan handoff · Incident log entry 2026-07-07.
+
+**Goal:** Crew phone PWA — header **Scan** → integrated panel → camera → asset QR → equipment + status actions (no full-page `mobile-scan.html` as primary UX).
+
+### Shipped (this campaign)
+
+- [x] **Integrated scan panel** — `01j_Mobile_Scan.html`, `Styles_Mobile.html`, mobile header Scan control
+- [x] **Shell fullscreen camera** — `#sr-mobile-shell-cam` on `web.app` (camera cannot run in GAS iframe)
+- [x] **Reliable handoff v466–467** — iframe reload `sessionboot&srScan=` + `pending-mobile-scan-b64` boot consume; `mobscanstage` server cache as backup; 20s dedupe; loop fix (no parallel relay/retry storms)
+- [x] **Vault lookup** — composite codes `RW-1000-20` via `findAssetByScanTagInVault_` (v464)
+- [x] **Simulate button** — proves lookup path without camera (`Simulate RW-1000-20`)
+- [x] **Status actions** — Maintenance / Damaged / Broken / Repaired from panel (`setMobileAssetStatus`)
+
+### Open (polish — finish then archive this section)
+
+- [ ] Director QA on anchored camera overlay (position, auto-start, backdrop blocking taps)
+- [ ] PA checkout forward from scan panel (if still wanted — was deferred)
+
+When phone QR polish is done, move the § Phone QR section to [../topics/mobile-crew.md](../topics/mobile-crew.md) and leave RFID/station items in this file until that campaign closes.
+
+---
+
+## Goal (station RFID)
 
 A warehouse tablet/phone **married to a Chainway UHF gun** boots the station shell, a crew **badge scan** hosts a session, and equipment scans run check-in/out — no personal login, no plug/unplug.
 

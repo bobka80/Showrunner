@@ -16,6 +16,7 @@
       hostMobileScanCloseShellCam_();
       hostMobileScanCloseCameraPage_();
       hostMobileScanHideTapGate_();
+      hostMobileScanShowShellCamBackdrop_(false);
       document.body.classList.remove('sr-shell-cam-active');
       hostMobileScanRestoreAppFrame_();
       if (hostMobileQrPendingRetryTimer) {
@@ -245,9 +246,55 @@
     return document.getElementById('sr-mobile-shell-cam');
   }
 
+  var hostMobileShellCamLastAnchor_ = null;
+
+  function hostMobileScanShowShellCamBackdrop_(show) {
+    var bd = document.getElementById('sr-mobile-shell-cam-backdrop');
+    if (!bd) return;
+    if (show) {
+      bd.classList.add('is-open');
+      bd.setAttribute('aria-hidden', 'false');
+    } else {
+      bd.classList.remove('is-open');
+      bd.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function hostMobileScanPositionShellCam_(anchorRect) {
+    hostMobileShellCamLastAnchor_ = anchorRect || null;
+    var el = hostMobileScanGetShellCam_();
+    if (!el) return;
+    var fr = hostMobileScanFrameRect_();
+    var top = Math.round(window.innerHeight * 0.22);
+    if (anchorRect) {
+      var bottom = anchorRect.bottom != null ? anchorRect.bottom : (anchorRect.top + anchorRect.height);
+      top = fr.top + bottom + 4;
+    }
+    top = Math.max(8, Math.min(top, window.innerHeight - 200));
+    var halfH = Math.floor(window.innerHeight * 0.5);
+    var height = Math.max(200, Math.min(halfH, window.innerHeight - top - 12));
+    el.style.top = Math.round(top) + 'px';
+    el.style.left = '8px';
+    el.style.right = '8px';
+    el.style.height = Math.round(height) + 'px';
+    el.style.bottom = 'auto';
+  }
+
+  function hostMobileScanShellCamPermRetry_() {
+    hostMobileScanStopShellCamEngine_();
+    var reader = document.getElementById('sr-shell-cam-reader');
+    if (reader) reader.innerHTML = '';
+    var startBtn = document.getElementById('sr-shell-cam-start');
+    if (startBtn) startBtn.style.display = 'none';
+    var st = document.getElementById('sr-shell-cam-status');
+    if (st) st.textContent = 'Requesting camera…';
+    hostMobileScanStartShellCamEngine_();
+  }
+
   function hostMobileScanWireShellCam_() {
     var cancel = document.getElementById('sr-shell-cam-cancel');
     var start = document.getElementById('sr-shell-cam-start');
+    var perm = document.getElementById('sr-shell-cam-perm');
     if (cancel && cancel.dataset.bound !== '1') {
       cancel.dataset.bound = '1';
       function onCancel(ev) {
@@ -256,6 +303,16 @@
       }
       cancel.addEventListener('click', onCancel);
       cancel.addEventListener('touchend', onCancel, { passive: false });
+    }
+    if (perm && perm.dataset.bound !== '1') {
+      perm.dataset.bound = '1';
+      function onPerm(ev) {
+        if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+        perm.classList.add('is-pulse');
+        hostMobileScanShellCamPermRetry_();
+      }
+      perm.addEventListener('click', onPerm);
+      perm.addEventListener('touchend', onPerm, { passive: false });
     }
     if (start && start.dataset.bound !== '1') {
       start.dataset.bound = '1';
@@ -271,7 +328,8 @@
     }
   }
 
-  function hostMobileScanOpenShellCam_() {
+  function hostMobileScanOpenShellCam_(opts) {
+    opts = opts || {};
     hostMobileScanWireShellCam_();
     hostMobileScanCloseCameraPage_();
     var el = hostMobileScanGetShellCam_();
@@ -283,17 +341,25 @@
       sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
       localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
     } catch (e) { /* ignore */ }
-    hostMobileScanHideAppFrame_();
     hostMobileShellCamOpen = true;
+    hostMobileScanPositionShellCam_(opts.anchorRect);
+    hostMobileScanShowShellCamBackdrop_(true);
     el.classList.add('is-open');
     el.setAttribute('aria-hidden', 'false');
     var startBtn = document.getElementById('sr-shell-cam-start');
     var status = document.getElementById('sr-shell-cam-status');
     var reader = document.getElementById('sr-shell-cam-reader');
-    if (startBtn) startBtn.style.display = 'block';
-    if (status) status.textContent = 'Tap below, then point at an asset QR label.';
+    var permBtn = document.getElementById('sr-shell-cam-perm');
+    if (startBtn) startBtn.style.display = 'none';
+    if (permBtn) permBtn.classList.remove('is-pulse');
+    if (status) status.textContent = 'Starting camera…';
     if (reader) reader.innerHTML = '';
     document.body.classList.add('sr-shell-cam-active');
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        hostMobileScanStartShellCamEngine_();
+      });
+    });
   }
 
   function hostMobileScanStopShellCamEngine_() {
@@ -311,6 +377,7 @@
   function hostMobileScanCloseShellCam_() {
     hostMobileScanStopShellCamEngine_();
     hostMobileShellCamOpen = false;
+    hostMobileShellCamLastAnchor_ = null;
     var el = hostMobileScanGetShellCam_();
     if (el) {
       el.classList.remove('is-open');
@@ -318,6 +385,7 @@
     }
     var reader = document.getElementById('sr-shell-cam-reader');
     if (reader) reader.innerHTML = '';
+    hostMobileScanShowShellCamBackdrop_(false);
     document.body.classList.remove('sr-shell-cam-active');
     hostMobileScanRestoreAppFrame_();
     hostMobileScanFlushPending_();
@@ -340,6 +408,8 @@
       if (st) st.textContent = String(err && err.message ? err.message : err);
       var startBtn = document.getElementById('sr-shell-cam-start');
       if (startBtn) startBtn.style.display = 'block';
+      var permBtn = document.getElementById('sr-shell-cam-perm');
+      if (permBtn) permBtn.classList.add('is-pulse');
     }
 
     function onDecode(decoded) {
@@ -373,7 +443,11 @@
     startCfg({ facingMode: 'environment' }).then(function() {
       hostMobileShellCamStarting = false;
       var st = document.getElementById('sr-shell-cam-status');
-      if (st) st.textContent = 'Camera active — point at QR';
+      if (st) st.textContent = 'Point at asset QR';
+      var permBtn = document.getElementById('sr-shell-cam-perm');
+      if (permBtn) permBtn.classList.remove('is-pulse');
+      var startBtn = document.getElementById('sr-shell-cam-start');
+      if (startBtn) startBtn.style.display = 'none';
     }).catch(function() {
       if (typeof Html5Qrcode.getCameras !== 'function') {
         onFail(new Error('Camera not available'));
@@ -393,7 +467,11 @@
       }).then(function() {
         hostMobileShellCamStarting = false;
         var st = document.getElementById('sr-shell-cam-status');
-        if (st) st.textContent = 'Camera active — point at QR';
+        if (st) st.textContent = 'Point at asset QR';
+        var permBtn = document.getElementById('sr-shell-cam-perm');
+        if (permBtn) permBtn.classList.remove('is-pulse');
+        var startBtn = document.getElementById('sr-shell-cam-start');
+        if (startBtn) startBtn.style.display = 'none';
       }).catch(onFail);
     });
   }
@@ -1084,7 +1162,10 @@
     hostMobileScanEmergencyReset_();
     hostMobileScanFlushPending_();
   });
-  window.addEventListener('resize', hostMobileScanRepositionOpen_, { passive: true });
+  window.addEventListener('resize', function() {
+    if (hostMobileShellCamOpen) hostMobileScanPositionShellCam_(hostMobileShellCamLastAnchor_);
+    hostMobileScanRepositionOpen_();
+  }, { passive: true });
   window.addEventListener('scroll', hostMobileScanRepositionOpen_, { passive: true });
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', hostMobileScanRepositionOpen_);
@@ -2174,7 +2255,7 @@
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA') {
       if (ev.data.sessionToken) hostMobileScanSessionToken_ = String(ev.data.sessionToken).trim();
-      hostMobileScanOpenShellCam_();
+      hostMobileScanOpenShellCam_(ev.data);
       return;
     }
     if (hostMobileScanIsEmbedMsg_(ev)) {
