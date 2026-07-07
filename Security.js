@@ -23,6 +23,8 @@ function getHeaderMap(dataMatrix) {
     map['Name'] = map['name'] !== undefined ? map['name'] : map['crewname'] !== undefined ? map['crewname'] : map['Name'];
     map['Passcode'] = map['passcode'] !== undefined ? map['passcode'] : map['password'] !== undefined ? map['password'] : map['Passcode'];
     map['uid'] = map['uid'] !== undefined ? map['uid'] : (map['UID'] !== undefined ? map['UID'] : map['Uid']);
+    map['rfid_tag'] = map['rfidtag'] !== undefined ? map['rfidtag'] : map['rfid_tag'];
+    map['rfid_tid'] = map['rfidtid'] !== undefined ? map['rfidtid'] : map['rfid_tid'];
   }
   return map;
 }

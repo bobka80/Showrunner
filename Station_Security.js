@@ -1225,6 +1225,15 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
     if (cMap['rfid_tag'] === undefined) {
       return { success: false, error: 'Crew roster has no rfid_tag column — run a vault sync first.' };
     }
+    if (cMap['rfid_tid'] === undefined) {
+      return { success: false, error: 'Crew roster has no rfid_tid column — open vault once to provision schema.' };
+    }
+    if (!tid) {
+      return {
+        success: false,
+        error: 'Gun did not read chip TID. Update station APK, reconnect gun, and scan again.',
+      };
+    }
 
     // Whole-DB duplicate guard: EPC and TID checked independently on crew + assets (EPC only).
     const owner = findStationRfidOwner_(tag, { excludeCrewRef: ref }, tid);
@@ -1238,9 +1247,7 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
       const nm = (getSheetCell(crewData[i], cMap, 'Name') || '').toString().toLowerCase().trim();
       if (uid !== ref && nm !== ref) continue;
       crewSheet.getRange(i + 1, cMap['rfid_tag'] + 1).setValue(tag);
-      if (cMap['rfid_tid'] !== undefined && tid) {
-        crewSheet.getRange(i + 1, cMap['rfid_tid'] + 1).setValue(tid);
-      }
+      crewSheet.getRange(i + 1, cMap['rfid_tid'] + 1).setValue(tid);
       flushCache();
       const name = getSheetCell(crewData[i], cMap, 'Name');
       let msg = 'Enrolled RFID badge for ' + name + ' (EPC ' + tag;

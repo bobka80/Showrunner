@@ -521,6 +521,7 @@ class RfidManager(
         readWorker.execute {
             if (readCancelled.get()) return@execute
             try {
+                ensureEpcTidReadMode()
                 val info = uhf.inventorySingleTag()
                 if (info != null) deliverTag(info)
             } catch (e: Exception) {
@@ -544,6 +545,7 @@ class RfidManager(
                 !readCancelled.get()
             ) {
                 try {
+                    ensureEpcTidReadMode()
                     val info = uhf.inventorySingleTag()
                     if (info != null) deliverTag(info)
                 } catch (e: Exception) {
@@ -555,10 +557,10 @@ class RfidManager(
         }
     }
 
-    private fun deliverTag(info: UHFTAGInfo?) {
-        val epc = info?.epc?.trim().orEmpty()
+    private fun deliverTag(info: UHFTAGInfo) {
+        val epc = info.epc?.trim().orEmpty().ifEmpty { info.getEPC()?.trim().orEmpty() }
         if (epc.isEmpty()) return
-        val tid = normalizeTid(info?.getTid())
+        val tid = resolveTid(info, epc)
         val now = System.currentTimeMillis()
         if (epc.equals(lastEpc, ignoreCase = true) && now - lastEpcAt < DEBOUNCE_MS) return
         lastEpc = epc
@@ -567,6 +569,54 @@ class RfidManager(
         pendingScans.add(PendingScan(upperEpc, tid))
         while (pendingScans.size > 32) pendingScans.poll()
         mainHandler.post { onTagScanned(upperEpc, tid) }
+    }
+
+    /** Must run on readWorker — sets gun inventory mode so TID is included in reads. */
+    private fun ensureEpcTidReadMode() {
+        try {
+            if (!uhf.setEPCAndTIDMode()) {
+                Log.w(TAG, "setEPCAndTIDMode returned false")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "setEPCAndTIDMode failed", e)
+        }
+    }
+
+    private fun resolveTid(info: UHFTAGInfo, epc: String): String {
+        val fromInfo = normalizeTid(info.getTid())
+        if (fromInfo.isNotEmpty()) return fromInfo
+        return readTidForEpc(epc)
+    }
+
+    /** Explicit TID bank read when inventory did not populate getTid() (common on R6 BLE). */
+    private fun readTidForEpc(epc: String): String {
+        val epcHex = epc.trim()
+        if (epcHex.isEmpty()) return ""
+        try {
+            val epcWords = (epcHex.length + 3) / 4
+            val tid = uhf.readData(
+                "00000000",
+                RFIDWithUHFBLE.Bank_EPC,
+                2,
+                epcWords,
+                epcHex,
+                RFIDWithUHFBLE.Bank_TID,
+                0,
+                6,
+            )
+            val norm = normalizeTid(tid)
+            if (norm.isNotEmpty()) return norm
+        } catch (e: Exception) {
+            Log.w(TAG, "readData TID (EPC filter) failed", e)
+        }
+        try {
+            val tid = uhf.readData("00000000", RFIDWithUHFBLE.Bank_TID, 0, 6)
+            val norm = normalizeTid(tid)
+            if (norm.isNotEmpty()) return norm
+        } catch (e: Exception) {
+            Log.w(TAG, "readData TID (plain) failed", e)
+        }
+        return ""
     }
 
     private fun normalizeTid(raw: String?): String {
@@ -616,11 +666,7 @@ class RfidManager(
         configWorker.execute {
             try {
                 if (sdkStatus() != ConnectionStatus.CONNECTED) return@execute
-                try {
-                    uhf.setEPCAndTIDMode()
-                } catch (e: Exception) {
-                    Log.w(TAG, "setEPCAndTIDMode failed", e)
-                }
+                ensureEpcTidReadMode()
                 uhf.setPower(powerDbm.coerceIn(POWER_MIN, POWER_MAX))
                 uhf.setBeep(beepEnabled)
             } catch (e: Exception) {

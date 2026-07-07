@@ -2653,7 +2653,7 @@ function stationCrewRecordCall_(rec, tag, tid, force) {
       stationRefreshEquipMap_();
       window.stationCrewRecord = null;
       stationVaultRenderRecordBar_();
-      stationSetStatus_('Badge linked to ' + rec.name + '.', 'ok');
+      stationSetStatus_('Badge linked to ' + rec.name + (tid ? ' (TID ok)' : ''), 'ok');
     })
     .withFailureHandler(function(err) {
       window.stationCrewRecordBusy = false;
