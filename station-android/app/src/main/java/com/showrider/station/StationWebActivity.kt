@@ -34,6 +34,8 @@ class StationWebActivity : AppCompatActivity() {
     private lateinit var splash: View
     private lateinit var rfid: RfidManager
     private val splashHandler = Handler(Looper.getMainLooper())
+    private val gunScreenHandler = Handler(Looper.getMainLooper())
+    private var releaseGunScreenRunnable: Runnable? = null
     private var splashHidden = false
     private var webViewRestored = false
     private var lastWakeAt = 0L
@@ -88,6 +90,7 @@ class StationWebActivity : AppCompatActivity() {
             onStatus = { msg -> postGunStatus(msg) },
             onTriggerWake = { maybeWakeForTrigger() },
             onLinkBusy = { busy -> setWebBleReconnecting(busy) },
+            onGunActivity = { onGunActivity() },
         )
         rfid.startWatchdog()
         registerScreenOnReceiver()
@@ -154,6 +157,7 @@ class StationWebActivity : AppCompatActivity() {
         screenOnReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action == Intent.ACTION_SCREEN_ON) {
+                    notifyWebHostEjectCheck()
                     if (::rfid.isInitialized) rfid.onAppWake()
                 }
             }
@@ -248,8 +252,37 @@ class StationWebActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         if (now - lastWakeAt < WAKE_DEBOUNCE_MS) return true
         lastWakeAt = now
-        runOnUiThread { wakeScreen(pm) }
+        runOnUiThread {
+            wakeScreen(pm)
+            onGunActivity()
+        }
         return true
+    }
+
+    /** Keep the panel on while the gun is in use; release after idle so normal sleep applies. */
+    private fun onGunActivity() {
+        runOnUiThread {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            releaseGunScreenRunnable?.let { gunScreenHandler.removeCallbacks(it) }
+            val release = Runnable {
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+            releaseGunScreenRunnable = release
+            gunScreenHandler.postDelayed(release, GUN_SCREEN_IDLE_MS)
+        }
+    }
+
+    private fun releaseGunScreenKeepOn() {
+        releaseGunScreenRunnable?.let { gunScreenHandler.removeCallbacks(it) }
+        releaseGunScreenRunnable = null
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun notifyWebHostEjectCheck() {
+        evalJs(
+            "try{if(typeof window.stationCheckHostEjectDeadline_==='function')" +
+                "window.stationCheckHostEjectDeadline_();}catch(e){}",
+        )
     }
 
     @Suppress("DEPRECATION")
@@ -431,6 +464,7 @@ class StationWebActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         if (splashWasDismissedBefore()) hideSplash()
+        notifyWebHostEjectCheck()
         if (::rfid.isInitialized && BlePermissions.hasAll(this)) {
             rfid.onAppWake()
         }
@@ -443,6 +477,8 @@ class StationWebActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         splashHandler.removeCallbacksAndMessages(null)
+        gunScreenHandler.removeCallbacksAndMessages(null)
+        releaseGunScreenKeepOn()
         unregisterScreenOnReceiver()
         BleKeepAliveService.stop(this)
         rfid.disconnect()
@@ -462,6 +498,8 @@ class StationWebActivity : AppCompatActivity() {
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L
         private const val WAKE_DEBOUNCE_MS = 1500L
+        /** Screen stays on while gun is active; release after this idle gap. */
+        private const val GUN_SCREEN_IDLE_MS = 90_000L
         private const val RENDERER_RELOAD_DEBOUNCE_MS = 10000L
     }
 }

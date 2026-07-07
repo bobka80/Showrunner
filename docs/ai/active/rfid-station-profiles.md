@@ -32,7 +32,7 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 - [x] **SECURITY — login error leaked passcodes (v429):** `authenticateUser` had a leftover debug diagnostic that echoed the input, the crew headers, and stored **names + passcodes** (e.g. `bogdan / 66ab26`) into the failed-login error shown on the lock screen. Removed the `debugLog` capture entirely; failed logins now return only `"Incorrect crew name or passcode."` — no roster, headers, input, or passcodes ever go to the client. **Rotate any passcode that was visible on-screen.**
 - [x] **Duplicate-tag guard with overwrite/cancel (v428)** — recording an equipment tag (`recordStationAssetRfid`) or crew badge (`enrollStationCrewRfidTag`) now checks the scanned tag against the **whole database** — every asset **and** every crew badge — via `findStationRfidOwner_`. If the tag already belongs to a different record, the backend returns `{ duplicate:{ kind, id, name } }` instead of writing; the station record bar shows **"Tag already on X — Overwrite / Cancel"**. Overwrite re-issues the write with `force=true`, which blanks the previous owner's tag (`clearStationRfidOwner_`) before assigning — so a tag is only ever on one thing. Audit log records the steal.
-- [x] **Screen sleep + wake-on-trigger (APK v0.1.10, build 12):** tablet **may sleep** (screen off) on normal system timeout — app + BLE gun stay alive in background. **Gun trigger wakes** via SDK `KeyEventCallback` only (no keyboard/power button): **first pull wakes** ("Screen on — pull again to scan"), **next pull scans**. `WAKE_LOCK` + `turnScreenOn`/`setShowWhenLocked` in `StationWebActivity`; removed `FLAG_KEEP_SCREEN_ON`. **Caveat:** on battery + long idle, Android Doze may delay the BLE callback — reliable on charger; foreground-service upgrade remains an option if flaky in the field.
+- [x] **Screen sleep + wake-on-trigger (APK v0.1.10, build 12):** tablet **may sleep** (screen off) on normal system timeout — app + BLE gun stay alive in background. **Gun trigger wakes** via SDK `KeyEventCallback` only (no keyboard/power button): **first pull wakes** ("Screen on — pull again to scan"), **next pull scans**. `WAKE_LOCK` + `turnScreenOn`/`setShowWhenLocked` in `StationWebActivity`; removed permanent `FLAG_KEEP_SCREEN_ON`. **v0.1.29:** temporary `FLAG_KEEP_SCREEN_ON` only while gun is active (90s idle release). **Caveat:** on battery + long idle, Android Doze may delay the BLE callback — reliable on charger; foreground-service upgrade remains an option if flaky in the field.
 - [x] **Host-inherit RBAC + Vault Crew tab + eject reset (v425–427)** — host session carries real tier + IAM; `assetOpsActor()` sends host to backend ops (v426); checkout/design/packing follow **host credentials** (not any-host); ROOT Crew tab; pristine reset on eject; boot hardening (v427). See **Agreed spec** below.
 
 ## Shipped (field-fix chronology)
@@ -97,7 +97,7 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 1. **[x] Crew EPC + TID (Chainway UHF, soft cutover A)** — `rfid_tid` column; native `setEPCAndTIDMode`; enroll/login pair match when TID on row; legacy EPC-only until re-enrolled.
 2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
 3. **[x] Optimistic host login + local roster cache** — local EPC+TID roster + instant host UI; server confirms in parallel (GAS v481+).
-4. **[ ] Host idle eject must fire after sleep** — `setTimeout` for host eject does not run while the tablet screen is off / app suspended; eject at configured minutes **wall-clock** even through sleep (use `localStorage` deadline + check on `visibilitychange` / resume).
+4. **[x] Host idle eject must fire after sleep** — `localStorage` wall-clock deadline (`sm_station_host_eject_deadline_v1_*`); checked on `visibilitychange` / `pageshow` / `focus`, native `ACTION_SCREEN_ON` + `onResume`, and boot restore (GAS v482+).
 
 ### Parked — must fix later (director 2026-07-07: stop work for now)
 
@@ -146,7 +146,8 @@ Files: `push-hosting/public/host-boot.js`, `Login.html`, `station-android/.../St
 
 ### Field / polish (ongoing)
 
-- [ ] **Host idle eject after screen sleep** — timer must eject hosted crew at configured minutes even when tablet slept (see priority #4 above).
+- [x] **Host idle eject after screen sleep** — wall-clock deadline in `localStorage`; `setTimeout` kept as fast path when awake (v482+).
+- [x] **Gun-active keep screen on (APK v0.1.29, build 31)** — `FLAG_KEEP_SCREEN_ON` while trigger/scan/inventory active; auto-release **90s** after last gun activity so idle tablet still sleeps normally.
 - [ ] **Gun name still unrecognised (build 3):** waiting on the gun's real Bluetooth name from the field.
 - [ ] **Dial in the real values on hardware** — power dBm, beep/power persist across reconnect on R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html`.

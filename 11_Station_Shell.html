@@ -1403,6 +1403,40 @@ function stationHostIdleMs_() {
   return stationEjectMinutes_() * 60 * 1000;
 }
 
+function stationHostEjectDeadlineKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_host_eject_deadline_v1_' + dev;
+}
+
+function stationClearHostEjectDeadline_() {
+  try { localStorage.removeItem(stationHostEjectDeadlineKey_()); } catch (e) { /* ignore */ }
+}
+
+/** Wall-clock eject deadline — survives screen-off / setTimeout suspension. */
+function stationArmHostEjectDeadline_() {
+  if (!stationReadHostSession_()) return 0;
+  var deadline = Date.now() + stationHostIdleMs_();
+  try { localStorage.setItem(stationHostEjectDeadlineKey_(), String(deadline)); } catch (e) { /* ignore */ }
+  return deadline;
+}
+
+function stationCheckHostEjectDeadline_() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (!stationReadHostSession_()) {
+    stationClearHostEjectDeadline_();
+    return;
+  }
+  try {
+    var raw = localStorage.getItem(stationHostEjectDeadlineKey_());
+    if (!raw) return;
+    var deadline = parseInt(raw, 10);
+    if (!deadline || isNaN(deadline)) return;
+    if (Date.now() >= deadline) stationHostIdleExpired_();
+  } catch (e) { /* ignore */ }
+}
+
 function stationClearHostIdleTimer_() {
   if (window.stationHostIdleTimer) {
     clearTimeout(window.stationHostIdleTimer);
@@ -1413,12 +1447,18 @@ function stationClearHostIdleTimer_() {
 function stationResetHostIdleTimer_() {
   stationClearHostIdleTimer_();
   if (!window.IS_STATION_DEVICE) return;
-  if (!stationReadHostSession_()) return;
-  window.stationHostIdleTimer = setTimeout(stationHostIdleExpired_, stationHostIdleMs_());
+  if (!stationReadHostSession_()) {
+    stationClearHostEjectDeadline_();
+    return;
+  }
+  var deadline = stationArmHostEjectDeadline_();
+  var msUntil = Math.max(0, deadline - Date.now());
+  window.stationHostIdleTimer = setTimeout(stationHostIdleExpired_, msUntil);
 }
 
 function stationHostIdleExpired_() {
   stationClearHostIdleTimer_();
+  stationClearHostEjectDeadline_();
   if (!stationReadHostSession_()) return;
   stationWriteHostSession_(null);
   stationRenderShellState_();
@@ -1436,6 +1476,11 @@ function stationBindHostIdleListeners_() {
   ['touchstart', 'pointerdown', 'mousedown', 'keydown', 'click'].forEach(function(evt) {
     document.addEventListener(evt, onActivity, { passive: true });
   });
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) stationCheckHostEjectDeadline_();
+  });
+  window.addEventListener('pageshow', function() { stationCheckHostEjectDeadline_(); });
+  window.addEventListener('focus', function() { stationCheckHostEjectDeadline_(); });
 }
 
 function stationHostStorageKey_() {
@@ -1461,7 +1506,10 @@ function stationWriteHostSession_(host) {
   window.stationHostSession = host;
   try {
     if (host) sessionStorage.setItem(stationHostStorageKey_(), JSON.stringify(host));
-    else sessionStorage.removeItem(stationHostStorageKey_());
+    else {
+      sessionStorage.removeItem(stationHostStorageKey_());
+      stationClearHostEjectDeadline_();
+    }
   } catch (e) { /* ignore */ }
   // Host-inherit RBAC: while hosted, the app evaluates permissions as the HOST (their real tier +
   // IAM), not the low-tier device account. Cleared on eject/logout. See stationHostRbac override.
@@ -3196,6 +3244,7 @@ window.stationSaveEjectMinutes = function() {
 };
 
 function stationAnnounceReady_() {
+  try { stationCheckHostEjectDeadline_(); } catch (e) { /* ignore */ }
   try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' }); } catch (e) { /* ignore */ }
 }
 
@@ -3273,10 +3322,16 @@ function initStationShell_() {
         }
         const bootHost = stationReadHostSession_();
         if (bootHost) {
-          // Re-run the full write so the reload restores the host globals AND stationHostRbac
-          // (host-inherit) + warms projects — not just the rendered chrome.
-          stationWriteHostSession_(bootHost);
-          stationRenderShellState_();
+          // Wall-clock eject may have passed while the tablet slept — check before restoring host.
+          stationCheckHostEjectDeadline_();
+          if (stationReadHostSession_()) {
+            // Re-run the full write so the reload restores the host globals AND stationHostRbac
+            // (host-inherit) + warms projects — not just the rendered chrome.
+            stationWriteHostSession_(bootHost);
+            stationRenderShellState_();
+          } else {
+            stationRenderShellState_();
+          }
         } else {
           stationSetStatus_('Pull trigger and scan your crew badge.', '');
         }

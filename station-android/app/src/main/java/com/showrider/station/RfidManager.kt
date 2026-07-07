@@ -31,6 +31,7 @@ class RfidManager(
     private val onStatus: (String) -> Unit,
     private val onTriggerWake: () -> Boolean = { false },
     private val onLinkBusy: (Boolean) -> Unit = {},
+    private val onGunActivity: () -> Unit = {},
 ) {
     private val uhf = RFIDWithUHFBLE.getInstance()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -461,6 +462,7 @@ class RfidManager(
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
                 if (!connected || sdkStatus() != ConnectionStatus.CONNECTED) return
+                onGunActivity()
                 if (onTriggerWake()) {
                     postStatus("Screen on — pull again to scan")
                     return
@@ -502,6 +504,7 @@ class RfidManager(
         }
         if (inventoryRunning) return
         inventoryRunning = true
+        onGunActivity()
         mainHandler.post(continuousRunnable)
     }
 
@@ -587,6 +590,7 @@ class RfidManager(
         lastEpcAt = now
         pendingScans.add(PendingScan(epc, tid))
         while (pendingScans.size > 32) pendingScans.poll()
+        onGunActivity()
         mainHandler.post { onTagScanned(epc, tid) }
     }
 
