@@ -102,18 +102,44 @@
         return new Promise(function(resolve) {
           if (!token || !scriptUrl) return resolve({ valid: false });
           var cb = '__srSessChk_' + Date.now();
-          window[cb] = function(res) {
-            delete window[cb];
+          var settled = false;
+          function finish(res) {
+            if (settled) return;
+            settled = true;
+            try { delete window[cb]; } catch (e) { /* ignore */ }
             resolve(res || { valid: false });
+          }
+          window[cb] = function(res) {
+            finish(res || { valid: false });
           };
           var s = document.createElement('script');
           s.src = scriptUrl + '?action=sessioncheck&token=' + encodeURIComponent(token) + '&callback=' + encodeURIComponent(cb);
           s.onerror = function() {
-            delete window[cb];
-            resolve({ valid: false });
+            finish({ valid: false, networkError: true });
           };
           document.head.appendChild(s);
+          setTimeout(function() {
+            try { if (s.parentNode) s.parentNode.removeChild(s); } catch (e) { /* ignore */ }
+            finish({ valid: false, networkError: true });
+          }, 8000);
         });
+      }
+
+      function showLoginForm() {
+        if (form) form.style.display = '';
+        if (bootMsg) bootMsg.style.display = 'none';
+        updateStaySignedInUI();
+      }
+
+      function postLoginState(loggedIn, withClear) {
+        if (window.parent === window) return;
+        try {
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_LOGIN_STATE',
+            loggedIn: loggedIn,
+            clearSession: !!withClear
+          }, '*');
+        } catch (e) { /* ignore */ }
       }
 
       function beginSessionBoot(token, crewName, expiresAt) {
@@ -168,6 +194,7 @@
          document.getElementById('error-display').innerText = errorDisplay;
          document.getElementById('error-display').style.display = 'block';
          btn.innerText = 'AUTHENTICATE';
+         postLoginState(false, !!clearSession);
       } else {
          try {
            const savedName = localStorage.getItem('sm_crew_name');
@@ -193,11 +220,15 @@
                beginSessionBoot(token, crew, newExp);
                return;
              }
+             if (res && res.networkError) {
+               var crewNet = localStorage.getItem('sm_crew_name') || nameInput.value;
+               beginSessionBoot(token, crewNet, exp);
+               return;
+             }
              clearStoredSession();
              notifyParentSessionClear();
-             if (form) form.style.display = '';
-             if (bootMsg) bootMsg.style.display = 'none';
-             updateStaySignedInUI();
+             showLoginForm();
+             postLoginState(false, true);
            });
            return;
          }
@@ -205,6 +236,8 @@
            clearStoredSession();
          }
          }
+
+         postLoginState(false, !!clearSession);
       }
 
       passInput.addEventListener('input', function(e) {
@@ -250,15 +283,6 @@
         btn.disabled = true;
       });
 
-      if (window.parent && window.parent !== window) {
-        try {
-          window.parent.postMessage({
-            type: 'SHOWRUNNER_LOGIN_STATE',
-            loggedIn: false,
-            clearSession: !!clearSession
-          }, '*');
-        } catch (e) { /* ignore */ }
-      }
     });
   </script>
 </body>

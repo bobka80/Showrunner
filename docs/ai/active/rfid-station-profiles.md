@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v472** · APK **v0.1.16 (build 18)** · **Last swept:** 2026-07-07
+**Opened:** 2026-07-02 · **Production:** GAS **v473** · APK **v0.1.18 (build 20)** · Hosting **host-boot v476** · **Last swept:** 2026-07-07
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -95,8 +95,9 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 ## In progress / next (director priority 2026-07-07)
 
 1. **[x] Bulletproof BLE gun reconnect (APK v0.1.16 build 18)** — health check, reconnect ladder, screen-on/resume, foreground service, `linkState` in settings. **Field verify** after gun sleep.
-2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
-3. **[ ] Optimistic host login + local roster cache** — instant badge host UI; server confirms in parallel (after EPC+TID schema).
+2. **[x] Session survives sleep + gun cycle (hosting v476, GAS Login, APK v0.1.18 build 20)** — `sessioncheck` retries + network≠invalid; 18s boot grace defers login-gate wipe; `Login.html` auto-boot no longer flashes logged-out; native `onRenderProcessGone` reloads hosting shell. **Field verify** after gun off/on + screen wake.
+3. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
+4. **[ ] Optimistic host login + local roster cache** — instant badge host UI; server confirms in parallel (after EPC+TID schema).
 
 ### Field / polish (ongoing)
 

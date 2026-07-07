@@ -18,6 +18,7 @@ import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.TextView
@@ -101,6 +102,17 @@ class StationWebActivity : AppCompatActivity() {
         webView.webChromeClient = WebChromeClient()
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
+
+            override fun onRenderProcessGone(
+                view: WebView?,
+                detail: RenderProcessGoneDetail?,
+            ): Boolean {
+                postGunStatus("WebView restarted — restoring session…")
+                if (::webView.isInitialized) {
+                    webView.loadUrl(SHOWRUNNER_URL)
+                }
+                return true
+            }
         }
 
         if (savedInstanceState != null) {

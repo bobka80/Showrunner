@@ -1500,6 +1500,7 @@
   let iframeLinkError = '';
   let deferredInstallPrompt = null;
   let shellInitStarted = false;
+  let shellBootGraceUntil = 0;
 
   function isMobileDevice() {
     return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
@@ -1707,37 +1708,72 @@
     return base;
   }
 
+  function startShellBootGrace() {
+    shellBootGraceUntil = Date.now() + 18000;
+  }
+
+  function shouldDeferSessionClear() {
+    return Date.now() < shellBootGraceUntil && !!readParentSession();
+  }
+
   function sessionCheckJsonp(token) {
     return new Promise(function(resolve) {
       if (!token) return resolve({ valid: false });
       var cb = '__srSessChk_' + Date.now();
-      window[cb] = function(res) {
-        delete window[cb];
+      var settled = false;
+      function finish(res) {
+        if (settled) return;
+        settled = true;
+        try { delete window[cb]; } catch (e) { /* ignore */ }
         resolve(res || { valid: false });
+      }
+      window[cb] = function(res) {
+        finish(res || { valid: false });
       };
       var base = PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
-      if (!base) return resolve({ valid: false });
+      if (!base) return resolve({ valid: false, networkError: true });
       var script = document.createElement('script');
       script.src = base + '?action=sessioncheck&token=' + encodeURIComponent(token) + '&callback=' + encodeURIComponent(cb);
       script.onerror = function() {
-        delete window[cb];
-        resolve({ valid: false });
+        finish({ valid: false, networkError: true });
       };
       document.head.appendChild(script);
+      setTimeout(function() {
+        try { if (script.parentNode) script.parentNode.removeChild(script); } catch (e) { /* ignore */ }
+        finish({ valid: false, networkError: true });
+      }, 8000);
     });
+  }
+
+  async function sessionCheckWithRetry(token, attempts) {
+    var tries = attempts || 3;
+    var last = { valid: false };
+    for (var i = 0; i < tries; i++) {
+      last = await sessionCheckJsonp(token);
+      if (last && last.valid) return last;
+      if (last && last.networkError && i < tries - 1) {
+        await new Promise(function(r) { setTimeout(r, 700 * (i + 1)); });
+        continue;
+      }
+      break;
+    }
+    return last;
   }
 
   async function resolveAppFrameUrl() {
     var base = PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
     var sess = readParentSession();
     if (!sess || !sess.token) return base;
-    var check = await sessionCheckJsonp(sess.token);
+    var check = await sessionCheckWithRetry(sess.token, 3);
     if (check && check.valid) {
       saveParentSession(
         sess.token,
         check.crewName || sess.crewName,
         check.expiresAt || sess.expiresAt
       );
+      return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
+    }
+    if (check && check.networkError) {
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
     clearParentSession();
@@ -2339,19 +2375,36 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_NAVIGATE_LOGIN_GATE') {
+      if (shouldDeferSessionClear()) {
+        if (frame) frame.src = buildAppFrameUrl();
+        return;
+      }
       navigateHostingToLoginGate();
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION_CLEAR') {
+      if (shouldDeferSessionClear()) return;
       navigateHostingToLoginGate();
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
-      hideStationSplash();
-      notifyNativeSplash('loginNeeded');
-      if (ev.data.clearSession === true) navigateHostingToLoginGate();
+      if (ev.data.clearSession === true) {
+        if (shouldDeferSessionClear()) {
+          if (frame) frame.src = buildAppFrameUrl();
+          return;
+        }
+        hideStationSplash();
+        notifyNativeSplash('loginNeeded');
+        navigateHostingToLoginGate();
+        return;
+      }
+      if (!isNativeStationApp()) {
+        hideStationSplash();
+        notifyNativeSplash('loginNeeded');
+      }
+      return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_READY') {
       hideStationSplash();
@@ -2680,6 +2733,7 @@
   }
 
   async function initShell() {
+    startShellBootGrace();
     if (frame) {
       try {
         frame.src = await resolveAppFrameUrl();
@@ -2771,6 +2825,18 @@
       startShellOnce();
     });
   }
+
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    if (!isNativeStationApp()) return;
+    var sess = readParentSession();
+    if (!sess || !sess.token || !frame) return;
+    if (iframeLoggedIn) return;
+    var src = String(frame.src || '');
+    if (src.indexOf('sessionboot') >= 0) return;
+    if (Date.now() - lastLoginScreenAt > 120000) return;
+    frame.src = buildAppFrameUrl();
+  });
 
   startShellOnce();
   if (shouldShowInstallPanel()) showInstallPanel();
