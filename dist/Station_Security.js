@@ -107,6 +107,18 @@ function normalizeStationRfidTag(tag) {
   return (tag || '').toString().trim().toLowerCase();
 }
 
+/** True when two TID reads are the same chip (exact, or shorter 4-word vs longer 6-word bank read). */
+function stationRfidTidEquivalent_(a, b) {
+  const x = normalizeStationRfidTag(a);
+  const y = normalizeStationRfidTag(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const short = x.length <= y.length ? x : y;
+  const long = x.length <= y.length ? y : x;
+  if (short.length >= 12 && long.indexOf(short) === 0) return true;
+  return false;
+}
+
 /** Crew badge lookup for host-inherit (station shell). Soft cutover: EPC-only when rfid_tid empty on row. */
 function lookupCrewMemberByRfidTag(rfidTag, crewData, cMap, rfidTid) {
   const result = lookupCrewMemberByRfidPair_(rfidTag, rfidTid, crewData, cMap);
@@ -115,14 +127,19 @@ function lookupCrewMemberByRfidTag(rfidTag, crewData, cMap, rfidTid) {
 
 /**
  * Match crew by EPC (+ TID when enrolled on row).
- * Returns { crew, tidMismatch } — tidMismatch true when EPC hit a row with rfid_tid but scan TID differs.
+ * Returns { crew, tidMismatch, tidMissing }.
+ * tidMismatch — scan had a TID that does not match the enrolled chip (possible clone).
+ * tidMissing — row has rfid_tid but this scan did not include a TID read (gun/read issue, not a clone).
  */
 function lookupCrewMemberByRfidPair_(rfidTag, rfidTid, crewData, cMap) {
   const needleEpc = normalizeStationRfidTag(rfidTag);
   const needleTid = normalizeStationRfidTag(rfidTid);
-  if (!needleEpc || !crewData || crewData.length < 2 || !cMap) return { crew: null, tidMismatch: false };
+  if (!needleEpc || !crewData || crewData.length < 2 || !cMap) {
+    return { crew: null, tidMismatch: false, tidMissing: false };
+  }
   const hasTidCol = cMap['rfid_tid'] !== undefined;
   let tidMismatch = false;
+  let tidMissing = false;
 
   for (let i = 1; i < crewData.length; i++) {
     if (cMap['rfid_tag'] === undefined) continue;
@@ -130,7 +147,11 @@ function lookupCrewMemberByRfidPair_(rfidTag, rfidTid, crewData, cMap) {
     if (!rowEpc || rowEpc !== needleEpc) continue;
     const rowTid = hasTidCol ? normalizeStationRfidTag(crewData[i][cMap['rfid_tid']]) : '';
     if (rowTid) {
-      if (!needleTid || rowTid !== needleTid) {
+      if (!needleTid) {
+        tidMissing = true;
+        continue;
+      }
+      if (!stationRfidTidEquivalent_(rowTid, needleTid)) {
         tidMismatch = true;
         continue;
       }
@@ -145,10 +166,11 @@ function lookupCrewMemberByRfidPair_(rfidTag, rfidTid, crewData, cMap) {
         rfidTag: rowEpc,
         rfidTid: rowTid
       },
-      tidMismatch: false
+      tidMismatch: false,
+      tidMissing: false
     };
   }
-  return { crew: null, tidMismatch: tidMismatch };
+  return { crew: null, tidMismatch: tidMismatch, tidMissing: tidMissing };
 }
 
 function actorUsesStationShell(crewName) {
@@ -1158,6 +1180,12 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
 
     if (lookup.tidMismatch) {
       return { success: false, error: 'Badge chip ID does not match — possible cloned tag.' };
+    }
+    if (lookup.tidMissing) {
+      return {
+        success: false,
+        error: 'Gun did not read chip TID on this scan. Hold the badge still and pull the trigger again.',
+      };
     }
 
     const crew = lookup.crew;

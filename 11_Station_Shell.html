@@ -1715,10 +1715,13 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   // Dedup: one physical scan can arrive via BOTH poll and relay (case/format may differ).
   if (norm) {
     var now = Date.now();
-    if (norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500) return;
+    var priorTid = String(window.stationLastScanTid || '').trim();
+    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500;
+    // Drop duplicate EPC-only delivery when we already handled this scan; allow upgrade when TID arrives.
+    if (sameEpcRecent && (priorTid || !tid)) return;
     window.stationLastScanNorm = norm;
     window.stationLastScanTag = tag;
-    window.stationLastScanTid = tid;
+    window.stationLastScanTid = tid || priorTid;
     window.stationLastScanAt = now;
   }
   stationDebug_('scan IN: ' + (tag || '(empty)') + (tid ? ' tid:' + tid : ''));
