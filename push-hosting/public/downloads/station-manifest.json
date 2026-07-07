@@ -1,15 +1,24 @@
 {
-  "versionName": "0.1.24",
-  "versionCode": 26,
+  "versionName": "0.1.26",
+  "versionCode": 28,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-07T18:38:04.186Z",
-  "sizeBytes": 12057257,
+  "updatedAt": "2026-07-07T19:01:07.847Z",
+  "sizeBytes": 12057261,
   "notes": [
-    "TID fix: setEPCAndTIDMode before each read + readData fallback",
-    "R6 BLE often omits getTid() from inventorySingleTag alone"
+    "Fix TID read: Chainway EPC filter uses bit ptr (32) not word ptr",
+    "reject EPC echoed as TID"
   ],
   "history": [
+    {
+      "versionName": "0.1.26",
+      "versionCode": 28,
+      "date": "2026-07-07T19:01:07.847Z",
+      "notes": [
+        "Fix TID read: Chainway EPC filter uses bit ptr (32) not word ptr",
+        "reject EPC echoed as TID"
+      ]
+    },
     {
       "versionName": "0.1.24",
       "versionCode": 26,
@@ -183,15 +192,6 @@
       "notes": [
         "Fixed: gun reads now reach the app (they were hitting the wrong browser frame) — scans show in the top strip and enrollment works",
         "New Setup screen: tap CHAINWAY HANDHELD at the top to set scan power/sensitivity, scan mode (single/continuous), gun beeper on/off, and the auto sign-out timer"
-      ]
-    },
-    {
-      "versionName": "0.1.2",
-      "versionCode": 4,
-      "date": "2026-07-02T16:09:54.049Z",
-      "notes": [
-        "Trigger now does a SINGLE read (one pull = one tag) instead of continuous machine-gun scanning",
-        "Gun echoes 'Read: <EPC>' on the status bar so we can see reads even if the top strip is empty"
       ]
     }
   ]

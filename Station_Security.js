@@ -1234,6 +1234,12 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
         error: 'Gun did not read chip TID. Update station APK, reconnect gun, and scan again.',
       };
     }
+    if (tid === tag) {
+      return {
+        success: false,
+        error: 'Gun returned EPC as chip TID — update station APK, reconnect gun, and scan again.',
+      };
+    }
 
     // Whole-DB duplicate guard: EPC and TID checked independently on crew + assets (EPC only).
     const owner = findStationRfidOwner_(tag, { excludeCrewRef: ref }, tid);

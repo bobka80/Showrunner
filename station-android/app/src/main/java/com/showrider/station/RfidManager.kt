@@ -583,40 +583,57 @@ class RfidManager(
     }
 
     private fun resolveTid(info: UHFTAGInfo, epc: String): String {
-        val fromInfo = normalizeTid(info.getTid())
+        val fromInfo = acceptTidForScan(info.getTid(), epc)
         if (fromInfo.isNotEmpty()) return fromInfo
         return readTidForEpc(epc)
     }
 
-    /** Explicit TID bank read when inventory did not populate getTid() (common on R6 BLE). */
+    /**
+     * Explicit TID bank read when inventory did not populate getTid() (common on R6 BLE).
+     * Chainway SDK: EPC filter ptr is in bits (32 = skip CRC+PC); filterCnt is also bits (hexLen*4).
+     * See uhf-ble-demo UHFReadWriteFragment.
+     */
     private fun readTidForEpc(epc: String): String {
         val epcHex = epc.trim()
         if (epcHex.isEmpty()) return ""
         try {
-            val epcWords = (epcHex.length + 3) / 4
-            val tid = uhf.readData(
-                "00000000",
-                RFIDWithUHFBLE.Bank_EPC,
-                2,
-                epcWords,
-                epcHex,
-                RFIDWithUHFBLE.Bank_TID,
-                0,
-                6,
-            )
-            val norm = normalizeTid(tid)
-            if (norm.isNotEmpty()) return norm
-        } catch (e: Exception) {
-            Log.w(TAG, "readData TID (EPC filter) failed", e)
-        }
-        try {
-            val tid = uhf.readData("00000000", RFIDWithUHFBLE.Bank_TID, 0, 6)
-            val norm = normalizeTid(tid)
+            val tid = uhf.readData("00000000", RFIDWithUHFBLE.Bank_TID, TID_READ_PTR_WORDS, TID_READ_CNT_WORDS)
+            val norm = acceptTidForScan(tid, epc)
             if (norm.isNotEmpty()) return norm
         } catch (e: Exception) {
             Log.w(TAG, "readData TID (plain) failed", e)
         }
+        try {
+            var filterData = epcHex.uppercase()
+            if (filterData.length % 2 != 0) filterData += "0"
+            val filterCntBits = filterData.length * 4
+            val tid = uhf.readData(
+                "00000000",
+                RFIDWithUHFBLE.Bank_EPC,
+                EPC_FILTER_PTR_BITS,
+                filterCntBits,
+                filterData,
+                RFIDWithUHFBLE.Bank_TID,
+                TID_READ_PTR_WORDS,
+                TID_READ_CNT_WORDS,
+            )
+            val norm = acceptTidForScan(tid, epc)
+            if (norm.isNotEmpty()) return norm
+        } catch (e: Exception) {
+            Log.w(TAG, "readData TID (EPC filter) failed", e)
+        }
         return ""
+    }
+
+    /** Reject empty, all-zero, or EPC-echo values — firmware may copy EPC into getTid() when TID read fails. */
+    private fun acceptTidForScan(raw: String?, epc: String): String {
+        val norm = normalizeTid(raw)
+        if (norm.isEmpty()) return ""
+        if (norm.equals(epc.trim().uppercase(), ignoreCase = true)) {
+            Log.w(TAG, "rejecting TID identical to EPC")
+            return ""
+        }
+        return norm
     }
 
     private fun normalizeTid(raw: String?): String {
@@ -785,5 +802,9 @@ class RfidManager(
         private const val POLL_MIN = 100
         private const val POLL_MAX = 2000
         private const val BLE_BUSY_CLEAR_MS = 4000L
+        /** EPC memory filter start (bits) — skip CRC+PC before EPC bytes. SDK demo rbEPC_filter. */
+        private const val EPC_FILTER_PTR_BITS = 32
+        private const val TID_READ_PTR_WORDS = 0
+        private const val TID_READ_CNT_WORDS = 6
     }
 }
