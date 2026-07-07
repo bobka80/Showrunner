@@ -391,6 +391,50 @@
     hostMobileScanFlushPending_();
   }
 
+  function hostMobileScanIsIos_() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  function hostMobileScanShellCamScanConfig_() {
+    var ios = hostMobileScanIsIos_();
+    var cfg = {
+      fps: ios ? 5 : 10,
+      disableFlip: false,
+      qrbox: function(w, h) {
+        var minDim = Math.min(w, h);
+        if (!minDim || minDim < 80) return { width: 140, height: 140 };
+        var pct = ios ? 0.8 : 0.72;
+        var edge = Math.floor(minDim * pct);
+        if (ios) edge = Math.min(edge, minDim - 24);
+        edge = Math.max(140, edge);
+        return { width: edge, height: edge };
+      }
+    };
+    if (ios) {
+      cfg.aspectRatio = 1.333334;
+      cfg.experimentalFeatures = { useBarCodeDetectorIfSupported: true };
+    }
+    return cfg;
+  }
+
+  function hostMobileScanPickBackCamera_(cams) {
+    if (!cams || !cams.length) return null;
+    var back = null;
+    for (var i = 0; i < cams.length; i++) {
+      var lab = String(cams[i].label || '').toLowerCase();
+      if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 ||
+          lab.indexOf('environment') !== -1 || lab.indexOf('wide') !== -1) {
+        back = cams[i];
+        break;
+      }
+    }
+    if (!back && hostMobileScanIsIos_() && cams.length > 1) {
+      back = cams[cams.length - 1];
+    }
+    return back || cams[cams.length - 1];
+  }
+
   function hostMobileScanStartShellCamEngine_() {
     if (hostMobileShellCamEngine || hostMobileShellCamStarting) return;
     if (typeof Html5Qrcode === 'undefined') {
@@ -401,6 +445,17 @@
       return;
     }
     hostMobileShellCamStarting = true;
+    var scanCfg = hostMobileScanShellCamScanConfig_();
+
+    function onSuccess() {
+      hostMobileShellCamStarting = false;
+      var st = document.getElementById('sr-shell-cam-status');
+      if (st) st.textContent = 'Point at asset QR';
+      var permBtn = document.getElementById('sr-shell-cam-perm');
+      if (permBtn) permBtn.classList.remove('is-pulse');
+      var startBtn = document.getElementById('sr-shell-cam-start');
+      if (startBtn) startBtn.style.display = 'none';
+    }
 
     function onFail(err) {
       hostMobileShellCamStarting = false;
@@ -424,56 +479,25 @@
       hostMobileScanDeliverScan_(raw, true);
     }
 
-    function startCfg(cfg) {
+    function startWithCfg(deviceCfg) {
       hostMobileShellCamEngine = new Html5Qrcode('sr-shell-cam-reader');
-      return hostMobileShellCamEngine.start(
-        cfg,
-        {
-          fps: 10,
-          qrbox: function(w, h) {
-            var edge = Math.floor(Math.min(w, h) * 0.72);
-            return { width: Math.max(edge, 160), height: Math.max(edge, 160) };
-          }
-        },
-        onDecode,
-        function() { /* frame miss */ }
-      );
+      return hostMobileShellCamEngine.start(deviceCfg, scanCfg, onDecode, function() { /* frame miss */ });
     }
 
-    startCfg({ facingMode: 'environment' }).then(function() {
-      hostMobileShellCamStarting = false;
-      var st = document.getElementById('sr-shell-cam-status');
-      if (st) st.textContent = 'Point at asset QR';
-      var permBtn = document.getElementById('sr-shell-cam-perm');
-      if (permBtn) permBtn.classList.remove('is-pulse');
-      var startBtn = document.getElementById('sr-shell-cam-start');
-      if (startBtn) startBtn.style.display = 'none';
-    }).catch(function() {
-      if (typeof Html5Qrcode.getCameras !== 'function') {
-        onFail(new Error('Camera not available'));
-        return;
-      }
+    if (typeof Html5Qrcode.getCameras === 'function') {
       Html5Qrcode.getCameras().then(function(cams) {
-        if (!cams || !cams.length) return startCfg({ facingMode: 'environment' });
-        var back = null;
-        for (var i = 0; i < cams.length; i++) {
-          var lab = String(cams[i].label || '').toLowerCase();
-          if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
-            back = cams[i];
-            break;
-          }
-        }
-        return startCfg((back || cams[cams.length - 1]).id);
-      }).then(function() {
-        hostMobileShellCamStarting = false;
-        var st = document.getElementById('sr-shell-cam-status');
-        if (st) st.textContent = 'Point at asset QR';
-        var permBtn = document.getElementById('sr-shell-cam-perm');
-        if (permBtn) permBtn.classList.remove('is-pulse');
-        var startBtn = document.getElementById('sr-shell-cam-start');
-        if (startBtn) startBtn.style.display = 'none';
-      }).catch(onFail);
-    });
+        var pick = hostMobileScanPickBackCamera_(cams);
+        if (pick && pick.id) return startWithCfg(pick.id);
+        return startWithCfg({ facingMode: { exact: 'environment' } }).catch(function() {
+          return startWithCfg({ facingMode: 'environment' });
+        });
+      }).then(onSuccess).catch(function() {
+        return startWithCfg({ facingMode: 'environment' }).then(onSuccess).catch(onFail);
+      });
+      return;
+    }
+
+    startWithCfg({ facingMode: 'environment' }).then(onSuccess).catch(onFail);
   }
 
   function hostMobileScanHideAppFrame_() {

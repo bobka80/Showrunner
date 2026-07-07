@@ -746,6 +746,60 @@ function mobileScanPushFeed_(raw, hit) {
   mobileScanRenderFeed_();
 }
 
+function mobileScanSelectFeedRow_(raw) {
+  if (!raw) return;
+  var tag = mobileScanExtractTag_(raw);
+  if (!tag) return;
+  var rows = window.mobileScanRecent || [];
+  var row = null;
+  for (var i = 0; i < rows.length; i++) {
+    if (mobileScanNormalize_(rows[i].raw) === mobileScanNormalize_(tag)) {
+      row = rows[i];
+      break;
+    }
+  }
+  var hit = (row && row.hit) ? row.hit : mobileScanResolve_(tag);
+  if (hit && hit.kind === 'crew') {
+    window.mobileScanSelection = { kind: 'crew', tag: tag, name: hit.name };
+  } else if (hit && hit.unitId) {
+    window.mobileScanSelection = {
+      kind: 'equipment',
+      tag: tag,
+      unitId: hit.unitId,
+      name: hit.name,
+      unitNumber: hit.unitNumber,
+      status: hit.status || 'Active',
+      statusNote: hit.statusNote || ''
+    };
+  } else if (hit && hit.name) {
+    window.mobileScanSelection = {
+      kind: 'equipment',
+      tag: tag,
+      unitId: hit.unitId || '',
+      name: hit.name,
+      unitNumber: hit.unitNumber || '',
+      status: hit.status || 'Active',
+      statusNote: hit.statusNote || ''
+    };
+  } else {
+    window.mobileScanSelection = { kind: 'unknown', tag: tag };
+  }
+  mobileScanRenderLast_();
+  mobileScanRenderFeed_();
+}
+
+function mobileScanWireFeedClicks_() {
+  var list = document.getElementById('mobile-scan-feed-list');
+  if (!list || list.dataset.bound === '1') return;
+  list.dataset.bound = '1';
+  list.addEventListener('click', function(ev) {
+    var row = ev.target.closest ? ev.target.closest('.mobile-scan-feed__row') : null;
+    if (!row) return;
+    var raw = row.getAttribute('data-raw');
+    if (raw) mobileScanSelectFeedRow_(raw);
+  });
+}
+
 function mobileScanRenderFeed_() {
   var list = document.getElementById('mobile-scan-feed-list');
   if (!list) return;
@@ -832,15 +886,15 @@ function mobileScanRenderLast_() {
     return;
   }
   if (sel.kind === 'unknown') {
-    nameEl.textContent = 'Unknown code';
-    if (metaEl) metaEl.textContent = sel.tag || '';
+    nameEl.textContent = 'Unknown equipment';
+    if (metaEl) metaEl.textContent = '';
     if (statusEl) statusEl.textContent = '';
     if (noteEl) noteEl.style.display = 'none';
     mobileScanRenderActions_();
     return;
   }
   nameEl.textContent = sel.name || 'Equipment';
-  if (metaEl) metaEl.textContent = (sel.unitNumber ? ('Unit ' + sel.unitNumber + ' · ') : '') + (sel.tag || '');
+  if (metaEl) metaEl.textContent = sel.unitNumber ? ('Unit #' + sel.unitNumber) : '';
   var st = sel.status || 'Active';
   var color = mobileScanStatusColor_(st);
   if (statusEl) {
@@ -1358,6 +1412,7 @@ function mobileScanConsumeBootPending_() {
 (function mobileScanInit_() {
   if (window.IS_STATION_DEVICE) return;
   function boot() {
+    mobileScanWireFeedClicks_();
     mobileScanRefreshBootstrap_();
     if (!mobileScanInHostingIframe_()) {
       mobileScanReopenPanelIfNeeded_();
