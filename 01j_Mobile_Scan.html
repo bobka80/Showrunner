@@ -22,8 +22,134 @@ var mobileQrStarting = false;
 var mobileQrUsesParent_ = false;
 var mobileQrUsesEmbed_ = false;
 var MOBILE_CAM_EMBED_VER = '2';
+var MOBILE_SCAN_DIAG_KEY = 'sm_mobile_scan_diag_app_v1';
+var MOBILE_SCAN_DEBUG_KEY = 'sm_scan_debug';
+var mobileScanDiagTapCount_ = 0;
+var mobileScanDiagTapTimer_ = null;
 
-function mobileScanStartShellEmbed_() {
+function mobileScanDebugOn_() {
+  return !!window.mobileScanDebugOn_;
+}
+
+function mobileScanDiagFormat_(side, tag, detail) {
+  var d = new Date();
+  var ts = d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes() + ':' +
+    (d.getSeconds() < 10 ? '0' : '') + d.getSeconds();
+  var extra = detail == null ? '' : (' ' + String(detail));
+  return ts + ' [' + side + '] ' + tag + extra;
+}
+
+function mobileScanDiagRead_() {
+  try {
+    return JSON.parse(localStorage.getItem(MOBILE_SCAN_DIAG_KEY) || '[]');
+  } catch (e) { return []; }
+}
+
+function mobileScanDiagPush_(line) {
+  if (!line) return;
+  try {
+    var arr = mobileScanDiagRead_();
+    arr.push(line);
+    if (arr.length > 80) arr = arr.slice(-80);
+    localStorage.setItem(MOBILE_SCAN_DIAG_KEY, JSON.stringify(arr));
+  } catch (e) { /* ignore */ }
+  if (mobileScanDebugOn_()) mobileScanDiagRender_();
+}
+
+function mobileScanDiag_(tag, detail) {
+  var line = mobileScanDiagFormat_('APP', tag, detail);
+  mobileScanDiagPush_(line);
+  if (mobileScanInHostingIframe_()) {
+    mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_DIAG', { line: line });
+  }
+}
+
+function mobileScanDiagRender_() {
+  var wrap = document.getElementById('mobile-scan-diag-wrap');
+  var log = document.getElementById('mobile-scan-diag-log');
+  if (!wrap || !log) return;
+  var rows = mobileScanDiagRead_();
+  log.textContent = rows.length ? rows.join('\n') : '(empty — scan or tap Simulate)';
+  wrap.style.display = mobileScanDebugOn_() ? 'flex' : 'none';
+  wrap.setAttribute('aria-hidden', mobileScanDebugOn_() ? 'false' : 'true');
+}
+
+function mobileScanDiagSetDebug_(on) {
+  window.mobileScanDebugOn_ = !!on;
+  try {
+    if (on) localStorage.setItem(MOBILE_SCAN_DEBUG_KEY, '1');
+    else localStorage.removeItem(MOBILE_SCAN_DEBUG_KEY);
+  } catch (e) { /* ignore */ }
+  mobileScanDiag_('debug_' + (on ? 'on' : 'off'));
+  mobileScanDiagRender_();
+}
+
+function mobileScanDiagCopy_() {
+  var text = mobileScanDiagRead_().join('\n');
+  if (!text) {
+    mobileScanToast_('Debug log is empty', true);
+    return;
+  }
+  function done() { mobileScanToast_('Debug log copied', false); }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function() {
+      mobileScanToast_(text.slice(0, 200), false);
+    });
+    return;
+  }
+  mobileScanToast_(text.slice(0, 240), false);
+}
+
+function mobileScanDiagSimulate_() {
+  var tag = window.prompt('Simulate scan — paste asset id from QR:', '');
+  if (!tag) return;
+  mobileScanDiag_('simulate', tag);
+  if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+    mobileOpenScanPanel();
+  }
+  mobileScanHandleDecode_(tag);
+}
+
+function mobileScanDiagWireUi_() {
+  var copyBtn = document.getElementById('mobile-scan-diag-copy');
+  var simBtn = document.getElementById('mobile-scan-diag-sim');
+  var feedLabel = document.getElementById('mobile-scan-feed-label');
+  if (copyBtn && copyBtn.dataset.bound !== '1') {
+    copyBtn.dataset.bound = '1';
+    copyBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      mobileScanDiagCopy_();
+    });
+  }
+  if (simBtn && simBtn.dataset.bound !== '1') {
+    simBtn.dataset.bound = '1';
+    simBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      mobileScanDiagSimulate_();
+    });
+  }
+  if (feedLabel && feedLabel.dataset.diagBound !== '1') {
+    feedLabel.dataset.diagBound = '1';
+    feedLabel.addEventListener('click', function(e) {
+      mobileScanDiagTapCount_ += 1;
+      clearTimeout(mobileScanDiagTapTimer_);
+      mobileScanDiagTapTimer_ = setTimeout(function() { mobileScanDiagTapCount_ = 0; }, 900);
+      if (mobileScanDiagTapCount_ >= 5) {
+        mobileScanDiagTapCount_ = 0;
+        mobileScanDiagSetDebug_(!mobileScanDebugOn_());
+      }
+    });
+  }
+  try {
+    if (localStorage.getItem(MOBILE_SCAN_DEBUG_KEY) === '1') window.mobileScanDebugOn_ = true;
+  } catch (e) { /* ignore */ }
+  mobileScanDiagRender_();
+}
+
+function mobileScanDiagInit_() {
+  mobileScanDiagWireUi_();
+  mobileScanDiag_('app_init', mobileScanInHostingIframe_() ? 'hosting' : 'standalone');
+}
   if (!mobileScanInHostingIframe_()) return false;
   mobileQrUsesParent_ = true;
   mobileQrUsesEmbed_ = false;
@@ -117,6 +243,7 @@ function mobileScanPrepareShellHole_() {
 }
 
 window.mobileScanLaunchShellCamera_ = function() {
+  mobileScanDiag_('open_camera_tap');
   if (!mobileScanInHostingIframe_()) {
     mobileScanStartCamera_();
     return;
@@ -225,10 +352,15 @@ function mobileScanRestoreReaderDiv_() {
     if (!ev.data || !ev.data.type) return;
     var t = ev.data.type;
     if (t === 'SHOWRUNNER_MOBILE_QR_SCAN') {
+      mobileScanDiag_('msg_scan', ev.data.text);
       if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
       }
       mobileScanHandleDecode_(ev.data.text);
+      return;
+    }
+    if (t === 'SHOWRUNNER_MOBILE_SCAN_DEBUG_ON') {
+      mobileScanDiagSetDebug_(ev.data.on !== false);
       return;
     }
     if (t === 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN') {
@@ -351,6 +483,7 @@ function mobileScanApplyHit_(raw, hit) {
     window.mobileScanSelection = { kind: 'unknown', tag: raw };
   }
   mobileScanRenderLast_();
+  mobileScanOnSelectionRendered_();
   if (navigator.vibrate) {
     try { navigator.vibrate(hit ? 40 : [30, 40, 30]); } catch (e) { /* ignore */ }
   }
@@ -360,6 +493,12 @@ function mobileScanApplyHit_(raw, hit) {
     mobileScanToast_('Unknown code — not in equipment vault', true);
   }
   mobileScanFinalizePendingDelivery_(raw);
+}
+
+function mobileScanOnSelectionRendered_() {
+  var sel = window.mobileScanSelection;
+  if (!sel) return;
+  mobileScanDiag_('selection', sel.kind + (sel.name ? (':' + sel.name) : ''));
 }
 
 var mobileScanUserWaitTimer = null;
@@ -391,18 +530,21 @@ function mobileScanResolveFromServer_(raw) {
     return;
   }
   mobileScanServerResolveBusy_ = true;
+  mobileScanDiag_('server_resolve', tag);
   try {
     google.script.run
       .withSuccessHandler(function(res) {
         mobileScanServerResolveBusy_ = false;
         var hit = (res && res.hit) ? res.hit : null;
         var tag = (res && res.tag) ? res.tag : raw;
+        mobileScanDiag_('server_result', hit ? (hit.name || hit.unitId) : 'miss');
         if (hit) mobileScanMergeHitIntoMap_(tag, hit);
         mobileScanApplyHit_(tag, hit);
         window.mobileScanPendingRaw = '';
       })
-      .withFailureHandler(function() {
+      .withFailureHandler(function(err) {
         mobileScanServerResolveBusy_ = false;
+        mobileScanDiag_('server_fail', err && err.message ? err.message : 'error');
         mobileScanApplyHit_(raw, null);
         window.mobileScanPendingRaw = '';
       })
@@ -543,6 +685,7 @@ function mobileScanRenderFeed_() {
 function mobileScanHandleDecode_(raw) {
   if (!raw) return;
   var tag = mobileScanExtractTag_(raw);
+  mobileScanDiag_('decode', tag || '(empty)');
   if (!tag) return;
   var sel = window.mobileScanSelection;
   if (sel && mobileScanNormalize_(sel.tag) === mobileScanNormalize_(tag) && sel.kind === 'equipment') {
@@ -562,6 +705,7 @@ function mobileScanHandleDecode_(raw) {
 
   var hit = mobileScanResolve_(tag);
   if (hit) {
+    mobileScanDiag_('map_hit', hit.name || hit.unitId || tag);
     mobileScanApplyHit_(tag, hit);
     window.mobileScanPendingRaw = '';
     return;
@@ -570,6 +714,7 @@ function mobileScanHandleDecode_(raw) {
   var mapSize = Object.keys(window.mobileScanEquipMap || {}).length;
   if (mapSize === 0 || !window.mobileScanBootstrap) {
     if (typeof ACTIVE_USER_NAME === 'undefined' || !ACTIVE_USER_NAME) {
+      mobileScanDiag_('wait_user');
       mobileScanWaitForUserThenDecode_();
       return;
     }
@@ -759,6 +904,7 @@ window.mobileToggleScanPanel = function() {
 /** Shell-native fullscreen camera (web.app document — reliable on iOS + Android PWA). */
 window.mobileGoToScanCameraPage_ = function() {
   if (mobileScanInHostingIframe_()) {
+    mobileScanDiag_('post_open_camera');
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA');
     return;
   }
@@ -1001,11 +1147,13 @@ function mobileScanClearReopenFlag_() {
 
 function mobileScanAckParent_() {
   if (mobileScanInHostingIframe_()) {
+    mobileScanDiag_('ack_sent');
     mobileScanParentPost_('SHOWRUNNER_MOBILE_QR_SCAN_ACK');
   }
 }
 
 function mobileScanFinalizePendingDelivery_(raw) {
+  mobileScanDiag_('finalize', raw);
   if (mobileScanInHostingIframe_()) {
     mobileScanAckParent_();
     window.mobileScanPendingConsumeKey_ = '';
@@ -1062,6 +1210,7 @@ function mobileScanReopenPanelIfNeeded_() {
 (function mobileScanInit_() {
   if (window.IS_STATION_DEVICE) return;
   function boot() {
+    mobileScanDiagInit_();
     mobileScanRefreshBootstrap_();
     if (!mobileScanInHostingIframe_()) {
       mobileScanReopenPanelIfNeeded_();
