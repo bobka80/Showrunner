@@ -15,6 +15,9 @@ window.mobileScanRecent = window.mobileScanRecent || [];
 var MOBILE_SCAN_MAP_KEY = 'sm_mobile_scan_map_v1';
 var MOBILE_SCAN_FEED_MAX = 8;
 var MOBILE_SCAN_DEDUPE_MS = 2000;
+var MOBILE_SCAN_DELIVER_DEDUPE_MS = 20000;
+var MOBILE_SCAN_DELIVERED_KEY = '';
+var MOBILE_SCAN_DELIVERED_TS = 0;
 var MOBILE_SCAN_LAST_KEY = '';
 var MOBILE_SCAN_LAST_TS = 0;
 var mobileQrEngine = null;
@@ -337,6 +340,42 @@ function mobileScanMergeHitIntoMap_(raw, hit) {
   } catch (e) { /* ignore */ }
 }
 
+function mobileScanShouldIgnoreDelivered_(tag) {
+  var key = mobileScanNormalize_(tag);
+  if (!key) return true;
+  var now = Date.now();
+  return key === MOBILE_SCAN_DELIVERED_KEY && (now - MOBILE_SCAN_DELIVERED_TS) < MOBILE_SCAN_DELIVER_DEDUPE_MS;
+}
+
+function mobileScanMarkDelivered_(tag) {
+  MOBILE_SCAN_DELIVERED_KEY = mobileScanNormalize_(tag);
+  MOBILE_SCAN_DELIVERED_TS = Date.now();
+}
+
+function mobileScanStopCameraReturnPoll_() {
+  clearInterval(window._mobileScanCamPollTimer);
+  window._mobileScanCamPollTimer = null;
+}
+
+function mobileScanStopBurstPull_() {
+  if (mobileScanBurstPullTimer_) {
+    clearInterval(mobileScanBurstPullTimer_);
+    mobileScanBurstPullTimer_ = null;
+  }
+}
+
+function mobileScanStopAllHandoffPolls_() {
+  mobileScanStopCameraReturnPoll_();
+  mobileScanStopBurstPull_();
+}
+
+function mobileScanClearReopenFlag_() {
+  try {
+    sessionStorage.removeItem('sm_mobile_scan_reopen_panel');
+    localStorage.removeItem('sm_mobile_scan_reopen_panel');
+  } catch (e) { /* ignore */ }
+}
+
 function mobileScanGetSessionToken_() {
   try {
     var t = document.querySelector('meta[name="session-token"]');
@@ -383,6 +422,13 @@ function mobileScanTryPullStaged_(reason) {
           mobileScanSetStatus_('pull: none');
           return;
         }
+        if (mobileScanShouldIgnoreDelivered_(res.tag)) {
+          mobileScanSetStatus_('pull: dup');
+          mobileScanAckParent_();
+          return;
+        }
+        mobileScanMarkDelivered_(res.tag);
+        mobileScanStopAllHandoffPolls_();
         mobileScanSetStatus_('pull: ' + res.tag + (res.hit ? (' → ' + (res.hit.name || res.hit.unitId)) : ' → miss'));
         if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
           mobileOpenScanPanel();
@@ -406,20 +452,24 @@ window.mobileScanIngestShellMessage_ = function(data) {
   if (!data || !data.type) return;
   var t = data.type;
   if (t === 'SHOWRUNNER_MOBILE_QR_SCAN' || t === 'SHOWRUNNER_MOBILE_SCAN_WAKE') {
+    if (data.text && mobileScanShouldIgnoreDelivered_(data.text)) {
+      mobileScanAckParent_();
+      return;
+    }
     mobileScanSetStatus_('relay: ' + String(data.text || '').slice(0, 40));
     if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
       mobileOpenScanPanel();
     }
     if (data.text) mobileScanHandleDecode_(data.text);
-    mobileScanBurstPullStaged_();
     return;
   }
   if (t === 'SHOWRUNNER_MOBILE_SCAN_REOPEN') {
     if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
       mobileOpenScanPanel();
     }
-    mobileScanTryPullStaged_('reopen');
-    mobileScanBurstPullStaged_();
+    if (!mobileScanShouldIgnoreDelivered_(window.mobileScanSelection && window.mobileScanSelection.tag)) {
+      mobileScanTryPullStaged_('reopen');
+    }
   }
 };
 
@@ -459,6 +509,9 @@ function mobileScanApplyHit_(raw, hit) {
   } else if (!hit) {
     mobileScanToast_('Unknown code — not in equipment vault', true);
   }
+  mobileScanMarkDelivered_(raw);
+  mobileScanStopAllHandoffPolls_();
+  mobileScanClearReopenFlag_();
   mobileScanFinalizePendingDelivery_(raw);
 }
 
@@ -712,6 +765,10 @@ function mobileScanHandleDecode_(raw) {
   var tag = mobileScanExtractTag_(raw);
   mobileScanSetStatus_('decode: ' + (tag || '(empty)'));
   if (!tag) return;
+  if (mobileScanShouldIgnoreDelivered_(tag)) {
+    mobileScanAckParent_();
+    return;
+  }
   var sel = window.mobileScanSelection;
   if (sel && mobileScanNormalize_(sel.tag) === mobileScanNormalize_(tag) && sel.kind === 'equipment') {
     mobileScanFinalizePendingDelivery_(tag);
@@ -944,6 +1001,7 @@ function mobileScanStartCameraReturnPoll_() {
 
 window.mobileGoToScanCameraPage_ = function() {
   if (mobileScanInHostingIframe_()) {
+    try { sessionStorage.removeItem('sm_mobile_scan_boot_tag'); } catch (e) { /* ignore */ }
     mobileScanStartCameraReturnPoll_();
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA', {
       sessionToken: mobileScanGetSessionToken_(),
@@ -1185,13 +1243,6 @@ function mobileScanShouldReopenPanel_() {
   } catch (e) { return false; }
 }
 
-function mobileScanClearReopenFlag_() {
-  try {
-    sessionStorage.removeItem('sm_mobile_scan_reopen_panel');
-    localStorage.removeItem('sm_mobile_scan_reopen_panel');
-  } catch (e) { /* ignore */ }
-}
-
 function mobileScanAckParent_() {
   if (mobileScanInHostingIframe_()) {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_QR_SCAN_ACK');
@@ -1261,6 +1312,24 @@ function mobileScanConsumeBootPending_() {
     m.content = '';
   } catch (e) { return false; }
   if (!raw) return false;
+  if (mobileScanShouldIgnoreDelivered_(raw)) {
+    m.content = '';
+    mobileScanAckParent_();
+    return false;
+  }
+  try {
+    var bootKey = 'sm_mobile_scan_boot_tag';
+    var consumed = sessionStorage.getItem(bootKey) || '';
+    if (consumed && mobileScanNormalize_(consumed) === mobileScanNormalize_(raw)) {
+      m.content = '';
+      mobileScanAckParent_();
+      return false;
+    }
+    sessionStorage.setItem(bootKey, raw);
+  } catch (e3) { /* ignore */ }
+  mobileScanStopAllHandoffPolls_();
+  mobileScanAckParent_();
+  mobileScanClearReopenFlag_();
   try {
     sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
     localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
@@ -1287,12 +1356,14 @@ function mobileScanConsumeBootPending_() {
       }
       document.addEventListener('visibilitychange', function() {
         if (document.visibilityState !== 'visible') return;
-        mobileScanTryPullStaged_('visible');
-        mobileScanBurstPullStaged_();
+        if (!mobileScanShouldIgnoreDelivered_(window.mobileScanSelection && window.mobileScanSelection.tag)) {
+          mobileScanTryPullStaged_('visible');
+        }
       });
       window.addEventListener('pageshow', function() {
-        mobileScanTryPullStaged_('pageshow');
-        mobileScanBurstPullStaged_();
+        if (!mobileScanShouldIgnoreDelivered_(window.mobileScanSelection && window.mobileScanSelection.tag)) {
+          mobileScanTryPullStaged_('pageshow');
+        }
       });
     }
   }

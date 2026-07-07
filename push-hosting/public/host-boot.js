@@ -154,6 +154,29 @@
   }
 
   var hostMobileScanReloadIssued_ = false;
+  var hostMobileScanLastDeliveredTag_ = '';
+  var hostMobileScanLastDeliveredTs_ = 0;
+  var HOST_MOBILE_SCAN_DELIVER_DEDUPE_MS = 20000;
+
+  function hostMobileScanStopPendingRetry_() {
+    if (hostMobileQrPendingRetryTimer) {
+      clearInterval(hostMobileQrPendingRetryTimer);
+      hostMobileQrPendingRetryTimer = null;
+    }
+  }
+
+  function hostMobileScanShouldIgnoreDeliver_(raw) {
+    var tag = String(raw == null ? '' : raw).trim();
+    if (!tag) return true;
+    var now = Date.now();
+    return tag === hostMobileScanLastDeliveredTag_ &&
+      (now - hostMobileScanLastDeliveredTs_) < HOST_MOBILE_SCAN_DELIVER_DEDUPE_MS;
+  }
+
+  function hostMobileScanMarkDelivered_(raw) {
+    hostMobileScanLastDeliveredTag_ = String(raw == null ? '' : raw).trim();
+    hostMobileScanLastDeliveredTs_ = Date.now();
+  }
 
   function hostMobileScanNavigateIframeWithScan_(raw) {
     if (!frame || hostMobileScanReloadIssued_) return;
@@ -188,31 +211,21 @@
   function hostMobileScanDeliverScan_(text, reopen) {
     var raw = String(text == null ? '' : text).trim();
     if (!raw) return;
+    if (hostMobileScanShouldIgnoreDeliver_(raw)) return;
+
+    hostMobileScanMarkDelivered_(raw);
+    hostMobileScanStopPendingRetry_();
     hostMobileScanStageOnServer_(raw);
-    try {
-      sessionStorage.setItem('sm_mobile_qr_pending', raw);
-      localStorage.setItem('sm_mobile_qr_pending', raw);
-      if (reopen !== false) {
+
+    if (reopen !== false) {
+      try {
         sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
         localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
-      }
-    } catch (e) { /* ignore */ }
-    var payload = {
-      type: 'SHOWRUNNER_MOBILE_QR_SCAN',
-      text: raw,
-      reopenPanel: reopen !== false
-    };
-    hostMobileScanRelayBurst_(payload);
-    hostMobileScanRelayBurst_({
-      type: 'SHOWRUNNER_MOBILE_SCAN_WAKE',
-      text: raw,
-      reopenPanel: reopen !== false
-    });
-    if (reopen !== false) {
-      hostMobileScanRelayBurst_({ type: 'SHOWRUNNER_MOBILE_SCAN_REOPEN' });
+      } catch (e) { /* ignore */ }
     }
+
     hostMobileScanNavigateIframeWithScan_(raw);
-    hostMobileScanSchedulePendingRetry_();
+    hostMobileScanClearPending_();
   }
 
   var hostMobileShellCamOpen = false;
@@ -1003,6 +1016,10 @@
   function hostMobileScanFlushPending_() {
     try {
       var raw = hostMobileScanReadPending_();
+      if (raw && hostMobileScanShouldIgnoreDeliver_(raw)) {
+        hostMobileScanClearPending_();
+        return;
+      }
       var reopen = hostMobileScanShouldReopen_();
       if (!raw && reopen) {
         if (!hostMobileScanRelayReady_()) {
@@ -2109,7 +2126,7 @@
     }
     if (ev.data.type === 'SHOWRUNNER_APP_READY') {
       handleIframeSession({ crewName: ev.data.crewName || '', regKey: ev.data.regKey || '' });
-      hostMobileScanFlushPending_();
+      if (!hostMobileScanReloadIssued_) hostMobileScanFlushPending_();
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ACK') {
       hostMobileScanClearPending_();
