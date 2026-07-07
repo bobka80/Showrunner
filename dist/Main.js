@@ -190,7 +190,8 @@ function doGet(e) {
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
-    return renderIndexForAuth_(authResult, sessionToken);
+    const pendingScan = e.parameter.srScan || '';
+    return renderIndexForAuth_(authResult, sessionToken, pendingScan);
   }
 
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
@@ -250,7 +251,7 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-function renderIndexForAuth_(authResult, sessionToken) {
+function renderIndexForAuth_(authResult, sessionToken, pendingScan) {
   let template = HtmlService.createTemplateFromFile('Index');
   template.userName = authResult.name;
   template.userAccess = normalizeAccessTier(authResult.access);
@@ -262,6 +263,8 @@ function renderIndexForAuth_(authResult, sessionToken) {
   template.sessionToken = sessionToken || '';
   template.isStationDevice = authResult.isStationDevice ? '1' : '0';
   template.stationDeviceLayout = authResult.stationDeviceLayout || '';
+  const scanRaw = String(pendingScan || '').trim();
+  template.pendingMobileScanB64 = scanRaw ? Utilities.base64Encode(scanRaw) : '';
   return template.evaluate()
     .setTitle('SM Showrunner Command Center')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')

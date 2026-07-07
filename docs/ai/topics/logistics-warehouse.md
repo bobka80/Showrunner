@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-04 · **Production:** GAS **v429** · **Status:** Partial — station shell through **v429** (host-inherit RBAC v425–426, Vault Crew tab, duplicate-tag guard v428, security fix v429); APK **v0.1.10** (sleep/wake). Open: checkout cache speed, QR gate, field dial-in — see [active campaign](../active/rfid-station-profiles.md).
+**Last swept:** 2026-07-07 · **Production:** GAS **v465** · **Status:** Partial — station shell through **v437+**; APK **v0.1.15**. Open: EPC+TID crew badges, optimistic host login, BLE reconnect hardening, kiosk auto-start, gate — see [active campaign](../active/rfid-station-profiles.md).
 
 ---
 
@@ -24,9 +24,9 @@
 
 **Hardware decision:** TSL + Chainway UHF guns, each **married to a dedicated tablet/phone** (fixed station — not personal BYOD plug/unplug).
 
-**Crew RFID:** Same UHF tag family as equipment. Store tag on **crew record** (`rfid_tag` or equivalent field — schema TBD). Gun reads tag → lookup crew first → login/host. No separate HF/NFC badge requirement unless hardware forces it later.
+**Crew RFID:** Same UHF tag family as equipment. Store **EPC** on `Crew_Roster.rfid_tag` today; **approved:** add `rfid_tid` (factory TID) — enroll + login require **both** from one gun read for anti-clone (ROOT first). Gun reads tag → lookup crew → host session. Details → [active campaign](../active/rfid-station-profiles.md) § Agreed spec — Security.
 
-**Gate (warehouse door):** The gate is the **building exit**, not a truck portal. Crew push cases through the door; ramp/truck loading is **outside**. Gate validates what left the warehouse. Misses are fixed with a **handheld re-scan** at the door (simple exception path).
+**Gate (warehouse door):** The gate is the **building exit**, not a truck portal. Crew push cases through the door; ramp/truck loading is **outside**. Gate validates what left the warehouse. Misses are fixed with a **handheld re-scan** at the door (simple exception path). **Approved (2026-07-07):** gate = **its own station device** (separate from warehouse Chainway guns); near-term hardware = **PC + TV** with rich on-screen UI; strict **one station profile per physical device** fleet-wide.
 
 **Handheld gun roles (not only checkout):**
 - Exception re-scan at door when gate count mismatches
@@ -82,9 +82,17 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 - [x] **Host idle auto-eject** (dropdown 1/3/5/10 min, default 10 — v411, timer configurable v414, dropdown v416)
 - [x] **Native gun app** (`station-android/` — Chainway BLE `RfidManager.kt` + WebView `StationWebActivity.kt`)
 - [x] **APK distribution via web app** — login link "Warehouse gun — install station app" → `/station-app` install page. Build: `node build-station-apk.js` → `node deploy-hosting.js`. APK served as `.bin` (Spark blocks `.apk`). Details → [FILE_MAP.md](../FILE_MAP.md) §8 / §11.
-- [ ] Gate integration (bulk door read — hardware TBD)
+- [ ] Gate integration (bulk door read — hardware TBD) — **separate station profile**; PC+TV surface
 - [ ] Tag-map / new-equipment RFID provisioning UX on station
 - [x] Remove `stationDevHostAsBogdan` DEV bypass + button (v432 — badge host verified on hardware)
+
+### Approved backlog (director 2026-07-07) — canonical checklist in [active campaign](../active/rfid-station-profiles.md)
+
+- [ ] **Crew EPC + TID** — `rfid_tid` column; enroll/login pair match; re-enroll existing badges; ROOT tag lock
+- [ ] **Optimistic host login** — local cache → instant host; server confirm in parallel; offline banner when DB down
+- [ ] **Bulletproof BLE reconnect (APK)** — health check, hard reconnect ladder, foreground service, fix Reconnect button
+- [ ] **Kiosk auto-start (APK)** — default launcher + boot receiver; no Google account required on phone
+- [ ] **Device hygiene** — one station profile per gun/phone/gate/TL device; TL SDK when hardware arrives
 
 **IAM split:** Office crew permissions → **ROLE EDITOR** (`06a`). Fixed gun/tablet logins → **STATION PROFILES** (`06h`). Tamper each independently.
 

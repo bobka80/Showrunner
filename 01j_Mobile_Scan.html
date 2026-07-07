@@ -928,8 +928,23 @@ window.mobileToggleScanPanel = function() {
 };
 
 /** Shell-native fullscreen camera (web.app document — reliable on iOS + Android PWA). */
+function mobileScanStartCameraReturnPoll_() {
+  if (!mobileScanInHostingIframe_()) return;
+  clearInterval(window._mobileScanCamPollTimer);
+  var n = 0;
+  window._mobileScanCamPollTimer = setInterval(function() {
+    n += 1;
+    mobileScanTryPullStaged_('campoll');
+    if (n >= 40) {
+      clearInterval(window._mobileScanCamPollTimer);
+      window._mobileScanCamPollTimer = null;
+    }
+  }, 500);
+}
+
 window.mobileGoToScanCameraPage_ = function() {
   if (mobileScanInHostingIframe_()) {
+    mobileScanStartCameraReturnPoll_();
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA', {
       sessionToken: mobileScanGetSessionToken_(),
       crewName: (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '')
@@ -1237,6 +1252,25 @@ function mobileScanReopenPanelIfNeeded_() {
   }
 }
 
+function mobileScanConsumeBootPending_() {
+  var m = document.querySelector('meta[name="pending-mobile-scan-b64"]');
+  if (!m || !m.content) return false;
+  var raw = '';
+  try {
+    raw = atob(String(m.content).trim());
+    m.content = '';
+  } catch (e) { return false; }
+  if (!raw) return false;
+  try {
+    sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+    localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+  } catch (e2) { /* ignore */ }
+  mobileScanSetStatus_('boot: ' + raw.slice(0, 40));
+  if (typeof mobileOpenScanPanel === 'function') mobileOpenScanPanel();
+  setTimeout(function() { mobileScanHandleDecode_(raw); }, 400);
+  return true;
+}
+
 (function mobileScanInit_() {
   if (window.IS_STATION_DEVICE) return;
   function boot() {
@@ -1248,7 +1282,9 @@ function mobileScanReopenPanelIfNeeded_() {
       setTimeout(mobileScanTryConsumePending_, 800);
       setTimeout(mobileScanTryConsumePending_, 2000);
     } else {
-      setTimeout(function() { mobileScanTryPullStaged_('boot'); }, 1200);
+      if (!mobileScanConsumeBootPending_()) {
+        setTimeout(function() { mobileScanTryPullStaged_('boot'); }, 1200);
+      }
       document.addEventListener('visibilitychange', function() {
         if (document.visibilityState !== 'visible') return;
         mobileScanTryPullStaged_('visible');

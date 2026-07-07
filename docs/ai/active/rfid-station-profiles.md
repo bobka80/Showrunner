@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11
 
-**Opened:** 2026-07-02 · **Production:** GAS **v437** · APK **v0.1.15 (build 17)** · **Last swept:** 2026-07-05
+**Opened:** 2026-07-02 · **Production:** GAS **v465** · APK **v0.1.15 (build 17)** · **Last swept:** 2026-07-07
 
 This is the work **in flight right now**: RFID gun scanning end-to-end and the fixed warehouse tablet/gun **device profiles** (station RBAC). This file tracks only the live campaign — the durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
 
@@ -97,13 +97,22 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [ ] **QR at gate / Gate-at-door** (when ready) — camera scan UID or bulk door read → same checkout confirm as RFID EPC; exception re-scan path (hardware TBD)
 - [x] **Phone QR scan panel (v437+)** — mobile header Scan dropdown + camera; vault status (Maintenance/Damaged/Broken/Repaired) via `setMobileAssetStatus`; profile-tier permissions; PA checkout forward **deferred**
 
+### Approved backlog (director 2026-07-07)
+
+- [ ] **Crew two-tag schema (EPC + TID)** — add `rfid_tid` on `Crew_Roster` alongside `rfid_tag` (EPC); enroll + login require **both** from one trigger read; re-enroll existing badges once. **ROOT first** for tag lock at provision. Equipment stays EPC-only until needed.
+- [ ] **Optimistic host login + local roster cache** — badge scan resolves **EPC+TID** against device cache (`getStationEquipmentRfidMap` successor / crew slice) → show host **immediately**; server `processStationRfidScan` confirms in parallel; on mismatch/error → clear host. Refresh cache on boot, timer, and after Vault → Crew enroll. Show **offline / roster age** when server unreachable.
+- [ ] **Offline host recognition (clone-safe)** — local host-in allowed without server when EPC+TID pair matches cache; **checkout / vault writes / crew enroll still require server**. Stale roster risk (fired crew, demotion) accepted until sync — mitigated by refresh + optional cap on delicate ops until online.
+- [ ] **Bulletproof BLE gun reconnect (APK)** — health-check reads (`getBattery` or ping) to detect zombie “connected”; hard reconnect ladder (disconnect → longer wait → `free`/`init`); reconnect on screen-on + resume; **foreground service** for Doze; Reconnect button must not block behind hung read worker; scan fallback if saved MAC fails; honest link status in UI. See **Agreed spec — BLE reconnect** below.
+- [ ] **Kiosk auto-start (APK)** — dedicated warehouse phones: **default launcher (HOME)** + **BOOT_COMPLETED** auto-launch; disable battery optimization; optional Lock Task / Device Owner later. No Google account on phone required; Wi‑Fi + station-device Showrunner login only.
+- [ ] **Device hygiene — one station profile per physical device** — each Chainway gun+phone, each future Chainway pair, each TL Solution gun, and **gate** = separate station device account + profile. Gate is **not** shared with warehouse guns. Gate + TL (for now) = **PC + TV** with richer on-screen UI; same station shell family, different hardware profiles when TL SDK lands.
+
 ## RFID badge lifecycle & fragile points (enrollment → DB → login)
 
 The path the director just proved on hardware, and every place it can silently break. Backend: `Station_Security.js`. Client: `11_Station_Shell.html`.
 
 **The flow (today vs target):**
-1. **Enroll (v425)** — ROOT hosts open **Vault → Crew tab**, tap a crew member, then scan the badge → `enrollStationCrewRfidTag(deviceActor, hostName, crewRef, tag)` (ROOT-gated, refuses station device profiles) writes `tag` to that member's `Crew_Roster.rfid_tag`. Self-serve "Link my RFID badge" is gone.
-2. **Login/host** — a later badge scan → `processStationRfidScan(deviceActor, tag, {hostOnly:true})` → `lookupCrewMemberByRfidTag` → returns the crew identity → the shell writes a **host session** and inherits.
+1. **Enroll (v425 today → EPC+TID target)** — ROOT hosts open **Vault → Crew tab**, tap a crew member, then scan the badge → `enrollStationCrewRfidTag` writes EPC to `Crew_Roster.rfid_tag`. **Target (approved 2026-07-07):** also write TID to `rfid_tid`; one scan captures both; lock ROOT tags at provision.
+2. **Login/host (today → optimistic local target)** — badge scan → `processStationRfidScan` (server round-trip). **Target:** local EPC+TID cache → instant host UI; server confirms in parallel; offline host recognition when DB errors on restart (checkout still needs server).
 
 **Fragile points (all of these must hold or the badge silently won't work):**
 - **Tag representation must be identical at enroll and login.** `normalizeStationRfidTag` = `trim().toLowerCase()` only — no hex/space/leading-zero cleanup. Native sends `epc.uppercase()`; server lowercases. If the gun ever returns a different EPC format (or a different memory bank / TID), the stored tag stops matching. **Enroll and login must read the same field the same way.**
@@ -179,17 +188,116 @@ On host logout, idle eject, or sign-out: return to **"waiting for badge"** main 
 
 ### Known fragilities (carry forward)
 
-- Manager/ROOT checks trust client-passed `hostName` on some endpoints — harden by binding writes to the badge that established the host session.
+- Manager/ROOT checks trust client-passed `hostName` on some endpoints — **de-prioritized** (trusted crew); optional harden later by binding writes to the badge that established the host session.
 - `saveProjectAssetsDelta` has no collision check — risk with multiple guns on one project.
 - "Repaired" writes `Active` in the sheet; audit log distinguishes the action.
+- **BLE zombie link** after gun sleep — SDK reports connected but reads fail; Reconnect button can block on worker thread. → **Agreed spec — Bulletproof BLE reconnect** above.
 
 ---
 
-## Parked / queued modifications (piling up before we build)
+## Agreed spec — Security & crew badge model (director 2026-07-07)
 
-Director is batching changes; implement together when ready.
+**Status:** Approved — not built yet.
 
-- **Preload personnel RFIDs into the app for faster login (director's idea — needs security review).** Cache the roster's `rfid_tag`→identity map on the device so a badge scan resolves **locally** without a DB round-trip. Faster, works offline. **Security notes to resolve before building:** UHF EPCs are readable/clonable by any UHF reader unless tag memory is locked, so a badge is a weak secret — a local map is only as safe as the (limited) station host-inherit scope it grants. Mitigations to weigh: store a **hash** of the EPC not the raw value; bind **EPC+TID** (TID is factory-immutable) to defeat clones; **lock** tag EPC memory at provisioning; short cache TTL + signed roster snapshot so a stolen device can't mint new mappings; keep station host strictly low-privilege. Decision pending.
+### Trust model
+
+- Crew with RFID access are **trusted people** — not designing against malicious insiders scripting the WebView.
+- **Primary security goal:** prevent **badge cloning**, especially **ROOT** badges. A cheap UHF copier can replay an **EPC**; it cannot copy another chip's factory **TID**.
+- **De-prioritized for v1:** server-side “prove this badge scan opened the session” binding (`hostName` spoofing) — relevant only if someone games the software, not the director's scenario.
+
+### Two-tag crew schema
+
+| Field | Sheet column (proposed) | What it is |
+|-------|----------------------|------------|
+| **EPC** | `rfid_tag` (existing) | Main ID the gun reads — cloneable if not locked |
+| **TID** | `rfid_tid` (new) | Factory-burned chip ID — anti-clone anchor |
+
+- **One physical scan** per enroll/login: native SDK reads **both** memory banks on the same trigger pull (not two separate scans).
+- **Enroll** (Vault → Crew): write EPC + TID; **lock tag memory** at provision for ROOT (and MANAGER if desired) when hardware allows.
+- **Login:** match **EPC + TID pair** — EPC alone is not enough after cutover.
+- **Normalize:** same `normalizeStationRfidTag` rules on both fields at enroll and login.
+- **Migration:** re-enroll all existing crew badges once so every row has `rfid_tid`.
+- **Equipment:** EPC-only (`Assets.rfid_tag`) is fine for now; same two-field pattern optional later.
+
+### Optimistic host login (fast badge-in)
+
+1. Gun reads EPC + TID.
+2. Station looks up pair in **local cache** (crew slice of equip map) → **immediately** show host name + apply cached tier/permissions (“Maria — logging in…”).
+3. **In parallel:** server `processStationRfidScan` confirms; on success, refresh RBAC snapshot; on failure → **clear host**, show error.
+4. When server is down: local EPC+TID match can still host for **recognition**; show **offline / roster from &lt;time&gt;** banner. Checkout, vault writes, crew enroll **still require server**.
+
+**What offline does / doesn't protect:**
+
+| Threat | Local EPC+TID |
+|--------|----------------|
+| Cloned badge (wrong TID) | **Blocked** |
+| Fired crew, demotion, removed badge | **Not blocked** until cache refresh — server is authority when online |
+
+### Native changes for TID
+
+- `RfidManager.kt` must read TID bank (Chainway SDK supports this; see demo `getEPCAndTIDUserMode` in SDK docs) and deliver `{ epc, tid }` to the web layer.
+- Local cache stores **both** per crew member.
+
+---
+
+## Agreed spec — Device fleet hygiene (director 2026-07-07)
+
+**Status:** Approved — operational rule + future gate/TL profiles.
+
+| Physical device | Station rule |
+|-----------------|--------------|
+| Each Chainway gun + married phone | **Own** station device account + profile |
+| Additional Chainway pairs | **New** device + profile each |
+| Each TL Solution gun (future) | **Own** device + profile; SDK integration TBD |
+| **Gate** | **Separate station** from warehouse guns — never shared login |
+| Gate + TL setups (near term) | **PC + TV** — large UI; same station shell / host model, device-specific profile |
+
+Checkout/check-in remains **input-agnostic** on every surface (tap, RFID, future QR) — see host permission model above.
+
+---
+
+## Agreed spec — Bulletproof BLE reconnect (director 2026-07-07)
+
+**Status:** Approved — APK work in `station-android/`.
+
+**Problem:** After **gun sleep** or long idle, BLE drops but SDK may still report **CONNECTED** (“zombie link”); `connectIfNeeded()` then skips reconnect. **Reconnect gun** button can appear dead if `forceReconnect()` queues behind a **stuck read** on the single worker thread.
+
+**Target behavior:**
+
+1. **Health check** — while “connected”, periodic cheap SDK call (`getBattery` or test read); failure → force disconnect + reconnect even if status says connected.
+2. **Hard reconnect ladder** — soft: disconnect → wait (extend to ~2s for waking R6) → connect saved MAC; medium: retry ×3; nuclear: `uhf.free()` → re-`init()` → connect; then BLE scan fallback if MAC connect fails twice.
+3. **Wake hooks** — on `onResume` and **screen on**, run health check + reconnect (not only when already disconnected).
+4. **Foreground service** — persistent notification; keeps process alive through Android Doze (especially on battery).
+5. **Reconnect button** — cancel/stop in-flight reads first; run on dedicated path so it cannot block; surface status: Disconnecting → Waiting for gun → Connected / Failed.
+6. **UI honesty** — settings show link state: live / zombie / disconnected (not only cached `connected: true`).
+
+Chainway demo reference: `AUTO_RECONNECT` + disconnect-time handling in `uhf-ble-demo` — align with our ladder, don't rely on SDK alone.
+
+---
+
+## Agreed spec — Kiosk auto-start (director 2026-07-07)
+
+**Status:** Approved — APK + device setup.
+
+**Goal:** Dedicated warehouse phone always lands in Showrunner Station after power-on — **no Google account** on phone, **no lock PIN** (swipe-only lock screen is OK).
+
+**Implementation stack (simple → strict):**
+
+1. **Default launcher (HOME)** — Showrunner Station is the home app after swipe.
+2. **`BOOT_COMPLETED` receiver** — launch `StationWebActivity` on reboot.
+3. **Disable battery optimization** for the app (vendor-specific; required on Samsung/Xiaomi etc. or BLE/boot launch dies).
+4. **Optional later:** Lock Task Mode or Device Owner for escape-proof kiosk.
+
+Wi‑Fi must be configured on device; Showrunner **station-device** login is separate from any Google account.
+
+---
+
+## Parked / deferred (lower priority)
+
+- **Server session binding** — tie delicate writes to the badge that opened host session (anti-spoofing; not director priority).
+- **Local crew map hash-only storage** — optional extra if tablet theft becomes a concern; EPC+TID pair match is the main anti-clone lever.
+- **View-only station profile toggle** — optional; not required for v1.
+- **Any-host checkout baseline** — deferred; equipment **status** is the true any-host baseline today.
 
 ## When this closes
 

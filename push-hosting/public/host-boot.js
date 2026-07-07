@@ -109,11 +109,17 @@
     return ev.origin.indexOf('sm-showrunner-97405.web.app') !== -1 || ev.origin.indexOf('web.app') !== -1;
   }
 
-  function hostMobileScanStageOnServer_(tag) {
+  function hostMobileScanStageOnServer_(tag, onDone) {
     var raw = String(tag == null ? '' : tag).trim();
-    if (!raw) return;
+    if (!raw) {
+      if (typeof onDone === 'function') onDone({ success: false });
+      return;
+    }
     var tok = hostMobileScanGetSessionToken_();
-    if (!tok) return;
+    if (!tok) {
+      if (typeof onDone === 'function') onDone({ success: false });
+      return;
+    }
     var url = PROD_GAS_EXEC + '?action=mobscanstage&token=' + encodeURIComponent(tok) +
       '&tag=' + encodeURIComponent(raw);
     try {
@@ -122,16 +128,22 @@
       }
     } catch (e) { /* ignore */ }
     var cb = 'srMobScanStage_' + Date.now();
-    window[cb] = function() {
+    window[cb] = function(res) {
       try { delete window[cb]; } catch (e) { /* ignore */ }
+      if (typeof onDone === 'function') onDone(res || { success: false });
     };
     try {
       var s = document.createElement('script');
       s.src = url + '&callback=' + encodeURIComponent(cb);
-      s.onerror = function() { try { delete window[cb]; } catch (e) { /* ignore */ } };
+      s.onerror = function() {
+        try { delete window[cb]; } catch (e) { /* ignore */ }
+        if (typeof onDone === 'function') onDone({ success: false });
+      };
       document.head.appendChild(s);
       setTimeout(function() { try { s.remove(); } catch (e) { /* ignore */ } }, 8000);
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      if (typeof onDone === 'function') onDone({ success: false });
+    }
   }
 
   function hostMobileScanRelayBurst_(payload) {
@@ -141,14 +153,46 @@
     });
   }
 
+  var hostMobileScanReloadIssued_ = false;
+
+  function hostMobileScanNavigateIframeWithScan_(raw) {
+    if (!frame || hostMobileScanReloadIssued_) return;
+    var tag = String(raw == null ? '' : raw).trim();
+    if (!tag) return;
+    var sess = readParentSession();
+    if (!sess || !sess.token) return;
+    hostMobileScanReloadIssued_ = true;
+    sessionCheckJsonp(sess.token).then(function(check) {
+      if (!check || !check.valid) {
+        hostMobileScanReloadIssued_ = false;
+        return;
+      }
+      var base = PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
+      if (!base) {
+        hostMobileScanReloadIssued_ = false;
+        return;
+      }
+      try {
+        sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+        localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+      } catch (e) { /* ignore */ }
+      var url = base + '?action=sessionboot&token=' + encodeURIComponent(sess.token) +
+        '&srScan=' + encodeURIComponent(tag);
+      frame.src = url;
+      setTimeout(function() { hostMobileScanReloadIssued_ = false; }, 12000);
+    }).catch(function() {
+      hostMobileScanReloadIssued_ = false;
+    });
+  }
+
   function hostMobileScanDeliverScan_(text, reopen) {
-    var raw = String(text == null ? '' : text);
+    var raw = String(text == null ? '' : text).trim();
     if (!raw) return;
     hostMobileScanStageOnServer_(raw);
     try {
       sessionStorage.setItem('sm_mobile_qr_pending', raw);
       localStorage.setItem('sm_mobile_qr_pending', raw);
-      if (reopen) {
+      if (reopen !== false) {
         sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
         localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
       }
@@ -167,6 +211,7 @@
     if (reopen !== false) {
       hostMobileScanRelayBurst_({ type: 'SHOWRUNNER_MOBILE_SCAN_REOPEN' });
     }
+    hostMobileScanNavigateIframeWithScan_(raw);
     hostMobileScanSchedulePendingRetry_();
   }
 
@@ -291,9 +336,9 @@
       if (raw === hostMobileShellCamLastDecode && (now - hostMobileShellCamLastDecodeTs) < 2000) return;
       hostMobileShellCamLastDecode = raw;
       hostMobileShellCamLastDecodeTs = now;
-      hostMobileScanDeliverScan_(raw, true);
       hostMobileScanStopShellCamEngine_();
       hostMobileScanCloseShellCam_();
+      hostMobileScanDeliverScan_(raw, true);
     }
 
     function startCfg(cfg) {
@@ -921,6 +966,7 @@
   }
 
   function hostMobileScanClearPending_() {
+    hostMobileScanReloadIssued_ = false;
     try {
       sessionStorage.removeItem('sm_mobile_qr_pending');
       localStorage.removeItem('sm_mobile_qr_pending');
