@@ -1,16 +1,24 @@
 {
-  "versionName": "0.1.23",
-  "versionCode": 25,
+  "versionName": "0.1.24",
+  "versionCode": 26,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-07T18:26:39.368Z",
-  "sizeBytes": 12057261,
+  "updatedAt": "2026-07-07T18:38:04.186Z",
+  "sizeBytes": 12057257,
   "notes": [
-    "Gun reads EPC+TID per trigger (setEPCAndTIDMode)",
-    "pollScans returns {epc,tid} objects",
-    "Requires GAS v475 for crew badge pair login"
+    "TID fix: setEPCAndTIDMode before each read + readData fallback",
+    "R6 BLE often omits getTid() from inventorySingleTag alone"
   ],
   "history": [
+    {
+      "versionName": "0.1.24",
+      "versionCode": 26,
+      "date": "2026-07-07T18:38:04.186Z",
+      "notes": [
+        "TID fix: setEPCAndTIDMode before each read + readData fallback",
+        "R6 BLE often omits getTid() from inventorySingleTag alone"
+      ]
+    },
     {
       "versionName": "0.1.23",
       "versionCode": 25,
@@ -184,16 +192,6 @@
       "notes": [
         "Trigger now does a SINGLE read (one pull = one tag) instead of continuous machine-gun scanning",
         "Gun echoes 'Read: <EPC>' on the status bar so we can see reads even if the top strip is empty"
-      ]
-    },
-    {
-      "versionName": "0.1.1",
-      "versionCode": 3,
-      "date": "2026-07-02T15:20:15.686Z",
-      "notes": [
-        "RFID: connect to gun paired under any name (not just Nordic_UART_CW)",
-        "Shows paired device names on screen when the gun name is unrecognised",
-        "Uses the only paired device on a dedicated station phone"
       ]
     }
   ]

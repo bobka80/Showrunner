@@ -91,7 +91,7 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 }
 ```
 
-**`rfid_tag` / `rfid_tid` matching contract (fragile):** both use `normalizeStationRfidTag()` = `trim().toLowerCase()` only. Native sends uppercase; server lowercases. **Soft cutover:** empty `rfid_tid` on row → host login is **EPC-only** (legacy). Once `rfid_tid` is enrolled → login requires **EPC + TID** pair; wrong TID rejects with clone warning. Equipment stays EPC-only on `Assets.rfid_tag`. Columns via `verifyVaultSchema` / `ensureCrewRfidTidColumn_`. Enrollment calls `flushCache()`. Lifecycle: [active/rfid-station-profiles.md](active/rfid-station-profiles.md).
+**`rfid_tag` / `rfid_tid` matching contract (fragile):** both use `normalizeStationRfidTag()` = `trim().toLowerCase()` only. Native sends uppercase; server lowercases. **Soft cutover:** empty `rfid_tid` on row → host login is **EPC-only** (legacy). Once `rfid_tid` is enrolled → login requires **EPC + TID** pair; wrong TID rejects with clone warning. Equipment stays EPC-only on `Assets.rfid_tag`. Columns via `verifyVaultSchema` (crew repair ensures `rfid_tag` then `rfid_tid`). Enrollment calls `flushCache()`. Lifecycle: [active/rfid-station-profiles.md](active/rfid-station-profiles.md).
 
 ---
 

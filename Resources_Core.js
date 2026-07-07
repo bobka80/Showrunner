@@ -222,6 +222,7 @@ function canonicalCrewHeader_(header) {
 function repairAndEnsureCrewRosterSchema_(crewSheet) {
   const PAY = 'Payroll_Multiplier';
   const RFID = 'rfid_tag';
+  const RFID_TID = 'rfid_tid';
 
   let state = readCrewRosterGrid_(crewSheet);
   let headers = state.headers;
@@ -279,13 +280,22 @@ function repairAndEnsureCrewRosterSchema_(crewSheet) {
 
   const lastRow = Math.max(crewSheet.getLastRow(), 1);
 
+  let tagIdx = -1;
+  let tidIdx = -1;
+  for (let c = 0; c < fixed.length; c++) {
+    const k = normalizeVaultHeaderKey_(fixed[c]);
+    if (k === 'rfidtag') tagIdx = c;
+    if (k === 'rfidtid') tidIdx = c;
+  }
+
   let rfidAtEnd = fixed.length > 0 && normalizeVaultHeaderKey_(fixed[fixed.length - 1]) === 'rfidtag';
 
-  if (rfidDataCol >= 0 && rfidDataCol !== fixed.length - 1) {
-    if (!rfidAtEnd) {
+  if (rfidDataCol >= 0 && rfidDataCol !== fixed.length - 1 && tidIdx !== fixed.length - 1) {
+    if (!rfidAtEnd && tidIdx !== fixed.length - 1) {
       crewSheet.insertColumnAfter(crewSheet.getLastColumn());
       fixed.push(RFID);
       rfidAtEnd = true;
+      tagIdx = fixed.length - 1;
     }
     const destCol = crewSheet.getLastColumn();
     if (lastRow >= 2) {
@@ -299,36 +309,40 @@ function repairAndEnsureCrewRosterSchema_(crewSheet) {
     }
   }
 
-  if (!rfidAtEnd) {
+  tagIdx = -1;
+  tidIdx = -1;
+  for (let c = 0; c < fixed.length; c++) {
+    const k = normalizeVaultHeaderKey_(fixed[c]);
+    if (k === 'rfidtag') tagIdx = c;
+    if (k === 'rfidtid') tidIdx = c;
+  }
+
+  if (tagIdx < 0) {
     crewSheet.insertColumnAfter(crewSheet.getLastColumn());
     fixed.push(RFID);
+    tagIdx = fixed.length - 1;
   } else {
-    fixed[fixed.length - 1] = RFID;
+    fixed[tagIdx] = RFID;
   }
+
+  tidIdx = -1;
+  for (let c = 0; c < fixed.length; c++) {
+    if (normalizeVaultHeaderKey_(fixed[c]) === 'rfidtid') tidIdx = c;
+  }
+  if (tidIdx < 0) {
+    crewSheet.insertColumnAfter(tagIdx + 1);
+    fixed.splice(tagIdx + 1, 0, RFID_TID);
+  } else {
+    fixed[tidIdx] = RFID_TID;
+  }
+
+  const colCount = crewSheet.getLastColumn();
+  while (fixed.length < colCount) fixed.push('');
+  if (fixed.length > colCount) fixed.length = colCount;
 
   crewSheet.getRange(1, 1, 1, fixed.length).setValues([fixed]);
   crewSheet.getRange(1, 1, 1, fixed.length)
     .setFontWeight('bold').setBackground('#064e3b').setFontColor('#ffffff');
-  ensureCrewRfidTidColumn_(crewSheet);
-}
-
-/** Add rfid_tid after rfid_tag when missing (crew badge anti-clone anchor). */
-function ensureCrewRfidTidColumn_(crewSheet) {
-  const lastCol = crewSheet.getLastColumn();
-  if (lastCol < 1) return;
-  const headers = crewSheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h || '').trim());
-  let hasTid = false;
-  let rfidCol = -1;
-  for (let i = 0; i < headers.length; i++) {
-    const key = normalizeVaultHeaderKey_(headers[i]);
-    if (key === 'rfidtid') hasTid = true;
-    if (key === 'rfidtag') rfidCol = i;
-  }
-  if (hasTid || rfidCol < 0) return;
-  crewSheet.insertColumnAfter(rfidCol + 1);
-  const tidCol = rfidCol + 2;
-  crewSheet.getRange(1, tidCol).setValue('rfid_tid');
-  crewSheet.getRange(1, tidCol).setFontWeight('bold').setBackground('#064e3b').setFontColor('#ffffff');
 }
 
 // @INDEX: SCHEMA_VAULT -> Relational Schema Engine
