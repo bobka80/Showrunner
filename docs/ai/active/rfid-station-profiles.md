@@ -96,7 +96,8 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 1. **[x] Crew EPC + TID (Chainway UHF, soft cutover A)** — `rfid_tid` column; native `setEPCAndTIDMode`; enroll/login pair match when TID on row; legacy EPC-only until re-enrolled.
 2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
-3. **[ ] Optimistic host login + local roster cache** — after EPC+TID schema ships.
+3. **[x] Optimistic host login + local roster cache** — local EPC+TID roster + instant host UI; server confirms in parallel (GAS v481+).
+4. **[ ] Host idle eject must fire after sleep** — `setTimeout` for host eject does not run while the tablet screen is off / app suspended; eject at configured minutes **wall-clock** even through sleep (use `localStorage` deadline + check on `visibilitychange` / resume).
 
 ### Parked — must fix later (director 2026-07-07: stop work for now)
 
@@ -145,6 +146,7 @@ Files: `push-hosting/public/host-boot.js`, `Login.html`, `station-android/.../St
 
 ### Field / polish (ongoing)
 
+- [ ] **Host idle eject after screen sleep** — timer must eject hosted crew at configured minutes even when tablet slept (see priority #4 above).
 - [ ] **Gun name still unrecognised (build 3):** waiting on the gun's real Bluetooth name from the field.
 - [ ] **Dial in the real values on hardware** — power dBm, beep/power persist across reconnect on R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html`.
@@ -272,6 +274,8 @@ On host logout, idle eject, or sign-out: return to **"waiting for badge"** main 
 - **Equipment:** EPC-only (`Assets.rfid_tag`) is fine for now; same two-field pattern optional later.
 
 ### Optimistic host login (fast badge-in)
+
+**Status:** **Shipped (GAS v481+)** — `buildCrewHostRosterFromSheets_` + `crewHostRoster` on `getStationEquipmentRfidMap`; shell caches to `sm_station_crew_host_v1`; `stationHandleRfidScan_` hosts instantly from cache then server confirms.
 
 1. Gun reads EPC + TID.
 2. Station looks up pair in **local cache** (crew slice of equip map) → **immediately** show host name + apply cached tier/permissions (“Maria — logging in…”).

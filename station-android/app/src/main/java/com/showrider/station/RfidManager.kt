@@ -619,17 +619,19 @@ class RfidManager(
         }
     }
 
-    /** TID bank: 4 words (64-bit Alien H3) then 6 words (96-bit FM / others). */
+    /** TID bank: prefer 6 words (96-bit FM / demo default), fall back to 4 words (64-bit H3). */
     private fun readTidBank(epc: String): String {
+        var best = ""
         for (words in TID_READ_WORD_CANDIDATES) {
             try {
                 val tid = uhf.readData("00000000", RFIDWithUHFBLE.Bank_TID, TID_READ_PTR_WORDS, words)
                 val norm = acceptTidForScan(tid, epc)
-                if (norm.isNotEmpty()) return norm
+                if (norm.length > best.length) best = norm
             } catch (e: Exception) {
                 Log.w(TAG, "readData TID ($words words) failed", e)
             }
         }
+        if (best.isNotEmpty()) return best
         return readTidForEpcFiltered(epc)
     }
 
@@ -640,6 +642,7 @@ class RfidManager(
     private fun readTidForEpcFiltered(epc: String): String {
         val epcHex = epc.trim()
         if (epcHex.isEmpty()) return ""
+        var best = ""
         try {
             var filterData = epcHex.uppercase()
             if (filterData.length % 2 != 0) filterData += "0"
@@ -656,12 +659,12 @@ class RfidManager(
                     words,
                 )
                 val norm = acceptTidForScan(tid, epc)
-                if (norm.isNotEmpty()) return norm
+                if (norm.length > best.length) best = norm
             }
         } catch (e: Exception) {
             Log.w(TAG, "readData TID (EPC filter) failed", e)
         }
-        return ""
+        return best
     }
 
     private fun acceptEpcForScan(raw: String?): String = normalizeHex(raw)
@@ -849,6 +852,7 @@ class RfidManager(
         private const val EPC_READ_PTR_WORDS = 2
         private const val EPC_READ_CNT_WORDS = 6
         private const val TID_READ_PTR_WORDS = 0
-        private val TID_READ_WORD_CANDIDATES = intArrayOf(4, 6)
+        /** 6 words first (96-bit TID, Chainway demo default); 4 words for 64-bit H3 fallback. */
+        private val TID_READ_WORD_CANDIDATES = intArrayOf(6, 4)
     }
 }

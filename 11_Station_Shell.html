@@ -1196,6 +1196,7 @@ var STATION_BEEP_KEY = 'sm_station_beep';
  * live scan strip can show a human name/unit instead of the raw tag — instantly and offline.
  */
 var STATION_EQUIP_MAP_KEY = 'sm_station_equip_map_v2';
+var STATION_CREW_HOST_KEY = 'sm_station_crew_host_v1';
 var STATION_EQUIP_MAP_REFRESH_MS = 5 * 60 * 1000;
 var STATION_PRESET_STORAGE_KEY = 'sm_station_power_presets_v1';
 var STATION_PRESET_HOLD_MS = 1000;
@@ -1203,6 +1204,58 @@ window.stationScanPanelOpen = false;
 window.stationPanelSelection = null;
 window.stationPanelPendingStatus = null;
 window.stationEquipMap = window.stationEquipMap || {};
+window.stationCrewHostRoster = window.stationCrewHostRoster || [];
+
+/** True when two TID reads are the same chip (exact or shorter 4-word vs longer 6-word read). */
+function stationRfidTidEquivalent_(a, b) {
+  var x = stationNormalizeEpc_(a);
+  var y = stationNormalizeEpc_(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  var short = x.length <= y.length ? x : y;
+  var long = x.length <= y.length ? y : x;
+  if (short.length >= 12 && long.indexOf(short) === 0) return true;
+  return false;
+}
+
+/** Local crew host lookup — mirrors lookupCrewMemberByRfidPair_ for optimistic badge-in. */
+function stationLookupCrewHostLocal_(epc, tid) {
+  var needleEpc = stationNormalizeEpc_(epc);
+  var needleTid = stationNormalizeEpc_(tid);
+  var roster = window.stationCrewHostRoster || [];
+  var tidMismatch = false;
+  var tidMissing = false;
+
+  for (var i = 0; i < roster.length; i++) {
+    var row = roster[i];
+    var rowEpc = stationNormalizeEpc_(row.rfidTag);
+    if (!rowEpc || rowEpc !== needleEpc) continue;
+    var rowTid = stationNormalizeEpc_(row.rfidTid || '');
+    if (rowTid) {
+      if (!needleTid) {
+        tidMissing = true;
+        continue;
+      }
+      if (!stationRfidTidEquivalent_(rowTid, needleTid)) {
+        tidMismatch = true;
+        continue;
+      }
+    }
+    return {
+      crew: {
+        uid: row.uid || '',
+        name: row.name,
+        rfidTag: row.rfidTag,
+        rfidTid: rowTid,
+        access: row.access || 'CREW',
+        permissions: row.permissions || {}
+      },
+      tidMismatch: false,
+      tidMissing: false
+    };
+  }
+  return { crew: null, tidMismatch: tidMismatch, tidMissing: tidMissing };
+}
 
 /** Same trim/lowercase contract the backend uses for tag matching. */
 function stationNormalizeEpc_(epc) {
@@ -1297,6 +1350,20 @@ function stationLoadEquipMapCache_() {
     var parsed = JSON.parse(raw);
     if (parsed && parsed.map) window.stationEquipMap = parsed.map;
   } catch (e) { /* ignore */ }
+  try {
+    var crewRaw = localStorage.getItem(STATION_CREW_HOST_KEY);
+    if (!crewRaw) return;
+    var crewParsed = JSON.parse(crewRaw);
+    if (crewParsed && crewParsed.roster) window.stationCrewHostRoster = crewParsed.roster;
+  } catch (e2) { /* ignore */ }
+}
+
+function stationStoreCrewHostRoster_(roster) {
+  if (!roster || !roster.length) return;
+  window.stationCrewHostRoster = roster;
+  try {
+    localStorage.setItem(STATION_CREW_HOST_KEY, JSON.stringify({ roster: roster, ts: Date.now() }));
+  } catch (e) { /* ignore */ }
 }
 
 function stationRefreshEquipMap_() {
@@ -1307,7 +1374,8 @@ function stationRefreshEquipMap_() {
         if (!res || !res.success || !res.map) return;
         window.stationEquipMap = res.map;
         try { localStorage.setItem(STATION_EQUIP_MAP_KEY, JSON.stringify({ map: res.map, ts: Date.now() })); } catch (e) { /* ignore */ }
-        stationDebug_('equip map: ' + (res.count || 0));
+        if (res.crewHostRoster) stationStoreCrewHostRoster_(res.crewHostRoster);
+        stationDebug_('equip map: ' + (res.count || 0) + ' crew roster: ' + ((res.crewHostRoster && res.crewHostRoster.length) || 0));
         stationRenderScanFeed_();
       })
       .withFailureHandler(function(err) { stationDebug_('equip map ERR'); })
@@ -1667,7 +1735,8 @@ function stationApplyBootstrap_(data) {
 
 function stationHandleRfidScan_(rawTag, rawTid) {
   const tag = String(rawTag || '').trim();
-  const tid = String(rawTid || '').trim();
+  let tid = String(rawTid || '').trim();
+  if (!tid && window.stationLastScanTid) tid = String(window.stationLastScanTid).trim();
   if (!tag || window.stationScanBusy) return;
   if (!window.IS_STATION_DEVICE) return;
 
@@ -1680,14 +1749,38 @@ function stationHandleRfidScan_(rawTag, rawTid) {
     return;
   }
 
+  const localLookup = stationLookupCrewHostLocal_(tag, tid);
+  let optimisticHost = null;
+  if (localLookup.tidMismatch) {
+    stationSetStatus_('Badge chip ID does not match — possible cloned tag.', 'error');
+    return;
+  }
+  if (localLookup.crew) {
+    optimisticHost = localLookup.crew;
+  } else if (localLookup.tidMissing) {
+    stationSetStatus_('Gun did not read chip TID. Hold the badge still and scan again.', 'error');
+    return;
+  }
+
   window.stationScanBusy = true;
   stationSetLastScan_(tag);
-  stationSetStatus_('Looking up badge…', '');
+
+  if (optimisticHost) {
+    stationWriteHostSession_(optimisticHost);
+    stationRenderShellState_();
+    stationSetStatus_('Hosted as ' + optimisticHost.name + ' — confirming…', '');
+  } else {
+    stationSetStatus_('Looking up badge…', '');
+  }
 
   google.script.run
     .withSuccessHandler(function(res) {
       window.stationScanBusy = false;
       if (!res || !res.success) {
+        if (optimisticHost) {
+          stationWriteHostSession_(null);
+          stationRenderShellState_();
+        }
         stationSetStatus_((res && res.error) ? res.error : 'Scan failed.', 'error');
         return;
       }
@@ -1697,10 +1790,18 @@ function stationHandleRfidScan_(rawTag, rawTid) {
         stationSetStatus_('Hosted as ' + res.host.name, 'ok');
         return;
       }
+      if (optimisticHost) {
+        stationWriteHostSession_(null);
+        stationRenderShellState_();
+      }
       stationSetStatus_('Unrecognized scan.', 'error');
     })
     .withFailureHandler(function(err) {
       window.stationScanBusy = false;
+      if (optimisticHost) {
+        stationWriteHostSession_(null);
+        stationRenderShellState_();
+      }
       stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
     })
     .processStationRfidScan(ACTIVE_USER_NAME, tag, { hostOnly: true, tid: tid });

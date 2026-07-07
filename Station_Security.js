@@ -464,10 +464,54 @@ function buildEquipmentScanMapFromSheets_(sheets) {
       if (!tag || out[tag]) continue;
       const nm = getSheetCell(crewData[i], crewMap, 'Name');
       if (!nm) continue;
-      out[tag] = { kind: 'crew', name: String(nm) };
+      const rowTid = crewMap['rfid_tid'] !== undefined
+        ? normalizeStationRfidTag(crewData[i][crewMap['rfid_tid']])
+        : '';
+      out[tag] = { kind: 'crew', name: String(nm), rfidTid: rowTid };
     }
   }
   return out;
+}
+
+/** Crew rows for optimistic host-in (EPC+TID + cached RBAC). Excludes station device profiles. */
+function buildCrewHostRosterFromSheets_(sheets) {
+  const crewData = getSheetData(sheets.crew);
+  const cMap = getHeaderMap(crewData);
+  if (cMap['rfid_tag'] === undefined) return [];
+
+  const rMap = ensureStationRoleColumns(sheets.roles);
+  const roleData = sheets.roles.getDataRange().getValues();
+  const deviceRoleIds = {};
+  for (let r = 1; r < roleData.length; r++) {
+    if (isStationDeviceProfileRow(roleData[r], rMap)) {
+      const rid = getSheetCell(roleData[r], rMap, 'Role_ID');
+      if (rid) deviceRoleIds[String(rid).toLowerCase().trim()] = true;
+    }
+  }
+
+  const roster = [];
+  for (let i = 1; i < crewData.length; i++) {
+    const epc = normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]);
+    if (!epc) continue;
+    const name = getSheetCell(crewData[i], cMap, 'Name');
+    if (!name) continue;
+    const roleId = (getSheetCell(crewData[i], cMap, 'Role_ID') || '').toString().toLowerCase().trim();
+    if (roleId && deviceRoleIds[roleId]) continue;
+
+    const tid = cMap['rfid_tid'] !== undefined
+      ? normalizeStationRfidTag(crewData[i][cMap['rfid_tid']])
+      : '';
+    const rbac = resolveHostRbacBundle_(name, crewData, cMap);
+    roster.push({
+      uid: getSheetCell(crewData[i], cMap, 'uid') || '',
+      name: name,
+      rfidTag: epc,
+      rfidTid: tid,
+      access: rbac.access || 'CREW',
+      permissions: rbac.permissions || {}
+    });
+  }
+  return roster;
 }
 
 function getMobileScanStatusPermissions_(crewName) {
@@ -530,7 +574,14 @@ function getStationEquipmentRfidMap(deviceActor) {
     }
     const sheets = verifyVaultSchema(true);
     const out = buildEquipmentScanMapFromSheets_(sheets);
-    return { success: true, map: out, count: Object.keys(out).length, ts: Date.now() };
+    const crewHostRoster = buildCrewHostRosterFromSheets_(sheets);
+    return {
+      success: true,
+      map: out,
+      crewHostRoster: crewHostRoster,
+      count: Object.keys(out).length,
+      ts: Date.now()
+    };
   });
 }
 

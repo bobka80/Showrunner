@@ -1,15 +1,24 @@
 {
-  "versionName": "0.1.27",
-  "versionCode": 29,
+  "versionName": "0.1.28",
+  "versionCode": 30,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-07T19:28:14.574Z",
-  "sizeBytes": 12057261,
+  "updatedAt": "2026-07-07T19:44:32.196Z",
+  "sizeBytes": 12057257,
   "notes": [
-    "Explicit EPC+TID bank reads (ptr=2 EPC, ptr=0 TID)",
-    "EPC-only inventory select"
+    "Read full 96-bit TID (6 words)",
+    "was truncating last 8 hex chars"
   ],
   "history": [
+    {
+      "versionName": "0.1.28",
+      "versionCode": 30,
+      "date": "2026-07-07T19:44:32.196Z",
+      "notes": [
+        "Read full 96-bit TID (6 words)",
+        "was truncating last 8 hex chars"
+      ]
+    },
     {
       "versionName": "0.1.27",
       "versionCode": 29,
@@ -182,16 +191,6 @@
       "notes": [
         "Fixed the real cause: the gun was in Continuous mode, which did not deliver tags on this reader. Both Single and Continuous now use the reliable read, so the trigger shows the tag again",
         "Tip: Single mode (one pull = one tag) is recommended for badge and equipment scans"
-      ]
-    },
-    {
-      "versionName": "0.1.4",
-      "versionCode": 6,
-      "date": "2026-07-02T16:56:28.307Z",
-      "notes": [
-        "Fixed: trigger reads stopped working in the last build (a battery/version check was blocking the scanner) - pull-to-read + beep now work again",
-        "Scanner starts at full power so it reads on first run",
-        "use the Setup screen to lower the range/sensitivity"
       ]
     }
   ]
