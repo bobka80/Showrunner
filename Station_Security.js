@@ -1237,7 +1237,7 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
     if (tid === tag) {
       return {
         success: false,
-        error: 'Gun returned EPC as chip TID — update station APK, reconnect gun, and scan again.',
+        error: 'Gun read the same value for EPC and chip TID. Update station APK (v0.1.27+), reconnect gun, hold badge still, and scan again.',
       };
     }
 

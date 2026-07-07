@@ -1,15 +1,24 @@
 {
-  "versionName": "0.1.26",
-  "versionCode": 28,
+  "versionName": "0.1.27",
+  "versionCode": 29,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-07T19:01:07.847Z",
+  "updatedAt": "2026-07-07T19:28:14.574Z",
   "sizeBytes": 12057261,
   "notes": [
-    "Fix TID read: Chainway EPC filter uses bit ptr (32) not word ptr",
-    "reject EPC echoed as TID"
+    "Explicit EPC+TID bank reads (ptr=2 EPC, ptr=0 TID)",
+    "EPC-only inventory select"
   ],
   "history": [
+    {
+      "versionName": "0.1.27",
+      "versionCode": 29,
+      "date": "2026-07-07T19:28:14.574Z",
+      "notes": [
+        "Explicit EPC+TID bank reads (ptr=2 EPC, ptr=0 TID)",
+        "EPC-only inventory select"
+      ]
+    },
     {
       "versionName": "0.1.26",
       "versionCode": 28,
@@ -183,15 +192,6 @@
         "Fixed: trigger reads stopped working in the last build (a battery/version check was blocking the scanner) - pull-to-read + beep now work again",
         "Scanner starts at full power so it reads on first run",
         "use the Setup screen to lower the range/sensitivity"
-      ]
-    },
-    {
-      "versionName": "0.1.3",
-      "versionCode": 5,
-      "date": "2026-07-02T16:34:25.467Z",
-      "notes": [
-        "Fixed: gun reads now reach the app (they were hitting the wrong browser frame) — scans show in the top strip and enrollment works",
-        "New Setup screen: tap CHAINWAY HANDHELD at the top to set scan power/sensitivity, scan mode (single/continuous), gun beeper on/off, and the auto sign-out timer"
       ]
     }
   ]

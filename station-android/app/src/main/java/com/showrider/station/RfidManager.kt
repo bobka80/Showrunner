@@ -521,9 +521,8 @@ class RfidManager(
         readWorker.execute {
             if (readCancelled.get()) return@execute
             try {
-                ensureEpcTidReadMode()
-                val info = uhf.inventorySingleTag()
-                if (info != null) deliverTag(info)
+                val pair = readTagPair()
+                if (pair != null) deliverTag(pair.first, pair.second)
             } catch (e: Exception) {
                 Log.e(TAG, "single read failed", e)
                 healthFailStreak++
@@ -545,9 +544,8 @@ class RfidManager(
                 !readCancelled.get()
             ) {
                 try {
-                    ensureEpcTidReadMode()
-                    val info = uhf.inventorySingleTag()
-                    if (info != null) deliverTag(info)
+                    val pair = readTagPair()
+                    if (pair != null) deliverTag(pair.first, pair.second)
                 } catch (e: Exception) {
                     Log.e(TAG, "multi read failed", e)
                 }
@@ -557,77 +555,120 @@ class RfidManager(
         }
     }
 
-    private fun deliverTag(info: UHFTAGInfo) {
-        val epc = info.epc?.trim().orEmpty().ifEmpty { info.getEPC()?.trim().orEmpty() }
+    /**
+     * Inventory selects one tag, then read EPC and TID banks explicitly (SDK demo pattern).
+     * Do not trust inventory getTid()/getEPC() alone — R6 BLE often echoes EPC into both fields.
+     */
+    private fun readTagPair(): Pair<String, String>? {
+        ensureEpcMode()
+        val info = uhf.inventorySingleTag() ?: return null
+        val invEpc = acceptEpcForScan(info.getEPC() ?: info.epc)
+        val epc = readEpcBank().ifEmpty { invEpc }
+        if (epc.isEmpty()) return null
+
+        var tid = readTidBank(epc)
+        if (tid.isEmpty()) tid = acceptTidForScan(info.getTid(), epc)
+
+        Log.i(
+            TAG,
+            "tag pair epc=${epc.length}ch tid=${tid.length}ch same=${epc.equals(tid, ignoreCase = true)}",
+        )
+        if (tid.isEmpty()) {
+            postStatus("EPC ok, chip TID not read — hold badge still and scan again")
+        }
+        return Pair(epc.uppercase(), tid)
+    }
+
+    private fun deliverTag(epc: String, tid: String) {
         if (epc.isEmpty()) return
-        val tid = resolveTid(info, epc)
         val now = System.currentTimeMillis()
         if (epc.equals(lastEpc, ignoreCase = true) && now - lastEpcAt < DEBOUNCE_MS) return
         lastEpc = epc
         lastEpcAt = now
-        val upperEpc = epc.uppercase()
-        pendingScans.add(PendingScan(upperEpc, tid))
+        pendingScans.add(PendingScan(epc, tid))
         while (pendingScans.size > 32) pendingScans.poll()
-        mainHandler.post { onTagScanned(upperEpc, tid) }
+        mainHandler.post { onTagScanned(epc, tid) }
     }
 
-    /** Must run on readWorker — sets gun inventory mode so TID is included in reads. */
+    /** EPC-only inventory for tag select; TID comes from an explicit bank read after. */
+    private fun ensureEpcMode() {
+        try {
+            if (!uhf.setEPCMode()) Log.w(TAG, "setEPCMode returned false")
+        } catch (e: Exception) {
+            Log.w(TAG, "setEPCMode failed", e)
+        }
+    }
+
     private fun ensureEpcTidReadMode() {
         try {
-            if (!uhf.setEPCAndTIDMode()) {
-                Log.w(TAG, "setEPCAndTIDMode returned false")
-            }
+            if (!uhf.setEPCAndTIDMode()) Log.w(TAG, "setEPCAndTIDMode returned false")
         } catch (e: Exception) {
             Log.w(TAG, "setEPCAndTIDMode failed", e)
         }
     }
 
-    private fun resolveTid(info: UHFTAGInfo, epc: String): String {
-        val fromInfo = acceptTidForScan(info.getTid(), epc)
-        if (fromInfo.isNotEmpty()) return fromInfo
-        return readTidForEpc(epc)
+    /** EPC bank: skip PC word (ptr=2), read 6 words — UHFReadWriteFragment defaults. */
+    private fun readEpcBank(): String {
+        return try {
+            acceptEpcForScan(
+                uhf.readData("00000000", RFIDWithUHFBLE.Bank_EPC, EPC_READ_PTR_WORDS, EPC_READ_CNT_WORDS),
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "readData EPC bank failed", e)
+            ""
+        }
+    }
+
+    /** TID bank: 4 words (64-bit Alien H3) then 6 words (96-bit FM / others). */
+    private fun readTidBank(epc: String): String {
+        for (words in TID_READ_WORD_CANDIDATES) {
+            try {
+                val tid = uhf.readData("00000000", RFIDWithUHFBLE.Bank_TID, TID_READ_PTR_WORDS, words)
+                val norm = acceptTidForScan(tid, epc)
+                if (norm.isNotEmpty()) return norm
+            } catch (e: Exception) {
+                Log.w(TAG, "readData TID ($words words) failed", e)
+            }
+        }
+        return readTidForEpcFiltered(epc)
     }
 
     /**
-     * Explicit TID bank read when inventory did not populate getTid() (common on R6 BLE).
-     * Chainway SDK: EPC filter ptr is in bits (32 = skip CRC+PC); filterCnt is also bits (hexLen*4).
-     * See uhf-ble-demo UHFReadWriteFragment.
+     * Filtered TID read when multiple tags may be in range.
+     * Chainway SDK: EPC filter ptr/cnt are in bits (ptr 32 = skip CRC+PC; cnt = hexLen*4).
      */
-    private fun readTidForEpc(epc: String): String {
+    private fun readTidForEpcFiltered(epc: String): String {
         val epcHex = epc.trim()
         if (epcHex.isEmpty()) return ""
-        try {
-            val tid = uhf.readData("00000000", RFIDWithUHFBLE.Bank_TID, TID_READ_PTR_WORDS, TID_READ_CNT_WORDS)
-            val norm = acceptTidForScan(tid, epc)
-            if (norm.isNotEmpty()) return norm
-        } catch (e: Exception) {
-            Log.w(TAG, "readData TID (plain) failed", e)
-        }
         try {
             var filterData = epcHex.uppercase()
             if (filterData.length % 2 != 0) filterData += "0"
             val filterCntBits = filterData.length * 4
-            val tid = uhf.readData(
-                "00000000",
-                RFIDWithUHFBLE.Bank_EPC,
-                EPC_FILTER_PTR_BITS,
-                filterCntBits,
-                filterData,
-                RFIDWithUHFBLE.Bank_TID,
-                TID_READ_PTR_WORDS,
-                TID_READ_CNT_WORDS,
-            )
-            val norm = acceptTidForScan(tid, epc)
-            if (norm.isNotEmpty()) return norm
+            for (words in TID_READ_WORD_CANDIDATES) {
+                val tid = uhf.readData(
+                    "00000000",
+                    RFIDWithUHFBLE.Bank_EPC,
+                    EPC_FILTER_PTR_BITS,
+                    filterCntBits,
+                    filterData,
+                    RFIDWithUHFBLE.Bank_TID,
+                    TID_READ_PTR_WORDS,
+                    words,
+                )
+                val norm = acceptTidForScan(tid, epc)
+                if (norm.isNotEmpty()) return norm
+            }
         } catch (e: Exception) {
             Log.w(TAG, "readData TID (EPC filter) failed", e)
         }
         return ""
     }
 
-    /** Reject empty, all-zero, or EPC-echo values — firmware may copy EPC into getTid() when TID read fails. */
+    private fun acceptEpcForScan(raw: String?): String = normalizeHex(raw)
+
+    /** Reject empty, all-zero, or EPC-echo values. */
     private fun acceptTidForScan(raw: String?, epc: String): String {
-        val norm = normalizeTid(raw)
+        val norm = normalizeHex(raw)
         if (norm.isEmpty()) return ""
         if (norm.equals(epc.trim().uppercase(), ignoreCase = true)) {
             Log.w(TAG, "rejecting TID identical to EPC")
@@ -636,11 +677,12 @@ class RfidManager(
         return norm
     }
 
-    private fun normalizeTid(raw: String?): String {
+    private fun normalizeHex(raw: String?): String {
         val t = raw?.trim().orEmpty()
         if (t.isEmpty()) return ""
         if (t.equals("0000000000000000", ignoreCase = true)) return ""
         if (t.equals("000000000000000000000000", ignoreCase = true)) return ""
+        if (t.all { it == '0' }) return ""
         return t.uppercase()
     }
 
@@ -804,7 +846,9 @@ class RfidManager(
         private const val BLE_BUSY_CLEAR_MS = 4000L
         /** EPC memory filter start (bits) — skip CRC+PC before EPC bytes. SDK demo rbEPC_filter. */
         private const val EPC_FILTER_PTR_BITS = 32
+        private const val EPC_READ_PTR_WORDS = 2
+        private const val EPC_READ_CNT_WORDS = 6
         private const val TID_READ_PTR_WORDS = 0
-        private const val TID_READ_CNT_WORDS = 6
+        private val TID_READ_WORD_CANDIDATES = intArrayOf(4, 6)
     }
 }
