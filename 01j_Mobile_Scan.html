@@ -756,7 +756,7 @@ window.mobileToggleScanPanel = function() {
   mobileOpenScanPanel();
 };
 
-/** Shell overlay camera (keeps GAS iframe loaded) or top-level fallback. */
+/** Shell-native fullscreen camera (web.app document — reliable on iOS + Android PWA). */
 window.mobileGoToScanCameraPage_ = function() {
   if (mobileScanInHostingIframe_()) {
     mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA');

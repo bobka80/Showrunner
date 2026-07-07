@@ -363,6 +363,82 @@
       border: none;
       background: #0a0a0c;
     }
+
+    /* Shell-native fullscreen QR (camera on web.app document — same as proven mobile-scan.html) */
+    #sr-mobile-shell-cam {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      flex-direction: column;
+      gap: 12px;
+      background: #0a0a0c;
+      color: #f4f4f5;
+      font-family: Inter, system-ui, sans-serif;
+      padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+      touch-action: manipulation;
+    }
+    #sr-mobile-shell-cam.is-open { display: flex; }
+    .sr-shell-cam-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .sr-shell-cam-title {
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: #fb923c;
+    }
+    #sr-shell-cam-cancel {
+      border: 1px solid #444;
+      background: transparent;
+      color: #a1a1aa;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 10px 12px;
+      border-radius: 8px;
+      touch-action: manipulation;
+    }
+    #sr-shell-cam-reader {
+      flex: 1;
+      min-height: 240px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid #f97316;
+      position: relative;
+    }
+    #sr-shell-cam-reader video {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    #sr-shell-cam-start {
+      width: 100%;
+      padding: 20px 16px;
+      border: 2px solid #f97316;
+      border-radius: 12px;
+      background: #18181b;
+      color: #fb923c;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0.06em;
+      touch-action: manipulation;
+      flex-shrink: 0;
+    }
+    #sr-shell-cam-status {
+      font-size: 12px;
+      color: #a1a1aa;
+      text-align: center;
+      min-height: 18px;
+      flex-shrink: 0;
+    }
+    body.sr-shell-cam-active #app-frame { display: none !important; }
     .sr-scan-stage-header {
       display: flex;
       align-items: center;
@@ -466,6 +542,16 @@
 
   </div>
 
+  <div id="sr-mobile-shell-cam" aria-hidden="true">
+    <div class="sr-shell-cam-header">
+      <span class="sr-shell-cam-title">SHOWRUNNER SCAN</span>
+      <button type="button" id="sr-shell-cam-cancel">CANCEL</button>
+    </div>
+    <div id="sr-shell-cam-reader"></div>
+    <button type="button" id="sr-shell-cam-start">TAP TO START CAMERA</button>
+    <p id="sr-shell-cam-status">Point at an asset QR label.</p>
+  </div>
+
   <div id="sr-mobile-scan-page" aria-hidden="true">
     <iframe id="sr-mobile-scan-page-frame" title="Showrunner QR scan" allow="camera; microphone"></iframe>
   </div>
@@ -518,7 +604,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <script src="/host-boot.js?v=459"></script>
+  <script src="/host-boot.js?v=460"></script>
 
 </body>
 
