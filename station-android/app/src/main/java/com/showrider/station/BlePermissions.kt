@@ -31,4 +31,17 @@ object BlePermissions {
     fun request(activity: Activity, requestCode: Int) {
         activity.requestPermissions(required(), requestCode)
     }
+
+    fun hasNotifications(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun requestNotifications(activity: Activity, requestCode: Int) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), requestCode)
+    }
 }

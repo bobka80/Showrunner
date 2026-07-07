@@ -2981,12 +2981,19 @@ function stationApplyGunConfig_(cfg) {
     if (storedBeep == null) stationSetStoredSetting_(STATION_BEEP_KEY, (cfg.beep !== false) ? '1' : '0');
   }
 
-  if (connEl) connEl.textContent = cfg.connected ? 'Connected' : 'Not connected';
-  if (typeof window.stationLastGunConnected === 'undefined') window.stationLastGunConnected = null;
-  if (window.stationLastGunConnected !== null && window.stationLastGunConnected !== !!cfg.connected) {
-    stationToast_(cfg.connected ? 'RFID gun connected' : 'RFID gun disconnected', cfg.connected ? 'ok' : 'error');
+  if (connEl) {
+    var connLabel = 'Not connected';
+    if (cfg.linkState === 'live' || (cfg.connected && !cfg.linkState)) connLabel = 'Connected';
+    else if (cfg.linkState === 'connecting' || cfg.linkState === 'reconnecting') connLabel = 'Connecting…';
+    else if (cfg.linkState === 'zombie') connLabel = 'Link stale — reconnecting';
+    connEl.textContent = connLabel;
   }
-  window.stationLastGunConnected = !!cfg.connected;
+  var liveNow = !!(cfg.connected || cfg.linkState === 'live');
+  if (typeof window.stationLastGunConnected === 'undefined') window.stationLastGunConnected = null;
+  if (window.stationLastGunConnected !== null && window.stationLastGunConnected !== liveNow) {
+    stationToast_(liveNow ? 'RFID gun connected' : 'RFID gun disconnected', liveNow ? 'ok' : 'error');
+  }
+  window.stationLastGunConnected = liveNow;
   if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
   if (fwEl) fwEl.textContent = cfg.firmware || '—';
   stationSyncPanelReadModeUI_();

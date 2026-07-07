@@ -9,49 +9,47 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.rscja.deviceapi.RFIDWithUHFBLE
-import com.rscja.deviceapi.entity.InventoryParameter
 import com.rscja.deviceapi.entity.UHFTAGInfo
 import com.rscja.deviceapi.interfaces.ConnectionStatus
 import com.rscja.deviceapi.interfaces.ConnectionStatusCallback
-import com.rscja.deviceapi.interfaces.IUHFInventoryCallback
 import com.rscja.deviceapi.interfaces.KeyEventCallback
 import com.rscja.deviceapi.interfaces.ScanBTCallback
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Chainway R6 BLE RFID bridge (SDK: RFIDWithUHFBLE).
- * Auto-connects to [TARGET_BT_NAME], EU band, forwards EPC reads to Showrunner.
+ * Auto-connects to bonded/known gun, health-checks the link, and recovers from sleep/zombie BLE.
  */
 class RfidManager(
     private val context: Context,
     private val onTagScanned: (String) -> Unit,
     private val onStatus: (String) -> Unit,
-    // Called on every trigger DOWN. Returns true if the tablet screen was asleep and this pull was
-    // consumed to WAKE it (so we skip the read this once — the next pull scans). Returns false when
-    // the screen is already awake, i.e. a normal scan should happen.
     private val onTriggerWake: () -> Boolean = { false },
 ) {
     private val uhf = RFIDWithUHFBLE.getInstance()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val worker: ExecutorService = Executors.newSingleThreadExecutor()
-    // Separate thread for config/device-info calls (setPower/setBeep/battery/firmware) so a slow
-    // BLE round-trip can NEVER starve the tag-read worker above.
+    private val readWorker: ExecutorService = Executors.newSingleThreadExecutor()
+    private val reconnectExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val configWorker: ExecutorService = Executors.newSingleThreadExecutor()
     private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    @Volatile
-    private var connected = false
+    @Volatile private var connected = false
+    @Volatile private var linkState = LINK_DISCONNECTED
     private var inventoryRunning = false
     private var activeDisconnect = false
     private var lastEpc = ""
     private var lastEpcAt = 0L
     private var lastBondedNames = ""
     private val initialized = AtomicBoolean(false)
+    private val readCancelled = AtomicBoolean(false)
+    private val reconnectGeneration = AtomicInteger(0)
+    private var healthFailStreak = 0
+    private var macConnectFails = 0
+    private var ladderStep = 0
 
-    // Device-configurable gun settings (persisted in prefs, editable from the web setup view).
     @Volatile private var powerDbm = prefs.getInt(PREF_POWER, DEFAULT_POWER)
     @Volatile private var scanMode = prefs.getString(PREF_SCAN_MODE, SCAN_MODE_SINGLE) ?: SCAN_MODE_SINGLE
     @Volatile private var beepEnabled = prefs.getBoolean(PREF_BEEP, true)
@@ -59,76 +57,128 @@ class RfidManager(
     @Volatile private var battery = -1
     @Volatile private var firmware = ""
 
-    // Reliable scan delivery: native evaluateJavascript can only reach the TOP frame, so scans had
-    // to be relayed into the Showrunner iframe (fragile). Instead we queue EPCs here and let the
-    // iframe pull them directly via the injected AndroidStation bridge (proven working).
-    private val pendingScans = ConcurrentLinkedQueue<String>()
+    private val pendingScans = java.util.concurrent.ConcurrentLinkedQueue<String>()
 
     private val connectionCallback = ConnectionStatusCallback<Any> { status, device ->
         mainHandler.post { handleConnectionStatus(status, device as? BluetoothDevice) }
     }
 
-    private fun scheduleReconnect() {
+    private fun scheduleReconnect(delayMs: Long = RECONNECT_MS) {
         if (activeDisconnect) return
         mainHandler.postDelayed({
-            if (!connected && !activeDisconnect) reconnect()
-        }, RECONNECT_MS)
+            if (!connected && !activeDisconnect) connectIfNeeded()
+        }, delayMs)
     }
 
-    /** Drop a stale BLE session before opening a new one (avoids SDK churn that felt like an app restart). */
-    private fun reconnect(force: Boolean = false) {
-        worker.execute {
-            try {
-                if (activeDisconnect) return@execute
-                if (!force && connected) return@execute
-                connected = false
-                inventoryRunning = false
-                try {
-                    mainHandler.post {
-                        uhf.setKeyEventCallback(null)
-                        uhf.setInventoryCallback(null)
-                    }
-                    if (uhf.connectStatus != ConnectionStatus.DISCONNECTED) {
-                        uhf.disconnect()
-                    }
-                } catch (e: Exception) {
-                    Log.w(TAG, "reconnect: pre-disconnect", e)
-                }
-                Thread.sleep(350)
-                connectInternal()
-            } catch (e: Exception) {
-                Log.e(TAG, "reconnect failed", e)
-                postStatus("RFID reconnect failed")
-                scheduleReconnect()
-            }
+    private fun beginReconnectLadder(reason: String, fromStep: Int = 0) {
+        if (activeDisconnect) return
+        val gen = reconnectGeneration.incrementAndGet()
+        readCancelled.set(true)
+        stopInventory()
+        reconnectExecutor.execute {
+            if (gen != reconnectGeneration.get()) return@execute
+            runReconnectLadder(gen, fromStep, reason)
         }
     }
 
-    /** Operator-triggered hard reset — use when BLE says connected but reads fail. */
+    private fun runReconnectLadder(gen: Int, fromStep: Int, reason: String) {
+        try {
+            ladderStep = fromStep.coerceIn(0, 2)
+            setLinkState(LINK_RECONNECTING)
+            postStatus(
+                when (ladderStep) {
+                    0 -> "Reconnecting gun…"
+                    1 -> "Waiting for gun to wake…"
+                    else -> "Resetting gun driver…"
+                },
+            )
+            softDisconnect()
+            val waitMs = when (ladderStep) {
+                0 -> RECONNECT_WAIT_SOFT_MS
+                1 -> RECONNECT_WAIT_MEDIUM_MS
+                else -> RECONNECT_WAIT_NUCLEAR_MS
+            }
+            Thread.sleep(waitMs)
+            if (gen != reconnectGeneration.get() || activeDisconnect) return
+
+            if (ladderStep >= 2) {
+                nuclearReset()
+            }
+
+            val connectedNow = connectBlocking(gen, ladderStep)
+            if (!connectedNow && gen == reconnectGeneration.get() && !activeDisconnect) {
+                if (ladderStep < 2) {
+                    runReconnectLadder(gen, ladderStep + 1, reason)
+                } else {
+                    macConnectFails = 0
+                    prefs.edit().remove(PREF_BT_MAC).apply()
+                    scanAndConnectBlocking(gen)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "reconnect ladder failed ($reason)", e)
+            postStatus("RFID reconnect failed")
+            scheduleReconnect(RECONNECT_MS * 2)
+        }
+    }
+
+    private fun softDisconnect() {
+        connected = false
+        inventoryRunning = false
+        try {
+            mainHandler.post {
+                uhf.setKeyEventCallback(null)
+                uhf.setInventoryCallback(null)
+            }
+            if (uhf.connectStatus != ConnectionStatus.DISCONNECTED) {
+                uhf.disconnect()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "softDisconnect", e)
+        }
+    }
+
+    private fun nuclearReset() {
+        try {
+            softDisconnect()
+            Thread.sleep(400)
+            uhf.free()
+            initialized.set(false)
+            Thread.sleep(350)
+        } catch (e: Exception) {
+            Log.w(TAG, "nuclearReset", e)
+        }
+    }
+
     fun forceReconnect() {
         activeDisconnect = false
-        stopInventory()
-        postStatus("Reconnecting gun…")
-        reconnect(force = true)
+        macConnectFails = 0
+        healthFailStreak = 0
+        beginReconnectLadder("manual", 0)
     }
 
     private var watchdogStarted = false
     private val watchdogRunnable = Runnable {
         if (!activeDisconnect) {
-            worker.execute {
+            reconnectExecutor.execute {
                 if (activeDisconnect) return@execute
-                val sdk = try {
-                    uhf.connectStatus
-                } catch (_: Exception) {
-                    ConnectionStatus.DISCONNECTED
-                }
-                if (sdk != ConnectionStatus.CONNECTED && connected) {
-                    connected = false
-                    inventoryRunning = false
-                    postStatus("RFID link lost — reconnecting…")
-                    reconnect(force = true)
-                } else if (sdk != ConnectionStatus.CONNECTED && !connected) {
-                    connectInternal()
+                val sdk = sdkStatus()
+                when {
+                    sdk == ConnectionStatus.CONNECTED && connected && linkState == LINK_LIVE -> Unit
+                    sdk == ConnectionStatus.CONNECTED && (!connected || linkState == LINK_ZOMBIE) -> {
+                        connected = true
+                        setLinkState(LINK_LIVE)
+                        mainHandler.post {
+                            installGunTriggerHandler()
+                            applyConfigToGun()
+                        }
+                        postStatus("RFID link restored")
+                    }
+                    sdk != ConnectionStatus.CONNECTED && (connected || linkState != LINK_DISCONNECTED) -> {
+                        markDisconnected("watchdog")
+                        beginReconnectLadder("watchdog", 0)
+                    }
+                    sdk != ConnectionStatus.CONNECTED -> connectIfNeeded()
                 }
             }
         }
@@ -144,57 +194,140 @@ class RfidManager(
         if (watchdogStarted) return
         watchdogStarted = true
         scheduleWatchdog()
+        scheduleHealthCheck()
     }
 
-    /** Idempotent entry — safe from onCreate and onResume. */
-    fun connectIfNeeded() {
+    private fun scheduleHealthCheck() {
+        mainHandler.removeCallbacks(healthRunnable)
+        mainHandler.postDelayed(healthRunnable, HEALTH_CHECK_MS)
+    }
+
+    private val healthRunnable = Runnable {
+        if (!activeDisconnect) {
+            configWorker.execute { runHealthCheck() }
+        }
+        scheduleHealthCheck()
+    }
+
+    private fun runHealthCheck() {
         if (activeDisconnect) return
-        worker.execute {
-            if (activeDisconnect) return@execute
-            val sdk = try {
-                uhf.connectStatus
-            } catch (_: Exception) {
-                ConnectionStatus.DISCONNECTED
+        val sdk = sdkStatus()
+        if (sdk != ConnectionStatus.CONNECTED) {
+            if (connected || linkState == LINK_LIVE || linkState == LINK_ZOMBIE) {
+                markDisconnected("health: sdk down")
+                beginReconnectLadder("health", 0)
             }
-            if (sdk == ConnectionStatus.CONNECTED && connected) return@execute
-            if (sdk != ConnectionStatus.CONNECTED) connected = false
-            connectInternal()
+            return
+        }
+        if (!connected) return
+        try {
+            val bat = uhf.getBattery()
+            if (bat < 0) throw IllegalStateException("battery ping failed")
+            healthFailStreak = 0
+            if (linkState == LINK_ZOMBIE) {
+                setLinkState(LINK_LIVE)
+                postStatus("RFID link OK")
+            }
+            battery = bat
+        } catch (e: Exception) {
+            healthFailStreak++
+            Log.w(TAG, "health check fail #$healthFailStreak", e)
+            if (healthFailStreak >= 2) {
+                setLinkState(LINK_ZOMBIE)
+                postStatus("RFID link stale — reconnecting…")
+                beginReconnectLadder("zombie", 1)
+            }
         }
     }
 
-    private fun connectInternal() {
+    fun onAppWake() {
+        healthFailStreak = 0
+        connectIfNeeded()
+        configWorker.execute { runHealthCheck() }
+    }
+
+    fun connectIfNeeded() {
+        if (activeDisconnect) return
+        reconnectExecutor.execute {
+            if (activeDisconnect) return@execute
+            val sdk = sdkStatus()
+            if (sdk == ConnectionStatus.CONNECTED && connected && linkState == LINK_LIVE) return@execute
+            if (sdk == ConnectionStatus.CONNECTED && !connected) {
+                connected = true
+                setLinkState(LINK_LIVE)
+                mainHandler.post {
+                    installGunTriggerHandler()
+                    applyConfigToGun()
+                }
+                return@execute
+            }
+            if (sdk != ConnectionStatus.CONNECTED) {
+                connected = false
+                connectBlocking(reconnectGeneration.get(), 0)
+            }
+        }
+    }
+
+    fun connect() {
+        reconnectExecutor.execute { connectBlocking(reconnectGeneration.get(), 0) }
+    }
+
+    private fun connectBlocking(gen: Int, step: Int): Boolean {
         try {
             if (!initialized.getAndSet(true)) {
                 if (!uhf.init(context.applicationContext)) {
                     postStatus("RFID init failed")
                     initialized.set(false)
-                    return
+                    return false
                 }
             }
+            if (gen != reconnectGeneration.get() || activeDisconnect) return false
 
+            setLinkState(LINK_CONNECTING)
             val savedMac = prefs.getString(PREF_BT_MAC, null)?.trim().orEmpty()
             if (savedMac.isNotEmpty()) {
                 postStatus("Connecting to gun…")
-                mainHandler.post { uhf.connect(savedMac, connectionCallback) }
-                return
+                connectOnMainThread(savedMac)
+                SystemClock.sleep(CONNECT_WAIT_MS)
+                if (sdkStatus() == ConnectionStatus.CONNECTED) {
+                    macConnectFails = 0
+                    return true
+                }
+                macConnectFails++
+                if (macConnectFails >= MAX_MAC_RETRIES && step >= 1) {
+                    prefs.edit().remove(PREF_BT_MAC).apply()
+                }
             }
 
             val bondedMac = findBondedGunMac()
-            if (bondedMac != null) {
+            if (!bondedMac.isNullOrBlank()) {
                 postStatus("Connecting to paired gun…")
-                mainHandler.post { uhf.connect(bondedMac, connectionCallback) }
-                return
+                connectOnMainThread(bondedMac)
+                SystemClock.sleep(CONNECT_WAIT_MS)
+                if (sdkStatus() == ConnectionStatus.CONNECTED) return true
             }
 
-            scanAndConnect()
+            scanAndConnectBlocking(gen)
+            return sdkStatus() == ConnectionStatus.CONNECTED
         } catch (e: Exception) {
-            Log.e(TAG, "connect failed", e)
+            Log.e(TAG, "connectBlocking failed", e)
             postStatus("RFID error: ${e.message ?: "unknown"}")
+            return false
         }
     }
 
-    fun connect() {
-        worker.execute { connectInternal() }
+    private fun connectOnMainThread(mac: String) {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        mainHandler.post {
+            try {
+                uhf.connect(mac, connectionCallback)
+            } catch (e: Exception) {
+                Log.e(TAG, "connect($mac)", e)
+            } finally {
+                latch.countDown()
+            }
+        }
+        latch.await(CONNECT_WAIT_MS + 500, java.util.concurrent.TimeUnit.MILLISECONDS)
     }
 
     @SuppressLint("MissingPermission")
@@ -209,15 +342,9 @@ class RfidManager(
             lastBondedNames = ""
             return null
         }
-
-        // 1. A paired device whose name looks like the gun.
         val named = bonded.firstOrNull { isGunName(it.name) }
         if (named != null) return named.address
-
-        // 2. Dedicated station phone: if exactly one device is paired, it's the gun.
         if (bonded.size == 1) return bonded.first().address
-
-        // 3. Can't tell — remember the names so we can show them on screen.
         lastBondedNames = bonded.joinToString(", ") { (it.name ?: "?") + " (" + it.address + ")" }
         return null
     }
@@ -228,11 +355,10 @@ class RfidManager(
     }
 
     @SuppressLint("MissingPermission")
-    private fun scanAndConnect() {
-        postStatus("Scanning for $TARGET_BT_NAME…")
+    private fun scanAndConnectBlocking(gen: Int) {
+        postStatus("Scanning for gun…")
         var bestMac: String? = null
         var bestRssi = Int.MIN_VALUE
-
         uhf.startScanBTDevices(ScanBTCallback { device, rssi, _ ->
             if (!isGunName(device.name)) return@ScanBTCallback
             if (rssi > bestRssi) {
@@ -242,20 +368,19 @@ class RfidManager(
         })
         SystemClock.sleep(SCAN_MS)
         uhf.stopScanBTDevices()
-
+        if (gen != reconnectGeneration.get()) return
         val mac = bestMac
         if (mac.isNullOrBlank()) {
             if (lastBondedNames.isNotBlank()) {
-                postStatus("Gun name not recognised. Paired: $lastBondedNames — tell setup which is the gun")
+                postStatus("Gun not found. Paired: $lastBondedNames")
             } else {
-                postStatus("Gun not found — power on the R6 and pair it in Android Bluetooth settings")
+                postStatus("Gun not found — power on R6 and pair in Bluetooth settings")
             }
             scheduleReconnect()
             return
         }
-
-        postStatus("Connecting to $TARGET_BT_NAME…")
-        mainHandler.post { uhf.connect(mac, connectionCallback) }
+        postStatus("Connecting to gun…")
+        connectOnMainThread(mac)
     }
 
     @SuppressLint("MissingPermission")
@@ -264,23 +389,27 @@ class RfidManager(
             ConnectionStatus.CONNECTED -> {
                 connected = true
                 activeDisconnect = false
+                readCancelled.set(false)
+                healthFailStreak = 0
+                macConnectFails = 0
+                ladderStep = 0
+                setLinkState(LINK_LIVE)
                 val name = device?.name ?: TARGET_BT_NAME
                 val mac = device?.address
                 if (!mac.isNullOrBlank()) {
                     prefs.edit().putString(PREF_BT_MAC, mac).apply()
                 }
                 if (uhf.setFrequencyMode(FREQUENCY_EUROPE)) {
-                    postStatus("RFID connected ($name) · EU 865–868 MHz")
+                    postStatus("RFID connected ($name)")
                 } else {
-                    postStatus("RFID connected ($name) — set EU band in gun settings if reads fail")
+                    postStatus("RFID connected ($name) — check EU band if reads fail")
                 }
                 installGunTriggerHandler()
                 applyConfigToGun()
             }
 
             ConnectionStatus.DISCONNECTED -> {
-                connected = false
-                inventoryRunning = false
+                markDisconnected("callback")
                 uhf.setKeyEventCallback(null)
                 uhf.setInventoryCallback(null)
                 if (!activeDisconnect) {
@@ -291,33 +420,49 @@ class RfidManager(
                 }
             }
 
-            ConnectionStatus.CONNECTING -> postStatus("Connecting to gun…")
+            ConnectionStatus.CONNECTING -> {
+                setLinkState(LINK_CONNECTING)
+                postStatus("Connecting to gun…")
+            }
+
             else -> Unit
         }
+    }
+
+    private fun markDisconnected(reason: String) {
+        Log.d(TAG, "markDisconnected: $reason")
+        connected = false
+        inventoryRunning = false
+        setLinkState(LINK_DISCONNECTED)
+    }
+
+    private fun setLinkState(state: String) {
+        linkState = state
+    }
+
+    private fun sdkStatus(): ConnectionStatus = try {
+        uhf.connectStatus
+    } catch (_: Exception) {
+        ConnectionStatus.DISCONNECTED
     }
 
     private fun installGunTriggerHandler() {
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
-                if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
-                // If the tablet was asleep, this pull only wakes the screen — don't also scan.
+                if (!connected || sdkStatus() != ConnectionStatus.CONNECTED) return
                 if (onTriggerWake()) {
                     postStatus("Screen on — pull again to scan")
                     return
                 }
                 when (scanMode) {
                     SCAN_MODE_CONTINUOUS ->
-                        // Continuous: one pull starts the repeat, next pull stops it.
                         if (inventoryRunning) stopInventory() else startInventory()
-                    SCAN_MODE_HOLD ->
-                        // Hold: read repeatedly while the trigger is held down.
-                        startInventory()
+                    SCAN_MODE_HOLD -> startInventory()
                     SCAN_MODE_MULTI -> {
                         if (inventoryRunning) stopInventory()
                         performMultiReadBurst()
                     }
                     else -> {
-                        // Single (default station mode): one pull = one tag.
                         if (inventoryRunning) stopInventory()
                         performSingleRead()
                     }
@@ -338,14 +483,10 @@ class RfidManager(
         }
     }
 
-    /**
-     * "Continuous" scanning implemented as a fast repeat of the single-tag read. The SDK's
-     * hardware inventory callback did not deliver tags on this R6, whereas single reads do — so
-     * both modes share the one reliable primitive.
-     */
     fun startInventory() {
-        if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) {
+        if (!connected || sdkStatus() != ConnectionStatus.CONNECTED) {
             postStatus("RFID not connected")
+            connectIfNeeded()
             return
         }
         if (inventoryRunning) return
@@ -360,24 +501,37 @@ class RfidManager(
     }
 
     fun performSingleRead() {
-        if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
-        worker.execute {
+        if (!connected || readCancelled.get() || sdkStatus() != ConnectionStatus.CONNECTED) {
+            if (connected && sdkStatus() != ConnectionStatus.CONNECTED) {
+                beginReconnectLadder("read-blocked", 0)
+            }
+            return
+        }
+        readWorker.execute {
+            if (readCancelled.get()) return@execute
             try {
                 val info = uhf.inventorySingleTag()
                 if (info != null) deliverTag(info)
             } catch (e: Exception) {
                 Log.e(TAG, "single read failed", e)
+                healthFailStreak++
+                if (healthFailStreak >= 2) {
+                    beginReconnectLadder("read-fail", 1)
+                }
             }
         }
     }
 
-    /** One trigger pull: rapid single reads to collect every tag in range. */
     private fun performMultiReadBurst() {
-        if (!connected || uhf.connectStatus != ConnectionStatus.CONNECTED) return
-        worker.execute {
+        if (!connected || readCancelled.get() || sdkStatus() != ConnectionStatus.CONNECTED) return
+        readWorker.execute {
             val deadline = SystemClock.elapsedRealtime() + MULTI_BURST_MS
             var attempts = 0
-            while (SystemClock.elapsedRealtime() < deadline && attempts < MULTI_BURST_MAX_READS) {
+            while (
+                SystemClock.elapsedRealtime() < deadline &&
+                attempts < MULTI_BURST_MAX_READS &&
+                !readCancelled.get()
+            ) {
                 try {
                     val info = uhf.inventorySingleTag()
                     if (info != null) deliverTag(info)
@@ -393,19 +547,16 @@ class RfidManager(
     private fun deliverTag(info: UHFTAGInfo?) {
         val epc = info?.epc?.trim().orEmpty()
         if (epc.isEmpty()) return
-
         val now = System.currentTimeMillis()
         if (epc.equals(lastEpc, ignoreCase = true) && now - lastEpcAt < DEBOUNCE_MS) return
         lastEpc = epc
         lastEpcAt = now
-
         val upper = epc.uppercase()
         pendingScans.add(upper)
-        if (pendingScans.size > 32) pendingScans.poll()
+        while (pendingScans.size > 32) pendingScans.poll()
         mainHandler.post { onTagScanned(upper) }
     }
 
-    /** Drain queued EPCs as a JSON array (called by the iframe poll). Clears as it reads. */
     fun drainPendingScans(): String {
         if (pendingScans.isEmpty()) return "[]"
         val sb = StringBuilder("[")
@@ -421,40 +572,42 @@ class RfidManager(
 
     fun disconnect() {
         activeDisconnect = true
+        reconnectGeneration.incrementAndGet()
+        readCancelled.set(true)
         stopInventory()
-        worker.execute {
+        reconnectExecutor.execute {
             try {
-                uhf.disconnect()
+                softDisconnect()
                 uhf.free()
             } catch (e: Exception) {
                 Log.e(TAG, "disconnect failed", e)
             }
             initialized.set(false)
             connected = false
+            setLinkState(LINK_DISCONNECTED)
         }
+        readWorker.shutdown()
+        reconnectExecutor.shutdown()
         configWorker.shutdown()
     }
 
-    /** Push the persisted settings to the connected gun (called after connect + after each change). */
     private fun applyConfigToGun() {
         configWorker.execute {
             try {
-                if (uhf.connectStatus != ConnectionStatus.CONNECTED) return@execute
+                if (sdkStatus() != ConnectionStatus.CONNECTED) return@execute
                 uhf.setPower(powerDbm.coerceIn(POWER_MIN, POWER_MAX))
                 uhf.setBeep(beepEnabled)
             } catch (e: Exception) {
                 Log.e(TAG, "applyConfigToGun failed", e)
             }
         }
-        // Device info (battery/firmware) is a separate, best-effort task — if the gun is slow to
-        // answer it must not delay applying power/beep, and it runs off the read worker regardless.
         refreshDeviceInfo()
     }
 
     private fun refreshDeviceInfo() {
         configWorker.execute {
             try {
-                if (uhf.connectStatus != ConnectionStatus.CONNECTED) return@execute
+                if (sdkStatus() != ConnectionStatus.CONNECTED) return@execute
                 battery = try { uhf.getBattery() } catch (e: Exception) { -1 }
                 firmware = try { uhf.getSTM32Version() ?: "" } catch (e: Exception) { "" }
             } catch (e: Exception) {
@@ -463,7 +616,6 @@ class RfidManager(
         }
     }
 
-    /** Reduce/raise read radius. Lower dBm = shorter range (badge-tap); higher = across the room. */
     fun setPowerLevel(power: Int) {
         powerDbm = power.coerceIn(POWER_MIN, POWER_MAX)
         prefs.edit().putInt(PREF_POWER, powerDbm).apply()
@@ -483,7 +635,6 @@ class RfidManager(
         if ((scanMode == SCAN_MODE_SINGLE || scanMode == SCAN_MODE_MULTI) && inventoryRunning) stopInventory()
     }
 
-    /** Continuous/hold repeat interval in ms. Lower = faster machine-gun repeat. */
     fun setPollMs(ms: Int) {
         pollMs = ms.coerceIn(POLL_MIN, POLL_MAX)
         prefs.edit().putInt(PREF_POLL_MS, pollMs).apply()
@@ -497,11 +648,12 @@ class RfidManager(
         }
     }
 
-    /** Snapshot for the web setup view. Cached values only — safe to call synchronously. */
     fun currentConfigJson(): String {
         val fw = firmware.replace("\"", "").replace("\\", "")
+        val live = linkState == LINK_LIVE && connected
         return "{" +
-            "\"connected\":$connected," +
+            "\"connected\":$live," +
+            "\"linkState\":\"$linkState\"," +
             "\"power\":$powerDbm," +
             "\"powerMin\":$POWER_MIN," +
             "\"powerMax\":$POWER_MAX," +
@@ -531,23 +683,31 @@ class RfidManager(
         const val SCAN_MODE_MULTI = "multi"
         const val SCAN_MODE_CONTINUOUS = "continuous"
         const val SCAN_MODE_HOLD = "hold"
+        const val LINK_DISCONNECTED = "disconnected"
+        const val LINK_CONNECTING = "connecting"
+        const val LINK_LIVE = "live"
+        const val LINK_ZOMBIE = "zombie"
+        const val LINK_RECONNECTING = "reconnecting"
         private const val MULTI_BURST_MS = 700L
         private const val MULTI_BURST_MAX_READS = 20
         private const val MULTI_READ_GAP_MS = 40L
         private const val POWER_MIN = 5
         private const val POWER_MAX = 30
-        // Default to full power so reads are guaranteed on first run; the operator dials the
-        // range DOWN from the setup view. (Matches the known-working pre-settings behaviour.)
         private const val DEFAULT_POWER = 30
         private const val TARGET_BT_NAME = "Nordic_UART_CW"
-        // Chainway UHF guns pair under varied names — match any of these tokens.
         private val GUN_NAME_HINTS = listOf(
             "Nordic_UART_CW", "Nordic", "UART", "Chainway", "R6", "RFID", "UHF", "CW",
         )
         private const val FREQUENCY_EUROPE = 0x04
         private const val SCAN_MS = 5000L
         private const val RECONNECT_MS = 3000L
-        private const val WATCHDOG_MS = 20000L
+        private const val WATCHDOG_MS = 15000L
+        private const val HEALTH_CHECK_MS = 12000L
+        private const val RECONNECT_WAIT_SOFT_MS = 350L
+        private const val RECONNECT_WAIT_MEDIUM_MS = 2000L
+        private const val RECONNECT_WAIT_NUCLEAR_MS = 800L
+        private const val CONNECT_WAIT_MS = 4500L
+        private const val MAX_MAC_RETRIES = 2
         private const val DEBOUNCE_MS = 2000L
         private const val DEFAULT_POLL_MS = 500
         private const val POLL_MIN = 100

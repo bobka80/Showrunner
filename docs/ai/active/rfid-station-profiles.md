@@ -1,37 +1,14 @@
-# Active — RFID scanning, station device profiles & phone QR scan
+# Active — RFID scanning & station device profiles
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v467** · APK **v0.1.15 (build 17)** · **Last swept:** 2026-07-07
+**Opened:** 2026-07-02 · **Production:** GAS **v471** · APK **build 18 (in flight)** · **Last swept:** 2026-07-07
 
-This is the work **in flight right now**: RFID gun scanning end-to-end, fixed warehouse tablet/gun **device profiles** (station RBAC), and **phone QR scan panel polish**. The durable model, state machine, and long backlog live in the canonical topic above (do not duplicate here).
+**Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
+
+This campaign is **RFID gun + station device profiles** only: warehouse tablet/phone married to Chainway UHF gun, host badge sessions, vault/project on station.
 
 > **`host-boot.js` is shared** between station RFID relay and phone QR shell camera. Before editing either path, read [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge — do not “fix” one bridge by breaking the other.
-
----
-
-## Phone QR scan panel (in flight — core handoff shipped v467)
-
-**Fragile reference:** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Mobile QR scan handoff · Incident log entry 2026-07-07.
-
-**Goal:** Crew phone PWA — header **Scan** → integrated panel → camera → asset QR → equipment + status actions (no full-page `mobile-scan.html` as primary UX).
-
-### Shipped (this campaign)
-
-- [x] **Integrated scan panel** — `01j_Mobile_Scan.html`, `Styles_Mobile.html`, mobile header Scan control
-- [x] **Shell fullscreen camera** — `#sr-mobile-shell-cam` on `web.app` (camera cannot run in GAS iframe)
-- [x] **Reliable handoff v466–467** — iframe reload `sessionboot&srScan=` + `pending-mobile-scan-b64` boot consume; `mobscanstage` server cache as backup; 20s dedupe; loop fix (no parallel relay/retry storms)
-- [x] **Vault lookup** — composite codes `RW-1000-20` via `findAssetByScanTagInVault_` (v464)
-- [x] **Simulate button** — proves lookup path without camera (`Simulate RW-1000-20`)
-- [x] **Status actions** — Maintenance / Damaged / Broken / Repaired from panel (`setMobileAssetStatus`)
-
-### Open (polish — finish then archive this section)
-
-- [x] **iPhone QR decode (hosting v472)** — full-screen `mobile-scan.html` + native `BarcodeDetector`; v473 anchored overlay reverted (v474).
-- [ ] Director QA on anchored camera overlay (position, auto-start, backdrop blocking taps)
-- [ ] PA checkout forward from scan panel (if still wanted — was deferred)
-
-When phone QR polish is done, move the § Phone QR section to [../topics/mobile-crew.md](../topics/mobile-crew.md) and leave RFID/station items in this file until that campaign closes.
 
 ---
 
@@ -115,23 +92,25 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [x] **Boot hardening (v427).** After v426 the station stopped loading its initial screen — a throw somewhere between showing the shell and sending the native `SHOWRUNNER_STATION_READY` left the kiosk splash stranded. `initStationShell_` now (1) shows `#station-shell` and posts `SHOWRUNNER_STATION_READY` **first**, then (2) wraps the rest of init **and** the bootstrap success callback in `try/catch`, surfacing any boot error in the status line + `stationDebug_` instead of blanking the screen. So no future boot-time error can strand the initial screen.
 - [x] **PROJECT open hardening (v424).** After v423 the picker loaded but tapping a project could still show nothing. Fixes in `stationPickProject_`: (1) resolve the picked project from `stationProjectsCache` **or** the phantom payload, and if it's genuinely missing, say so + force a fresh fetch instead of silently bailing; (2) `openMobileProjectAssets` can **bail with only a toast** (no throw) when it can't resolve a project — the shell was hidden so the screen went blank — so we now **detect the still-hidden `#project-assets-modal-overlay` after ~250 ms, restore the shell, and report** "equipment list unavailable"; (3) **status breadcrumbs** ("Opening <project>…" → open / error) so any remaining failure is pinpointed; (4) **preload also runs on shell init** when a host session was restored from a reload (not just on `stationWriteHostSession_`).
 
-## In progress / next
+## In progress / next (director priority 2026-07-07)
 
-- [ ] **Gun name still unrecognised (build 3):** first fix guessed the BT name `Nordic_UART_CW`; broadened hints (Nordic/UART/Chainway/R6/RFID/UHF/CW) + single-paired-device fallback + on-screen paired-device names for diagnosis (v0.1.1 build 3). **Waiting on the gun's real Bluetooth name from the field** to lock the match.
-- [ ] **Dial in the real values on hardware** — confirm a power dBm that reads a badge at the gun but not shelf tags; confirm `setBeep`/`setPower` persist across reconnect on the actual R6.
-- [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html` (WebViews hard-cache it).
+1. **[ ] Bulletproof BLE gun reconnect (APK)** — **in flight** — health check, reconnect ladder, screen-on/resume hooks, foreground service, honest `linkState` in settings.
+2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
+3. **[ ] Optimistic host login + local roster cache** — instant badge host UI; server confirms in parallel (after EPC+TID schema).
+
+### Field / polish (ongoing)
+
+- [ ] **Gun name still unrecognised (build 3):** waiting on the gun's real Bluetooth name from the field.
+- [ ] **Dial in the real values on hardware** — power dBm, beep/power persist across reconnect on R6.
+- [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html`.
 - [ ] **Tag-map / new-equipment RFID provisioning UX** on the station
-- [ ] **QR at gate / Gate-at-door** (when ready) — camera scan UID or bulk door read → same checkout confirm as RFID EPC; exception re-scan path (hardware TBD)
-- [x] **Phone QR scan panel (v437+)** — mobile header Scan dropdown + camera; vault status (Maintenance/Damaged/Broken/Repaired) via `setMobileAssetStatus`; profile-tier permissions; PA checkout forward **deferred**
+- [ ] **QR at gate / Gate-at-door** (future — separate gate device; TL SDK later)
 
-### Approved backlog (director 2026-07-07)
+### Approved backlog (not started)
 
-- [ ] **Crew two-tag schema (EPC + TID)** — add `rfid_tid` on `Crew_Roster` alongside `rfid_tag` (EPC); enroll + login require **both** from one trigger read; re-enroll existing badges once. **ROOT first** for tag lock at provision. Equipment stays EPC-only until needed.
-- [ ] **Optimistic host login + local roster cache** — badge scan resolves **EPC+TID** against device cache (`getStationEquipmentRfidMap` successor / crew slice) → show host **immediately**; server `processStationRfidScan` confirms in parallel; on mismatch/error → clear host. Refresh cache on boot, timer, and after Vault → Crew enroll. Show **offline / roster age** when server unreachable.
-- [ ] **Offline host recognition (clone-safe)** — local host-in allowed without server when EPC+TID pair matches cache; **checkout / vault writes / crew enroll still require server**. Stale roster risk (fired crew, demotion) accepted until sync — mitigated by refresh + optional cap on delicate ops until online.
-- [ ] **Bulletproof BLE gun reconnect (APK)** — health-check reads (`getBattery` or ping) to detect zombie “connected”; hard reconnect ladder (disconnect → longer wait → `free`/`init`); reconnect on screen-on + resume; **foreground service** for Doze; Reconnect button must not block behind hung read worker; scan fallback if saved MAC fails; honest link status in UI. See **Agreed spec — BLE reconnect** below.
-- [ ] **Kiosk auto-start (APK)** — dedicated warehouse phones: **default launcher (HOME)** + **BOOT_COMPLETED** auto-launch; disable battery optimization; optional Lock Task / Device Owner later. No Google account on phone required; Wi‑Fi + station-device Showrunner login only.
-- [ ] **Device hygiene — one station profile per physical device** — each Chainway gun+phone, each future Chainway pair, each TL Solution gun, and **gate** = separate station device account + profile. Gate is **not** shared with warehouse guns. Gate + TL (for now) = **PC + TV** with richer on-screen UI; same station shell family, different hardware profiles when TL SDK lands.
+- [ ] **Crew two-tag schema (EPC + TID)** — prerequisite for optimistic login
+- [ ] **Offline host recognition (clone-safe)** — host-in from cache; writes still need server
+- [ ] **Device hygiene** — one station profile per physical device (operational; no purchase blocker). Future: TL Solutions SDK driver, gate PC+TV when hardware bought.
 
 ## RFID badge lifecycle & fragile points (enrollment → DB → login)
 
@@ -285,7 +264,7 @@ Checkout/check-in remains **input-agnostic** on every surface (tap, RFID, future
 
 ## Agreed spec — Bulletproof BLE reconnect (director 2026-07-07)
 
-**Status:** Approved — APK work in `station-android/`.
+**Status:** **In flight** — APK build 18+ (`RfidManager.kt`, `BleKeepAliveService.kt`).
 
 **Problem:** After **gun sleep** or long idle, BLE drops but SDK may still report **CONNECTED** (“zombie link”); `connectIfNeeded()` then skips reconnect. **Reconnect gun** button can appear dead if `forceReconnect()` queues behind a **stuck read** on the single worker thread.
 

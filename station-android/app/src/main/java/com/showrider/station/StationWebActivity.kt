@@ -3,7 +3,10 @@ package com.showrider.station
 import android.annotation.SuppressLint
 import android.app.KeyguardManager
 import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -32,8 +35,9 @@ class StationWebActivity : AppCompatActivity() {
     private var splashHidden = false
     private var webViewRestored = false
     private var lastWakeAt = 0L
+    private var screenOnReceiver: BroadcastReceiver? = null
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_station_web)
@@ -66,6 +70,7 @@ class StationWebActivity : AppCompatActivity() {
             onTriggerWake = { maybeWakeForTrigger() },
         )
         rfid.startWatchdog()
+        registerScreenOnReceiver()
 
         webView.settings.apply {
             javaScriptEnabled = true
@@ -101,9 +106,48 @@ class StationWebActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
 
+    private fun registerScreenOnReceiver() {
+        if (screenOnReceiver != null) return
+        screenOnReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == Intent.ACTION_SCREEN_ON) {
+                    if (::rfid.isInitialized) rfid.onAppWake()
+                }
+            }
+        }
+        val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenOnReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(screenOnReceiver, filter)
+        }
+    }
+
+    private fun unregisterScreenOnReceiver() {
+        screenOnReceiver?.let {
+            try { unregisterReceiver(it) } catch (_: Exception) { /* ignore */ }
+        }
+        screenOnReceiver = null
+    }
+
+    private fun startBleKeepAlive() {
+        try {
+            BleKeepAliveService.start(this)
+        } catch (e: Exception) {
+            postGunStatus("Background link service unavailable")
+        }
+    }
+
     private fun ensureBleReady() {
         if (!BlePermissions.hasAll(this)) {
             BlePermissions.request(this, REQ_BLE_PERMISSIONS)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !BlePermissions.hasNotifications(this)
+        ) {
+            BlePermissions.requestNotifications(this, REQ_POST_NOTIFICATIONS)
             return
         }
         val adapter = BluetoothAdapter.getDefaultAdapter()
@@ -116,6 +160,7 @@ class StationWebActivity : AppCompatActivity() {
             startActivityForResult(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE), REQ_ENABLE_BT)
             return
         }
+        startBleKeepAlive()
         rfid.connect()
     }
 
@@ -131,6 +176,9 @@ class StationWebActivity : AppCompatActivity() {
             } else {
                 postGunStatus("Bluetooth permissions required for the RFID gun")
             }
+        }
+        if (requestCode == REQ_POST_NOTIFICATIONS) {
+            ensureBleReady()
         }
     }
 
@@ -271,9 +319,8 @@ class StationWebActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Reconnect the gun after background without reloading the WebView.
         if (::rfid.isInitialized && BlePermissions.hasAll(this)) {
-            rfid.connectIfNeeded()
+            rfid.onAppWake()
         }
     }
 
@@ -284,6 +331,8 @@ class StationWebActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         splashHandler.removeCallbacksAndMessages(null)
+        unregisterScreenOnReceiver()
+        BleKeepAliveService.stop(this)
         rfid.disconnect()
         webView.destroy()
         super.onDestroy()
@@ -293,6 +342,7 @@ class StationWebActivity : AppCompatActivity() {
         private const val SHOWRUNNER_URL = "https://sm-showrunner-97405.web.app"
         private const val REQ_BLE_PERMISSIONS = 1001
         private const val REQ_ENABLE_BT = 1002
+        private const val REQ_POST_NOTIFICATIONS = 1003
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L
         private const val WAKE_DEBOUNCE_MS = 1500L
