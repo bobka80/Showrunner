@@ -101,11 +101,21 @@
     var engine = null;
     var starting = false;
     var HOST = 'https://sm-showrunner-97405.web.app';
+    var params = new URLSearchParams(window.location.search);
+    var isEmbed = params.get('embed') === '1';
 
-    function goBack() {
+    function stopEngine() {
       try {
         if (engine) engine.stop().catch(function() {});
       } catch (e) { /* ignore */ }
+    }
+
+    function goBack() {
+      stopEngine();
+      if (isEmbed && window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'SHOWRUNNER_SCAN_PAGE_CANCEL' }, '*');
+        return;
+      }
       if (window.history.length > 1) {
         window.history.back();
         return;
@@ -115,18 +125,24 @@
 
     function saveAndReturn(text) {
       var raw = String(text == null ? '' : text);
-      try {
-        sessionStorage.setItem('sm_mobile_qr_pending', raw);
-        localStorage.setItem('sm_mobile_qr_pending', raw);
-        sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
-        localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
-      } catch (e) { /* ignore */ }
       document.getElementById('qr-last').textContent = 'Scanned — returning…';
       setTimeout(function() {
+        stopEngine();
+        if (isEmbed && window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'SHOWRUNNER_SCAN_PAGE_QR', text: raw }, '*');
+          return;
+        }
         try {
-          if (engine) engine.stop().catch(function() {});
+          sessionStorage.setItem('sm_mobile_qr_pending', raw);
+          localStorage.setItem('sm_mobile_qr_pending', raw);
+          sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+          localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
         } catch (e) { /* ignore */ }
-        window.location.href = HOST + '/?srScan=' + encodeURIComponent(raw);
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          window.location.href = HOST + '/?srScan=' + encodeURIComponent(raw);
+        }
       }, 400);
     }
 

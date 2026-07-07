@@ -225,12 +225,10 @@ function mobileScanRestoreReaderDiv_() {
     if (!ev.data || !ev.data.type) return;
     var t = ev.data.type;
     if (t === 'SHOWRUNNER_MOBILE_QR_SCAN') {
-      if (ev.data.reopenPanel && !window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
-        mobileOpenScanPanel();
-      } else if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
+      if (!window.mobileScanPanelOpen && typeof mobileOpenScanPanel === 'function') {
         mobileOpenScanPanel();
       }
-      setTimeout(function() { mobileScanHandleDecode_(ev.data.text); }, 0);
+      mobileScanHandleDecode_(ev.data.text);
       return;
     }
     if (t === 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN') {
@@ -758,15 +756,13 @@ window.mobileToggleScanPanel = function() {
   mobileOpenScanPanel();
 };
 
-/** Opens same-origin camera page (top-level — only reliable path on Android + GAS). */
+/** Shell overlay camera (keeps GAS iframe loaded) or top-level fallback. */
 window.mobileGoToScanCameraPage_ = function() {
+  if (mobileScanInHostingIframe_()) {
+    mobileScanParentPost_('SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA');
+    return;
+  }
   var url = MOBILE_SCAN_HOST + '/mobile-scan.html?scan=1';
-  try {
-    if (window.top && window.top !== window) {
-      window.top.location.href = url;
-      return;
-    }
-  } catch (e) { /* ignore */ }
   try {
     window.location.href = url;
   } catch (e2) {
@@ -791,12 +787,11 @@ window.mobileOpenScanPanel = function() {
   setTimeout(function() {
     document.addEventListener('click', mobileScanPanelOutsideClick_, true);
   }, 0);
-  if (mobileScanInHostingIframe_()) {
-    if (!mobileScanStartEmbedCamera_()) {
-      mobileScanSetPlaceholder_('Camera failed to load', 'error');
-    }
-  } else {
+  if (!mobileScanInHostingIframe_()) {
     mobileScanStartCamera_();
+  } else {
+    mobileScanSetPlaceholder_('Tap OPEN CAMERA for full-screen scan', 'live');
+    mobileScanShowLaunchBtn_(true);
   }
   mobileScanTryConsumePending_();
 };

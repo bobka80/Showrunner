@@ -48,8 +48,73 @@
   var hostMobileQrEmbedFrame = null;
   var hostMobileQrLastOpenData = null;
   var HOST_CAM_EMBED_PATH = '/camera-embed.html?v=4';
+  var HOST_SCAN_PAGE_PATH = '/mobile-scan.html';
   var hostMobileScanStageOpen = false;
   var hostMobileScanDocked = false;
+  var hostMobileScanPageOpen = false;
+
+  function hostMobileScanGetPageOverlay_() {
+    return document.getElementById('sr-mobile-scan-page');
+  }
+
+  function hostMobileScanGetPageFrame_() {
+    return document.getElementById('sr-mobile-scan-page-frame');
+  }
+
+  function hostMobileScanOpenCameraPage_() {
+    var overlay = hostMobileScanGetPageOverlay_();
+    var camFrame = hostMobileScanGetPageFrame_();
+    if (!overlay || !camFrame) {
+      window.location.href = HOST_SCAN_PAGE_PATH + '?scan=1';
+      return;
+    }
+    hostMobileScanHideAppFrame_();
+    overlay.classList.add('is-open');
+    overlay.setAttribute('aria-hidden', 'false');
+    hostMobileScanPageOpen = true;
+    camFrame.src = HOST_SCAN_PAGE_PATH + '?embed=1&scan=1&v=' + Date.now();
+  }
+
+  function hostMobileScanCloseCameraPage_() {
+    var overlay = hostMobileScanGetPageOverlay_();
+    var camFrame = hostMobileScanGetPageFrame_();
+    hostMobileScanPageOpen = false;
+    if (overlay) {
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+    if (camFrame) {
+      try { camFrame.src = 'about:blank'; } catch (e) { /* ignore */ }
+    }
+    hostMobileScanRestoreAppFrame_();
+  }
+
+  function hostMobileScanIsScanPageMsg_(ev) {
+    if (!ev || !ev.data || !ev.data.type) return false;
+    var t = ev.data.type;
+    if (t !== 'SHOWRUNNER_SCAN_PAGE_QR' && t !== 'SHOWRUNNER_SCAN_PAGE_CANCEL') return false;
+    if (!ev.origin) return false;
+    return ev.origin.indexOf('sm-showrunner-97405.web.app') !== -1 || ev.origin.indexOf('web.app') !== -1;
+  }
+
+  function hostMobileScanDeliverScan_(text, reopen) {
+    var raw = String(text == null ? '' : text);
+    if (!raw) return;
+    try {
+      sessionStorage.setItem('sm_mobile_qr_pending', raw);
+      localStorage.setItem('sm_mobile_qr_pending', raw);
+      if (reopen) {
+        sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+        localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+      }
+    } catch (e) { /* ignore */ }
+    hostMobileScanRelay_({
+      type: 'SHOWRUNNER_MOBILE_QR_SCAN',
+      text: raw,
+      reopenPanel: reopen !== false
+    });
+    hostMobileScanSchedulePendingRetry_();
+  }
 
   function hostMobileScanHideAppFrame_() {
     if (!frame) return;
@@ -718,7 +783,12 @@
   hostMobileScanWirePermBtn_();
   hostMobileScanWireInlineStart_();
   hostMobileScanWireStage_();
-  window.addEventListener('pageshow', function() { hostMobileScanFlushPending_(); });
+  window.addEventListener('pageshow', function() {
+    if (hostMobileScanReadPending_() || hostMobileScanShouldReopen_()) {
+      hostMobileScanSchedulePendingRetry_();
+    }
+    hostMobileScanFlushPending_();
+  });
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') hostMobileScanFlushPending_();
   });
@@ -1799,6 +1869,19 @@
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_SET') {
       applyStationConfig(ev.data.key, ev.data.value);
+      return;
+    }
+    if (hostMobileScanIsScanPageMsg_(ev)) {
+      if (ev.data.type === 'SHOWRUNNER_SCAN_PAGE_QR') {
+        hostMobileScanCloseCameraPage_();
+        hostMobileScanDeliverScan_(ev.data.text, true);
+      } else if (ev.data.type === 'SHOWRUNNER_SCAN_PAGE_CANCEL') {
+        hostMobileScanCloseCameraPage_();
+      }
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA') {
+      hostMobileScanOpenCameraPage_();
       return;
     }
     if (hostMobileScanIsEmbedMsg_(ev)) {
