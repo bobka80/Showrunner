@@ -81,6 +81,10 @@
       window.location.href = HOST_SCAN_PAGE_PATH + '?scan=1';
       return;
     }
+    try {
+      sessionStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+      localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
+    } catch (e) { /* ignore */ }
     hostMobileScanHideAppFrame_();
     overlay.classList.add('is-open');
     overlay.setAttribute('aria-hidden', 'false');
@@ -247,6 +251,92 @@
   }
 
   var hostMobileShellCamLastAnchor_ = null;
+  var hostMobileShellCamIosQueue_ = [];
+  var hostMobileShellCamIosIdx_ = 0;
+  var hostMobileShellCamNoDecodeTimer_ = null;
+  var hostMobileShellCamGotDecode_ = false;
+  var hostMobileShellCamNativeTimer_ = null;
+  var hostMobileShellCamTuneTimer_ = null;
+  var hostMobileShellCamNativeDetector_ = null;
+
+  function hostMobileScanClearIosCamTimers_() {
+    if (hostMobileShellCamNoDecodeTimer_) {
+      clearTimeout(hostMobileShellCamNoDecodeTimer_);
+      hostMobileShellCamNoDecodeTimer_ = null;
+    }
+    if (hostMobileShellCamNativeTimer_) {
+      clearInterval(hostMobileShellCamNativeTimer_);
+      hostMobileShellCamNativeTimer_ = null;
+    }
+    if (hostMobileShellCamTuneTimer_) {
+      clearInterval(hostMobileShellCamTuneTimer_);
+      hostMobileShellCamTuneTimer_ = null;
+    }
+  }
+
+  function hostMobileScanCameraScore_(cam) {
+    var lab = String(cam.label || '').toLowerCase();
+    if (lab.indexOf('ultra') !== -1) return 35;
+    if (lab.indexOf('tele') !== -1) return 45;
+    if (lab.indexOf('dual') !== -1 && lab.indexOf('ultra') === -1) return 8;
+    if (lab === 'back camera' || (lab.indexOf('back') !== -1 && lab.indexOf('ultra') === -1)) return 0;
+    if (lab.indexOf('wide') !== -1) return 15;
+    if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) return 10;
+    return 25;
+  }
+
+  function hostMobileScanBuildIosCameraQueue_(cams) {
+    var rear = [];
+    var i;
+    for (i = 0; i < cams.length; i++) {
+      var lab = String(cams[i].label || '').toLowerCase();
+      if (lab.indexOf('front') !== -1 || lab.indexOf('selfie') !== -1) continue;
+      rear.push(cams[i]);
+    }
+    if (!rear.length) return cams.slice();
+    rear.sort(function(a, b) {
+      return hostMobileScanCameraScore_(a) - hostMobileScanCameraScore_(b);
+    });
+    return rear;
+  }
+
+  function hostMobileScanApplyIosVideoTuning_(engine) {
+    if (!engine || !hostMobileScanIsIos_()) return;
+    if (hostMobileShellCamTuneTimer_) clearInterval(hostMobileShellCamTuneTimer_);
+    var tries = 0;
+    hostMobileShellCamTuneTimer_ = setInterval(function() {
+      tries += 1;
+      if (tries > 20 || !hostMobileShellCamEngine || hostMobileShellCamEngine !== engine) {
+        clearInterval(hostMobileShellCamTuneTimer_);
+        hostMobileShellCamTuneTimer_ = null;
+        return;
+      }
+      if (typeof engine.getState !== 'function') return;
+      var state;
+      try { state = engine.getState(); } catch (e) { return; }
+      if (state !== 2) return;
+      clearInterval(hostMobileShellCamTuneTimer_);
+      hostMobileShellCamTuneTimer_ = null;
+      if (typeof engine.applyVideoConstraints !== 'function') return;
+      var caps = {};
+      try {
+        if (typeof engine.getRunningTrackCapabilities === 'function') {
+          caps = engine.getRunningTrackCapabilities() || {};
+        }
+      } catch (e2) { /* ignore */ }
+      var advanced = [];
+      if (caps.zoom && typeof caps.zoom.max === 'number' && caps.zoom.max > 1) {
+        advanced.push({ zoom: Math.min(2, Math.max(1.1, caps.zoom.max * 0.45)) });
+      }
+      var constraints = {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        focusMode: 'continuous'
+      };
+      if (advanced.length) constraints.advanced = advanced;
+      engine.applyVideoConstraints(constraints).catch(function() { /* ignore */ });
+    }, 350);
+  }
 
   function hostMobileScanShowShellCamBackdrop_(show) {
     var bd = document.getElementById('sr-mobile-shell-cam-backdrop');
@@ -364,6 +454,7 @@
 
   function hostMobileScanStopShellCamEngine_() {
     hostMobileShellCamStarting = false;
+    hostMobileScanClearIosCamTimers_();
     if (!hostMobileShellCamEngine) return;
     var eng = hostMobileShellCamEngine;
     hostMobileShellCamEngine = null;
@@ -377,7 +468,9 @@
   function hostMobileScanCloseShellCam_() {
     hostMobileScanStopShellCamEngine_();
     hostMobileShellCamOpen = false;
-    hostMobileShellCamLastAnchor_ = null;
+    hostMobileShellCamGotDecode_ = false;
+    hostMobileShellCamIosQueue_ = [];
+    hostMobileShellCamIosIdx_ = 0;
     var el = hostMobileScanGetShellCam_();
     if (el) {
       el.classList.remove('is-open');
@@ -387,6 +480,7 @@
     if (reader) reader.innerHTML = '';
     hostMobileScanShowShellCamBackdrop_(false);
     document.body.classList.remove('sr-shell-cam-active');
+    hostMobileShellCamLastAnchor_ = null;
     hostMobileScanRestoreAppFrame_();
     hostMobileScanFlushPending_();
   }
@@ -397,65 +491,56 @@
   }
 
   function hostMobileScanShellCamScanConfig_() {
-    var ios = hostMobileScanIsIos_();
-    var cfg = {
-      fps: ios ? 5 : 10,
+    return {
+      fps: 10,
       disableFlip: false,
       qrbox: function(w, h) {
         var minDim = Math.min(w, h);
         if (!minDim || minDim < 80) return { width: 140, height: 140 };
-        var pct = ios ? 0.8 : 0.72;
-        var edge = Math.floor(minDim * pct);
-        if (ios) edge = Math.min(edge, minDim - 24);
+        var edge = Math.floor(minDim * 0.72);
         edge = Math.max(140, edge);
         return { width: edge, height: edge };
       }
     };
-    if (ios) {
-      cfg.aspectRatio = 1.333334;
-      cfg.experimentalFeatures = { useBarCodeDetectorIfSupported: true };
-    }
-    return cfg;
+  }
+
+  function hostMobileScanDeviceCfgForId_(deviceId) {
+    if (!deviceId) return { facingMode: 'environment' };
+    return { deviceId: { exact: deviceId } };
   }
 
   function hostMobileScanPickBackCamera_(cams) {
     if (!cams || !cams.length) return null;
     var back = null;
-    for (var i = 0; i < cams.length; i++) {
+    var i;
+    for (i = 0; i < cams.length; i++) {
       var lab = String(cams[i].label || '').toLowerCase();
-      if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 ||
-          lab.indexOf('environment') !== -1 || lab.indexOf('wide') !== -1) {
+      if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
         back = cams[i];
         break;
       }
     }
-    if (!back && hostMobileScanIsIos_() && cams.length > 1) {
-      back = cams[cams.length - 1];
-    }
     return back || cams[cams.length - 1];
+  }
+
+  function hostMobileScanStartWithDevice_(cam, onDecode) {
+    var deviceCfg = hostMobileScanDeviceCfgForId_(cam && cam.id ? cam.id : '');
+    var scanCfg = hostMobileScanShellCamScanConfig_();
+    hostMobileShellCamEngine = new Html5Qrcode('sr-shell-cam-reader');
+    return hostMobileShellCamEngine.start(deviceCfg, scanCfg, onDecode, function() { /* frame miss */ })
+      .then(function() {
+        hostMobileShellCamStarting = false;
+        var st = document.getElementById('sr-shell-cam-status');
+        if (st) st.textContent = 'Point at asset QR';
+        var permBtn = document.getElementById('sr-shell-cam-perm');
+        if (permBtn) permBtn.classList.remove('is-pulse');
+        var startBtn = document.getElementById('sr-shell-cam-start');
+        if (startBtn) startBtn.style.display = 'none';
+      });
   }
 
   function hostMobileScanStartShellCamEngine_() {
     if (hostMobileShellCamEngine || hostMobileShellCamStarting) return;
-    if (typeof Html5Qrcode === 'undefined') {
-      var st0 = document.getElementById('sr-shell-cam-status');
-      if (st0) st0.textContent = 'Scanner failed to load.';
-      var sb0 = document.getElementById('sr-shell-cam-start');
-      if (sb0) sb0.style.display = 'block';
-      return;
-    }
-    hostMobileShellCamStarting = true;
-    var scanCfg = hostMobileScanShellCamScanConfig_();
-
-    function onSuccess() {
-      hostMobileShellCamStarting = false;
-      var st = document.getElementById('sr-shell-cam-status');
-      if (st) st.textContent = 'Point at asset QR';
-      var permBtn = document.getElementById('sr-shell-cam-perm');
-      if (permBtn) permBtn.classList.remove('is-pulse');
-      var startBtn = document.getElementById('sr-shell-cam-start');
-      if (startBtn) startBtn.style.display = 'none';
-    }
 
     function onFail(err) {
       hostMobileShellCamStarting = false;
@@ -472,6 +557,8 @@
       if (!raw) return;
       var now = Date.now();
       if (raw === hostMobileShellCamLastDecode && (now - hostMobileShellCamLastDecodeTs) < 2000) return;
+      hostMobileShellCamGotDecode_ = true;
+      hostMobileScanClearIosCamTimers_();
       hostMobileShellCamLastDecode = raw;
       hostMobileShellCamLastDecodeTs = now;
       hostMobileScanStopShellCamEngine_();
@@ -479,25 +566,61 @@
       hostMobileScanDeliverScan_(raw, true);
     }
 
-    function startWithCfg(deviceCfg) {
-      hostMobileShellCamEngine = new Html5Qrcode('sr-shell-cam-reader');
-      return hostMobileShellCamEngine.start(deviceCfg, scanCfg, onDecode, function() { /* frame miss */ });
+    if (typeof Html5Qrcode === 'undefined') {
+      var st0 = document.getElementById('sr-shell-cam-status');
+      if (st0) st0.textContent = 'Scanner failed to load.';
+      var sb0 = document.getElementById('sr-shell-cam-start');
+      if (sb0) sb0.style.display = 'block';
+      return;
     }
+    hostMobileShellCamStarting = true;
+    hostMobileShellCamGotDecode_ = false;
+    hostMobileScanClearIosCamTimers_();
 
     if (typeof Html5Qrcode.getCameras === 'function') {
       Html5Qrcode.getCameras().then(function(cams) {
-        var pick = hostMobileScanPickBackCamera_(cams);
-        if (pick && pick.id) return startWithCfg(pick.id);
-        return startWithCfg({ facingMode: { exact: 'environment' } }).catch(function() {
-          return startWithCfg({ facingMode: 'environment' });
+        var pick = hostMobileScanPickBackCamera_(cams || []);
+        if (pick && pick.id) return hostMobileScanStartWithDevice_(pick, onDecode).catch(onFail);
+        return hostMobileScanStartWithDevice_({ id: '' }, onDecode).catch(function() {
+          hostMobileShellCamEngine = new Html5Qrcode('sr-shell-cam-reader');
+          return hostMobileShellCamEngine.start(
+            { facingMode: 'environment' },
+            hostMobileScanShellCamScanConfig_(),
+            onDecode,
+            function() {}
+          ).then(function() {
+            hostMobileShellCamStarting = false;
+            var st = document.getElementById('sr-shell-cam-status');
+            if (st) st.textContent = 'Point at asset QR';
+          });
         });
-      }).then(onSuccess).catch(function() {
-        return startWithCfg({ facingMode: 'environment' }).then(onSuccess).catch(onFail);
-      });
+      }).catch(function() {
+        hostMobileShellCamEngine = new Html5Qrcode('sr-shell-cam-reader');
+        return hostMobileShellCamEngine.start(
+          { facingMode: 'environment' },
+          hostMobileScanShellCamScanConfig_(),
+          onDecode,
+          function() {}
+        ).then(function() {
+          hostMobileShellCamStarting = false;
+          var st = document.getElementById('sr-shell-cam-status');
+          if (st) st.textContent = 'Point at asset QR';
+        });
+      }).catch(onFail);
       return;
     }
 
-    startWithCfg({ facingMode: 'environment' }).then(onSuccess).catch(onFail);
+    hostMobileShellCamEngine = new Html5Qrcode('sr-shell-cam-reader');
+    hostMobileShellCamEngine.start(
+      { facingMode: 'environment' },
+      hostMobileScanShellCamScanConfig_(),
+      onDecode,
+      function() {}
+    ).then(function() {
+      hostMobileShellCamStarting = false;
+      var st = document.getElementById('sr-shell-cam-status');
+      if (st) st.textContent = 'Point at asset QR';
+    }).catch(onFail);
   }
 
   function hostMobileScanHideAppFrame_() {
@@ -2279,6 +2402,10 @@
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA') {
       if (ev.data.sessionToken) hostMobileScanSessionToken_ = String(ev.data.sessionToken).trim();
+      if (hostMobileScanIsIos_()) {
+        hostMobileScanOpenCameraPage_();
+        return;
+      }
       hostMobileScanOpenShellCam_(ev.data);
       return;
     }

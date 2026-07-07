@@ -24,6 +24,15 @@
     border-bottom: 1px solid #333;
 }
 
+/* iOS PWA / Safari — keep brand + profile row below status bar (battery, time) */
+@supports (-webkit-touch-callout: none) {
+    @media (max-width: 768px) {
+        .mobile-header-wrap {
+            padding-top: env(safe-area-inset-top);
+        }
+    }
+}
+
 .mobile-header {
     height: 56px;
     min-height: 56px;

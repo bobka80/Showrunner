@@ -51,6 +51,7 @@
       overflow: hidden;
       background: #000;
       border: 1px solid #f97316;
+      position: relative;
     }
     #qr-reader video {
       display: block !important;
@@ -100,14 +101,55 @@
   (function() {
     var engine = null;
     var starting = false;
+    var gotDecode = false;
     var HOST = 'https://sm-showrunner-97405.web.app';
     var params = new URLSearchParams(window.location.search);
     var isEmbed = params.get('embed') === '1';
 
+    var iosNativeStream = null;
+    var iosNativeVideo = null;
+    var iosNativeTimer = null;
+    var iosNativeDetector = null;
+    var iosCamQueue = [];
+    var iosCamIdx = 0;
+    var iosCamSwitchTimer = null;
+    var iosLastDecode = '';
+    var iosLastDecodeTs = 0;
+
+    function isIos() {
+      return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
+    function setStatus(msg) {
+      var el = document.getElementById('qr-status');
+      if (el) el.textContent = msg || '';
+    }
+
+    function stopIosNative() {
+      if (iosCamSwitchTimer) {
+        clearTimeout(iosCamSwitchTimer);
+        iosCamSwitchTimer = null;
+      }
+      if (iosNativeTimer) {
+        clearInterval(iosNativeTimer);
+        iosNativeTimer = null;
+      }
+      if (iosNativeStream) {
+        try {
+          iosNativeStream.getTracks().forEach(function(t) { t.stop(); });
+        } catch (e) { /* ignore */ }
+        iosNativeStream = null;
+      }
+      iosNativeVideo = null;
+    }
+
     function stopEngine() {
+      stopIosNative();
       try {
         if (engine) engine.stop().catch(function() {});
       } catch (e) { /* ignore */ }
+      engine = null;
     }
 
     function goBack() {
@@ -124,14 +166,21 @@
     }
 
     function saveAndReturn(text) {
-      var raw = String(text == null ? '' : text);
+      var raw = String(text == null ? '' : text).trim();
+      if (!raw || gotDecode) return;
+      var now = Date.now();
+      if (raw === iosLastDecode && (now - iosLastDecodeTs) < 1500) return;
+      gotDecode = true;
+      iosLastDecode = raw;
+      iosLastDecodeTs = now;
+      stopEngine();
+      if (isEmbed && window.parent && window.parent !== window) {
+        setStatus('Scanned!');
+        window.parent.postMessage({ type: 'SHOWRUNNER_SCAN_PAGE_QR', text: raw }, '*');
+        return;
+      }
       document.getElementById('qr-last').textContent = 'Scanned — returning…';
       setTimeout(function() {
-        stopEngine();
-        if (isEmbed && window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'SHOWRUNNER_SCAN_PAGE_QR', text: raw }, '*');
-          return;
-        }
         try {
           sessionStorage.setItem('sm_mobile_qr_pending', raw);
           localStorage.setItem('sm_mobile_qr_pending', raw);
@@ -143,16 +192,172 @@
         } else {
           window.location.href = HOST + '/?srScan=' + encodeURIComponent(raw);
         }
-      }, 400);
+      }, 200);
     }
 
     function onFail(err) {
       starting = false;
-      document.getElementById('qr-status').textContent = String(err && err.message ? err.message : err);
+      setStatus(String(err && err.message ? err.message : err));
       document.getElementById('qr-start').style.display = 'block';
     }
 
-    function startCamera() {
+    function cameraScore(cam) {
+      var lab = String(cam.label || '').toLowerCase();
+      if (lab.indexOf('ultra') !== -1) return 35;
+      if (lab.indexOf('tele') !== -1) return 45;
+      if (lab.indexOf('dual') !== -1 && lab.indexOf('ultra') === -1) return 8;
+      if (lab === 'back camera' || (lab.indexOf('back') !== -1 && lab.indexOf('ultra') === -1)) return 0;
+      if (lab.indexOf('wide') !== -1) return 15;
+      if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1) return 10;
+      return 25;
+    }
+
+    function buildRearCameraQueue(cams) {
+      var rear = [];
+      var i;
+      for (i = 0; i < cams.length; i++) {
+        var lab = String(cams[i].label || '').toLowerCase();
+        if (lab.indexOf('front') !== -1 || lab.indexOf('selfie') !== -1) continue;
+        rear.push(cams[i]);
+      }
+      if (!rear.length) return cams.slice();
+      rear.sort(function(a, b) { return cameraScore(a) - cameraScore(b); });
+      return rear;
+    }
+
+    function applyTrackTuning(track) {
+      if (!track || typeof track.applyConstraints !== 'function') return;
+      var caps = {};
+      try { caps = track.getCapabilities ? track.getCapabilities() : {}; } catch (e) { /* ignore */ }
+      var advanced = [];
+      if (caps.zoom && typeof caps.zoom.max === 'number' && caps.zoom.max > 1) {
+        advanced.push({ zoom: Math.min(2, Math.max(1.1, caps.zoom.max * 0.45)) });
+      }
+      var constraints = {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: 'continuous'
+      };
+      if (advanced.length) constraints.advanced = advanced;
+      track.applyConstraints(constraints).catch(function() { /* ignore */ });
+    }
+
+    function scheduleIosCamSwitch() {
+      if (iosCamSwitchTimer) {
+        clearTimeout(iosCamSwitchTimer);
+        iosCamSwitchTimer = null;
+      }
+      if (!isIos() || gotDecode || iosCamIdx >= iosCamQueue.length - 1) return;
+      iosCamSwitchTimer = setTimeout(function() {
+        if (gotDecode) return;
+        iosCamIdx += 1;
+        setStatus('Trying alternate lens…');
+        startIosNativeStream(iosCamQueue[iosCamIdx]).then(function() {
+          scheduleIosCamSwitch();
+        }).catch(function() {
+          scheduleIosCamSwitch();
+        });
+      }, 4000);
+    }
+
+    function startIosNativeDetectLoop() {
+      if (!iosNativeDetector) {
+        try {
+          iosNativeDetector = new BarcodeDetector({ formats: ['qr_code'] });
+        } catch (e) { return; }
+      }
+      if (iosNativeTimer) clearInterval(iosNativeTimer);
+      iosNativeTimer = setInterval(function() {
+        if (gotDecode || !iosNativeVideo || !iosNativeVideo.videoWidth) return;
+        iosNativeDetector.detect(iosNativeVideo).then(function(codes) {
+          if (!codes || !codes.length || !codes[0].rawValue) return;
+          saveAndReturn(codes[0].rawValue);
+        }).catch(function() { /* ignore */ });
+      }, 180);
+    }
+
+    function startIosNativeStream(cam) {
+      stopIosNative();
+      var reader = document.getElementById('qr-reader');
+      if (!reader) return Promise.reject(new Error('No reader'));
+      reader.innerHTML = '';
+      iosNativeVideo = document.createElement('video');
+      iosNativeVideo.setAttribute('playsinline', 'true');
+      iosNativeVideo.setAttribute('webkit-playsinline', 'true');
+      iosNativeVideo.autoplay = true;
+      iosNativeVideo.muted = true;
+      iosNativeVideo.playsInline = true;
+      reader.appendChild(iosNativeVideo);
+
+      var videoConstraints = {
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        focusMode: 'continuous'
+      };
+      if (cam && cam.deviceId) {
+        videoConstraints.deviceId = { exact: cam.deviceId };
+      } else if (cam && cam.id) {
+        videoConstraints.deviceId = { exact: cam.id };
+      } else {
+        videoConstraints.facingMode = 'environment';
+      }
+
+      return navigator.mediaDevices.getUserMedia({ audio: false, video: videoConstraints })
+        .then(function(stream) {
+          iosNativeStream = stream;
+          iosNativeVideo.srcObject = stream;
+          return iosNativeVideo.play();
+        })
+        .then(function() {
+          var track = iosNativeStream && iosNativeStream.getVideoTracks
+            ? iosNativeStream.getVideoTracks()[0] : null;
+          applyTrackTuning(track);
+          startIosNativeDetectLoop();
+        });
+    }
+
+    function startIosNativeCamera() {
+      if (starting || gotDecode) return;
+      if (typeof BarcodeDetector === 'undefined' || !navigator.mediaDevices) {
+        startHtml5QrcodeCamera();
+        return;
+      }
+      starting = true;
+      document.getElementById('qr-start').style.display = 'none';
+      setStatus('Starting camera…');
+      iosCamIdx = 0;
+      iosCamQueue = [];
+
+      function beginWithCams(cams) {
+        iosCamQueue = buildRearCameraQueue(cams || []);
+        var first = iosCamQueue[0] || null;
+        return startIosNativeStream(first).then(function() {
+          starting = false;
+          setStatus('Point at QR — hold phone 15–20 cm away');
+          scheduleIosCamSwitch();
+        });
+      }
+
+      if (typeof Html5Qrcode !== 'undefined' && typeof Html5Qrcode.getCameras === 'function') {
+        Html5Qrcode.getCameras().then(beginWithCams).catch(function() {
+          return beginWithCams([]);
+        }).catch(onFail);
+        return;
+      }
+      if (navigator.mediaDevices.enumerateDevices) {
+        navigator.mediaDevices.enumerateDevices().then(function(devs) {
+          var cams = [];
+          for (var i = 0; i < devs.length; i++) {
+            if (devs[i].kind === 'videoinput') cams.push({ id: devs[i].deviceId, label: devs[i].label });
+          }
+          return beginWithCams(cams);
+        }).catch(function() { return beginWithCams([]); }).catch(onFail);
+        return;
+      }
+      beginWithCams([]).catch(onFail);
+    }
+
+    function startHtml5QrcodeCamera() {
       if (typeof Html5Qrcode === 'undefined') {
         onFail(new Error('Scanner failed to load.'));
         return;
@@ -160,52 +365,81 @@
       if (engine || starting) return;
       starting = true;
       document.getElementById('qr-start').style.display = 'none';
-      document.getElementById('qr-status').textContent = 'Starting camera…';
+      setStatus('Starting camera…');
+      var ios = isIos();
 
-      function startCfg(cfg) {
-        engine = new Html5Qrcode('qr-reader');
-        return engine.start(
-          cfg,
-          {
-            fps: 10,
-            qrbox: function(w, h) {
+      function scanCfg() {
+        return {
+          fps: ios ? 10 : 10,
+          disableFlip: false,
+          qrbox: ios
+            ? function(w, h) { return { width: w, height: h }; }
+            : function(w, h) {
               var edge = Math.floor(Math.min(w, h) * 0.72);
               return { width: Math.max(edge, 160), height: Math.max(edge, 160) };
             }
-          },
+        };
+      }
+
+      function deviceCfgForId(id) {
+        if (!id) return { facingMode: 'environment' };
+        var cfg = { deviceId: { exact: id } };
+        if (ios) {
+          cfg.width = { ideal: 1920 };
+          cfg.height = { ideal: 1080 };
+          cfg.focusMode = 'continuous';
+        }
+        return cfg;
+      }
+
+      function startWithDevice(cam) {
+        engine = new Html5Qrcode('qr-reader');
+        return engine.start(
+          deviceCfgForId(cam && (cam.id || cam.deviceId) ? (cam.id || cam.deviceId) : ''),
+          scanCfg(),
           function(decoded) { saveAndReturn(decoded); },
           function() {}
-        );
+        ).then(function() {
+          if (ios && typeof engine.applyVideoConstraints === 'function') {
+            engine.applyVideoConstraints({
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              focusMode: 'continuous'
+            }).catch(function() {});
+          }
+        });
       }
 
       if (typeof Html5Qrcode.getCameras === 'function') {
         Html5Qrcode.getCameras().then(function(cams) {
-          if (!cams || !cams.length) return startCfg({ facingMode: 'environment' });
-          var back = null;
-          for (var i = 0; i < cams.length; i++) {
-            var lab = String(cams[i].label || '').toLowerCase();
-            if (lab.indexOf('back') !== -1 || lab.indexOf('rear') !== -1 || lab.indexOf('environment') !== -1) {
-              back = cams[i];
-              break;
-            }
-          }
-          return startCfg((back || cams[cams.length - 1]).id);
+          var queue = ios ? buildRearCameraQueue(cams || []) : (cams || []);
+          var pick = queue.length ? queue[0] : null;
+          if (pick) return startWithDevice(pick);
+          return startWithDevice(null);
         }).then(function() {
           starting = false;
-          document.getElementById('qr-status').textContent = 'Camera active';
+          setStatus('Camera active');
         }).catch(function() {
-          startCfg({ facingMode: 'environment' }).then(function() {
+          return startWithDevice(null).then(function() {
             starting = false;
-            document.getElementById('qr-status').textContent = 'Camera active';
-          }).catch(onFail);
-        });
+            setStatus('Camera active');
+          });
+        }).catch(onFail);
         return;
       }
 
-      startCfg({ facingMode: 'environment' }).then(function() {
+      startWithDevice(null).then(function() {
         starting = false;
-        document.getElementById('qr-status').textContent = 'Camera active';
+        setStatus('Camera active');
       }).catch(onFail);
+    }
+
+    function startCamera() {
+      if (isIos()) {
+        startIosNativeCamera();
+        return;
+      }
+      startHtml5QrcodeCamera();
     }
 
     document.getElementById('qr-start').addEventListener('click', startCamera);
@@ -215,8 +449,9 @@
     }, { passive: false });
     document.getElementById('btn-back').addEventListener('click', goBack);
 
-    if (new URLSearchParams(window.location.search).get('scan') === '1') {
-      document.getElementById('qr-status').textContent = 'Starting camera…';
+    if (params.get('scan') === '1') {
+      setStatus('Starting camera…');
+      document.getElementById('qr-start').style.display = 'none';
       requestAnimationFrame(function() { startCamera(); });
     }
   })();

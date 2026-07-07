@@ -7,6 +7,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   
   <style>
     /* @INDEX: STYLES -> Core Theme Variables */
@@ -2177,6 +2178,15 @@
     flex-shrink: 0;
     background: var(--bg-sidebar);
     border-bottom: 1px solid #333;
+}
+
+/* iOS PWA / Safari — keep brand + profile row below status bar (battery, time) */
+@supports (-webkit-touch-callout: none) {
+    @media (max-width: 768px) {
+        .mobile-header-wrap {
+            padding-top: env(safe-area-inset-top);
+        }
+    }
 }
 
 .mobile-header {

@@ -27,6 +27,7 @@ This is the work **in flight right now**: RFID gun scanning end-to-end, fixed wa
 
 ### Open (polish — finish then archive this section)
 
+- [x] **iPhone QR decode (hosting v472)** — full-screen `mobile-scan.html` + native `BarcodeDetector`; v473 anchored overlay reverted (v474).
 - [ ] Director QA on anchored camera overlay (position, auto-start, backdrop blocking taps)
 - [ ] PA checkout forward from scan panel (if still wanted — was deferred)
 
