@@ -602,13 +602,18 @@ function mobileScanTimeLabel_() {
 function mobileScanToast_(msg, isError) {
   var el = document.getElementById('mobile-scan-toast');
   if (!el) return;
+  if (!isError) {
+    el.style.display = 'none';
+    el.textContent = '';
+    return;
+  }
   el.textContent = msg || '';
-  el.className = 'mobile-scan-toast' + (isError ? ' is-error' : ' is-ok');
+  el.className = 'mobile-scan-toast is-error';
   el.style.display = 'block';
   clearTimeout(window._mobileScanToastTimer);
   window._mobileScanToastTimer = setTimeout(function() {
     el.style.display = 'none';
-  }, 2800);
+  }, 3200);
 }
 
 function mobileScanResolve_(raw) {
