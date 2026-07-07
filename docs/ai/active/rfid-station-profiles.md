@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v473** · APK **v0.1.18 (build 20)** · Hosting **host-boot v476** · **Last swept:** 2026-07-07
+**Opened:** 2026-07-02 · **Production:** GAS **v474** · APK **v0.1.22 (build 24)** · Hosting **host-boot v479** · **Last swept:** 2026-07-07
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -94,10 +94,54 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 ## In progress / next (director priority 2026-07-07)
 
-1. **[x] Bulletproof BLE gun reconnect (APK v0.1.16 build 18)** — health check, reconnect ladder, screen-on/resume, foreground service, `linkState` in settings. **Field verify** after gun sleep.
-2. **[x] Session survives sleep + gun cycle (hosting v476, GAS Login, APK v0.1.18 build 20)** — `sessioncheck` retries + network≠invalid; 18s boot grace defers login-gate wipe; `Login.html` auto-boot no longer flashes logged-out; native `onRenderProcessGone` reloads hosting shell. **Field verify** after gun off/on + screen wake.
-3. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
-4. **[ ] Optimistic host login + local roster cache** — instant badge host UI; server confirms in parallel (after EPC+TID schema).
+1. **[x] Crew EPC + TID (Chainway UHF, soft cutover A)** — `rfid_tid` column; native `setEPCAndTIDMode`; enroll/login pair match when TID on row; legacy EPC-only until re-enrolled.
+2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
+3. **[ ] Optimistic host login + local roster cache** — after EPC+TID schema ships.
+
+### Parked — must fix later (director 2026-07-07: stop work for now)
+
+**[ ] BLE reconnect must not reset device login / station shell** — symptom persists after v479. Gun BLE disconnect/reconnect still feels like a hard app reset: back to **SYSTEM SECURE** (device passcode) and/or station cold boot (splash, host badge lost, project state gone). **Director decision:** defer; document attempts below; revisit with a fresh architectural pass.
+
+#### Symptom (what “still the same” means)
+
+| Layer | What resets | Storage |
+|-------|-------------|---------|
+| **Device login** (30-day passcode) | SYSTEM SECURE screen | Parent `localStorage` `sm_session_token` |
+| **Host badge** | “Waiting for badge” | Iframe `sessionStorage` `sm_station_host_v1_*` |
+| **Project / PA state** | Back to station home | Iframe in-memory + caches |
+
+BLE gun link recovery itself **mostly works** (reconnect ladder, status text). The failure is the **web session bridge** treating BLE flap like logout.
+
+#### Root causes identified (not fully solved)
+
+1. **Two-layer shell** — Showrunner runs in a GAS **iframe** inside Firebase **parent**. Any `frame.src` change or full WebView reload re-runs the GAS bootloader (`Index` → `sessionboot` or `Login`) — feels like restart; host `sessionStorage` is wiped.
+2. **`Login.html` spurious signal** — whenever Login paints, it `postMessage`s `SHOWRUNNER_LOGIN_STATE { loggedIn: false }` even when parent still has a valid token. Parent used to react by reloading iframe or clearing session.
+3. **`visibilitychange` auto-reload (native)** — on screen resume, parent reloaded iframe with `sessionboot` when `iframeLoggedIn` was false → full GAS cold boot.
+4. **Cross-origin storage split** — device token lives in **parent** `localStorage`; Login auto-boot reads **iframe** `localStorage` (different origin). Plain Login URL without `sessionboot` always shows SYSTEM SECURE even if parent has a token.
+5. **WebView / renderer death** — `onRenderProcessGone` → `webView.reload()` reloads entire hosting shell; race if `initShell()` runs before session restored.
+
+#### What we tried (chronological — field still broken)
+
+| Ship | Layer | Change | Result |
+|------|-------|--------|--------|
+| v476 | GAS `Login.html` | `sessioncheck` retry; network error ≠ invalid session; defer `SHOWRUNNER_LOGIN_STATE` flash | **Not sufficient alone** |
+| v476 | `host-boot.js` | 18s `shellBootGraceUntil`; `shouldDeferSessionClear()`; `sessionCheckWithRetry` | Reduced spurious clears; **symptom persists** |
+| v476 | APK 21 | `onRenderProcessGone` → `reload()` + debounce; safe `JSONObject` JS injection | **Symptom persists** |
+| v477 | `host-boot.js` | `window.__srBleReconnecting` from native `onLinkBusy`; defer blocks session wipe + login-gate nav | **Symptom persists** |
+| v477 | APK 22 | `RfidManager.setLinkState` → `onLinkBusy` on disconnect/reconnect | **Symptom persists** |
+| v478 (partial) | `host-boot.js` | **Bug found:** defer branches still did `frame.src = buildAppFrameUrl()` → iframe cold boot during BLE; changed to no-op `return` | Shipped in v479 |
+| v479 | `host-boot.js` | Ignore native `SHOWRUNNER_LOGIN_STATE` when parent session valid + no `clearSession`; **disable** `visibilitychange` iframe reload on native; `restoreParentSessionFromNative()` before `initShell`; BLE-safe `resolveAppFrameUrl` (no clear during reconnect); `saveSession`/`getSavedSession` bridge | **Director: still broken** |
+| v479 | APK 22→24 | `AndroidStation.saveSession` / `getSavedSession` in SharedPreferences; inject session on `onPageFinished`; `__srBleReconnecting` clear delayed 4s after `LINK_LIVE` | **Director: still broken** |
+| Earlier | APK 12+ | WebView `saveState`/`restoreState`, `singleTask`, BLE reconnect ladder, foreground service, health check | Gun reconnects; **login reset separate issue** |
+
+#### Likely next approaches (when resumed)
+
+- **Never reload GAS iframe on BLE** — only native status; parent session is sacred.
+- **Persist host session to parent** `localStorage` (or native prefs) so iframe reload can restore badge without re-scan.
+- **Single-frame station** (no iframe) for native app — largest change, cleanest fix.
+- **Instrument** — log whether failure is parent reload vs iframe reload vs session clear (timestamped breadcrumbs in parent + native logcat).
+
+Files: `push-hosting/public/host-boot.js`, `Login.html`, `station-android/.../StationWebActivity.kt`, `RfidManager.kt`. Fragile zone: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § PWA session bridge.
 
 ### Field / polish (ongoing)
 
@@ -109,9 +153,10 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 ### Approved backlog (not started)
 
-- [ ] **Crew two-tag schema (EPC + TID)** — prerequisite for optimistic login
 - [ ] **Offline host recognition (clone-safe)** — host-in from cache; writes still need server
 - [ ] **Device hygiene** — one station profile per physical device (operational; no purchase blocker). Future: TL Solutions SDK driver, gate PC+TV when hardware bought.
+
+**Moved to in-progress:** Crew **EPC + TID** (was listed here; now priority #1 above).
 
 ## RFID badge lifecycle & fragile points (enrollment → DB → login)
 
@@ -204,7 +249,7 @@ On host logout, idle eject, or sign-out: return to **"waiting for badge"** main 
 
 ## Agreed spec — Security & crew badge model (director 2026-07-07)
 
-**Status:** Approved — not built yet.
+**Status:** **Shipped (soft cutover A)** — EPC+TID native read + `rfid_tid` schema; pair match when TID enrolled.
 
 ### Trust model
 
@@ -265,7 +310,7 @@ Checkout/check-in remains **input-agnostic** on every surface (tap, RFID, future
 
 ## Agreed spec — Bulletproof BLE reconnect (director 2026-07-07)
 
-**Status:** **In flight** — APK build 18+ (`RfidManager.kt`, `BleKeepAliveService.kt`).
+**Status:** **Gun link — shipped** (APK build 18+). **Login/shell reset on reconnect — parked** (see § Parked above; v479 still broken in field).
 
 **Problem:** After **gun sleep** or long idle, BLE drops but SDK may still report **CONNECTED** (“zombie link”); `connectIfNeeded()` then skips reconnect. **Reconnect gun** button can appear dead if `forceReconnect()` queues behind a **stuck read** on the single worker thread.
 

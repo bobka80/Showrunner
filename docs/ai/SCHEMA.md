@@ -86,11 +86,12 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
   "Email": "john@showrider.com",
   "Passcode": "123456",
   "Role_ID": "uuid-linking-to-role-matrix",
-  "rfid_tag": "UHF EPC hex string for crew badge (host login on warehouse gun)"
+  "rfid_tag": "UHF EPC hex string for crew badge (host login on warehouse gun)",
+  "rfid_tid": "Factory TID hex from the same chip (anti-clone; paired with rfid_tag when set)"
 }
 ```
 
-**`rfid_tag` matching contract (fragile — keep both sides identical):** the tag is stored and compared through `normalizeStationRfidTag()` = `trim().toLowerCase()` **only** (no hex cleanup, no leading-zero/space stripping). The native gun sends `epc.uppercase()`; the server lowercases it. Matching therefore works **only if enrollment and login read the exact same EPC representation** — same memory bank, same formatting. If a gun/firmware ever returns a differently-formatted EPC (embedded spaces, different length, TID vs EPC), the stored badge silently stops matching. The `rfid_tag` **column must exist** on `Crew_Roster` (provisioned by `verifyVaultSchema`); if absent, enrollment errors and badge login silently returns no match. Enrollment (`enrollStationCrewRfidTag`) calls `flushCache()` so a freshly linked badge logs in immediately. Full lifecycle + fragilities: [active/rfid-station-profiles.md](active/rfid-station-profiles.md).
+**`rfid_tag` / `rfid_tid` matching contract (fragile):** both use `normalizeStationRfidTag()` = `trim().toLowerCase()` only. Native sends uppercase; server lowercases. **Soft cutover:** empty `rfid_tid` on row → host login is **EPC-only** (legacy). Once `rfid_tid` is enrolled → login requires **EPC + TID** pair; wrong TID rejects with clone warning. Equipment stays EPC-only on `Assets.rfid_tag`. Columns via `verifyVaultSchema` / `ensureCrewRfidTidColumn_`. Enrollment calls `flushCache()`. Lifecycle: [active/rfid-station-profiles.md](active/rfid-station-profiles.md).
 
 ---
 

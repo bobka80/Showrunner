@@ -27,10 +27,14 @@
   }
   // The native app injects `AndroidStation` and calls `showrunnerStationDeliverScan`
   // in THIS (top) frame; Showrunner itself runs in the iframe, so we relay by postMessage.
-  window.showrunnerStationDeliverScan = function(tag) {
+  window.showrunnerStationDeliverScan = function(tag, tid) {
     try {
       if (frame && frame.contentWindow) {
-        frame.contentWindow.postMessage({ type: 'SHOWRUNNER_RFID_SCAN', tag: String(tag == null ? '' : tag) }, '*');
+        frame.contentWindow.postMessage({
+          type: 'SHOWRUNNER_RFID_SCAN',
+          tag: String(tag == null ? '' : tag),
+          tid: tid ? String(tid) : ''
+        }, '*');
       }
     } catch (e) { /* ignore */ }
   };
@@ -1653,6 +1657,9 @@
       localStorage.setItem('sm_session_token', String(token).trim());
       localStorage.setItem('sm_session_expires', String(expiresAt || (Date.now() + SESSION_MS)));
       if (crewName) localStorage.setItem('sm_crew_name', String(crewName).trim());
+      if (window.AndroidStation && typeof AndroidStation.saveSession === 'function') {
+        AndroidStation.saveSession(String(token).trim(), expiresAt || (Date.now() + SESSION_MS));
+      }
     } catch (e) { /* ignore */ }
   }
 
@@ -1660,6 +1667,25 @@
     try {
       localStorage.removeItem('sm_session_token');
       localStorage.removeItem('sm_session_expires');
+      if (window.AndroidStation && typeof AndroidStation.saveSession === 'function') {
+        AndroidStation.saveSession('', 0);
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function restoreParentSessionFromNative() {
+    try {
+      if (!window.AndroidStation || typeof AndroidStation.getSavedSession !== 'function') return;
+      var raw = AndroidStation.getSavedSession();
+      if (!raw) return;
+      var data = JSON.parse(raw);
+      if (!data || !data.token || String(data.token).length < 20) return;
+      var exp = parseInt(data.expiresAt, 10) || 0;
+      if (!exp || exp <= Date.now()) return;
+      if (!readParentSession()) {
+        localStorage.setItem('sm_session_token', String(data.token).trim());
+        localStorage.setItem('sm_session_expires', String(exp));
+      }
     } catch (e) { /* ignore */ }
   }
 
@@ -1679,7 +1705,13 @@
     return PROD_GAS_EXEC || (firebaseConfig && firebaseConfig.gasExecUrl) || '';
   }
 
+  function shouldDeferSessionClear() {
+    if (window.__srBleReconnecting && readParentSession()) return true;
+    return Date.now() < shellBootGraceUntil && !!readParentSession();
+  }
+
   function navigateHostingToLoginGate() {
+    if (shouldDeferSessionClear()) return;
     clearParentSession();
     iframeLoggedIn = false;
     lastLoginScreenAt = Date.now();
@@ -1710,10 +1742,6 @@
 
   function startShellBootGrace() {
     shellBootGraceUntil = Date.now() + 18000;
-  }
-
-  function shouldDeferSessionClear() {
-    return Date.now() < shellBootGraceUntil && !!readParentSession();
   }
 
   function sessionCheckJsonp(token) {
@@ -1776,6 +1804,9 @@
     if (check && check.networkError) {
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
+    if (shouldDeferSessionClear() || window.__srBleReconnecting) {
+      return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
+    }
     clearParentSession();
     return base;
   }
@@ -1783,6 +1814,7 @@
   function startShellOnce() {
     if (shellInitStarted) return;
     shellInitStarted = true;
+    restoreParentSessionFromNative();
     bootstrapCrewFromParentStorage();
     initShell();
   }
@@ -2375,10 +2407,7 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_NAVIGATE_LOGIN_GATE') {
-      if (shouldDeferSessionClear()) {
-        if (frame) frame.src = buildAppFrameUrl();
-        return;
-      }
+      if (shouldDeferSessionClear()) return;
       navigateHostingToLoginGate();
       return;
     }
@@ -2388,13 +2417,13 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
+      if (shouldDeferSessionClear()) return;
+      if (isNativeStationApp() && readParentSession() && ev.data.clearSession !== true) {
+        return;
+      }
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
       if (ev.data.clearSession === true) {
-        if (shouldDeferSessionClear()) {
-          if (frame) frame.src = buildAppFrameUrl();
-          return;
-        }
         hideStationSplash();
         notifyNativeSplash('loginNeeded');
         navigateHostingToLoginGate();
@@ -2828,7 +2857,8 @@
 
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState !== 'visible') return;
-    if (!isNativeStationApp()) return;
+    if (isNativeStationApp()) return;
+    if (shouldDeferSessionClear()) return;
     var sess = readParentSession();
     if (!sess || !sess.token || !frame) return;
     if (iframeLoggedIn) return;
@@ -2837,6 +2867,16 @@
     if (Date.now() - lastLoginScreenAt > 120000) return;
     frame.src = buildAppFrameUrl();
   });
+
+  window.__srReloadAppFrameOnly = function() {
+    if (!frame) return false;
+    try {
+      frame.src = buildAppFrameUrl();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
 
   startShellOnce();
   if (shouldShowInstallPanel()) showInstallPanel();

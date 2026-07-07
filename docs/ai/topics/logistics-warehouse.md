@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-07 · **Production:** GAS **v465** · **Status:** Partial — station shell through **v437+**; APK **v0.1.15**. Open: EPC+TID crew badges, optimistic host login, BLE reconnect hardening, kiosk auto-start, gate — see [active campaign](../active/rfid-station-profiles.md).
+**Last swept:** 2026-07-07 · **Production:** GAS **v474** · **Status:** Partial — BLE login reset **parked**; **next: EPC+TID** on Chainway tags. See [active campaign](../active/rfid-station-profiles.md).
 
 ---
 

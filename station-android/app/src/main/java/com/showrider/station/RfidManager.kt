@@ -14,6 +14,8 @@ import com.rscja.deviceapi.interfaces.ConnectionStatus
 import com.rscja.deviceapi.interfaces.ConnectionStatusCallback
 import com.rscja.deviceapi.interfaces.KeyEventCallback
 import com.rscja.deviceapi.interfaces.ScanBTCallback
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -25,9 +27,10 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 class RfidManager(
     private val context: Context,
-    private val onTagScanned: (String) -> Unit,
+    private val onTagScanned: (epc: String, tid: String) -> Unit,
     private val onStatus: (String) -> Unit,
     private val onTriggerWake: () -> Boolean = { false },
+    private val onLinkBusy: (Boolean) -> Unit = {},
 ) {
     private val uhf = RFIDWithUHFBLE.getInstance()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -57,7 +60,9 @@ class RfidManager(
     @Volatile private var battery = -1
     @Volatile private var firmware = ""
 
-    private val pendingScans = java.util.concurrent.ConcurrentLinkedQueue<String>()
+    private val pendingScans = java.util.concurrent.ConcurrentLinkedQueue<PendingScan>()
+
+    private data class PendingScan(val epc: String, val tid: String)
 
     private val connectionCallback = ConnectionStatusCallback<Any> { status, device ->
         mainHandler.post { handleConnectionStatus(status, device as? BluetoothDevice) }
@@ -438,6 +443,12 @@ class RfidManager(
 
     private fun setLinkState(state: String) {
         linkState = state
+        when (state) {
+            LINK_LIVE -> mainHandler.postDelayed({ onLinkBusy(false) }, BLE_BUSY_CLEAR_MS)
+            LINK_RECONNECTING, LINK_DISCONNECTED, LINK_ZOMBIE, LINK_CONNECTING ->
+                mainHandler.post { onLinkBusy(true) }
+            else -> Unit
+        }
     }
 
     private fun sdkStatus(): ConnectionStatus = try {
@@ -547,27 +558,37 @@ class RfidManager(
     private fun deliverTag(info: UHFTAGInfo?) {
         val epc = info?.epc?.trim().orEmpty()
         if (epc.isEmpty()) return
+        val tid = normalizeTid(info?.getTid())
         val now = System.currentTimeMillis()
         if (epc.equals(lastEpc, ignoreCase = true) && now - lastEpcAt < DEBOUNCE_MS) return
         lastEpc = epc
         lastEpcAt = now
-        val upper = epc.uppercase()
-        pendingScans.add(upper)
+        val upperEpc = epc.uppercase()
+        pendingScans.add(PendingScan(upperEpc, tid))
         while (pendingScans.size > 32) pendingScans.poll()
-        mainHandler.post { onTagScanned(upper) }
+        mainHandler.post { onTagScanned(upperEpc, tid) }
+    }
+
+    private fun normalizeTid(raw: String?): String {
+        val t = raw?.trim().orEmpty()
+        if (t.isEmpty()) return ""
+        if (t.equals("0000000000000000", ignoreCase = true)) return ""
+        if (t.equals("000000000000000000000000", ignoreCase = true)) return ""
+        return t.uppercase()
     }
 
     fun drainPendingScans(): String {
         if (pendingScans.isEmpty()) return "[]"
-        val sb = StringBuilder("[")
-        var first = true
+        val arr = JSONArray()
         while (true) {
-            val e = pendingScans.poll() ?: break
-            if (!first) sb.append(",")
-            sb.append("\"").append(e.replace("\\", "\\\\").replace("\"", "\\\"")).append("\"")
-            first = false
+            val scan = pendingScans.poll() ?: break
+            arr.put(
+                JSONObject()
+                    .put("epc", scan.epc)
+                    .put("tid", scan.tid),
+            )
         }
-        return sb.append("]").toString()
+        return arr.toString()
     }
 
     fun disconnect() {
@@ -595,6 +616,11 @@ class RfidManager(
         configWorker.execute {
             try {
                 if (sdkStatus() != ConnectionStatus.CONNECTED) return@execute
+                try {
+                    uhf.setEPCAndTIDMode()
+                } catch (e: Exception) {
+                    Log.w(TAG, "setEPCAndTIDMode failed", e)
+                }
                 uhf.setPower(powerDbm.coerceIn(POWER_MIN, POWER_MAX))
                 uhf.setBeep(beepEnabled)
             } catch (e: Exception) {
@@ -712,5 +738,6 @@ class RfidManager(
         private const val DEFAULT_POLL_MS = 500
         private const val POLL_MIN = 100
         private const val POLL_MAX = 2000
+        private const val BLE_BUSY_CLEAR_MS = 4000L
     }
 }

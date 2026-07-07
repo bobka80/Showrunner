@@ -1209,6 +1209,19 @@ function stationNormalizeEpc_(epc) {
   return String(epc == null ? '' : epc).trim().toLowerCase();
 }
 
+function stationParseScanPayload_(raw, tidOpt) {
+  if (raw != null && typeof raw === 'object') {
+    return {
+      epc: String(raw.epc || raw.tag || '').trim(),
+      tid: String(raw.tid || '').trim()
+    };
+  }
+  return {
+    epc: String(raw == null ? '' : raw).trim(),
+    tid: String(tidOpt || '').trim()
+  };
+}
+
 function stationResolveEpc_(epc) {
   var key = stationNormalizeEpc_(epc);
   if (!key) return null;
@@ -1652,8 +1665,9 @@ function stationApplyBootstrap_(data) {
   }
 }
 
-function stationHandleRfidScan_(rawTag) {
+function stationHandleRfidScan_(rawTag, rawTid) {
   const tag = String(rawTag || '').trim();
+  const tid = String(rawTid || '').trim();
   if (!tag || window.stationScanBusy) return;
   if (!window.IS_STATION_DEVICE) return;
 
@@ -1689,12 +1703,14 @@ function stationHandleRfidScan_(rawTag) {
       window.stationScanBusy = false;
       stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
     })
-    .processStationRfidScan(ACTIVE_USER_NAME, tag, { hostOnly: true });
+    .processStationRfidScan(ACTIVE_USER_NAME, tag, { hostOnly: true, tid: tid });
 }
 
 /** Entry point for Chainway Android SDK bridge. */
-window.onStationRfidScan = function(rawTag) {
-  const tag = String(rawTag || '').trim();
+window.onStationRfidScan = function(rawTag, rawTid) {
+  const scan = stationParseScanPayload_(rawTag, rawTid);
+  const tag = scan.epc;
+  const tid = scan.tid;
   const norm = stationNormalizeEpc_(tag);
   // Dedup: one physical scan can arrive via BOTH poll and relay (case/format may differ).
   if (norm) {
@@ -1702,13 +1718,14 @@ window.onStationRfidScan = function(rawTag) {
     if (norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500) return;
     window.stationLastScanNorm = norm;
     window.stationLastScanTag = tag;
+    window.stationLastScanTid = tid;
     window.stationLastScanAt = now;
   }
-  stationDebug_('scan IN: ' + (tag || '(empty)'));
+  stationDebug_('scan IN: ' + (tag || '(empty)') + (tid ? ' tid:' + tid : ''));
   if (tag) stationPushScanFeed_(tag);
   // ROOT recording a crew badge (Vault → Crew tab) takes top priority.
   if (tag && window.stationCrewRecord) {
-    if (stationCrewConsumeScan_(tag)) return;
+    if (stationCrewConsumeScan_(tag, tid)) return;
   }
   // Manager recording a tag onto equipment (Vault) is next.
   if (tag && window.stationVaultRecord && window.stationVaultRecord.queue && window.stationVaultRecord.queue.length) {
@@ -1719,7 +1736,7 @@ window.onStationRfidScan = function(rawTag) {
     if (tag) stationPanelHandleScan_(tag);
     return;
   }
-  stationHandleRfidScan_(rawTag);
+  stationHandleRfidScan_(tag, tid);
 };
 
 /**
@@ -1738,8 +1755,14 @@ function stationStartScanPoll_() {
     var arr;
     try { arr = JSON.parse(raw); } catch (e) { return; }
     for (var i = 0; i < arr.length; i++) {
-      stationDebug_('poll scan: ' + arr[i]);
-      window.onStationRfidScan(arr[i]);
+      var item = arr[i];
+      if (item && typeof item === 'object') {
+        stationDebug_('poll scan: ' + (item.epc || item.tag || ''));
+        window.onStationRfidScan(item.epc || item.tag || '', item.tid || '');
+      } else {
+        stationDebug_('poll scan: ' + item);
+        window.onStationRfidScan(item);
+      }
     }
   }, 300);
 }
@@ -2591,18 +2614,18 @@ window.stationVaultStartCrewRecord_ = function(ref, name) {
 };
 
 /** Consume a scan onto the armed crew member. Returns true if used. */
-function stationCrewConsumeScan_(tag) {
+function stationCrewConsumeScan_(tag, tid) {
   const rec = window.stationCrewRecord;
   if (!rec) return false;
   if (window.stationCrewRecordBusy) return true;
   const host = stationReadHostSession_();
   if (!host) { stationVaultCancelRecord_(); return true; }
-  stationCrewRecordCall_(rec, tag, false);
+  stationCrewRecordCall_(rec, tag, tid, false);
   return true;
 }
 
 /** Crew enroll write, split out so the Overwrite button can re-issue it with force=true. */
-function stationCrewRecordCall_(rec, tag, force) {
+function stationCrewRecordCall_(rec, tag, tid, force) {
   const host = stationReadHostSession_();
   if (!host) { stationVaultCancelRecord_(); return; }
   window.stationCrewRecordBusy = true;
@@ -2613,7 +2636,7 @@ function stationCrewRecordCall_(rec, tag, force) {
     .withSuccessHandler(function(res) {
       window.stationCrewRecordBusy = false;
       if (res && res.duplicate) {
-        stationShowOverwritePrompt_(res.duplicate, function() { stationCrewRecordCall_(rec, tag, true); });
+        stationShowOverwritePrompt_(res.duplicate, function() { stationCrewRecordCall_(rec, tag, tid, true); });
         return;
       }
       if (!res || !res.success) {
@@ -2622,7 +2645,10 @@ function stationCrewRecordCall_(rec, tag, force) {
       }
       // Reflect the new tag in the cached crew row + refresh the live-strip resolver.
       const c = (window.stationVaultCrew || []).find(function(x) { return String(x.uid || x.name) === String(rec.ref) || String(x.name) === String(rec.name); });
-      if (c) c.rfidTag = tag;
+      if (c) {
+        c.rfidTag = tag;
+        c.rfidTid = tid || '';
+      }
       stationVaultRenderCrew_();
       stationRefreshEquipMap_();
       window.stationCrewRecord = null;
@@ -2633,7 +2659,7 @@ function stationCrewRecordCall_(rec, tag, force) {
       window.stationCrewRecordBusy = false;
       if (txt) txt.textContent = 'Error: ' + (err && err.message ? err.message : String(err)) + ' — Cancel to stop.';
     })
-    .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.name, rec.ref, tag, !!force);
+    .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.name, rec.ref, tag, !!force, tid || '');
 }
 
 window.stationCloseProjectPicker = function() {
@@ -3076,8 +3102,8 @@ function stationBindMessageListener_() {
     const d = ev && ev.data;
     if (!d) return;
     if (d.type === 'SHOWRUNNER_RFID_SCAN') {
-      stationDebug_('relay scan: ' + (d.tag || '(empty)'));
-      if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag);
+      stationDebug_('relay scan: ' + (d.tag || '(empty)') + (d.tid ? ' tid:' + d.tid : ''));
+      if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag, d.tid || '');
     } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
       stationDebug_('relay config');
       stationApplyGunConfig_(d.config || null);

@@ -107,24 +107,48 @@ function normalizeStationRfidTag(tag) {
   return (tag || '').toString().trim().toLowerCase();
 }
 
-/** Crew badge lookup for host-inherit (station shell). */
-function lookupCrewMemberByRfidTag(rfidTag, crewData, cMap) {
-  const needle = normalizeStationRfidTag(rfidTag);
-  if (!needle || !crewData || crewData.length < 2 || !cMap) return null;
+/** Crew badge lookup for host-inherit (station shell). Soft cutover: EPC-only when rfid_tid empty on row. */
+function lookupCrewMemberByRfidTag(rfidTag, crewData, cMap, rfidTid) {
+  const result = lookupCrewMemberByRfidPair_(rfidTag, rfidTid, crewData, cMap);
+  return result.crew;
+}
+
+/**
+ * Match crew by EPC (+ TID when enrolled on row).
+ * Returns { crew, tidMismatch } — tidMismatch true when EPC hit a row with rfid_tid but scan TID differs.
+ */
+function lookupCrewMemberByRfidPair_(rfidTag, rfidTid, crewData, cMap) {
+  const needleEpc = normalizeStationRfidTag(rfidTag);
+  const needleTid = normalizeStationRfidTag(rfidTid);
+  if (!needleEpc || !crewData || crewData.length < 2 || !cMap) return { crew: null, tidMismatch: false };
+  const hasTidCol = cMap['rfid_tid'] !== undefined;
+  let tidMismatch = false;
+
   for (let i = 1; i < crewData.length; i++) {
     if (cMap['rfid_tag'] === undefined) continue;
-    const rowTag = normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]);
-    if (!rowTag || rowTag !== needle) continue;
+    const rowEpc = normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]);
+    if (!rowEpc || rowEpc !== needleEpc) continue;
+    const rowTid = hasTidCol ? normalizeStationRfidTag(crewData[i][cMap['rfid_tid']]) : '';
+    if (rowTid) {
+      if (!needleTid || rowTid !== needleTid) {
+        tidMismatch = true;
+        continue;
+      }
+    }
     const name = getSheetCell(crewData[i], cMap, 'Name');
     if (!name) continue;
     return {
-      uid: getSheetCell(crewData[i], cMap, 'uid'),
-      name: name,
-      email: getSheetCell(crewData[i], cMap, 'Email'),
-      rfidTag: rowTag
+      crew: {
+        uid: getSheetCell(crewData[i], cMap, 'uid'),
+        name: name,
+        email: getSheetCell(crewData[i], cMap, 'Email'),
+        rfidTag: rowEpc,
+        rfidTid: rowTid
+      },
+      tidMismatch: false
     };
   }
-  return null;
+  return { crew: null, tidMismatch: tidMismatch };
 }
 
 function actorUsesStationShell(crewName) {
@@ -857,7 +881,8 @@ function getStationCrewRfidList(deviceActor, hostName) {
       list.push({
         uid: getSheetCell(crewData[i], cMap, 'uid'),
         name: name,
-        rfidTag: cMap['rfid_tag'] !== undefined ? normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]) : ''
+        rfidTag: cMap['rfid_tag'] !== undefined ? normalizeStationRfidTag(crewData[i][cMap['rfid_tag']]) : '',
+        rfidTid: cMap['rfid_tid'] !== undefined ? normalizeStationRfidTag(crewData[i][cMap['rfid_tid']]) : ''
       });
     }
     list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -935,46 +960,66 @@ function setStationAssetStatus(deviceActor, hostName, assetId, status, note) {
  * { kind:'equipment'|'crew', id, name } for the first owner found, or null. Read-only (cached).
  * `excl` lets the caller ignore the row it's writing to: { excludeAssetId, excludeCrewRef }.
  */
-function findStationRfidOwner_(rfidTag, excl) {
+function findStationRfidOwner_(rfidTag, excl, rfidTid) {
   excl = excl || {};
   const needle = normalizeStationRfidTag(rfidTag);
-  if (!needle) return null;
+  const tidNeedle = normalizeStationRfidTag(rfidTid);
+  if (!needle && !tidNeedle) return null;
   const sheets = verifyVaultSchema(true);
 
-  const aData = getSheetData(sheets.assets);
-  const aMap = aData.hMap || getHeaderMap(aData);
-  const aCol = (arr) => {
-    const k = Object.keys(aMap).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
-    return k !== undefined ? aMap[k] : undefined;
-  };
-  const aUid = aCol(['uid', 'id', 'assetuid']) ?? aMap['uid'];
-  const aRfid = aCol(['rfidtag', 'rfid']) ?? aMap['rfid_tag'];
-  const aName = aCol(['name', 'assetname', 'itemname']) ?? aMap['name'];
-  const aUnit = aCol(['unitnumber', 'unit']) ?? aMap['unit_number'];
-  if (aRfid !== undefined) {
-    for (let i = 1; i < aData.length; i++) {
-      if (normalizeStationRfidTag(aData[i][aRfid]) !== needle) continue;
-      const uid = String(aData[i][aUid] || '').trim();
-      if (excl.excludeAssetId && uid === String(excl.excludeAssetId).trim()) continue;
-      let nm = aName !== undefined ? String(aData[i][aName] || 'asset') : 'asset';
-      const un = aUnit !== undefined ? String(aData[i][aUnit] || '').trim() : '';
-      if (un) nm += ' #' + un;
-      return { kind: 'equipment', id: uid, name: nm };
+  if (needle) {
+    const aData = getSheetData(sheets.assets);
+    const aMap = aData.hMap || getHeaderMap(aData);
+    const aCol = (arr) => {
+      const k = Object.keys(aMap).find(k => arr.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+      return k !== undefined ? aMap[k] : undefined;
+    };
+    const aUid = aCol(['uid', 'id', 'assetuid']) ?? aMap['uid'];
+    const aRfid = aCol(['rfidtag', 'rfid']) ?? aMap['rfid_tag'];
+    const aName = aCol(['name', 'assetname', 'itemname']) ?? aMap['name'];
+    const aUnit = aCol(['unitnumber', 'unit']) ?? aMap['unit_number'];
+    if (aRfid !== undefined) {
+      for (let i = 1; i < aData.length; i++) {
+        if (normalizeStationRfidTag(aData[i][aRfid]) !== needle) continue;
+        const uid = String(aData[i][aUid] || '').trim();
+        if (excl.excludeAssetId && uid === String(excl.excludeAssetId).trim()) continue;
+        let nm = aName !== undefined ? String(aData[i][aName] || 'asset') : 'asset';
+        const un = aUnit !== undefined ? String(aData[i][aUnit] || '').trim() : '';
+        if (un) nm += ' #' + un;
+        return { kind: 'equipment', id: uid, name: nm };
+      }
+    }
+
+    const cData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(cData);
+    if (cMap['rfid_tag'] !== undefined) {
+      for (let i = 1; i < cData.length; i++) {
+        if (normalizeStationRfidTag(cData[i][cMap['rfid_tag']]) !== needle) continue;
+        const uid = (getSheetCell(cData[i], cMap, 'uid') || '').toString().trim();
+        const nm = (getSheetCell(cData[i], cMap, 'Name') || '').toString().trim();
+        if (excl.excludeCrewRef) {
+          const ref = String(excl.excludeCrewRef).toLowerCase().trim();
+          if ((uid && uid.toLowerCase() === ref) || (nm && nm.toLowerCase() === ref)) continue;
+        }
+        return { kind: 'crew', id: uid || nm, name: nm || 'crew member' };
+      }
     }
   }
 
-  const cData = getSheetData(sheets.crew);
-  const cMap = getHeaderMap(cData);
-  if (cMap['rfid_tag'] !== undefined) {
-    for (let i = 1; i < cData.length; i++) {
-      if (normalizeStationRfidTag(cData[i][cMap['rfid_tag']]) !== needle) continue;
-      const uid = (getSheetCell(cData[i], cMap, 'uid') || '').toString().trim();
-      const nm = (getSheetCell(cData[i], cMap, 'Name') || '').toString().trim();
-      if (excl.excludeCrewRef) {
-        const ref = String(excl.excludeCrewRef).toLowerCase().trim();
-        if ((uid && uid.toLowerCase() === ref) || (nm && nm.toLowerCase() === ref)) continue;
+  if (tidNeedle) {
+    const cData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(cData);
+    if (cMap['rfid_tid'] !== undefined) {
+      for (let i = 1; i < cData.length; i++) {
+        if (normalizeStationRfidTag(cData[i][cMap['rfid_tid']]) !== tidNeedle) continue;
+        const uid = (getSheetCell(cData[i], cMap, 'uid') || '').toString().trim();
+        const nm = (getSheetCell(cData[i], cMap, 'Name') || '').toString().trim();
+        if (excl.excludeCrewRef) {
+          const ref = String(excl.excludeCrewRef).toLowerCase().trim();
+          if ((uid && uid.toLowerCase() === ref) || (nm && nm.toLowerCase() === ref)) continue;
+        }
+        return { kind: 'crew', id: uid || nm, name: nm || 'crew member', field: 'tid' };
       }
-      return { kind: 'crew', id: uid || nm, name: nm || 'crew member' };
     }
   }
   return null;
@@ -1011,6 +1056,9 @@ function clearStationRfidOwner_(owner) {
       const nm = (getSheetCell(data[i], map, 'Name') || '').toString().toLowerCase().trim();
       if ((uid && uid === ref) || (nm && nm === ref)) {
         sheets.crew.getRange(i + 1, map['rfid_tag'] + 1).setValue('');
+        if (map['rfid_tid'] !== undefined) {
+          sheets.crew.getRange(i + 1, map['rfid_tid'] + 1).setValue('');
+        }
         return;
       }
     }
@@ -1101,18 +1149,26 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
     if (!tag) return { success: false, error: 'Empty scan.' };
 
     const opts = options || {};
+    const scanTid = normalizeStationRfidTag(opts.tid || opts.rfidTid || '');
     const hostOnly = opts.hostOnly !== false;
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
     const cMap = getHeaderMap(crewData);
-    const crew = lookupCrewMemberByRfidTag(tag, crewData, cMap);
+    const lookup = lookupCrewMemberByRfidPair_(tag, scanTid, crewData, cMap);
+
+    if (lookup.tidMismatch) {
+      return { success: false, error: 'Badge chip ID does not match — possible cloned tag.' };
+    }
+
+    const crew = lookup.crew;
 
     if (crew) {
       if (!effectiveStationPermission(deviceActor, 'station_host_inherit')) {
         return { success: false, error: 'Host inherit is not enabled for this device profile.' };
       }
+      const auditTag = scanTid ? (tag + ' / TID ' + scanTid) : tag;
       writeToAuditLog(deviceActor, 'STATION_HOST', 'STATION', 'GLOBAL', crew.uid || crew.name,
-        'Crew badge host: ' + crew.name + ' (' + tag + ').');
+        'Crew badge host: ' + crew.name + ' (' + auditTag + ').');
       const rbac = resolveHostRbacBundle_(crew.name, crewData, cMap);
       return {
         success: true,
@@ -1121,6 +1177,7 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
           uid: crew.uid,
           name: crew.name,
           rfidTag: crew.rfidTag,
+          rfidTid: crew.rfidTid || '',
           access: rbac.access,
           permissions: rbac.permissions
         }
@@ -1141,7 +1198,7 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
 // @INDEX: STATION_SHELL -> Enroll crew RFID badge (ROOT host only; via Vault → Crew tab)
 // Signature note: hostName is the ROOT-tier person hosting the station (their badge established
 // the session). Crew-badge provisioning is a ROOT-only admin task per the agreed model.
-function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force) {
+function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force, rfidTid) {
   return executeWithRetry(() => {
     if (!actorUsesStationShell(deviceActor)) {
       return { success: false, error: 'PERMISSION DENIED: Station device login only.' };
@@ -1151,6 +1208,7 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
     }
     const tag = normalizeStationRfidTag(rfidTag);
     if (!tag) return { success: false, error: 'Empty scan — pull the trigger on the badge.' };
+    const tid = normalizeStationRfidTag(rfidTid);
 
     const ref = String(crewRef || '').toLowerCase().trim();
     if (!ref) return { success: false, error: 'No crew member specified for enrollment.' };
@@ -1168,9 +1226,8 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
       return { success: false, error: 'Crew roster has no rfid_tag column — run a vault sync first.' };
     }
 
-    // Whole-DB duplicate guard: if the badge is already on another crew member OR any asset, ask to
-    // overwrite (steal it) or cancel — unless already confirmed (force).
-    const owner = findStationRfidOwner_(tag, { excludeCrewRef: ref });
+    // Whole-DB duplicate guard: EPC and TID checked independently on crew + assets (EPC only).
+    const owner = findStationRfidOwner_(tag, { excludeCrewRef: ref }, tid);
     if (owner && !force) {
       return { success: false, duplicate: owner };
     }
@@ -1181,9 +1238,14 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
       const nm = (getSheetCell(crewData[i], cMap, 'Name') || '').toString().toLowerCase().trim();
       if (uid !== ref && nm !== ref) continue;
       crewSheet.getRange(i + 1, cMap['rfid_tag'] + 1).setValue(tag);
+      if (cMap['rfid_tid'] !== undefined && tid) {
+        crewSheet.getRange(i + 1, cMap['rfid_tid'] + 1).setValue(tid);
+      }
       flushCache();
       const name = getSheetCell(crewData[i], cMap, 'Name');
-      let msg = 'Enrolled RFID badge for ' + name + ' (' + tag + ').';
+      let msg = 'Enrolled RFID badge for ' + name + ' (EPC ' + tag;
+      if (tid) msg += ', TID ' + tid;
+      msg += ').';
       if (owner && force) msg += ' Overwrote ' + owner.kind + ' ' + owner.name + '.';
       writeToAuditLog(deviceActor, 'STATION_ENROLL', 'STATION', 'GLOBAL',
         getSheetCell(crewData[i], cMap, 'uid') || name, msg);
@@ -1193,7 +1255,8 @@ function enrollStationCrewRfidTag(deviceActor, hostName, crewRef, rfidTag, force
         host: {
           uid: getSheetCell(crewData[i], cMap, 'uid'),
           name: name,
-          rfidTag: tag
+          rfidTag: tag,
+          rfidTid: tid
         }
       };
     }

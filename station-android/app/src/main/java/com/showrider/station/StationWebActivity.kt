@@ -25,6 +25,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
+import org.json.JSONObject
 
 class StationWebActivity : AppCompatActivity() {
 
@@ -39,6 +40,7 @@ class StationWebActivity : AppCompatActivity() {
     private var screenOnReceiver: BroadcastReceiver? = null
     private var lastGunStatusMsg = ""
     private var lastGunStatusAt = 0L
+    private var lastRendererReloadAt = 0L
     private val stationPrefs by lazy {
         getSharedPreferences(RfidManager.PREFS_NAME, MODE_PRIVATE)
     }
@@ -82,9 +84,10 @@ class StationWebActivity : AppCompatActivity() {
 
         rfid = RfidManager(
             context = this,
-            onTagScanned = { epc -> deliverEpcToShowrunner(epc) },
+            onTagScanned = { epc, tid -> deliverScanToShowrunner(epc, tid) },
             onStatus = { msg -> postGunStatus(msg) },
             onTriggerWake = { maybeWakeForTrigger() },
+            onLinkBusy = { busy -> setWebBleReconnecting(busy) },
         )
         rfid.startWatchdog()
         registerScreenOnReceiver()
@@ -103,13 +106,25 @@ class StationWebActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
 
+            override fun onPageFinished(view: WebView?, url: String?) {
+                injectPersistedWebSession()
+            }
+
             override fun onRenderProcessGone(
                 view: WebView?,
                 detail: RenderProcessGoneDetail?,
             ): Boolean {
-                postGunStatus("WebView restarted — restoring session…")
-                if (::webView.isInitialized) {
-                    webView.loadUrl(SHOWRUNNER_URL)
+                val now = System.currentTimeMillis()
+                if (now - lastRendererReloadAt < RENDERER_RELOAD_DEBOUNCE_MS) return true
+                lastRendererReloadAt = now
+                runOnUiThread {
+                    if (!::webView.isInitialized) return@runOnUiThread
+                    val current = webView.url
+                    if (!current.isNullOrBlank() && current != "about:blank") {
+                        webView.reload()
+                    } else {
+                        webView.loadUrl(SHOWRUNNER_URL)
+                    }
                 }
                 return true
             }
@@ -277,16 +292,42 @@ class StationWebActivity : AppCompatActivity() {
         }
     }
 
-    private fun deliverEpcToShowrunner(epc: String) {
-        val safe = epc.replace("\\", "\\\\").replace("'", "\\'")
-        // Showrunner runs inside an iframe on the hosting shell, so onStationRfidScan lives in the
-        // child frame. Prefer the shell relay (posts into the iframe); fall back to a direct call
-        // when the app is pointed straight at the GAS URL.
-        val js = "(function(t){try{" +
-            "if(typeof window.showrunnerStationDeliverScan==='function'){window.showrunnerStationDeliverScan(t);}" +
-            "else if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t);}" +
-            "}catch(e){}})('$safe');"
-        runOnUiThread { webView.evaluateJavascript(js, null) }
+    private fun evalJs(js: String) {
+        if (!::webView.isInitialized) return
+        runOnUiThread {
+            try {
+                webView.evaluateJavascript(js, null)
+            } catch (_: Exception) { /* ignore */ }
+        }
+    }
+
+    private fun setWebBleReconnecting(active: Boolean) {
+        evalJs("try{window.__srBleReconnecting=" + (if (active) "true" else "false") + ";}catch(e){}")
+    }
+
+    private fun injectPersistedWebSession() {
+        val token = stationPrefs.getString(PREF_WEB_SESSION_TOKEN, null)?.trim().orEmpty()
+        val exp = stationPrefs.getLong(PREF_WEB_SESSION_EXPIRES, 0L)
+        if (token.length < 20 || exp <= System.currentTimeMillis()) return
+        val quotedToken = JSONObject.quote(token)
+        evalJs(
+            "try{" +
+                "if(!localStorage.getItem('sm_session_token')){" +
+                "localStorage.setItem('sm_session_token',$quotedToken);" +
+                "localStorage.setItem('sm_session_expires'," + JSONObject.quote(exp.toString()) + ");" +
+                "}" +
+                "}catch(e){}",
+        )
+    }
+
+    private fun deliverScanToShowrunner(epc: String, tid: String) {
+        val epcQ = JSONObject.quote(epc)
+        val tidQ = JSONObject.quote(tid)
+        val js = "(function(e,t){try{" +
+            "if(typeof window.showrunnerStationDeliverScan==='function'){window.showrunnerStationDeliverScan(e,t);}" +
+            "else if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(e);}" +
+            "}catch(err){}})($epcQ,$tidQ);"
+        evalJs(js)
     }
 
     private fun postGunStatus(msg: String) {
@@ -302,12 +343,14 @@ class StationWebActivity : AppCompatActivity() {
             ) {
                 Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
             }
-            val safe = msg.replace("\\", "\\\\").replace("'", "\\'")
-            webView.evaluateJavascript(
-                "try{var f=document.getElementById('app-frame');" +
-                    "if(f&&f.contentWindow){f.contentWindow.postMessage({type:'SHOWRUNNER_STATION_GUN_STATUS',message:'$safe'},'*');}" +
-                    "}catch(e){}",
-                null,
+            val payload = JSONObject()
+                .put("type", "SHOWRUNNER_STATION_GUN_STATUS")
+                .put("message", msg)
+                .toString()
+            evalJs(
+                "(function(d){try{var f=document.getElementById('app-frame');" +
+                    "if(f&&f.contentWindow){f.contentWindow.postMessage(d,'*');}" +
+                    "}catch(e){}})($payload);",
             )
         }
     }
@@ -346,6 +389,34 @@ class StationWebActivity : AppCompatActivity() {
         /** A login screen needs the operator — reveal the WebView so they can act. */
         @JavascriptInterface
         fun loginNeeded() { hideSplash() }
+
+        /** Parent shell stores device session — survive WebView reload / renderer restart. */
+        @JavascriptInterface
+        fun saveSession(token: String?, expiresAt: Long) {
+            val t = token?.trim().orEmpty()
+            if (t.length < 20) {
+                stationPrefs.edit()
+                    .remove(PREF_WEB_SESSION_TOKEN)
+                    .remove(PREF_WEB_SESSION_EXPIRES)
+                    .apply()
+                return
+            }
+            stationPrefs.edit()
+                .putString(PREF_WEB_SESSION_TOKEN, t)
+                .putLong(PREF_WEB_SESSION_EXPIRES, expiresAt)
+                .apply()
+        }
+
+        @JavascriptInterface
+        fun getSavedSession(): String {
+            val token = stationPrefs.getString(PREF_WEB_SESSION_TOKEN, null)?.trim().orEmpty()
+            val exp = stationPrefs.getLong(PREF_WEB_SESSION_EXPIRES, 0L)
+            if (token.length < 20 || exp <= System.currentTimeMillis()) return ""
+            return JSONObject()
+                .put("token", token)
+                .put("expiresAt", exp)
+                .toString()
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -385,9 +456,12 @@ class StationWebActivity : AppCompatActivity() {
         private const val REQ_ENABLE_BT = 1002
         private const val REQ_POST_NOTIFICATIONS = 1003
         private const val PREF_SPLASH_DISMISSED = "splash_dismissed"
+        private const val PREF_WEB_SESSION_TOKEN = "web_session_token"
+        private const val PREF_WEB_SESSION_EXPIRES = "web_session_expires"
         private const val GUN_STATUS_DEBOUNCE_MS = 1800L
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L
         private const val WAKE_DEBOUNCE_MS = 1500L
+        private const val RENDERER_RELOAD_DEBOUNCE_MS = 10000L
     }
 }

@@ -17,8 +17,8 @@ android {
         applicationId = "com.showrider.station"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "0.1.18"
+        versionCode = 24
+        versionName = "0.1.22"
     }
 
     buildTypes {
