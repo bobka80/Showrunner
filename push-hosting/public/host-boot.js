@@ -11,142 +11,10 @@
   const frame = document.getElementById('app-frame');
   const installPanel = document.getElementById('install-pwa-panel');
 
-  var MOBILE_SCAN_DIAG_SHELL_KEY = 'sm_mobile_scan_diag_shell_v1';
-  var MOBILE_SCAN_DEBUG_KEY = 'sm_scan_debug';
-  var hostMobileScanDiagTapCount_ = 0;
-  var hostMobileScanDiagTapTimer_ = null;
-
-  function hostMobileScanDebugOn_() {
-    try {
-      if (new URLSearchParams(window.location.search).get('scanDebug') === '1') return true;
-      return localStorage.getItem(MOBILE_SCAN_DEBUG_KEY) === '1';
-    } catch (e) { return false; }
-  }
-
-  function hostMobileScanDiagFormat_(side, tag, detail) {
-    var d = new Date();
-    var ts = d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes() + ':' +
-      (d.getSeconds() < 10 ? '0' : '') + d.getSeconds();
-    var extra = detail == null ? '' : (' ' + String(detail));
-    return ts + ' [' + side + '] ' + tag + extra;
-  }
-
-  function hostMobileScanDiagRead_() {
-    try {
-      return JSON.parse(localStorage.getItem(MOBILE_SCAN_DIAG_SHELL_KEY) || '[]');
-    } catch (e) { return []; }
-  }
-
-  function hostMobileScanDiagPush_(line) {
-    if (!line) return;
-    try {
-      var arr = hostMobileScanDiagRead_();
-      arr.push(line);
-      if (arr.length > 100) arr = arr.slice(-100);
-      localStorage.setItem(MOBILE_SCAN_DIAG_SHELL_KEY, JSON.stringify(arr));
-    } catch (e) { /* ignore */ }
-    if (hostMobileScanDebugOn_()) hostMobileScanDiagRender_();
-  }
-
-  function hostMobileScanDiag_(tag, detail) {
-    if (!hostMobileScanDebugOn_()) return;
-    hostMobileScanDiagPush_(hostMobileScanDiagFormat_('SHELL', tag, detail));
-  }
-
-  function hostMobileScanDiagRender_() {
-    var panel = document.getElementById('sr-mobile-scan-diag');
-    var log = document.getElementById('sr-mobile-scan-diag-log');
-    if (!panel || !log) return;
-    var rows = hostMobileScanDiagRead_();
-    log.textContent = rows.length ? rows.join('\n') : '(empty)';
-    var on = hostMobileScanDebugOn_();
-    panel.classList.toggle('is-open', on);
-    panel.setAttribute('aria-hidden', on ? 'false' : 'true');
-  }
-
-  function hostMobileScanNotifyAppDebug_(on) {
-    if (!frame || !frame.contentWindow) return;
-    try {
-      frame.contentWindow.postMessage({ type: 'SHOWRUNNER_MOBILE_SCAN_DEBUG_ON', on: on !== false }, '*');
-    } catch (e) { /* ignore */ }
-  }
-
-  function hostMobileScanDiagSetDebug_(on) {
-    try {
-      if (on) localStorage.setItem(MOBILE_SCAN_DEBUG_KEY, '1');
-      else localStorage.removeItem(MOBILE_SCAN_DEBUG_KEY);
-    } catch (e) { /* ignore */ }
-    hostMobileScanDiag_(on ? 'debug_on' : 'debug_off');
-    hostMobileScanDiagRender_();
-    hostMobileScanNotifyAppDebug_(on);
-  }
-
-  function hostMobileScanDiagCopy_() {
-    var text = hostMobileScanDiagRead_().join('\n');
-    if (!text) return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).catch(function() { /* ignore */ });
-    }
-  }
-
-  function hostMobileScanDiagWireUi_() {
-    var copyBtn = document.getElementById('sr-mobile-scan-diag-copy');
-    var clearBtn = document.getElementById('sr-mobile-scan-diag-clear');
-    var title = document.querySelector('.sr-shell-cam-title');
-    if (copyBtn && copyBtn.dataset.bound !== '1') {
-      copyBtn.dataset.bound = '1';
-      copyBtn.addEventListener('click', function(ev) {
-        if (ev) ev.preventDefault();
-        hostMobileScanDiagCopy_();
-      });
-    }
-    if (clearBtn && clearBtn.dataset.bound !== '1') {
-      clearBtn.dataset.bound = '1';
-      clearBtn.addEventListener('click', function(ev) {
-        if (ev) ev.preventDefault();
-        try { localStorage.setItem(MOBILE_SCAN_DIAG_SHELL_KEY, '[]'); } catch (e) { /* ignore */ }
-        hostMobileScanDiagRender_();
-      });
-    }
-    if (title && title.dataset.diagBound !== '1') {
-      title.dataset.diagBound = '1';
-      title.addEventListener('click', function() {
-        hostMobileScanDiagTapCount_ += 1;
-        clearTimeout(hostMobileScanDiagTapTimer_);
-        hostMobileScanDiagTapTimer_ = setTimeout(function() { hostMobileScanDiagTapCount_ = 0; }, 900);
-        if (hostMobileScanDiagTapCount_ >= 5) {
-          hostMobileScanDiagTapCount_ = 0;
-          hostMobileScanDiagSetDebug_(!hostMobileScanDebugOn_());
-        }
-      });
-    }
-  }
-
-  function hostMobileScanDiagInit_() {
-    try {
-      var p = new URLSearchParams(window.location.search);
-      if (p.get('scanDebug') === '0') {
-        localStorage.removeItem(MOBILE_SCAN_DEBUG_KEY);
-        localStorage.removeItem(MOBILE_SCAN_DIAG_SHELL_KEY);
-      } else if (p.get('scanDebug') === '1') {
-        localStorage.setItem(MOBILE_SCAN_DEBUG_KEY, '1');
-        if (window.history && window.history.replaceState) {
-          window.history.replaceState(null, '', window.location.pathname + (window.location.hash || ''));
-        }
-      }
-    } catch (e) { /* ignore */ }
-    hostMobileScanDiagWireUi_();
-    if (hostMobileScanDebugOn_()) {
-      hostMobileScanDiag_('shell_init');
-      hostMobileScanDiagRender_();
-    }
-  }
-
   function hostMobileScanEmergencyReset_() {
     try {
       hostMobileScanCloseShellCam_();
       hostMobileScanCloseCameraPage_();
-      hostMobileScanStop();
       hostMobileScanHideTapGate_();
       document.body.classList.remove('sr-shell-cam-active');
       hostMobileScanRestoreAppFrame_();
@@ -155,12 +23,6 @@
         hostMobileQrPendingRetryTimer = null;
       }
     } catch (e) { /* ignore */ }
-  }
-  hostMobileScanDiagInit_();
-
-  function hostMobileScanNotifyAppDebugSoon_() {
-    if (!hostMobileScanDebugOn_()) return;
-    hostMobileScanNotifyAppDebug_(true);
   }
   // The native app injects `AndroidStation` and calls `showrunnerStationDeliverScan`
   // in THIS (top) frame; Showrunner itself runs in the iframe, so we relay by postMessage.
@@ -250,7 +112,6 @@
   function hostMobileScanDeliverScan_(text, reopen) {
     var raw = String(text == null ? '' : text);
     if (!raw) return;
-    hostMobileScanDiag_('deliver', raw);
     try {
       sessionStorage.setItem('sm_mobile_qr_pending', raw);
       localStorage.setItem('sm_mobile_qr_pending', raw);
@@ -264,7 +125,6 @@
       text: raw,
       reopenPanel: reopen !== false
     });
-    hostMobileScanDiag_('relay_post', raw);
     hostMobileScanSchedulePendingRetry_();
   }
 
@@ -305,7 +165,6 @@
   }
 
   function hostMobileScanOpenShellCam_() {
-    hostMobileScanDiag_('open_shell_cam');
     hostMobileScanWireShellCam_();
     hostMobileScanCloseCameraPage_();
     var el = hostMobileScanGetShellCam_();
@@ -369,7 +228,6 @@
 
     function onFail(err) {
       hostMobileShellCamStarting = false;
-      hostMobileScanDiag_('camera_fail', err && err.message ? err.message : err);
       var st = document.getElementById('sr-shell-cam-status');
       if (st) st.textContent = String(err && err.message ? err.message : err);
       var startBtn = document.getElementById('sr-shell-cam-start');
@@ -383,7 +241,6 @@
       if (raw === hostMobileShellCamLastDecode && (now - hostMobileShellCamLastDecodeTs) < 2000) return;
       hostMobileShellCamLastDecode = raw;
       hostMobileShellCamLastDecodeTs = now;
-      hostMobileScanDiag_('qr_decoded', raw);
       hostMobileScanStopShellCamEngine_();
       hostMobileScanCloseShellCam_();
       hostMobileScanDeliverScan_(raw, true);
@@ -407,7 +264,6 @@
 
     startCfg({ facingMode: 'environment' }).then(function() {
       hostMobileShellCamStarting = false;
-      hostMobileScanDiag_('camera_active');
       var st = document.getElementById('sr-shell-cam-status');
       if (st) st.textContent = 'Camera active — point at QR';
     }).catch(function() {
@@ -1070,14 +926,12 @@
         return;
       }
       try {
-        hostMobileScanDiag_('flush_pending', raw);
         frame.contentWindow.postMessage({
           type: 'SHOWRUNNER_MOBILE_QR_SCAN',
           text: raw,
           reopenPanel: reopen
         }, '*');
       } catch (e) {
-        hostMobileScanDiag_('flush_error', e && e.message ? e.message : 'postMessage failed');
         hostMobileScanSchedulePendingRetry_();
       }
     } catch (e) { /* ignore */ }
@@ -1110,13 +964,11 @@
       hostMobileScanSchedulePendingRetry_();
     }
     hostMobileScanFlushPending_();
-    hostMobileScanNotifyAppDebugSoon_();
   });
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState !== 'visible') return;
     hostMobileScanEmergencyReset_();
     hostMobileScanFlushPending_();
-    hostMobileScanNotifyAppDebugSoon_();
   });
   window.addEventListener('resize', hostMobileScanRepositionOpen_, { passive: true });
   window.addEventListener('scroll', hostMobileScanRepositionOpen_, { passive: true });
@@ -2161,14 +2013,8 @@
     if (ev.data.type === 'SHOWRUNNER_APP_READY') {
       handleIframeSession({ crewName: ev.data.crewName || '', regKey: ev.data.regKey || '' });
       hostMobileScanFlushPending_();
-      if (hostMobileScanDebugOn_()) hostMobileScanNotifyAppDebug_(true);
-    }
-    if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_DIAG') {
-      if (hostMobileScanDebugOn_() && ev.data.line) hostMobileScanDiagPush_(ev.data.line);
-      return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ACK') {
-      hostMobileScanDiag_('ack_received');
       hostMobileScanClearPending_();
       hostMobileScanClearReopen_();
       if (hostMobileQrPendingRetryTimer) {
@@ -2213,7 +2059,6 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA') {
-      hostMobileScanDiag_('open_camera_msg');
       hostMobileScanOpenShellCam_();
       return;
     }
@@ -2286,7 +2131,6 @@
   if (frame) {
     frame.addEventListener('load', function() {
       hostMobileScanFlushPending_();
-      hostMobileScanNotifyAppDebugSoon_();
       burstRequestAuthFromIframe();
       if (serverSaveConfirmed) return;
       if (fcmToken) {
