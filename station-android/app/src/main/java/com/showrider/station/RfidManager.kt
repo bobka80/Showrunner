@@ -673,7 +673,7 @@ class RfidManager(
 
     companion object {
         private const val TAG = "ShowrunnerRfid"
-        private const val PREFS_NAME = "showrunner_station"
+        const val PREFS_NAME = "showrunner_station"
         private const val PREF_BT_MAC = "bt_mac"
         private const val PREF_POWER = "gun_power"
         private const val PREF_SCAN_MODE = "gun_scan_mode"

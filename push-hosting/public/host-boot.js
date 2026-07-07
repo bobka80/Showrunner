@@ -1334,7 +1334,20 @@
   // Native app cold-start: cover the "normal phone" hosting chrome with a
   // station splash until the Showrunner station shell mounts (or login is needed).
   var stationSplashTimer = null;
+  function stationSplashDismissed_() {
+    try {
+      return sessionStorage.getItem('sr_station_splash_off') === '1' ||
+        localStorage.getItem('sr_station_splash_off') === '1';
+    } catch (e) { return false; }
+  }
+  function markStationSplashDismissed_() {
+    try {
+      sessionStorage.setItem('sr_station_splash_off', '1');
+      localStorage.setItem('sr_station_splash_off', '1');
+    } catch (e) { /* ignore */ }
+  }
   function showStationSplash() {
+    if (stationSplashDismissed_()) return;
     if (document.getElementById('sr-station-splash')) return;
     var el = document.createElement('div');
     el.id = 'sr-station-splash';
@@ -1354,6 +1367,7 @@
     stationSplashTimer = setTimeout(hideStationSplash, 12000);
   }
   function hideStationSplash() {
+    markStationSplashDismissed_();
     if (stationSplashTimer) { clearTimeout(stationSplashTimer); stationSplashTimer = null; }
     var el = document.getElementById('sr-station-splash');
     if (!el) return;
@@ -1361,7 +1375,7 @@
     el.style.opacity = '0';
     setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
   }
-  if (isNativeStationApp()) showStationSplash();
+  if (isNativeStationApp() && !stationSplashDismissed_()) showStationSplash();
 
   // Relay shell-ready / login-needed to the native kiosk splash (StationWebActivity).
   function notifyNativeSplash(method) {

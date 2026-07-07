@@ -36,6 +36,18 @@ class StationWebActivity : AppCompatActivity() {
     private var webViewRestored = false
     private var lastWakeAt = 0L
     private var screenOnReceiver: BroadcastReceiver? = null
+    private var lastGunStatusMsg = ""
+    private var lastGunStatusAt = 0L
+    private val stationPrefs by lazy {
+        getSharedPreferences(RfidManager.PREFS_NAME, MODE_PRIVATE)
+    }
+
+    private fun splashWasDismissedBefore(): Boolean =
+        stationPrefs.getBoolean(PREF_SPLASH_DISMISSED, false)
+
+    private fun markSplashDismissed() {
+        stationPrefs.edit().putBoolean(PREF_SPLASH_DISMISSED, true).apply()
+    }
 
     @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +72,10 @@ class StationWebActivity : AppCompatActivity() {
         statusBar = findViewById(R.id.station_status)
         statusBar.isVisible = false
         splash = findViewById(R.id.station_splash)
+        if (splashWasDismissedBefore()) {
+            splashHidden = true
+            splash.visibility = View.GONE
+        }
         // Safety net: never let the splash trap the operator if the shell never reports in.
         splashHandler.postDelayed({ hideSplash() }, SPLASH_TIMEOUT_MS)
 
@@ -240,6 +256,7 @@ class StationWebActivity : AppCompatActivity() {
     private fun hideSplash() {
         if (splashHidden) return
         splashHidden = true
+        markSplashDismissed()
         splashHandler.removeCallbacksAndMessages(null)
         runOnUiThread {
             splash.animate().alpha(0f).setDuration(300).withEndAction {
@@ -262,11 +279,22 @@ class StationWebActivity : AppCompatActivity() {
 
     private fun postGunStatus(msg: String) {
         if (msg.isBlank()) return
+        val now = System.currentTimeMillis()
+        if (msg == lastGunStatusMsg && now - lastGunStatusAt < GUN_STATUS_DEBOUNCE_MS) return
+        lastGunStatusMsg = msg
+        lastGunStatusAt = now
         runOnUiThread {
-            Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            val low = msg.lowercase()
+            if (low.contains("fail") || low.contains("error") || low.contains("connected") ||
+                low.contains("disconnect") || low.contains("reconnect") || low.contains("reset")
+            ) {
+                Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+            }
             val safe = msg.replace("\\", "\\\\").replace("'", "\\'")
             webView.evaluateJavascript(
-                "try{if(typeof window.stationOnGunStatus_==='function')window.stationOnGunStatus_('$safe');}catch(e){}",
+                "try{var f=document.getElementById('app-frame');" +
+                    "if(f&&f.contentWindow){f.contentWindow.postMessage({type:'SHOWRUNNER_STATION_GUN_STATUS',message:'$safe'},'*');}" +
+                    "}catch(e){}",
                 null,
             )
         }
@@ -319,6 +347,7 @@ class StationWebActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        if (splashWasDismissedBefore()) hideSplash()
         if (::rfid.isInitialized && BlePermissions.hasAll(this)) {
             rfid.onAppWake()
         }
@@ -343,6 +372,8 @@ class StationWebActivity : AppCompatActivity() {
         private const val REQ_BLE_PERMISSIONS = 1001
         private const val REQ_ENABLE_BT = 1002
         private const val REQ_POST_NOTIFICATIONS = 1003
+        private const val PREF_SPLASH_DISMISSED = "splash_dismissed"
+        private const val GUN_STATUS_DEBOUNCE_MS = 1800L
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L
         private const val WAKE_DEBOUNCE_MS = 1500L

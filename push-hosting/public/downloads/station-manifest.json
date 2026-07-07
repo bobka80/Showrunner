@@ -1,17 +1,35 @@
 {
-  "versionName": "0.1.15",
-  "versionCode": 17,
+  "versionName": "0.1.17",
+  "versionCode": 19,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-05T14:05:27.996Z",
-  "sizeBytes": 12057073,
+  "updatedAt": "2026-07-07T15:20:51.363Z",
+  "sizeBytes": 12057257,
   "notes": [
-    "BLE forceReconnect + watchdog",
-    "native toasts replace status bar",
-    "Settings Reconnect gun bridge (AndroidStation.reconnectGun)",
-    "Gun-late connect: faster retry + SDK status sync"
+    "Gun reconnect no longer shows STARTING splash",
+    "splash dismissed once per device",
+    "station re-announces ready on resume"
   ],
   "history": [
+    {
+      "versionName": "0.1.17",
+      "versionCode": 19,
+      "date": "2026-07-07T15:20:51.363Z",
+      "notes": [
+        "Gun reconnect no longer shows STARTING splash",
+        "splash dismissed once per device",
+        "station re-announces ready on resume"
+      ]
+    },
+    {
+      "versionName": "0.1.16",
+      "versionCode": 18,
+      "date": "2026-07-07T15:03:30.414Z",
+      "notes": [
+        "Bulletproof BLE reconnect: health check, reconnect ladder, foreground service, screen-on wake",
+        "honest linkState in settings"
+      ]
+    },
     {
       "versionName": "0.1.15",
       "versionCode": 17,

@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v471** · APK **build 18 (in flight)** · **Last swept:** 2026-07-07
+**Opened:** 2026-07-02 · **Production:** GAS **v472** · APK **v0.1.16 (build 18)** · **Last swept:** 2026-07-07
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -94,7 +94,7 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 ## In progress / next (director priority 2026-07-07)
 
-1. **[ ] Bulletproof BLE gun reconnect (APK)** — **in flight** — health check, reconnect ladder, screen-on/resume hooks, foreground service, honest `linkState` in settings.
+1. **[x] Bulletproof BLE gun reconnect (APK v0.1.16 build 18)** — health check, reconnect ladder, screen-on/resume, foreground service, `linkState` in settings. **Field verify** after gun sleep.
 2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
 3. **[ ] Optimistic host login + local roster cache** — instant badge host UI; server confirms in parallel (after EPC+TID schema).
 

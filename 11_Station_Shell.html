@@ -3065,6 +3065,10 @@ window.stationSaveEjectMinutes = function() {
   }
 };
 
+function stationAnnounceReady_() {
+  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' }); } catch (e) { /* ignore */ }
+}
+
 function stationBindMessageListener_() {
   if (window.stationMessageListenerBound) return;
   window.stationMessageListenerBound = true;
@@ -3077,6 +3081,8 @@ function stationBindMessageListener_() {
     } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
       stationDebug_('relay config');
       stationApplyGunConfig_(d.config || null);
+    } else if (d.type === 'SHOWRUNNER_STATION_GUN_STATUS' && d.message) {
+      if (typeof window.stationOnGunStatus_ === 'function') window.stationOnGunStatus_(d.message);
     }
   });
 }
@@ -3092,7 +3098,7 @@ function initStationShell_() {
     const shell = document.getElementById('station-shell');
     if (shell) shell.style.display = 'flex';
   } catch (e) { /* ignore */ }
-  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' }); } catch (e) { /* ignore */ }
+  try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
 
   try {
     stationBindHostIdleListeners_();
@@ -3156,5 +3162,13 @@ function initStationShell_() {
 
 document.addEventListener('DOMContentLoaded', function() {
   if (window.IS_STATION_DEVICE) initStationShell_();
+});
+document.addEventListener('visibilitychange', function() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (document.visibilityState === 'visible') stationAnnounceReady_();
+});
+window.addEventListener('pageshow', function(ev) {
+  if (!window.IS_STATION_DEVICE) return;
+  if (ev.persisted) stationAnnounceReady_();
 });
 </script>
