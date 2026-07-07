@@ -145,6 +145,9 @@
       text: raw,
       reopenPanel: reopen !== false
     });
+    if (reopen !== false) {
+      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_REOPEN' });
+    }
     hostMobileScanSchedulePendingRetry_();
   }
 
@@ -233,6 +236,7 @@
     if (reader) reader.innerHTML = '';
     document.body.classList.remove('sr-shell-cam-active');
     hostMobileScanRestoreAppFrame_();
+    hostMobileScanFlushPending_();
   }
 
   function hostMobileScanStartShellCamEngine_() {

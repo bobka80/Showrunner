@@ -544,8 +544,7 @@ function resolveMobileScanTag(crewName, raw) {
     const tag = extractMobileScanTag_(raw);
     if (!tag) return { success: false, error: 'Empty tag.' };
     const sheets = verifyVaultSchema(true);
-    const map = buildEquipmentScanMapFromSheets_(sheets);
-    const hit = lookupEquipmentScanHit_(map, tag);
+    const hit = findAssetByScanTagInVault_(sheets, tag);
     return { success: true, hit: hit, tag: tag };
   });
 }
@@ -557,6 +556,110 @@ function lookupEquipmentScanHit_(map, rawTag) {
   const key = normalizeStationRfidTag(tag);
   if (!key) return null;
   return map[key] || map['uid:' + key] || null;
+}
+
+function buildEquipmentScanEntryFromRow_(data, i, cols) {
+  return {
+    kind: 'equipment',
+    name: cols.cName !== undefined ? String(data[i][cols.cName] || '') : '',
+    unitId: String(data[i][cols.cUid] || '').trim(),
+    unitNumber: cols.cUnit !== undefined ? String(data[i][cols.cUnit] || '') : '',
+    status: cols.cStatus !== undefined ? String(data[i][cols.cStatus] || '') : '',
+    statusNote: cols.cStatusNote !== undefined ? String(data[i][cols.cStatusNote] || '') : ''
+  };
+}
+
+function getAssetScanColumns_(data) {
+  const hMap = data.hMap || getHeaderMap(data);
+  const getCol = (matchStrs) => {
+    const key = Object.keys(hMap).find(k => matchStrs.includes(String(k).toLowerCase().replace(/[^a-z0-9]/g, '')));
+    return key !== undefined ? hMap[key] : undefined;
+  };
+  return {
+    cUid: getCol(['uid', 'id', 'assetuid']) ?? hMap['uid'],
+    cName: getCol(['name', 'assetname', 'itemname']) ?? hMap['name'],
+    cUnit: getCol(['unitnumber', 'unit']) ?? hMap['unit_number'],
+    cRfid: getCol(['rfidtag', 'rfid']) ?? hMap['rfid_tag'],
+    cStatus: getCol(['status', 'lifecycle']) ?? hMap['status'],
+    cStatusNote: getCol(['statusnote', 'issuenote', 'defectnote']) ?? hMap['status_note']
+  };
+}
+
+/** Parse human-readable codes like RW-1000-20 (shortcut-model-unit). */
+function tryParseAssetCompositeCode_(tag) {
+  const m = String(tag || '').trim().match(/^([A-Za-z]{1,8})-(\d+)-(\d+)$/);
+  if (!m) return null;
+  return { shortcut: m[1].toLowerCase(), model: m[2], unit: m[3] };
+}
+
+function nameMatchesCompositeHint_(name, parts) {
+  const n = String(name || '').toLowerCase().trim();
+  if (!n || !parts) return false;
+  if (parts.model && n.indexOf(parts.model) !== -1) return true;
+  const sc = parts.shortcut;
+  if (!sc) return false;
+  if (n.indexOf(sc) !== -1) return true;
+  const words = n.split(/\s+/).filter(Boolean);
+  const initials = words.map(w => w.charAt(0)).join('').toLowerCase();
+  return initials === sc;
+}
+
+/** Full vault row scan — same contract as Operations checkout (uid, rfid, unit, name, composite codes). */
+function findAssetByScanTagInVault_(sheets, rawTag) {
+  const tag = extractMobileScanTag_(rawTag);
+  if (!tag) return null;
+  const fromMap = lookupEquipmentScanHit_(buildEquipmentScanMapFromSheets_(sheets), tag);
+  if (fromMap) return fromMap;
+
+  const data = getSheetData(sheets.assets);
+  const cols = getAssetScanColumns_(data);
+  if (cols.cUid === undefined) return null;
+
+  const needle = normalizeStationRfidTag(tag);
+  const rawNeedle = String(tag).trim().toLowerCase();
+
+  for (let i = 1; i < data.length; i++) {
+    if (!data[i][cols.cUid]) continue;
+    const uid = normalizeStationRfidTag(data[i][cols.cUid]);
+    const rawUid = String(data[i][cols.cUid]).trim().toLowerCase();
+    const rfid = cols.cRfid !== undefined ? normalizeStationRfidTag(data[i][cols.cRfid]) : '';
+    const unit = cols.cUnit !== undefined ? normalizeStationRfidTag(data[i][cols.cUnit]) : '';
+    const name = cols.cName !== undefined ? String(data[i][cols.cName] || '').toLowerCase().trim() : '';
+    const nameUnit = name + (unit ? ' #' + unit : '');
+    const nameUnitSpace = name + (unit ? ' ' + unit : '');
+
+    if (rawUid === rawNeedle || uid === needle || rfid === needle ||
+        unit === needle || name === needle || nameUnit === needle || nameUnitSpace === needle) {
+      return buildEquipmentScanEntryFromRow_(data, i, cols);
+    }
+  }
+
+  const composite = tryParseAssetCompositeCode_(tag);
+  if (composite) {
+    const unitNeedle = normalizeStationRfidTag(composite.unit);
+    let candidates = [];
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][cols.cUid]) continue;
+      const uid = normalizeStationRfidTag(data[i][cols.cUid]);
+      if (uid === needle || String(data[i][cols.cUid]).trim().toLowerCase() === rawNeedle) {
+        return buildEquipmentScanEntryFromRow_(data, i, cols);
+      }
+      const unit = cols.cUnit !== undefined ? normalizeStationRfidTag(data[i][cols.cUnit]) : '';
+      if (unit !== unitNeedle) continue;
+      const name = cols.cName !== undefined ? String(data[i][cols.cName] || '') : '';
+      if (nameMatchesCompositeHint_(name, composite)) {
+        candidates.push(buildEquipmentScanEntryFromRow_(data, i, cols));
+      }
+    }
+    if (candidates.length === 1) return candidates[0];
+    if (candidates.length > 1 && composite.model) {
+      const filtered = candidates.filter(c => String(c.name || '').toLowerCase().indexOf(composite.model) !== -1);
+      if (filtered.length === 1) return filtered[0];
+      if (filtered.length > 1) return filtered[0];
+    }
+  }
+
+  return null;
 }
 
 const MOBILE_SCAN_PENDING_TTL_SEC = 300;
@@ -599,8 +702,7 @@ function pullStagedMobileScan(crewName, sessionToken) {
     if (!staged) return { success: true, pending: false };
     cache.remove(cacheKey);
     const sheets = verifyVaultSchema(true);
-    const map = buildEquipmentScanMapFromSheets_(sheets);
-    const hit = lookupEquipmentScanHit_(map, staged);
+    const hit = findAssetByScanTagInVault_(sheets, staged);
     return { success: true, pending: true, tag: staged, hit: hit };
   });
 }

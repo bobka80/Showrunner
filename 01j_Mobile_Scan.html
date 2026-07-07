@@ -237,7 +237,7 @@ function mobileScanRestoreReaderDiv_() {
         mobileOpenScanPanel();
       }
       mobileScanHandleDecode_(ev.data.text);
-      setTimeout(function() { mobileScanTryPullStaged_('relay-backup'); }, 400);
+      mobileScanBurstPullStaged_();
       return;
     }
     if (t === 'SHOWRUNNER_MOBILE_SCAN_STAGE_OPEN') {
@@ -276,6 +276,7 @@ function mobileScanRestoreReaderDiv_() {
         mobileOpenScanPanel();
       }
       mobileScanTryPullStaged_('reopen');
+      mobileScanBurstPullStaged_();
       return;
     }
     if (mobileScanIsEmbedOrigin_(ev.origin) && t.indexOf('SHOWRUNNER_EMBED_') === 0) {
@@ -473,8 +474,9 @@ function mobileScanResolveFromServer_(raw) {
         mobileScanApplyHit_(tag, hit);
         window.mobileScanPendingRaw = '';
       })
-      .withFailureHandler(function() {
+      .withFailureHandler(function(err) {
         mobileScanServerResolveBusy_ = false;
+        mobileScanSetStatus_('server err: ' + (err && err.message ? err.message : 'fail'));
         mobileScanApplyHit_(raw, null);
         window.mobileScanPendingRaw = '';
       })
@@ -536,11 +538,19 @@ function mobileScanResolve_(raw) {
   if (m[key]) return m[key];
   if (m['uid:' + key]) return m['uid:' + key];
   if (typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length) {
+    var needle = key;
+    var rawNeedle = String(tag).trim().toLowerCase();
     for (var i = 0; i < globalAssets.length; i++) {
       var a = globalAssets[i];
       var uid = mobileScanNormalize_(a.id);
       var rfid = mobileScanNormalize_(a.rfidTag || a.rfid_tag || '');
-      if (uid === key || rfid === key) {
+      var unit = mobileScanNormalize_(a.unitNumber || a.unit_number || '');
+      var name = String(a.name || '').toLowerCase().trim();
+      var nameUnit = name + (unit ? ' #' + unit : '');
+      var nameUnitSpace = name + (unit ? ' ' + unit : '');
+      if (uid === needle || rfid === needle || unit === needle ||
+          String(a.id || '').trim().toLowerCase() === rawNeedle ||
+          name === needle || nameUnit === needle || nameUnitSpace === needle) {
         return {
           kind: 'equipment',
           name: a.name || '',
@@ -551,8 +561,65 @@ function mobileScanResolve_(raw) {
         };
       }
     }
+    var composite = mobileScanTryParseComposite_(tag);
+    if (composite) {
+      var candidates = [];
+      for (var j = 0; j < globalAssets.length; j++) {
+        var b = globalAssets[j];
+        var bUnit = mobileScanNormalize_(b.unitNumber || b.unit_number || '');
+        if (bUnit !== mobileScanNormalize_(composite.unit)) continue;
+        if (mobileScanNameMatchesComposite_(b.name, composite)) {
+          candidates.push(b);
+        }
+      }
+      if (candidates.length === 1) {
+        var c0 = candidates[0];
+        return {
+          kind: 'equipment',
+          name: c0.name || '',
+          unitId: c0.id,
+          unitNumber: c0.unitNumber || c0.unit_number || '',
+          status: c0.status || 'Active',
+          statusNote: c0.statusNote || c0.status_note || ''
+        };
+      }
+    }
   }
   return null;
+}
+
+function mobileScanTryParseComposite_(tag) {
+  var m = String(tag || '').trim().match(/^([A-Za-z]{1,8})-(\d+)-(\d+)$/);
+  if (!m) return null;
+  return { shortcut: m[1].toLowerCase(), model: m[2], unit: m[3] };
+}
+
+function mobileScanNameMatchesComposite_(name, parts) {
+  var n = String(name || '').toLowerCase().trim();
+  if (!n || !parts) return false;
+  if (parts.model && n.indexOf(parts.model) !== -1) return true;
+  var sc = parts.shortcut;
+  if (!sc) return false;
+  if (n.indexOf(sc) !== -1) return true;
+  var words = n.split(/\s+/).filter(Boolean);
+  var initials = words.map(function(w) { return w.charAt(0); }).join('').toLowerCase();
+  return initials === sc;
+}
+
+var mobileScanBurstPullTimer_ = null;
+
+function mobileScanBurstPullStaged_() {
+  if (!mobileScanInHostingIframe_()) return;
+  if (mobileScanBurstPullTimer_) return;
+  var n = 0;
+  mobileScanBurstPullTimer_ = setInterval(function() {
+    n += 1;
+    mobileScanTryPullStaged_('burst');
+    if (n >= 12) {
+      clearInterval(mobileScanBurstPullTimer_);
+      mobileScanBurstPullTimer_ = null;
+    }
+  }, 500);
 }
 
 function mobileScanUpdateEquipEntry_(unitId, status, statusNote) {
