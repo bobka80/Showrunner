@@ -455,8 +455,10 @@
       border-top: 1px solid #3f3f46;
       box-sizing: border-box;
       font-family: Inter, system-ui, sans-serif;
+      pointer-events: none;
     }
-    #sr-mobile-scan-diag.is-open { display: flex; }
+    #sr-mobile-scan-diag.is-open { display: flex; pointer-events: none; }
+    .sr-mobile-scan-diag__head button { pointer-events: auto; }
     .sr-mobile-scan-diag__head {
       display: flex;
       align-items: center;
@@ -665,7 +667,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-  <script src="/host-boot.js?v=461"></script>
+  <script src="/host-boot.js?v=462"></script>
 
 </body>
 

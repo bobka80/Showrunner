@@ -49,6 +49,7 @@
   }
 
   function hostMobileScanDiag_(tag, detail) {
+    if (!hostMobileScanDebugOn_()) return;
     hostMobileScanDiagPush_(hostMobileScanDiagFormat_('SHELL', tag, detail));
   }
 
@@ -124,7 +125,10 @@
   function hostMobileScanDiagInit_() {
     try {
       var p = new URLSearchParams(window.location.search);
-      if (p.get('scanDebug') === '1') {
+      if (p.get('scanDebug') === '0') {
+        localStorage.removeItem(MOBILE_SCAN_DEBUG_KEY);
+        localStorage.removeItem(MOBILE_SCAN_DIAG_SHELL_KEY);
+      } else if (p.get('scanDebug') === '1') {
         localStorage.setItem(MOBILE_SCAN_DEBUG_KEY, '1');
         if (window.history && window.history.replaceState) {
           window.history.replaceState(null, '', window.location.pathname + (window.location.hash || ''));
@@ -132,16 +136,32 @@
       }
     } catch (e) { /* ignore */ }
     hostMobileScanDiagWireUi_();
-    hostMobileScanDiag_('shell_init');
     if (hostMobileScanDebugOn_()) {
+      hostMobileScanDiag_('shell_init');
       hostMobileScanDiagRender_();
-      setTimeout(function() { hostMobileScanNotifyAppDebug_(true); }, 500);
-      setTimeout(function() { hostMobileScanNotifyAppDebug_(true); }, 2500);
     }
+  }
+
+  function hostMobileScanEmergencyReset_() {
+    try {
+      hostMobileScanCloseShellCam_();
+      hostMobileScanCloseCameraPage_();
+      hostMobileScanStop();
+      hostMobileScanHideTapGate_();
+      document.body.classList.remove('sr-shell-cam-active');
+      hostMobileScanRestoreAppFrame_();
+      if (hostMobileQrPendingRetryTimer) {
+        clearInterval(hostMobileQrPendingRetryTimer);
+        hostMobileQrPendingRetryTimer = null;
+      }
+    } catch (e) { /* ignore */ }
   }
   hostMobileScanDiagInit_();
 
-  // --- Native station bridge (RFID gun) --------------------------------------
+  function hostMobileScanNotifyAppDebugSoon_() {
+    if (!hostMobileScanDebugOn_()) return;
+    hostMobileScanNotifyAppDebug_(true);
+  }
   // The native app injects `AndroidStation` and calls `showrunnerStationDeliverScan`
   // in THIS (top) frame; Showrunner itself runs in the iframe, so we relay by postMessage.
   window.showrunnerStationDeliverScan = function(tag) {
@@ -1085,13 +1105,18 @@
   hostMobileScanWireInlineStart_();
   hostMobileScanWireStage_();
   window.addEventListener('pageshow', function() {
+    hostMobileScanEmergencyReset_();
     if (hostMobileScanReadPending_() || hostMobileScanShouldReopen_()) {
       hostMobileScanSchedulePendingRetry_();
     }
     hostMobileScanFlushPending_();
+    hostMobileScanNotifyAppDebugSoon_();
   });
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') hostMobileScanFlushPending_();
+    if (document.visibilityState !== 'visible') return;
+    hostMobileScanEmergencyReset_();
+    hostMobileScanFlushPending_();
+    hostMobileScanNotifyAppDebugSoon_();
   });
   window.addEventListener('resize', hostMobileScanRepositionOpen_, { passive: true });
   window.addEventListener('scroll', hostMobileScanRepositionOpen_, { passive: true });
@@ -2139,7 +2164,7 @@
       if (hostMobileScanDebugOn_()) hostMobileScanNotifyAppDebug_(true);
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_DIAG') {
-      if (ev.data.line) hostMobileScanDiagPush_(ev.data.line);
+      if (hostMobileScanDebugOn_() && ev.data.line) hostMobileScanDiagPush_(ev.data.line);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_QR_SCAN_ACK') {
@@ -2261,7 +2286,7 @@
   if (frame) {
     frame.addEventListener('load', function() {
       hostMobileScanFlushPending_();
-      if (hostMobileScanDebugOn_()) hostMobileScanNotifyAppDebug_(true);
+      hostMobileScanNotifyAppDebugSoon_();
       burstRequestAuthFromIframe();
       if (serverSaveConfirmed) return;
       if (fcmToken) {
