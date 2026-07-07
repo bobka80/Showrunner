@@ -112,6 +112,36 @@
     setTimeout(function() { clearInterval(headPing); }, 600000);
   })();
   </script>
+  <script>
+  (function hostingMobileScanRelay_() {
+    if (window.self === window.top) return;
+    var shellTypes = {
+      SHOWRUNNER_MOBILE_QR_SCAN: 1,
+      SHOWRUNNER_MOBILE_SCAN_WAKE: 1,
+      SHOWRUNNER_MOBILE_SCAN_REOPEN: 1
+    };
+    function forwardToInnerFrames(data) {
+      try {
+        var frames = document.querySelectorAll('iframe');
+        for (var i = 0; i < frames.length; i++) {
+          try { frames[i].contentWindow.postMessage(data, '*'); } catch (e) { /* ignore */ }
+        }
+      } catch (e) { /* ignore */ }
+    }
+    window.addEventListener('message', function(ev) {
+      if (!ev.data || !ev.data.type || !shellTypes[ev.data.type]) return;
+      var fromShell = false;
+      try {
+        fromShell = (ev.source === window.parent) || (ev.origin && ev.origin.indexOf('web.app') !== -1);
+      } catch (e) { fromShell = true; }
+      if (!fromShell) return;
+      forwardToInnerFrames(ev.data);
+      if (typeof window.mobileScanIngestShellMessage_ === 'function') {
+        window.mobileScanIngestShellMessage_(ev.data);
+      }
+    });
+  })();
+  </script>
 
 </head>
 <body>

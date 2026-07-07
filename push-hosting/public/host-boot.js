@@ -112,20 +112,33 @@
   function hostMobileScanStageOnServer_(tag) {
     var raw = String(tag == null ? '' : tag).trim();
     if (!raw) return;
-    var sess = readParentSession();
-    if (!sess || !sess.token) return;
+    var tok = hostMobileScanGetSessionToken_();
+    if (!tok) return;
+    var url = PROD_GAS_EXEC + '?action=mobscanstage&token=' + encodeURIComponent(tok) +
+      '&tag=' + encodeURIComponent(raw);
+    try {
+      if (typeof fetch === 'function') {
+        fetch(url, { mode: 'no-cors', credentials: 'omit' }).catch(function() { /* ignore */ });
+      }
+    } catch (e) { /* ignore */ }
     var cb = 'srMobScanStage_' + Date.now();
     window[cb] = function() {
       try { delete window[cb]; } catch (e) { /* ignore */ }
     };
     try {
       var s = document.createElement('script');
-      s.src = PROD_GAS_EXEC + '?action=mobscanstage&token=' + encodeURIComponent(sess.token) +
-        '&tag=' + encodeURIComponent(raw) + '&callback=' + encodeURIComponent(cb);
+      s.src = url + '&callback=' + encodeURIComponent(cb);
       s.onerror = function() { try { delete window[cb]; } catch (e) { /* ignore */ } };
       document.head.appendChild(s);
       setTimeout(function() { try { s.remove(); } catch (e) { /* ignore */ } }, 8000);
     } catch (e) { /* ignore */ }
+  }
+
+  function hostMobileScanRelayBurst_(payload) {
+    hostMobileScanRelay_(payload);
+    [150, 400, 900, 1800, 3200].forEach(function(ms) {
+      setTimeout(function() { hostMobileScanRelay_(payload); }, ms);
+    });
   }
 
   function hostMobileScanDeliverScan_(text, reopen) {
@@ -140,13 +153,19 @@
         localStorage.setItem('sm_mobile_scan_reopen_panel', '1');
       }
     } catch (e) { /* ignore */ }
-    hostMobileScanRelay_({
+    var payload = {
       type: 'SHOWRUNNER_MOBILE_QR_SCAN',
+      text: raw,
+      reopenPanel: reopen !== false
+    };
+    hostMobileScanRelayBurst_(payload);
+    hostMobileScanRelayBurst_({
+      type: 'SHOWRUNNER_MOBILE_SCAN_WAKE',
       text: raw,
       reopenPanel: reopen !== false
     });
     if (reopen !== false) {
-      hostMobileScanRelay_({ type: 'SHOWRUNNER_MOBILE_SCAN_REOPEN' });
+      hostMobileScanRelayBurst_({ type: 'SHOWRUNNER_MOBILE_SCAN_REOPEN' });
     }
     hostMobileScanSchedulePendingRetry_();
   }
@@ -156,6 +175,13 @@
   var hostMobileShellCamStarting = false;
   var hostMobileShellCamLastDecode = '';
   var hostMobileShellCamLastDecodeTs = 0;
+  var hostMobileScanSessionToken_ = '';
+
+  function hostMobileScanGetSessionToken_() {
+    if (hostMobileScanSessionToken_) return hostMobileScanSessionToken_;
+    var sess = readParentSession();
+    return (sess && sess.token) ? sess.token : '';
+  }
 
   function hostMobileScanGetShellCam_() {
     return document.getElementById('sr-mobile-shell-cam');
@@ -2084,6 +2110,7 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA') {
+      if (ev.data.sessionToken) hostMobileScanSessionToken_ = String(ev.data.sessionToken).trim();
       hostMobileScanOpenShellCam_();
       return;
     }
