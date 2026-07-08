@@ -429,11 +429,24 @@
   const ACTIVE_USER_NAME = (document.querySelector('meta[name="user-name"]') || {}).content || '';
   const ACTIVE_USER_UID = (document.querySelector('meta[name="user-uid"]') || {}).content || '';
   const ACTIVE_USER_EMAIL = (document.querySelector('meta[name="user-email"]') || {}).content || '';
-  const IS_STATION_DEVICE = (document.querySelector('meta[name="station-device"]') || {}).content === '1';
+  window.stationEnsureDeviceMode_ = function() {
+    if (window.IS_STATION_DEVICE) {
+      try { document.documentElement.classList.add('station-device-root'); } catch (e) { /* ignore */ }
+      return true;
+    }
+    var meta = document.querySelector('meta[name="station-device"]');
+    var fromMeta = meta && String(meta.content).trim() === '1';
+    var fromUa = /ShowrunnerStation/i.test(navigator.userAgent || '');
+    if (fromMeta || fromUa) {
+      window.IS_STATION_DEVICE = true;
+      try { document.documentElement.classList.add('station-device-root'); } catch (e) { /* ignore */ }
+      return true;
+    }
+    return false;
+  };
+  const IS_STATION_DEVICE = window.stationEnsureDeviceMode_();
   const STATION_DEVICE_LAYOUT = (document.querySelector('meta[name="station-device-layout"]') || {}).content || 'chainway_handheld';
-  window.IS_STATION_DEVICE = IS_STATION_DEVICE;
   window.STATION_DEVICE_LAYOUT = STATION_DEVICE_LAYOUT;
-  if (IS_STATION_DEVICE) document.documentElement.classList.add('station-device-root');
   window.ACTIVE_USER_UID = ACTIVE_USER_UID;
   window.ACTIVE_USER_EMAIL = ACTIVE_USER_EMAIL;
   

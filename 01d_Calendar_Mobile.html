@@ -312,6 +312,7 @@ function triggerMobileEventClick(pId) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    if (window.IS_STATION_DEVICE) return;
     if (window.innerWidth <= 768 && typeof setMobileHeaderHome === 'function') {
         setMobileHeaderHome();
     }

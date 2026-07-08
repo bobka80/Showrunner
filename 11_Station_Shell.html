@@ -1152,6 +1152,7 @@ window.stationHostActive_ = function() {
 };
 
 (function installStationRbacOverride_() {
+  if (typeof window.stationEnsureDeviceMode_ === 'function') window.stationEnsureDeviceMode_();
   if (!window.IS_STATION_DEVICE) return;
   var _userHasPerm = window.userHasPerm;
   var _effectiveHasPerm = window.effectiveHasPerm;
@@ -3569,6 +3570,7 @@ function stationBindMessageListener_() {
 }
 
 function initStationShell_() {
+  if (typeof window.stationEnsureDeviceMode_ === 'function') window.stationEnsureDeviceMode_();
   if (!window.IS_STATION_DEVICE) return;
 
   // Show the shell and tell the native app to drop its splash FIRST, so a later error can never

@@ -8079,6 +8079,27 @@ html.station-device-root #station-device-controls { display: flex; }
 <script>
   console.log('Booting UI... Fetching App Logic...');
 
+  // Station gun: hide mobile shell immediately — do not wait for async LogicPayload.
+  // Meta flag (IAM station login) OR ShowrunnerStation WebView UA (Chainway APK).
+  (function stationEarlyBoot_() {
+    try {
+      if (window.IS_STATION_DEVICE) return;
+      var meta = document.querySelector('meta[name="station-device"]');
+      var fromMeta = meta && String(meta.content).trim() === '1';
+      var fromUa = /ShowrunnerStation/i.test(navigator.userAgent || '');
+      if (!fromMeta && !fromUa) return;
+      window.IS_STATION_DEVICE = true;
+      document.documentElement.classList.add('station-device-root');
+      var shell = document.getElementById('station-shell');
+      if (shell) shell.style.display = 'flex';
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'SHOWRUNNER_STATION_READY' }, '*');
+        }
+      } catch (e) { /* ignore */ }
+    } catch (e) { /* ignore */ }
+  })();
+
   function showBootFailure(msg) {
     console.error('[Showrunner boot]', msg);
     var el = document.getElementById('sr-boot-failure');

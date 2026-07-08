@@ -1,15 +1,24 @@
 {
-  "versionName": "0.1.41",
-  "versionCode": 43,
+  "versionName": "0.1.42",
+  "versionCode": 44,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T17:37:24.803Z",
+  "updatedAt": "2026-07-08T18:19:15.684Z",
   "sizeBytes": 12073677,
   "notes": [
-    "Chainway trigger-idle sleep: native timer tracks last trigger pull (not RFID scans). After configured idle minutes with no trigger, releases BLE so firmware powers gun down. setGunIdleSleepMinutes bridge from web dropdown.",
-    "Watchdog suppressed while asleep — pull trigger then Reconnect gun to wake."
+    "Chainway sleep fix: sleepGun disconnects BLE on main thread immediately, pin setReaderAwaitSleepTime(1) before drop, no free() so watchdog stays suppressed. Firmware powers down ~1min after link release.",
+    "Idle timer fix shipped in GAS v498 — install both."
   ],
   "history": [
+    {
+      "versionName": "0.1.42",
+      "versionCode": 44,
+      "date": "2026-07-08T18:19:15.684Z",
+      "notes": [
+        "Chainway sleep fix: sleepGun disconnects BLE on main thread immediately, pin setReaderAwaitSleepTime(1) before drop, no free() so watchdog stays suppressed. Firmware powers down ~1min after link release.",
+        "Idle timer fix shipped in GAS v498 — install both."
+      ]
+    },
     {
       "versionName": "0.1.41",
       "versionCode": 43,
@@ -182,16 +191,6 @@
         "BLE reconnect: stop spurious login reset (host-boot v479)",
         "Native session backup restore before shell boot",
         "Ignore Login paint signals when parent session valid"
-      ]
-    },
-    {
-      "versionName": "0.1.20",
-      "versionCode": 22,
-      "date": "2026-07-07T16:35:45.278Z",
-      "notes": [
-        "Fix login reset on BLE reconnect — safe JS injection, BLE busy guard",
-        "WebView renderer reload debounced",
-        "session gate ignores reconnect flap"
       ]
     }
   ]
