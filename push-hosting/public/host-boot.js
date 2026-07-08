@@ -1338,17 +1338,17 @@
   // Native app cold-start: cover the "normal phone" hosting chrome with a
   // station splash until the Showrunner station shell mounts (or login is needed).
   var stationSplashTimer = null;
+  // In-memory only. Previously this was persisted to localStorage/sessionStorage, which permanently
+  // suppressed the splash after the very first boot — so every later cold start showed a black screen
+  // then a flash of the personal web UI before the station shell. The splash must cover EVERY cold
+  // start (host-boot runs once per parent load) and hide only when the shell reports ready / login is
+  // needed / the safety timeout fires.
+  var stationSplashDone = false;
   function stationSplashDismissed_() {
-    try {
-      return sessionStorage.getItem('sr_station_splash_off') === '1' ||
-        localStorage.getItem('sr_station_splash_off') === '1';
-    } catch (e) { return false; }
+    return stationSplashDone;
   }
   function markStationSplashDismissed_() {
-    try {
-      sessionStorage.setItem('sr_station_splash_off', '1');
-      localStorage.setItem('sr_station_splash_off', '1');
-    } catch (e) { /* ignore */ }
+    stationSplashDone = true;
   }
   function showStationSplash() {
     if (stationSplashDismissed_()) return;

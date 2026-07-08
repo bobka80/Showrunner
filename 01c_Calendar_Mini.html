@@ -29,10 +29,32 @@ function bootMiniCalendar(targetDateString, projectId) {
     }
     container.innerHTML = ''; 
 
+    // Focused-but-full grid: keep a full month's worth of weeks (6), but anchor the view one week
+    // BEFORE the pressed date so that date's week lands on the SECOND row — one week of context
+    // above it, the rest of the scope below — instead of always starting at the 1st of the month
+    // (which buried late-month dates and forced scrolling). Parse YYYY-MM-DD as a LOCAL date so the
+    // week alignment can't drift a day across the UTC boundary.
+    var miniAnchor;
+    var miniDateMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(targetDateString || ''));
+    if (miniDateMatch) {
+        miniAnchor = new Date(+miniDateMatch[1], +miniDateMatch[2] - 1, +miniDateMatch[3]);
+    } else if (targetDateString && !isNaN(new Date(targetDateString).getTime())) {
+        miniAnchor = new Date(targetDateString);
+    } else {
+        miniAnchor = new Date();
+    }
+    var miniFocusStart = new Date(miniAnchor);
+    miniFocusStart.setDate(miniFocusStart.getDate() - 7);
+
     setTimeout(() => {
         miniCalendar = new FullCalendar.Calendar(container, {
-            initialView: 'dayGridMonth',
-            initialDate: targetDateString || new Date(),
+            initialView: 'miniFocusGrid',
+            initialDate: miniFocusStart,
+            views: {
+                // Generic 6-week day grid, aligned to the start of the week that contains
+                // miniFocusStart (the week before the pressed date) → pressed date's week = row 2.
+                miniFocusGrid: { type: 'dayGrid', duration: { weeks: 6 }, dateAlignment: 'week' }
+            },
             headerToolbar: {
                 left: 'title',
                     right: 'prev,next'

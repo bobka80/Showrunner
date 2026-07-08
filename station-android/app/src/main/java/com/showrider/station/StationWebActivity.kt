@@ -47,13 +47,6 @@ class StationWebActivity : AppCompatActivity() {
         getSharedPreferences(RfidManager.PREFS_NAME, MODE_PRIVATE)
     }
 
-    private fun splashWasDismissedBefore(): Boolean =
-        stationPrefs.getBoolean(PREF_SPLASH_DISMISSED, false)
-
-    private fun markSplashDismissed() {
-        stationPrefs.edit().putBoolean(PREF_SPLASH_DISMISSED, true).apply()
-    }
-
     @SuppressLint("SetJavaScriptEnabled", "UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,10 +70,12 @@ class StationWebActivity : AppCompatActivity() {
         statusBar = findViewById(R.id.station_status)
         statusBar.isVisible = false
         splash = findViewById(R.id.station_splash)
-        if (splashWasDismissedBefore()) {
-            splashHidden = true
-            splash.visibility = View.GONE
-        }
+        // Show the rotating-circle kiosk splash on EVERY cold start, so the operator sees the
+        // Showrunner Station loading screen instead of a black screen followed by a flash of the
+        // personal web UI while the WebView + hosting shell + GAS iframe boot. The splash is NOT
+        // persisted-dismissed: a config-change recreation restores the hidden state via
+        // savedInstanceState (below), and a genuine process restart correctly re-shows it. It hides
+        // only when the station shell reports ready (shellReady), login is needed, or the timeout.
         // Safety net: never let the splash trap the operator if the shell never reports in.
         splashHandler.postDelayed({ hideSplash() }, SPLASH_TIMEOUT_MS)
 
@@ -360,7 +355,6 @@ class StationWebActivity : AppCompatActivity() {
     private fun hideSplash() {
         if (splashHidden) return
         splashHidden = true
-        markSplashDismissed()
         splashHandler.removeCallbacksAndMessages(null)
         runOnUiThread {
             splash.animate().alpha(0f).setDuration(300).withEndAction {
@@ -556,7 +550,6 @@ class StationWebActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (splashWasDismissedBefore()) hideSplash()
         notifyWebHostEjectCheck()
         if (::rfid.isInitialized && BlePermissions.hasAll(this)) {
             rfid.onAppWake()
@@ -584,7 +577,6 @@ class StationWebActivity : AppCompatActivity() {
         private const val REQ_BLE_PERMISSIONS = 1001
         private const val REQ_ENABLE_BT = 1002
         private const val REQ_POST_NOTIFICATIONS = 1003
-        private const val PREF_SPLASH_DISMISSED = "splash_dismissed"
         private const val PREF_WEB_SESSION_TOKEN = "web_session_token"
         private const val PREF_WEB_SESSION_EXPIRES = "web_session_expires"
         private const val PREF_BLE_FLAP_UNTIL = "ble_flap_until"

@@ -1,15 +1,22 @@
 {
-  "versionName": "0.1.36",
-  "versionCode": 38,
+  "versionName": "0.1.37",
+  "versionCode": 39,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T07:47:15.196Z",
+  "updatedAt": "2026-07-08T10:38:54.502Z",
   "sizeBytes": 12057261,
   "notes": [
-    "Fix true root cause: RFID gun is an HID keyboard so connect/disconnect changed the keyboard config and recreated the Activity, rebooting the UI. Handle keyboard|navigation config changes so the WebView survives gun flap",
-    "Add gun config-change breadcrumb toast"
+    "Restore station loading splash on every cold start: the rotating-circle 'SHOWRUNNER STATION / STARTING' screen now covers the whole boot until the shell reports ready, instead of a black screen then a flash of the personal web UI. Removed the persistent splash-dismissed flag that permanently suppressed it after the first launch (config-change recreation still restores hidden state via savedInstanceState)."
   ],
   "history": [
+    {
+      "versionName": "0.1.37",
+      "versionCode": 39,
+      "date": "2026-07-08T10:38:54.502Z",
+      "notes": [
+        "Restore station loading splash on every cold start: the rotating-circle 'SHOWRUNNER STATION / STARTING' screen now covers the whole boot until the shell reports ready, instead of a black screen then a flash of the personal web UI. Removed the persistent splash-dismissed flag that permanently suppressed it after the first launch (config-change recreation still restores hidden state via savedInstanceState)."
+      ]
+    },
     {
       "versionName": "0.1.36",
       "versionCode": 38,
@@ -185,14 +192,6 @@
         "native toasts replace status bar",
         "Settings Reconnect gun bridge (AndroidStation.reconnectGun)",
         "Gun-late connect: faster retry + SDK status sync"
-      ]
-    },
-    {
-      "versionName": "0.1.14",
-      "versionCode": 16,
-      "date": "2026-07-04T14:43:42.873Z",
-      "notes": [
-        "Cleanup build — retire native diagnostic status spam"
       ]
     }
   ]
