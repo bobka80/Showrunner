@@ -1,0 +1,3 @@
+﻿Version 1.0
+-----------
+- First attempt at a library to provide ViewModel binding like WPF for Windows Forms

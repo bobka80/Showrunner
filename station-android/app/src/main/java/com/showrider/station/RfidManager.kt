@@ -464,7 +464,7 @@ class RfidManager(
                 if (!connected || sdkStatus() != ConnectionStatus.CONNECTED) return
                 onGunActivity()
                 if (onTriggerWake()) {
-                    postStatus("Screen on — pull again to scan")
+                    postStatus("Station ready — pull again to scan")
                     return
                 }
                 when (scanMode) {

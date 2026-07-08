@@ -1,0 +1,313 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{C2B75722-E480-49C7-8A44-0E250233C2D7}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>TechnologySolutions.AsciiProtocolSample</RootNamespace>
+    <AssemblyName>1151 AsciiProtocol CommandsSample FX</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="log4net.FX2, Version=1.2.10.18042, Culture=neutral, PublicKeyToken=06276a4145aa3c2e, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\API\log4net.FX2.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Xml.Linq">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Deployment" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="TechnologySolutions.Rfid.AsciiProtocol.FX35, Version=1.0.5081.21435, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\API\TechnologySolutions.Rfid.AsciiProtocol.FX35.dll</HintPath>
+    </Reference>
+    <Reference Include="WindowsBase">
+      <RequiredTargetFramework>3.0</RequiredTargetFramework>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AsciiProtocol\SwitchAsynchronousResponder.cs" />
+    <Compile Include="AsciiProtocol\SwitchStateEventArgs.cs" />
+    <Compile Include="Entities\CommonCommandParameters.cs" />
+    <Compile Include="Entities\ConnectSettingsAdapter.cs" />
+    <Compile Include="Entities\IdentifiedItem.cs" />
+    <Compile Include="Entities\ILockParameters.cs" />
+    <Compile Include="Entities\InventoryCache.cs" />
+    <Compile Include="Entities\InventoryItem.cs" />
+    <Compile Include="Entities\LockParameters.cs" />
+    <Compile Include="Entities\PropertyChangedEntityBase.cs" />
+    <Compile Include="Entities\QueryParameters.cs" />
+    <Compile Include="Entities\RenderRssi.cs" />
+    <Compile Include="Entities\ResponseParametersAdapter.cs" />
+    <Compile Include="Entities\ResponseSettingsAdapter.cs" />
+    <Compile Include="Entities\RunningAverage.cs" />
+    <Compile Include="Entities\SelectParameters.cs" />
+    <Compile Include="Entities\SettingsEntityBase.cs" />
+    <Compile Include="Entities\TransponderOrBarcode.cs" />
+    <Compile Include="Entities\TransponderParametersAdapter.cs" />
+    <Compile Include="Program.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <EmbeddedResource Include="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\AutorunFileUserControl.resx">
+      <DependentUpon>AutorunFileUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\BarcodeUserControl.resx">
+      <DependentUpon>BarcodeUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\CommandsUserControl.resx">
+      <DependentUpon>CommandsUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\AntennaParametersUserControl.resx">
+      <DependentUpon>AntennaParametersUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\ConfigureReaderUserControl.resx">
+      <DependentUpon>ConfigureReaderUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\IdentifiedItemsUserControl.resx">
+      <DependentUpon>IdentifiedItemsUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\InventoryUserControl.resx">
+      <DependentUpon>InventoryUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\CommissionTransponderUserControl.resx">
+      <DependentUpon>CommissionTransponderUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\LogFileUserControl.resx">
+      <DependentUpon>LogFileUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\MainForm.resx">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\QueryParametersUserControl.resx">
+      <DependentUpon>QueryParametersUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\ReadWriteUserControl.resx">
+      <DependentUpon>ReadWriteUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\ResponseParametersUserControl.resx">
+      <DependentUpon>ResponseParametersUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\SelectParametersUserControl.resx">
+      <DependentUpon>SelectParametersUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\SwitchActionUserControl.resx">
+      <DependentUpon>SwitchActionUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\SwitchUserControl.resx">
+      <DependentUpon>SwitchUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\TransponderParametersUserControl.resx">
+      <DependentUpon>TransponderParametersUserControl.cs</DependentUpon>
+    </EmbeddedResource>
+    <Compile Include="Properties\Resources.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+    </Compile>
+    <None Include="App.config" />
+    <None Include="Properties\Settings.settings">
+      <Generator>PublicSettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+    </Compile>
+    <Compile Include="Service.cs" />
+    <Compile Include="Entities\AntennaParametersAdapter.cs" />
+    <Compile Include="Entities\ParametersExtensions.cs" />
+    <Compile Include="Services\IIdentifiedItemEventArgs.cs" />
+    <Compile Include="Services\IdentifiedItemService.cs" />
+    <Compile Include="Services\DesignerCommandService.cs" />
+    <Compile Include="Services\ICommandService.cs" />
+    <Compile Include="Services\IConnectionService.cs" />
+    <Compile Include="Entities\IdentifiedItemExtensions.cs" />
+    <Compile Include="Services\IMessageService.cs" />
+    <Compile Include="Services\MessageService.cs" />
+    <Compile Include="Services\CommandService.cs" />
+    <Compile Include="Services\ReaderCommand.cs" />
+    <Compile Include="Services\ReaderService.cs" />
+    <Compile Include="Services\IdentifierCacheService.cs" />
+    <Compile Include="Services\TransponderOrBarcodeEventArgs.cs" />
+    <Compile Include="ViewModels\AntennaParametersViewModel.cs" />
+    <Compile Include="ViewModels\AutorunFileViewModel.cs" />
+    <Compile Include="ViewModels\BarcodeViewModel.cs" />
+    <Compile Include="ViewModels\CommandsViewModel.cs" />
+    <Compile Include="ViewModels\ConnectViewModel.cs" />
+    <Compile Include="AsciiProtocol\DisplayResponder.cs" />
+    <Compile Include="ViewModels\ConfigureReaderViewModel.cs" />
+    <Compile Include="ViewModels\IdentifiedItemsViewModel.cs" />
+    <Compile Include="ViewModels\InventoryViewModel.cs" />
+    <Compile Include="ViewModels\CommissionTransponderViewModel.cs" />
+    <Compile Include="ViewModels\LockParametersViewModel.cs" />
+    <Compile Include="ViewModels\LogFileViewModel.cs" />
+    <Compile Include="ViewModels\QueryParametersViewModel.cs" />
+    <Compile Include="ViewModels\ReadWriteViewModel.cs" />
+    <Compile Include="ViewModels\ResponseParametersViewModel.cs" />
+    <Compile Include="ViewModels\ResponsesViewModel.cs" />
+    <Compile Include="ViewModels\SelectParametersViewModel.cs" />
+    <Compile Include="ViewModels\SwitchActionViewModel.cs" />
+    <Compile Include="ViewModels\SwitchViewModel.cs" />
+    <Compile Include="ViewModels\TransponderParametersViewModel.cs" />
+    <Compile Include="Views\AutorunFileUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\AutorunFileUserControl.Designer.cs">
+      <DependentUpon>AutorunFileUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BarcodeUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\BarcodeUserControl.Designer.cs">
+      <DependentUpon>BarcodeUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\BindingExtensions.cs" />
+    <Compile Include="Views\CommandsUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\CommandsUserControl.Designer.cs">
+      <DependentUpon>CommandsUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\AntennaParametersUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\AntennaParametersUserControl.Designer.cs">
+      <DependentUpon>AntennaParametersUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ConfigureReaderUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\ConfigureReaderUserControl.Designer.cs">
+      <DependentUpon>ConfigureReaderUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\IdentifiedItemsUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\IdentifiedItemsUserControl.Designer.cs">
+      <DependentUpon>IdentifiedItemsUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\InventoryUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\InventoryUserControl.Designer.cs">
+      <DependentUpon>InventoryUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\CommissionTransponderUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\CommissionTransponderUserControl.Designer.cs">
+      <DependentUpon>CommissionTransponderUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\InventoryViewManager.cs" />
+    <Compile Include="Views\LogFileUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\LogFileUserControl.Designer.cs">
+      <DependentUpon>LogFileUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\MainForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Views\MainForm.designer.cs">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\QueryParametersUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\QueryParametersUserControl.Designer.cs">
+      <DependentUpon>QueryParametersUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ReadWriteUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\ReadWriteUserControl.Designer.cs">
+      <DependentUpon>ReadWriteUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ResponseParametersUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\ResponseParametersUserControl.Designer.cs">
+      <DependentUpon>ResponseParametersUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SelectParametersUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\SelectParametersUserControl.Designer.cs">
+      <DependentUpon>SelectParametersUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SwitchActionUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\SwitchActionUserControl.Designer.cs">
+      <DependentUpon>SwitchActionUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\SwitchUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\SwitchUserControl.Designer.cs">
+      <DependentUpon>SwitchUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\TransponderParametersUserControl.cs">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Views\TransponderParametersUserControl.Designer.cs">
+      <DependentUpon>TransponderParametersUserControl.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\ViewModelLocator.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="_Notes\ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TechnologySolutions.ModelViewViewModel\TechnologySolutions.ModelViewViewModel.FX35.csproj">
+      <Project>{FDAB254A-30F7-4EA1-83F5-E7F1B2715A10}</Project>
+      <Name>TechnologySolutions.ModelViewViewModel.FX35</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

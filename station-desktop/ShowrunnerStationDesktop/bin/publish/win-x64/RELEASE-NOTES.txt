@@ -1,0 +1,3 @@
+Showrunner Station Desktop v0.1.0
+
+- Add Disconnect+Sleep gun (.sl power-down) with watchdog suppression + settings button

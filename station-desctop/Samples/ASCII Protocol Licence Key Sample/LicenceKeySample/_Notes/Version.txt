@@ -1,0 +1,27 @@
+﻿
+Version 1.0
+-----------
+- First version
+- Based on API release v0.8 ASCII Protocol 2.0
+
+Version 2.0
+-----------
+- Based on API release v1.0 ASCII Protocol 2.1
+
+Changes for migrating from pre-release v0.8 to release v1.0
+- DLL reference updated from TechnologySolutions.Rfid.AsciiProtocol to TechnologySolutions.Rfid.AsciiProtocol.WM35.dll
+- CaptureNonLibraryResponses is no longer required
+- SynchronousCommand static methods is no longer used. Standard constructor is used. 
+  Command is synchronous if executed synchronously rather than created as a synchronous command
+- Commands now have-a Responder rather than is-a responder. Use the Responder property of a command when adding to the responder chain
+- ReaderService now has a synchronous parameter to execute a command synchronously or asynchronously
+- AsciiCommandExecutor requires a Responder (Responder property of AsciiCommandBase, base class for all commands) 
+  to execute synchronously or null to execute asychronously
+  
+Version 2.2
+-----------
+- Based on API release v1.1 ASCII Protocol 2.2
+- Copied project from Simple inventory sample
+- Started to generalise the common code
+- Attempt to migrate the UI from the iOS Licence Key sample to Windows Mobile (limited success)
+- Added code to authorise, de-authorise and verify the reader licence

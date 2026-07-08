@@ -6985,6 +6985,10 @@ html.station-device-root #station-device-controls { display: flex; }
         <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f97316; color:#fb923c;" onclick="stationReconnectGun_()">Reconnect gun</button>
         <div class="station-field__hint">Use when Bluetooth shows connected but scans do not work — forces a fresh driver handshake.</div>
       </div>
+      <div class="station-field" id="station-gun-sleep-field" style="margin-top:8px; display:none;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#64748b; color:#cbd5e1;" onclick="stationSleepGun_()">Disconnect + sleep gun</button>
+        <div class="station-field__hint">Powers the gun down (no on/off button on this reader). Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
       <div class="station-field" style="margin-top:8px;">
         <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="stationDeviceSignOut()">Sign out device</button>
         <div class="station-field__hint">Signs out this station profile (e.g. CW1) from Showrunner — not the hosted crew member.</div>

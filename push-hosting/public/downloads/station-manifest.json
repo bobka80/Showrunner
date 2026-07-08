@@ -1,14 +1,24 @@
 {
-  "versionName": "0.1.37",
-  "versionCode": 39,
+  "versionName": "0.1.38",
+  "versionCode": 40,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T10:38:54.502Z",
-  "sizeBytes": 12057261,
+  "updatedAt": "2026-07-08T11:31:49.123Z",
+  "sizeBytes": 12057293,
   "notes": [
-    "Restore station loading splash on every cold start: the rotating-circle 'SHOWRUNNER STATION / STARTING' screen now covers the whole boot until the shell reports ready, instead of a black screen then a flash of the personal web UI. Removed the persistent splash-dismissed flag that permanently suppressed it after the first launch (config-change recreation still restores hidden state via savedInstanceState)."
+    "Trigger brings the station to the front: when the gun is connected, pulling the trigger now wakes the screen AND foregrounds the Showrunner Station app if something else is showing (home screen / another app / screen off). Uses SYSTEM_ALERT_WINDOW (Display over other apps, prompted once at setup) to allow the background Activity launch",
+    "singleTask reorder means no WebView rebuild. First pull brings it up, next pull scans (same pattern as screen wake)."
   ],
   "history": [
+    {
+      "versionName": "0.1.38",
+      "versionCode": 40,
+      "date": "2026-07-08T11:31:49.123Z",
+      "notes": [
+        "Trigger brings the station to the front: when the gun is connected, pulling the trigger now wakes the screen AND foregrounds the Showrunner Station app if something else is showing (home screen / another app / screen off). Uses SYSTEM_ALERT_WINDOW (Display over other apps, prompted once at setup) to allow the background Activity launch",
+        "singleTask reorder means no WebView rebuild. First pull brings it up, next pull scans (same pattern as screen wake)."
+      ]
+    },
     {
       "versionName": "0.1.37",
       "versionCode": 39,
@@ -181,17 +191,6 @@
       "notes": [
         "Bulletproof BLE reconnect: health check, reconnect ladder, foreground service, screen-on wake",
         "honest linkState in settings"
-      ]
-    },
-    {
-      "versionName": "0.1.15",
-      "versionCode": 17,
-      "date": "2026-07-05T14:05:27.996Z",
-      "notes": [
-        "BLE forceReconnect + watchdog",
-        "native toasts replace status bar",
-        "Settings Reconnect gun bridge (AndroidStation.reconnectGun)",
-        "Gun-late connect: faster retry + SDK status sync"
       ]
     }
   ]

@@ -1,0 +1,89 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{FDAB254A-30F7-4EA1-83F5-E7F1B2715A10}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>TechnologySolutions.ModelViewViewModel.FX35</RootNamespace>
+    <AssemblyName>TechnologySolutions.ModelViewViewModel.FX35</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DocumentationFile>bin\Release\TechnologySolutions.ModelViewViewModel.FX35.XML</DocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml.Linq">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="WindowsBase">
+      <RequiredTargetFramework>3.0</RequiredTargetFramework>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Dispatcher.cs" />
+    <Compile Include="Navigation.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ServiceProvider.cs" />
+    <Compile Include="ServiceProviderExtensions.cs" />
+    <Compile Include="Services\ControlDispatcher.cs" />
+    <Compile Include="Services\FormNavigationService.cs" />
+    <Compile Include="Services\IDispatcher.cs" />
+    <Compile Include="Services\INavigationService.cs" />
+    <Compile Include="StringFormatExtentions.cs" />
+    <Compile Include="TextEventArgs.cs" />
+    <Compile Include="ViewModels\DelegateCommand.cs" />
+    <Compile Include="ViewModels\ICommand.cs" />
+    <Compile Include="ViewModels\IViewLifeCycle.cs" />
+    <Compile Include="ViewModels\PropertyChangedViewModel.cs" />
+    <Compile Include="Views\BindExtensions.cs" />
+    <Compile Include="Views\ButtonBinder.cs" />
+    <Compile Include="Views\CommandBinder.cs" />
+    <Compile Include="Views\ListBinding.cs" />
+    <Compile Include="Views\ListBoxBinding.cs" />
+    <Compile Include="Views\MenuItemBinder.cs" />
+    <Compile Include="Views\OneWayBinder.cs" />
+    <Compile Include="Views\ToolStripItemBinder.cs" />
+    <Compile Include="Views\ViewExtensions.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="_Notes\Version.txt" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

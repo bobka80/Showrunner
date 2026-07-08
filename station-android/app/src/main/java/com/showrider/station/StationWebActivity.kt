@@ -7,11 +7,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -39,6 +41,8 @@ class StationWebActivity : AppCompatActivity() {
     private var splashHidden = false
     private var webViewRestored = false
     private var lastWakeAt = 0L
+    @Volatile private var isInForeground = false
+    private var overlayPrompted = false
     private var screenOnReceiver: BroadcastReceiver? = null
     private var lastGunStatusMsg = ""
     private var lastGunStatusAt = 0L
@@ -278,24 +282,67 @@ class StationWebActivity : AppCompatActivity() {
     }
 
     /**
-     * Called from the gun-trigger handler (SDK key event). If the screen is asleep, wake it and
-     * report that this pull was consumed as a wake (true) so the trigger handler skips the read —
-     * the operator's next pull scans. If the screen is already on, return false = scan normally.
-     * Safe to call from the SDK/binder thread: the interactive check is thread-safe and the actual
-     * wake is posted to the UI thread.
+     * Called from the gun-trigger handler (SDK key event) while the gun is connected. Brings the
+     * station up so the operator can scan: wakes the screen if it is asleep AND/OR pulls the app to
+     * the foreground if something else is showing (home screen, another app). Returns true when this
+     * pull was consumed to bring the app up (so the trigger handler skips the read — the operator's
+     * next pull scans, matching the long-standing wake behavior). Returns false only when the app is
+     * already visible and interactive, in which case the pull scans normally.
+     * Safe to call from the SDK/binder thread: the checks are thread-safe and UI work is posted.
      */
     private fun maybeWakeForTrigger(): Boolean {
-        val pm = getSystemService(PowerManager::class.java) ?: return false
-        if (pm.isInteractive) return false
+        val pm = getSystemService(PowerManager::class.java)
+        val needWake = pm != null && !pm.isInteractive
+        val needFront = !isInForeground
+        if (!needWake && !needFront) return false
         // Debounce: BLE can deliver a couple of key events back-to-back; only one should wake.
         val now = System.currentTimeMillis()
         if (now - lastWakeAt < WAKE_DEBOUNCE_MS) return true
         lastWakeAt = now
         runOnUiThread {
-            wakeScreen(pm)
+            if (needFront) bringStationToFront()
+            if (pm != null) wakeScreen(pm)
             onGunActivity()
         }
         return true
+    }
+
+    /**
+     * Reorder the (singleTask) station activity to the front from the background. Android blocks
+     * background Activity starts on API 29+ unless the app can draw overlays, which is why setup
+     * grants "Display over other apps" (ensureOverlayPermission). singleTask means this reorders the
+     * existing instance and delivers onNewIntent — no cold reboot / WebView rebuild.
+     */
+    private fun bringStationToFront() {
+        try {
+            val intent = Intent(this, StationWebActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            // Best-effort: if the launch is blocked, the operator can still open the app manually.
+        }
+    }
+
+    /**
+     * One-time kiosk setup: the trigger-brings-app-to-front feature needs background Activity-launch,
+     * which Android only allows with the "Display over other apps" (SYSTEM_ALERT_WINDOW) permission.
+     * Prompt for it once if it is not already granted.
+     */
+    private fun ensureOverlayPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        if (Settings.canDrawOverlays(this) || overlayPrompted) return
+        overlayPrompted = true
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+        } catch (_: Exception) {
+            // Some ROMs lack the settings screen; skip silently.
+        }
     }
 
     /** Keep the panel on while the gun is in use; release after idle so normal sleep applies. */
@@ -550,6 +597,8 @@ class StationWebActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        isInForeground = true
+        ensureOverlayPermission()
         notifyWebHostEjectCheck()
         if (::rfid.isInitialized && BlePermissions.hasAll(this)) {
             rfid.onAppWake()
@@ -557,6 +606,7 @@ class StationWebActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        isInForeground = false
         rfid.stopInventory()
         super.onPause()
     }

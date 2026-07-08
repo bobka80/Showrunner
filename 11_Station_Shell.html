@@ -1020,6 +1020,10 @@ html.station-device-root #station-device-controls { display: flex; }
         <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f97316; color:#fb923c;" onclick="stationReconnectGun_()">Reconnect gun</button>
         <div class="station-field__hint">Use when Bluetooth shows connected but scans do not work — forces a fresh driver handshake.</div>
       </div>
+      <div class="station-field" id="station-gun-sleep-field" style="margin-top:8px; display:none;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#64748b; color:#cbd5e1;" onclick="stationSleepGun_()">Disconnect + sleep gun</button>
+        <div class="station-field__hint">Powers the gun down (no on/off button on this reader). Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
       <div class="station-field" style="margin-top:8px;">
         <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="stationDeviceSignOut()">Sign out device</button>
         <div class="station-field__hint">Signs out this station profile (e.g. CW1) from Showrunner — not the hosted crew member.</div>
@@ -1693,6 +1697,30 @@ window.stationReconnectGun_ = function() {
   }
   stationToast_('Reconnect works in the station app with the RFID gun.', 'error');
 };
+
+/**
+ * Disconnect + sleep the gun (desktop TSL bridge only). Sends the reader to sleep like a power
+ * button — the reader has no physical on/off. Waking is a trigger pull + Reconnect gun.
+ */
+window.stationSleepGun_ = function() {
+  var b = stationNativeBridge_();
+  if (b && typeof b.sleepGun === 'function') {
+    stationToast_('Gun going to sleep…', '');
+    try { b.sleepGun(); } catch (e) { stationToast_('Sleep failed.', 'error'); return; }
+    setTimeout(function() { stationRequestGunConfig_(); }, 1200);
+    return;
+  }
+  stationToast_('Sleep is available on the desktop station with the TSL gun.', 'error');
+};
+
+/** Show the Disconnect+sleep button only when the native bridge supports it (desktop TSL gun). */
+function stationSyncGunSleepButton_() {
+  var field = document.getElementById('station-gun-sleep-field');
+  if (!field) return;
+  var b = stationNativeBridge_();
+  var canSleep = !!(b && typeof b.sleepGun === 'function');
+  field.style.display = canSleep ? 'block' : 'none';
+}
 
 function stationSetLastScan_(tag) {
   const el = document.getElementById('station-shell-last-scan');
@@ -3150,6 +3178,7 @@ window.stationOpenSettings = function() {
   const savedEl = document.getElementById('station-eject-saved');
   if (savedEl) savedEl.textContent = '';
   stationPopulateGunControlsFromStorage_();
+  stationSyncGunSleepButton_();
   stationRequestGunConfig_();
 };
 
@@ -3290,6 +3319,7 @@ function stationApplyGunConfig_(cfg) {
     if (cfg.linkState === 'live' || (cfg.connected && !cfg.linkState)) connLabel = 'Connected';
     else if (cfg.linkState === 'connecting' || cfg.linkState === 'reconnecting') connLabel = 'Connecting…';
     else if (cfg.linkState === 'zombie') connLabel = 'Link stale — reconnecting';
+    else if (cfg.linkState === 'asleep') connLabel = 'Asleep — pull trigger + Reconnect';
     connEl.textContent = connLabel;
   }
   var liveNow = !!(cfg.connected || cfg.linkState === 'live');
