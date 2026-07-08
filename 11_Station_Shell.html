@@ -1464,6 +1464,9 @@ function stationHostIdleExpired_() {
   stationClearHostIdleTimer_();
   stationClearHostEjectDeadline_();
   if (!stationReadHostSession_()) return;
+  // Invalidate any in-flight badge-in confirmation so it can't re-host after a wall-clock eject.
+  window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+  window.stationScanBusy = false;
   stationWriteHostSession_(null);
   stationRenderShellState_();
   var mins = stationEjectMinutes_();
@@ -1921,6 +1924,13 @@ function stationBeginHostLogin_(tag, tid) {
   window.stationScanBusy = true;
   stationSetLastScan_(tag);
 
+  // Race guard — "eject beats the server". processStationRfidScan takes ~1s. If the operator logs
+  // the host out (or scans a different badge) BEFORE this reply lands, the confirmation must be
+  // ignored, otherwise the slow success handler re-writes the host and signs the ejected person
+  // straight back in. Every login and every eject bumps stationHostLoginSeq; a callback whose
+  // captured seq no longer matches is stale and does nothing.
+  const loginSeq = window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+
   if (optimisticHost) {
     stationWriteHostSession_(optimisticHost);
     stationRenderShellState_();
@@ -1932,6 +1942,8 @@ function stationBeginHostLogin_(tag, tid) {
   google.script.run
     .withSuccessHandler(function(res) {
       window.stationScanBusy = false;
+      // Stale reply: operator ejected or switched badge while this was in flight → do not re-host.
+      if (loginSeq !== window.stationHostLoginSeq) return;
       if (!res || !res.success) {
         if (optimisticHost) {
           stationWriteHostSession_(null);
@@ -1954,6 +1966,8 @@ function stationBeginHostLogin_(tag, tid) {
     })
     .withFailureHandler(function(err) {
       window.stationScanBusy = false;
+      // Stale reply: operator ejected or switched badge while this was in flight → leave state alone.
+      if (loginSeq !== window.stationHostLoginSeq) return;
       if (optimisticHost) {
         stationWriteHostSession_(null);
         stationRenderShellState_();
@@ -2028,6 +2042,10 @@ function stationStartScanPoll_() {
 }
 
 window.stationLogoutHost = function() {
+  // Cancel any in-flight badge-in confirmation so a slow (~1s) server reply can't re-host the
+  // person we're logging out, and free the scan lock so the next badge works immediately.
+  window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+  window.stationScanBusy = false;
   stationWriteHostSession_(null);
   stationRenderShellState_();
   stationSetStatus_('Host cleared. Scan crew badge.', '');

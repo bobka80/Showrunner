@@ -283,7 +283,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Canonical block list:** root **`gas-node-only.js`** (used by `build.js` and `check-google-account.js`).
 
-**Known leaks (fixed):** `check-google-account.js` @ v363–364; `git-push-backup.js` @ v377–378.
+**Known leaks (fixed):** `check-google-account.js` @ v363–364; `git-push-backup.js` @ v377–378; **`rollback.js` @ v486** — top-level `require()` threw `ReferenceError: require is not defined (line 24, file "rollback")` on **every** server call, white-screening the live app; fixed v487 (added to `gas-node-only.js` + `.claspignore`, orphan removed by `gas-push-sync`).
 
 **AI rules:**
 1. New root `.js` tooling → add to **`gas-node-only.js`** immediately (and `.claspignore` if clasp might see it).
