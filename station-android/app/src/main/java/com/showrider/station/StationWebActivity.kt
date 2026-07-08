@@ -555,6 +555,12 @@ class StationWebActivity : AppCompatActivity() {
             rfid.sleepGun()
         }
 
+        /** Chainway: minutes with no trigger pull before the gun powers down (0 = never). */
+        @JavascriptInterface
+        fun setGunIdleSleepMinutes(minutes: Int) {
+            rfid.setGunIdleSleepMinutes(minutes)
+        }
+
         /** Station shell mounted inside the WebView — drop the kiosk splash. */
         @JavascriptInterface
         fun shellReady() { hideSplash() }

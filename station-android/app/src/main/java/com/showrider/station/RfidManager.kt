@@ -60,6 +60,11 @@ class RfidManager(
     @Volatile private var pollMs = prefs.getInt(PREF_POLL_MS, DEFAULT_POLL_MS)
     @Volatile private var battery = -1
     @Volatile private var firmware = ""
+    /** Minutes with no trigger pull before the gun powers down (0 = never). Set from web dropdown. */
+    @Volatile private var gunIdleSleepMinutes = prefs.getInt(PREF_GUN_IDLE_SLEEP_MIN, 0)
+    @Volatile private var lastTriggerAt = SystemClock.elapsedRealtime()
+
+    private val triggerIdleSleepRunnable = Runnable { onTriggerIdleSleepFired() }
 
     private val pendingScans = java.util.concurrent.ConcurrentLinkedQueue<PendingScan>()
 
@@ -160,6 +165,7 @@ class RfidManager(
         activeDisconnect = false
         macConnectFails = 0
         healthFailStreak = 0
+        lastTriggerAt = SystemClock.elapsedRealtime()
         beginReconnectLadder("manual", 0)
     }
 
@@ -445,11 +451,58 @@ class RfidManager(
     private fun setLinkState(state: String) {
         linkState = state
         when (state) {
-            LINK_LIVE -> mainHandler.postDelayed({ onLinkBusy(false) }, BLE_BUSY_CLEAR_MS)
-            LINK_RECONNECTING, LINK_DISCONNECTED, LINK_ZOMBIE, LINK_CONNECTING ->
+            LINK_LIVE -> {
+                mainHandler.postDelayed({ onLinkBusy(false) }, BLE_BUSY_CLEAR_MS)
+                scheduleTriggerIdleSleep()
+            }
+            LINK_ASLEEP, LINK_DISCONNECTED ->
+                mainHandler.removeCallbacks(triggerIdleSleepRunnable)
+            LINK_RECONNECTING, LINK_ZOMBIE, LINK_CONNECTING ->
                 mainHandler.post { onLinkBusy(true) }
             else -> Unit
         }
+    }
+
+    /** Web dropdown → native trigger-idle sleep (Chainway only). 0 = off. */
+    fun setGunIdleSleepMinutes(minutes: Int) {
+        val m = minutes.coerceIn(0, 120)
+        gunIdleSleepMinutes = m
+        prefs.edit().putInt(PREF_GUN_IDLE_SLEEP_MIN, m).apply()
+        if (m <= 0) {
+            mainHandler.removeCallbacks(triggerIdleSleepRunnable)
+        } else {
+            scheduleTriggerIdleSleep()
+        }
+    }
+
+    /** Reset countdown from the last physical trigger pull (not RFID reads). */
+    private fun recordTriggerActivity() {
+        lastTriggerAt = SystemClock.elapsedRealtime()
+        scheduleTriggerIdleSleep()
+    }
+
+    private fun scheduleTriggerIdleSleep() {
+        mainHandler.removeCallbacks(triggerIdleSleepRunnable)
+        if (gunIdleSleepMinutes <= 0 || activeDisconnect || linkState != LINK_LIVE || !connected) return
+        val needMs = gunIdleSleepMinutes * 60_000L
+        val elapsed = SystemClock.elapsedRealtime() - lastTriggerAt
+        val remaining = needMs - elapsed
+        if (remaining <= 0) {
+            mainHandler.post(triggerIdleSleepRunnable)
+        } else {
+            mainHandler.postDelayed(triggerIdleSleepRunnable, remaining)
+        }
+    }
+
+    private fun onTriggerIdleSleepFired() {
+        if (gunIdleSleepMinutes <= 0 || activeDisconnect || linkState != LINK_LIVE) return
+        val elapsed = SystemClock.elapsedRealtime() - lastTriggerAt
+        if (elapsed < gunIdleSleepMinutes * 60_000L - 500) {
+            scheduleTriggerIdleSleep()
+            return
+        }
+        Log.i(TAG, "trigger idle ${gunIdleSleepMinutes}min — releasing BLE so firmware can power down")
+        sleepGun(idleMinutes = gunIdleSleepMinutes)
     }
 
     private fun sdkStatus(): ConnectionStatus = try {
@@ -462,6 +515,7 @@ class RfidManager(
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
                 if (!connected || sdkStatus() != ConnectionStatus.CONNECTED) return
+                recordTriggerActivity()
                 onGunActivity()
                 if (onTriggerWake()) {
                     postStatus("Station ready — pull again to scan")
@@ -729,17 +783,18 @@ class RfidManager(
     }
 
     /**
-     * Idle auto-sleep / manual "Disconnect + sleep gun". Drops the BLE link so the gun's firmware
-     * can power down, and suppresses the reconnect ladder/watchdog so we don't wake it straight back
-     * up. Resumable (unlike [disconnect]) — executors stay alive; forceReconnect() brings it back.
+     * Idle auto-sleep / manual sleep. Drops the BLE link so firmware can power down, and suppresses
+     * reconnect until forceReconnect(). [idleMinutes] set when fired from the trigger-idle timer.
      */
-    fun sleepGun() {
+    fun sleepGun(idleMinutes: Int? = null) {
+        mainHandler.removeCallbacks(triggerIdleSleepRunnable)
         activeDisconnect = true
         reconnectGeneration.incrementAndGet()
         readCancelled.set(true)
         stopInventory()
         reconnectExecutor.execute {
             try {
+                try { uhf.setReaderAwaitSleepTime(READER_AWAIT_SLEEP_MIN) } catch (e: Exception) { Log.w(TAG, "sleepGun setReaderAwaitSleepTime", e) }
                 softDisconnect()
                 uhf.free()
             } catch (e: Exception) {
@@ -749,7 +804,12 @@ class RfidManager(
             connected = false
             setLinkState(LINK_ASLEEP)
         }
-        postStatus("Gun asleep — pull the trigger to wake it, then tap Reconnect gun")
+        val msg = if (idleMinutes != null && idleMinutes > 0) {
+            "Gun powered down ($idleMinutes min since last trigger) — pull trigger, then Reconnect"
+        } else {
+            "Gun asleep — pull the trigger to wake it, then tap Reconnect gun"
+        }
+        postStatus(msg)
     }
 
     private fun applyConfigToGun() {
@@ -841,6 +901,7 @@ class RfidManager(
         private const val PREF_SCAN_MODE = "gun_scan_mode"
         private const val PREF_BEEP = "gun_beep"
         private const val PREF_POLL_MS = "gun_poll_ms"
+        private const val PREF_GUN_IDLE_SLEEP_MIN = "gun_idle_sleep_min"
         const val SCAN_MODE_SINGLE = "single"
         const val SCAN_MODE_MULTI = "multi"
         const val SCAN_MODE_CONTINUOUS = "continuous"
@@ -857,6 +918,12 @@ class RfidManager(
         private const val POWER_MIN = 5
         private const val POWER_MAX = 30
         private const val DEFAULT_POWER = 30
+        // Reader firmware auto-sleep: minutes the gun waits AFTER being disconnected before it powers
+        // down (SDK setReaderAwaitSleepTime, range 1-254, factory default 5). We pin it to the minimum
+        // so that when the app's idle timer disconnects the gun (sleepGun) — or any BLE drop happens —
+        // the gun actually sleeps promptly instead of staying lit. This is the real "make it sleep"
+        // knob; a drifted/large value is why the Chainway "stopped sleeping".
+        private const val READER_AWAIT_SLEEP_MIN = 1
         private const val TARGET_BT_NAME = "Nordic_UART_CW"
         private val GUN_NAME_HINTS = listOf(
             "Nordic_UART_CW", "Nordic", "UART", "Chainway", "R6", "RFID", "UHF", "CW",

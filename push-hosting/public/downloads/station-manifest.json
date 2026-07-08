@@ -1,16 +1,26 @@
 {
-  "versionName": "0.1.39",
-  "versionCode": 41,
+  "versionName": "0.1.40",
+  "versionCode": 42,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T15:10:33.922Z",
+  "updatedAt": "2026-07-08T17:08:23.849Z",
   "sizeBytes": 12057293,
   "notes": [
-    "Gun auto-sleep timer: gun powers down after chosen idle minutes (1/2/3/5/10) to save battery",
-    "wake with trigger + Reconnect",
-    "Settings: new 'Sleep the gun after (idle)' dropdown next to the host-eject timer"
+    "Chainway gun now actually sleeps: the app now sets the reader's built-in auto-sleep timer to 1 minute (setReaderAwaitSleepTime) on connect and when the idle timer sleeps the gun, so it powers down shortly after instead of staying lit forever.",
+    "Wake the gun after sleep by pulling the trigger, then tap Reconnect gun.",
+    "Gun-sleep idle dropdown now works for the Chainway too (shared settings menu)."
   ],
   "history": [
+    {
+      "versionName": "0.1.40",
+      "versionCode": 42,
+      "date": "2026-07-08T17:08:23.849Z",
+      "notes": [
+        "Chainway gun now actually sleeps: the app now sets the reader's built-in auto-sleep timer to 1 minute (setReaderAwaitSleepTime) on connect and when the idle timer sleeps the gun, so it powers down shortly after instead of staying lit forever.",
+        "Wake the gun after sleep by pulling the trigger, then tap Reconnect gun.",
+        "Gun-sleep idle dropdown now works for the Chainway too (shared settings menu)."
+      ]
+    },
     {
       "versionName": "0.1.39",
       "versionCode": 41,
@@ -183,16 +193,6 @@
       "notes": [
         "Session survives gun/phone sleep — sessioncheck retries on network blip",
         "WebView render-process death reloads hosting shell with stored session"
-      ]
-    },
-    {
-      "versionName": "0.1.17",
-      "versionCode": 19,
-      "date": "2026-07-07T15:20:51.363Z",
-      "notes": [
-        "Gun reconnect no longer shows STARTING splash",
-        "splash dismissed once per device",
-        "station re-announces ready on resume"
       ]
     }
   ]

@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-08 · **Production:** GAS **v495** · **Status:** Partial — per-device **gun-driver fork** shipped (Chainway/TSL/gate); **TSL 1128 desktop thin shell** live; **next: EPC+TID** on Chainway tags. See [active campaign](../active/rfid-station-profiles.md).
+**Last swept:** 2026-07-08 · **Production:** GAS **v496** · **Status:** Partial — per-device **gun-driver fork** (Chainway/TSL/gate); **TSL 1128 desktop thin shell** live; **per-station settings** + idle gun-sleep for both guns (v496); **next: EPC+TID** on Chainway tags. See [active campaign](../active/rfid-station-profiles.md).
 
 ---
 

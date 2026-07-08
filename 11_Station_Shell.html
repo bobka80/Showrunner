@@ -1484,26 +1484,33 @@ function stationClearGunIdleTimer_() {
     clearTimeout(window.stationGunIdleTimer);
     window.stationGunIdleTimer = null;
   }
+  // Chainway native idle is managed in RfidManager — do not zero it here on link drop.
 }
 
 /**
- * (Re)arm the gun idle-sleep countdown. Called on every read and whenever the gun connects.
- * After the configured idle minutes with no activity we ask the native bridge to sleep the gun.
+ * (Re)arm the gun idle-sleep countdown. TSL: web setTimeout → bridge.sleepGun().
+ * Chainway: native trigger-idle timer (setGunIdleSleepMinutes) — only resets on trigger pull,
+ * not on RFID reads.
  */
 function stationResetGunIdleTimer_() {
   stationClearGunIdleTimer_();
-  // Only guns whose driver opts into app-driven sleep (e.g. TSL). Chainway sleeps in firmware —
-  // an app-forced disconnect there would break the trigger→wake-screen behaviour.
   if (typeof stationGunCap_ === 'function' && !stationGunCap_('appSleep')) return;
   var mins = stationGunSleepMinutes_();
   if (!mins) return; // Never
+  var b = stationNativeBridge_();
+  // Chainway pool: native SDK tracks last trigger pull and powers down after idle.
+  if (typeof stationGunCap_ === 'function' && stationGunCap_('nativeIdleSleep') &&
+      b && typeof b.setGunIdleSleepMinutes === 'function') {
+    try { b.setGunIdleSleepMinutes(mins); } catch (e) { /* ignore */ }
+    return;
+  }
   if (!stationSleepCapableBridge_()) return;
   window.stationGunIdleTimer = setTimeout(function() {
     window.stationGunIdleTimer = null;
-    var b = stationSleepCapableBridge_();
-    if (!b) return;
+    var br = stationSleepCapableBridge_();
+    if (!br) return;
     try {
-      b.sleepGun();
+      br.sleepGun();
       stationToast_('Gun asleep (idle ' + mins + ' min) — pull trigger + Reconnect', '');
       setTimeout(function() { stationRequestGunConfig_(); }, 1200);
     } catch (e) { /* ignore */ }
@@ -2113,7 +2120,10 @@ function stationBeginHostLogin_(tag, tid) {
 
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag, rawTid) {
-  stationResetGunIdleTimer_(); // any read is activity — restart the auto-sleep countdown
+  // RFID reads reset the idle timer for TSL only. Chainway uses native trigger-idle sleep.
+  if (typeof stationGunCap_ !== 'function' || !stationGunCap_('nativeIdleSleep')) {
+    stationResetGunIdleTimer_();
+  }
   const scan = stationParseScanPayload_(rawTag, rawTid);
   const tag = scan.epc;
   const tid = scan.tid;

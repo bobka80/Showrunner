@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v495** · APK **v0.1.39 (build 41)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-08
+**Opened:** 2026-07-02 · **Production:** GAS **v496** · APK **v0.1.40 (build 42)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-08
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -26,7 +26,7 @@ Because different devices carry different guns, gun behaviour is **forked per st
 
 | Layout id | Driver | Native binary | app sleep | wake-screen |
 |-----------|--------|---------------|-----------|-------------|
-| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **yes** — idle timer → **resumable** `sleepGun()` (build 41): drops BLE so firmware powers down, executors stay alive, `forceReconnect()` wakes it. Each driver sleeps with its **own SDK** | **yes** (SDK `KeyEventCallback`) |
+| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **yes** — idle timer → resumable `sleepGun()` disconnects; firmware powers down per `setReaderAwaitSleepTime(1 min)` pinned on connect (build 42). `forceReconnect()` wakes it. Each driver sleeps with its **own SDK** | **yes** (SDK `KeyEventCallback`) |
 | `tsl_dock_desktop` | TSL 1128 desktop | `station-desktop/` `TslRfidManager.cs` (EXE) | **yes** — ASCII `.sl` sleep + re-acquire on Reconnect | no |
 | `gate` *(planned)* | Gate reader + TV | TBD | TBD | no |
 
@@ -55,7 +55,7 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 
 **Why the fork exists (regression that triggered it):** a shared auto-sleep timer force-disconnected *any* connected gun to "sleep" it. On Chainway that suppressed the reconnect ladder and killed the trigger→wake-screen handler. The fork means each gun sleeps with its **own** SDK path instead of one shared force-disconnect.
 
-**Chainway sleep (starting point):** Chainway idle-sleep now runs through its **resumable** `sleepGun()` (`RfidManager.kt`, build 41) — link drops so firmware powers down, executors stay alive, **Reconnect gun** (`forceReconnect()`) brings it back. ⚠️ **Needs field verification:** after auto-sleep the BLE link is down, so waking is **pull trigger → Reconnect gun**; if trigger-only wake is required it needs a further native step. This is the agreed **starting point** for sorting out the long-standing "Chainway stays on" behaviour — fallback is `appSleep:false` (dropdown shown, timer inert).
+**Chainway sleep (root cause + fix, build 42):** the long-standing "Chainway won't sleep" was **not** the JS timer — that fires and calls `sleepGun()` correctly. The gap was native: `sleepGun()` only **disconnected** BLE, but the Chainway only powers down after `setReaderAwaitSleepTime` minutes **in the disconnected state** (SDK `RFIDWithUHFBLE.setReaderAwaitSleepTime(int)`, range 1–254 min, factory default 5). If that timer drifted high, the gun stayed lit long after we disconnected. **Fix (`RfidManager.kt`):** pin `setReaderAwaitSleepTime(READER_AWAIT_SLEEP_MIN = 1)` on **every connect** (restores prompt firmware sleep for any disconnect/BLE-drop) **and** inside `sleepGun()` right before dropping the link. Flow: app idle timer → `sleepGun()` disconnect → firmware sleeps ~1 min later. Wake = **pull trigger + Reconnect gun** (`forceReconnect()`, resumable). Requires **APK build 42**. Fallback if it misbehaves: `appSleep:false` (dropdown shown, timer inert).
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 
