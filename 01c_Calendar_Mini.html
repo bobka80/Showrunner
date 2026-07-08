@@ -196,7 +196,7 @@ function bootMiniCalendar(targetDateString, projectId, focusCue) {
         }
 
         // Press cue: briefly frame the exact day tapped in the main calendar so, on entry, the
-        // operator sees where they pressed. A glowing outline fades in → out over ~3s, then the
+        // operator sees where they pressed. A glowing white outline fades in → out over ~3s, then the
         // class is removed so nothing lingers. Only fires for a new-project day-click (focusCue).
         if (focusCue) {
             var cuePad2 = function(n) { return n < 10 ? '0' + n : '' + n; };
