@@ -850,7 +850,7 @@ class RfidManager(
         private const val DEFAULT_POLL_MS = 500
         private const val POLL_MIN = 100
         private const val POLL_MAX = 2000
-        private const val BLE_BUSY_CLEAR_MS = 15_000L
+        private const val BLE_BUSY_CLEAR_MS = 4000L
         /** EPC memory filter start (bits) — skip CRC+PC before EPC bytes. SDK demo rbEPC_filter. */
         private const val EPC_FILTER_PTR_BITS = 32
         private const val EPC_READ_PTR_WORDS = 2

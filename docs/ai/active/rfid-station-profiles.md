@@ -92,35 +92,14 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 - [x] **Boot hardening (v427).** After v426 the station stopped loading its initial screen — a throw somewhere between showing the shell and sending the native `SHOWRUNNER_STATION_READY` left the kiosk splash stranded. `initStationShell_` now (1) shows `#station-shell` and posts `SHOWRUNNER_STATION_READY` **first**, then (2) wraps the rest of init **and** the bootstrap success callback in `try/catch`, surfacing any boot error in the status line + `stationDebug_` instead of blanking the screen. So no future boot-time error can strand the initial screen.
 - [x] **PROJECT open hardening (v424).** After v423 the picker loaded but tapping a project could still show nothing. Fixes in `stationPickProject_`: (1) resolve the picked project from `stationProjectsCache` **or** the phantom payload, and if it's genuinely missing, say so + force a fresh fetch instead of silently bailing; (2) `openMobileProjectAssets` can **bail with only a toast** (no throw) when it can't resolve a project — the shell was hidden so the screen went blank — so we now **detect the still-hidden `#project-assets-modal-overlay` after ~250 ms, restore the shell, and report** "equipment list unavailable"; (3) **status breadcrumbs** ("Opening <project>…" → open / error) so any remaining failure is pinpointed; (4) **preload also runs on shell init** when a host session was restored from a reload (not just on `stationWriteHostSession_`).
 
-## In progress / next (director priority 2026-07-07)
+## In progress / next (director priority 2026-07-08)
 
-1. **[x] BLE reconnect must not restart app** — v483/APK 0.1.31: native GAS direct load, BLE flap guard, host session native persist, session-clear hardening.
+1. **[ ] BLE reconnect must not restart app** — **v483 direct-GAS REVERTED** (worse: session restart + Google “created by user” banner). Restored **v482** hosting shell (`web.app` → iframe). **Next (no restructure):** hosting-only flap guard + host badge in parent `localStorage` + ignore spurious `SESSION_CLEAR`.
 2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
 
-### Parked — must fix later (director 2026-07-07: stop work for now) → **RESUMED priority 2026-07-07**
+### Parked — must fix later (director 2026-07-07: stop work for now)
 
-**[ ] BLE reconnect must not reset device login / station shell** — **chronic from first station app ship** (not a recent regression). Gun BLE disconnect/reconnect still feels like a hard app reset: back to **SYSTEM SECURE** (device passcode) and/or station cold boot (splash, host badge lost, project state gone). v476–479 mitigations reduced some races but did not fix the root architecture. **Director priority:** fix before kiosk polish — ~20 s unusable after every gun sleep.
-
-#### Investigation culprits (ranked — see agent todo list)
-
-| Tier | ID | Suspect | File(s) |
-|------|-----|---------|---------|
-| **A** | A1 | Full **WebView reload** (`onRenderProcessGone` → `reload`/`loadUrl`) retriggers entire `host-boot.js` | `StationWebActivity.kt` |
-| **A** | A2 | Any **`frame.src`** change → GAS cold boot (`sessionboot` or Login) + `getStationShellBootstrap` (~20 s) | `host-boot.js`, `11_Station_Shell.html` |
-| **A** | A3 | **`navigateHostingToLoginGate`** / `clearParentSession` → plain Login (SYSTEM SECURE) | `host-boot.js` |
-| **B** | B1 | **`resolveAppFrameUrl`** clears session when `sessioncheck` fails and `__srBleReconnecting` is false | `host-boot.js` |
-| **B** | B2 | **`__srBleReconnecting`** clears 4 s after `LINK_LIVE` but reconnect ladder can flap longer | `RfidManager.kt` |
-| **B** | B3 | **Login.html** `sessioncheck` fail → `SHOWRUNNER_SESSION_CLEAR` + `clearSession:true` | `Login.html` |
-| **B** | B4 | **Login.html** paints → `postLoginState(false)`; iframe `localStorage` empty while parent has token | `Login.html` |
-| **C** | C1 | **Host badge** only in iframe `sessionStorage` — lost on any iframe reload | `11_Station_Shell.html` |
-| **C** | C2 | **`injectPersistedWebSession`** seeds parent origin only, not GAS iframe | `StationWebActivity.kt` |
-| **C** | C3 | **Two-layer shell** — BLE must not trigger iframe navigation (architectural) | `host-boot.js`, `FRAGILE_ZONES.md` |
-| **D** | D1 | **GAS `sessionboot`** failure returns Login + `clearSession:true` | `Main.js` |
-| **D** | D2 | **`shellBootGraceUntil`** 18 s — cold-start only, no mid-session BLE guard | `host-boot.js` |
-| **D** | D3 | Reconnect ladder **flapping** may stress WebView renderer | `RfidManager.kt` |
-| **D** | D4 | **Splash** until `SHOWRUNNER_STATION_READY` amplifies perceived restart | `host-boot.js`, `StationWebActivity.kt` |
-
-**Next fix direction:** **v483 / APK 0.1.31** — native loads GAS direct (single frame); BLE flap guard blocks iframe navigation; host session in native prefs + localStorage; parent ignores spurious SESSION_CLEAR.
+**[ ] BLE reconnect must not reset device login / station shell** — symptom persists after v479. Gun BLE disconnect/reconnect still feels like a hard app reset: back to **SYSTEM SECURE** (device passcode) and/or station cold boot (splash, host badge lost, project state gone). **Director decision:** defer; document attempts below; revisit with a fresh architectural pass.
 
 #### Symptom (what “still the same” means)
 

@@ -1490,39 +1490,9 @@ function stationHostStorageKey_() {
   return 'sm_station_host_v1_' + dev;
 }
 
-function stationPersistHostSurvivors_(host) {
-  var key = stationHostStorageKey_();
-  var json = host ? JSON.stringify(host) : '';
-  try {
-    if (host) localStorage.setItem(key, json);
-    else localStorage.removeItem(key);
-  } catch (e) { /* ignore */ }
-  try {
-    var b = stationNativeBridge_();
-    if (b && typeof b.saveHostSession === 'function') {
-      b.saveHostSession(key, json);
-    }
-  } catch (e) { /* ignore */ }
-  try {
-    stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_SESSION', deviceKey: key, host: host || null });
-  } catch (e) { /* ignore */ }
-}
-
 function stationReadHostSession_() {
-  var key = stationHostStorageKey_();
   try {
-    var raw = sessionStorage.getItem(key);
-    if (!raw) raw = localStorage.getItem(key);
-    if (!raw) {
-      var bridge = stationNativeBridge_();
-      if (bridge && typeof bridge.getHostSession === 'function') {
-        raw = bridge.getHostSession(key);
-        if (raw) {
-          sessionStorage.setItem(key, raw);
-          localStorage.setItem(key, raw);
-        }
-      }
-    }
+    const raw = sessionStorage.getItem(stationHostStorageKey_());
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.name) return null;
@@ -1541,7 +1511,6 @@ function stationWriteHostSession_(host) {
       stationClearHostEjectDeadline_();
     }
   } catch (e) { /* ignore */ }
-  stationPersistHostSurvivors_(host);
   // Host-inherit RBAC: while hosted, the app evaluates permissions as the HOST (their real tier +
   // IAM), not the low-tier device account. Cleared on eject/logout. See stationHostRbac override.
   if (host && (host.access || host.permissions)) {
@@ -2993,14 +2962,10 @@ window.stationDeviceSignOut = function() {
     localStorage.removeItem('sm_session_token');
     localStorage.removeItem('sm_session_expires');
   } catch (e) { /* ignore */ }
-  try {
-    var b = stationNativeBridge_();
-    if (b && typeof b.saveSession === 'function') b.saveSession('', 0);
-  } catch (e) { /* ignore */ }
   const base = document.querySelector('base');
   const scriptUrl = base && base.href ? base.href.split('?')[0] : '';
-  if (scriptUrl) window.location.replace(scriptUrl);
-  else window.location.reload();
+  if (scriptUrl) window.top.location.href = scriptUrl;
+  else window.top.location.reload();
 };
 
 function stationPostToHosting_(payload) {
@@ -3281,10 +3246,6 @@ window.stationSaveEjectMinutes = function() {
 function stationAnnounceReady_() {
   try { stationCheckHostEjectDeadline_(); } catch (e) { /* ignore */ }
   try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' }); } catch (e) { /* ignore */ }
-  try {
-    var b = stationNativeBridge_();
-    if (b && typeof b.shellReady === 'function') b.shellReady();
-  } catch (e) { /* ignore */ }
 }
 
 function stationBindMessageListener_() {

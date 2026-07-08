@@ -168,17 +168,6 @@
       function notifyParentSessionClear() {
         if (window.parent && window.parent !== window) {
           try {
-            if (/ShowrunnerStation/i.test(navigator.userAgent || '')) {
-              if (window.AndroidStation && typeof AndroidStation.getSavedSession === 'function') {
-                var saved = AndroidStation.getSavedSession();
-                if (saved) {
-                  try {
-                    var parsed = JSON.parse(saved);
-                    if (parsed && parsed.token && parseInt(parsed.expiresAt, 10) > Date.now()) return;
-                  } catch (e) { /* ignore */ }
-                }
-              }
-            }
             window.parent.postMessage({ type: 'SHOWRUNNER_SESSION_CLEAR' }, '*');
           } catch (e) { /* ignore */ }
         }

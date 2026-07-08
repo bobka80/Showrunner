@@ -1,14 +1,24 @@
 {
-  "versionName": "0.1.32",
-  "versionCode": 34,
+  "versionName": "0.1.31",
+  "versionCode": 33,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T04:52:21.302Z",
-  "sizeBytes": 12057261,
+  "updatedAt": "2026-07-08T05:08:53.998Z",
+  "sizeBytes": 12057257,
   "notes": [
-    "BLE decouple: GAS direct load, host session native persist, flap guard"
+    "Revert v483 direct-GAS",
+    "restore hosting shell startup"
   ],
   "history": [
+    {
+      "versionName": "0.1.31",
+      "versionCode": 33,
+      "date": "2026-07-08T05:08:53.998Z",
+      "notes": [
+        "Revert v483 direct-GAS",
+        "restore hosting shell startup"
+      ]
+    },
     {
       "versionName": "0.1.32",
       "versionCode": 34,
@@ -182,14 +192,6 @@
       "date": "2026-07-02T19:02:11.441Z",
       "notes": [
         "Settings now apply live the moment you change them (Done just closes the menu) - the app talks to the gun directly instead of through a slower relay. Added an on-screen diagnostic overlay (bottom-left) plus native status messages so we can finally SEE the scan/settings path on the device: it shows whether the station bridge is connected, echoes 'Gun set: ...' when a setting reaches the gun, and prints 'Trigger DOWN/UP' so we can tell why Hold behaves like a toggle. This build is about pinpointing why scans reach the bottom text but not the top strip."
-      ]
-    },
-    {
-      "versionName": "0.1.7",
-      "versionCode": 9,
-      "date": "2026-07-02T18:31:23.942Z",
-      "notes": [
-        "New Hold scan mode: squeeze the trigger to read continuously while held, release to stop (pick it in Settings, alongside Single and Continuous). The repeat-speed slider now applies to both Hold and Continuous. Startup fix: the app now shows a Showrunner Station splash over the whole screen until the station screen is actually ready, so you no longer see the normal phone dashboard for a few seconds first. Note: the device must be signed in as its station account to land on the station screen."
       ]
     }
   ]

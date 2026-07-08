@@ -38,11 +38,6 @@
         if (!autoLoginOff) {
           localStorage.setItem('sm_session_token', String(t.content).trim());
           localStorage.setItem('sm_session_expires', String(Date.now() + SESSION_MS));
-          if (window.AndroidStation && typeof AndroidStation.saveSession === 'function') {
-            try {
-              AndroidStation.saveSession(String(t.content).trim(), Date.now() + SESSION_MS);
-            } catch (e) { /* ignore */ }
-          }
         }
       } catch (e) { /* ignore */ }
     }
