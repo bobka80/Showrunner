@@ -134,18 +134,40 @@ class RfidManager(
     }
 
     private fun softDisconnect() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            softDisconnectMainSync()
+        } else {
+            mainHandler.post { softDisconnectMainSync() }
+        }
+    }
+
+    /** BLE drop on the main thread (SDK requirement). Does not call [free]. */
+    private fun softDisconnectMainSync() {
         connected = false
         inventoryRunning = false
         try {
-            mainHandler.post {
-                uhf.setKeyEventCallback(null)
-                uhf.setInventoryCallback(null)
-            }
+            uhf.setKeyEventCallback(null)
+            uhf.setInventoryCallback(null)
             if (uhf.connectStatus != ConnectionStatus.DISCONNECTED) {
                 uhf.disconnect()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "softDisconnect", e)
+            Log.w(TAG, "softDisconnectMainSync", e)
+        }
+    }
+
+    /**
+     * Pin the reader firmware "await sleep" to the SDK minimum (1 minute after BLE drops).
+     * Valid range is 1–254 per Chainway docs — 0 is not supported and may mean "never sleep".
+     */
+    private fun pinReaderFastSleepOnConnect() {
+        try {
+            if (sdkStatus() != ConnectionStatus.CONNECTED) return
+            val ok = uhf.setReaderAwaitSleepTime(READER_AWAIT_SLEEP_MIN)
+            val readback = uhf.readerAwaitSleepTime
+            Log.i(TAG, "readerAwaitSleepTime set to $READER_AWAIT_SLEEP_MIN min (ok=$ok readback=$readback)")
+        } catch (e: Exception) {
+            Log.w(TAG, "pinReaderFastSleepOnConnect failed", e)
         }
     }
 
@@ -783,8 +805,8 @@ class RfidManager(
     }
 
     /**
-     * Idle auto-sleep / manual sleep. Drops the BLE link so firmware can power down, and suppresses
-     * reconnect until forceReconnect(). [idleMinutes] set when fired from the trigger-idle timer.
+     * Idle auto-sleep / manual sleep. Releases BLE immediately so firmware can power down.
+     * Suppresses reconnect until forceReconnect(). Does NOT call free() so reconnect is fast.
      */
     fun sleepGun(idleMinutes: Int? = null) {
         mainHandler.removeCallbacks(triggerIdleSleepRunnable)
@@ -792,24 +814,24 @@ class RfidManager(
         reconnectGeneration.incrementAndGet()
         readCancelled.set(true)
         stopInventory()
-        reconnectExecutor.execute {
+        mainHandler.post {
             try {
-                try { uhf.setReaderAwaitSleepTime(READER_AWAIT_SLEEP_MIN) } catch (e: Exception) { Log.w(TAG, "sleepGun setReaderAwaitSleepTime", e) }
-                softDisconnect()
-                uhf.free()
+                pinReaderFastSleepOnConnect()
+                softDisconnectMainSync()
+                // Stay initialized — forceReconnect() reuses the SDK without a cold free/init.
+                connected = false
+                setLinkState(LINK_ASLEEP)
+                Log.i(TAG, "sleepGun: BLE disconnected, firmware awaitSleep=${READER_AWAIT_SLEEP_MIN}min")
             } catch (e: Exception) {
                 Log.e(TAG, "sleepGun failed", e)
             }
-            initialized.set(false)
-            connected = false
-            setLinkState(LINK_ASLEEP)
+            val msg = if (idleMinutes != null && idleMinutes > 0) {
+                "Gun disconnected ($idleMinutes min idle) — powers down in ~${READER_AWAIT_SLEEP_MIN} min — pull trigger + Reconnect"
+            } else {
+                "Gun disconnected — powers down in ~${READER_AWAIT_SLEEP_MIN} min — pull trigger + Reconnect"
+            }
+            postStatus(msg)
         }
-        val msg = if (idleMinutes != null && idleMinutes > 0) {
-            "Gun powered down ($idleMinutes min since last trigger) — pull trigger, then Reconnect"
-        } else {
-            "Gun asleep — pull the trigger to wake it, then tap Reconnect gun"
-        }
-        postStatus(msg)
     }
 
     private fun applyConfigToGun() {
@@ -819,6 +841,7 @@ class RfidManager(
                 ensureEpcTidReadMode()
                 uhf.setPower(powerDbm.coerceIn(POWER_MIN, POWER_MAX))
                 uhf.setBeep(beepEnabled)
+                pinReaderFastSleepOnConnect()
             } catch (e: Exception) {
                 Log.e(TAG, "applyConfigToGun failed", e)
             }
@@ -919,10 +942,8 @@ class RfidManager(
         private const val POWER_MAX = 30
         private const val DEFAULT_POWER = 30
         // Reader firmware auto-sleep: minutes the gun waits AFTER being disconnected before it powers
-        // down (SDK setReaderAwaitSleepTime, range 1-254, factory default 5). We pin it to the minimum
-        // so that when the app's idle timer disconnects the gun (sleepGun) — or any BLE drop happens —
-        // the gun actually sleeps promptly instead of staying lit. This is the real "make it sleep"
-        // knob; a drifted/large value is why the Chainway "stopped sleeping".
+        // down (SDK setReaderAwaitSleepTime, range 1–254 min, factory default 5). SDK minimum is 1 —
+        // there is no 0. We pin 1 so the gun powers down as soon as the BLE link drops.
         private const val READER_AWAIT_SLEEP_MIN = 1
         private const val TARGET_BT_NAME = "Nordic_UART_CW"
         private val GUN_NAME_HINTS = listOf(

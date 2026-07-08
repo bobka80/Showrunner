@@ -1,16 +1,24 @@
 {
-  "versionName": "0.1.40",
-  "versionCode": 42,
+  "versionName": "0.1.41",
+  "versionCode": 43,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T17:08:23.849Z",
-  "sizeBytes": 12057293,
+  "updatedAt": "2026-07-08T17:37:24.803Z",
+  "sizeBytes": 12073677,
   "notes": [
-    "Chainway gun now actually sleeps: the app now sets the reader's built-in auto-sleep timer to 1 minute (setReaderAwaitSleepTime) on connect and when the idle timer sleeps the gun, so it powers down shortly after instead of staying lit forever.",
-    "Wake the gun after sleep by pulling the trigger, then tap Reconnect gun.",
-    "Gun-sleep idle dropdown now works for the Chainway too (shared settings menu)."
+    "Chainway trigger-idle sleep: native timer tracks last trigger pull (not RFID scans). After configured idle minutes with no trigger, releases BLE so firmware powers gun down. setGunIdleSleepMinutes bridge from web dropdown.",
+    "Watchdog suppressed while asleep — pull trigger then Reconnect gun to wake."
   ],
   "history": [
+    {
+      "versionName": "0.1.41",
+      "versionCode": 43,
+      "date": "2026-07-08T17:37:24.803Z",
+      "notes": [
+        "Chainway trigger-idle sleep: native timer tracks last trigger pull (not RFID scans). After configured idle minutes with no trigger, releases BLE so firmware powers gun down. setGunIdleSleepMinutes bridge from web dropdown.",
+        "Watchdog suppressed while asleep — pull trigger then Reconnect gun to wake."
+      ]
+    },
     {
       "versionName": "0.1.40",
       "versionCode": 42,
@@ -184,15 +192,6 @@
         "Fix login reset on BLE reconnect — safe JS injection, BLE busy guard",
         "WebView renderer reload debounced",
         "session gate ignores reconnect flap"
-      ]
-    },
-    {
-      "versionName": "0.1.19",
-      "versionCode": 21,
-      "date": "2026-07-07T15:49:09.008Z",
-      "notes": [
-        "Session survives gun/phone sleep — sessioncheck retries on network blip",
-        "WebView render-process death reloads hosting shell with stored session"
       ]
     }
   ]

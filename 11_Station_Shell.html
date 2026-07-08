@@ -1488,33 +1488,38 @@ function stationClearGunIdleTimer_() {
 }
 
 /**
- * (Re)arm the gun idle-sleep countdown. TSL: web setTimeout → bridge.sleepGun().
- * Chainway: native trigger-idle timer (setGunIdleSleepMinutes) — only resets on trigger pull,
- * not on RFID reads.
+ * Arm the gun idle-sleep countdown (wall-clock). Fires sleepGun() → BLE disconnect so firmware
+ * can power down. Only call when minutes change, on boot, or after manual reconnect — NOT on
+ * every config refresh (that was resetting the timer and preventing sleep).
  */
-function stationResetGunIdleTimer_() {
+function stationArmGunSleepTimer_() {
   stationClearGunIdleTimer_();
   if (typeof stationGunCap_ === 'function' && !stationGunCap_('appSleep')) return;
   var mins = stationGunSleepMinutes_();
-  if (!mins) return; // Never
-  var b = stationNativeBridge_();
-  // Chainway pool: native SDK tracks last trigger pull and powers down after idle.
-  if (typeof stationGunCap_ === 'function' && stationGunCap_('nativeIdleSleep') &&
-      b && typeof b.setGunIdleSleepMinutes === 'function') {
-    try { b.setGunIdleSleepMinutes(mins); } catch (e) { /* ignore */ }
+  if (!mins) {
+    window.stationGunSleepArmedMins = 0;
     return;
   }
   if (!stationSleepCapableBridge_()) return;
+  window.stationGunSleepArmedMins = mins;
   window.stationGunIdleTimer = setTimeout(function() {
     window.stationGunIdleTimer = null;
+    window.stationGunSleepArmedMins = 0;
     var br = stationSleepCapableBridge_();
     if (!br) return;
     try {
       br.sleepGun();
-      stationToast_('Gun asleep (idle ' + mins + ' min) — pull trigger + Reconnect', '');
+      stationToast_('Gun disconnecting (idle ' + mins + ' min) — LED off in ~1 min after link drop', '');
       setTimeout(function() { stationRequestGunConfig_(); }, 1200);
     } catch (e) { /* ignore */ }
   }, mins * 60 * 1000);
+}
+
+/** @deprecated use stationArmGunSleepTimer_ — kept so old call sites only re-arm when minutes change */
+function stationResetGunIdleTimer_() {
+  var mins = stationGunSleepMinutes_();
+  if (window.stationGunSleepArmedMins === mins && window.stationGunIdleTimer) return;
+  stationArmGunSleepTimer_();
 }
 
 function stationHostEjectDeadlineKey_() {
@@ -1798,7 +1803,10 @@ window.stationReconnectGun_ = function() {
   if (b && typeof b.reconnectGun === 'function') {
     stationToast_('Reconnecting gun…', '');
     try { b.reconnectGun(); } catch (e) { stationToast_('Reconnect failed.', 'error'); return; }
-    setTimeout(function() { stationRequestGunConfig_(); }, 2500);
+    setTimeout(function() {
+      stationRequestGunConfig_();
+      stationArmGunSleepTimer_();
+    }, 2500);
     return;
   }
   stationToast_('Reconnect works in the station app with the RFID gun.', 'error');
@@ -2120,10 +2128,7 @@ function stationBeginHostLogin_(tag, tid) {
 
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag, rawTid) {
-  // RFID reads reset the idle timer for TSL only. Chainway uses native trigger-idle sleep.
-  if (typeof stationGunCap_ !== 'function' || !stationGunCap_('nativeIdleSleep')) {
-    stationResetGunIdleTimer_();
-  }
+  // Do not reset the idle-sleep timer on RFID reads — only stationArmGunSleepTimer_ on boot/save/reconnect.
   const scan = stationParseScanPayload_(rawTag, rawTid);
   const tag = scan.epc;
   const tid = scan.tid;
@@ -3371,6 +3376,7 @@ function stationSyncSettingsToGun_() {
   if (power != null) stationApplyGunSetting_('power', parseInt(power, 10));
   var beep = stationStoredSetting_(STATION_BEEP_KEY);
   if (beep != null) stationApplyGunSetting_('beep', (beep === '1'));
+  stationArmGunSleepTimer_();
 }
 
 function stationApplyGunConfig_(cfg) {
@@ -3445,9 +3451,9 @@ function stationApplyGunConfig_(cfg) {
     stationToast_(liveNow ? 'RFID gun connected' : 'RFID gun disconnected', liveNow ? 'ok' : 'error');
   }
   window.stationLastGunConnected = liveNow;
-  // Arm the auto-sleep countdown while the gun is live; stop it when it drops/sleeps.
-  if (liveNow) stationResetGunIdleTimer_();
-  else stationClearGunIdleTimer_();
+  if (liveNow && !window.stationGunIdleTimer && stationGunSleepMinutes_()) {
+    stationArmGunSleepTimer_();
+  }
   if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
   if (fwEl) fwEl.textContent = cfg.firmware || '—';
   stationSyncPanelReadModeUI_();
@@ -3526,7 +3532,7 @@ window.stationSaveGunSleepMinutes = function() {
   if (STATION_GUNSLEEP_CHOICES.indexOf(mins) === -1) mins = STATION_GUNSLEEP_DEFAULT_MIN;
   el.value = String(mins);
   stationSetStoredSetting_(STATION_GUNSLEEP_STORAGE_KEY, mins);
-  stationResetGunIdleTimer_();
+  stationArmGunSleepTimer_();
   const savedEl = document.getElementById('station-eject-saved');
   if (savedEl) {
     savedEl.textContent = mins ? ('Saved — gun sleeps after ' + mins + ' min idle.') : 'Saved — gun stays on.';

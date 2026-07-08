@@ -25,7 +25,9 @@
         // setTimeout/sleepGun path. Firmware only powers down after BLE is released; native tracks
         // last trigger pull and drops the link after the configured idle window.
         appSleep: true,
-        nativeIdleSleep: true,
+        // Idle sleep: web timer → sleepGun() disconnect. (nativeIdleSleep reserved for a future
+        // trigger-only path; disabled while we debug disconnect + firmware sleep.)
+        nativeIdleSleep: false,
         // No in-app "Disconnect + sleep" button — Chainway has a physical trigger/firmware path;
         // that manual button is TSL-only (the TSL 1128 has no power button).
         disconnectSleep: false,
