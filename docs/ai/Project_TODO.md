@@ -27,7 +27,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station profiles** | Active — **BLE reconnect UI-restart SOLVED** (APK 0.1.36: HID-keyboard configChanges fix); next: kiosk auto-start → optimistic badge login | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **RFID scanning & station profiles** | Active — **per-device gun-driver fork shipped (v495)**: Chainway/TSL/gate isolated by `caps`; **TSL 1128 desktop thin shell** (`station-desktop/`, WebView2 + ASCII, auto-detect + app-sleep); auto-sleep timer (TSL-only). Next: cogwheel hidden→greyed-disabled, kiosk auto-start, gate layout | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | **Planned — not executing**; phone app first; blocks Firebase prep/timeline fork until Phase 3 | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---

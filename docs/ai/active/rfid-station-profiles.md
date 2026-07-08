@@ -2,11 +2,11 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v475** · APK **v0.1.36 (build 38)** · Hosting **host-boot v480** · **Last swept:** 2026-07-08
+**Opened:** 2026-07-02 · **Production:** GAS **v495** · APK **v0.1.39 (build 41)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-08
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
-This campaign is **RFID gun + station device profiles** only: warehouse tablet/phone married to Chainway UHF gun, host badge sessions, vault/project on station.
+This campaign is **RFID gun + station device profiles** only: each warehouse tablet/phone/PC is **married to exactly one gun device**, boots the station shell, hosts crew badge sessions, and runs vault/project on the station.
 
 > **`host-boot.js` is shared** between station RFID relay and phone QR shell camera. Before editing either path, read [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge — do not “fix” one bridge by breaking the other.
 
@@ -14,28 +14,57 @@ This campaign is **RFID gun + station device profiles** only: warehouse tablet/p
 
 ## Goal (station RFID)
 
-A warehouse tablet/phone **married to a Chainway UHF gun** boots the station shell, a crew **badge scan** hosts a session, and equipment scans run check-in/out — no personal login, no plug/unplug.
+A warehouse device — tablet, phone, **or desktop/TV PC** — **married to exactly one gun** boots the station shell, a crew **badge scan** hosts a session, and equipment scans run check-in/out — no personal login, no plug/unplug.
 
-## Gun driver fork (multi-gun architecture) — v494
+**One device = one station profile = one layout = one driver.** A station profile is built for the specific device it lives on and carries the **layout** for that device (`chainway_handheld`, `tsl_dock_desktop`, planned `gate`); the layout selects the **gun driver**. There is **never more than one gun on a station**. If a second Chainway arrives it gets its **own** profile reusing the **same** `chainway_handheld` layout — the layout is the reusable template, the profile is per-device.
 
-The station now supports **more than one gun type**, so gun behaviour is **forked per station layout** and must never be mixed in the shared shell.
+## Gun driver fork (per-device driver architecture) — v495
 
-**Registry:** `11a_Station_Gun_Drivers.html` (included before `11_Station_Shell.html`) defines `window.StationGunDrivers`, keyed by station layout, plus helpers `stationActiveGunDriver_()` and `stationGunCap_(name)`. The shared shell asks the **active driver** what it supports — it never hard-codes gun-specific logic.
+Because different devices carry different guns, gun behaviour is **forked per station layout** and must never be mixed in the shared shell. This is the standing rule for **how we add device-specific behaviour from now on**.
+
+**Registry:** `11a_Station_Gun_Drivers.html` (included before `11_Station_Shell.html`) defines `window.StationGunDrivers`, keyed by station layout, plus helpers `stationActiveGunLayout_()`, `stationActiveGunDriver_()` and `stationGunCap_(name)`. The shared shell asks the **active driver** what it supports — it never hard-codes gun-specific logic.
 
 | Layout id | Driver | Native binary | app sleep | wake-screen |
 |-----------|--------|---------------|-----------|-------------|
-| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **no** — firmware sleeps when idle/disconnected; app must NOT force-disconnect (breaks trigger→wake) | **yes** (SDK `KeyEventCallback`) |
+| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **yes** — idle timer → **resumable** `sleepGun()` (build 41): drops BLE so firmware powers down, executors stay alive, `forceReconnect()` wakes it. Each driver sleeps with its **own SDK** | **yes** (SDK `KeyEventCallback`) |
 | `tsl_dock_desktop` | TSL 1128 desktop | `station-desktop/` `TslRfidManager.cs` (EXE) | **yes** — ASCII `.sl` sleep + re-acquire on Reconnect | no |
 | `gate` *(planned)* | Gate reader + TV | TBD | TBD | no |
 
 **`caps` flags** (`power, scanMode, multi, continuous, beep, pollMs, battery, firmware, appSleep, disconnectSleep, wakeScreen`) decide which controls are relevant per gun.
 
-- **Now:** unsupported controls are **hidden** (e.g. the auto-sleep dropdown + Disconnect+sleep button show only for `appSleep`/`disconnectSleep` drivers).
-- **Next step:** keep the settings screen **identical for every gun** and **auto-gray-out** (disable) the controls a driver does not support — same `stationGunCap_` flags, `disabled` instead of hidden.
+### How to divert for a new device-specific driver (standing procedure)
+1. Add a **new layout id** to `11a_Station_Gun_Drivers.html` with its own `caps` block — set `true` only for what the hardware/native bridge actually supports.
+2. Give the device its **own station profile** in `06h_Admin_Station_Profiles.html` (`Station_Security.js`) pointing at that layout.
+3. Put **all** gun-specific native logic in that device's binary (`station-android/` for Chainway, `station-desktop/` for TSL, future gate binary) — **never** branch on gun type inside the shared shell; branch on `stationGunCap_()` instead.
+4. The shared shell (`11_Station_Shell.html`) stays gun-agnostic: it reads caps and enables/greys controls accordingly.
 
-**Why the fork exists (regression that triggered it):** a shared auto-sleep timer called `sleepGun()` on *any* connected gun (default 5 min). On Chainway that disconnected the BLE link and suppressed the reconnect ladder, which killed the trigger→wake-screen handler (only runs while connected) — "gun won't turn off and won't wake the screen". The driver fork isolates each gun so TSL sleep can never touch Chainway again.
+### Cogwheel settings — identical menu, per-station values, per-driver SDK
+The station settings cogwheel is **the same view/model for every gun** (power, single/multi scan, poll, beep, eject, gun-sleep). Two rules:
+- **Per-driver control (no shared native code):** the shell only calls the **abstract bridge** (`setPower`/`setScanMode`/`setBeep`/`setPollMs`/`sleepGun`). Each gun's native binary implements those with its **own SDK** — Chainway `RfidManager.kt` (Chainway BLE SDK), TSL `TslRfidManager.cs` (TSL ASCII SDK). The same UI drives different SDKs; we never write one code path for both device types.
+- **Per-station values (device-local, namespaced):** each station (one profile per device) stores its **own** settings bucket, so two same-model guns on two profiles never share values. Keyed by `profileName` (fallback `deviceName`) via `stationSettingsNs_()` / `stationNsKey_()`; all settings flow through `stationStoredSetting_` / `stationSetStoredSetting_`, which **migrate** legacy global keys into the station namespace on first read.
+- **Greying (target):** unsupported controls should be `disabled` (greyed), not removed, via `stationGunCap_`. **Now:** a couple are still *hidden* (Disconnect+sleep button is TSL-only via `disconnectSleep`); hidden → greyed-disabled is the remaining fork polish.
 
-**Native note:** Chainway `RfidManager.kt` gained a resumable `sleepGun()` (build 41) that is **not used** by the Chainway driver (`appSleep:false`); it's parked for a future Chainway-specific sleep that preserves trigger-wake. Trigger→wake-screen behaviour is restored purely by the shell no longer calling it.
+### Config constants (behaviour-changing) — all now **per-station namespaced**
+Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `stationNs` = slug of `profileName` (fallback `deviceName`). Legacy global keys migrate into the station namespace on first read.
+
+| Constant | File | Default | Meaning |
+|----------|------|---------|---------|
+| `sm_station_eject_min` (`stationEjectMinutes_`) | `11_Station_Shell.html` | 10 min | host idle auto-eject window (1–120) |
+| `sm_station_gunsleep_min` (`STATION_GUNSLEEP_DEFAULT_MIN`, choices `0/1/2/3/5/10`) | `11_Station_Shell.html` | 5 min | idle minutes before `sleepGun()` — fires for **both** drivers (`appSleep:true`), each via its own SDK; `0`/Never disables |
+| `sm_station_power` / `sm_station_scan_mode` / `sm_station_poll_ms` / `sm_station_beep` | `11_Station_Shell.html` | from gun | gun config; web is source of truth, pushed to the active driver's native bridge on apply/startup |
+
+**Why the fork exists (regression that triggered it):** a shared auto-sleep timer force-disconnected *any* connected gun to "sleep" it. On Chainway that suppressed the reconnect ladder and killed the trigger→wake-screen handler. The fork means each gun sleeps with its **own** SDK path instead of one shared force-disconnect.
+
+**Chainway sleep (starting point):** Chainway idle-sleep now runs through its **resumable** `sleepGun()` (`RfidManager.kt`, build 41) — link drops so firmware powers down, executors stay alive, **Reconnect gun** (`forceReconnect()`) brings it back. ⚠️ **Needs field verification:** after auto-sleep the BLE link is down, so waking is **pull trigger → Reconnect gun**; if trigger-only wake is required it needs a further native step. This is the agreed **starting point** for sorting out the long-standing "Chainway stays on" behaviour — fallback is `appSleep:false` (dropdown shown, timer inert).
+
+## Desktop TSL station (thin shell) — `station-desktop/`
+
+Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showrunner station web UI in **WebView2** and exposes a native **`window.AndroidStation`** bridge (identical API to the Chainway APK) so `11_Station_Shell.html` needs no fork. Full setup, prefs, and troubleshooting: [station-desktop/README.md](../../../station-desktop/README.md). File index: [../FILE_MAP.md](../FILE_MAP.md) §8 (`station-desktop/`, `build-station-desktop.js`).
+
+- **Gun I/O:** TSL ASCII protocol over Bluetooth virtual COM; auto-detects the reader by its `PID_1128` signature (no COM port to configure) with a background watchdog that re-acquires after sleep/drop — mirrors the ASCII Protocol Explorer "always connected" feel (`GunPortDetector.cs`, `TslRfidManager.cs`).
+- **App sleep:** Disconnect+Sleep sends ASCII `.sl`, suppresses watchdog reconnect until manual **Reconnect gun** (`SleepAndDisconnect()`, `_userSleep`).
+- **Build / ship (separate from GAS and APK):** `node build-station-desktop.js "<notes>"` (add `--self-contained` to bundle .NET) → zips `ShowrunnerStationDesktop.exe`. Node-only tool — excluded from GAS via `gas-node-only.js` + `.claspignore` (a leak caused a `require is not defined` white screen, fixed v493).
+- **Profile:** assign layout **`tsl_dock_desktop`** to the device account.
 
 ## Shipped (this campaign)
 
@@ -50,6 +79,9 @@ The station now supports **more than one gun type**, so gun behaviour is **forke
 - [x] **APK distribution via web app** — login link → `/station-app` install page; build `node build-station-apk.js` → `node deploy-hosting.js`; served as `.bin` (Spark blocks `.apk`)
 - [x] **App launcher icon** — vector adaptive icon: Stage Masters red "A" + RFID broadcast waves on dark gradient (`station-android/app/src/main/res/…/ic_launcher*`)
 - [x] **App versioning + changelog** — `build-station-apk.js` auto-bumps `versionCode`/`versionName`, requires release notes, records build timestamp + history; `/station-app` page shows version, upload time, "What's fixed", and previous builds. Doctrine Rule 6 + [station-android README](../../../station-android/README.md).
+- [x] **Per-device gun-driver fork (v495)** — `11a_Station_Gun_Drivers.html` registry + `stationGunCap_`; Chainway/TSL/gate isolated by `caps`; Chainway auto-sleep regression reverted (`appSleep:false`, trigger-wake restored). See § Gun driver fork.
+- [x] **TSL 1128 desktop thin shell** — `station-desktop/` (WebView2 + TSL ASCII, `PID_1128` auto-detect + watchdog, `.sl` app-sleep), `window.AndroidStation` bridge parity; build via `build-station-desktop.js`. See § Desktop TSL station.
+- [x] **Gun auto-sleep timer** — Session-settings dropdown (`sm_station_gunsleep_min`, default 5, Never=0); fires `sleepGun()` only for `appSleep:true` drivers (TSL).
 
 - [x] **SECURITY — login error leaked passcodes (v429):** `authenticateUser` had a leftover debug diagnostic that echoed the input, the crew headers, and stored **names + passcodes** (e.g. `bogdan / 66ab26`) into the failed-login error shown on the lock screen. Removed the `debugLog` capture entirely; failed logins now return only `"Incorrect crew name or passcode."` — no roster, headers, input, or passcodes ever go to the client. **Rotate any passcode that was visible on-screen.**
 - [x] **Duplicate-tag guard with overwrite/cancel (v428)** — recording an equipment tag (`recordStationAssetRfid`) or crew badge (`enrollStationCrewRfidTag`) now checks the scanned tag against the **whole database** — every asset **and** every crew badge — via `findStationRfidOwner_`. If the tag already belongs to a different record, the backend returns `{ duplicate:{ kind, id, name } }` instead of writing; the station record bar shows **"Tag already on X — Overwrite / Cancel"**. Overwrite re-issues the write with `force=true`, which blanks the previous owner's tag (`clearStationRfidOwner_`) before assigning — so a tag is only ever on one thing. Audit log records the steal.

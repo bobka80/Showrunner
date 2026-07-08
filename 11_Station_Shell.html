@@ -1408,17 +1408,53 @@ function stationRefreshEquipMap_() {
   } catch (e) { /* ignore */ }
 }
 
+/**
+ * Per-station settings namespace. Every station (one profile per device) keeps its OWN copy of the
+ * driver/gun settings, so two same-model guns on two different profiles never share values. The
+ * settings VIEW/MODEL is identical for all; only the stored bucket (and the active driver it talks
+ * to) differs. Keyed by the station profile name from the bootstrap, falling back to the device
+ * account name, then a safe default before the bootstrap arrives.
+ */
+function stationSettingsNs_() {
+  try {
+    var boot = window.stationShellBootstrap;
+    var id = boot && (boot.profileName || boot.deviceName);
+    if (!id && typeof ACTIVE_USER_NAME !== 'undefined') id = ACTIVE_USER_NAME;
+    if (id) {
+      var slug = String(id).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (slug) return slug;
+    }
+  } catch (e) { /* ignore */ }
+  return 'default';
+}
+function stationNsKey_(key) { return key + '::' + stationSettingsNs_(); }
+
+/**
+ * Read a station setting from THIS station's namespace. If the namespaced slot is empty but a legacy
+ * global value exists (pre per-station keys), migrate it into this station's namespace on first read
+ * so nothing resets. All gun settings (power/scanMode/pollMs/beep) plus eject + gun-sleep flow here.
+ */
 function stationStoredSetting_(key) {
-  try { var v = localStorage.getItem(key); return (v === null || v === undefined) ? null : v; } catch (e) { return null; }
+  try {
+    var nsk = stationNsKey_(key);
+    var v = localStorage.getItem(nsk);
+    if (v !== null && v !== undefined) return v;
+    var legacy = localStorage.getItem(key); // one-time migration from the old global key
+    if (legacy !== null && legacy !== undefined) {
+      try { localStorage.setItem(nsk, legacy); } catch (e2) { /* ignore */ }
+      return legacy;
+    }
+    return null;
+  } catch (e) { return null; }
 }
 function stationSetStoredSetting_(key, val) {
-  try { localStorage.setItem(key, String(val)); } catch (e) { /* ignore */ }
+  try { localStorage.setItem(stationNsKey_(key), String(val)); } catch (e) { /* ignore */ }
 }
 
 /** Configurable per-device eject timeout (minutes) — set in the station setup view. */
 function stationEjectMinutes_() {
   try {
-    var v = parseInt(localStorage.getItem(STATION_EJECT_STORAGE_KEY), 10);
+    var v = parseInt(stationStoredSetting_(STATION_EJECT_STORAGE_KEY), 10);
     if (STATION_EJECT_CHOICES.indexOf(v) !== -1) return v;
   } catch (e) { /* ignore */ }
   return STATION_HOST_IDLE_DEFAULT_MIN;
@@ -1431,7 +1467,7 @@ function stationHostIdleMs_() {
 /** Configurable gun auto-sleep (minutes idle). 0 = never. */
 function stationGunSleepMinutes_() {
   try {
-    var v = parseInt(localStorage.getItem(STATION_GUNSLEEP_STORAGE_KEY), 10);
+    var v = parseInt(stationStoredSetting_(STATION_GUNSLEEP_STORAGE_KEY), 10);
     if (STATION_GUNSLEEP_CHOICES.indexOf(v) !== -1) return v;
   } catch (e) { /* ignore */ }
   return STATION_GUNSLEEP_DEFAULT_MIN;
@@ -3465,7 +3501,7 @@ window.stationSaveEjectMinutes = function() {
   let mins = parseInt(ejectEl.value, 10);
   if (STATION_EJECT_CHOICES.indexOf(mins) === -1) mins = STATION_HOST_IDLE_DEFAULT_MIN;
   ejectEl.value = String(mins);
-  try { localStorage.setItem(STATION_EJECT_STORAGE_KEY, String(mins)); } catch (e) { /* ignore */ }
+  stationSetStoredSetting_(STATION_EJECT_STORAGE_KEY, mins);
   if (stationReadHostSession_()) stationResetHostIdleTimer_();
   if (savedEl) {
     savedEl.textContent = 'Saved — host ejects after ' + mins + ' min.';
@@ -3479,7 +3515,7 @@ window.stationSaveGunSleepMinutes = function() {
   let mins = parseInt(el.value, 10);
   if (STATION_GUNSLEEP_CHOICES.indexOf(mins) === -1) mins = STATION_GUNSLEEP_DEFAULT_MIN;
   el.value = String(mins);
-  try { localStorage.setItem(STATION_GUNSLEEP_STORAGE_KEY, String(mins)); } catch (e) { /* ignore */ }
+  stationSetStoredSetting_(STATION_GUNSLEEP_STORAGE_KEY, mins);
   stationResetGunIdleTimer_();
   const savedEl = document.getElementById('station-eject-saved');
   if (savedEl) {

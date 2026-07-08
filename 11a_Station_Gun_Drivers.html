@@ -21,9 +21,13 @@
       caps: {
         power: true, scanMode: true, multi: true, continuous: true, beep: true, pollMs: true,
         battery: true, firmware: true,
-        // Chainway sleeps via its own firmware when idle+disconnected. The APP must NOT force a
-        // disconnect to "sleep" it — that kills the trigger→wake-screen handler. So no app sleep.
-        appSleep: false,
+        // Idle auto-sleep runs through the Chainway SDK's OWN resumable sleepGun() (RfidManager.kt,
+        // build 41): it drops the BLE link so firmware can power down but keeps executors alive so
+        // Reconnect gun (forceReconnect) brings it back. Wake = pull trigger + Reconnect. Each driver
+        // sleeps with its own SDK — the shell only calls the abstract bridge.sleepGun().
+        appSleep: true,
+        // No in-app "Disconnect + sleep" button — Chainway has a physical trigger/firmware path;
+        // that manual button is TSL-only (the TSL 1128 has no power button).
         disconnectSleep: false,
         wakeScreen: true
       }
