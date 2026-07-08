@@ -90,6 +90,33 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 ---
 
+## Station APK + hosting pipeline (native gun app)
+
+The Android station app (`station-android/`) is versioned and shipped **separately** from GAS — `milestone.js` does **not** touch it. The `/station-app` page shows the director "Build N" by reading the **live** `push-hosting/public/downloads/station-manifest.json`.
+
+**Ship an APK update (in order):**
+
+```
+node build-station-apk.js "<what changed>" ["<another bullet>"]   # builds debug APK, bumps versionCode, writes manifest
+node deploy-hosting.js                                            # pushes to Firebase, then VERIFIES the live build
+node milestone.js "<note>"                                       # only if GAS/shell also changed (e.g. 11_Station_Shell.html)
+```
+
+`build-station-apk.js` **requires release notes** (fails without them — they render on the download page). Use `--no-bump` only when you deliberately set the version in `build.gradle.kts` yourself; otherwise it auto-increments `versionCode` + patch `versionName`.
+
+**Built-in safety (added 2026-07-08 after a long hang + a bad-downgrade + a stale-page incident — see [FRAGILE_ZONES.md](FRAGILE_ZONES.md) § Station APK + hosting deploy pipeline and Incident Log):**
+
+- **Downgrade guard** — `build-station-apk.js` refuses to build a `versionCode` lower than the highest already published (Android would reject it with "App not installed").
+- **No-hang deploy** — `deploy-hosting.js` runs `firebase deploy --only hosting --non-interactive` (fails fast instead of blocking on a hidden auth/consent prompt) with a **20s heartbeat** and **10-min hard timeout**.
+- **prepare-hosting must exit** — `prepare-hosting.js` drains the Apps Script config **redirect** and `process.exit(0)`s after its work; otherwise a lingering socket froze the deploy right after `Config project: … appId: set`.
+- **Post-deploy verify** — after deploy, `deploy-hosting.js` fetches the live `station-manifest.json` and confirms the served `versionCode` matches; success prints `[verify] OK — live site serves build N`. If it never shipped, it warns and exits non-zero. **Do not trust a deploy without this line.**
+
+**If `deploy-hosting.js` hangs or errors:** confirm auth with `firebase login:list`; re-auth with `firebase login --reauth`; then re-run. It can no longer freeze silently.
+
+**`rollback.js` (step-back re-ship):** re-ships a previous milestone's shippable source as a **new** milestone (versions only move forward). It prompts for confirmation **only in an interactive terminal** — in a non-interactive shell (AI agent / CI) it refuses and requires `--yes` (or `--dry-run`), so it can never hang the session. Usage: `node rollback.js --list` · `node rollback.js --to 482 --yes` · `node rollback.js --dry-run`.
+
+---
+
 ## One-time setup (director or AI once)
 
 1. **Git identity (required once on your PC):** In a terminal, run (use your name/email):

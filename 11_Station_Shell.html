@@ -1178,6 +1178,10 @@ var STATION_SCAN_FEED_MAX = 8;
 
 /** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
 var STATION_HOST_IDLE_DEFAULT_MIN = 10;
+// After an explicit log-out / idle-eject, ignore re-reads of the SAME badge for this long. One
+// trigger pull emits a burst of reads for a tag; without this window a stray tail-end read arriving
+// after the 1.5s scan-dedup would instantly re-host the person the operator just ejected.
+var STATION_HOST_EJECT_COOLDOWN_MS = 3000;
 var STATION_EJECT_STORAGE_KEY = 'sm_station_eject_min';
 var STATION_EJECT_CHOICES = [1, 3, 5, 10];
 
@@ -1522,6 +1526,19 @@ function stationReadHostSession_() {
 }
 
 function stationWriteHostSession_(host) {
+  if (!host) {
+    // Arm the eject cooldown: capture the badge we're clearing so a lingering read from the same
+    // trigger burst (or a tag left in the antenna field) cannot instantly re-host them. A deliberate
+    // re-scan after the cooldown, or a DIFFERENT badge at any time, still works.
+    var outgoing = stationReadHostSession_() || window.stationHostSession || null;
+    var outNorm = outgoing ? stationNormalizeEpc_(outgoing.rfidTag || '') : '';
+    window.stationEjectedHostNorm = outNorm || null;
+    window.stationEjectCooldownUntil = outNorm ? (Date.now() + STATION_HOST_EJECT_COOLDOWN_MS) : 0;
+  } else {
+    // Someone is now hosted — the eject cooldown no longer applies (allows an immediate switch back).
+    window.stationEjectedHostNorm = null;
+    window.stationEjectCooldownUntil = 0;
+  }
   window.stationHostSession = host;
   try {
     if (host) sessionStorage.setItem(stationHostStorageKey_(), JSON.stringify(host));
@@ -1637,6 +1654,30 @@ window.stationOnGunStatus_ = function(msg) {
   if (low.indexOf('fail') !== -1 || low.indexOf('error') !== -1 || low.indexOf('not found') !== -1) kind = 'error';
   else if (low.indexOf('connected') !== -1 && low.indexOf('disconnect') === -1) kind = 'ok';
   stationToast_(msg, kind);
+};
+
+// Diagnostic: native WebView renderer death breadcrumb. If this ever fires with count>0 after a
+// gun disconnect/reconnect, the renderer-priority fix did NOT hold and the reload came from a
+// renderer kill (not from session/nav logic). Surfaced once as a toast so it's visible on-device.
+window.stationOnRendererBreadcrumb_ = function(info) {
+  try {
+    if (!info || !info.count || window.__srRendererBreadcrumbShown_) return;
+    window.__srRendererBreadcrumbShown_ = true;
+    var when = info.at ? new Date(info.at).toLocaleTimeString() : '?';
+    stationToast_('WebView reloaded ' + info.count + '× (renderer ' +
+      (info.crashed ? 'crashed' : 'killed') + ', last ' + when + ')', 'error');
+  } catch (e) {}
+};
+
+// Diagnostic: the RFID gun is an HID keyboard, so connect/disconnect fires an Android
+// keyboard/navigation config change. With the manifest fix, that no longer recreates the Activity
+// — it lands in onConfigurationChanged and the WebView survives. If this counter climbs while the
+// UI stays put (no reload), the fix is working: gun flap absorbed, session intact.
+window.stationOnGunConfigChange_ = function(count) {
+  try {
+    if (!count) return;
+    stationToast_('Gun link changed (' + count + ') — session kept', 'ok');
+  } catch (e) {}
 };
 
 window.stationReconnectGun_ = function() {
@@ -1813,10 +1854,57 @@ function stationHandleRfidScan_(rawTag, rawTid) {
   if (host) {
     stationResetHostIdleTimer_();
     stationSetLastScan_(tag);
-    if (stationForwardCheckoutScan_(tag)) return;
+    const norm = stationNormalizeEpc_(tag);
+    const hostTag = stationNormalizeEpc_(host.rfidTag || '');
+    // Same badge as the current host → just keep the session alive (idle already reset above).
+    if (norm && hostTag && norm === hostTag) return;
+    // Is this a DIFFERENT crew badge? If so, hand the station to that person (implicit eject +
+    // host) — the operator no longer has to log the previous host out first. Crew badges take
+    // priority over checkout forwarding, so a badge switch works even mid-checkout.
+    const swap = stationLookupCrewHostLocal_(tag, tid);
+    if (swap.tidMismatch) {
+      stationSetStatus_('Badge chip ID does not match — possible cloned tag.', 'error');
+      return;
+    }
+    let scanIsCrewBadge = !!swap.crew || !!swap.tidMissing;
+    if (!scanIsCrewBadge) {
+      const hit = stationResolveEpc_(tag);
+      if (hit && hit.kind === 'crew') scanIsCrewBadge = true; // known crew badge via equip map
+    }
+    if (scanIsCrewBadge) {
+      // Same person on a host record that carried no stored tag → don't bounce the session.
+      if (swap.crew && (
+        (host.uid && swap.crew.uid && String(host.uid) === String(swap.crew.uid)) ||
+        (!host.uid && host.name && swap.crew.name && host.name === swap.crew.name)
+      )) return;
+      stationBeginHostLogin_(tag, tid);
+      return;
+    }
+    // Not a crew badge → equipment scan during an open checkout / existing behavior.
+    stationForwardCheckoutScan_(tag);
     return;
   }
 
+  stationBeginHostLogin_(tag, tid);
+}
+
+/**
+ * Optimistic badge-in / host-switch: host instantly from the local crew cache when the EPC(+TID)
+ * pair is recognized, then let the server confirm. Used for a fresh badge-in (no host yet) AND to
+ * SWITCH to a different crew badge while someone is already hosted, so the operator does not have
+ * to eject the previous host first.
+ */
+function stationBeginHostLogin_(tag, tid) {
+  // Eject cooldown: swallow residual reads of the badge we JUST logged out so the eject sticks.
+  // A different badge falls through (norm mismatch) and re-hosting the same person is allowed again
+  // once the short window passes.
+  const cooldownNorm = stationNormalizeEpc_(tag);
+  if (cooldownNorm && cooldownNorm === window.stationEjectedHostNorm &&
+      Date.now() < (window.stationEjectCooldownUntil || 0)) {
+    stationSetLastScan_(tag);
+    stationSetStatus_('Logged out — scan again to sign back in.', '');
+    return;
+  }
   const localLookup = stationLookupCrewHostLocal_(tag, tid);
   let optimisticHost = null;
   if (localLookup.tidMismatch) {

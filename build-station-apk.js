@@ -83,6 +83,24 @@ function readExistingHistory() {
   }
 }
 
+// The highest versionCode we've ever published (current manifest + its history).
+// Android REFUSES to install an APK whose versionCode is lower than the one already
+// on the device, silently causing "App not installed". Guard against ever shipping
+// a downgrade so the field never gets a build it cannot install over the current one.
+function readPublishedMaxVersionCode() {
+  try {
+    const prev = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    let max = parseInt(prev.versionCode, 10) || 0;
+    (Array.isArray(prev.history) ? prev.history : []).forEach((h) => {
+      const c = parseInt(h.versionCode, 10) || 0;
+      if (c > max) max = c;
+    });
+    return max;
+  } catch (e) {
+    return 0;
+  }
+}
+
 function findGradlew() {
   const win = path.join(androidDir, 'gradlew.bat');
   const unix = path.join(androidDir, 'gradlew');
@@ -179,6 +197,20 @@ function main() {
     log(`Version: ${current.versionName} (build ${current.versionCode}) -> ${newName} (build ${newCode})`);
   } else {
     log(`Version: ${newName} (build ${newCode}) — no bump (--no-bump)`);
+  }
+
+  // Downgrade guard: a versionCode <= the last published build cannot install over the
+  // app already on the tablet (Android blocks it). Fail loudly instead of shipping a dud.
+  const publishedMax = readPublishedMaxVersionCode();
+  if (newCode < publishedMax) {
+    fail(
+      `versionCode ${newCode} is LOWER than the already-published build ${publishedMax}.\n` +
+      `  Android will reject it with "App not installed" on any device running ${publishedMax}.\n` +
+      `  Bump versionCode above ${publishedMax} in station-android/app/build.gradle.kts, or drop --no-bump.`
+    );
+  }
+  if (newCode === publishedMax) {
+    log(`  Note: rebuilding the SAME build number (${newCode}) — installs only over build ${newCode}, not a new update.`);
   }
 
   ensureGradleWrapper();

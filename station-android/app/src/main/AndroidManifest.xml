@@ -33,7 +33,7 @@
             android:name=".StationWebActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|keyboardHidden|uiMode|screenLayout|smallestScreenSize"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode|screenLayout|smallestScreenSize|density|fontScale|locale"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

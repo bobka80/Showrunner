@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v475** · APK **v0.1.23 (build 25)** · Hosting **host-boot v480** · **Last swept:** 2026-07-07
+**Opened:** 2026-07-02 · **Production:** GAS **v475** · APK **v0.1.36 (build 38)** · Hosting **host-boot v480** · **Last swept:** 2026-07-08
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -94,12 +94,14 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 ## In progress / next (director priority 2026-07-08)
 
-1. **[ ] BLE reconnect must not restart app** — **v483 direct-GAS REVERTED** (worse: session restart + Google “created by user” banner). Restored **v482** hosting shell (`web.app` → iframe). **Next (no restructure):** hosting-only flap guard + host badge in parent `localStorage` + ignore spurious `SESSION_CLEAR`.
-2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
+1. **[x] BLE reconnect UI restart — TRUE ROOT CAUSE FOUND & FIXED (APK 0.1.36 build 38).** The chronic "gun disconnect/reconnect reboots the whole UI (mobile→station flash, ~20s)" was **never** a session-bridge or renderer problem. **The RFID gun is a Bluetooth HID keyboard** (it delivers the trigger as a `KeyEvent`). Connecting/disconnecting an HID keyboard changes the Android **`keyboard`/`navigation` device configuration**, and `AndroidManifest.xml` handled `keyboardHidden` but **not `keyboard` or `navigation`** — so every gun flap fired an unhandled config change and **Android destroyed + recreated `StationWebActivity`**, rebuilding the WebView from zero. Fix: added `keyboard|navigation` (plus `density|fontScale|locale`) to `android:configChanges`; the change now lands in `onConfigurationChanged` and the WebView survives untouched. Breadcrumb: `onConfigurationChanged` bumps a counter → `window.stationOnGunConfigChange_` shows a quiet "Gun link changed (N) — session kept" toast, proving the flap is absorbed with no reload. This explains why every prior mitigation (v476–485: flap guard, renderer priority, host persistence, session guards) failed — they all fought the wrong layer. Those hosting-side guards remain as belt-and-suspenders. **All the earlier hosting-only work below is now secondary to this one-line manifest fix.**
+2. **[x] BLE reconnect hosting-only mitigations (v485 / APK 0.1.34 build 36)** — flap guard in native prefs (survives WebView reload), block iframe nav during BLE, host badge in parent `localStorage`, ignore spurious `SESSION_CLEAR`, Login guard, 20s BLE busy window. **v483 direct-GAS reverted** (worse in field). *Kept as defense-in-depth; the real cure is the manifest configChanges fix (#1).*
+3. **[x] APK 0.1.35 (build 37)** — WebView `setRendererPriorityPolicy(IMPORTANT, waived=false)` + renderer-death breadcrumb. Did **not** fix the reboot (proved the trigger was Activity recreation, not renderer death) but is a reasonable hardening; kept.
+4. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
 
-### Parked — must fix later (director 2026-07-07: stop work for now)
+### SOLVED 2026-07-08 — BLE reconnect reset was Activity recreation (HID keyboard config change)
 
-**[ ] BLE reconnect must not reset device login / station shell** — symptom persists after v479. Gun BLE disconnect/reconnect still feels like a hard app reset: back to **SYSTEM SECURE** (device passcode) and/or station cold boot (splash, host badge lost, project state gone). **Director decision:** defer; document attempts below; revisit with a fresh architectural pass.
+**[x] BLE reconnect must not reset device login / station shell** — **ROOT-CAUSED & FIXED in APK 0.1.36 (build 38).** After v479–485 mitigations all failed in the field, the real trigger was found: the gun is a **Bluetooth HID keyboard**, so connect/disconnect changes the Android `keyboard`/`navigation` configuration, and the manifest didn't list those in `android:configChanges` → **Android recreated `StationWebActivity`** on every gun flap (full WebView rebuild = SYSTEM SECURE / station cold boot / lost host badge). Adding `keyboard|navigation` to `configChanges` stops the recreation entirely. The whole "web session bridge treats BLE flap like logout" framing below was a **misdiagnosis** — the reload was native Activity recreation, not any JS/session logic. History retained below for the record; the hosting-side guards are kept as defense-in-depth.
 
 #### Symptom (what “still the same” means)
 

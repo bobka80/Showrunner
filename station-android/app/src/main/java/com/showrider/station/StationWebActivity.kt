@@ -102,6 +102,20 @@ class StationWebActivity : AppCompatActivity() {
             userAgentString = userAgentString + " ShowrunnerStation/0.1"
         }
 
+        // Root cause of the "UI reset + mobile→station flash" on gun disconnect/reconnect: Android
+        // kills the WebView renderer process when the WebView is not visible / under memory
+        // pressure (gun toggle often dips the screen or backgrounds the app briefly). That fires
+        // onRenderProcessGone → full page reload → the GAS iframe cold-boots. Keeping the renderer
+        // at IMPORTANT priority and NOT waiving it when off-screen stops the kill, so no reload.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                webView.setRendererPriorityPolicy(
+                    WebView.RENDERER_PRIORITY_IMPORTANT,
+                    /* waivedWhenNotVisible = */ false,
+                )
+            } catch (_: Exception) { /* best-effort */ }
+        }
+
         // Web setup view -> native gun controls (injected into the hosting shell frame).
         webView.addJavascriptInterface(StationBridge(), "AndroidStation")
 
@@ -112,12 +126,18 @@ class StationWebActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 injectPersistedWebSession()
                 injectBleFlapGuardFromPrefs()
+                injectRendererBreadcrumb()
             }
 
             override fun onRenderProcessGone(
                 view: WebView?,
                 detail: RenderProcessGoneDetail?,
             ): Boolean {
+                // Breadcrumb: record WHY the last full reload happened so we can confirm on-device
+                // whether renderer death was truly the cause of the UI reset. Read it in the station
+                // debug line (window.__srLastReload) or via getSavedSession-style inspection.
+                val crashed = detail?.didCrash() == true
+                recordRendererGone(crashed)
                 val now = System.currentTimeMillis()
                 if (now - lastRendererReloadAt < RENDERER_RELOAD_DEBOUNCE_MS) return true
                 lastRendererReloadAt = now
@@ -152,6 +172,28 @@ class StationWebActivity : AppCompatActivity() {
         }
         outState.putBoolean("splash_hidden", splashHidden)
         super.onSaveInstanceState(outState)
+    }
+
+    /**
+     * ROOT CAUSE of the "UI reboots on gun connect/disconnect": the RFID gun is a Bluetooth HID
+     * keyboard, so pairing/dropping it changes the device keyboard/navigation configuration. Those
+     * flags are now declared in the manifest's android:configChanges, so Android delivers the change
+     * HERE instead of destroying + recreating the Activity (which rebuilt the WebView and rebooted
+     * the UI). We do nothing but keep running — the WebView stays intact. Breadcrumb it so we can
+     * prove on-device that gun flap now lands here and no longer recreates the Activity.
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val count = stationPrefs.getInt(PREF_CONFIG_CHANGE_COUNT, 0) + 1
+        stationPrefs.edit()
+            .putInt(PREF_CONFIG_CHANGE_COUNT, count)
+            .putLong(PREF_CONFIG_CHANGE_AT, System.currentTimeMillis())
+            .apply()
+        evalJs(
+            "try{window.__srGunConfigChanges=$count;" +
+                "if(typeof window.stationOnGunConfigChange_==='function')" +
+                "window.stationOnGunConfigChange_($count);}catch(e){}",
+        )
     }
 
     private fun registerScreenOnReceiver() {
@@ -362,6 +404,33 @@ class StationWebActivity : AppCompatActivity() {
         )
     }
 
+    /**
+     * Diagnostic breadcrumb: the WebView renderer being killed (onRenderProcessGone) is the
+     * suspected cause of the UI reset on gun toggle. Count it + timestamp it in prefs so we can
+     * prove whether the renderer-priority fix eliminated it. Reset the counter to zero here so the
+     * meaning is "reloads since this build was installed".
+     */
+    private fun recordRendererGone(crashed: Boolean) {
+        val count = stationPrefs.getInt(PREF_RENDERER_GONE_COUNT, 0) + 1
+        stationPrefs.edit()
+            .putInt(PREF_RENDERER_GONE_COUNT, count)
+            .putLong(PREF_RENDERER_GONE_AT, System.currentTimeMillis())
+            .putBoolean(PREF_RENDERER_GONE_CRASHED, crashed)
+            .apply()
+    }
+
+    /** Publish the renderer-death breadcrumb into the page so the station debug line can show it. */
+    private fun injectRendererBreadcrumb() {
+        val count = stationPrefs.getInt(PREF_RENDERER_GONE_COUNT, 0)
+        val at = stationPrefs.getLong(PREF_RENDERER_GONE_AT, 0L)
+        val crashed = stationPrefs.getBoolean(PREF_RENDERER_GONE_CRASHED, false)
+        evalJs(
+            "try{window.__srRendererGone={count:$count,at:$at,crashed:$crashed};" +
+                "if($count>0&&typeof window.stationOnRendererBreadcrumb_==='function')" +
+                "window.stationOnRendererBreadcrumb_(window.__srRendererGone);}catch(e){}",
+        )
+    }
+
     private fun injectPersistedWebSession() {
         val token = stationPrefs.getString(PREF_WEB_SESSION_TOKEN, null)?.trim().orEmpty()
         val exp = stationPrefs.getLong(PREF_WEB_SESSION_EXPIRES, 0L)
@@ -519,6 +588,11 @@ class StationWebActivity : AppCompatActivity() {
         private const val PREF_WEB_SESSION_TOKEN = "web_session_token"
         private const val PREF_WEB_SESSION_EXPIRES = "web_session_expires"
         private const val PREF_BLE_FLAP_UNTIL = "ble_flap_until"
+        private const val PREF_RENDERER_GONE_COUNT = "renderer_gone_count"
+        private const val PREF_RENDERER_GONE_AT = "renderer_gone_at"
+        private const val PREF_RENDERER_GONE_CRASHED = "renderer_gone_crashed"
+        private const val PREF_CONFIG_CHANGE_COUNT = "config_change_count"
+        private const val PREF_CONFIG_CHANGE_AT = "config_change_at"
         private const val GUN_STATUS_DEBOUNCE_MS = 1800L
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L

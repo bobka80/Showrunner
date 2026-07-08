@@ -18,6 +18,10 @@ function fetchText(url) {
         const next = res.headers.location.startsWith('http')
           ? res.headers.location
           : new URL(res.headers.location, url).href;
+        // Drain the redirect response, otherwise its socket lingers and keeps the
+        // Node event loop alive — the process then hangs after printing its last line,
+        // which stalls deploy-hosting.js right after "Config project …".
+        res.resume();
         return fetchText(next).then(resolve).catch(reject);
       }
       let data = '';
@@ -152,8 +156,14 @@ messaging.onBackgroundMessage(function(payload) {
   console.log('Config project:', cfg.projectId, '| sender:', cfg.messagingSenderId || '(missing)', '| appId:', cfg.appId ? 'set' : '(missing)');
 }
 
-main().catch((err) => {
-  console.error(err.message || err);
-  process.exit(1);
-});
-
+main()
+  .then(() => {
+    // All work is synchronous by now; force a clean exit so a lingering keep-alive
+    // socket can never hold the process open and stall the deploy pipeline.
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error(err.message || err);
+    process.exit(1);
+  });
+

@@ -27,7 +27,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station profiles** | Active — BLE reconnect in flight; then kiosk → optimistic badge login | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **RFID scanning & station profiles** | Active — **BLE reconnect UI-restart SOLVED** (APK 0.1.36: HID-keyboard configChanges fix); next: kiosk auto-start → optimistic badge login | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | **Planned — not executing**; phone app first; blocks Firebase prep/timeline fork until Phase 3 | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---
@@ -41,7 +41,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Mobile crew UX | Shipped v314+; **phone QR scan shipped v474** (see topic) | [topics/mobile-crew.md](topics/mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [topics/financials.md](topics/financials.md) |
-| Logistics & warehouse RFID | Active campaign — station BLE reconnect; phone QR shipped → mobile-crew | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
+| Logistics & warehouse RFID | Active campaign — station BLE reconnect UI-restart solved (APK 0.1.36); phone QR shipped → mobile-crew | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |
 | Availability & fleet tracker | Partial — equipment tracker matrix | [topics/availability-fleet.md](topics/availability-fleet.md) |

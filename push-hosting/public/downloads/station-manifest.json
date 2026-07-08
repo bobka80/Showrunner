@@ -1,16 +1,42 @@
 {
-  "versionName": "0.1.34",
-  "versionCode": 36,
+  "versionName": "0.1.36",
+  "versionCode": 38,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T06:05:37.823Z",
-  "sizeBytes": 12057257,
+  "updatedAt": "2026-07-08T07:47:15.196Z",
+  "sizeBytes": 12057261,
   "notes": [
-    "BLE flap guard survives WebView reload",
-    "Block iframe nav during gun reconnect",
-    "host badge in parent storage"
+    "Fix true root cause: RFID gun is an HID keyboard so connect/disconnect changed the keyboard config and recreated the Activity, rebooting the UI. Handle keyboard|navigation config changes so the WebView survives gun flap",
+    "Add gun config-change breadcrumb toast"
   ],
   "history": [
+    {
+      "versionName": "0.1.36",
+      "versionCode": 38,
+      "date": "2026-07-08T07:47:15.196Z",
+      "notes": [
+        "Fix true root cause: RFID gun is an HID keyboard so connect/disconnect changed the keyboard config and recreated the Activity, rebooting the UI. Handle keyboard|navigation config changes so the WebView survives gun flap",
+        "Add gun config-change breadcrumb toast"
+      ]
+    },
+    {
+      "versionName": "0.1.36",
+      "versionCode": 38,
+      "date": "2026-07-08T07:39:42.755Z",
+      "notes": [
+        "Fix true root cause: RFID gun is an HID keyboard so connect/disconnect changed the keyboard config and recreated the Activity, rebooting the UI. Handle keyboard|navigation config changes so the WebView survives gun flap",
+        "Add gun config-change breadcrumb toast"
+      ]
+    },
+    {
+      "versionName": "0.1.35",
+      "versionCode": 37,
+      "date": "2026-07-08T07:14:34.817Z",
+      "notes": [
+        "BLE reconnect: pin WebView renderer priority so gun disconnect/reconnect no longer reloads the app",
+        "Add renderer-death breadcrumb toast for diagnostics"
+      ]
+    },
     {
       "versionName": "0.1.34",
       "versionCode": 36,
@@ -167,34 +193,6 @@
       "date": "2026-07-04T14:43:42.873Z",
       "notes": [
         "Cleanup build — retire native diagnostic status spam"
-      ]
-    },
-    {
-      "versionName": "0.1.13",
-      "versionCode": 15,
-      "date": "2026-07-04T14:31:43.719Z",
-      "notes": [
-        "Multi-scan mode (one pull, many tags)"
-      ]
-    },
-    {
-      "versionName": "0.1.12",
-      "versionCode": 14,
-      "date": "2026-07-04T14:02:08.390Z",
-      "notes": [
-        "BLE reconnect no longer reloads WebView (save/restore state, singleTask)",
-        "Scan panel: live feed, sensitivity presets, Damaged/Broken status with notes",
-        "Assets sheet: status_note column + Damaged lifecycle"
-      ]
-    },
-    {
-      "versionName": "0.1.10",
-      "versionCode": 12,
-      "date": "2026-07-03T14:37:22.148Z",
-      "notes": [
-        "Screen may now sleep to save power/screen wear",
-        "the gun stays connected in the background",
-        "Pull the gun trigger to wake the tablet (SDK only, no keyboard/power button) — first pull wakes, next pull scans"
       ]
     }
   ]

@@ -30,6 +30,8 @@ When the director reports a bug in these areas, state the risk in plain language
 | **PWA session + login boot** | `push-hosting/public/host-boot.js`, `Login.html`, `Index.html` (session `postMessage`), `Main.js` (`sessionboot`, `sessioncheck`), `Security.js` | Change iframe load order; skip `sessioncheck` before `sessionboot`; clear parent session on every login screen paint; single-token login that kicks other devices without director approval | Token sync only via `SHOWRUNNER_SESSION_TOKEN`; validate server-side before `sessionboot`; multi-device sessions in `Security.js` |
 | **Mobile QR camera (PWA)** | `push-hosting/public/host-boot.js`, `01j_Mobile_Scan.html`, `Main.js` (`sessionboot`/`mobscanstage`), `Station_Security.js`, `Index.html` | `getUserMedia` in GAS iframe; **`postMessage` as sole handoff**; parallel retry loops (relay + pending flush + burst pull + reload); forget `host-boot.js?v=` bump | Camera on **shell** (`#sr-mobile-shell-cam`); **primary handoff = iframe reload** `sessionboot&srScan=`; 20s dedupe; see § Two-layer shell bridge + § Mobile QR handoff |
 | **Station RFID / native gun bridge** | `host-boot.js`, `11_Station_Shell.html`, `station-android/RfidManager.kt` | Rely on **`postMessage` or `evaluateJavascript` alone** for scan delivery; remove `pollScans()` pull path; share BLE read/config workers | **Primary = iframe `AndroidStation.pollScans()`** (~300 ms); relay + `showrunnerStationDeliverScan` = fallback; direct `AndroidStation` for settings; see § Two-layer shell bridge + § Station RFID delivery |
+| **Station native app lifecycle (APK)** | `station-android/AndroidManifest.xml`, `StationWebActivity.kt`, `RfidManager.kt` | Remove `keyboard`/`navigation` from `android:configChanges` (gun is an HID keyboard → connect/disconnect recreates the Activity → full WebView reboot); chase gun-flap resets in JS/session before ruling out Activity recreation | Keep the full `configChanges` list; absorb gun flap in `onConfigurationChanged`; see § Station native app — Android Activity lifecycle |
+| **Station APK + hosting deploy** | `build-station-apk.js`, `deploy-hosting.js`, `push-hosting/prepare-hosting.js`, `station-manifest.json` | Add stdin prompts without `isTTY` guard (wedges shell); leave HTTP fetches undrained (hangs deploy); ship a lower `versionCode`; trust "deploy ran" without live verify | `--non-interactive` firebase + heartbeat/timeout; drain redirects + `process.exit(0)`; downgrade guard; post-deploy live-manifest verify; see § Station APK + Firebase hosting deploy pipeline |
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
 | **Warehouse ledger** | `Operations.js` | Mutate assignments directly during RFID chaos | Append to `Operations_Ledger` |
 
@@ -224,6 +226,53 @@ web.app (host-boot.js)                 GAS iframe (Index / station shell)
 
 ---
 
+## Station native app — Android Activity lifecycle (APK) (Critical)
+
+**Files:** `station-android/app/src/main/AndroidManifest.xml`, `StationWebActivity.kt`, `RfidManager.kt`.
+
+**The gun is a Bluetooth HID keyboard.** The Chainway trigger arrives as a `KeyEvent` (`onKeyDown`) — to Android the paired gun is a **hardware keyboard / navigation device**. This has one dangerous consequence:
+
+> **Connecting or disconnecting the gun changes the device `keyboard`/`navigation` configuration.** If `StationWebActivity` does not declare those in `android:configChanges`, **Android destroys and recreates the Activity** on every gun flap — the WebView is rebuilt from scratch (station cold boot, SYSTEM SECURE, host badge lost, ~20s). This was the chronic "app restarts on gun disconnect/reconnect" bug, misdiagnosed for many versions as a session/renderer problem.
+
+**Manifest requirement (never remove):**
+
+```
+android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode|screenLayout|smallestScreenSize|density|fontScale|locale"
+```
+
+`keyboard` **and** `navigation` are the load-bearing flags for gun flap. `keyboardHidden` alone is **not** enough (it only covers soft-keyboard visibility, not the keyboard *device* changing). With these declared, the change is delivered to `onConfigurationChanged` and the WebView survives untouched.
+
+**Never do:**
+- Remove `keyboard` or `navigation` from `configChanges` "to clean it up" — the reboot returns instantly.
+- Assume a WebView reload on gun flap is a JS/session bug — check for Activity recreation **first** (breadcrumb below).
+- Chase BLE-reconnect UI resets in `host-boot.js` / `Login.html` / session logic before ruling out native Activity recreation.
+
+**Breadcrumb:** `onConfigurationChanged` bumps a SharedPreferences counter and calls `window.stationOnGunConfigChange_(count)` → quiet "Gun link changed (N) — session kept" toast. If the toast shows and the UI stays put, the flap is absorbed correctly. `onRenderProcessGone` writes a separate `window.__srRendererGone` breadcrumb (renderer death is a *different*, rarer cause).
+
+**Related renderer hardening (APK 0.1.35):** `setRendererPriorityPolicy(RENDERER_PRIORITY_IMPORTANT, waivedWhenNotVisible=false)` keeps the renderer alive off-screen. Kept as defense-in-depth; it did **not** fix the gun-flap reboot (that was Activity recreation, not renderer death).
+
+---
+
+## Station APK + Firebase hosting deploy pipeline (Critical)
+
+**Files:** `build-station-apk.js`, `deploy-hosting.js`, `push-hosting/prepare-hosting.js`, `push-hosting/public/station-app.html`, `push-hosting/public/downloads/station-manifest.json`. **Canonical workflow:** [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) § Station APK + hosting pipeline.
+
+The station APK ships **separately** from GAS: `node build-station-apk.js "<notes>"` → `node deploy-hosting.js`. The `/station-app` page reads the **live** `station-manifest.json`; that is what the director sees as "Build N". Hard-won pitfalls, all now guarded:
+
+| Pitfall | Symptom | Guard (do not remove) |
+|---------|---------|-----------------------|
+| **`prepare-hosting.js` never exits** | Deploy **hangs forever right after `Config project: … appId: set`**; never reaches Firebase | It fetches config from Apps Script, which **302-redirects**; the redirect response must be **drained** (`res.resume()`) and `main()` ends with **`process.exit(0)`**, else a lingering keep-alive socket holds the event loop open and stalls `deploy-hosting.js` |
+| **Firebase CLI blocks on a hidden prompt** | Deploy stuck with no output (auth refresh / usage-consent / update notice) | `firebase deploy --only hosting` runs **`--non-interactive`** (+ `NO_UPDATE_NOTIFIER`, `shell:true`) so it **fails fast** instead of hanging; a **20s heartbeat** + **10-min hard timeout** make a true hang visible and self-aborting |
+| **versionCode downgrade** | "App not installed" on the tablet (Android blocks lower `versionCode`) | `build-station-apk.js` reads the highest published `versionCode` (manifest + history) and **refuses to build a lower one** |
+| **Stale download page** | Site still serves the old build after a half-run / dead shell | `deploy-hosting.js` **fetches the live manifest after deploy** and confirms the served `versionCode` matches; warns + exits non-zero on mismatch |
+
+**Never do:**
+- Add a `readline`/stdin prompt to any pipeline script without an `!process.stdin.isTTY` guard — an AI agent / CI shell has no keyboard and will **hang forever, wedging the whole terminal session** (this is exactly what `rollback.js` did — see Incident Log 2026-07-08).
+- Leave an HTTP fetch in a deploy script without draining the response and forcing exit.
+- Assume "deploy ran" without the `[verify] OK — live site serves build N` line.
+
+---
+
 ## Node-only files must never ship to GAS (white screen)
 
 **Plain language:** Showrunner is built on your PC, then uploaded to Google. Some files are **only for your PC** (they use Node’s `require`). If one of those lands on Google by mistake, the live app **crashes on load** — white screen, error like `ReferenceError: require is not defined`. This is **not** task notes, RELEASES notes, or in-app data.
@@ -343,4 +392,37 @@ FRAGILE ZONE: Two-layer shell bridge; Mobile QR camera (PWA); host-boot.js (shar
 FILES TOUCHED: host-boot.js, 01j_Mobile_Scan.html, Index.html, Main.js (sessionboot srScan, mobscanstage), Station_Security.js (stage/pull/resolve), push-hosting/public/index.html (?v=), FRAGILE_ZONES.md
 LESSON: For shell↔iframe scan delivery, never use postMessage as sole path — use iframe reload with server-embedded tag (QR) or native poll pull (RFID). Never run parallel handoff mechanisms without dedupe. Simulate working + camera not = lookup bug — split “decode/handoff” from “vault resolve”. Always bump host-boot.js?v= on hosting deploy. Read FRAGILE_ZONES § Two-layer bridge before touching host-boot.js.
 VERSION TRAIL (GAS unless noted): v437–455 panel + shell bridges; v457 embed-origin; v458 srScan nav reverted; v459 shell fullscreen cam; v460 diagnostics removed v461; v463 server stage + simulate; v464 vault lookup; v465 relay burst + forwarder; v466 reload handoff (hosting v466–467); v467 loop fix (hosting v468).
+```
+
+#### 2026-07-08 — Gun disconnect/reconnect reboots the whole station UI (fixed APK 0.1.36 build 38)
+
+```
+DATE: 2026-07-08
+SYMPTOM: From the very first builds, every time the RFID gun slept/disconnected and reconnected, the app "restarted" — mobile→station flash, back to SYSTEM SECURE / station cold boot, host badge and project state lost, ~20s before you could badge in again. Persisted through ~10 versions of fixes.
+CAUSE: The Chainway gun is a Bluetooth HID keyboard (trigger = KeyEvent). Connecting/disconnecting an HID keyboard changes Android's `keyboard`/`navigation` device configuration. AndroidManifest declared `keyboardHidden` but NOT `keyboard`/`navigation`, so each gun flap was an UNHANDLED config change → Android destroyed + recreated StationWebActivity → WebView rebuilt from zero. It was never a session-bridge or renderer problem; every v476–485 mitigation (flap guards, session guards, host persistence, renderer priority) fought the wrong layer and failed in the field.
+FRAGILE ZONE: Station native app lifecycle (APK); Station RFID / native gun bridge
+FILES TOUCHED: station-android/app/src/main/AndroidManifest.xml (added keyboard|navigation|density|fontScale|locale to configChanges), StationWebActivity.kt (onConfigurationChanged breadcrumb + renderer priority), 11_Station_Shell.html (stationOnGunConfigChange_ toast), FRAGILE_ZONES.md, active/rfid-station-profiles.md
+LESSON: When a native Android WebView app "reboots" on a hardware event (BT device connect/disconnect, rotation, keyboard), suspect Activity recreation from an unhandled config change BEFORE blaming web/session logic. HID input devices (scanners, guns) flip `keyboard`/`navigation` — they MUST be in configChanges. A one-line manifest fix beat weeks of JS mitigations. Add a config-change breadcrumb so the layer is provable on-device.
+```
+
+#### 2026-07-08 — Firebase hosting deploy hangs forever after "Config project…" (fixed)
+
+```
+DATE: 2026-07-08
+SYMPTOM: `node deploy-hosting.js` printed up to "Config project: sm-showrunner-97405 | sender: … | appId: set" and then froze indefinitely — the terminal never returned, the new APK build never reached the /station-app download page (kept showing the old build).
+CAUSE: `prepare-hosting.js` fetches Firebase config from Apps Script, which responds with a 302 redirect. The redirect response body was never drained, so a keep-alive socket kept Node's event loop alive — the process finished its work, printed its last line ("Config project…"), but never EXITED. `deploy-hosting.js` ran it via execSync and blocked forever waiting for that child to end, never reaching `firebase deploy`. Intermittent (sometimes the socket timed out and it escaped). Compounded by no visibility (silent) and no timeout.
+FRAGILE ZONE: Station APK + hosting deploy pipeline
+FILES TOUCHED: push-hosting/prepare-hosting.js (res.resume() on redirect + process.exit(0) after work), deploy-hosting.js (firebase --non-interactive + NO_UPDATE_NOTIFIER + 20s heartbeat + 10-min timeout + post-deploy live-manifest verify), build-station-apk.js (versionCode downgrade guard)
+LESSON: A deploy script that spawns Node children must guarantee those children EXIT — drain every HTTP response (especially redirects) and force process.exit after synchronous work. Long silent steps need a heartbeat + hard timeout so a hang is visible and self-aborting, never an infinite freeze. Always verify the LIVE artifact after deploy (fetch the served manifest) — never trust "the command ran".
+```
+
+#### 2026-07-08 — `rollback.js` prompt wedged the entire agent shell (fixed)
+
+```
+DATE: 2026-07-08
+SYMPTOM: After creating rollback.js, EVERY subsequent terminal command in the AI agent's shell returned "no exit status" — nothing ran for the rest of the session; even `echo` hung. Survived Cursor window reloads.
+CAUSE: rollback.js used readline to ask "Proceed with rollback? [y/N]". Run in a non-interactive shell (AI agent / CI — no keyboard/stdin), readline blocked forever waiting for a keypress. Because the agent shell is a single stateful session, that hung `node` process sat in the foreground and every later command queued behind it indefinitely. On Windows the orphaned node even survived app restarts (needed `taskkill /F /IM node.exe`).
+FRAGILE ZONE: Station APK + hosting deploy pipeline (tooling scripts)
+FILES TOUCHED: rollback.js (guard: if !process.stdin.isTTY, print instructions and exit(1) instead of prompting; require --yes)
+LESSON: NEVER put an interactive stdin prompt in a script that an AI agent or CI might run without guarding on `process.stdin.isTTY`. Without a TTY, refuse and require an explicit flag (--yes) instead of blocking. A single hung foreground process wedges the whole stateful agent shell; recovery needs killing the orphaned process, not just reloading the IDE.
 ```
