@@ -1,15 +1,35 @@
 {
-  "versionName": "0.1.31",
-  "versionCode": 33,
+  "versionName": "0.1.34",
+  "versionCode": 36,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T05:08:53.998Z",
+  "updatedAt": "2026-07-08T06:05:37.823Z",
   "sizeBytes": 12057257,
   "notes": [
-    "Revert v483 direct-GAS",
-    "restore hosting shell startup"
+    "BLE flap guard survives WebView reload",
+    "Block iframe nav during gun reconnect",
+    "host badge in parent storage"
   ],
   "history": [
+    {
+      "versionName": "0.1.34",
+      "versionCode": 36,
+      "date": "2026-07-08T06:05:37.823Z",
+      "notes": [
+        "BLE flap guard survives WebView reload",
+        "Block iframe nav during gun reconnect",
+        "host badge in parent storage"
+      ]
+    },
+    {
+      "versionName": "0.1.33",
+      "versionCode": 35,
+      "date": "2026-07-08T05:21:14.647Z",
+      "notes": [
+        "Restore hosting shell (revert v483)",
+        "Fix install: versionCode must exceed build 34"
+      ]
+    },
     {
       "versionName": "0.1.31",
       "versionCode": 33,
@@ -175,23 +195,6 @@
         "Screen may now sleep to save power/screen wear",
         "the gun stays connected in the background",
         "Pull the gun trigger to wake the tablet (SDK only, no keyboard/power button) — first pull wakes, next pull scans"
-      ]
-    },
-    {
-      "versionName": "0.1.9",
-      "versionCode": 11,
-      "date": "2026-07-02T19:24:17.996Z",
-      "notes": [
-        "Fixes scans not showing on the top strip: the app now sends tags to the screen through a direct, reliable channel instead of the relay that was dropping them - your reads should now appear up top, not just in the bottom text. Removed Hold mode: this gun model does not report when you release the trigger, so Hold could not work",
-        "scan modes are now Single and Continuous only (any device set to Hold is moved back to Single automatically)."
-      ]
-    },
-    {
-      "versionName": "0.1.8",
-      "versionCode": 10,
-      "date": "2026-07-02T19:02:11.441Z",
-      "notes": [
-        "Settings now apply live the moment you change them (Done just closes the menu) - the app talks to the gun directly instead of through a slower relay. Added an on-screen diagnostic overlay (bottom-left) plus native status messages so we can finally SEE the scan/settings path on the device: it shows whether the station bridge is connected, echoes 'Gun set: ...' when a setting reaches the gun, and prints 'Trigger DOWN/UP' so we can tell why Hold behaves like a toggle. This build is about pinpointing why scans reach the bottom text but not the top strip."
       ]
     }
   ]

@@ -111,6 +111,7 @@ class StationWebActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 injectPersistedWebSession()
+                injectBleFlapGuardFromPrefs()
             }
 
             override fun onRenderProcessGone(
@@ -120,6 +121,7 @@ class StationWebActivity : AppCompatActivity() {
                 val now = System.currentTimeMillis()
                 if (now - lastRendererReloadAt < RENDERER_RELOAD_DEBOUNCE_MS) return true
                 lastRendererReloadAt = now
+                armBleFlapGuard(45_000L)
                 runOnUiThread {
                     if (!::webView.isInitialized) return@runOnUiThread
                     val current = webView.url
@@ -335,7 +337,29 @@ class StationWebActivity : AppCompatActivity() {
     }
 
     private fun setWebBleReconnecting(active: Boolean) {
-        evalJs("try{window.__srBleReconnecting=" + (if (active) "true" else "false") + ";}catch(e){}")
+        if (active) {
+            armBleFlapGuard(30_000L)
+            evalJs("try{window.__srBleReconnecting=true;}catch(e){}")
+        } else {
+            armBleFlapGuard(20_000L)
+            evalJs("try{window.__srBleReconnecting=false;}catch(e){}")
+        }
+    }
+
+    private fun armBleFlapGuard(durationMs: Long) {
+        val until = System.currentTimeMillis() + durationMs
+        stationPrefs.edit().putLong(PREF_BLE_FLAP_UNTIL, until).apply()
+        evalJs(
+            "try{window.__srBleFlapUntil=$until;window.__srBleReconnecting=true;}catch(e){}",
+        )
+    }
+
+    private fun injectBleFlapGuardFromPrefs() {
+        val until = stationPrefs.getLong(PREF_BLE_FLAP_UNTIL, 0L)
+        if (until <= System.currentTimeMillis()) return
+        evalJs(
+            "try{window.__srBleFlapUntil=$until;window.__srBleReconnecting=true;}catch(e){}",
+        )
     }
 
     private fun injectPersistedWebSession() {
@@ -494,6 +518,7 @@ class StationWebActivity : AppCompatActivity() {
         private const val PREF_SPLASH_DISMISSED = "splash_dismissed"
         private const val PREF_WEB_SESSION_TOKEN = "web_session_token"
         private const val PREF_WEB_SESSION_EXPIRES = "web_session_expires"
+        private const val PREF_BLE_FLAP_UNTIL = "ble_flap_until"
         private const val GUN_STATUS_DEBOUNCE_MS = 1800L
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L

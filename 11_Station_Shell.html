@@ -1490,9 +1490,28 @@ function stationHostStorageKey_() {
   return 'sm_station_host_v1_' + dev;
 }
 
-function stationReadHostSession_() {
+function stationPersistHostToParent_(host) {
+  var key = stationHostStorageKey_();
   try {
-    const raw = sessionStorage.getItem(stationHostStorageKey_());
+    if (host) localStorage.setItem(key, JSON.stringify(host));
+    else localStorage.removeItem(key);
+  } catch (e) { /* ignore */ }
+  try {
+    stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_SESSION', deviceKey: key, host: host || null });
+  } catch (e) { /* ignore */ }
+}
+
+function stationRequestHostRestoreFromParent_() {
+  try {
+    stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_RESTORE_REQUEST', deviceKey: stationHostStorageKey_() });
+  } catch (e) { /* ignore */ }
+}
+
+function stationReadHostSession_() {
+  var key = stationHostStorageKey_();
+  try {
+    var raw = sessionStorage.getItem(key);
+    if (!raw) raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.name) return null;
@@ -1511,6 +1530,7 @@ function stationWriteHostSession_(host) {
       stationClearHostEjectDeadline_();
     }
   } catch (e) { /* ignore */ }
+  stationPersistHostToParent_(host);
   // Host-inherit RBAC: while hosted, the app evaluates permissions as the HOST (their real tier +
   // IAM), not the low-tier device account. Cleared on eject/logout. See stationHostRbac override.
   if (host && (host.access || host.permissions)) {
@@ -3262,6 +3282,11 @@ function stationBindMessageListener_() {
       stationApplyGunConfig_(d.config || null);
     } else if (d.type === 'SHOWRUNNER_STATION_GUN_STATUS' && d.message) {
       if (typeof window.stationOnGunStatus_ === 'function') window.stationOnGunStatus_(d.message);
+    } else if (d.type === 'SHOWRUNNER_STATION_HOST_RESTORE' && d.host && d.host.name) {
+      if (!stationReadHostSession_()) {
+        stationWriteHostSession_(d.host);
+        stationRenderShellState_();
+      }
     }
   });
 }
@@ -3278,6 +3303,7 @@ function initStationShell_() {
     if (shell) shell.style.display = 'flex';
   } catch (e) { /* ignore */ }
   try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
+  try { stationRequestHostRestoreFromParent_(); } catch (e) { /* ignore */ }
 
   try {
     stationBindHostIdleListeners_();
