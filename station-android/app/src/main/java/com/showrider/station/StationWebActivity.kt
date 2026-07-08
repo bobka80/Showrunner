@@ -549,6 +549,12 @@ class StationWebActivity : AppCompatActivity() {
             rfid.forceReconnect()
         }
 
+        /** Sleep the gun to save battery (Settings → auto-sleep timer or Disconnect + sleep). */
+        @JavascriptInterface
+        fun sleepGun() {
+            rfid.sleepGun()
+        }
+
         /** Station shell mounted inside the WebView — drop the kiosk splash. */
         @JavascriptInterface
         fun shellReady() { hideSplash() }

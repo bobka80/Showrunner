@@ -943,6 +943,18 @@ html.station-device-root #station-device-controls { display: flex; }
         </select>
         <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected.</div>
       </div>
+      <div class="station-field" id="station-gunsleep-field" style="display:none;">
+        <label class="station-field__label" for="station-set-gunsleep">Sleep the gun after (minutes idle)</label>
+        <select id="station-set-gunsleep" onchange="stationSaveGunSleepMinutes()">
+          <option value="0">Never (stay on)</option>
+          <option value="1">1 minute</option>
+          <option value="2">2 minutes</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">Saves battery — the gun powers down after this long with no reads. Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
       <div id="station-eject-saved" class="station-settings-saved"></div>
     </div>
 
@@ -1188,6 +1200,11 @@ var STATION_HOST_IDLE_DEFAULT_MIN = 10;
 var STATION_HOST_EJECT_COOLDOWN_MS = 3000;
 var STATION_EJECT_STORAGE_KEY = 'sm_station_eject_min';
 var STATION_EJECT_CHOICES = [1, 3, 5, 10];
+// Gun idle auto-sleep (battery save). 0 = never. Sleeps the gun via the native bridge after this
+// many minutes with no reads; wake = trigger pull + Reconnect gun.
+var STATION_GUNSLEEP_STORAGE_KEY = 'sm_station_gunsleep_min';
+var STATION_GUNSLEEP_CHOICES = [0, 1, 2, 3, 5, 10];
+var STATION_GUNSLEEP_DEFAULT_MIN = 5;
 
 /**
  * Device-local gun settings. The web setup is the source of truth (survives app
@@ -1409,6 +1426,49 @@ function stationEjectMinutes_() {
 
 function stationHostIdleMs_() {
   return stationEjectMinutes_() * 60 * 1000;
+}
+
+/** Configurable gun auto-sleep (minutes idle). 0 = never. */
+function stationGunSleepMinutes_() {
+  try {
+    var v = parseInt(localStorage.getItem(STATION_GUNSLEEP_STORAGE_KEY), 10);
+    if (STATION_GUNSLEEP_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_GUNSLEEP_DEFAULT_MIN;
+}
+
+/** Native bridge that can sleep the gun (desktop TSL or Chainway with sleepGun support). */
+function stationSleepCapableBridge_() {
+  var b = stationNativeBridge_();
+  return (b && typeof b.sleepGun === 'function') ? b : null;
+}
+
+function stationClearGunIdleTimer_() {
+  if (window.stationGunIdleTimer) {
+    clearTimeout(window.stationGunIdleTimer);
+    window.stationGunIdleTimer = null;
+  }
+}
+
+/**
+ * (Re)arm the gun idle-sleep countdown. Called on every read and whenever the gun connects.
+ * After the configured idle minutes with no activity we ask the native bridge to sleep the gun.
+ */
+function stationResetGunIdleTimer_() {
+  stationClearGunIdleTimer_();
+  var mins = stationGunSleepMinutes_();
+  if (!mins) return; // Never
+  if (!stationSleepCapableBridge_()) return;
+  window.stationGunIdleTimer = setTimeout(function() {
+    window.stationGunIdleTimer = null;
+    var b = stationSleepCapableBridge_();
+    if (!b) return;
+    try {
+      b.sleepGun();
+      stationToast_('Gun asleep (idle ' + mins + ' min) — pull trigger + Reconnect', '');
+      setTimeout(function() { stationRequestGunConfig_(); }, 1200);
+    } catch (e) { /* ignore */ }
+  }, mins * 60 * 1000);
 }
 
 function stationHostEjectDeadlineKey_() {
@@ -1713,13 +1773,15 @@ window.stationSleepGun_ = function() {
   stationToast_('Sleep is available on the desktop station with the TSL gun.', 'error');
 };
 
-/** Show the Disconnect+sleep button only when the native bridge supports it (desktop TSL gun). */
+/** Show the sleep controls only when the native bridge supports sleeping the gun. */
 function stationSyncGunSleepButton_() {
-  var field = document.getElementById('station-gun-sleep-field');
-  if (!field) return;
-  var b = stationNativeBridge_();
-  var canSleep = !!(b && typeof b.sleepGun === 'function');
-  field.style.display = canSleep ? 'block' : 'none';
+  var canSleep = !!stationSleepCapableBridge_();
+  var btnField = document.getElementById('station-gun-sleep-field');
+  if (btnField) btnField.style.display = canSleep ? 'block' : 'none';
+  var dropField = document.getElementById('station-gunsleep-field');
+  if (dropField) dropField.style.display = canSleep ? 'block' : 'none';
+  var dropEl = document.getElementById('station-set-gunsleep');
+  if (dropEl) dropEl.value = String(stationGunSleepMinutes_());
 }
 
 function stationSetLastScan_(tag) {
@@ -2007,6 +2069,7 @@ function stationBeginHostLogin_(tag, tid) {
 
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag, rawTid) {
+  stationResetGunIdleTimer_(); // any read is activity — restart the auto-sleep countdown
   const scan = stationParseScanPayload_(rawTag, rawTid);
   const tag = scan.epc;
   const tid = scan.tid;
@@ -3328,6 +3391,9 @@ function stationApplyGunConfig_(cfg) {
     stationToast_(liveNow ? 'RFID gun connected' : 'RFID gun disconnected', liveNow ? 'ok' : 'error');
   }
   window.stationLastGunConnected = liveNow;
+  // Arm the auto-sleep countdown while the gun is live; stop it when it drops/sleeps.
+  if (liveNow) stationResetGunIdleTimer_();
+  else stationClearGunIdleTimer_();
   if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
   if (fwEl) fwEl.textContent = cfg.firmware || '—';
   stationSyncPanelReadModeUI_();
@@ -3395,6 +3461,21 @@ window.stationSaveEjectMinutes = function() {
   if (stationReadHostSession_()) stationResetHostIdleTimer_();
   if (savedEl) {
     savedEl.textContent = 'Saved — host ejects after ' + mins + ' min.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
+window.stationSaveGunSleepMinutes = function() {
+  const el = document.getElementById('station-set-gunsleep');
+  if (!el) return;
+  let mins = parseInt(el.value, 10);
+  if (STATION_GUNSLEEP_CHOICES.indexOf(mins) === -1) mins = STATION_GUNSLEEP_DEFAULT_MIN;
+  el.value = String(mins);
+  try { localStorage.setItem(STATION_GUNSLEEP_STORAGE_KEY, String(mins)); } catch (e) { /* ignore */ }
+  stationResetGunIdleTimer_();
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) {
+    savedEl.textContent = mins ? ('Saved — gun sleeps after ' + mins + ' min idle.') : 'Saved — gun stays on.';
     setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
   }
 };

@@ -1,15 +1,26 @@
 {
-  "versionName": "0.1.38",
-  "versionCode": 40,
+  "versionName": "0.1.39",
+  "versionCode": 41,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T11:31:49.123Z",
+  "updatedAt": "2026-07-08T15:10:33.922Z",
   "sizeBytes": 12057293,
   "notes": [
-    "Trigger brings the station to the front: when the gun is connected, pulling the trigger now wakes the screen AND foregrounds the Showrunner Station app if something else is showing (home screen / another app / screen off). Uses SYSTEM_ALERT_WINDOW (Display over other apps, prompted once at setup) to allow the background Activity launch",
-    "singleTask reorder means no WebView rebuild. First pull brings it up, next pull scans (same pattern as screen wake)."
+    "Gun auto-sleep timer: gun powers down after chosen idle minutes (1/2/3/5/10) to save battery",
+    "wake with trigger + Reconnect",
+    "Settings: new 'Sleep the gun after (idle)' dropdown next to the host-eject timer"
   ],
   "history": [
+    {
+      "versionName": "0.1.39",
+      "versionCode": 41,
+      "date": "2026-07-08T15:10:33.922Z",
+      "notes": [
+        "Gun auto-sleep timer: gun powers down after chosen idle minutes (1/2/3/5/10) to save battery",
+        "wake with trigger + Reconnect",
+        "Settings: new 'Sleep the gun after (idle)' dropdown next to the host-eject timer"
+      ]
+    },
     {
       "versionName": "0.1.38",
       "versionCode": 40,
@@ -182,15 +193,6 @@
         "Gun reconnect no longer shows STARTING splash",
         "splash dismissed once per device",
         "station re-announces ready on resume"
-      ]
-    },
-    {
-      "versionName": "0.1.16",
-      "versionCode": 18,
-      "date": "2026-07-07T15:03:30.414Z",
-      "notes": [
-        "Bulletproof BLE reconnect: health check, reconnect ladder, foreground service, screen-on wake",
-        "honest linkState in settings"
       ]
     }
   ]

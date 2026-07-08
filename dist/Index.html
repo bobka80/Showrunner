@@ -6908,6 +6908,18 @@ html.station-device-root #station-device-controls { display: flex; }
         </select>
         <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected.</div>
       </div>
+      <div class="station-field" id="station-gunsleep-field" style="display:none;">
+        <label class="station-field__label" for="station-set-gunsleep">Sleep the gun after (minutes idle)</label>
+        <select id="station-set-gunsleep" onchange="stationSaveGunSleepMinutes()">
+          <option value="0">Never (stay on)</option>
+          <option value="1">1 minute</option>
+          <option value="2">2 minutes</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">Saves battery — the gun powers down after this long with no reads. Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
       <div id="station-eject-saved" class="station-settings-saved"></div>
     </div>
 

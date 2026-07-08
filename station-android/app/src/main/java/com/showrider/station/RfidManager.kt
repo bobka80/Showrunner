@@ -728,6 +728,30 @@ class RfidManager(
         configWorker.shutdown()
     }
 
+    /**
+     * Idle auto-sleep / manual "Disconnect + sleep gun". Drops the BLE link so the gun's firmware
+     * can power down, and suppresses the reconnect ladder/watchdog so we don't wake it straight back
+     * up. Resumable (unlike [disconnect]) — executors stay alive; forceReconnect() brings it back.
+     */
+    fun sleepGun() {
+        activeDisconnect = true
+        reconnectGeneration.incrementAndGet()
+        readCancelled.set(true)
+        stopInventory()
+        reconnectExecutor.execute {
+            try {
+                softDisconnect()
+                uhf.free()
+            } catch (e: Exception) {
+                Log.e(TAG, "sleepGun failed", e)
+            }
+            initialized.set(false)
+            connected = false
+            setLinkState(LINK_ASLEEP)
+        }
+        postStatus("Gun asleep — pull the trigger to wake it, then tap Reconnect gun")
+    }
+
     private fun applyConfigToGun() {
         configWorker.execute {
             try {
@@ -826,6 +850,7 @@ class RfidManager(
         const val LINK_LIVE = "live"
         const val LINK_ZOMBIE = "zombie"
         const val LINK_RECONNECTING = "reconnecting"
+        const val LINK_ASLEEP = "asleep"
         private const val MULTI_BURST_MS = 700L
         private const val MULTI_BURST_MAX_READS = 20
         private const val MULTI_READ_GAP_MS = 40L
