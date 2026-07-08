@@ -1456,6 +1456,9 @@ function stationClearGunIdleTimer_() {
  */
 function stationResetGunIdleTimer_() {
   stationClearGunIdleTimer_();
+  // Only guns whose driver opts into app-driven sleep (e.g. TSL). Chainway sleeps in firmware —
+  // an app-forced disconnect there would break the trigger→wake-screen behaviour.
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('appSleep')) return;
   var mins = stationGunSleepMinutes_();
   if (!mins) return; // Never
   if (!stationSleepCapableBridge_()) return;
@@ -1773,13 +1776,18 @@ window.stationSleepGun_ = function() {
   stationToast_('Sleep is available on the desktop station with the TSL gun.', 'error');
 };
 
-/** Show the sleep controls only when the native bridge supports sleeping the gun. */
+/**
+ * Show the sleep controls only for gun drivers that support them AND when the native bridge can
+ * sleep the gun. (Next step: keep the screen identical for every gun and gray these out instead
+ * of hiding — driven by the same stationGunCap_ flags.)
+ */
 function stationSyncGunSleepButton_() {
-  var canSleep = !!stationSleepCapableBridge_();
+  var bridge = stationSleepCapableBridge_();
+  var cap = (typeof stationGunCap_ === 'function') ? stationGunCap_ : function() { return true; };
   var btnField = document.getElementById('station-gun-sleep-field');
-  if (btnField) btnField.style.display = canSleep ? 'block' : 'none';
+  if (btnField) btnField.style.display = (bridge && cap('disconnectSleep')) ? 'block' : 'none';
   var dropField = document.getElementById('station-gunsleep-field');
-  if (dropField) dropField.style.display = canSleep ? 'block' : 'none';
+  if (dropField) dropField.style.display = (bridge && cap('appSleep')) ? 'block' : 'none';
   var dropEl = document.getElementById('station-set-gunsleep');
   if (dropEl) dropEl.value = String(stationGunSleepMinutes_());
 }

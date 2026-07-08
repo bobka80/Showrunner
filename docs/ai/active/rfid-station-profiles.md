@@ -16,6 +16,27 @@ This campaign is **RFID gun + station device profiles** only: warehouse tablet/p
 
 A warehouse tablet/phone **married to a Chainway UHF gun** boots the station shell, a crew **badge scan** hosts a session, and equipment scans run check-in/out — no personal login, no plug/unplug.
 
+## Gun driver fork (multi-gun architecture) — v494
+
+The station now supports **more than one gun type**, so gun behaviour is **forked per station layout** and must never be mixed in the shared shell.
+
+**Registry:** `11a_Station_Gun_Drivers.html` (included before `11_Station_Shell.html`) defines `window.StationGunDrivers`, keyed by station layout, plus helpers `stationActiveGunDriver_()` and `stationGunCap_(name)`. The shared shell asks the **active driver** what it supports — it never hard-codes gun-specific logic.
+
+| Layout id | Driver | Native binary | app sleep | wake-screen |
+|-----------|--------|---------------|-----------|-------------|
+| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **no** — firmware sleeps when idle/disconnected; app must NOT force-disconnect (breaks trigger→wake) | **yes** (SDK `KeyEventCallback`) |
+| `tsl_dock_desktop` | TSL 1128 desktop | `station-desktop/` `TslRfidManager.cs` (EXE) | **yes** — ASCII `.sl` sleep + re-acquire on Reconnect | no |
+| `gate` *(planned)* | Gate reader + TV | TBD | TBD | no |
+
+**`caps` flags** (`power, scanMode, multi, continuous, beep, pollMs, battery, firmware, appSleep, disconnectSleep, wakeScreen`) decide which controls are relevant per gun.
+
+- **Now:** unsupported controls are **hidden** (e.g. the auto-sleep dropdown + Disconnect+sleep button show only for `appSleep`/`disconnectSleep` drivers).
+- **Next step:** keep the settings screen **identical for every gun** and **auto-gray-out** (disable) the controls a driver does not support — same `stationGunCap_` flags, `disabled` instead of hidden.
+
+**Why the fork exists (regression that triggered it):** a shared auto-sleep timer called `sleepGun()` on *any* connected gun (default 5 min). On Chainway that disconnected the BLE link and suppressed the reconnect ladder, which killed the trigger→wake-screen handler (only runs while connected) — "gun won't turn off and won't wake the screen". The driver fork isolates each gun so TSL sleep can never touch Chainway again.
+
+**Native note:** Chainway `RfidManager.kt` gained a resumable `sleepGun()` (build 41) that is **not used** by the Chainway driver (`appSleep:false`); it's parked for a future Chainway-specific sleep that preserves trigger-wake. Trigger→wake-screen behaviour is restored purely by the shell no longer calling it.
+
 ## Shipped (this campaign)
 
 - [x] **Station profile editor** — `06h_Admin_Station_Profiles.html` + `Station_Security.js` (separate from office Role Editor `06a`)

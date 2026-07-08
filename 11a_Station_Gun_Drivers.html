@@ -1,0 +1,78 @@
+<script>
+/**
+ * Station gun driver registry — one driver per station layout so each gun type's behaviour
+ * (sleep, wake, which controls apply) stays fully isolated. The shared station shell never
+ * hard-codes gun-specific logic; it asks the ACTIVE driver what it supports.
+ *
+ * The native side is already a separate binary per platform:
+ *   - chainway_handheld → station-android/ RfidManager.kt          (Chainway BLE, APK)
+ *   - tsl_dock_desktop  → station-desktop/ TslRfidManager.cs        (TSL 1128 over COM, EXE)
+ *   - gate (planned)     → third layout + its own driver, TBD       (fixed gate reader + TV)
+ *
+ * `caps` flags drive which controls are relevant per gun. Today unsupported controls are hidden;
+ * the next step is to keep the settings screen identical for every gun and auto-GRAY-OUT the
+ * controls a given driver does not support (see docs/ai/active/rfid-station-profiles.md).
+ */
+(function() {
+  var DRIVERS = {
+    chainway_handheld: {
+      id: 'chainway_handheld',
+      label: 'Chainway handheld',
+      caps: {
+        power: true, scanMode: true, multi: true, continuous: true, beep: true, pollMs: true,
+        battery: true, firmware: true,
+        // Chainway sleeps via its own firmware when idle+disconnected. The APP must NOT force a
+        // disconnect to "sleep" it — that kills the trigger→wake-screen handler. So no app sleep.
+        appSleep: false,
+        disconnectSleep: false,
+        wakeScreen: true
+      }
+    },
+    tsl_dock_desktop: {
+      id: 'tsl_dock_desktop',
+      label: 'TSL 1128 desktop',
+      caps: {
+        power: true, scanMode: true, multi: true, continuous: true, beep: true, pollMs: true,
+        battery: false, firmware: true,
+        // TSL 1128 has no power button; the app sleeps it with the ASCII .sl command and re-acquires
+        // on Reconnect. Safe because there is no trigger→wake-screen behaviour to break.
+        appSleep: true,
+        disconnectSleep: true,
+        wakeScreen: false
+      }
+    },
+    gate: {
+      id: 'gate',
+      label: 'Gate reader (planned)',
+      caps: {
+        power: true, scanMode: false, multi: false, continuous: true, beep: false, pollMs: true,
+        battery: false, firmware: true,
+        appSleep: false, disconnectSleep: false, wakeScreen: false
+      }
+    }
+  };
+
+  var DEFAULT_ID = 'chainway_handheld';
+
+  window.StationGunDrivers = DRIVERS;
+
+  /** Active station layout id (from the bootstrap), falling back to the safe Chainway default. */
+  window.stationActiveGunLayout_ = function() {
+    try {
+      var boot = window.stationShellBootstrap;
+      if (boot && boot.layout && DRIVERS[boot.layout]) return boot.layout;
+    } catch (e) { /* ignore */ }
+    return DEFAULT_ID;
+  };
+
+  window.stationActiveGunDriver_ = function() {
+    return DRIVERS[window.stationActiveGunLayout_()] || DRIVERS[DEFAULT_ID];
+  };
+
+  /** Does the active gun driver support a capability? Used to show/hide (and later gray-out). */
+  window.stationGunCap_ = function(name) {
+    var d = window.stationActiveGunDriver_();
+    return !!(d && d.caps && d.caps[name]);
+  };
+})();
+</script>
