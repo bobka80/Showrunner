@@ -14,7 +14,7 @@ let lastMiniEventClickTime = 0;
 let lastMiniEventClickId = null;
 let currentEditingEvent = null; 
 
-function bootMiniCalendar(targetDateString, projectId) {
+function bootMiniCalendar(targetDateString, projectId, focusCue) {
     const container = document.getElementById('mini-project-calendar');
     if (!container) return;
     
@@ -192,6 +192,21 @@ function bootMiniCalendar(targetDateString, projectId) {
                         });
                     });
                 }
+            }
+        }
+
+        // Press cue: briefly frame the exact day tapped in the main calendar so, on entry, the
+        // operator sees where they pressed. A glowing outline fades in → out over ~3s, then the
+        // class is removed so nothing lingers. Only fires for a new-project day-click (focusCue).
+        if (focusCue) {
+            var cuePad2 = function(n) { return n < 10 ? '0' + n : '' + n; };
+            var cueDateStr = miniAnchor.getFullYear() + '-' + cuePad2(miniAnchor.getMonth() + 1) + '-' + cuePad2(miniAnchor.getDate());
+            var cueCell = container.querySelector('.fc-daygrid-day[data-date="' + cueDateStr + '"]');
+            if (cueCell) {
+                cueCell.classList.remove('mini-press-cue');
+                void cueCell.offsetWidth; // reflow so re-adding restarts the animation
+                cueCell.classList.add('mini-press-cue');
+                setTimeout(function() { cueCell.classList.remove('mini-press-cue'); }, 3200);
             }
         }
 

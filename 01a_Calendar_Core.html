@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (document.getElementById('edit-proj-multiplier')) document.getElementById('edit-proj-multiplier').value = '1.0';
           window.currentReadinessState = {};
           if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
-          bootMiniCalendar(info.dateStr, 'NEW');
+          bootMiniCalendar(info.dateStr, 'NEW', true);
           if (typeof applyProjectEditorMode === 'function') applyProjectEditorMode('NEW');
       },
       
