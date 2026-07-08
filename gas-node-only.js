@@ -9,6 +9,7 @@ module.exports = new Set([
   'dev-push.js',
   'works-save.js',
   'milestone.js',
+  'rollback.js',
   'rollback-works.js',
   'rollback-milestone.js',
   'deploy-hosting.js',
