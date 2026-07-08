@@ -94,14 +94,33 @@ A warehouse tablet/phone **married to a Chainway UHF gun** boots the station she
 
 ## In progress / next (director priority 2026-07-07)
 
-1. **[x] Crew EPC + TID (Chainway UHF, soft cutover A)** — `rfid_tid` column; native `setEPCAndTIDMode`; enroll/login pair match when TID on row; legacy EPC-only until re-enrolled.
+1. **[x] BLE reconnect must not restart app** — v483/APK 0.1.31: native GAS direct load, BLE flap guard, host session native persist, session-clear hardening.
 2. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
-3. **[x] Optimistic host login + local roster cache** — local EPC+TID roster + instant host UI; server confirms in parallel (GAS v481+).
-4. **[x] Host idle eject must fire after sleep** — `localStorage` wall-clock deadline (`sm_station_host_eject_deadline_v1_*`); checked on `visibilitychange` / `pageshow` / `focus`, native `ACTION_SCREEN_ON` + `onResume`, and boot restore (GAS v482+).
 
-### Parked — must fix later (director 2026-07-07: stop work for now)
+### Parked — must fix later (director 2026-07-07: stop work for now) → **RESUMED priority 2026-07-07**
 
-**[ ] BLE reconnect must not reset device login / station shell** — symptom persists after v479. Gun BLE disconnect/reconnect still feels like a hard app reset: back to **SYSTEM SECURE** (device passcode) and/or station cold boot (splash, host badge lost, project state gone). **Director decision:** defer; document attempts below; revisit with a fresh architectural pass.
+**[ ] BLE reconnect must not reset device login / station shell** — **chronic from first station app ship** (not a recent regression). Gun BLE disconnect/reconnect still feels like a hard app reset: back to **SYSTEM SECURE** (device passcode) and/or station cold boot (splash, host badge lost, project state gone). v476–479 mitigations reduced some races but did not fix the root architecture. **Director priority:** fix before kiosk polish — ~20 s unusable after every gun sleep.
+
+#### Investigation culprits (ranked — see agent todo list)
+
+| Tier | ID | Suspect | File(s) |
+|------|-----|---------|---------|
+| **A** | A1 | Full **WebView reload** (`onRenderProcessGone` → `reload`/`loadUrl`) retriggers entire `host-boot.js` | `StationWebActivity.kt` |
+| **A** | A2 | Any **`frame.src`** change → GAS cold boot (`sessionboot` or Login) + `getStationShellBootstrap` (~20 s) | `host-boot.js`, `11_Station_Shell.html` |
+| **A** | A3 | **`navigateHostingToLoginGate`** / `clearParentSession` → plain Login (SYSTEM SECURE) | `host-boot.js` |
+| **B** | B1 | **`resolveAppFrameUrl`** clears session when `sessioncheck` fails and `__srBleReconnecting` is false | `host-boot.js` |
+| **B** | B2 | **`__srBleReconnecting`** clears 4 s after `LINK_LIVE` but reconnect ladder can flap longer | `RfidManager.kt` |
+| **B** | B3 | **Login.html** `sessioncheck` fail → `SHOWRUNNER_SESSION_CLEAR` + `clearSession:true` | `Login.html` |
+| **B** | B4 | **Login.html** paints → `postLoginState(false)`; iframe `localStorage` empty while parent has token | `Login.html` |
+| **C** | C1 | **Host badge** only in iframe `sessionStorage` — lost on any iframe reload | `11_Station_Shell.html` |
+| **C** | C2 | **`injectPersistedWebSession`** seeds parent origin only, not GAS iframe | `StationWebActivity.kt` |
+| **C** | C3 | **Two-layer shell** — BLE must not trigger iframe navigation (architectural) | `host-boot.js`, `FRAGILE_ZONES.md` |
+| **D** | D1 | **GAS `sessionboot`** failure returns Login + `clearSession:true` | `Main.js` |
+| **D** | D2 | **`shellBootGraceUntil`** 18 s — cold-start only, no mid-session BLE guard | `host-boot.js` |
+| **D** | D3 | Reconnect ladder **flapping** may stress WebView renderer | `RfidManager.kt` |
+| **D** | D4 | **Splash** until `SHOWRUNNER_STATION_READY` amplifies perceived restart | `host-boot.js`, `StationWebActivity.kt` |
+
+**Next fix direction:** **v483 / APK 0.1.31** — native loads GAS direct (single frame); BLE flap guard blocks iframe navigation; host session in native prefs + localStorage; parent ignores spurious SESSION_CLEAR.
 
 #### Symptom (what “still the same” means)
 

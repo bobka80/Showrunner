@@ -111,6 +111,7 @@ class StationWebActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView?, url: String?) {
                 injectPersistedWebSession()
+                pullSessionFromWebStorage()
             }
 
             override fun onRenderProcessGone(
@@ -123,10 +124,12 @@ class StationWebActivity : AppCompatActivity() {
                 runOnUiThread {
                     if (!::webView.isInitialized) return@runOnUiThread
                     val current = webView.url
-                    if (!current.isNullOrBlank() && current != "about:blank") {
+                    if (!current.isNullOrBlank() && current != "about:blank" &&
+                        current.contains("script.google.com")
+                    ) {
                         webView.reload()
                     } else {
-                        webView.loadUrl(SHOWRUNNER_URL)
+                        webView.loadUrl(resolveStartupUrl())
                     }
                 }
                 return true
@@ -139,7 +142,7 @@ class StationWebActivity : AppCompatActivity() {
             if (splashHidden) hideSplash()
         }
         if (!webViewRestored) {
-            webView.loadUrl(SHOWRUNNER_URL)
+            webView.loadUrl(resolveStartupUrl())
         }
         ensureBleReady()
     }
@@ -335,7 +338,27 @@ class StationWebActivity : AppCompatActivity() {
     }
 
     private fun setWebBleReconnecting(active: Boolean) {
-        evalJs("try{window.__srBleReconnecting=" + (if (active) "true" else "false") + ";}catch(e){}")
+        if (active) {
+            evalJs(
+                "try{window.__srBleReconnecting=true;" +
+                    "window.__srBleFlapUntil=Date.now()+25000;}catch(e){}",
+            )
+        } else {
+            evalJs(
+                "try{window.__srBleReconnecting=false;" +
+                    "window.__srBleFlapUntil=Date.now()+15000;}catch(e){}",
+            )
+        }
+    }
+
+    private fun resolveStartupUrl(): String {
+        val token = stationPrefs.getString(PREF_WEB_SESSION_TOKEN, null)?.trim().orEmpty()
+        val exp = stationPrefs.getLong(PREF_WEB_SESSION_EXPIRES, 0L)
+        if (token.length >= 20 && exp > System.currentTimeMillis()) {
+            return GAS_EXEC_URL + "?action=sessionboot&token=" +
+                java.net.URLEncoder.encode(token, "UTF-8")
+        }
+        return GAS_EXEC_URL
     }
 
     private fun injectPersistedWebSession() {
@@ -348,6 +371,20 @@ class StationWebActivity : AppCompatActivity() {
                 "if(!localStorage.getItem('sm_session_token')){" +
                 "localStorage.setItem('sm_session_token',$quotedToken);" +
                 "localStorage.setItem('sm_session_expires'," + JSONObject.quote(exp.toString()) + ");" +
+                "}" +
+                "}catch(e){}",
+        )
+    }
+
+    /** Pull session from whichever origin is loaded (hosting or GAS) into native prefs. */
+    private fun pullSessionFromWebStorage() {
+        evalJs(
+            "try{" +
+                "var t=localStorage.getItem('sm_session_token');" +
+                "var e=parseInt(localStorage.getItem('sm_session_expires')||'0',10);" +
+                "if(t&&t.length>=20&&e>Date.now()&&window.AndroidStation&&" +
+                "typeof AndroidStation.saveSession==='function'){" +
+                "AndroidStation.saveSession(t,e);" +
                 "}" +
                 "}catch(e){}",
         )
@@ -450,6 +487,24 @@ class StationWebActivity : AppCompatActivity() {
                 .put("expiresAt", exp)
                 .toString()
         }
+
+        /** Host badge session — survives GAS reload / WebView restart. */
+        @JavascriptInterface
+        fun saveHostSession(deviceKey: String?, json: String?) {
+            val key = deviceKey?.trim().orEmpty()
+            if (key.isEmpty()) return
+            val prefKey = PREF_HOST_SESSION_PREFIX + key
+            stationPrefs.edit().apply {
+                if (json.isNullOrBlank()) remove(prefKey) else putString(prefKey, json)
+            }.apply()
+        }
+
+        @JavascriptInterface
+        fun getHostSession(deviceKey: String?): String {
+            val key = deviceKey?.trim().orEmpty()
+            if (key.isEmpty()) return ""
+            return stationPrefs.getString(PREF_HOST_SESSION_PREFIX + key, null).orEmpty()
+        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -488,12 +543,15 @@ class StationWebActivity : AppCompatActivity() {
 
     companion object {
         private const val SHOWRUNNER_URL = "https://sm-showrunner-97405.web.app"
+        private const val GAS_EXEC_URL =
+            "https://script.google.com/macros/s/AKfycbxynTt5JaKQiv1Iu_ahSQBcrBDKpuhz98lac4G-bJO5PMtmvgJr_uKZ1Y58lxOOupSwlw/exec"
         private const val REQ_BLE_PERMISSIONS = 1001
         private const val REQ_ENABLE_BT = 1002
         private const val REQ_POST_NOTIFICATIONS = 1003
         private const val PREF_SPLASH_DISMISSED = "splash_dismissed"
         private const val PREF_WEB_SESSION_TOKEN = "web_session_token"
         private const val PREF_WEB_SESSION_EXPIRES = "web_session_expires"
+        private const val PREF_HOST_SESSION_PREFIX = "host_session_"
         private const val GUN_STATUS_DEBOUNCE_MS = 1800L
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L

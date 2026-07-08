@@ -1706,21 +1706,45 @@
   }
 
   function shouldDeferSessionClear() {
+    if (isNativeStationApp() && readParentSession()) {
+      if (window.__srBleReconnecting) return true;
+      if (window.__srBleFlapUntil && Date.now() < window.__srBleFlapUntil) return true;
+    }
     if (window.__srBleReconnecting && readParentSession()) return true;
     return Date.now() < shellBootGraceUntil && !!readParentSession();
   }
 
+  /** Native station: never navigate the GAS iframe during BLE flap or when already logged in. */
+  function shouldBlockIframeNavigation(reason) {
+    if (!isNativeStationApp() || !readParentSession()) return false;
+    if (window.__srBleReconnecting) return true;
+    if (window.__srBleFlapUntil && Date.now() < window.__srBleFlapUntil) return true;
+    if (iframeLoggedIn && (reason === 'login_gate' || reason === 'session_clear' || reason === 'login_state')) {
+      return true;
+    }
+    return false;
+  }
+
+  function setAppFrameSrc(url, reason) {
+    if (!frame || !url) return false;
+    if (shouldBlockIframeNavigation(reason || '')) return false;
+    try {
+      frame.src = url;
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function navigateHostingToLoginGate() {
     if (shouldDeferSessionClear()) return;
+    if (shouldBlockIframeNavigation('login_gate')) return;
     clearParentSession();
     iframeLoggedIn = false;
     lastLoginScreenAt = Date.now();
-    if (!frame) return;
     var base = getGasBaseUrl();
     if (!base) return;
-    try {
-      frame.src = base;
-    } catch (e) { /* ignore */ }
+    setAppFrameSrc(base, 'login_gate');
   }
 
   function bootstrapCrewFromParentStorage() {
@@ -1805,6 +1829,9 @@
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
     if (shouldDeferSessionClear() || window.__srBleReconnecting) {
+      return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
+    }
+    if (isNativeStationApp() && readParentSession()) {
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
     clearParentSession();
@@ -2413,6 +2440,7 @@
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION_CLEAR') {
       if (shouldDeferSessionClear()) return;
+      if (isNativeStationApp() && readParentSession()) return;
       navigateHostingToLoginGate();
       return;
     }
@@ -2421,6 +2449,7 @@
       if (isNativeStationApp() && readParentSession() && ev.data.clearSession !== true) {
         return;
       }
+      if (shouldBlockIframeNavigation('login_state')) return;
       lastLoginScreenAt = Date.now();
       iframeLoggedIn = false;
       if (ev.data.clearSession === true) {
@@ -2438,6 +2467,15 @@
     if (ev.data.type === 'SHOWRUNNER_STATION_READY') {
       hideStationSplash();
       notifyNativeSplash('shellReady');
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_STATION_HOST_SESSION') {
+      var hostKey = ev.data.deviceKey || '';
+      if (!hostKey) return;
+      try {
+        if (ev.data.host) localStorage.setItem(hostKey, JSON.stringify(ev.data.host));
+        else localStorage.removeItem(hostKey);
+      } catch (e) { /* ignore */ }
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_FCM_LINK_ERROR') {
@@ -2764,10 +2802,19 @@
   async function initShell() {
     startShellBootGrace();
     if (frame) {
-      try {
-        frame.src = await resolveAppFrameUrl();
-      } catch (e) {
-        frame.src = buildAppFrameUrl();
+      var skipNav = false;
+      if (isNativeStationApp() && readParentSession()) {
+        var cur = String(frame.src || '');
+        if (cur.indexOf('script.google.com') >= 0 && cur.indexOf('sessionboot') >= 0) {
+          skipNav = true;
+        }
+      }
+      if (!skipNav) {
+        try {
+          setAppFrameSrc(await resolveAppFrameUrl(), 'init_shell');
+        } catch (e) {
+          setAppFrameSrc(buildAppFrameUrl(), 'init_shell');
+        }
       }
     }
     try {
@@ -2870,12 +2917,8 @@
 
   window.__srReloadAppFrameOnly = function() {
     if (!frame) return false;
-    try {
-      frame.src = buildAppFrameUrl();
-      return true;
-    } catch (e) {
-      return false;
-    }
+    if (shouldBlockIframeNavigation('manual_reload')) return false;
+    return setAppFrameSrc(buildAppFrameUrl(), 'manual_reload');
   };
 
   startShellOnce();
