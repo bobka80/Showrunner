@@ -955,6 +955,29 @@ html.station-device-root #station-device-controls { display: flex; }
         </select>
         <div class="station-field__hint">Saves battery — the gun powers down after this long with no reads. Pull the trigger to wake it, then tap Reconnect gun.</div>
       </div>
+      <div id="station-no-host-park-fields" style="display:none;">
+        <div class="station-field">
+          <label class="station-field__label" for="station-set-no-host-grace">Keep gun connected between hosts (minutes)</label>
+          <select id="station-set-no-host-grace" onchange="stationSaveNoHostGraceMinutes()">
+            <option value="1">1 minute</option>
+            <option value="2">2 minutes</option>
+            <option value="3">3 minutes</option>
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+          <div class="station-field__hint">After the host signs out, the app driver stays connected this long so the next badge can scan in without reconnecting.</div>
+        </div>
+        <div class="station-field">
+          <label class="station-field__label" for="station-set-gun-park-delay">Disconnect gun after grace (minutes)</label>
+          <select id="station-set-gun-park-delay" onchange="stationSaveGunParkDelayMinutes()">
+            <option value="0">Immediately when grace ends (recommended)</option>
+            <option value="1">1 minute after grace</option>
+          </select>
+          <div class="station-field__hint">Shortest is best — disconnected time is vulnerable. Gun firmware powers down ~1 min after the app drops the link.</div>
+        </div>
+      </div>
       <div id="station-eject-saved" class="station-settings-saved"></div>
     </div>
 
@@ -1201,11 +1224,17 @@ var STATION_HOST_IDLE_DEFAULT_MIN = 10;
 var STATION_HOST_EJECT_COOLDOWN_MS = 3000;
 var STATION_EJECT_STORAGE_KEY = 'sm_station_eject_min';
 var STATION_EJECT_CHOICES = [1, 3, 5, 10];
-// Gun idle auto-sleep (TSL desktop only — Chainway appSleep:false). 0 = never. Native sleepGun()
-// after this many minutes with no reads; wake = trigger pull + Reconnect gun.
+// Gun idle auto-sleep (TSL desktop only — Chainway uses no-host park below).
 var STATION_GUNSLEEP_STORAGE_KEY = 'sm_station_gunsleep_min';
 var STATION_GUNSLEEP_CHOICES = [0, 1, 2, 3, 5, 10];
 var STATION_GUNSLEEP_DEFAULT_MIN = 5;
+// Chainway: grace after host leaves before parking; then optional extra delay before disconnect.
+var STATION_NO_HOST_GRACE_KEY = 'sm_station_no_host_grace_min';
+var STATION_NO_HOST_GRACE_CHOICES = [1, 2, 3, 5, 10, 15, 30];
+var STATION_NO_HOST_GRACE_DEFAULT_MIN = 3;
+var STATION_GUN_PARK_DELAY_KEY = 'sm_station_gun_park_delay_min';
+var STATION_GUN_PARK_DELAY_CHOICES = [0, 1];
+var STATION_GUN_PARK_DELAY_DEFAULT_MIN = 0;
 
 /**
  * Device-local gun settings. The web setup is the source of truth (survives app
@@ -1474,6 +1503,92 @@ function stationGunSleepMinutes_() {
   return STATION_GUNSLEEP_DEFAULT_MIN;
 }
 
+function stationNoHostGraceMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_NO_HOST_GRACE_KEY), 10);
+    if (STATION_NO_HOST_GRACE_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_NO_HOST_GRACE_DEFAULT_MIN;
+}
+
+function stationGunParkDelayMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_GUN_PARK_DELAY_KEY), 10);
+    if (STATION_GUN_PARK_DELAY_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_GUN_PARK_DELAY_DEFAULT_MIN;
+}
+
+function stationNoHostParkDeadlineKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_no_host_park_deadline_v1_' + dev;
+}
+
+function stationClearNoHostParkDeadline_() {
+  if (window.stationNoHostParkTimer) {
+    clearTimeout(window.stationNoHostParkTimer);
+    window.stationNoHostParkTimer = null;
+  }
+  try { localStorage.removeItem(stationNoHostParkDeadlineKey_()); } catch (e) { /* ignore */ }
+}
+
+/** Arm park countdown after host clears — wall-clock survives screen-off. */
+function stationArmNoHostParkDeadline_() {
+  stationClearNoHostParkDeadline_();
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('noHostPark')) return;
+  if (stationReadHostSession_()) return;
+  var grace = stationNoHostGraceMinutes_();
+  var delay = stationGunParkDelayMinutes_();
+  var totalMs = (grace + delay) * 60 * 1000;
+  if (totalMs <= 0) {
+    stationParkGun_();
+    return;
+  }
+  var deadline = Date.now() + totalMs;
+  try { localStorage.setItem(stationNoHostParkDeadlineKey_(), String(deadline)); } catch (e) { /* ignore */ }
+  window.stationNoHostParkTimer = setTimeout(stationNoHostParkExpired_, totalMs);
+}
+
+function stationNoHostParkExpired_() {
+  window.stationNoHostParkTimer = null;
+  if (stationReadHostSession_()) {
+    stationClearNoHostParkDeadline_();
+    return;
+  }
+  stationParkGun_();
+}
+
+function stationCheckNoHostParkDeadline_() {
+  if (stationReadHostSession_()) {
+    stationClearNoHostParkDeadline_();
+    return;
+  }
+  if (typeof stationGunCap_ !== 'function' || !stationGunCap_('noHostPark')) return;
+  try {
+    var raw = localStorage.getItem(stationNoHostParkDeadlineKey_());
+    if (!raw) return;
+    var deadline = parseInt(raw, 10);
+    if (!deadline || isNaN(deadline)) return;
+    if (Date.now() >= deadline) stationNoHostParkExpired_();
+    else if (!window.stationNoHostParkTimer) {
+      var ms = Math.max(0, deadline - Date.now());
+      window.stationNoHostParkTimer = setTimeout(stationNoHostParkExpired_, ms);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function stationParkGun_() {
+  stationClearNoHostParkDeadline_();
+  var br = stationSleepCapableBridge_();
+  if (!br || typeof br.sleepGun !== 'function') return;
+  try {
+    br.sleepGun();
+    stationSetStatus_('Gun parked — pull trigger or tap Reconnect gun.', '');
+  } catch (e) { /* ignore */ }
+}
+
 /** Native bridge that can sleep the gun (desktop TSL or Chainway with sleepGun support). */
 function stationSleepCapableBridge_() {
   var b = stationNativeBridge_();
@@ -1600,10 +1715,19 @@ function stationBindHostIdleListeners_() {
     document.addEventListener(evt, onActivity, { passive: true });
   });
   document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) stationCheckHostEjectDeadline_();
+    if (!document.hidden) {
+      stationCheckHostEjectDeadline_();
+      stationCheckNoHostParkDeadline_();
+    }
   });
-  window.addEventListener('pageshow', function() { stationCheckHostEjectDeadline_(); });
-  window.addEventListener('focus', function() { stationCheckHostEjectDeadline_(); });
+  window.addEventListener('pageshow', function() {
+    stationCheckHostEjectDeadline_();
+    stationCheckNoHostParkDeadline_();
+  });
+  window.addEventListener('focus', function() {
+    stationCheckHostEjectDeadline_();
+    stationCheckNoHostParkDeadline_();
+  });
 }
 
 function stationHostStorageKey_() {
@@ -1678,9 +1802,11 @@ function stationWriteHostSession_(host) {
   // (same list their personal profile sees). Clearing the host drops the cache + wipes the device.
   if (host && host.name) {
     stationPreloadProjects_(host.name);
+    stationClearNoHostParkDeadline_();
   } else {
     window.stationProjectsCache = null; window.stationProjectsFor = null;
     stationResetDeviceToPristine_();
+    stationArmNoHostParkDeadline_();
   }
 }
 
@@ -1804,10 +1930,7 @@ window.stationReconnectGun_ = function() {
   if (b && typeof b.reconnectGun === 'function') {
     stationToast_('Reconnecting gun…', '');
     try { b.reconnectGun(); } catch (e) { stationToast_('Reconnect failed.', 'error'); return; }
-    setTimeout(function() {
-      stationRequestGunConfig_();
-      stationArmGunSleepTimer_();
-    }, 2500);
+    setTimeout(function() { stationRequestGunConfig_(); }, 2500);
     return;
   }
   stationToast_('Reconnect works in the station app with the RFID gun.', 'error');
@@ -1842,6 +1965,12 @@ function stationSyncGunSleepButton_() {
   if (dropField) dropField.style.display = (bridge && cap('appSleep')) ? 'block' : 'none';
   var dropEl = document.getElementById('station-set-gunsleep');
   if (dropEl) dropEl.value = String(stationGunSleepMinutes_());
+  var parkFields = document.getElementById('station-no-host-park-fields');
+  if (parkFields) parkFields.style.display = (bridge && cap('noHostPark')) ? 'block' : 'none';
+  var graceEl = document.getElementById('station-set-no-host-grace');
+  if (graceEl) graceEl.value = String(stationNoHostGraceMinutes_());
+  var parkDelayEl = document.getElementById('station-set-gun-park-delay');
+  if (parkDelayEl) parkDelayEl.value = String(stationGunParkDelayMinutes_());
 }
 
 function stationSetLastScan_(tag) {
@@ -3381,7 +3510,7 @@ function stationSyncSettingsToGun_() {
   if (power != null) stationApplyGunSetting_('power', parseInt(power, 10));
   var beep = stationStoredSetting_(STATION_BEEP_KEY);
   if (beep != null) stationApplyGunSetting_('beep', (beep === '1'));
-  stationArmGunSleepTimer_();
+  if (typeof stationGunCap_ === 'function' && stationGunCap_('appSleep')) stationArmGunSleepTimer_();
 }
 
 function stationApplyGunConfig_(cfg) {
@@ -3456,7 +3585,8 @@ function stationApplyGunConfig_(cfg) {
     stationToast_(liveNow ? 'RFID gun connected' : 'RFID gun disconnected', liveNow ? 'ok' : 'error');
   }
   window.stationLastGunConnected = liveNow;
-  if (liveNow && !window.stationGunIdleTimer && stationGunSleepMinutes_()) {
+  if (liveNow && typeof stationGunCap_ === 'function' && stationGunCap_('appSleep') &&
+      !window.stationGunIdleTimer && stationGunSleepMinutes_()) {
     stationArmGunSleepTimer_();
   }
   if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
@@ -3545,8 +3675,41 @@ window.stationSaveGunSleepMinutes = function() {
   }
 };
 
+window.stationSaveNoHostGraceMinutes = function() {
+  const el = document.getElementById('station-set-no-host-grace');
+  if (!el) return;
+  let mins = parseInt(el.value, 10);
+  if (STATION_NO_HOST_GRACE_CHOICES.indexOf(mins) === -1) mins = STATION_NO_HOST_GRACE_DEFAULT_MIN;
+  el.value = String(mins);
+  stationSetStoredSetting_(STATION_NO_HOST_GRACE_KEY, mins);
+  if (!stationReadHostSession_()) stationArmNoHostParkDeadline_();
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) {
+    savedEl.textContent = 'Saved — gun stays connected ' + mins + ' min between hosts.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
+window.stationSaveGunParkDelayMinutes = function() {
+  const el = document.getElementById('station-set-gun-park-delay');
+  if (!el) return;
+  let mins = parseInt(el.value, 10);
+  if (STATION_GUN_PARK_DELAY_CHOICES.indexOf(mins) === -1) mins = STATION_GUN_PARK_DELAY_DEFAULT_MIN;
+  el.value = String(mins);
+  stationSetStoredSetting_(STATION_GUN_PARK_DELAY_KEY, mins);
+  if (!stationReadHostSession_()) stationArmNoHostParkDeadline_();
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) {
+    savedEl.textContent = mins
+      ? ('Saved — disconnect ' + mins + ' min after grace ends.')
+      : 'Saved — disconnect as soon as grace ends.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
 function stationAnnounceReady_() {
   try { stationCheckHostEjectDeadline_(); } catch (e) { /* ignore */ }
+  try { stationCheckNoHostParkDeadline_(); } catch (e) { /* ignore */ }
   try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' }); } catch (e) { /* ignore */ }
 }
 
@@ -3643,6 +3806,7 @@ function initStationShell_() {
           }
         } else {
           stationSetStatus_('Pull trigger and scan your crew badge.', '');
+          stationCheckNoHostParkDeadline_();
         }
       } catch (e) {
         stationSetStatus_('Profile load error: ' + (e && e.message ? e.message : String(e)), 'error');

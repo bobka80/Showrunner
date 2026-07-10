@@ -88,7 +88,12 @@ class StationWebActivity : AppCompatActivity() {
             context = this,
             onTagScanned = { epc, tid -> deliverScanToShowrunner(epc, tid) },
             onStatus = { msg -> postGunStatus(msg) },
-            onTriggerWake = { maybeWakeForTrigger() },
+            isScreenInteractive = {
+                val pm = getSystemService(PowerManager::class.java)
+                pm != null && pm.isInteractive
+            },
+            isAppInForeground = { isInForeground },
+            onWakeAndForeground = { maybeWakeForTrigger() },
             onLinkBusy = { busy -> setWebBleReconnecting(busy) },
             onGunActivity = { onGunActivity() },
             onGunPowerOn = { wakeStationForGun_() },
@@ -621,7 +626,7 @@ class StationWebActivity : AppCompatActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         // HID fallback when BLE is down (SDK key callback is cleared on disconnect).
         if (keyCode == KeyEvent.KEYCODE_F1 || keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
-            rfid.onTriggerPressed { maybeWakeForTrigger() }
+            rfid.onTriggerPressed()
             return true
         }
         return super.onKeyDown(keyCode, event)

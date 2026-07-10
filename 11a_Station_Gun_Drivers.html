@@ -21,10 +21,9 @@
       caps: {
         power: true, scanMode: true, multi: true, continuous: true, beep: true, pollMs: true,
         battery: true, firmware: true,
-        // Chainway stays BLE-connected while the app runs (R6: 70+ h standby connected). App-initiated
-        // idle disconnect created a dead zone (trigger/scan unreliable until reconnect). Gun powers
-        // down only from its physical button or accidental BLE drop (watchdog reconnects).
+        // Chainway: stay connected while a host is signed in; park after configurable no-host grace.
         appSleep: false,
+        noHostPark: true,
         nativeIdleSleep: false,
         // No in-app "Disconnect + sleep" button — Chainway has a physical trigger/firmware path;
         // that manual button is TSL-only (the TSL 1128 has no power button).

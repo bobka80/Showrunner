@@ -33,7 +33,10 @@ class RfidManager(
     private val context: Context,
     private val onTagScanned: (epc: String, tid: String) -> Unit,
     private val onStatus: (String) -> Unit,
-    private val onTriggerWake: () -> Boolean = { false },
+    private val isScreenInteractive: () -> Boolean = { true },
+    private val isAppInForeground: () -> Boolean = { true },
+    /** Wake screen + bring app forward; returns true when this pull was consumed for wake only. */
+    private val onWakeAndForeground: () -> Boolean = { false },
     private val onLinkBusy: (Boolean) -> Unit = {},
     private val onGunActivity: () -> Unit = {},
     /** Gun powered on / driver live — wake tablet + bring app forward (one package with reconnect). */
@@ -73,6 +76,9 @@ class RfidManager(
     @Volatile private var reconnectGunJustWoke = false
 
     private val triggerIdleSleepRunnable = Runnable { onTriggerIdleSleepFired() }
+    private val triggerReconnectRunnable = Runnable {
+        requestReconnect("trigger-hid", immediate = true)
+    }
     private var btAclReceiver: BroadcastReceiver? = null
 
     private val pendingScans = java.util.concurrent.ConcurrentLinkedQueue<PendingScan>()
@@ -294,8 +300,7 @@ class RfidManager(
 
     fun onAppWake() {
         healthFailStreak = 0
-        // Operator is back — end deliberate app-sleep so morning / manual screen-on can reconnect.
-        activeDisconnect = false
+        if (activeDisconnect) return // parked — trigger or Reconnect gun only
         if (!isGunLinkLive()) {
             requestReconnect("screen-on", immediate = true)
         } else {
@@ -344,22 +349,32 @@ class RfidManager(
     }
 
     /**
-     * Unified trigger entry — SDK callback when BLE is live, Activity HID keys when it is not.
-     * Always wakes the tablet first; reconnects when the link is down so the next pull can scan.
+     * HID + SDK unified trigger state machine:
+     * 1) driver live + screen up → scan
+     * 2) driver live + screen down → wake only
+     * 3) driver down → wake, foreground, 500ms, reconnect (HID can start when SDK callback is dead)
      */
-    fun onTriggerPressed(onWake: () -> Boolean): Boolean {
+    fun onTriggerPressed(): Boolean {
         onGunActivity()
-        val consumedWake = onWake()
-        if (!isGunLinkLive()) {
-            requestReconnect("trigger", immediate = true)
-            return true
+        val live = isGunLinkLive()
+        val needWake = !isScreenInteractive() || !isAppInForeground()
+        if (needWake) {
+            onWakeAndForeground()
         }
-        recordTriggerActivity()
-        if (consumedWake) {
-            postStatus("Station ready — pull again to scan")
-            return true
+        when {
+            live && !needWake -> {
+                recordTriggerActivity()
+                performTriggerScan()
+            }
+            live -> postStatus("Screen on — pull again to scan")
+            linkState == LINK_RECONNECTING || linkState == LINK_CONNECTING ->
+                postStatus("Connecting to gun…")
+            else -> {
+                postStatus(if (needWake) "Waking — connecting to gun…" else "Reconnecting to gun…")
+                mainHandler.removeCallbacks(triggerReconnectRunnable)
+                mainHandler.postDelayed(triggerReconnectRunnable, TRIGGER_RECONNECT_DELAY_MS)
+            }
         }
-        performTriggerScan()
         return true
     }
 
@@ -675,7 +690,7 @@ class RfidManager(
     private fun installGunTriggerHandler() {
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
-                onTriggerPressed(onTriggerWake)
+                onTriggerPressed()
             }
 
             override fun onKeyUp(keycode: Int) {
@@ -926,13 +941,28 @@ class RfidManager(
     }
 
     /**
-     * No-op on Chainway — app holds BLE open so trigger→scan stays reliable.
-     * Accidental drops still recover via the reconnect watchdog; use forceReconnect() manually.
+     * Park the gun: drop the app driver so firmware can power down (~READER_AWAIT_SLEEP_MIN after link).
+     * Suppresses auto-reconnect until trigger or forceReconnect(). Does not call free().
      */
     fun sleepGun(idleMinutes: Int? = null) {
         mainHandler.removeCallbacks(triggerIdleSleepRunnable)
-        Log.i(TAG, "sleepGun ignored — Chainway stays connected")
-        postStatus("Gun stays connected — pull trigger to scan")
+        mainHandler.removeCallbacks(triggerReconnectRunnable)
+        activeDisconnect = true
+        reconnectGeneration.incrementAndGet()
+        readCancelled.set(true)
+        stopInventory()
+        mainHandler.post {
+            try {
+                pinReaderFastSleepOnConnect()
+                softDisconnectMainSync()
+                connected = false
+                setLinkState(LINK_ASLEEP)
+                Log.i(TAG, "sleepGun: parked, firmware awaitSleep=${READER_AWAIT_SLEEP_MIN}min")
+            } catch (e: Exception) {
+                Log.e(TAG, "sleepGun failed", e)
+            }
+            postStatus("Gun parked — pull trigger or tap Reconnect gun")
+        }
     }
 
     private fun applyConfigToGun() {
@@ -1062,6 +1092,8 @@ class RfidManager(
         /** After gun power button: brief pause so BLE/UHF stack is ready before SDK connect. */
         private const val GUN_POWER_ON_CONNECT_WAIT_MS = 1200L
         private const val GUN_POWER_ON_DEBOUNCE_MS = 400L
+        /** HID wake/foreground before SDK reconnect (state 3). */
+        private const val TRIGGER_RECONNECT_DELAY_MS = 500L
         private const val RECONNECT_WAIT_NUCLEAR_MS = 800L
         private const val CONNECT_WAIT_MS = 4500L
         private const val MAX_MAC_RETRIES = 2
