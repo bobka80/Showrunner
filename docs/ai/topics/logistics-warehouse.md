@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-10 · **Production:** GAS **v499** · **Status:** Partial — per-device **gun-driver fork** (Chainway/TSL/gate); **TSL 1128 desktop thin shell** live; **Chainway stay-connected** (no app idle sleep, build 49); **next: EPC+TID** on Chainway tags. See [active campaign](../active/rfid-station-profiles.md).
+**Last swept:** 2026-07-10 · **Production:** GAS **v500** · **Status:** Partial — per-device **gun-driver fork** (Chainway/TSL/gate); **TSL 1128 desktop thin shell** live; **Chainway stay-connected** (no app idle sleep, build 49); **next: EPC+TID** on Chainway tags. See [active campaign](../active/rfid-station-profiles.md).
 
 ---
 
@@ -50,7 +50,7 @@ A **device RBAC profile** for tablets locked to RFID guns — **not** a crew “
 | State | Accepts | Rejects |
 |-------|---------|---------|
 | **Empty (no host)** | Scans that match a **legitimate crew** RFID (host login) | All equipment/operation scans |
-| **Hosted (host locked)** | Equipment and operation scans | Further host scans until logout |
+| **Hosted (host locked)** | Equipment and operation scans | Further host scans until logout — different crew badge shows an error; use **LOG OUT HOST** or wait for idle eject |
 
 This removes “scan hygiene” (accidental badge wave during checkout): empty station ignores gear; hosted station ignores host tags.
 

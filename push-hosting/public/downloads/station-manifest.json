@@ -1,16 +1,26 @@
 {
-  "versionName": "0.1.46",
-  "versionCode": 48,
+  "versionName": "0.1.47",
+  "versionCode": 49,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-10T05:30:41.736Z",
+  "updatedAt": "2026-07-10T05:55:33.077Z",
   "sizeBytes": 12073677,
   "notes": [
-    "Gun power-on package: ACL wakes screen + app front + driver reconnect (1.2s gun-wake wait)",
-    "CONNECTED shows ready to scan",
-    "watchdog 5s when driver down"
+    "Chainway stays connected: app idle sleep disabled (appSleep false)",
+    "sleepGun is a no-op",
+    "BLE held open so trigger scans work after long idle"
   ],
   "history": [
+    {
+      "versionName": "0.1.47",
+      "versionCode": 49,
+      "date": "2026-07-10T05:55:33.077Z",
+      "notes": [
+        "Chainway stays connected: app idle sleep disabled (appSleep false)",
+        "sleepGun is a no-op",
+        "BLE held open so trigger scans work after long idle"
+      ]
+    },
     {
       "versionName": "0.1.46",
       "versionCode": 48,
@@ -184,15 +194,6 @@
       "notes": [
         "Explicit EPC+TID bank reads (ptr=2 EPC, ptr=0 TID)",
         "EPC-only inventory select"
-      ]
-    },
-    {
-      "versionName": "0.1.26",
-      "versionCode": 28,
-      "date": "2026-07-07T19:01:07.847Z",
-      "notes": [
-        "Fix TID read: Chainway EPC filter uses bit ptr (32) not word ptr",
-        "reject EPC echoed as TID"
       ]
     }
   ]

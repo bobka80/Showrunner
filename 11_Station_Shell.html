@@ -1654,7 +1654,7 @@ function stationWriteHostSession_(host) {
     window.stationEjectedHostNorm = outNorm || null;
     window.stationEjectCooldownUntil = outNorm ? (Date.now() + STATION_HOST_EJECT_COOLDOWN_MS) : 0;
   } else {
-    // Someone is now hosted — the eject cooldown no longer applies (allows an immediate switch back).
+    // Someone is now hosted — clear any eject cooldown from a prior logout.
     window.stationEjectedHostNorm = null;
     window.stationEjectCooldownUntil = 0;
   }
@@ -2011,15 +2011,17 @@ function stationHandleRfidScan_(rawTag, rawTid) {
     const hostTag = stationNormalizeEpc_(host.rfidTag || '');
     // Same badge as the current host → just keep the session alive (idle already reset above).
     if (norm && hostTag && norm === hostTag) return;
-    // Is this a DIFFERENT crew badge? If so, hand the station to that person (implicit eject +
-    // host) — the operator no longer has to log the previous host out first. Crew badges take
-    // priority over checkout forwarding, so a badge switch works even mid-checkout.
+    // Different crew badge while someone is hosted → reject (must LOG OUT HOST / idle eject first).
     const swap = stationLookupCrewHostLocal_(tag, tid);
     if (swap.tidMismatch) {
       stationSetStatus_('Badge chip ID does not match — possible cloned tag.', 'error');
       return;
     }
-    let scanIsCrewBadge = !!swap.crew || !!swap.tidMissing;
+    if (swap.tidMissing) {
+      stationSetStatus_('Gun did not read chip TID. Hold the badge still and scan again.', 'error');
+      return;
+    }
+    let scanIsCrewBadge = !!swap.crew;
     if (!scanIsCrewBadge) {
       const hit = stationResolveEpc_(tag);
       if (hit && hit.kind === 'crew') scanIsCrewBadge = true; // known crew badge via equip map
@@ -2030,7 +2032,11 @@ function stationHandleRfidScan_(rawTag, rawTid) {
         (host.uid && swap.crew.uid && String(host.uid) === String(swap.crew.uid)) ||
         (!host.uid && host.name && swap.crew.name && host.name === swap.crew.name)
       )) return;
-      stationBeginHostLogin_(tag, tid);
+      // Hosted state machine: reject further host badges until explicit logout / idle eject.
+      stationSetStatus_(
+        host.name + ' is signed in — tap LOG OUT HOST first, then scan the next badge.',
+        'error'
+      );
       return;
     }
     // Not a crew badge → equipment scan during an open checkout / existing behavior.
@@ -2042,10 +2048,8 @@ function stationHandleRfidScan_(rawTag, rawTid) {
 }
 
 /**
- * Optimistic badge-in / host-switch: host instantly from the local crew cache when the EPC(+TID)
- * pair is recognized, then let the server confirm. Used for a fresh badge-in (no host yet) AND to
- * SWITCH to a different crew badge while someone is already hosted, so the operator does not have
- * to eject the previous host first.
+ * Optimistic badge-in: host instantly from the local crew cache when the EPC(+TID) pair is
+ * recognized, then let the server confirm. Only used when no host is signed in yet.
  */
 function stationBeginHostLogin_(tag, tid) {
   // Eject cooldown: swallow residual reads of the badge we JUST logged out so the eject sticks.

@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v499** · APK **v0.1.47 (build 49)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-10
+**Opened:** 2026-07-02 · **Production:** GAS **v500** · APK **v0.1.47 (build 49)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-10
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -83,6 +83,7 @@ Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showru
 - [x] **TSL 1128 desktop thin shell** — `station-desktop/` (WebView2 + TSL ASCII, `PID_1128` auto-detect + watchdog, `.sl` app-sleep), `window.AndroidStation` bridge parity; build via `build-station-desktop.js`. See § Desktop TSL station.
 - [x] **Gun auto-sleep timer** — Session-settings dropdown (`sm_station_gunsleep_min`, default 5, Never=0); fires `sleepGun()` only for `appSleep:true` drivers (TSL).
 - [x] **Chainway stay-connected (build 49, 2026-07-10)** — `appSleep:false`; native `sleepGun()` no-op; BLE held open so trigger→scan stays reliable after long idle. TSL sleep unchanged.
+- [x] **Host badge lock while hosted (v501, 2026-07-10)** — scanning a different crew badge while someone is signed in is rejected; operator must **LOG OUT HOST** (or wait for idle eject) so `stationResetDeviceToPristine_` runs before the next badge-in. Restores the hosted-state machine in [logistics-warehouse.md](../topics/logistics-warehouse.md).
 
 - [x] **SECURITY — login error leaked passcodes (v429):** `authenticateUser` had a leftover debug diagnostic that echoed the input, the crew headers, and stored **names + passcodes** (e.g. `bogdan / 66ab26`) into the failed-login error shown on the lock screen. Removed the `debugLog` capture entirely; failed logins now return only `"Incorrect crew name or passcode."` — no roster, headers, input, or passcodes ever go to the client. **Rotate any passcode that was visible on-screen.**
 - [x] **Duplicate-tag guard with overwrite/cancel (v428)** — recording an equipment tag (`recordStationAssetRfid`) or crew badge (`enrollStationCrewRfidTag`) now checks the scanned tag against the **whole database** — every asset **and** every crew badge — via `findStationRfidOwner_`. If the tag already belongs to a different record, the backend returns `{ duplicate:{ kind, id, name } }` instead of writing; the station record bar shows **"Tag already on X — Overwrite / Cancel"**. Overwrite re-issues the write with `force=true`, which blanks the previous owner's tag (`clearStationRfidOwner_`) before assigning — so a tag is only ever on one thing. Audit log records the steal.
