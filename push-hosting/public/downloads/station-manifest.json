@@ -1,15 +1,46 @@
 {
-  "versionName": "0.1.42",
-  "versionCode": 44,
+  "versionName": "0.1.46",
+  "versionCode": 48,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-08T18:19:15.684Z",
+  "updatedAt": "2026-07-10T05:30:41.736Z",
   "sizeBytes": 12073677,
   "notes": [
-    "Chainway sleep fix: sleepGun disconnects BLE on main thread immediately, pin setReaderAwaitSleepTime(1) before drop, no free() so watchdog stays suppressed. Firmware powers down ~1min after link release.",
-    "Idle timer fix shipped in GAS v498 — install both."
+    "Gun power-on package: ACL wakes screen + app front + driver reconnect (1.2s gun-wake wait)",
+    "CONNECTED shows ready to scan",
+    "watchdog 5s when driver down"
   ],
   "history": [
+    {
+      "versionName": "0.1.46",
+      "versionCode": 48,
+      "date": "2026-07-10T05:30:41.736Z",
+      "notes": [
+        "Gun power-on package: ACL wakes screen + app front + driver reconnect (1.2s gun-wake wait)",
+        "CONNECTED shows ready to scan",
+        "watchdog 5s when driver down"
+      ]
+    },
+    {
+      "versionName": "0.1.45",
+      "versionCode": 47,
+      "date": "2026-07-10T05:17:27.243Z",
+      "notes": [
+        "Cold-start reconnect: trigger/screen-on/BT ACL all start reconnect ladder when gun not live",
+        "HID trigger fallback when BLE down (SDK callback cleared on disconnect)",
+        "Gun power-on: ACTION_ACL_CONNECTED auto-reconnect without menus"
+      ]
+    },
+    {
+      "versionName": "0.1.44",
+      "versionCode": 46,
+      "date": "2026-07-09T04:07:26.956Z",
+      "notes": [
+        "Trigger wake runs before BLE connected check — screen wakes even after idle sleepGun disconnect",
+        "Asleep gun: first trigger also starts forceReconnect",
+        "HID fallback (F1/L1) now calls maybeWakeForTrigger"
+      ]
+    },
     {
       "versionName": "0.1.42",
       "versionCode": 44,
@@ -162,35 +193,6 @@
       "notes": [
         "Fix TID read: Chainway EPC filter uses bit ptr (32) not word ptr",
         "reject EPC echoed as TID"
-      ]
-    },
-    {
-      "versionName": "0.1.24",
-      "versionCode": 26,
-      "date": "2026-07-07T18:38:04.186Z",
-      "notes": [
-        "TID fix: setEPCAndTIDMode before each read + readData fallback",
-        "R6 BLE often omits getTid() from inventorySingleTag alone"
-      ]
-    },
-    {
-      "versionName": "0.1.23",
-      "versionCode": 25,
-      "date": "2026-07-07T18:26:39.368Z",
-      "notes": [
-        "Gun reads EPC+TID per trigger (setEPCAndTIDMode)",
-        "pollScans returns {epc,tid} objects",
-        "Requires GAS v475 for crew badge pair login"
-      ]
-    },
-    {
-      "versionName": "0.1.22",
-      "versionCode": 24,
-      "date": "2026-07-07T17:24:21.633Z",
-      "notes": [
-        "BLE reconnect: stop spurious login reset (host-boot v479)",
-        "Native session backup restore before shell boot",
-        "Ignore Login paint signals when parent session valid"
       ]
     }
   ]

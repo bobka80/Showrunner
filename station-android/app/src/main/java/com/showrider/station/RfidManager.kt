@@ -3,7 +3,11 @@ package com.showrider.station
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -32,6 +36,8 @@ class RfidManager(
     private val onTriggerWake: () -> Boolean = { false },
     private val onLinkBusy: (Boolean) -> Unit = {},
     private val onGunActivity: () -> Unit = {},
+    /** Gun powered on / driver live — wake tablet + bring app forward (one package with reconnect). */
+    private val onGunPowerOn: () -> Unit = {},
 ) {
     private val uhf = RFIDWithUHFBLE.getInstance()
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -60,11 +66,14 @@ class RfidManager(
     @Volatile private var pollMs = prefs.getInt(PREF_POLL_MS, DEFAULT_POLL_MS)
     @Volatile private var battery = -1
     @Volatile private var firmware = ""
-    /** Minutes with no trigger pull before the gun powers down (0 = never). Set from web dropdown. */
-    @Volatile private var gunIdleSleepMinutes = prefs.getInt(PREF_GUN_IDLE_SLEEP_MIN, 0)
+    /** Always 0 — Chainway stays connected; idle disconnect disabled (see appSleep:false). */
+    @Volatile private var gunIdleSleepMinutes = 0
     @Volatile private var lastTriggerAt = SystemClock.elapsedRealtime()
+    @Volatile private var lastReconnectRequestAt = 0L
+    @Volatile private var reconnectGunJustWoke = false
 
     private val triggerIdleSleepRunnable = Runnable { onTriggerIdleSleepFired() }
+    private var btAclReceiver: BroadcastReceiver? = null
 
     private val pendingScans = java.util.concurrent.ConcurrentLinkedQueue<PendingScan>()
 
@@ -104,9 +113,10 @@ class RfidManager(
                 },
             )
             softDisconnect()
-            val waitMs = when (ladderStep) {
-                0 -> RECONNECT_WAIT_SOFT_MS
-                1 -> RECONNECT_WAIT_MEDIUM_MS
+            val waitMs = when {
+                ladderStep == 0 && reconnectGunJustWoke -> GUN_POWER_ON_CONNECT_WAIT_MS
+                ladderStep == 0 -> RECONNECT_WAIT_SOFT_MS
+                ladderStep == 1 -> RECONNECT_WAIT_MEDIUM_MS
                 else -> RECONNECT_WAIT_NUCLEAR_MS
             }
             Thread.sleep(waitMs)
@@ -117,6 +127,9 @@ class RfidManager(
             }
 
             val connectedNow = connectBlocking(gen, ladderStep)
+            if (connectedNow) {
+                reconnectGunJustWoke = false
+            }
             if (!connectedNow && gen == reconnectGeneration.get() && !activeDisconnect) {
                 if (ladderStep < 2) {
                     runReconnectLadder(gen, ladderStep + 1, reason)
@@ -210,23 +223,28 @@ class RfidManager(
                     }
                     sdk != ConnectionStatus.CONNECTED && (connected || linkState != LINK_DISCONNECTED) -> {
                         markDisconnected("watchdog")
-                        beginReconnectLadder("watchdog", 0)
+                        requestReconnect("watchdog", immediate = false)
                     }
-                    sdk != ConnectionStatus.CONNECTED -> connectIfNeeded()
+                    sdk != ConnectionStatus.CONNECTED -> requestReconnect("watchdog-idle", immediate = false)
                 }
             }
         }
         scheduleWatchdog()
     }
 
+    private fun watchdogDelayMs(): Long {
+        return if (!activeDisconnect && !isGunLinkLive()) WATCHDOG_DISCONNECTED_MS else WATCHDOG_MS
+    }
+
     private fun scheduleWatchdog() {
         mainHandler.removeCallbacks(watchdogRunnable)
-        mainHandler.postDelayed(watchdogRunnable, WATCHDOG_MS)
+        mainHandler.postDelayed(watchdogRunnable, watchdogDelayMs())
     }
 
     fun startWatchdog() {
         if (watchdogStarted) return
         watchdogStarted = true
+        registerBtAclReceiver()
         scheduleWatchdog()
         scheduleHealthCheck()
     }
@@ -276,8 +294,128 @@ class RfidManager(
 
     fun onAppWake() {
         healthFailStreak = 0
-        connectIfNeeded()
-        configWorker.execute { runHealthCheck() }
+        // Operator is back — end deliberate app-sleep so morning / manual screen-on can reconnect.
+        activeDisconnect = false
+        if (!isGunLinkLive()) {
+            requestReconnect("screen-on", immediate = true)
+        } else {
+            connectIfNeeded()
+            configWorker.execute { runHealthCheck() }
+        }
+    }
+
+    /** True when BLE is up and reads are allowed. */
+    private fun isGunLinkLive(): Boolean {
+        return connected && linkState == LINK_LIVE && sdkStatus() == ConnectionStatus.CONNECTED
+    }
+
+    /**
+     * Start (or continue) the reconnect ladder without spamming on rapid triggers.
+     * Clears deliberate app-sleep — the operator is trying to work.
+     */
+    private fun requestReconnect(reason: String, immediate: Boolean = false, gunJustWoke: Boolean = false) {
+        activeDisconnect = false
+        lastTriggerAt = SystemClock.elapsedRealtime()
+        if (isGunLinkLive()) {
+            mainHandler.post { onGunPowerOn() }
+            return
+        }
+        if (linkState == LINK_RECONNECTING || linkState == LINK_CONNECTING) {
+            if (gunJustWoke) mainHandler.post { onGunPowerOn() }
+            postStatus("Connecting to gun…")
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        val debounceMs = when {
+            gunJustWoke -> GUN_POWER_ON_DEBOUNCE_MS
+            immediate -> 1200L
+            else -> 2500L
+        }
+        if (now - lastReconnectRequestAt < debounceMs) return
+        lastReconnectRequestAt = now
+        reconnectGunJustWoke = gunJustWoke
+        if (gunJustWoke) {
+            mainHandler.post { onGunPowerOn() }
+            postStatus("Gun on — connecting…")
+        } else {
+            postStatus("Reconnecting to gun…")
+        }
+        beginReconnectLadder(reason, 0)
+    }
+
+    /**
+     * Unified trigger entry — SDK callback when BLE is live, Activity HID keys when it is not.
+     * Always wakes the tablet first; reconnects when the link is down so the next pull can scan.
+     */
+    fun onTriggerPressed(onWake: () -> Boolean): Boolean {
+        onGunActivity()
+        val consumedWake = onWake()
+        if (!isGunLinkLive()) {
+            requestReconnect("trigger", immediate = true)
+            return true
+        }
+        recordTriggerActivity()
+        if (consumedWake) {
+            postStatus("Station ready — pull again to scan")
+            return true
+        }
+        performTriggerScan()
+        return true
+    }
+
+    private fun performTriggerScan() {
+        when (scanMode) {
+            SCAN_MODE_CONTINUOUS ->
+                if (inventoryRunning) stopInventory() else startInventory()
+            SCAN_MODE_HOLD -> startInventory()
+            SCAN_MODE_MULTI -> {
+                if (inventoryRunning) stopInventory()
+                performMultiReadBurst()
+            }
+            else -> {
+                if (inventoryRunning) stopInventory()
+                performSingleRead()
+            }
+        }
+    }
+
+    /** Bonded R6 powered on — wake station + connect driver in one package. */
+    private fun onGunBluetoothAvailable() {
+        activeDisconnect = false
+        Log.i(TAG, "Gun on Bluetooth — wake + connect")
+        requestReconnect("gun-power-on", immediate = true, gunJustWoke = true)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun registerBtAclReceiver() {
+        if (btAclReceiver != null) return
+        btAclReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action != BluetoothDevice.ACTION_ACL_CONNECTED) return
+                val device = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE, BluetoothDevice::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE)
+                } ?: return
+                if (!isGunName(device.name)) return
+                onGunBluetoothAvailable()
+            }
+        }
+        val filter = IntentFilter(BluetoothDevice.ACTION_ACL_CONNECTED)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(btAclReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(btAclReceiver, filter)
+        }
+    }
+
+    private fun unregisterBtAclReceiver() {
+        btAclReceiver?.let {
+            try { context.unregisterReceiver(it) } catch (_: Exception) { /* ignore */ }
+        }
+        btAclReceiver = null
     }
 
     fun connectIfNeeded() {
@@ -423,6 +561,7 @@ class RfidManager(
             ConnectionStatus.CONNECTED -> {
                 connected = true
                 activeDisconnect = false
+                reconnectGunJustWoke = false
                 readCancelled.set(false)
                 healthFailStreak = 0
                 macConnectFails = 0
@@ -433,10 +572,14 @@ class RfidManager(
                 if (!mac.isNullOrBlank()) {
                     prefs.edit().putString(PREF_BT_MAC, mac).apply()
                 }
+                mainHandler.post {
+                    onGunPowerOn()
+                    onGunActivity()
+                }
                 if (uhf.setFrequencyMode(FREQUENCY_EUROPE)) {
-                    postStatus("RFID connected ($name)")
+                    postStatus("RFID connected ($name) — ready to scan")
                 } else {
-                    postStatus("RFID connected ($name) — check EU band if reads fail")
+                    postStatus("RFID connected ($name) — ready (check EU band if reads fail)")
                 }
                 installGunTriggerHandler()
                 applyConfigToGun()
@@ -485,16 +628,11 @@ class RfidManager(
         }
     }
 
-    /** Web dropdown → native trigger-idle sleep (Chainway only). 0 = off. */
+    /** Legacy bridge — idle sleep disabled; Chainway holds BLE open. */
     fun setGunIdleSleepMinutes(minutes: Int) {
-        val m = minutes.coerceIn(0, 120)
-        gunIdleSleepMinutes = m
-        prefs.edit().putInt(PREF_GUN_IDLE_SLEEP_MIN, m).apply()
-        if (m <= 0) {
-            mainHandler.removeCallbacks(triggerIdleSleepRunnable)
-        } else {
-            scheduleTriggerIdleSleep()
-        }
+        mainHandler.removeCallbacks(triggerIdleSleepRunnable)
+        gunIdleSleepMinutes = 0
+        prefs.edit().putInt(PREF_GUN_IDLE_SLEEP_MIN, 0).apply()
     }
 
     /** Reset countdown from the last physical trigger pull (not RFID reads). */
@@ -505,6 +643,7 @@ class RfidManager(
 
     private fun scheduleTriggerIdleSleep() {
         mainHandler.removeCallbacks(triggerIdleSleepRunnable)
+        // Chainway stays connected — no app-initiated idle disconnect.
         if (gunIdleSleepMinutes <= 0 || activeDisconnect || linkState != LINK_LIVE || !connected) return
         val needMs = gunIdleSleepMinutes * 60_000L
         val elapsed = SystemClock.elapsedRealtime() - lastTriggerAt
@@ -536,26 +675,7 @@ class RfidManager(
     private fun installGunTriggerHandler() {
         uhf.setKeyEventCallback(object : KeyEventCallback {
             override fun onKeyDown(keycode: Int) {
-                if (!connected || sdkStatus() != ConnectionStatus.CONNECTED) return
-                recordTriggerActivity()
-                onGunActivity()
-                if (onTriggerWake()) {
-                    postStatus("Station ready — pull again to scan")
-                    return
-                }
-                when (scanMode) {
-                    SCAN_MODE_CONTINUOUS ->
-                        if (inventoryRunning) stopInventory() else startInventory()
-                    SCAN_MODE_HOLD -> startInventory()
-                    SCAN_MODE_MULTI -> {
-                        if (inventoryRunning) stopInventory()
-                        performMultiReadBurst()
-                    }
-                    else -> {
-                        if (inventoryRunning) stopInventory()
-                        performSingleRead()
-                    }
-                }
+                onTriggerPressed(onTriggerWake)
             }
 
             override fun onKeyUp(keycode: Int) {
@@ -788,6 +908,7 @@ class RfidManager(
         reconnectGeneration.incrementAndGet()
         readCancelled.set(true)
         stopInventory()
+        unregisterBtAclReceiver()
         reconnectExecutor.execute {
             try {
                 softDisconnect()
@@ -805,33 +926,13 @@ class RfidManager(
     }
 
     /**
-     * Idle auto-sleep / manual sleep. Releases BLE immediately so firmware can power down.
-     * Suppresses reconnect until forceReconnect(). Does NOT call free() so reconnect is fast.
+     * No-op on Chainway — app holds BLE open so trigger→scan stays reliable.
+     * Accidental drops still recover via the reconnect watchdog; use forceReconnect() manually.
      */
     fun sleepGun(idleMinutes: Int? = null) {
         mainHandler.removeCallbacks(triggerIdleSleepRunnable)
-        activeDisconnect = true
-        reconnectGeneration.incrementAndGet()
-        readCancelled.set(true)
-        stopInventory()
-        mainHandler.post {
-            try {
-                pinReaderFastSleepOnConnect()
-                softDisconnectMainSync()
-                // Stay initialized — forceReconnect() reuses the SDK without a cold free/init.
-                connected = false
-                setLinkState(LINK_ASLEEP)
-                Log.i(TAG, "sleepGun: BLE disconnected, firmware awaitSleep=${READER_AWAIT_SLEEP_MIN}min")
-            } catch (e: Exception) {
-                Log.e(TAG, "sleepGun failed", e)
-            }
-            val msg = if (idleMinutes != null && idleMinutes > 0) {
-                "Gun disconnected ($idleMinutes min idle) — powers down in ~${READER_AWAIT_SLEEP_MIN} min — pull trigger + Reconnect"
-            } else {
-                "Gun disconnected — powers down in ~${READER_AWAIT_SLEEP_MIN} min — pull trigger + Reconnect"
-            }
-            postStatus(msg)
-        }
+        Log.i(TAG, "sleepGun ignored — Chainway stays connected")
+        postStatus("Gun stays connected — pull trigger to scan")
     }
 
     private fun applyConfigToGun() {
@@ -953,9 +1054,14 @@ class RfidManager(
         private const val SCAN_MS = 5000L
         private const val RECONNECT_MS = 3000L
         private const val WATCHDOG_MS = 15000L
+        /** Faster retry when driver is down but gun may be on (backup if ACL broadcast is missed). */
+        private const val WATCHDOG_DISCONNECTED_MS = 5000L
         private const val HEALTH_CHECK_MS = 12000L
         private const val RECONNECT_WAIT_SOFT_MS = 350L
         private const val RECONNECT_WAIT_MEDIUM_MS = 2000L
+        /** After gun power button: brief pause so BLE/UHF stack is ready before SDK connect. */
+        private const val GUN_POWER_ON_CONNECT_WAIT_MS = 1200L
+        private const val GUN_POWER_ON_DEBOUNCE_MS = 400L
         private const val RECONNECT_WAIT_NUCLEAR_MS = 800L
         private const val CONNECT_WAIT_MS = 4500L
         private const val MAX_MAC_RETRIES = 2

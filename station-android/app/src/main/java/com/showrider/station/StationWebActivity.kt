@@ -41,6 +41,7 @@ class StationWebActivity : AppCompatActivity() {
     private var splashHidden = false
     private var webViewRestored = false
     private var lastWakeAt = 0L
+    private var lastGunPowerWakeAt = 0L
     @Volatile private var isInForeground = false
     private var overlayPrompted = false
     private var screenOnReceiver: BroadcastReceiver? = null
@@ -90,6 +91,7 @@ class StationWebActivity : AppCompatActivity() {
             onTriggerWake = { maybeWakeForTrigger() },
             onLinkBusy = { busy -> setWebBleReconnecting(busy) },
             onGunActivity = { onGunActivity() },
+            onGunPowerOn = { wakeStationForGun_() },
         )
         rfid.startWatchdog()
         registerScreenOnReceiver()
@@ -308,6 +310,22 @@ class StationWebActivity : AppCompatActivity() {
     }
 
     /**
+     * Gun power-on package: wake the panel and bring Showrunner forward while the driver reconnects.
+     * Called from Bluetooth ACL + when the SDK link goes live — not only on trigger.
+     */
+    fun wakeStationForGun_() {
+        val now = System.currentTimeMillis()
+        if (now - lastGunPowerWakeAt < GUN_POWER_WAKE_DEBOUNCE_MS) return
+        lastGunPowerWakeAt = now
+        runOnUiThread {
+            val pm = getSystemService(PowerManager::class.java)
+            if (!isInForeground) bringStationToFront()
+            if (pm != null && !pm.isInteractive) wakeScreen(pm)
+            onGunActivity()
+        }
+    }
+
+    /**
      * Reorder the (singleTask) station activity to the front from the background. Android blocks
      * background Activity starts on API 29+ unless the app can draw overlays, which is why setup
      * grants "Display over other apps" (ensureOverlayPermission). singleTask means this reorders the
@@ -387,13 +405,15 @@ class StationWebActivity : AppCompatActivity() {
                 )
             }
             // A brief ACQUIRE_CAUSES_WAKEUP lock actually powers the panel back on; it auto-releases.
+            @Suppress("DEPRECATION")
             val wl = pm.newWakeLock(
-                PowerManager.FULL_WAKE_LOCK or
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
                     PowerManager.ACQUIRE_CAUSES_WAKEUP or
                     PowerManager.ON_AFTER_RELEASE,
                 "showrunner:trigger-wake",
             )
             wl.acquire(WAKE_HOLD_MS)
+            wl.release()
         } catch (_: Exception) {
             // Best-effort: if wake fails, the operator can still tap the screen.
         }
@@ -599,9 +619,9 @@ class StationWebActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // Fallback if SDK key events do not fire (dev keyboard / some devices).
+        // HID fallback when BLE is down (SDK key callback is cleared on disconnect).
         if (keyCode == KeyEvent.KEYCODE_F1 || keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
-            rfid.performSingleRead()
+            rfid.onTriggerPressed { maybeWakeForTrigger() }
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -651,6 +671,7 @@ class StationWebActivity : AppCompatActivity() {
         private const val SPLASH_TIMEOUT_MS = 30000L
         private const val WAKE_HOLD_MS = 4000L
         private const val WAKE_DEBOUNCE_MS = 1500L
+        private const val GUN_POWER_WAKE_DEBOUNCE_MS = 600L
         /** Screen stays on while gun is active; release after this idle gap. */
         private const val GUN_SCREEN_IDLE_MS = 90_000L
         private const val RENDERER_RELOAD_DEBOUNCE_MS = 10000L

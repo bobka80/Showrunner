@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v496** · APK **v0.1.40 (build 42)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-08
+**Opened:** 2026-07-02 · **Production:** GAS **v499** · APK **v0.1.47 (build 49)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-10
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -26,7 +26,7 @@ Because different devices carry different guns, gun behaviour is **forked per st
 
 | Layout id | Driver | Native binary | app sleep | wake-screen |
 |-----------|--------|---------------|-----------|-------------|
-| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **yes** — idle timer → resumable `sleepGun()` disconnects; firmware powers down per `setReaderAwaitSleepTime(1 min)` pinned on connect (build 42). `forceReconnect()` wakes it. Each driver sleeps with its **own SDK** | **yes** (SDK `KeyEventCallback`) |
+| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **no** — app holds BLE open (`appSleep:false`); gun powers down from physical button or accidental drop (watchdog reconnects). R6 spec: 70+ h standby while connected | **yes** (SDK `KeyEventCallback`) |
 | `tsl_dock_desktop` | TSL 1128 desktop | `station-desktop/` `TslRfidManager.cs` (EXE) | **yes** — ASCII `.sl` sleep + re-acquire on Reconnect | no |
 | `gate` *(planned)* | Gate reader + TV | TBD | TBD | no |
 
@@ -50,12 +50,12 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 | Constant | File | Default | Meaning |
 |----------|------|---------|---------|
 | `sm_station_eject_min` (`stationEjectMinutes_`) | `11_Station_Shell.html` | 10 min | host idle auto-eject window (1–120) |
-| `sm_station_gunsleep_min` (`STATION_GUNSLEEP_DEFAULT_MIN`, choices `0/1/2/3/5/10`) | `11_Station_Shell.html` | 5 min | idle minutes before `sleepGun()` — fires for **both** drivers (`appSleep:true`), each via its own SDK; `0`/Never disables |
+| `sm_station_gunsleep_min` (`STATION_GUNSLEEP_DEFAULT_MIN`, choices `0/1/2/3/5/10`) | `11_Station_Shell.html` | 5 min | idle minutes before `sleepGun()` — **TSL only** (`appSleep:true`); Chainway `appSleep:false` hides dropdown and native `sleepGun()` is a no-op |
 | `sm_station_power` / `sm_station_scan_mode` / `sm_station_poll_ms` / `sm_station_beep` | `11_Station_Shell.html` | from gun | gun config; web is source of truth, pushed to the active driver's native bridge on apply/startup |
 
 **Why the fork exists (regression that triggered it):** a shared auto-sleep timer force-disconnected *any* connected gun to "sleep" it. On Chainway that suppressed the reconnect ladder and killed the trigger→wake-screen handler. The fork means each gun sleeps with its **own** SDK path instead of one shared force-disconnect.
 
-**Chainway sleep (root cause + fix, build 42):** the long-standing "Chainway won't sleep" was **not** the JS timer — that fires and calls `sleepGun()` correctly. The gap was native: `sleepGun()` only **disconnected** BLE, but the Chainway only powers down after `setReaderAwaitSleepTime` minutes **in the disconnected state** (SDK `RFIDWithUHFBLE.setReaderAwaitSleepTime(int)`, range 1–254 min, factory default 5). If that timer drifted high, the gun stayed lit long after we disconnected. **Fix (`RfidManager.kt`):** pin `setReaderAwaitSleepTime(READER_AWAIT_SLEEP_MIN = 1)` on **every connect** (restores prompt firmware sleep for any disconnect/BLE-drop) **and** inside `sleepGun()` right before dropping the link. Flow: app idle timer → `sleepGun()` disconnect → firmware sleeps ~1 min later. Wake = **pull trigger + Reconnect gun** (`forceReconnect()`, resumable). Requires **APK build 42**. Fallback if it misbehaves: `appSleep:false` (dropdown shown, timer inert).
+**Chainway stay-connected (build 49, 2026-07-10):** app-initiated idle disconnect (`sleepGun` / web timer / native trigger-idle) created a dead zone where the phone still showed the gun paired but the **app driver** was down — trigger and scan were unreliable until manual reconnect. **Fix:** `appSleep:false` for `chainway_handheld`; `RfidManager.sleepGun()` is a no-op; BLE stays open while the app runs (R6: 70+ h standby connected). Accidental BLE drops still use the reconnect watchdog. TSL desktop unchanged (`appSleep:true`, `.sl` sleep). Prior `setReaderAwaitSleepTime(1)` on connect still applies if the link drops for any reason.
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 
@@ -82,6 +82,7 @@ Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showru
 - [x] **Per-device gun-driver fork (v495)** — `11a_Station_Gun_Drivers.html` registry + `stationGunCap_`; Chainway/TSL/gate isolated by `caps`; Chainway auto-sleep regression reverted (`appSleep:false`, trigger-wake restored). See § Gun driver fork.
 - [x] **TSL 1128 desktop thin shell** — `station-desktop/` (WebView2 + TSL ASCII, `PID_1128` auto-detect + watchdog, `.sl` app-sleep), `window.AndroidStation` bridge parity; build via `build-station-desktop.js`. See § Desktop TSL station.
 - [x] **Gun auto-sleep timer** — Session-settings dropdown (`sm_station_gunsleep_min`, default 5, Never=0); fires `sleepGun()` only for `appSleep:true` drivers (TSL).
+- [x] **Chainway stay-connected (build 49, 2026-07-10)** — `appSleep:false`; native `sleepGun()` no-op; BLE held open so trigger→scan stays reliable after long idle. TSL sleep unchanged.
 
 - [x] **SECURITY — login error leaked passcodes (v429):** `authenticateUser` had a leftover debug diagnostic that echoed the input, the crew headers, and stored **names + passcodes** (e.g. `bogdan / 66ab26`) into the failed-login error shown on the lock screen. Removed the `debugLog` capture entirely; failed logins now return only `"Incorrect crew name or passcode."` — no roster, headers, input, or passcodes ever go to the client. **Rotate any passcode that was visible on-screen.**
 - [x] **Duplicate-tag guard with overwrite/cancel (v428)** — recording an equipment tag (`recordStationAssetRfid`) or crew badge (`enrollStationCrewRfidTag`) now checks the scanned tag against the **whole database** — every asset **and** every crew badge — via `findStationRfidOwner_`. If the tag already belongs to a different record, the backend returns `{ duplicate:{ kind, id, name } }` instead of writing; the station record bar shows **"Tag already on X — Overwrite / Cancel"**. Overwrite re-issues the write with `force=true`, which blanks the previous owner's tag (`clearStationRfidOwner_`) before assigning — so a tag is only ever on one thing. Audit log records the steal.
@@ -151,6 +152,8 @@ Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showru
 2. **[x] BLE reconnect hosting-only mitigations (v485 / APK 0.1.34 build 36)** — flap guard in native prefs (survives WebView reload), block iframe nav during BLE, host badge in parent `localStorage`, ignore spurious `SESSION_CLEAR`, Login guard, 20s BLE busy window. **v483 direct-GAS reverted** (worse in field). *Kept as defense-in-depth; the real cure is the manifest configChanges fix (#1).*
 3. **[x] APK 0.1.35 (build 37)** — WebView `setRendererPriorityPolicy(IMPORTANT, waived=false)` + renderer-death breadcrumb. Did **not** fix the reboot (proved the trigger was Activity recreation, not renderer death) but is a reasonable hardening; kept.
 4. **[ ] Kiosk auto-start (APK)** — default launcher + `BOOT_COMPLETED` + battery optimization off.
+5. **[x] Cold-morning gun reconnect (APK 0.1.45 build 47).** After overnight gun power-off + tablet sleep, trigger could not wake the screen and manual wake + scan failed because BLE was down and the SDK trigger callback is **cleared on disconnect** (only HID keys reach the Activity). Fix in `RfidManager.kt` only: unified `onTriggerPressed()` always wakes + starts reconnect ladder when not live; `onAppWake()` (screen on / `onResume`) clears app-sleep and reconnects; `ACTION_ACL_CONNECTED` on bonded R6 auto-reconnects when the gun powers on. HID fallback (`F1`/`L1`) routes through the same path.
+6. **[x] Gun power-on one package (APK next).** `ACTION_ACL_CONNECTED` → `wakeStationForGun_()` (screen on + app front) + reconnect ladder with **1.2s** gun-wake wait (reliable SDK connect, not rushed). On `CONNECTED`: wake again + **"ready to scan"**. Watchdog **5s** when driver down (ACL backup). Chainway-only (`RfidManager.kt`, `StationWebActivity.kt`).
 
 ### SOLVED 2026-07-08 — BLE reconnect reset was Activity recreation (HID keyboard config change)
 
