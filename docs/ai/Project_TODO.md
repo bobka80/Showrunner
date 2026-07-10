@@ -27,7 +27,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station profiles** | Active — **Chainway stay-connected** (build 49, no app idle sleep); **TSL 1128 desktop thin shell** (`station-desktop/`); gun-sleep timer TSL-only. Next: cogwheel hidden→greyed-disabled, kiosk auto-start, gate layout | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **RFID scanning & station profiles** | Active — **Chainway no-host park** + HID trigger reconnect (build 50); TSL desktop. Next: field-tune timers, kiosk auto-start, gate layout | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | **Planned — not executing**; phone app first; blocks Firebase prep/timeline fork until Phase 3 | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---

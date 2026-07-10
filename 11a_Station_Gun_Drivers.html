@@ -21,9 +21,10 @@
       caps: {
         power: true, scanMode: true, multi: true, continuous: true, beep: true, pollMs: true,
         battery: true, firmware: true,
-        // Chainway: stay connected while a host is signed in; park after configurable no-host grace.
+        // SDK disconnect ≠ phone Bluetooth off — leaves HID dead zone (wake fails). Stay connected.
         appSleep: false,
         noHostPark: true,
+        autoSdkPark: false,
         nativeIdleSleep: false,
         // No in-app "Disconnect + sleep" button — Chainway has a physical trigger/firmware path;
         // that manual button is TSL-only (the TSL 1128 has no power button).

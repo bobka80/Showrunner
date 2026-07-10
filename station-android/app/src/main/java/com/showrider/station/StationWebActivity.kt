@@ -94,6 +94,7 @@ class StationWebActivity : AppCompatActivity() {
             },
             isAppInForeground = { isInForeground },
             onWakeAndForeground = { maybeWakeForTrigger() },
+            onTriggerWakeAndReconnect = { wakeThenReconnectGun_() },
             onLinkBusy = { busy -> setWebBleReconnecting(busy) },
             onGunActivity = { onGunActivity() },
             onGunPowerOn = { wakeStationForGun_() },
@@ -623,9 +624,33 @@ class StationWebActivity : AppCompatActivity() {
         }
     }
 
+    private fun wakeThenReconnectGun_() {
+        runOnUiThread {
+            val pm = getSystemService(PowerManager::class.java)
+            val needWake = pm != null && !pm.isInteractive
+            val needFront = !isInForeground
+            if (needFront) bringStationToFront()
+            if (pm != null && needWake) wakeScreen(pm)
+            if (needWake || needFront) onGunActivity()
+            val delayMs = if (needWake || needFront) TRIGGER_RECONNECT_DELAY_MS else 200L
+            gunScreenHandler.postDelayed({ rfid.continueTriggerReconnect() }, delayMs)
+        }
+    }
+
+    private fun isGunTriggerKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_F1 || keyCode == KeyEvent.KEYCODE_BUTTON_L1
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // HID path — must intercept before WebView; often the only path when screen is off.
+        if (event.action == KeyEvent.ACTION_DOWN && isGunTriggerKey(event.keyCode)) {
+            rfid.onTriggerPressed()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // HID fallback when BLE is down (SDK key callback is cleared on disconnect).
-        if (keyCode == KeyEvent.KEYCODE_F1 || keyCode == KeyEvent.KEYCODE_BUTTON_L1) {
+        if (isGunTriggerKey(keyCode)) {
             rfid.onTriggerPressed()
             return true
         }
@@ -679,6 +704,7 @@ class StationWebActivity : AppCompatActivity() {
         private const val GUN_POWER_WAKE_DEBOUNCE_MS = 600L
         /** Screen stays on while gun is active; release after this idle gap. */
         private const val GUN_SCREEN_IDLE_MS = 90_000L
+        private const val TRIGGER_RECONNECT_DELAY_MS = 500L
         private const val RENDERER_RELOAD_DEBOUNCE_MS = 10000L
     }
 }

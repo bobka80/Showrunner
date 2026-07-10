@@ -967,15 +967,15 @@ html.station-device-root #station-device-controls { display: flex; }
             <option value="15">15 minutes</option>
             <option value="30">30 minutes</option>
           </select>
-          <div class="station-field__hint">After the host signs out, the app driver stays connected this long so the next badge can scan in without reconnecting.</div>
+          <div class="station-field__hint">Informational window after host signs out. On Chainway the app driver <strong>stays connected</strong> so trigger scan keeps working — SDK-only disconnect leaves phone Bluetooth up and breaks HID wake.</div>
         </div>
-        <div class="station-field">
+        <div class="station-field" id="station-gun-park-delay-field">
           <label class="station-field__label" for="station-set-gun-park-delay">Disconnect gun after grace (minutes)</label>
           <select id="station-set-gun-park-delay" onchange="stationSaveGunParkDelayMinutes()">
             <option value="0">Immediately when grace ends (recommended)</option>
             <option value="1">1 minute after grace</option>
           </select>
-          <div class="station-field__hint">Shortest is best — disconnected time is vulnerable. Gun firmware powers down ~1 min after the app drops the link.</div>
+          <div class="station-field__hint">TSL only. Chainway stays connected — SDK disconnect leaves phone Bluetooth up and HID wake fails.</div>
         </div>
       </div>
       <div id="station-eject-saved" class="station-settings-saved"></div>
@@ -1534,21 +1534,35 @@ function stationClearNoHostParkDeadline_() {
   try { localStorage.removeItem(stationNoHostParkDeadlineKey_()); } catch (e) { /* ignore */ }
 }
 
-/** Arm park countdown after host clears — wall-clock survives screen-off. */
+/** Arm between-hosts notice after host clears (Chainway: no SDK disconnect). */
 function stationArmNoHostParkDeadline_() {
   stationClearNoHostParkDeadline_();
   if (typeof stationGunCap_ === 'function' && !stationGunCap_('noHostPark')) return;
   if (stationReadHostSession_()) return;
   var grace = stationNoHostGraceMinutes_();
   var delay = stationGunParkDelayMinutes_();
-  var totalMs = (grace + delay) * 60 * 1000;
+  var autoPark = (typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark'));
+  var totalMs = (autoPark ? (grace + delay) : grace) * 60 * 1000;
   if (totalMs <= 0) {
-    stationParkGun_();
+    stationNoHostParkExpired_();
     return;
   }
   var deadline = Date.now() + totalMs;
   try { localStorage.setItem(stationNoHostParkDeadlineKey_(), String(deadline)); } catch (e) { /* ignore */ }
   window.stationNoHostParkTimer = setTimeout(stationNoHostParkExpired_, totalMs);
+  if (autoPark) {
+    stationSetStatus_(
+      'No host — gun stays connected ' + grace + ' min' +
+      (delay ? (' then disconnects in ' + delay + ' min') : ' then parks') +
+      ' (~1 min more until LED off).',
+      ''
+    );
+  } else {
+    stationSetStatus_(
+      'No host — gun stays connected. Scan crew badge when ready (notice after ' + grace + ' min).',
+      ''
+    );
+  }
 }
 
 function stationNoHostParkExpired_() {
@@ -1557,7 +1571,15 @@ function stationNoHostParkExpired_() {
     stationClearNoHostParkDeadline_();
     return;
   }
-  stationParkGun_();
+  stationClearNoHostParkDeadline_();
+  if (typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark')) {
+    stationParkGun_();
+    return;
+  }
+  stationSetStatus_(
+    'No host — gun still connected. Scan badge to host, or power off the gun to save battery.',
+    ''
+  );
 }
 
 function stationCheckNoHostParkDeadline_() {
@@ -1580,12 +1602,13 @@ function stationCheckNoHostParkDeadline_() {
 }
 
 function stationParkGun_() {
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('autoSdkPark')) return;
   stationClearNoHostParkDeadline_();
   var br = stationSleepCapableBridge_();
   if (!br || typeof br.sleepGun !== 'function') return;
   try {
     br.sleepGun();
-    stationSetStatus_('Gun parked — pull trigger or tap Reconnect gun.', '');
+    stationSetStatus_('Gun parked — pull trigger to wake and reconnect.', '');
   } catch (e) { /* ignore */ }
 }
 
@@ -1967,6 +1990,8 @@ function stationSyncGunSleepButton_() {
   if (dropEl) dropEl.value = String(stationGunSleepMinutes_());
   var parkFields = document.getElementById('station-no-host-park-fields');
   if (parkFields) parkFields.style.display = (bridge && cap('noHostPark')) ? 'block' : 'none';
+  var parkDelayField = document.getElementById('station-gun-park-delay-field');
+  if (parkDelayField) parkDelayField.style.display = (bridge && cap('autoSdkPark')) ? 'block' : 'none';
   var graceEl = document.getElementById('station-set-no-host-grace');
   if (graceEl) graceEl.value = String(stationNoHostGraceMinutes_());
   var parkDelayEl = document.getElementById('station-set-gun-park-delay');
@@ -3682,7 +3707,9 @@ window.stationSaveNoHostGraceMinutes = function() {
   if (STATION_NO_HOST_GRACE_CHOICES.indexOf(mins) === -1) mins = STATION_NO_HOST_GRACE_DEFAULT_MIN;
   el.value = String(mins);
   stationSetStoredSetting_(STATION_NO_HOST_GRACE_KEY, mins);
-  if (!stationReadHostSession_()) stationArmNoHostParkDeadline_();
+  if (!stationReadHostSession_() && typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark')) {
+    stationArmNoHostParkDeadline_();
+  }
   const savedEl = document.getElementById('station-eject-saved');
   if (savedEl) {
     savedEl.textContent = 'Saved — gun stays connected ' + mins + ' min between hosts.';
@@ -3697,7 +3724,9 @@ window.stationSaveGunParkDelayMinutes = function() {
   if (STATION_GUN_PARK_DELAY_CHOICES.indexOf(mins) === -1) mins = STATION_GUN_PARK_DELAY_DEFAULT_MIN;
   el.value = String(mins);
   stationSetStoredSetting_(STATION_GUN_PARK_DELAY_KEY, mins);
-  if (!stationReadHostSession_()) stationArmNoHostParkDeadline_();
+  if (!stationReadHostSession_() && typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark')) {
+    stationArmNoHostParkDeadline_();
+  }
   const savedEl = document.getElementById('station-eject-saved');
   if (savedEl) {
     savedEl.textContent = mins

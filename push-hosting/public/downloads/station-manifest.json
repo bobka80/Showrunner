@@ -1,16 +1,38 @@
 {
-  "versionName": "0.1.47",
-  "versionCode": 49,
+  "versionName": "0.1.49",
+  "versionCode": 51,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-10T05:55:33.077Z",
+  "updatedAt": "2026-07-10T10:30:02.627Z",
   "sizeBytes": 12073677,
   "notes": [
-    "Chainway stays connected: app idle sleep disabled (appSleep false)",
-    "sleepGun is a no-op",
-    "BLE held open so trigger scans work after long idle"
+    "Fix HID trigger via dispatchKeyEvent",
+    "wake-then-reconnect on UI thread",
+    "block ACL auto-reconnect while parked",
+    "preserve LINK_ASLEEP"
   ],
   "history": [
+    {
+      "versionName": "0.1.49",
+      "versionCode": 51,
+      "date": "2026-07-10T10:30:02.627Z",
+      "notes": [
+        "Fix HID trigger via dispatchKeyEvent",
+        "wake-then-reconnect on UI thread",
+        "block ACL auto-reconnect while parked",
+        "preserve LINK_ASLEEP"
+      ]
+    },
+    {
+      "versionName": "0.1.48",
+      "versionCode": 50,
+      "date": "2026-07-10T10:05:10.576Z",
+      "notes": [
+        "No-host park timers (grace + disconnect delay)",
+        "restored sleepGun with 1min firmware sleep",
+        "HID+SDK 3-state trigger (wake/scan/reconnect 500ms)"
+      ]
+    },
     {
       "versionName": "0.1.47",
       "versionCode": 49,
@@ -176,24 +198,6 @@
       "notes": [
         "Gun-active keep screen on (90s idle release)",
         "wall-clock host eject deadline"
-      ]
-    },
-    {
-      "versionName": "0.1.28",
-      "versionCode": 30,
-      "date": "2026-07-07T19:44:32.196Z",
-      "notes": [
-        "Read full 96-bit TID (6 words)",
-        "was truncating last 8 hex chars"
-      ]
-    },
-    {
-      "versionName": "0.1.27",
-      "versionCode": 29,
-      "date": "2026-07-07T19:28:14.574Z",
-      "notes": [
-        "Explicit EPC+TID bank reads (ptr=2 EPC, ptr=0 TID)",
-        "EPC-only inventory select"
       ]
     }
   ]

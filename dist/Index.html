@@ -6934,15 +6934,15 @@ html.station-device-root #station-device-controls { display: flex; }
             <option value="15">15 minutes</option>
             <option value="30">30 minutes</option>
           </select>
-          <div class="station-field__hint">After the host signs out, the app driver stays connected this long so the next badge can scan in without reconnecting.</div>
+          <div class="station-field__hint">Informational window after host signs out. On Chainway the app driver <strong>stays connected</strong> so trigger scan keeps working — SDK-only disconnect leaves phone Bluetooth up and breaks HID wake.</div>
         </div>
-        <div class="station-field">
+        <div class="station-field" id="station-gun-park-delay-field">
           <label class="station-field__label" for="station-set-gun-park-delay">Disconnect gun after grace (minutes)</label>
           <select id="station-set-gun-park-delay" onchange="stationSaveGunParkDelayMinutes()">
             <option value="0">Immediately when grace ends (recommended)</option>
             <option value="1">1 minute after grace</option>
           </select>
-          <div class="station-field__hint">Shortest is best — disconnected time is vulnerable. Gun firmware powers down ~1 min after the app drops the link.</div>
+          <div class="station-field__hint">TSL only. Chainway stays connected — SDK disconnect leaves phone Bluetooth up and HID wake fails.</div>
         </div>
       </div>
       <div id="station-eject-saved" class="station-settings-saved"></div>

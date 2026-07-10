@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v501** · APK **v0.1.47 (build 49)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-10
+**Opened:** 2026-07-02 · **Production:** GAS **v502** · APK **v0.1.48 (build 50)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-10
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -57,7 +57,7 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 
 **Why the fork exists (regression that triggered it):** a shared auto-sleep timer force-disconnected *any* connected gun to "sleep" it. On Chainway that suppressed the reconnect ladder and killed the trigger→wake-screen handler. The fork means each gun sleeps with its **own** SDK path instead of one shared force-disconnect.
 
-**Chainway park + trigger (build 50, 2026-07-10):** Stay connected **while a host is signed in**. After host logout/eject, **between-hosts grace** (`sm_station_no_host_grace_min`, default 3) then **park delay** (`sm_station_gun_park_delay_min`, default 0 = disconnect immediately when grace ends) → `sleepGun()` drops app driver; `setReaderAwaitSleepTime(1)` pins **~1 min** firmware sleep (SDK minimum). **Trigger state machine:** (1) driver live → scan; (2) driver live, screen off → wake only; (3) driver down → HID wake + 500ms + reconnect. Parked state: no auto-reconnect on screen-on — trigger or Reconnect gun.
+**Chainway partial-disconnect dead zone (build 52):** `sleepGun()` / SDK `disconnect()` drops the **app driver** but **phone Bluetooth (HID) often stays up** — gun LED stays on, firmware sleep may not start, SDK trigger is dead, and **HID wake fails on screen-off** (field-verified). **Fix:** `autoSdkPark:false` — no automatic SDK disconnect on no-host timer; driver stays connected between hosts. Grace dropdown is notice-only. Power off gun manually for battery. TSL unchanged (`autoSdkPark` via `.sl`).
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 
