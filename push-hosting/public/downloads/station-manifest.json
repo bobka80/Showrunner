@@ -1,17 +1,22 @@
 {
-  "versionName": "0.1.49",
-  "versionCode": 51,
+  "versionName": "0.1.51",
+  "versionCode": 53,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-10T10:30:02.627Z",
+  "updatedAt": "2026-07-10T15:26:59.090Z",
   "sizeBytes": 12073677,
   "notes": [
-    "Fix HID trigger via dispatchKeyEvent",
-    "wake-then-reconnect on UI thread",
-    "block ACL auto-reconnect while parked",
-    "preserve LINK_ASLEEP"
+    "disconnect beep + no-host auto park (build 52)"
   ],
   "history": [
+    {
+      "versionName": "0.1.51",
+      "versionCode": 53,
+      "date": "2026-07-10T15:26:59.090Z",
+      "notes": [
+        "disconnect beep + no-host auto park (build 52)"
+      ]
+    },
     {
       "versionName": "0.1.49",
       "versionCode": 51,
@@ -189,15 +194,6 @@
       "date": "2026-07-08T04:52:21.302Z",
       "notes": [
         "BLE decouple: GAS direct load, host session native persist, flap guard"
-      ]
-    },
-    {
-      "versionName": "0.1.30",
-      "versionCode": 32,
-      "date": "2026-07-07T20:22:11.284Z",
-      "notes": [
-        "Gun-active keep screen on (90s idle release)",
-        "wall-clock host eject deadline"
       ]
     }
   ]

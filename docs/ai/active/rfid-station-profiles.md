@@ -50,14 +50,14 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 | Constant | File | Default | Meaning |
 |----------|------|---------|---------|
 | `sm_station_eject_min` (`stationEjectMinutes_`) | `11_Station_Shell.html` | 10 min | host idle auto-eject window (1–120) |
-| `sm_station_no_host_grace_min` | `11_Station_Shell.html` | 3 min | Chainway **noHostPark**: keep app driver connected after host leaves (between hosts) |
-| `sm_station_gun_park_delay_min` | `11_Station_Shell.html` | 0 (immediate) | Extra minutes after grace before `sleepGun()` — keep 0 to minimize vulnerable disconnect window |
+| `sm_station_no_host_grace_min` | `11_Station_Shell.html` | 3 min | **noHostPark**: keep app driver connected after host leaves; then `sleepGun()` parks |
+| `sm_station_gun_park_delay_min` | `11_Station_Shell.html` | 0 (immediate) | Extra minutes after grace before `sleepGun()` (disconnect beep + SDK drop) |
 | `sm_station_gunsleep_min` | `11_Station_Shell.html` | 5 min | TSL **appSleep** idle timer only; Chainway uses no-host park instead |
 | `sm_station_power` / `sm_station_scan_mode` / `sm_station_poll_ms` / `sm_station_beep` | `11_Station_Shell.html` | from gun | gun config; web is source of truth, pushed to the active driver's native bridge on apply/startup |
 
 **Why the fork exists (regression that triggered it):** a shared auto-sleep timer force-disconnected *any* connected gun to "sleep" it. On Chainway that suppressed the reconnect ladder and killed the trigger→wake-screen handler. The fork means each gun sleeps with its **own** SDK path instead of one shared force-disconnect.
 
-**Chainway partial-disconnect dead zone (build 52):** `sleepGun()` / SDK `disconnect()` drops the **app driver** but **phone Bluetooth (HID) often stays up** — gun LED stays on, firmware sleep may not start, SDK trigger is dead, and **HID wake fails on screen-off** (field-verified). **Fix:** `autoSdkPark:false` — no automatic SDK disconnect on no-host timer; driver stays connected between hosts. Grace dropdown is notice-only. Power off gun manually for battery. TSL unchanged (`autoSdkPark` via `.sl`).
+**Chainway no-host park (build 52 / v505+):** After host eject/logout, grace (+ optional park delay) → `sleepGun()` → **`triggerBeep` (~200 ms) then SDK disconnect** so the operator hears when the app drops the link. Pull trigger → wake + reconnect (reconnect may beep again). **Risk:** partial SDK disconnect can leave phone Bluetooth HID up (dead zone on screen-off) — field-tune grace/delay; power off gun manually if stuck. TSL unchanged (`autoSdkPark` via `.sl`).
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 

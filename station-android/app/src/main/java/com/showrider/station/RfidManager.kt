@@ -159,11 +159,25 @@ class RfidManager(
         }
     }
 
+    /** One short beep while still connected — audible cue that the app is dropping the SDK link. */
+    private fun playDisconnectBeep() {
+        try {
+            if (uhf.connectStatus == ConnectionStatus.CONNECTED) {
+                uhf.triggerBeep(BEEP_DISCONNECT_TICKS)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "playDisconnectBeep", e)
+        }
+    }
+
     /** BLE drop on the main thread (SDK requirement). Does not call [free]. */
     private fun softDisconnectMainSync() {
         connected = false
         inventoryRunning = false
         try {
+            if (uhf.connectStatus != ConnectionStatus.DISCONNECTED) {
+                playDisconnectBeep()
+            }
             uhf.setKeyEventCallback(null)
             uhf.setInventoryCallback(null)
             if (uhf.connectStatus != ConnectionStatus.DISCONNECTED) {
@@ -1091,6 +1105,8 @@ class RfidManager(
         private const val POWER_MIN = 5
         private const val POWER_MAX = 30
         private const val DEFAULT_POWER = 30
+        /** ~200 ms disconnect beep (SDK units: 100 ms each, range 1–255). */
+        private const val BEEP_DISCONNECT_TICKS = 2
         // Reader firmware auto-sleep: minutes the gun waits AFTER being disconnected before it powers
         // down (SDK setReaderAwaitSleepTime, range 1–254 min, factory default 5). SDK minimum is 1 —
         // there is no 0. We pin 1 so the gun powers down as soon as the BLE link drops.
