@@ -33,7 +33,7 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 | Cursor IDE session, rules, review gates | [CURSOR_WORKFLOW.md](docs/ai/CURSOR_WORKFLOW.md) |
 | Warehouse gate, guns, station profile, PA concurrency | [topics/logistics-warehouse.md](docs/ai/topics/logistics-warehouse.md) + [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) |
 
-The director may dictate by voice — match **terminology lock** in [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) when searching code.
+The director may dictate by voice — match **terminology lock** in [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) when searching code. See **Rule 12 (dictation mode)** — speech-to-text errors are common; confirm ambiguous terms before acting.
 
 ---
 
@@ -83,6 +83,16 @@ The director may dictate by voice — match **terminology lock** in [EQUIPMENT_M
     - **Announce completion + ask what's next:** when **every** box in an active campaign is checked, **stop and tell the director** the campaign is complete, and **ask what to do next** — proposing 2–3 concrete candidate next steps drawn from that campaign's remaining backlog and the [Project_TODO.md](docs/ai/Project_TODO.md) topics (e.g. the next phase, or a related topic). Do not silently start new work.
     - **Archive on the director's go:** once the director confirms the campaign is done, move its `active/*.md` file → `docs/ai/archive/`, update the **Active campaigns** row in `Project_TODO.md` (mark closed), and carry any still-open items back to the owning topic file so nothing is lost.
     - **Keep the drawer honest:** the files present in `active/` must always reflect what is genuinely in flight — no completed campaigns lingering, no in-flight work missing a file.
+
+12. **Director dictation mode (speech-to-text):** The director often uses **voice dictation** (not typed input). Transcription **frequently mishears** words — homophones, product names, acronyms, and near-miss spellings are common (e.g. **LFID → RFID**, **TLS → TSL**, **Android/desktop** swapped, file names garbled).
+
+    **AI must:**
+    - Treat odd spellings, surprise terminology, or ambiguous requests as **possible dictation errors** before searching code or changing docs.
+    - **Infer from context** when the intent is clear (warehouse RFID gate vs a typo; TSL gun vs TLS certificate).
+    - **Ask briefly** when the wrong interpretation would waste a long debug loop or touch fragile code — one clarifying question beats a wrong assumption.
+    - When the director confirms a correction, use the **correct term** in docs and commits; do not preserve the mis-transcription as canonical naming.
+
+    This applies in **every mode** (brainstorm, summarize, build) — not only when the director mentions dictation.
 
 ---
 

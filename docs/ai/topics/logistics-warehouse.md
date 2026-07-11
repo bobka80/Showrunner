@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-10 · **Production:** GAS **v501** · **Status:** Partial — per-device **gun-driver fork** (Chainway/TSL/gate); **TSL 1128 desktop thin shell** live; **Chainway stay-connected** (no app idle sleep, build 49); **next: EPC+TID** on Chainway tags. See [active campaign](../active/rfid-station-profiles.md).
+**Last swept:** 2026-07-11 · **Production:** GAS **v525** · **Status:** Partial — per-device **gun-driver fork** (Chainway/TSL/gate); **TSL 1128 desktop thin shell** live (v0.1.40); **Chainway stay-connected** (build 50); **gate driver planned** (desktop-only, own SDK). See [active campaign](../active/rfid-station-profiles.md).
 
 ---
 
@@ -27,6 +27,8 @@
 **Crew RFID:** Same UHF tag family as equipment. Store **EPC** on `Crew_Roster.rfid_tag` today; **approved:** add `rfid_tid` (factory TID) — enroll + login require **both** from one gun read for anti-clone (ROOT first). Gun reads tag → lookup crew → host session. Details → [active campaign](../active/rfid-station-profiles.md) § Agreed spec — Security.
 
 **Gate (warehouse door):** The gate is the **building exit**, not a truck portal. Crew push cases through the door; ramp/truck loading is **outside**. Gate validates what left the warehouse. Misses are fixed with a **handheld re-scan** at the door (simple exception path). **Approved (2026-07-07):** gate = **its own station device** (separate from warehouse Chainway guns); near-term hardware = **PC + TV** with rich on-screen UI; strict **one station profile per physical device** fleet-wide.
+
+**Native stack (approved 2026-07-11):** The gate reader runs in the **desktop station app only** (`station-desktop/` WebView2 shell — same family as today's TSL gate PC, **not** the Android APK). It gets layout **`gate`**, a **new native driver class**, and **its own vendor SDK** — separate from TSL (`TslRfidManager.cs`) and Chainway (`RfidManager.kt`). The shared station web UI and settings cogwheel stay the same; only the native SDK layer forks. Canonical detail → [active/rfid-station-profiles.md](../active/rfid-station-profiles.md) § Future: RFID gate driver.
 
 **Handheld gun roles (not only checkout):**
 - Exception re-scan at door when gate count mismatches
@@ -92,7 +94,7 @@ This removes “scan hygiene” (accidental badge wave during checkout): empty s
 - [ ] **Optimistic host login** — local cache → instant host; server confirm in parallel; offline banner when DB down
 - [ ] **Bulletproof BLE reconnect (APK)** — health check, hard reconnect ladder, foreground service, fix Reconnect button
 - [ ] **Kiosk auto-start (APK)** — default launcher + boot receiver; no Google account required on phone
-- [ ] **Device hygiene** — one station profile per gun/phone/gate/TL device; TL SDK when hardware arrives
+- [ ] **Device hygiene** — one station profile per gun/phone/gate device. **Gate:** desktop app + own SDK when hardware arrives (see active § Future: RFID gate driver).
 
 **IAM split:** Office crew permissions → **ROLE EDITOR** (`06a`). Fixed gun/tablet logins → **STATION PROFILES** (`06h`). Tamper each independently.
 

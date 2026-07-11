@@ -24,23 +24,26 @@ Because different devices carry different guns, gun behaviour is **forked per st
 
 **Registry:** `11a_Station_Gun_Drivers.html` (included before `11_Station_Shell.html`) defines `window.StationGunDrivers`, keyed by station layout, plus helpers `stationActiveGunLayout_()`, `stationActiveGunDriver_()` and `stationGunCap_(name)`. The shared shell asks the **active driver** what it supports — it never hard-codes gun-specific logic.
 
-| Layout id | Driver | Native binary | app sleep | wake-screen |
-|-----------|--------|---------------|-----------|-------------|
-| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | **noHostPark** — connected while host signed in; after host leaves, grace then park (`sleepGun`); firmware ~1 min after disconnect; HID+SDK trigger reconnect (build 50) | **yes** (SDK `KeyEventCallback` + HID F1/L1) |
-| `tsl_dock_desktop` | TSL 1128 desktop | `station-desktop/` `TslRfidManager.cs` (EXE) | **yes** — ASCII `.sl` sleep + re-acquire on Reconnect | no |
-| `gate` *(planned)* | Gate reader + TV | TBD | TBD | no |
+| Layout id | Driver | Native binary | SDK | app sleep | wake-screen |
+|-----------|--------|---------------|-----|-----------|-------------|
+| `chainway_handheld` | Chainway handheld | `station-android/` `RfidManager.kt` (APK) | Chainway BLE SDK | **noHostPark** — connected while host signed in; after host leaves, grace then park (`sleepGun`); firmware ~1 min after disconnect; HID+SDK trigger reconnect (build 50) | **yes** (SDK `KeyEventCallback` + HID F1/L1) |
+| `tsl_dock_desktop` | TSL 1128 handheld gun | `station-desktop/` `TslRfidManager.cs` (EXE) | TSL ASCII over COM | **yes** — ASCII `.sl` sleep + re-acquire on Reconnect | no |
+| `gate` *(planned)* | Fixed RFID gate reader + TV | `station-desktop/` **new driver class** (EXE only — **not** Android) | **Gate vendor SDK (TBD)** — **separate from TSL and Chainway** | TBD | no |
 
 **`caps` flags** (`power, scanMode, multi, continuous, beep, pollMs, battery, firmware, appSleep, disconnectSleep, wakeScreen`) decide which controls are relevant per gun.
 
 ### How to divert for a new device-specific driver (standing procedure)
 1. Add a **new layout id** to `11a_Station_Gun_Drivers.html` with its own `caps` block — set `true` only for what the hardware/native bridge actually supports.
 2. Give the device its **own station profile** in `06h_Admin_Station_Profiles.html` (`Station_Security.js`) pointing at that layout.
-3. Put **all** gun-specific native logic in that device's binary (`station-android/` for Chainway, `station-desktop/` for TSL, future gate binary) — **never** branch on gun type inside the shared shell; branch on `stationGunCap_()` instead.
+3. Put **all** gun-specific native logic in that device's binary — **never** branch on gun type inside the shared shell; branch on `stationGunCap_()` instead:
+   - **Chainway** → `station-android/` (`RfidManager.kt`)
+   - **TSL handheld gun** → `station-desktop/` (`TslRfidManager.cs`)
+   - **RFID gate reader** *(planned)* → `station-desktop/` (**new driver**, own vendor SDK — **do not** extend `TslRfidManager.cs`)
 4. The shared shell (`11_Station_Shell.html`) stays gun-agnostic: it reads caps and enables/greys controls accordingly.
 
 ### Cogwheel settings — identical menu, per-station values, per-driver SDK
 The station settings cogwheel is **the same view/model for every gun** (power, single/multi scan, poll, beep, eject, gun-sleep). Two rules:
-- **Per-driver control (no shared native code):** the shell only calls the **abstract bridge** (`setPower`/`setScanMode`/`setBeep`/`setPollMs`/`sleepGun`). Each gun's native binary implements those with its **own SDK** — Chainway `RfidManager.kt` (Chainway BLE SDK), TSL `TslRfidManager.cs` (TSL ASCII SDK). The same UI drives different SDKs; we never write one code path for both device types.
+- **Per-driver control (no shared native code):** the shell only calls the **abstract bridge** (`setPower`/`setScanMode`/`setBeep`/`setPollMs`/`sleepGun`). Each layout's native binary implements those with **its own vendor SDK** — Chainway `RfidManager.kt` (Chainway BLE SDK), TSL `TslRfidManager.cs` (TSL ASCII SDK), future gate driver (gate vendor SDK). The **same settings menu** drives **different SDKs**; we never merge native code across layouts.
 - **Per-station values (device-local, namespaced):** each station (one profile per device) stores its **own** settings bucket, so two same-model guns on two profiles never share values. Keyed by `profileName` (fallback `deviceName`) via `stationSettingsNs_()` / `stationNsKey_()`; all settings flow through `stationStoredSetting_` / `stationSetStoredSetting_`, which **migrate** legacy global keys into the station namespace on first read.
 - **Greying (target):** unsupported controls should be `disabled` (greyed), not removed, via `stationGunCap_`. **Now:** a couple are still *hidden* (Disconnect+sleep button is TSL-only via `disconnectSleep`); hidden → greyed-disabled is the remaining fork polish.
 
@@ -58,6 +61,23 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 **Why the fork exists (regression that triggered it):** a shared auto-sleep timer force-disconnected *any* connected gun to "sleep" it. On Chainway that suppressed the reconnect ladder and killed the trigger→wake-screen handler. The fork means each gun sleeps with its **own** SDK path instead of one shared force-disconnect.
 
 **Chainway no-host park (build 53 / GAS v505+):** After host eject/logout, grace (+ optional park delay) → `sleepGun()` → **`triggerBeep` (~200 ms) then SDK disconnect** so the operator hears when the app drops the link. Pull trigger → wake + reconnect (reconnect may beep again). **Risk:** partial SDK disconnect can leave phone Bluetooth HID up (dead zone on screen-off) — field-tune grace/delay; power off gun manually if stuck. TSL unchanged (`autoSdkPark` via `.sl`).
+
+### Future: RFID gate driver (planned — approved 2026-07-11)
+
+**What it is:** A **fixed RFID reader at the warehouse door** (PC + TV, rich on-screen UI). Validates what left the building; handheld guns handle exception re-scans at the door. Operational vision → [topics/logistics-warehouse.md](../topics/logistics-warehouse.md) § Gate.
+
+**Standing architecture rule (do not re-debate in future chats):**
+
+| Fact | Rule |
+|------|------|
+| **Platform** | **Desktop app only** — same `station-desktop/` WebView2 shell as the TSL gate PC; **not** the Android APK |
+| **Native driver** | **Third fork** — new class/module with **its own vendor SDK**; **never** bolt gate hardware onto `TslRfidManager.cs` |
+| **Web UI** | Same `11_Station_Shell.html` + **same settings cogwheel**; `stationGunCap_('gate')` greys/hides unsupported controls |
+| **Bridge** | Same `window.AndroidStation` API surface (`setPower`, `setScanMode`, scan delivery, etc.) — gate SDK implements the contract |
+| **Registry** | Layout id **`gate`** in `11a_Station_Gun_Drivers.html` (stub exists); own station profile per physical gate device |
+| **When built** | Follow § How to divert for a new device-specific driver above; add gate SDK reference under `stage-desktop-info/` or a sibling vendor folder |
+
+**Not the same as today's TSL gate PC:** The current working desktop station uses layout **`tsl_dock_desktop`** (handheld TSL 1128 gun). The future **`gate`** layout is a **different reader, different SDK**, in the **same desktop binary family**.
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 
@@ -221,12 +241,12 @@ Files: `push-hosting/public/host-boot.js`, `Login.html`, `station-android/.../St
 - [ ] **Dial in the real values on hardware** — power dBm, beep/power persist across reconnect on R6.
 - [ ] **Reminder:** whenever `host-boot.js` changes, bump the `?v=` in `push-hosting/public/index.html`.
 - [ ] **Tag-map / new-equipment RFID provisioning UX** on the station
-- [ ] **QR at gate / Gate-at-door** (future — separate gate device; TL SDK later)
+- [ ] **RFID gate reader (fixed door)** — layout `gate`; desktop app + **own SDK** (not TSL, not Android). See [rfid-station-profiles.md](../active/rfid-station-profiles.md) § Future: RFID gate driver.
 
 ### Approved backlog (not started)
 
 - [ ] **Offline host recognition (clone-safe)** — host-in from cache; writes still need server
-- [ ] **Device hygiene** — one station profile per physical device (operational; no purchase blocker). Future: TL Solutions SDK driver, gate PC+TV when hardware bought.
+- [ ] **Device hygiene** — one station profile per gun/phone/gate device. **Gate:** desktop-only, own SDK when hardware arrives (not TSL driver reuse).
 
 **Moved to in-progress:** Crew **EPC + TID** (was listed here; now priority #1 above).
 

@@ -1,6 +1,6 @@
 # Showrunner Station Desktop (thin shell)
 
-Windows gate PC / TV shell for the **TSL 1128-EU** RFID gun.
+Windows **desktop station shell** — today: **TSL 1128-EU** handheld gun on a gate PC. **Future:** same app will host a **third native driver** for a fixed **RFID gate reader** (own SDK, layout `gate`) — see [rfid-station-profiles.md](../docs/ai/active/rfid-station-profiles.md) § Future: RFID gate driver.
 
 **Field status (2026-07-11):** Login, logout, auto pin, and RFID scans work — the station UI shows **equipment names with unit numbers**, not raw EPC hex. Desktop **v0.1.40**, GAS **525**.
 
@@ -13,7 +13,16 @@ Windows gate PC / TV shell for the **TSL 1128-EU** RFID gun.
 | **`station-desktop/`** | **The app — build and run this** |
 | **`stage-desktop-info/`** | TSL vendor SDK, PDFs, Explorer installer — **reference only**. See [stage-desktop-info/README.md](../stage-desktop-info/README.md). |
 
-There is only one Showrunner desktop app. `stage-desktop-info/` is manufacturer reference material (renamed from the old typo folder `station-desctop`).
+There is only one Showrunner **desktop station** executable. It can host **multiple native gun/reader drivers** over time (TSL handheld today; fixed gate reader planned) — each layout gets its own SDK integration, not shared native code. `stage-desktop-info/` is TSL manufacturer reference only (renamed from the old typo folder `station-desctop`).
+
+### Native drivers in this app (one SDK each)
+
+| Layout | Driver class (today/planned) | Hardware |
+|--------|------------------------------|----------|
+| `tsl_dock_desktop` | `TslRfidManager.cs` | TSL 1128 handheld gun (Bluetooth COM) |
+| `gate` *(planned)* | **New driver — TBD** | Fixed RFID gate reader at warehouse door (PC + TV) |
+
+Both use the same WebView2 shell and `window.AndroidStation` bridge; the web settings menu stays shared. **Do not** implement gate hardware inside `TslRfidManager.cs`.
 
 ## What it is
 

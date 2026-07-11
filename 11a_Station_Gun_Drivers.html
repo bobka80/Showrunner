@@ -6,8 +6,11 @@
  *
  * The native side is already a separate binary per platform:
  *   - chainway_handheld → station-android/ RfidManager.kt          (Chainway BLE, APK)
- *   - tsl_dock_desktop  → station-desktop/ TslRfidManager.cs        (TSL 1128 over COM, EXE)
- *   - gate (planned)     → third layout + its own driver, TBD       (fixed gate reader + TV)
+ *   - tsl_dock_desktop  → station-desktop/ TslRfidManager.cs        (TSL 1128 handheld gun, EXE)
+ *   - gate (planned)     → station-desktop/ NEW driver + gate SDK   (fixed door reader + TV, EXE only — NOT TslRfidManager)
+ *
+ * One layout = one native driver = one vendor SDK. Same settings menu in 11_Station_Shell.html;
+ * never merge SDK code across layouts. See docs/ai/active/rfid-station-profiles.md § Gun driver fork.
  *
  * `caps` flags drive which controls are relevant per gun. Today unsupported controls are hidden;
  * the next step is to keep the settings screen identical for every gun and auto-GRAY-OUT the
