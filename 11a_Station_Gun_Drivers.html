@@ -81,17 +81,5 @@
     var d = window.stationActiveGunDriver_();
     return !!(d && d.caps && d.caps[name]);
   };
-
-  /** UI skin — phone sled (Chainway phone in R6) vs dock panel (gate PC, large tablet, gate TV). */
-  var UI_SKINS = {
-    chainway_handheld: 'phone_sled',
-    tsl_dock_desktop: 'dock_panel',
-    gate: 'dock_panel'
-  };
-
-  window.stationActiveUiSkin_ = function() {
-    var layout = window.stationActiveGunLayout_();
-    return UI_SKINS[layout] || 'phone_sled';
-  };
 })();
 </script>

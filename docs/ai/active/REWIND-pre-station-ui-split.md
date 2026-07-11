@@ -1,7 +1,7 @@
 # REWIND POINT — pre station UI split (major milestone)
 
 **Status:** **ACTIVE REWIND** — restore here before the **11-series shell split** and **dock panel UI** rework.  
-**Pinned:** 2026-07-11 · **GAS v530** = monolith baseline · **GAS v531** = split modules (same behavior) · **Hosting host-boot v499** · **Desktop 0.1.44** · **APK build 53**
+**Pinned:** 2026-07-11 · **GAS:** see `RELEASES.md` row tagged **REWIND POINT** · **Last updated:** 2026-07-11
 
 **Next work after this point:** [rfid-station-profiles.md](rfid-station-profiles.md) — mechanical split of `11_Station_Shell.html`, then **phone sled** vs **dock panel** UI. See session plan in chat / `STATION_UI.md` (when added).
 
@@ -27,7 +27,7 @@ These numbers **do not match each other** — that is normal. Each track is depl
 
 | Track | What it is | Pin at this rewind | Deploy command | Rollback |
 |-------|------------|-------------------|----------------|----------|
-| **1. GAS** | Apps Script — backend + compiled web app (`Index.html`, all `11_*.html`, LogicPayload) | **530** (`RELEASES.md` #1) | `node milestone.js "<note>"` | `node rollback-milestone.js` or redeploy prior GAS version |
+| **1. GAS** | Apps Script — backend + compiled web app (`Index.html`, all `11_*.html`, LogicPayload) | **`RELEASES.md` REWIND row** (e.g. v530) | `node milestone.js "<note>"` | `node rollback-milestone.js` or redeploy prior GAS version |
 | **2. Hosting** | Firebase shell at `sm-showrunner-97405.web.app` — `host-boot.js`, session bridge, scan relay, PWA | **`host-boot.js?v=`** in `push-hosting/public/index.html` (e.g. **499**) | `node deploy-hosting.js` | Redeploy prior hosting from Git; bump `?v=` |
 | **3. Desktop EXE** | Windows `ShowrunnerStationDesktop` — COM gun, WebView2, `AndroidStation` bridge | **0.1.44** (`ShowrunnerStationDesktop.csproj`) | `station-desktop/RUN-STATION.bat` or `node build-station-desktop.js` | Rebuild/checkout prior tag; no cloud auto-deploy |
 | **4. Station APK** | Android Chainway app — BLE gun native driver | **0.1.51 (versionCode 53)** — `push-hosting/public/downloads/station-manifest.json` | `node build-station-apk.js "notes"` → `node deploy-hosting.js` | Re-ship older APK only forward (downgrade guard); manifest history |

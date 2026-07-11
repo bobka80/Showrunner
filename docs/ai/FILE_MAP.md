@@ -98,23 +98,8 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`06_System_Admin.html`**: Core admin resource hub router.
 - **`06a_Admin_IAM.html`**: User access and role configuration (office crew roles).
 - **`06h_Admin_Station_Profiles.html`**: **Warehouse device IAM** — gun/tablet station profiles (Chainway handheld, TSL dock desktop, planned gate). One profile per physical device; profile carries the **layout** that selects the gun driver. Separate from office Role Editor. Backend: **`Station_Security.js`**.
-- **`11a_Station_Gun_Drivers.html`**: **Station gun driver registry** — `window.StationGunDrivers`, `stationActiveGunLayout_()`, `stationActiveGunDriver_()`, `stationGunCap_()`, **`stationActiveUiSkin_()`** (`phone_sled` \| `dock_panel`). Included first. See [STATION_UI.md](STATION_UI.md).
-- **`11b_Station_Styles.html`**: Station shell CSS (split from former monolith). `@INDEX: STATION -> Styles`.
-- **`11c_Station_Core.html`**: Host session, idle/eject timers, RBAC override, bootstrap, `initStationShell_`, messaging. `@INDEX: STATION -> Core`.
-- **`11d_Station_Rfid.html`**: Equip map, scan feed, `onStationRfidScan`, host badge login. `@INDEX: STATION -> RFID`.
-- **`11e_Station_ScanPanel.html`**: Scan panel dropdown, presets, status actions. `@INDEX: STATION -> Scan panel`.
-- **`11f_Station_Vault.html`**: Vault overlay **markup** (equipment + crew tabs).
-- **`11g_Station_Vault.html`**: Vault equipment list, rollup, record RFID. `@INDEX: STATION -> Vault equipment`.
-- **`11g_Station_Vault_Crew.html`**: Vault crew tab (ROOT badge enroll). `@INDEX: STATION -> Vault crew`.
-- **`11h_Station_Project.html`**: Project picker **markup**.
-- **`11h_Station_Project_Logic.html`**: Project picker + `openMobileProjectAssets`. `@INDEX: STATION -> Project logic`.
-- **`11i_Station_Settings.html`**: Settings overlay **markup**.
-- **`11i_Station_Settings_Logic.html`**: Gun config sync, native bridge, settings open/close. `@INDEX: STATION -> Settings logic`.
-- **`11j_Station_Phone_UI.html`**: **Phone sled** kiosk shell markup (Chainway phone in R6 sled). `@INDEX: STATION -> Phone sled shell`.
-- **`11k_Station_Dock_UI.html`**: **Dock panel** shell scaffold (right scan rail, bottom eject — Phase B). `@INDEX: STATION -> Dock panel shell`.
-- **`11l_Station_Dock_Scale.html`**: Dock UI scale presets (`--station-ui-scale`). `@INDEX: STATION -> Dock UI scale`.
-- **`11_Station_Shell.html`**: **Stub only** — logic moved to `11b`–`11l`. Do not add code.
-- **`docs/ai/STATION_UI.md`**: UI skin taxonomy, include order, dock panel roadmap.
+- **`11a_Station_Gun_Drivers.html`**: **Station gun driver registry** — `window.StationGunDrivers` keyed by station layout (`chainway_handheld`, `tsl_dock_desktop`, planned `gate`) + `stationActiveGunDriver_()` / `stationGunCap_(name)`. Per-gun `caps` flags decide which shell controls apply (hidden now, auto-gray-out next). Isolates each gun so one gun's behaviour (e.g. TSL app-sleep) can't affect another (Chainway trigger-wake). Included before `11_Station_Shell.html`. See [active/rfid-station-profiles.md](active/rfid-station-profiles.md) § Gun driver fork.
+- **`11_Station_Shell.html`**: **Warehouse gun / station computer UI** — station login takeover, crew badge host inherit, `window.onStationRfidScan` SDK hook. APIs: `getStationShellBootstrap`, `processStationRfidScan`, `enrollStationCrewRfidTag`, `getStationEquipmentRfidMap`, `getRefreshPayload` (project picker), `getStationVaultList` / `setStationAssetStatus` / `recordStationAssetRfid` (Vault). **PROJECT** → host-scoped picker → `openMobileProjectAssets`. **VAULT** → identical-unit rollup + status + manager equipment RFID cascade + **Crew tab** (ROOT). **Shipped:** host-inherit RBAC (v425–426), duplicate-tag overwrite guard (v428), login passcode leak fix (v429). APK **v0.1.10** sleep/wake-on-trigger. **Gun-agnostic:** gun-specific behaviour (sleep, wake, control visibility) is delegated to the active driver via `stationGunCap_()` — never branch on gun type here. See [active/rfid-station-profiles.md](active/rfid-station-profiles.md).
 - **`station-android/`**: **Native gun app** (WebView + Chainway `API_Ver20251103` AAR — `RfidManager.kt`, `StationWebActivity.kt`). Exposes `AndroidStation` `@JavascriptInterface` (`getConfig`/`setPower`/`setScanMode`/`setBeep`) for the web setup view; delivers scans via `showrunnerStationDeliverScan` (iframe relay). Gun settings (power/mode/beep) persist in Android prefs. See `station-android/README.md`. Drives the `chainway_handheld` layout — see [active/rfid-station-profiles.md](active/rfid-station-profiles.md) § Gun driver fork.
 - **`station-desktop/`**: **Native desktop/TV station shell** for the **TSL 1128-EU** gun (Windows WPF + **WebView2**, .NET 8). `ShowrunnerStationDesktop/`: `MainWindow.xaml.cs` (four-layer WebView scan relay + session sync), `TslRfidManager.cs`, `GunPortDetector.cs`, `StationBridge.cs` (`window.AndroidStation`), `DesktopPrefs.cs`, `ScanDiagnostics.cs`. Drives `tsl_dock_desktop`. **Architecture + fragile rules:** [active/tsl-desktop-handoff.md](active/tsl-desktop-handoff.md) · [FRAGILE_ZONES.md](FRAGILE_ZONES.md) § Desktop WebView2. Field readme: `station-desktop/README.md`.
 - **`stage-desktop-info/`**: **TSL vendor reference only** (not Showrunner software). `Doc/` (ASCII protocol + 1128 user guide PDFs), `Samples/` (vendor .NET SDK sample apps), `TSL Reference/` (ASCII Protocol Explorer installer). Renamed from historic typo `station-desctop`. **Do not ship.** See [stage-desktop-info/README.md](../../stage-desktop-info/README.md).
@@ -407,26 +392,6 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 ### Styles.html
 - `STYLES -> Core Theme Variables`
 - `STYLES -> CSS Color Engine`
-### 11c_Station_Core.html
-- `STATION -> Core`
-### 11d_Station_Rfid.html
-- `STATION -> RFID`
-### 11e_Station_ScanPanel.html
-- `STATION -> Scan panel`
-### 11g_Station_Vault.html
-- `STATION -> Vault equipment`
-### 11g_Station_Vault_Crew.html
-- `STATION -> Vault crew`
-### 11h_Station_Project_Logic.html
-- `STATION -> Project logic`
-### 11i_Station_Settings_Logic.html
-- `STATION -> Settings logic`
-### 11j_Station_Phone_UI.html
-- `STATION -> Phone sled shell`
-### 11k_Station_Dock_UI.html
-- `STATION -> Dock panel shell`
-### 11l_Station_Dock_Scale.html
-- `STATION -> Dock UI scale`
 
 ---
 
