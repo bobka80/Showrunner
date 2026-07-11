@@ -94,36 +94,50 @@
       return;
     }
 
-    if (window.stationProjectsCache && window.stationProjectsCache.length &&
-        window.stationProjectsFor === host.name) {
-      stationDockRenderProjectList_(window.stationProjectsCache);
-      return;
+    var cached = (window.stationProjectsFor === host.name && window.stationProjectsCache && window.stationProjectsCache.length)
+      ? window.stationProjectsCache : null;
+    if (cached) {
+      stationDockRenderProjectList_(cached);
+    } else if (!listEl.children.length) {
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading projects…'; }
+    } else if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Updating projects…';
     }
 
-    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading projects…'; }
-    listEl.innerHTML = '';
+    if (typeof stationPreloadProjects_ === 'function') stationPreloadProjects_(host.name);
+  };
 
-    google.script.run
-      .withSuccessHandler(function(payload) {
-        var projects = (payload && payload.projects) ? payload.projects : [];
-        if (typeof stationCacheProjectsPayload_ === 'function') stationCacheProjectsPayload_(payload, projects);
-        window.stationProjectsCache = projects;
-        window.stationProjectsFor = host.name;
-        stationDockRenderProjectList_(projects);
-      })
-      .withFailureHandler(function(err) {
-        if (statusEl) {
-          statusEl.style.display = 'block';
-          statusEl.textContent = 'Could not load projects: ' + (err && err.message ? err.message : String(err));
-        }
-      })
-      .getRefreshPayload(host.name);
+  window.stationDockShowProjectsError_ = function(msg) {
+    var statusEl = document.getElementById('station-dock-project-status');
+    var listEl = document.getElementById('station-dock-project-list');
+    if (statusEl) {
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'Could not load projects' + (msg ? ': ' + msg : '') + '. Tap to retry.';
+      statusEl.style.cursor = 'pointer';
+      statusEl.onclick = function() {
+        statusEl.onclick = null;
+        statusEl.style.cursor = '';
+        window.stationProjectsCache = null;
+        window.stationProjectsFor = null;
+        window.__stationProjectsFetchHost = null;
+        stationDockLoadProjects_();
+      };
+    }
+    if (listEl && !listEl.children.length) {
+      listEl.innerHTML = '';
+    }
   };
 
   window.stationDockRenderProjectList_ = function(projects) {
     var statusEl = document.getElementById('station-dock-project-status');
     var listEl = document.getElementById('station-dock-project-list');
     if (!listEl) return;
+
+    if (statusEl) {
+      statusEl.onclick = null;
+      statusEl.style.cursor = '';
+    }
 
     var sorted = (projects || []).slice().sort(function(a, b) {
       var d1 = a.start ? new Date(a.start) : new Date(8640000000000000);

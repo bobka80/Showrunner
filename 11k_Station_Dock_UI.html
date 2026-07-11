@@ -4,6 +4,31 @@
     <div class="station-dock-unified-head__left">
       <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
       <button type="button" id="station-dock-back-projects" class="btn-outline btn-sm station-dock-back-btn" style="display:none;" onclick="stationDockBackToProjects_()">← Projects</button>
+      <div class="station-dock-head-left-actions">
+        <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn" onclick="stationDockToggleAppSettings_()" title="Display settings" aria-label="Display settings">&#9881; Display</button>
+        <div id="station-dock-app-settings" class="station-dock-app-settings" style="display:none;" aria-hidden="true">
+          <div class="station-dock-app-settings__title">Display zoom</div>
+          <label class="station-dock-app-settings__field" for="station-dock-zoom-left">
+            <span>Left pane</span>
+            <select id="station-dock-zoom-left" onchange="stationDockApplyZoomLeft_(this.value)">
+              <option value="100">100%</option>
+              <option value="125">125%</option>
+              <option value="150">150%</option>
+              <option value="175">175%</option>
+            </select>
+          </label>
+          <label class="station-dock-app-settings__field" for="station-dock-zoom-right">
+            <span>Right pane (scans)</span>
+            <select id="station-dock-zoom-right" onchange="stationDockApplyZoomRight_(this.value)">
+              <option value="100">100%</option>
+              <option value="125">125%</option>
+              <option value="150">150%</option>
+              <option value="175">175%</option>
+            </select>
+          </label>
+          <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationDockToggleAppSettings_(false)">Done</button>
+        </div>
+      </div>
     </div>
     <div id="station-dock-head-right" class="station-dock-unified-head__right" aria-label="Station device"></div>
   </header>
@@ -18,31 +43,6 @@
           <div id="station-dock-project-status" class="station-dock-project-status">Loading projects…</div>
           <div id="station-dock-project-list" class="station-dock-project-list"></div>
         </div>
-      </div>
-      <footer class="station-dock-workspace__foot">
-        <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn" onclick="stationDockToggleAppSettings_()" title="Display settings" aria-label="Display settings">&#9881; Display</button>
-      </footer>
-      <div id="station-dock-app-settings" class="station-dock-app-settings" style="display:none;" aria-hidden="true">
-        <div class="station-dock-app-settings__title">Display zoom</div>
-        <label class="station-dock-app-settings__field" for="station-dock-zoom-left">
-          <span>Left pane</span>
-          <select id="station-dock-zoom-left" onchange="stationDockApplyZoomLeft_(this.value)">
-            <option value="100">100%</option>
-            <option value="125">125%</option>
-            <option value="150">150%</option>
-            <option value="175">175%</option>
-          </select>
-        </label>
-        <label class="station-dock-app-settings__field" for="station-dock-zoom-right">
-          <span>Right pane (scans)</span>
-          <select id="station-dock-zoom-right" onchange="stationDockApplyZoomRight_(this.value)">
-            <option value="100">100%</option>
-            <option value="125">125%</option>
-            <option value="150">150%</option>
-            <option value="175">175%</option>
-          </select>
-        </label>
-        <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationDockToggleAppSettings_(false)">Done</button>
       </div>
     </main>
     <aside id="station-dock-scan-rail" class="station-dock-scan-rail" aria-label="Live scans">

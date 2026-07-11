@@ -445,19 +445,37 @@ function stationResetDeviceToPristine_() {
 /** Background-fetch the host's projects (getRefreshPayload scoped to the person, not the device). */
 function stationPreloadProjects_(hostName) {
   if (!hostName) return;
-  if (window.stationProjectsFor === hostName && window.stationProjectsCache) return;
+
+  if (window.stationProjectsFor === hostName && window.stationProjectsCache && window.stationProjectsCache.length) {
+    if (typeof stationDockRenderProjectList_ === 'function') stationDockRenderProjectList_(window.stationProjectsCache);
+    const panel = document.getElementById('station-project-picker');
+    if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(window.stationProjectsCache);
+    return;
+  }
+
+  if (window.__stationProjectsFetchHost === hostName) return;
+
+  window.__stationProjectsFetchHost = hostName;
   window.stationProjectsFor = hostName;
   window.stationProjectsCache = null;
+
   google.script.run
     .withSuccessHandler(function(payload) {
+      window.__stationProjectsFetchHost = null;
       const projects = (payload && payload.projects) ? payload.projects : [];
       stationCacheProjectsPayload_(payload, projects);
       window.stationProjectsCache = projects;
-      // If the picker is already open and waiting, fill it now.
       const panel = document.getElementById('station-project-picker');
       if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(projects);
+      if (typeof stationDockRenderProjectList_ === 'function') stationDockRenderProjectList_(projects);
     })
-    .withFailureHandler(function() { window.stationProjectsFor = null; })
+    .withFailureHandler(function(err) {
+      window.__stationProjectsFetchHost = null;
+      window.stationProjectsFor = null;
+      if (typeof stationDockShowProjectsError_ === 'function') {
+        stationDockShowProjectsError_(err && err.message ? err.message : String(err));
+      }
+    })
     .getRefreshPayload(hostName);
 }
 

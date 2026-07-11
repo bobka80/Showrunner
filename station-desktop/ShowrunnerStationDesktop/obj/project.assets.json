@@ -649,4 +649,132 @@
         "lib/net8.0-windows10.0.19041/TechnologySolutions.Rfid.AsciiProtocol.dll",
         "lib/net8.0-windows10.0.19041/TechnologySolutions.Rfid.AsciiProtocol.xml",
         "lib/net8.0-windows7.0/TechnologySolutions.Rfid.AsciiProtocol.dll",
-        "lib/net8.0-windows7.0/TechnologySo
+        "lib/net8.0-windows7.0/TechnologySolutions.Rfid.AsciiProtocol.xml",
+        "lib/netstandard2.0/TechnologySolutions.Rfid.AsciiProtocol.dll",
+        "lib/netstandard2.0/TechnologySolutions.Rfid.AsciiProtocol.xml",
+        "tsl.asciiprotocol.6.3.4.nupkg.sha512",
+        "tsl.asciiprotocol.nuspec"
+      ]
+    },
+    "Tsl.Rfid.AsciiProtocol.Core/6.3.4": {
+      "sha512": "/EhkaJjGlVWI+YlPCeewIMwh9M8pb5MUcfLJvSCKKzHbw2GrKSiV7Q811Y45kXTRi/M5mkh8eC0vUm9zx+MRhw==",
+      "type": "package",
+      "path": "tsl.rfid.asciiprotocol.core/6.3.4",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENCE.TXT",
+        "ReadMe.md",
+        "asciiProtocol.png",
+        "lib/netstandard2.0/TechnologySolutions.Rfid.AsciiProtocol.Core.dll",
+        "lib/netstandard2.0/TechnologySolutions.Rfid.AsciiProtocol.Core.xml",
+        "tsl.rfid.asciiprotocol.core.6.3.4.nupkg.sha512",
+        "tsl.rfid.asciiprotocol.core.nuspec"
+      ]
+    },
+    "Tsl.Rfid.Operations/6.3.4": {
+      "sha512": "s6vh0cDt+qD24++n+AkABWTLGAoDiUyrw+NhaTy26J96dmHldZdspNUJwrOSxUM/zgIsGGTxXT4UgXwii/PdSw==",
+      "type": "package",
+      "path": "tsl.rfid.operations/6.3.4",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "LICENCE.TXT",
+        "lib/netstandard2.0/TechnologySolutions.Rfid.Operations.dll",
+        "lib/netstandard2.0/TechnologySolutions.Rfid.Operations.xml",
+        "tsl.rfid.operations.6.3.4.nupkg.sha512",
+        "tsl.rfid.operations.nuspec"
+      ]
+    }
+  },
+  "projectFileDependencyGroups": {
+    "net8.0-windows7.0": [
+      "Microsoft.Web.WebView2 >= 1.0.2957.106",
+      "System.Management >= 8.0.0",
+      "Tsl.AsciiProtocol >= 6.3.4"
+    ]
+  },
+  "packageFolders": {
+    "C:\\Users\\bobby\\.nuget\\packages\\": {}
+  },
+  "project": {
+    "version": "0.1.46",
+    "restore": {
+      "projectUniqueName": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
+      "projectName": "ShowrunnerStationDesktop",
+      "projectPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
+      "packagesPath": "C:\\Users\\bobby\\.nuget\\packages\\",
+      "outputPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\obj\\",
+      "projectStyle": "PackageReference",
+      "configFilePaths": [
+        "C:\\Users\\bobby\\AppData\\Roaming\\NuGet\\NuGet.Config"
+      ],
+      "originalTargetFrameworks": [
+        "net8.0-windows"
+      ],
+      "sources": {
+        "https://api.nuget.org/v3/index.json": {}
+      },
+      "frameworks": {
+        "net8.0-windows7.0": {
+          "targetAlias": "net8.0-windows",
+          "projectReferences": {}
+        }
+      },
+      "warningProperties": {
+        "warnAsError": [
+          "NU1605"
+        ]
+      },
+      "restoreAuditProperties": {
+        "enableAudit": "true",
+        "auditLevel": "low",
+        "auditMode": "direct"
+      }
+    },
+    "frameworks": {
+      "net8.0-windows7.0": {
+        "targetAlias": "net8.0-windows",
+        "dependencies": {
+          "Microsoft.Web.WebView2": {
+            "target": "Package",
+            "version": "[1.0.2957.106, )"
+          },
+          "System.Management": {
+            "target": "Package",
+            "version": "[8.0.0, )"
+          },
+          "Tsl.AsciiProtocol": {
+            "target": "Package",
+            "version": "[6.3.4, )"
+          }
+        },
+        "imports": [
+          "net461",
+          "net462",
+          "net47",
+          "net471",
+          "net472",
+          "net48",
+          "net481"
+        ],
+        "assetTargetFallback": true,
+        "warn": true,
+        "frameworkReferences": {
+          "Microsoft.NETCore.App": {
+            "privateAssets": "all"
+          },
+          "Microsoft.WindowsDesktop.App.WPF": {
+            "privateAssets": "none"
+          }
+        },
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.301/PortableRuntimeIdentifierGraph.json"
+      }
+    },
+    "runtimes": {
+      "win-x64": {
+        "#import": []
+      }
+    }
+  }
+}
