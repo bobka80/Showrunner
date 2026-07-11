@@ -32,7 +32,14 @@ Vendor reference (protocol PDFs, SDK samples, Explorer installer): [`stage-deskt
 node build-station-desktop.js "First gate shell build"
 ```
 
-**Field launch:** double-click [`RUN-STATION.bat`](RUN-STATION.bat) in this folder — it kills stale copies, waits briefly, then starts `bin/publish/win-x64/ShowrunnerStationDesktop.exe` (current canonical build output).
+**Field launch:** use a **desktop shortcut to [`RUN-STATION.bat`](RUN-STATION.bat)** (or double-click the bat in this folder). The bat:
+
+1. Kills any stale `ShowrunnerStationDesktop.exe` (COM port release)
+2. Waits ~2 s for Bluetooth COM to free
+3. **Auto-builds** the latest code into `bin/publish/win-x64/` (requires .NET 8 **SDK** on the gate PC)
+4. Starts that single exe
+
+You never need to open subfolders or run `dotnet publish` by hand for daily use. For release zips / version notes, still use `node build-station-desktop.js "…"`.
 
 Optional larger zip with bundled .NET:
 

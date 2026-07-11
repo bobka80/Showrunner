@@ -184,11 +184,9 @@ public partial class MainWindow : Window
                 if (WebView.CoreWebView2 == null) return;
                 var cfgMsg = JsonSerializer.Serialize(new { type = "SR_GUN_CONFIG", json = cfg });
                 WebView.CoreWebView2.PostWebMessageAsJson(cfgMsg);
-                PostJsonToChildFrames(cfgMsg, "push", "SR_GUN_CONFIG");
                 if (!string.IsNullOrWhiteSpace(scans) && scans != "[]")
                 {
                     var scansMsg = JsonSerializer.Serialize(new { type = "SR_GUN_SCANS", scansRaw = scans });
-                    WebView.CoreWebView2.PostWebMessageAsJson(scansMsg);
                     PostJsonToChildFrames(scansMsg, "push", "SR_GUN_SCANS");
                     RelayScanBatchToWeb(scans, "push");
                 }
@@ -229,51 +227,42 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Direct script invoke into each WebView2 frame — reliable for cross-origin GAS iframe where
-    /// postMessage and frame PostWebMessage may not reach onStationRfidScan.
+    /// Push scan into each frame's JS queue and invoke handler — awaited on UI thread for diagnostics.
     /// </summary>
-    private void InvokeScanHandlerInChildFrames(string epc, string tid, string pass)
-    {
-        var tagJson = JsonSerializer.Serialize(epc);
-        var tidJson = JsonSerializer.Serialize(tid ?? "");
-        var js =
-            "(function(){try{var t=" + tagJson + ",i=" + tidJson + ";" +
-            "if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);return 'scan';}" +
-            "if(typeof window.stationPushScanFeed_==='function'){window.stationPushScanFeed_(t,i);return 'feed';}" +
-            "window.__srPendingRfidScans=window.__srPendingRfidScans||[];" +
-            "window.__srPendingRfidScans.push({tag:t,tid:i,ts:Date.now()});return 'queued';" +
-            "}catch(e){return 'err:'+e.message;}})()";
+    private static string BuildFrameScanInjectJs(string epc, string tid) =>
+        "(function(){try{var t=" + JsonSerializer.Serialize(epc) + ",i=" + JsonSerializer.Serialize(tid ?? "") + ";" +
+        "window.__srScanQueue=window.__srScanQueue||[];" +
+        "window.__srScanQueue.push({epc:t,tag:t,tid:i});" +
+        "while(window.__srScanQueue.length>32)window.__srScanQueue.shift();" +
+        "var info={href:String(location.href||'').substring(0,72),isStation:!!window.IS_STATION_DEVICE," +
+        "hasOnScan:typeof window.onStationRfidScan,hasFeed:typeof window.stationPushScanFeed_,bridge:!!window.__srDesktopBridge};" +
+        "if(typeof window.__srInjectScan==='function'){window.__srInjectScan(t,i);info.action='inject';}" +
+        "else if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);info.action='scan';}" +
+        "else if(typeof window.stationPushScanFeed_==='function'){window.stationPushScanFeed_(t,i);info.action='feed';}" +
+        "else{window.__srPendingRfidScans=window.__srPendingRfidScans||[];" +
+        "window.__srPendingRfidScans.push({tag:t,tid:i,ts:Date.now()});info.action='queued';}" +
+        "info.recent=(window.stationRecentScans||[]).length;info.q=(window.__srScanQueue||[]).length;" +
+        "return JSON.stringify(info);}catch(e){return JSON.stringify({err:String(e.message||e)});}})()";
 
+    private async Task InjectScanIntoFramesAsync(string epc, string tid, string pass)
+    {
+        var js = BuildFrameScanInjectJs(epc, tid);
         CoreWebView2Frame[] frames;
         lock (_frameLock) frames = _childFrames.ToArray();
-        var invoked = 0;
-        foreach (var frame in frames)
+        if (frames.Length == 0)
+            ScanDiagnostics.Log("WEB", pass + ": no child frames tracked");
+        for (var i = 0; i < frames.Length; i++)
         {
             try
             {
-                _ = frame.ExecuteScriptAsync(js).ContinueWith(t =>
-                {
-                    if (!t.IsCompletedSuccessfully || t.IsFaulted) return;
-                    try
-                    {
-                        var result = UnwrapScriptResult(t.Result);
-                        if (!string.IsNullOrEmpty(result))
-                            ScanDiagnostics.Log("WEB", pass + ": frame script → " + result);
-                    }
-                    catch
-                    {
-                        // ignore
-                    }
-                }, TaskScheduler.Default);
-                invoked++;
+                var raw = await frames[i].ExecuteScriptAsync(js);
+                ScanDiagnostics.Log("WEB", pass + ": FRAME[" + i + "] " + Trunc(UnwrapScriptResult(raw), 160));
             }
             catch (Exception ex)
             {
-                ScanDiagnostics.Log("WEB", pass + ": frame ExecuteScript failed — " + ex.Message);
+                ScanDiagnostics.Log("WEB", pass + ": FRAME[" + i + "] ERR " + ex.Message);
             }
         }
-        if (invoked > 0)
-            ScanDiagnostics.Log("WEB", pass + ": ExecuteScript scan → " + invoked + " frame(s)");
     }
 
     private void PostJsonToChildFrames(string json, string pass, string label)
@@ -310,9 +299,7 @@ public partial class MainWindow : Window
                     epc = tagEl.GetString();
                 var tid = item.TryGetProperty("tid", out var tidEl) ? tidEl.GetString() : "";
                 if (string.IsNullOrWhiteSpace(epc)) continue;
-                RelayScanToTopHosting(epc, tid ?? "");
-                PostScanToChildFrames(epc, tid ?? "", pass);
-                InvokeScanHandlerInChildFrames(epc, tid ?? "", pass);
+                _ = DeliverScanToPageCoreAsync(epc, tid ?? "", pass);
             }
         }
         catch (Exception ex)
@@ -502,7 +489,7 @@ public partial class MainWindow : Window
         }
         ScanDiagnostics.Log("WEB", "DeliverScanToPage EPC=" + epc + " desktop="
             + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "?"));
-        DeliverScanToPageCore(epc, tid, "immediate");
+        _ = DeliverScanToPageCoreAsync(epc, tid, "immediate");
         ScheduleScanDeliveryRetries(epc, tid);
     }
 
@@ -512,11 +499,11 @@ public partial class MainWindow : Window
         {
             var capturedDelay = delayMs;
             Task.Delay(capturedDelay).ContinueWith(_ =>
-                Dispatcher.BeginInvoke(() => DeliverScanToPageCore(epc, tid, "retry@" + capturedDelay + "ms")));
+                Dispatcher.BeginInvoke(() => _ = DeliverScanToPageCoreAsync(epc, tid, "retry@" + capturedDelay + "ms")));
         }
     }
 
-    private void DeliverScanToPageCore(string epc, string tid, string pass)
+    private async Task DeliverScanToPageCoreAsync(string epc, string tid, string pass)
     {
         if (WebView.CoreWebView2 == null) return;
         var msgJs = JsonSerializer.Serialize(new { type = "SHOWRUNNER_RFID_SCAN", tag = epc, tid });
@@ -534,7 +521,7 @@ public partial class MainWindow : Window
         }
 
         PostScanToChildFrames(epc, tid, pass);
-        InvokeScanHandlerInChildFrames(epc, tid, pass);
+        await InjectScanIntoFramesAsync(epc, tid, pass);
         try
         {
             var topMsg = BuildNativeScanMessageJson(epc, tid);
@@ -543,6 +530,25 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             ScanDiagnostics.Log("WEB", pass + ": top PostWebMessage failed — " + ex.Message);
+        }
+
+        try
+        {
+            var tagJson = JsonSerializer.Serialize(epc);
+            var tidJson = JsonSerializer.Serialize(tid ?? "");
+            var topDiag =
+                "(function(){try{var t=" + tagJson + ",i=" + tidJson + ",m={type:'SHOWRUNNER_RFID_SCAN',tag:t,tid:i};" +
+                "var r={iframes:0,posted:0,deliver:typeof window.showrunnerStationDeliverScan};" +
+                "var fs=document.querySelectorAll('iframe');r.iframes=fs.length;" +
+                "for(var n=0;n<fs.length;n++){try{if(fs[n].contentWindow){fs[n].contentWindow.postMessage(m,'*');r.posted++;}}catch(x){}}" +
+                "if(window.showrunnerStationDeliverScan)window.showrunnerStationDeliverScan(t,i);" +
+                "return JSON.stringify(r);}catch(e){return JSON.stringify({err:e.message});}})()";
+            var raw = await WebView.CoreWebView2.ExecuteScriptAsync(topDiag);
+            ScanDiagnostics.Log("WEB", pass + ": top diag " + Trunc(UnwrapScriptResult(raw), 100));
+        }
+        catch (Exception ex)
+        {
+            ScanDiagnostics.Log("WEB", pass + ": top diag ERR " + ex.Message);
         }
     }
 
@@ -787,6 +793,14 @@ public partial class MainWindow : Window
             } catch (e2) {}
           }
           window.__srDesktopBridge = true;
+          window.__srInjectScan = function(tag, tid) {
+            var t = String(tag || ''), i = String(tid || '');
+            window.__srScanQueue = window.__srScanQueue || [];
+            window.__srScanQueue.push({ epc: t, tag: t, tid: i });
+            while (window.__srScanQueue.length > 32) window.__srScanQueue.shift();
+            if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(t, i);
+            else if (typeof window.stationPushScanFeed_ === 'function') window.stationPushScanFeed_(t, i);
+          };
           window.AndroidStation = {
             getConfig: function() { return window.__srGunConfigJson || '{}'; },
             setPower: function(p) { postGun('setPower', [p]); },

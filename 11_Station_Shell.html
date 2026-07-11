@@ -2373,6 +2373,24 @@ function stationStartScanPoll_() {
 
   var native = stationNativeBridge_();
   if (!native || typeof native.pollScans !== 'function') {
+    // Desktop cache shim: drain __srScanQueue even if pollScans path is unavailable.
+    if (window.__srDesktopBridge) {
+      window.stationScanPollTimer = setInterval(function() {
+        var q = window.__srScanQueue;
+        if (!q || !q.length) return;
+        var batch = q.splice(0, q.length);
+        for (var i = 0; i < batch.length; i++) {
+          var item = batch[i];
+          if (!item) continue;
+          var tag = item.epc || item.tag || '';
+          if (!tag) continue;
+          if (typeof window.onStationRfidScan === 'function') {
+            window.onStationRfidScan(tag, item.tid || '');
+          }
+        }
+      }, 200);
+      return;
+    }
     if (!window.stationScanPollRetryTimer && window.IS_STATION_DEVICE) {
       window.stationScanPollRetryTimer = setTimeout(function() {
         window.stationScanPollRetryTimer = null;
@@ -3482,7 +3500,7 @@ function stationNativeBridge_() {
     var b = window.AndroidStation;
     if (b && typeof b.getConfig === 'function' && typeof b.setScanMode === 'function') return b;
   } catch (e) { /* ignore */ }
-  // Desktop WebView2 sync hostObjects block the UI thread — only use when cache shim is absent.
+  // Desktop without cache shim: do not touch sync hostObjects (blocks UI / COM).
   if (window.__srDesktopBridge) return null;
   try {
     var h = chrome && chrome.webview && chrome.webview.hostObjects &&

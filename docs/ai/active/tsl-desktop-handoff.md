@@ -24,9 +24,13 @@ station-desktop/RUN-STATION.bat
 
 What the bat does:
 
-1. `taskkill /F /IM ShowrunnerStationDesktop.exe` — kills stale copies (critical; two instances fight for COM3 → “Access denied”).
-2. `ping` delay (~2 s) — lets Windows release the Bluetooth virtual COM port.
-3. Starts **`ShowrunnerStationDesktop\bin\publish\win-x64\ShowrunnerStationDesktop.exe`** (canonical build output).
+1. `cd` to the bat folder (works from a **desktop shortcut** with any working directory)
+2. `taskkill /F /IM ShowrunnerStationDesktop.exe` — kills stale copies (critical; two instances fight for COM3 → “Access denied”).
+3. `ping` delay (~2 s) — lets Windows release the Bluetooth virtual COM port.
+4. **`dotnet publish`** → **`ShowrunnerStationDesktop\bin\publish\win-x64\`** (always latest source — no manual build step)
+5. Starts **`ShowrunnerStationDesktop.exe`** from that folder
+
+Requires **.NET 8 SDK** on the gate PC for auto-build. If SDK is missing, the bat starts the last published exe if one exists.
 
 **Do not** launch from `win-x64-launch`, `win-x64-v019`, `win-x64-v020`, or an old zip — those were debug/legacy folders and caused version confusion (e.g. running v0.1.17 while thinking v0.1.23 was live).
 
