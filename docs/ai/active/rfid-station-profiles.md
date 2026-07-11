@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **REWIND (major):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — restore before UI split · **Production:** GAS **see RELEASES.md REWIND row** · APK **v0.1.51 (build 53)** · Desktop **v0.1.44** · Hosting **host-boot ?v=499** · **Last swept:** 2026-07-11
+**Opened:** 2026-07-02 · **REWIND (major):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — **GAS v530** · APK **v0.1.51 (build 53)** · Desktop **v0.1.44** · Hosting **host-boot ?v=499** · **Last swept:** 2026-07-11
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
