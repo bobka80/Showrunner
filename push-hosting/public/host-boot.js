@@ -2587,6 +2587,10 @@
     if (ev.data.type === 'SHOWRUNNER_STATION_HOST_SESSION') {
       var hostKey = ev.data.deviceKey || '';
       if (!hostKey) return;
+      if (isDesktopStationApp()) {
+        try { localStorage.removeItem(hostKey); } catch (e) { /* ignore */ }
+        return;
+      }
       try {
         if (ev.data.host) localStorage.setItem(hostKey, JSON.stringify(ev.data.host));
         else localStorage.removeItem(hostKey);
@@ -2594,6 +2598,7 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_HOST_RESTORE_REQUEST') {
+      if (isDesktopStationApp()) return;
       var reqKey = ev.data.deviceKey || '';
       if (!reqKey || !frame || !frame.contentWindow) return;
       try {
@@ -2951,8 +2956,21 @@
     hidePushPrompt();
   }
 
+  function clearDesktopStationHostSessions_() {
+    if (!isDesktopStationApp()) return;
+    try {
+      var keys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf('sm_station_host_v1_') === 0) keys.push(k);
+      }
+      keys.forEach(function(k) { localStorage.removeItem(k); });
+    } catch (e) { /* ignore */ }
+  }
+
   async function initShell() {
     startShellBootGrace();
+    clearDesktopStationHostSessions_();
     if (frame) {
       var skipNav = false;
       if (isStationShellApp() && readParentSession()) {

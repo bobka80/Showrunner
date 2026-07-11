@@ -79,6 +79,7 @@ public partial class MainWindow : Window
                "if(!localStorage.getItem('sm_session_token')){" +
                "localStorage.setItem('sm_session_token',t);" +
                "localStorage.setItem('sm_session_expires',String(exp));}" +
+               "try{var hk=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('sm_station_host_v1_')===0)hk.push(k);}hk.forEach(function(k){localStorage.removeItem(k);});}catch(e){}" +
                "}catch(e){}})();";
     }
 

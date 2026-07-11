@@ -1764,8 +1764,22 @@ function stationHostStorageKey_() {
   return 'sm_station_host_v1_' + dev;
 }
 
+/** TSL desktop gate PC — crew host must not survive app restart (badge in fresh each launch). */
+function stationIsDesktopKiosk_() {
+  try {
+    return /ShowrunnerStationDesktop/i.test(navigator.userAgent || '');
+  } catch (e) { return false; }
+}
+
 function stationPersistHostToParent_(host) {
   var key = stationHostStorageKey_();
+  if (stationIsDesktopKiosk_()) {
+    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+    try {
+      stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_SESSION', deviceKey: key, host: null });
+    } catch (e) { /* ignore */ }
+    return;
+  }
   try {
     if (host) localStorage.setItem(key, JSON.stringify(host));
     else localStorage.removeItem(key);
@@ -1785,7 +1799,7 @@ function stationReadHostSession_() {
   var key = stationHostStorageKey_();
   try {
     var raw = sessionStorage.getItem(key);
-    if (!raw) raw = localStorage.getItem(key);
+    if (!raw && !stationIsDesktopKiosk_()) raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.name) return null;
@@ -3908,7 +3922,7 @@ function stationBindMessageListener_() {
     } else if (d.type === 'SHOWRUNNER_STATION_GUN_STATUS' && d.message) {
       if (typeof window.stationOnGunStatus_ === 'function') window.stationOnGunStatus_(d.message);
     } else if (d.type === 'SHOWRUNNER_STATION_HOST_RESTORE' && d.host && d.host.name) {
-      if (!stationReadHostSession_()) {
+      if (!stationIsDesktopKiosk_() && !stationReadHostSession_()) {
         stationWriteHostSession_(d.host);
         stationRenderShellState_();
       }
@@ -3929,7 +3943,11 @@ function initStationShell_() {
     if (shell) shell.style.display = 'flex';
   } catch (e) { /* ignore */ }
   try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
-  try { stationRequestHostRestoreFromParent_(); } catch (e) { /* ignore */ }
+  if (stationIsDesktopKiosk_()) {
+    try { stationWriteHostSession_(null); } catch (e) { /* ignore */ }
+  } else {
+    try { stationRequestHostRestoreFromParent_(); } catch (e) { /* ignore */ }
+  }
 
   try {
     stationBindHostIdleListeners_();
@@ -3973,7 +3991,7 @@ function initStationShell_() {
           stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
           return;
         }
-        const bootHost = stationReadHostSession_();
+        const bootHost = stationIsDesktopKiosk_() ? null : stationReadHostSession_();
         if (bootHost) {
           // Wall-clock eject may have passed while the tablet slept — check before restoring host.
           stationCheckHostEjectDeadline_();
