@@ -3480,7 +3480,42 @@ window.stationDeviceSignOut = function() {
 
 function stationPostToHosting_(payload) {
   try { if (window.parent && window.parent !== window) window.parent.postMessage(payload, '*'); } catch (e) { /* ignore */ }
-  try { if (window.top && window.top !== window && window.top !== window.parent) window.top.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+  try { if (window.top && window.top !== window) window.top.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+}
+
+function stationRelayGunCommandToTop_(method, args) {
+  if (!method) return;
+  args = args || [];
+  try {
+    if (window.top && window.top !== window) {
+      window.top.postMessage({ type: 'SR_STATION_GUN', method: method, args: args }, '*');
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function stationApplyGunSetting_(key, value) {
+  var method = null;
+  var args = [];
+  if (key === 'power') { method = 'setPower'; args = [parseInt(value, 10)]; }
+  else if (key === 'scanMode') { method = 'setScanMode'; args = [String(value)]; }
+  else if (key === 'pollMs') { method = 'setPollMs'; args = [parseInt(value, 10)]; }
+  else if (key === 'beep') { method = 'setBeep'; args = [!!value]; }
+
+  var b = stationNativeBridge_();
+  if (b && method) {
+    try {
+      if (method === 'setPower' && typeof b.setPower === 'function') b.setPower(args[0]);
+      else if (method === 'setScanMode' && typeof b.setScanMode === 'function') b.setScanMode(args[0]);
+      else if (method === 'setPollMs' && typeof b.setPollMs === 'function') b.setPollMs(args[0]);
+      else if (method === 'setBeep' && typeof b.setBeep === 'function') b.setBeep(args[0]);
+    } catch (e) { /* ignore */ }
+  }
+
+  // Desktop nested GAS iframe: mirror every setting change to hosting shell → native COM.
+  if (method && (window.__srDesktopBridge || /ShowrunnerStation/i.test(navigator.userAgent || ''))) {
+    stationRelayGunCommandToTop_(method, args);
+  }
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: key, value: value });
 }
 
 /**
@@ -3536,23 +3571,6 @@ function stationNativeBridge_() {
     }
   } catch (e2) { /* ignore */ }
   return null;
-}
-
-/** Apply one gun setting live — direct native call first, relay as fallback. */
-function stationApplyGunSetting_(key, value) {
-  var b = stationNativeBridge_();
-  if (b) {
-    try {
-      if (key === 'power' && typeof b.setPower === 'function') b.setPower(parseInt(value, 10));
-      else if (key === 'scanMode' && typeof b.setScanMode === 'function') b.setScanMode(String(value));
-      else if (key === 'pollMs' && typeof b.setPollMs === 'function') b.setPollMs(parseInt(value, 10));
-      else if (key === 'beep' && typeof b.setBeep === 'function') b.setBeep(!!value);
-      stationDebug_('set ' + key + '=' + value + ' →native');
-      return;
-    } catch (e) { stationDebug_('direct set ' + key + ' ERR'); }
-  }
-  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: key, value: value });
-  stationDebug_('set ' + key + '=' + value + ' →relay');
 }
 
 /**

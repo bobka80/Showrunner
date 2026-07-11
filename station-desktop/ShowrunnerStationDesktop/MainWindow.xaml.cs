@@ -219,10 +219,13 @@ public partial class MainWindow : Window
         }
     }
 
+    private string? _lastGunConfigPushed;
+
     private void PushGunStateToWeb()
     {
         var cfg = _rfid.CurrentConfigJson();
-        var scans = _rfid.DrainPendingScans();
+        if (cfg == _lastGunConfigPushed) return;
+        _lastGunConfigPushed = cfg;
         Dispatcher.BeginInvoke(() =>
         {
             try
@@ -230,7 +233,7 @@ public partial class MainWindow : Window
                 if (WebView.CoreWebView2 == null) return;
                 var cfgMsg = JsonSerializer.Serialize(new { type = "SR_GUN_CONFIG", json = cfg });
                 WebView.CoreWebView2.PostWebMessageAsJson(cfgMsg);
-                PostJsonToChildFrames(cfgMsg, "WEB", "gun-config");
+                PostJsonToChildFrames(cfgMsg, "WEB", "gun-config-changed");
             }
             catch
             {
@@ -289,7 +292,8 @@ public partial class MainWindow : Window
         try
         {
             if (!TryParseGunWebMessage(args, out var method, out var payload)) return;
-            ScanDiagnostics.Log("WEB", "SR_STATION_GUN " + method);
+            if (method != "saveSession")
+                ScanDiagnostics.Log("WEB", "SR_STATION_GUN " + method);
             switch (method)
             {
                 case "reconnectGun":
@@ -352,7 +356,10 @@ public partial class MainWindow : Window
                         var token = payload[0].GetString();
                         var exp = payload[1].TryGetInt64(out var e) ? e : 0L;
                         if (TryPersistSession(token, exp, "bridge"))
+                        {
+                            ScanDiagnostics.Log("WEB", "SR_STATION_GUN saveSession (persisted)");
                             MaybeScheduleSessionBoot();
+                        }
                     }
                     break;
             }
@@ -1069,6 +1076,9 @@ public partial class MainWindow : Window
                 try { if (window.parent && window.parent !== window) window.parent.postMessage(d, '*'); } catch (e) {}
               }
               if (d.type === 'SR_STATION_GUN' && __srIsGasWrapperFrame_()) {
+                try { if (window.top && window.top !== window) window.top.postMessage(d, '*'); } catch (e) {}
+              }
+              if (d.type === 'SHOWRUNNER_STATION_CONFIG_SET' && __srIsGasWrapperFrame_()) {
                 try { if (window.top && window.top !== window) window.top.postMessage(d, '*'); } catch (e) {}
               }
             }, true);

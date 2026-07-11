@@ -117,7 +117,12 @@
     }
     pingHostingParent();
     document.addEventListener('DOMContentLoaded', pingHostingParent);
-    var headPing = setInterval(pingHostingParent, 1500);
+    var headPing = setInterval(pingHostingParent, (function() {
+      try {
+        if (/ShowrunnerStation/i.test(navigator.userAgent || '')) return 30000;
+      } catch (e) { /* ignore */ }
+      return 1500;
+    })());
     setTimeout(function() { clearInterval(headPing); }, 600000);
   })();
   </script>
