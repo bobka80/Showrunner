@@ -2307,6 +2307,15 @@ function stationBeginHostLogin_(tag, tid) {
     .processStationRfidScan(ACTIVE_USER_NAME, tag, { hostOnly: true, tid: tid });
 }
 
+function stationDrainPendingRfidScans_() {
+  var q = window.__srPendingRfidScans;
+  if (!q || !q.length || typeof window.onStationRfidScan !== 'function') return;
+  var pending = q.splice(0, q.length);
+  for (var i = 0; i < pending.length; i++) {
+    window.onStationRfidScan(pending[i].tag, pending[i].tid || '');
+  }
+}
+
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag, rawTid) {
   if (window.stationScanBusy && (Date.now() - (window.stationScanBusyAt || 0)) > 8000) {
@@ -2351,6 +2360,7 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   }
   stationHandleRfidScan_(tag, tid);
 };
+stationDrainPendingRfidScans_();
 
 /**
  * Pull scans straight from the gun via the injected native bridge — the reliable path when
@@ -3867,6 +3877,7 @@ function initStationShell_() {
     stationSyncSettingsToGun_();
     // Seed the on-screen sensitivity bar from the stored (source-of-truth) power value.
     stationSyncPowerControls_(stationStoredSetting_(STATION_POWER_KEY));
+    stationDrainPendingRfidScans_();
     // Pull scans directly from the gun (reliable path; relay stays as fallback).
     stationStartScanPoll_();
     stationBindPresetButtons_();

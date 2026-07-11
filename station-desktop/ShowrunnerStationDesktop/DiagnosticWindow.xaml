@@ -1,0 +1,46 @@
+<Window x:Class="Showrunner.Station.Desktop.DiagnosticWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Showrunner Scan Diagnostics"
+        Width="720" Height="520"
+        MinWidth="480" MinHeight="320"
+        Background="#111114"
+        WindowStartupLocation="Manual"
+        Topmost="True"
+        ShowInTaskbar="True">
+  <Grid Margin="10">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Foreground="#e8eaed" FontSize="14" FontWeight="Bold" TextWrapping="Wrap"
+               Text="Scan pipeline diagnostics — F12 to hide · gun read → native → WebView → station shell"/>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,8">
+      <Button x:Name="ProbeBtn" Content="Probe web bridge" Padding="10,6" Margin="0,0,8,0" Click="ProbeBtn_OnClick"/>
+      <Button x:Name="TestScanBtn" Content="Inject test scan" Padding="10,6" Margin="0,0,8,0" Click="TestScanBtn_OnClick"/>
+      <Button x:Name="ClearBtn" Content="Clear" Padding="10,6" Margin="0,0,8,0" Click="ClearBtn_OnClick"/>
+      <Button x:Name="CopyBtn" Content="Copy all" Padding="10,6" Margin="0,0,8,0" Click="CopyBtn_OnClick"/>
+      <CheckBox x:Name="AutoScrollBox" Content="Auto-scroll" IsChecked="True" Foreground="#c4c7cc"
+                VerticalAlignment="Center" Margin="8,0,0,0"/>
+    </StackPanel>
+
+    <TextBox Grid.Row="2" x:Name="LogBox"
+             IsReadOnly="True"
+             TextWrapping="Wrap"
+             VerticalScrollBarVisibility="Auto"
+             HorizontalScrollBarVisibility="Auto"
+             FontFamily="Consolas, Courier New, monospace"
+             FontSize="11"
+             Background="#0a0a0c"
+             Foreground="#a3e635"
+             BorderBrush="#333"
+             Padding="8"/>
+
+    <TextBlock Grid.Row="3" x:Name="FooterText" Margin="0,8,0,0"
+               Foreground="#8a8f98" FontSize="10" TextWrapping="Wrap"/>
+  </Grid>
+</Window>

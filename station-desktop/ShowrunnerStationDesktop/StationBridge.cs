@@ -21,15 +21,37 @@ public sealed class StationBridge
 
     public string getConfig() => _rfid.CurrentConfigJson();
 
-    public void setPower(int power) => _rfid.SetPowerLevel(power);
+    public void setPower(int power)
+    {
+        ScanDiagnostics.Log("BRIDGE", "setPower(" + power + ")");
+        _rfid.SetPowerLevel(power);
+    }
 
-    public void setScanMode(string mode) => _rfid.SetScanMode(mode);
+    public void setScanMode(string mode)
+    {
+        ScanDiagnostics.Log("BRIDGE", "setScanMode(" + mode + ")");
+        _rfid.SetScanMode(mode);
+    }
 
-    public void setBeep(bool enabled) => _rfid.SetBeepEnabled(enabled);
+    public void setBeep(bool enabled)
+    {
+        ScanDiagnostics.Log("BRIDGE", "setBeep(" + enabled + ")");
+        _rfid.SetBeepEnabled(enabled);
+    }
 
-    public void setPollMs(int ms) => _rfid.SetPollMs(ms);
+    public void setPollMs(int ms)
+    {
+        ScanDiagnostics.Log("BRIDGE", "setPollMs(" + ms + ")");
+        _rfid.SetPollMs(ms);
+    }
 
-    public string pollScans() => _rfid.DrainPendingScans();
+    public string pollScans()
+    {
+        var raw = _rfid.DrainPendingScans();
+        if (!string.IsNullOrWhiteSpace(raw) && raw != "[]")
+            ScanDiagnostics.Log("POLL", "iframe pollScans drained: " + raw);
+        return raw;
+    }
 
     public void reconnectGun() => _rfid.ForceReconnect();
 

@@ -14,6 +14,7 @@ namespace Showrunner.Station.Desktop;
 public sealed class TslRfidManager : IDisposable
 {
     public const string ScanModeSingle = "single";
+    public const string ScanModeMulti = "multi";
     public const string ScanModeContinuous = "continuous";
 
     // TSL SDK: AntennaParameters.OutputPower valid range is 10–29 dBm.
@@ -49,10 +50,15 @@ public sealed class TslRfidManager : IDisposable
     private long _lastTriggerMs;
     private string _lastDeliverNorm = "";
     private long _lastDeliverMs;
+    private volatile bool _suppressTransponderDelivery;
+    private volatile bool _appDrivenRead;
 
     private const int WatchdogMs = 2500;
-    private const int TriggerDebounceMs = 700;
-    private const int ScanDedupeMs = 800;
+    private const int TriggerDebounceMs = 1200;
+    private const int ScanDedupeMs = 1200;
+    private const int MultiBurstMs = 700;
+    private const int MultiBurstMaxReads = 20;
+    private const int MultiReadGapMs = 40;
 
     public event Action<string>? StatusChanged;
     public event Action<string, string>? ScanReceived;
@@ -62,6 +68,7 @@ public sealed class TslRfidManager : IDisposable
         _switchResponder.SwitchStateChanged += OnSwitchStateChanged;
         _inventory.FastIdentifier = TriState.Yes;
         _inventory.TagFocus = TriState.Yes;
+        _inventory.TransponderReceived += OnInventoryTransponder;
     }
 
     public string PortName
@@ -80,7 +87,12 @@ public sealed class TslRfidManager : IDisposable
         _portName = _manualPort;
         _powerDbm = prefs.PowerDbm is >= PowerMin and <= PowerMax ? prefs.PowerDbm : 29;
         _beepEnabled = prefs.Beep;
-        _scanMode = prefs.ScanMode == ScanModeContinuous ? ScanModeContinuous : ScanModeSingle;
+        _scanMode = prefs.ScanMode switch
+        {
+            ScanModeContinuous => ScanModeContinuous,
+            ScanModeMulti => ScanModeMulti,
+            _ => ScanModeSingle,
+        };
         _pollMs = prefs.PollMs is >= PollMin and <= PollMax ? prefs.PollMs : 500;
 
         PostStatus(string.IsNullOrWhiteSpace(_manualPort)
@@ -383,18 +395,35 @@ public sealed class TslRfidManager : IDisposable
         {
             if (!_commander.IsConnected) return;
             ConfigureChainInventory();
-            SeedInventoryParameters();
         }
+        ScanDiagnostics.Log("GUN", "Power → " + _powerDbm + " dBm");
+        PostStatus("Sensitivity " + _powerDbm + " dBm");
     }
 
     public void SetScanMode(string? mode)
     {
-        _scanMode = ScanModeContinuous.Equals(mode, StringComparison.OrdinalIgnoreCase)
-            ? ScanModeContinuous
-            : ScanModeSingle;
+        var next = NormalizeScanMode(mode);
+        if (next == _scanMode) return;
+        _scanMode = next;
         DesktopPrefs.SavePartial(p => p.ScanMode = _scanMode);
-        if (_scanMode == ScanModeSingle)
+        if (_scanMode != ScanModeContinuous)
             StopContinuous();
+        lock (_commandLock)
+        {
+            if (_commander.IsConnected)
+                EnableSwitchReporting();
+        }
+        ScanDiagnostics.Log("GUN", "Scan mode → " + _scanMode);
+        PostStatus("Scan mode: " + _scanMode);
+    }
+
+    private static string NormalizeScanMode(string? mode)
+    {
+        if (ScanModeContinuous.Equals(mode, StringComparison.OrdinalIgnoreCase))
+            return ScanModeContinuous;
+        if (ScanModeMulti.Equals(mode, StringComparison.OrdinalIgnoreCase))
+            return ScanModeMulti;
+        return ScanModeSingle;
     }
 
     public void SetBeepEnabled(bool enabled)
@@ -403,12 +432,14 @@ public sealed class TslRfidManager : IDisposable
         DesktopPrefs.SavePartial(p => p.Beep = _beepEnabled);
         lock (_commandLock)
             ApplyBeep();
+        ScanDiagnostics.Log("GUN", "Beep → " + (_beepEnabled ? "on" : "off"));
     }
 
     public void SetPollMs(int ms)
     {
         _pollMs = Math.Clamp(ms, PollMin, PollMax);
         DesktopPrefs.SavePartial(p => p.PollMs = _pollMs);
+        ScanDiagnostics.Log("GUN", "Poll interval → " + _pollMs + " ms");
     }
 
     public void Dispose()
@@ -418,6 +449,7 @@ public sealed class TslRfidManager : IDisposable
         _watchdog = null;
         StopContinuous();
         _switchResponder.SwitchStateChanged -= OnSwitchStateChanged;
+        _inventory.TransponderReceived -= OnInventoryTransponder;
         try
         {
             if (_commander.IsConnected)
@@ -478,6 +510,7 @@ public sealed class TslRfidManager : IDisposable
     {
         try
         {
+            _suppressTransponderDelivery = true;
             ConfigureChainInventory();
             _commander.ExecuteCommand(_inventory, _inventory.Responder);
         }
@@ -485,6 +518,10 @@ public sealed class TslRfidManager : IDisposable
         {
             // Non-fatal — switch-trigger inventory may still work with partial params.
             PostStatus("Inventory seed: " + ex.Message);
+        }
+        finally
+        {
+            _suppressTransponderDelivery = false;
         }
     }
 
@@ -495,7 +532,7 @@ public sealed class TslRfidManager : IDisposable
             var sw = new SwitchActionCommand
             {
                 AsynchronousReportingEnabled = TriState.Yes,
-                // App owns inventory on trigger — avoids double-read (gun + app) and duplicate beeps.
+                // App owns every inventory — gun only reports the trigger (one read per press in single).
                 SinglePressAction = SwitchAction.Off,
                 DoublePressAction = SwitchAction.Off,
             };
@@ -530,10 +567,26 @@ public sealed class TslRfidManager : IDisposable
         if (e.State == SwitchState.Single)
         {
             var now = Environment.TickCount64;
-            if (now - _lastTriggerMs < TriggerDebounceMs) return;
+            if (now - _lastTriggerMs < TriggerDebounceMs)
+            {
+                ScanDiagnostics.Log("GUN", "Trigger debounced");
+                return;
+            }
             _lastTriggerMs = now;
-            PostStatus("Trigger");
-            OnTriggerPressed();
+            ScanDiagnostics.Log("GUN", "Trigger → mode=" + _scanMode);
+            switch (_scanMode)
+            {
+                case ScanModeContinuous:
+                    PostStatus("Trigger");
+                    OnTriggerPressed();
+                    break;
+                case ScanModeMulti:
+                    Task.Run(PerformMultiReadBurst);
+                    break;
+                default:
+                    Task.Run(PerformSingleRead);
+                    break;
+            }
         }
         else if (e.State is SwitchState.Off)
             StopContinuous();
@@ -541,43 +594,67 @@ public sealed class TslRfidManager : IDisposable
 
     private void OnTriggerPressed()
     {
-        if (_scanMode == ScanModeContinuous)
-        {
-            if (_continuousRunning)
-                StopContinuous();
-            else
-                StartContinuous();
-            return;
-        }
-        PerformSingleRead();
+        if (_continuousRunning)
+            StopContinuous();
+        else
+            StartContinuous();
     }
 
-    private void PerformSingleRead()
+    /// <summary>Inventory responder hook — delivery is via PerformSingleRead / multi burst only.</summary>
+    private void OnInventoryTransponder(object? sender, TransponderDataEventArgs ev)
+    {
+        // Gun switch uses SinglePressAction=Off; ignore async inventory noise here.
+    }
+
+    private void PerformMultiReadBurst()
+    {
+        var deadline = Environment.TickCount64 + MultiBurstMs;
+        var attempts = 0;
+        while (Environment.TickCount64 < deadline && attempts < MultiBurstMaxReads && !_disposed)
+        {
+            PerformSingleRead(deliverAllTags: true);
+            attempts++;
+            if (Environment.TickCount64 < deadline)
+                Thread.Sleep(MultiReadGapMs);
+        }
+    }
+
+    private static string ExtractEpc(TransponderDataEventArgs ev)
+    {
+        var tag = NormalizeHex(ev.Transponder.Epc);
+        if (string.IsNullOrEmpty(tag))
+            tag = NormalizeHex(ev.Transponder.ReadData);
+        return tag;
+    }
+
+    private static string ExtractTid(TransponderDataEventArgs ev, string epc)
+    {
+        var chip = NormalizeHex(ev.Transponder.TransponderIdentifier);
+        if (!string.IsNullOrEmpty(chip) && chip == epc)
+            chip = "";
+        if (string.IsNullOrEmpty(chip))
+            chip = NormalizeHex(ev.Transponder.ReadData);
+        if (!string.IsNullOrEmpty(chip) && chip == epc)
+            chip = "";
+        return chip;
+    }
+
+    private void PerformSingleRead(bool deliverAllTags = false)
     {
         lock (_commandLock)
         {
             if (!_commander.IsConnected) return;
+            _appDrivenRead = true;
             try
             {
                 ConfigureChainInventory();
-                string? epc = null;
-                string? tid = null;
+                var tags = new List<(string Epc, string Tid)>();
                 void OnTag(object? s, TransponderDataEventArgs ev)
                 {
-                    var tag = NormalizeHex(ev.Transponder.Epc);
-                    if (string.IsNullOrEmpty(tag))
-                        tag = NormalizeHex(ev.Transponder.ReadData);
+                    var tag = ExtractEpc(ev);
                     if (string.IsNullOrEmpty(tag)) return;
-                    var chip = NormalizeHex(ev.Transponder.TransponderIdentifier);
-                    if (!string.IsNullOrEmpty(chip) && chip == tag)
-                        chip = "";
-                    if (string.IsNullOrEmpty(chip))
-                        chip = NormalizeHex(ev.Transponder.ReadData);
-                    if (!string.IsNullOrEmpty(chip) && chip == tag)
-                        chip = "";
-                    epc = tag;
-                    if (!string.IsNullOrEmpty(chip))
-                        tid = chip;
+                    if (!deliverAllTags && tags.Count > 0) return;
+                    tags.Add((tag, ExtractTid(ev, tag)));
                 }
 
                 _inventory.TransponderReceived += OnTag;
@@ -590,19 +667,27 @@ public sealed class TslRfidManager : IDisposable
                     _inventory.TransponderReceived -= OnTag;
                 }
 
-                if (string.IsNullOrEmpty(epc))
+                if (tags.Count == 0)
                 {
                     PostStatus("No tag in range");
                     return;
                 }
 
-                if (string.IsNullOrEmpty(tid))
-                    tid = TryReadTidForEpc(epc);
-                DeliverScan(epc, tid ?? "");
+                foreach (var (epc, tidHint) in tags)
+                {
+                    var tid = tidHint;
+                    if (string.IsNullOrEmpty(tid))
+                        tid = TryReadTidForEpc(epc);
+                    DeliverScan(epc, tid ?? "");
+                }
             }
             catch (Exception ex)
             {
                 PostStatus("Read failed: " + ex.Message);
+            }
+            finally
+            {
+                _appDrivenRead = false;
             }
         }
     }
@@ -612,12 +697,16 @@ public sealed class TslRfidManager : IDisposable
         var norm = epc.Trim().ToUpperInvariant();
         var now = Environment.TickCount64;
         if (norm == _lastDeliverNorm && now - _lastDeliverMs < ScanDedupeMs && string.IsNullOrEmpty(tid))
+        {
+            ScanDiagnostics.Log("NATIVE", "Deduped duplicate EPC " + norm);
             return;
+        }
         _lastDeliverNorm = norm;
         _lastDeliverMs = now;
 
         EnqueueScan(epc, tid);
-        ScanReceived?.Invoke(epc, tid);
+        ScanDiagnostics.Log("NATIVE", "DeliverScan queue+event EPC=" + epc + " TID=" + (tid ?? ""));
+        ScanReceived?.Invoke(epc, tid ?? "");
         PostStatus("Read: " + epc + (string.IsNullOrEmpty(tid) ? " (no TID — hold badge still)" : " tid:" + tid));
     }
 
@@ -640,7 +729,6 @@ public sealed class TslRfidManager : IDisposable
             if (!_commander.IsConnected) return "";
             try
             {
-                AbortIfConnected();
                 var epcBlock = new DataBlock(epcHex);
                 var read = new ReadTransponderCommand
                 {

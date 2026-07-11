@@ -1,3 +1,5 @@
-Showrunner Station Desktop v0.1.11
+Showrunner Station Desktop v0.1.13
 
-- v0.1.11: fix scan delivery — trigger inventory, ScanReceived event, poll relay
+- v0.1.13 gun-native inventory
+- stop top-frame poll steal
+- scan delivery retry

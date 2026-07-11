@@ -47,9 +47,15 @@
 
   // Desktop WebView2: AndroidStation is on this (top) frame; the GAS station shell is cross-origin
   // in the iframe and cannot call reconnect/sleep/poll directly — relay here.
+  // Do NOT poll on desktop: the iframe pulls via chrome.webview host object, and top-frame poll
+  // drains the native queue before the iframe sees it (relay-only path was lossy).
+  function isDesktopWebView2_() {
+    try { return !!(window.chrome && window.chrome.webview); } catch (e) { return false; }
+  }
   var stationGunPollTimer = null;
   function startStationGunPoll_() {
     if (stationGunPollTimer) return;
+    if (isDesktopWebView2_()) return;
     if (!window.AndroidStation || typeof AndroidStation.pollScans !== 'function') return;
     stationGunPollTimer = setInterval(function() {
       try {

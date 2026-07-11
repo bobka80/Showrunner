@@ -19,15 +19,29 @@ public partial class MainWindow : Window
     private readonly object _frameLock = new();
     private StationBridge? _bridge;
     private bool _splashHidden;
+    private DiagnosticWindow? _diagWindow;
 
     public MainWindow()
     {
         InitializeComponent();
+        ScanDiagnostics.Log("APP", "Starting v" + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "?"));
         _rfid.StatusChanged += OnGunStatus;
         _rfid.ScanReceived += (epc, tid) =>
-            Dispatcher.BeginInvoke(() => DeliverScanToPage(epc, tid ?? ""));
+            Dispatcher.BeginInvoke(() =>
+            {
+                ScanDiagnostics.Log("NATIVE", "ScanReceived event EPC=" + epc);
+                DeliverScanToPage(epc, tid ?? "");
+            });
         Loaded += async (_, _) => await InitWebViewAsync();
-        Closed += (_, _) => _rfid.Dispose();
+        Closed += (_, _) =>
+        {
+            if (_diagWindow != null)
+            {
+                _diagWindow.Detach();
+                _diagWindow = null;
+            }
+            _rfid.Dispose();
+        };
     }
 
     private async Task InitWebViewAsync()
@@ -63,8 +77,6 @@ public partial class MainWindow : Window
             _bridge = new StationBridge(_rfid, HideSplash);
 
             WebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
-
-            // Top frame (web.app shell).
             WebView.CoreWebView2.AddHostObjectToScript("androidStation", _bridge);
 
             // The Showrunner station UI runs inside a cross-origin GAS iframe, so the host object
@@ -89,13 +101,15 @@ public partial class MainWindow : Window
                 child.NavigationCompleted += async (_, nav) =>
                 {
                     if (!nav.IsSuccess) return;
+                    ScanDiagnostics.Log("WEB", "Child frame navigation completed");
                     try
                     {
                         await child.ExecuteScriptAsync(BridgeShimScript);
+                        ScanDiagnostics.Log("WEB", "Bridge shim injected into child frame");
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // ignore
+                        ScanDiagnostics.Log("WEB", "Child shim failed: " + ex.Message);
                     }
                 };
             };
@@ -109,6 +123,7 @@ public partial class MainWindow : Window
             };
 
             WebView.Source = new Uri(ShowrunnerUrl);
+            ScanDiagnostics.Log("WEB", "Navigating to " + ShowrunnerUrl);
         }
         catch (Exception ex)
         {
@@ -225,7 +240,8 @@ public partial class MainWindow : Window
 
     private void OnGunStatus(string msg)
     {
-        Dispatcher.Invoke(() =>
+        // Never block the COM watchdog thread waiting on the UI dispatcher.
+        Dispatcher.BeginInvoke(() =>
         {
             var low = msg.ToLowerInvariant();
             if (low.Contains("fail") || low.Contains("error") || low.Contains("connect") ||
@@ -235,13 +251,37 @@ public partial class MainWindow : Window
                 ShowStatus(msg, persistent: false);
 
             if (low.Contains("gun connected") || low.Contains("gun asleep") || low.StartsWith("reconnecting"))
-            {
                 RelayGunConfigToPage();
-            }
+
+            if (low.StartsWith("read:") || low.Contains("gun connected") ||
+                low.Contains("connect fail") || low.StartsWith("rfid connect"))
+                ScanDiagnostics.Log("GUN", msg);
         });
     }
 
     private void DeliverScanToPage(string epc, string tid)
+    {
+        if (WebView.CoreWebView2 == null)
+        {
+            ScanDiagnostics.Log("WEB", "DeliverScan skipped — WebView not ready");
+            return;
+        }
+        ScanDiagnostics.Log("WEB", "DeliverScanToPage EPC=" + epc);
+        DeliverScanToPageCore(epc, tid, "immediate");
+        ScheduleScanDeliveryRetries(epc, tid);
+    }
+
+    private void ScheduleScanDeliveryRetries(string epc, string tid)
+    {
+        foreach (var delayMs in new[] { 400, 1200, 2500 })
+        {
+            var capturedDelay = delayMs;
+            Task.Delay(capturedDelay).ContinueWith(_ =>
+                Dispatcher.BeginInvoke(() => DeliverScanToPageCore(epc, tid, "retry@" + capturedDelay + "ms")));
+        }
+    }
+
+    private void DeliverScanToPageCore(string epc, string tid, string pass)
     {
         if (WebView.CoreWebView2 == null) return;
         var tagJs = JsonSerializer.Serialize(epc);
@@ -261,25 +301,167 @@ public partial class MainWindow : Window
             _ = WebView.CoreWebView2.ExecuteScriptAsync(
                 $"(function(m){{try{{var f=document.getElementById('app-frame');" +
                 "if(f&&f.contentWindow)f.contentWindow.postMessage(m,'*');}}catch(e){{}}}})({msgJs});");
+            ScanDiagnostics.Log("WEB", pass + ": top relay + postMessage sent");
         }
-        catch
+        catch (Exception ex)
         {
-            // ignore
+            ScanDiagnostics.Log("WEB", pass + ": top relay failed — " + ex.Message);
         }
 
         CoreWebView2Frame[] frames;
         lock (_frameLock) frames = _childFrames.ToArray();
+        ScanDiagnostics.Log("WEB", pass + ": child frames=" + frames.Length);
+        var injected = 0;
         foreach (var frame in frames)
         {
             try
             {
                 _ = frame.ExecuteScriptAsync(childJs);
+                injected++;
             }
-            catch
+            catch (Exception ex)
             {
-                // ignore
+                ScanDiagnostics.Log("WEB", pass + ": frame script failed — " + ex.Message);
             }
         }
+        if (injected > 0)
+            ScanDiagnostics.Log("WEB", pass + ": onStationRfidScan injected into " + injected + " frame(s)");
+    }
+
+    private void ShowDiagnosticWindow()
+    {
+        if (_diagWindow == null)
+        {
+            _diagWindow = new DiagnosticWindow(ProbeWebBridgeAsync, DeliverScanToPage, GunSummary)
+            {
+                Owner = this,
+            };
+        }
+
+        if (_diagWindow.IsVisible)
+        {
+            _diagWindow.Activate();
+            return;
+        }
+
+        _diagWindow.Show();
+        _diagWindow.Activate();
+        ScanDiagnostics.Log("DIAG", "Diagnostic window opened (F12 to hide)");
+    }
+
+    private void HideDiagnosticWindow()
+    {
+        if (_diagWindow == null || !_diagWindow.IsVisible) return;
+        _diagWindow.Hide();
+        ScanDiagnostics.Log("DIAG", "Diagnostic window hidden");
+    }
+
+    private void ToggleDiagnosticWindow()
+    {
+        if (_diagWindow is { IsVisible: true })
+            HideDiagnosticWindow();
+        else
+            ShowDiagnosticWindow();
+    }
+
+    private string GunSummary()
+    {
+        try
+        {
+            var cfg = JsonDocument.Parse(_rfid.CurrentConfigJson()).RootElement;
+            return "connected=" + cfg.GetProperty("connected") +
+                   " port=" + cfg.GetProperty("comPort").GetString() +
+                   " state=" + cfg.GetProperty("linkState").GetString();
+        }
+        catch
+        {
+            return _rfid.CurrentConfigJson();
+        }
+    }
+
+    private const string WebProbeScript = """
+        (function(){
+          try {
+            return JSON.stringify({
+              role: window.top === window ? 'top' : 'child',
+              href: String(location.href || '').substring(0, 120),
+              isStation: !!window.IS_STATION_DEVICE,
+              hasOnScan: typeof window.onStationRfidScan === 'function',
+              pollActive: !!window.stationScanPollTimer,
+              recentScans: (window.stationRecentScans || []).length,
+              lastTag: String(window.stationLastScanTag || '').substring(0, 32),
+              androidStation: !!(window.AndroidStation && typeof window.AndroidStation.getConfig === 'function'),
+              chromeHost: !!(window.chrome && window.chrome.webview && window.chrome.webview.hostObjects && window.chrome.webview.hostObjects.sync && window.chrome.webview.hostObjects.sync.androidStation),
+              deliverFn: typeof window.showrunnerStationDeliverScan === 'function',
+              appFrame: !!(document.getElementById && document.getElementById('app-frame'))
+            });
+          } catch (e) { return JSON.stringify({ error: String(e) }); }
+        })()
+        """;
+
+    private async Task ProbeWebBridgeAsync()
+    {
+        if (WebView.CoreWebView2 == null)
+        {
+            ScanDiagnostics.Log("WEB", "Probe skipped — WebView not ready");
+            return;
+        }
+
+        try
+        {
+            var topRaw = await WebView.CoreWebView2.ExecuteScriptAsync(WebProbeScript);
+            ScanDiagnostics.Log("WEB", "TOP " + UnwrapScriptResult(topRaw));
+        }
+        catch (Exception ex)
+        {
+            ScanDiagnostics.Log("WEB", "TOP probe error: " + ex.Message);
+        }
+
+        try
+        {
+            var iframeMeta = await WebView.CoreWebView2.ExecuteScriptAsync(
+                "(function(){try{var f=document.getElementById('app-frame');if(!f)return 'no app-frame';return 'app-frame src='+String(f.src||'').substring(0,100);}catch(e){return String(e);}})()");
+            ScanDiagnostics.Log("WEB", UnwrapScriptResult(iframeMeta));
+        }
+        catch (Exception ex)
+        {
+            ScanDiagnostics.Log("WEB", "app-frame probe error: " + ex.Message);
+        }
+
+        CoreWebView2Frame[] frames;
+        lock (_frameLock) frames = _childFrames.ToArray();
+        ScanDiagnostics.Log("WEB", "Tracked child frames: " + frames.Length);
+        for (var i = 0; i < frames.Length; i++)
+        {
+            try
+            {
+                var raw = await frames[i].ExecuteScriptAsync(WebProbeScript);
+                ScanDiagnostics.Log("WEB", "FRAME[" + i + "] " + UnwrapScriptResult(raw));
+            }
+            catch (Exception ex)
+            {
+                ScanDiagnostics.Log("WEB", "FRAME[" + i + "] error: " + ex.Message);
+            }
+        }
+    }
+
+    private static string UnwrapScriptResult(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw) || raw == "null") return "(empty)";
+        try
+        {
+            return JsonSerializer.Deserialize<string>(raw) ?? raw;
+        }
+        catch
+        {
+            return raw;
+        }
+    }
+
+    private static string Trunc(string? s, int max)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        return s.Length <= max ? s : s[..max] + "…";
     }
 
     private void HideSplash()
@@ -310,6 +492,12 @@ public partial class MainWindow : Window
 
     private void Window_OnKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.F12 || (e.Key == Key.D && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
+        {
+            ToggleDiagnosticWindow();
+            e.Handled = true;
+            return;
+        }
         // F11 toggles borderless fullscreen; Escape exits app (kiosk ops).
         if (e.Key == Key.F11)
         {

@@ -59,6 +59,22 @@ function build() {
       document.documentElement.classList.add('station-device-root');
       var shell = document.getElementById('station-shell');
       if (shell) shell.style.display = 'flex';
+      // Queue RFID scans until the full station shell assigns onStationRfidScan (LogicPayload is async).
+      window.__srPendingRfidScans = window.__srPendingRfidScans || [];
+      if (!window.onStationRfidScan) {
+        window.onStationRfidScan = function(tag, tid) {
+          window.__srPendingRfidScans.push({ tag: String(tag || ''), tid: String(tid || ''), ts: Date.now() });
+        };
+      }
+      if (!window.stationMessageListenerBound) {
+        window.stationMessageListenerBound = true;
+        window.addEventListener('message', function(ev) {
+          var d = ev && ev.data;
+          if (d && d.type === 'SHOWRUNNER_RFID_SCAN' && typeof window.onStationRfidScan === 'function') {
+            window.onStationRfidScan(d.tag, d.tid || '');
+          }
+        });
+      }
       try {
         if (window.parent && window.parent !== window) {
           window.parent.postMessage({ type: 'SHOWRUNNER_STATION_READY' }, '*');
