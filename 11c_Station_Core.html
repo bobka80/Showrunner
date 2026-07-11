@@ -1,0 +1,1009 @@
+<!-- @INDEX: STATION -> Core host session, RBAC, bootstrap init -->
+<script>
+/**
+ * 11c_Station_Core.html — split from 11_Station_Shell.html
+
+window.stationShellBootstrap = null;
+window.stationHostSession = null;
+window.stationScanBusy = false;
+window.stationHostIdleTimer = null;
+window.stationHostIdleListenersBound = false;
+window.stationEnrollMode = false;
+window.stationRecentScans = [];
+
+/**
+ * Host-inherit RBAC. While a crew member is hosted at this station, the whole app evaluates
+ * permissions as the HOST (their real tier + IAM keys) — a warehouse computer/gun is a surface,
+ * not a stripped-down role. `stationHostRbac` is set in stationWriteHostSession_ from the host
+ * payload and cleared on eject/logout. Guarded so a non-station page or host-less state is
+ * untouched. Plus a station BASELINE: any host can check-in/out + set status even if their own
+ * tier normally can't (warehouse-context grant). Design/packing add-remove stays on real creds.
+ */
+window.stationHostRbac = null; // { access:'MANAGER', permissions:{event_assets_window:true,...} }
+var STATION_TIER_ORDER = ['CREW', 'EDITOR', 'MANAGER', 'ADMIN', 'ROOT'];
+var STATION_IMPLICIT_MANAGER_KEYS = [
+  'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
+  'event_view_pricing', 'task_manage_global', 'task_manage_personal'
+];
+
+function stationTierRank_(tier) {
+  var i = STATION_TIER_ORDER.indexOf(String(tier || 'CREW').toUpperCase());
+  return i === -1 ? 1 : i + 1;
+}
+window.stationHostActive_ = function() {
+  return !!(window.IS_STATION_DEVICE && window.stationHostRbac);
+};
+
+(function installStationRbacOverride_() {
+  if (typeof window.stationEnsureDeviceMode_ === 'function') window.stationEnsureDeviceMode_();
+  if (!window.IS_STATION_DEVICE) return;
+  var _userHasPerm = window.userHasPerm;
+  var _effectiveHasPerm = window.effectiveHasPerm;
+  var _accessTierAtLeast = window.accessTierAtLeast;
+
+  window.userHasPerm = function(key) {
+    if (window.stationHostActive_()) {
+      var p = window.stationHostRbac.permissions || {};
+      return p[key] === true || p[key] === 'true';
+    }
+    return _userHasPerm ? _userHasPerm(key) : false;
+  };
+
+  window.accessTierAtLeast = function(minTier) {
+    if (window.stationHostActive_()) {
+      return stationTierRank_(window.stationHostRbac.access) >= stationTierRank_(minTier);
+    }
+    return _accessTierAtLeast ? _accessTierAtLeast(minTier) : false;
+  };
+
+  window.effectiveHasPerm = function(key) {
+    if (window.stationHostActive_()) {
+      if (!key) return false;
+      if (key === 'task_manage_personal') return true;
+      if (String(window.stationHostRbac.access || '').toUpperCase() === 'ROOT') return true;
+      if (window.userHasPerm(key)) return true;
+      if (STATION_IMPLICIT_MANAGER_KEYS.indexOf(key) !== -1 && window.accessTierAtLeast('MANAGER')) return true;
+      return false;
+    }
+    return _effectiveHasPerm ? _effectiveHasPerm(key) : false;
+  };
+  // NOTE: canEditAssets()/canUseAssetCheckout() intentionally follow the host's REAL credentials
+  // (via the effectiveHasPerm override above) so the client and the backend
+  // (assertActorCanPerformAssetOperations) agree — no misleading buttons. Equipment status changes
+  // (Maintenance/Broken/Repaired) are the true any-host baseline, handled in the Vault backend.
+})();
+
+/** How many recent scans to keep in the always-on top strip. */
+var STATION_SCAN_FEED_MAX = 8;
+
+/** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
+var STATION_HOST_IDLE_DEFAULT_MIN = 10;
+// After an explicit log-out / idle-eject, ignore re-reads of the SAME badge for this long. One
+// trigger pull emits a burst of reads for a tag; without this window a stray tail-end read arriving
+// after the 1.5s scan-dedup would instantly re-host the person the operator just ejected.
+var STATION_HOST_EJECT_COOLDOWN_MS = 3000;
+var STATION_EJECT_STORAGE_KEY = 'sm_station_eject_min';
+var STATION_EJECT_CHOICES = [1, 3, 5, 10];
+// Gun idle auto-sleep (TSL desktop only — Chainway uses no-host park below).
+var STATION_GUNSLEEP_STORAGE_KEY = 'sm_station_gunsleep_min';
+var STATION_GUNSLEEP_CHOICES = [0, 1, 2, 3, 5, 10];
+var STATION_GUNSLEEP_DEFAULT_MIN = 5;
+// Chainway: grace after host leaves before parking; then optional extra delay before disconnect.
+var STATION_NO_HOST_GRACE_KEY = 'sm_station_no_host_grace_min';
+var STATION_NO_HOST_GRACE_CHOICES = [1, 2, 3, 5, 10, 15, 30];
+var STATION_NO_HOST_GRACE_DEFAULT_MIN = 3;
+var STATION_GUN_PARK_DELAY_KEY = 'sm_station_gun_park_delay_min';
+var STATION_GUN_PARK_DELAY_CHOICES = [0, 1];
+var STATION_GUN_PARK_DELAY_DEFAULT_MIN = 0;
+
+/**
+ * Device-local gun settings. The web setup is the source of truth (survives app
+ * updates), and is pushed down to the native gun on every startup so the screen
+ * and the gun never disagree.
+ */
+var STATION_MODE_KEY = 'sm_station_scan_mode';
+var STATION_POLL_KEY = 'sm_station_poll_ms';
+var STATION_POWER_KEY = 'sm_station_power';
+var STATION_BEEP_KEY = 'sm_station_beep';
+
+/**
+ * Equipment RFID map (epc -> { name, unitId, unitNumber }) preloaded from the vault so the
+ * live scan strip can show a human name/unit instead of the raw tag — instantly and offline.
+ */
+var STATION_EQUIP_MAP_KEY = 'sm_station_equip_map_v2';
+var STATION_CREW_HOST_KEY = 'sm_station_crew_host_v1';
+var STATION_EQUIP_MAP_REFRESH_MS = 5 * 60 * 1000;
+var STATION_PRESET_STORAGE_KEY = 'sm_station_power_presets_v1';
+var STATION_PRESET_HOLD_MS = 1000;
+window.stationScanPanelOpen = false;
+window.stationPanelSelection = null;
+window.stationPanelPendingStatus = null;
+window.stationEquipMap = window.stationEquipMap || {};
+window.stationCrewHostRoster = window.stationCrewHostRoster || [];
+
+/** True when two TID reads are the same chip (exact or shorter 4-word vs longer 6-word read). */
+function stationRfidTidEquivalent_(a, b) {
+  var x = stationNormalizeEpc_(a);
+  var y = stationNormalizeEpc_(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  var short = x.length <= y.length ? x : y;
+  var long = x.length <= y.length ? y : x;
+  if (short.length >= 12 && long.indexOf(short) === 0) return true;
+  return false;
+}
+
+/** Local crew host lookup — mirrors lookupCrewMemberByRfidPair_ for optimistic badge-in. */
+function stationLookupCrewHostLocal_(epc, tid) {
+  var needleEpc = stationNormalizeEpc_(epc);
+  var needleTid = stationNormalizeEpc_(tid);
+  var roster = window.stationCrewHostRoster || [];
+  var tidMismatch = false;
+  var tidMissing = false;
+
+  for (var i = 0; i < roster.length; i++) {
+    var row = roster[i];
+    var rowEpc = stationNormalizeEpc_(row.rfidTag);
+    if (!rowEpc || rowEpc !== needleEpc) continue;
+    var rowTid = stationNormalizeEpc_(row.rfidTid || '');
+    if (rowTid) {
+      if (!needleTid) {
+        tidMissing = true;
+        continue;
+      }
+      if (!stationRfidTidEquivalent_(rowTid, needleTid)) {
+        tidMismatch = true;
+        continue;
+      }
+    }
+    return {
+      crew: {
+        uid: row.uid || '',
+        name: row.name,
+        rfidTag: row.rfidTag,
+        rfidTid: rowTid,
+        access: row.access || 'CREW',
+        permissions: row.permissions || {}
+      },
+      tidMismatch: false,
+      tidMissing: false
+    };
+  }
+  return { crew: null, tidMismatch: tidMismatch, tidMissing: tidMissing };
+}
+
+/** Same trim/lowercase contract the backend uses for tag matching. */
+ */
+function stationSettingsNs_() {
+  try {
+    var boot = window.stationShellBootstrap;
+    var id = boot && (boot.profileName || boot.deviceName);
+    if (!id && typeof ACTIVE_USER_NAME !== 'undefined') id = ACTIVE_USER_NAME;
+    if (id) {
+      var slug = String(id).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (slug) return slug;
+    }
+  } catch (e) { /* ignore */ }
+  return 'default';
+}
+function stationNsKey_(key) { return key + '::' + stationSettingsNs_(); }
+
+/**
+ * Read a station setting from THIS station's namespace. If the namespaced slot is empty but a legacy
+ * global value exists (pre per-station keys), migrate it into this station's namespace on first read
+ * so nothing resets. All gun settings (power/scanMode/pollMs/beep) plus eject + gun-sleep flow here.
+ */
+function stationStoredSetting_(key) {
+  try {
+    var nsk = stationNsKey_(key);
+    var v = localStorage.getItem(nsk);
+    if (v !== null && v !== undefined) return v;
+    var legacy = localStorage.getItem(key); // one-time migration from the old global key
+    if (legacy !== null && legacy !== undefined) {
+      try { localStorage.setItem(nsk, legacy); } catch (e2) { /* ignore */ }
+      return legacy;
+    }
+    return null;
+  } catch (e) { return null; }
+}
+function stationSetStoredSetting_(key, val) {
+  try { localStorage.setItem(stationNsKey_(key), String(val)); } catch (e) { /* ignore */ }
+}
+
+/** Configurable per-device eject timeout (minutes) — set in the station setup view. */
+function stationEjectMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_EJECT_STORAGE_KEY), 10);
+    if (STATION_EJECT_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_HOST_IDLE_DEFAULT_MIN;
+}
+
+function stationHostIdleMs_() {
+  return stationEjectMinutes_() * 60 * 1000;
+}
+
+/** Configurable gun auto-sleep (minutes idle). 0 = never. */
+function stationGunSleepMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_GUNSLEEP_STORAGE_KEY), 10);
+    if (STATION_GUNSLEEP_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_GUNSLEEP_DEFAULT_MIN;
+}
+
+function stationNoHostGraceMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_NO_HOST_GRACE_KEY), 10);
+    if (STATION_NO_HOST_GRACE_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_NO_HOST_GRACE_DEFAULT_MIN;
+}
+
+function stationGunParkDelayMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_GUN_PARK_DELAY_KEY), 10);
+    if (STATION_GUN_PARK_DELAY_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_GUN_PARK_DELAY_DEFAULT_MIN;
+}
+
+function stationNoHostParkDeadlineKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_no_host_park_deadline_v1_' + dev;
+}
+
+function stationClearNoHostParkDeadline_() {
+  if (window.stationNoHostParkTimer) {
+    clearTimeout(window.stationNoHostParkTimer);
+    window.stationNoHostParkTimer = null;
+  }
+  try { localStorage.removeItem(stationNoHostParkDeadlineKey_()); } catch (e) { /* ignore */ }
+}
+
+/** Arm between-hosts notice after host clears (Chainway: no SDK disconnect). */
+function stationArmNoHostParkDeadline_() {
+  stationClearNoHostParkDeadline_();
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('noHostPark')) return;
+  if (stationReadHostSession_()) return;
+  var grace = stationNoHostGraceMinutes_();
+  var delay = stationGunParkDelayMinutes_();
+  var autoPark = (typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark'));
+  var totalMs = (autoPark ? (grace + delay) : grace) * 60 * 1000;
+  if (totalMs <= 0) {
+    stationNoHostParkExpired_();
+    return;
+  }
+  var deadline = Date.now() + totalMs;
+  try { localStorage.setItem(stationNoHostParkDeadlineKey_(), String(deadline)); } catch (e) { /* ignore */ }
+  window.stationNoHostParkTimer = setTimeout(stationNoHostParkExpired_, totalMs);
+  if (autoPark) {
+    stationSetStatus_(
+      'No host — gun stays connected ' + grace + ' min' +
+      (delay ? (' then disconnects in ' + delay + ' min') : ' then parks') +
+      ' (~1 min more until LED off).',
+      ''
+    );
+  } else {
+    stationSetStatus_(
+      'No host — gun stays connected. Scan crew badge when ready (notice after ' + grace + ' min).',
+      ''
+    );
+  }
+}
+
+function stationNoHostParkExpired_() {
+  window.stationNoHostParkTimer = null;
+  if (stationReadHostSession_()) {
+    stationClearNoHostParkDeadline_();
+    return;
+  }
+  stationClearNoHostParkDeadline_();
+  if (typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark')) {
+    stationParkGun_();
+    return;
+  }
+  stationSetStatus_(
+    'No host — gun still connected. Scan badge to host, or power off the gun to save battery.',
+    ''
+  );
+}
+
+function stationCheckNoHostParkDeadline_() {
+  if (stationReadHostSession_()) {
+    stationClearNoHostParkDeadline_();
+    return;
+  }
+  if (typeof stationGunCap_ !== 'function' || !stationGunCap_('noHostPark')) return;
+  try {
+    var raw = localStorage.getItem(stationNoHostParkDeadlineKey_());
+    if (!raw) return;
+    var deadline = parseInt(raw, 10);
+    if (!deadline || isNaN(deadline)) return;
+    if (Date.now() >= deadline) stationNoHostParkExpired_();
+    else if (!window.stationNoHostParkTimer) {
+      var ms = Math.max(0, deadline - Date.now());
+      window.stationNoHostParkTimer = setTimeout(stationNoHostParkExpired_, ms);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function stationParkGun_() {
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('autoSdkPark')) return;
+  stationClearNoHostParkDeadline_();
+  var br = stationSleepCapableBridge_();
+  if (!br || typeof br.sleepGun !== 'function') return;
+  try {
+    br.sleepGun();
+    stationSetStatus_('Gun parked (disconnect beep) — pull trigger to wake and reconnect.', '');
+  } catch (e) { /* ignore */ }
+}
+
+/** Native bridge that can sleep the gun (desktop TSL or Chainway with sleepGun support). */
+function stationSleepCapableBridge_() {
+  if (stationNativeBridge_()) return stationNativeBridge_();
+  if (!window.IS_STATION_DEVICE) return null;
+  return {
+    sleepGun: function() { stationInvokeGunNative_('sleepGun'); },
+    reconnectGun: function() { stationInvokeGunNative_('reconnectGun'); }
+  };
+}
+
+function stationClearGunIdleTimer_() {
+  if (window.stationGunIdleTimer) {
+    clearTimeout(window.stationGunIdleTimer);
+    window.stationGunIdleTimer = null;
+  }
+  // Chainway native idle is managed in RfidManager — do not zero it here on link drop.
+}
+
+/**
+ * Arm the gun idle-sleep countdown (wall-clock). Fires sleepGun() → BLE disconnect so firmware
+ * can power down. Only call when minutes change, on boot, or after manual reconnect — NOT on
+ * every config refresh (that was resetting the timer and preventing sleep).
+ */
+function stationArmGunSleepTimer_() {
+  stationClearGunIdleTimer_();
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('appSleep')) return;
+  var mins = stationGunSleepMinutes_();
+  if (!mins) {
+    window.stationGunSleepArmedMins = 0;
+    return;
+  }
+  if (!stationSleepCapableBridge_()) return;
+  window.stationGunSleepArmedMins = mins;
+  window.stationGunIdleTimer = setTimeout(function() {
+    window.stationGunIdleTimer = null;
+    window.stationGunSleepArmedMins = 0;
+    var br = stationSleepCapableBridge_();
+    if (!br) return;
+    try {
+      br.sleepGun();
+      stationToast_('Gun disconnecting (idle ' + mins + ' min) — LED off in ~1 min after link drop', '');
+      setTimeout(function() { stationRequestGunConfig_(); }, 1200);
+    } catch (e) { /* ignore */ }
+  }, mins * 60 * 1000);
+}
+
+/** @deprecated use stationArmGunSleepTimer_ — kept so old call sites only re-arm when minutes change */
+function stationResetGunIdleTimer_() {
+  var mins = stationGunSleepMinutes_();
+  if (window.stationGunSleepArmedMins === mins && window.stationGunIdleTimer) return;
+  stationArmGunSleepTimer_();
+}
+
+function stationHostEjectDeadlineKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_host_eject_deadline_v1_' + dev;
+}
+
+function stationClearHostEjectDeadline_() {
+  try { localStorage.removeItem(stationHostEjectDeadlineKey_()); } catch (e) { /* ignore */ }
+}
+
+/** Wall-clock eject deadline — survives screen-off / setTimeout suspension. */
+function stationArmHostEjectDeadline_() {
+  if (!stationReadHostSession_()) return 0;
+  var deadline = Date.now() + stationHostIdleMs_();
+  try { localStorage.setItem(stationHostEjectDeadlineKey_(), String(deadline)); } catch (e) { /* ignore */ }
+  return deadline;
+}
+
+function stationCheckHostEjectDeadline_() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (!stationReadHostSession_()) {
+    stationClearHostEjectDeadline_();
+    return;
+  }
+  try {
+    var raw = localStorage.getItem(stationHostEjectDeadlineKey_());
+    if (!raw) return;
+    var deadline = parseInt(raw, 10);
+    if (!deadline || isNaN(deadline)) return;
+    if (Date.now() >= deadline) stationHostIdleExpired_();
+  } catch (e) { /* ignore */ }
+}
+
+function stationClearHostIdleTimer_() {
+  if (window.stationHostIdleTimer) {
+    clearTimeout(window.stationHostIdleTimer);
+    window.stationHostIdleTimer = null;
+  }
+}
+
+function stationResetHostIdleTimer_() {
+  stationClearHostIdleTimer_();
+  if (!window.IS_STATION_DEVICE) return;
+  if (!stationReadHostSession_()) {
+    stationClearHostEjectDeadline_();
+    return;
+  }
+  var deadline = stationArmHostEjectDeadline_();
+  var msUntil = Math.max(0, deadline - Date.now());
+  window.stationHostIdleTimer = setTimeout(stationHostIdleExpired_, msUntil);
+}
+
+function stationHostIdleExpired_() {
+  stationClearHostIdleTimer_();
+  stationClearHostEjectDeadline_();
+  if (!stationReadHostSession_()) return;
+  // Invalidate any in-flight badge-in confirmation so it can't re-host after a wall-clock eject.
+  window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+  window.stationScanBusy = false;
+  stationWriteHostSession_(null);
+  stationRenderShellState_();
+  var mins = stationEjectMinutes_();
+  stationSetStatus_('Signed out after ' + mins + ' min of inactivity. Scan your badge.', 'error');
+  stationSetLastScan_('');
+}
+
+function stationBindHostIdleListeners_() {
+  if (window.stationHostIdleListenersBound) return;
+  window.stationHostIdleListenersBound = true;
+  var onActivity = function() {
+    if (stationReadHostSession_()) stationResetHostIdleTimer_();
+  };
+  ['touchstart', 'pointerdown', 'mousedown', 'keydown', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, onActivity, { passive: true });
+  });
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      stationCheckHostEjectDeadline_();
+      stationCheckNoHostParkDeadline_();
+    }
+  });
+  window.addEventListener('pageshow', function() {
+    stationCheckHostEjectDeadline_();
+    stationCheckNoHostParkDeadline_();
+  });
+  window.addEventListener('focus', function() {
+    stationCheckHostEjectDeadline_();
+    stationCheckNoHostParkDeadline_();
+  });
+}
+
+function stationHostStorageKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_host_v1_' + dev;
+}
+
+/** TSL desktop gate PC — crew host must not survive app restart (badge in fresh each launch). */
+function stationIsDesktopKiosk_() {
+  try {
+    return /ShowrunnerStationDesktop/i.test(navigator.userAgent || '');
+  } catch (e) { return false; }
+}
+
+function stationPersistHostToParent_(host) {
+  var key = stationHostStorageKey_();
+  if (stationIsDesktopKiosk_()) {
+    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+    try {
+      stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_SESSION', deviceKey: key, host: null });
+    } catch (e) { /* ignore */ }
+    return;
+  }
+  try {
+    if (host) localStorage.setItem(key, JSON.stringify(host));
+    else localStorage.removeItem(key);
+  } catch (e) { /* ignore */ }
+  try {
+    stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_SESSION', deviceKey: key, host: host || null });
+  } catch (e) { /* ignore */ }
+}
+
+function stationRequestHostRestoreFromParent_() {
+  try {
+    stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_RESTORE_REQUEST', deviceKey: stationHostStorageKey_() });
+  } catch (e) { /* ignore */ }
+}
+
+function stationReadHostSession_() {
+  var key = stationHostStorageKey_();
+  try {
+    var raw = sessionStorage.getItem(key);
+    if (!raw && !stationIsDesktopKiosk_()) raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.name) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function stationWriteHostSession_(host) {
+  if (!host) {
+    // Arm the eject cooldown: capture the badge we're clearing so a lingering read from the same
+    // trigger burst (or a tag left in the antenna field) cannot instantly re-host them. A deliberate
+    // re-scan after the cooldown, or a DIFFERENT badge at any time, still works.
+    var outgoing = stationReadHostSession_() || window.stationHostSession || null;
+    var outNorm = outgoing ? stationNormalizeEpc_(outgoing.rfidTag || '') : '';
+    window.stationEjectedHostNorm = outNorm || null;
+    window.stationEjectCooldownUntil = outNorm ? (Date.now() + STATION_HOST_EJECT_COOLDOWN_MS) : 0;
+  } else {
+    // Someone is now hosted — clear any eject cooldown from a prior logout.
+    window.stationEjectedHostNorm = null;
+    window.stationEjectCooldownUntil = 0;
+  }
+  window.stationHostSession = host;
+  try {
+    if (host) sessionStorage.setItem(stationHostStorageKey_(), JSON.stringify(host));
+    else {
+      sessionStorage.removeItem(stationHostStorageKey_());
+      stationClearHostEjectDeadline_();
+    }
+  } catch (e) { /* ignore */ }
+  stationPersistHostToParent_(host);
+  // Host-inherit RBAC: while hosted, the app evaluates permissions as the HOST (their real tier +
+  // IAM), not the low-tier device account. Cleared on eject/logout. See stationHostRbac override.
+  if (host && (host.access || host.permissions)) {
+    window.stationHostRbac = { access: host.access || 'CREW', permissions: host.permissions || {} };
+  } else {
+    window.stationHostRbac = null;
+  }
+  // Warm the project list for THIS host in the background so pressing PROJECT opens instantly
+  // (same list their personal profile sees). Clearing the host drops the cache + wipes the device.
+  if (host && host.name) {
+    stationPreloadProjects_(host.name);
+    stationClearNoHostParkDeadline_();
+  } else {
+    window.stationProjectsCache = null; window.stationProjectsFor = null;
+    stationResetDeviceToPristine_();
+    stationArmNoHostParkDeadline_();
+  }
+}
+
+/**
+ * Eject/logout returns the gun to a never-used state so the next person sees nothing of the last
+ * session: clear the live scan strip, cancel any armed vault record, drop cached lists, close
+ * overlays, and reset status/last-scan.
+ */
+function stationResetDeviceToPristine_() {
+  window.stationRecentScans = [];
+  try { if (typeof stationRenderScanFeed_ === 'function') stationRenderScanFeed_(); } catch (e) {}
+  window.stationLastScanTag = null;
+  window.stationLastScanAt = 0;
+  try { if (typeof stationVaultCancelRecord_ === 'function') stationVaultCancelRecord_(); } catch (e) {}
+  window.stationVaultItems = [];
+  window.stationVaultCrew = null;
+  window.stationVaultExpanded = {};
+  window.stationEnrollMode = false;
+  try { if (typeof stationSetEnrollButton_ === 'function') stationSetEnrollButton_('idle'); } catch (e) {}
+  try { if (typeof stationCloseVault === 'function') stationCloseVault(); } catch (e) {}
+  try { if (typeof stationCloseProjectPicker === 'function') stationCloseProjectPicker(); } catch (e) {}
+  try { if (typeof stationSetLastScan_ === 'function') stationSetLastScan_(''); } catch (e) {}
+}
+
+/** Background-fetch the host's projects (getRefreshPayload scoped to the person, not the device). */
+function stationPreloadProjects_(hostName) {
+  if (!hostName) return;
+  if (window.stationProjectsFor === hostName && window.stationProjectsCache) return;
+  window.stationProjectsFor = hostName;
+  window.stationProjectsCache = null;
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      const projects = (payload && payload.projects) ? payload.projects : [];
+      stationCacheProjectsPayload_(payload, projects);
+      window.stationProjectsCache = projects;
+      // If the picker is already open and waiting, fill it now.
+      const panel = document.getElementById('station-project-picker');
+      if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(projects);
+    })
+    .withFailureHandler(function() { window.stationProjectsFor = null; })
+    .getRefreshPayload(hostName);
+}
+
+/** Persist the payload into sm_phantom_payload so the phone PA resolver (resolveMobileProject) works. */
+function stationCacheProjectsPayload_(payload, projects) {
+  try {
+    const phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+    phantom.projects = projects;
+    if (payload && payload.monthData) phantom.monthData = payload.monthData;
+    if (payload && payload.tasks) phantom.tasks = payload.tasks;
+    if (payload && payload.notifs) phantom.notifs = payload.notifs;
+    localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+  } catch (e) { /* ignore */ }
+}
+
+function stationToast_(msg, kind) {
+  if (!msg) return;
+  var el = document.getElementById('station-toast');
+  if (!el) return;
+  if (stationToastTimer_) clearTimeout(stationToastTimer_);
+  el.textContent = msg;
+  el.classList.remove('is-ok', 'is-error', 'is-visible');
+  if (kind === 'error') el.classList.add('is-error');
+  else if (kind === 'ok') el.classList.add('is-ok');
+  requestAnimationFrame(function() { el.classList.add('is-visible'); });
+  stationToastTimer_ = setTimeout(function() {
+    el.classList.remove('is-visible');
+  }, kind === 'error' ? 4500 : 2800);
+}
+
+function stationSetStatus_(msg, kind) {
+  if (msg) stationToast_(msg, kind);
+}
+
+/** Native APK forwards BLE status strings here (replaces the old bottom status bar). */
+window.stationOnGunStatus_ = function(msg) {
+  if (!msg) return;
+  var low = String(msg).toLowerCase();
+  var kind = '';
+  if (low.indexOf('fail') !== -1 || low.indexOf('error') !== -1 || low.indexOf('not found') !== -1) kind = 'error';
+  else if (low.indexOf('connected') !== -1 && low.indexOf('disconnect') === -1) kind = 'ok';
+  stationToast_(msg, kind);
+};
+
+// Diagnostic: native WebView renderer death breadcrumb. If this ever fires with count>0 after a
+// gun disconnect/reconnect, the renderer-priority fix did NOT hold and the reload came from a
+// renderer kill (not from session/nav logic). Surfaced once as a toast so it's visible on-device.
+window.stationOnRendererBreadcrumb_ = function(info) {
+  try {
+    if (!info || !info.count || window.__srRendererBreadcrumbShown_) return;
+    window.__srRendererBreadcrumbShown_ = true;
+    var when = info.at ? new Date(info.at).toLocaleTimeString() : '?';
+    stationToast_('WebView reloaded ' + info.count + '× (renderer ' +
+      (info.crashed ? 'crashed' : 'killed') + ', last ' + when + ')', 'error');
+  } catch (e) {}
+};
+
+// Diagnostic: the RFID gun is an HID keyboard, so connect/disconnect fires an Android
+// keyboard/navigation config change. With the manifest fix, that no longer recreates the Activity
+// — it lands in onConfigurationChanged and the WebView survives. If this counter climbs while the
+// UI stays put (no reload), the fix is working: gun flap absorbed, session intact.
+window.stationOnGunConfigChange_ = function(count) {
+  try {
+    if (!count) return;
+    stationToast_('Gun link changed (' + count + ') — session kept', 'ok');
+  } catch (e) {}
+};
+
+window.stationReconnectGun_ = function() {
+  stationToast_('Reconnecting gun…', '');
+  stationInvokeGunNative_('reconnectGun');
+  setTimeout(function() { stationRequestGunConfig_(); }, 2500);
+};
+
+/**
+ * Disconnect + sleep the gun (desktop TSL bridge only). Sends the reader to sleep like a power
+ * button — the reader has no physical on/off. Waking is a trigger pull + Reconnect gun.
+ */
+window.stationSleepGun_ = function() {
+  stationToast_('Gun going to sleep…', '');
+  stationInvokeGunNative_('sleepGun');
+  setTimeout(function() { stationRequestGunConfig_(); }, 1200);
+};
+
+/** Invoke reconnect/sleep on desktop WebView2, native bridge, or hosting parent relay. */
+function stationInvokeGunNative_(method) {
+  if (!method) return;
+  var relayType = method === 'sleepGun' ? 'SHOWRUNNER_STATION_GUN_SLEEP' : 'SHOWRUNNER_STATION_GUN_RECONNECT';
+  var isDesktop = window.__srDesktopBridge || /ShowrunnerStation/i.test(navigator.userAgent || '');
+
+  // Desktop nested GAS iframe: always relay to hosting shell → native COM (same as gun settings).
+  if (isDesktop) {
+    stationRelayGunCommandToTop_(method, []);
+    stationPostToHosting_({ type: relayType });
+    return;
+  }
+
+  try {
+    var h = chrome && chrome.webview && chrome.webview.hostObjects &&
+      chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;
+    if (h && typeof h[method] === 'function') { h[method](); return; }
+  } catch (e) { /* ignore */ }
+  try {
+    var a = window.AndroidStation;
+    if (a && typeof a[method] === 'function') { a[method](); return; }
+  } catch (e2) { /* ignore */ }
+  try {
+    if (chrome && chrome.webview && chrome.webview.postMessage) {
+      chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: [] }));
+      return;
+    }
+  } catch (e3) { /* ignore */ }
+  stationPostToHosting_({ type: relayType });
+}
+
+/**
+ * Show the sleep controls only for gun drivers that support them AND when the native bridge can
+ * sleep the gun. (Next step: keep the screen identical for every gun and gray these out instead
+ * of hiding — driven by the same stationGunCap_ flags.)
+ */
+function stationSyncGunSleepButton_() {
+  var bridge = stationSleepCapableBridge_();
+  var cap = (typeof stationGunCap_ === 'function') ? stationGunCap_ : function() { return true; };
+  var btnField = document.getElementById('station-gun-sleep-field');
+  if (btnField) btnField.style.display = (bridge && cap('disconnectSleep')) ? 'block' : 'none';
+  var dropField = document.getElementById('station-gunsleep-field');
+  if (dropField) dropField.style.display = (bridge && cap('appSleep')) ? 'block' : 'none';
+  var dropEl = document.getElementById('station-set-gunsleep');
+  if (dropEl) dropEl.value = String(stationGunSleepMinutes_());
+  var parkFields = document.getElementById('station-no-host-park-fields');
+  if (parkFields) parkFields.style.display = (bridge && cap('noHostPark')) ? 'block' : 'none';
+  var parkDelayField = document.getElementById('station-gun-park-delay-field');
+  if (parkDelayField) parkDelayField.style.display = (bridge && cap('autoSdkPark')) ? 'block' : 'none';
+  var graceEl = document.getElementById('station-set-no-host-grace');
+  if (graceEl) graceEl.value = String(stationNoHostGraceMinutes_());
+  var parkDelayEl = document.getElementById('station-set-gun-park-delay');
+  if (parkDelayEl) parkDelayEl.value = String(stationGunParkDelayMinutes_());
+}
+function stationRenderShellState_() {
+  const host = stationReadHostSession_();
+  window.stationHostSession = host;
+  const stateLabel = document.getElementById('station-shell-state-label');
+  const prompt = document.getElementById('station-shell-prompt');
+  const hostNameEl = document.getElementById('station-shell-host-name');
+  const logoutHostBtn = document.getElementById('station-btn-logout-host');
+  const enrollBtn = document.getElementById('station-btn-enroll');
+  const hostInline = document.getElementById('station-shell-host-inline');
+  const projectBtn = document.getElementById('station-btn-project');
+  const vaultBtn = document.getElementById('station-btn-vault');
+
+  if (host) {
+    if (stateLabel) stateLabel.textContent = 'Hosted session';
+    if (prompt) prompt.style.display = 'none';
+    if (hostNameEl) {
+      hostNameEl.style.display = 'block';
+      hostNameEl.textContent = host.name;
+    }
+    if (hostInline) {
+      hostInline.style.display = 'inline';
+      hostInline.textContent = '— ' + host.name;
+    }
+    if (logoutHostBtn) logoutHostBtn.style.display = 'block';
+    if (enrollBtn) enrollBtn.style.display = 'none';
+    if (projectBtn) projectBtn.classList.remove('is-disabled');
+    if (vaultBtn) vaultBtn.classList.remove('is-disabled');
+    stationSetStatus_('Ready — ' + host.name + ' hosting.', 'ok');
+    stationResetHostIdleTimer_();
+  } else {
+    if (stateLabel) stateLabel.textContent = 'Waiting for host';
+    if (prompt) {
+      prompt.style.display = 'block';
+      prompt.textContent = 'Scan your crew badge';
+    }
+    if (hostNameEl) hostNameEl.style.display = 'none';
+    if (hostInline) { hostInline.style.display = 'none'; hostInline.textContent = ''; }
+    if (logoutHostBtn) logoutHostBtn.style.display = 'none';
+    if (enrollBtn) enrollBtn.style.display = 'none';
+    if (projectBtn) projectBtn.classList.add('is-disabled');
+    if (vaultBtn) vaultBtn.classList.add('is-disabled');
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    stationSetStatus_('', '');
+    stationClearHostIdleTimer_();
+    // No host → close any hosted-only overlays and stop recording.
+    if (typeof window.stationCloseVault === 'function') window.stationCloseVault();
+    if (typeof window.stationCloseProjectPicker === 'function') window.stationCloseProjectPicker();
+  }
+}
+
+function stationSetEnrollButton_(mode) {
+  const btn = document.getElementById('station-btn-enroll');
+  if (!btn) return;
+  if (mode === 'active') {
+    btn.textContent = 'CANCEL — scan the badge now…';
+    btn.classList.add('is-active');
+  } else {
+    btn.textContent = 'LINK MY RFID BADGE';
+    btn.classList.remove('is-active');
+  }
+}
+
+window.stationToggleEnroll = function() {
+  const host = stationReadHostSession_();
+  if (!host) return;
+  if (window.stationEnrollMode) {
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    stationSetStatus_('Enrollment cancelled.', '');
+    return;
+  }
+  window.stationEnrollMode = true;
+  stationSetEnrollButton_('active');
+  stationSetStatus_('Pull the trigger on the badge to link it to ' + host.name + '.', '');
+};
+
+function stationApplyBootstrap_(data) {
+  window.stationShellBootstrap = data;
+  const profEl = document.getElementById('station-shell-profile-name');
+  const layoutEl = document.getElementById('station-shell-layout-text');
+  // Device account name (e.g. CW1) — not the hardware profile label (e.g. Chainway).
+  if (profEl) profEl.textContent = data.deviceName || ACTIVE_USER_NAME || data.profileName || 'Station';
+  if (layoutEl) {
+    const layout = (data.layout || 'chainway_handheld').replace(/_/g, ' ');
+    layoutEl.textContent = layout.toUpperCase();
+  }
+  try { if (typeof window.stationRefreshDockUiSkin_ === 'function') window.stationRefreshDockUiSkin_(); } catch (e) { /* ignore */ }
+}
+window.stationDeviceSignOut = function() {
+  if (!confirm('Sign this warehouse device out of Showrunner?')) return;
+  stationCloseSettings();
+  stationCloseScanPanel();
+  stationWriteHostSession_(null);
+  try {
+    localStorage.removeItem('sm_session_token');
+    localStorage.removeItem('sm_session_expires');
+  } catch (e) { /* ignore */ }
+  const base = document.querySelector('base');
+  const scriptUrl = base && base.href ? base.href.split('?')[0] : '';
+  if (scriptUrl) window.top.location.href = scriptUrl;
+  else window.top.location.reload();
+};
+
+function stationPostToHosting_(payload) {
+  try { if (window.parent && window.parent !== window) window.parent.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+  try { if (window.top && window.top !== window) window.top.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+}
+
+function stationRelayGunCommandToTop_(method, args) {
+  if (!method) return;
+  args = args || [];
+  try {
+    if (window.top && window.top !== window) {
+      window.top.postMessage({ type: 'SR_STATION_GUN', method: method, args: args }, '*');
+    }
+  } catch (e) { /* ignore */ }
+}
+function stationAnnounceReady_() {
+  try { stationCheckHostEjectDeadline_(); } catch (e) { /* ignore */ }
+  try { stationCheckNoHostParkDeadline_(); } catch (e) { /* ignore */ }
+  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY', full: true }); } catch (e) { /* ignore */ }
+}
+
+function stationBindMessageListener_() {
+  if (window.__srShimMessageHandler) {
+    try { window.removeEventListener('message', window.__srShimMessageHandler); } catch (e) { /* ignore */ }
+    window.__srShimMessageHandler = null;
+    window.__srShimMessageBound = false;
+  }
+  if (window.stationMessageListenerBound) return;
+  window.stationMessageListenerBound = true;
+  window.addEventListener('message', function(ev) {
+    const d = ev && ev.data;
+    if (!d) return;
+    if (d.type === 'SHOWRUNNER_RFID_SCAN') {
+      stationDebug_('relay scan: ' + (d.tag || '(empty)') + (d.tid ? ' tid:' + d.tid : ''));
+      if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag, d.tid || '');
+    } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
+      stationDebug_('relay config');
+      try { if (d.config) window.__srGunConfigJson = JSON.stringify(d.config); } catch (e) { /* ignore */ }
+      stationApplyGunConfig_(d.config || null);
+    } else if (d.type === 'SHOWRUNNER_STATION_GUN_STATUS' && d.message) {
+      if (typeof window.stationOnGunStatus_ === 'function') window.stationOnGunStatus_(d.message);
+    } else if (d.type === 'SHOWRUNNER_STATION_HOST_RESTORE' && d.host && d.host.name) {
+      if (!stationIsDesktopKiosk_() && !stationReadHostSession_()) {
+        stationWriteHostSession_(d.host);
+        stationRenderShellState_();
+      }
+    }
+  });
+}
+
+function initStationShell_() {
+  if (typeof window.stationEnsureDeviceMode_ === 'function') window.stationEnsureDeviceMode_();
+  if (!window.IS_STATION_DEVICE) return;
+
+  // Show the shell and tell the native app to drop its splash FIRST, so a later error can never
+  // strand the initial screen. Everything after this is wrapped so boot failures surface on-screen
+  // instead of leaving a blank kiosk.
+  try {
+    document.documentElement.classList.add('station-device-root');
+    const shell = document.getElementById('station-shell');
+    if (shell) shell.style.display = 'flex';
+  } catch (e) { /* ignore */ }
+  try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
+  if (stationIsDesktopKiosk_()) {
+    try { stationWriteHostSession_(null); } catch (e) { /* ignore */ }
+  } else {
+    try { stationRequestHostRestoreFromParent_(); } catch (e) { /* ignore */ }
+  }
+
+  try {
+    stationBindHostIdleListeners_();
+    stationBindMessageListener_();
+    stationRenderShellState_();
+    stationSetStatus_('Loading station profile…', '');
+
+    // Retire the removed "hold" mode on any device that stored it during testing.
+    if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
+
+    // Push device-local gun settings down so the screen and the gun agree on boot.
+    stationSyncSettingsToGun_();
+    // Seed the on-screen sensitivity bar from the stored (source-of-truth) power value.
+    stationSyncPowerControls_(stationStoredSetting_(STATION_POWER_KEY));
+    stationDrainPendingRfidScans_();
+    // Pull scans directly from the gun (reliable path; relay stays as fallback).
+    stationStartScanPoll_();
+    stationBindPresetButtons_();
+
+    // Equipment name/unit resolution for the live scan strip: show cache instantly, then refresh.
+    stationLoadEquipMapCache_();
+    stationRenderScanFeed_();
+    stationRefreshEquipMap_();
+    if (!window.stationEquipMapTimer) {
+      window.stationEquipMapTimer = setInterval(stationRefreshEquipMap_, STATION_EQUIP_MAP_REFRESH_MS);
+    }
+  } catch (bootErr) {
+    try { stationSetStatus_('Boot error: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr)), 'error'); } catch (e) {}
+    try { stationDebug_('BOOT ERROR: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr))); } catch (e) {}
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      try {
+        if (!res || !res.success) {
+          stationSetStatus_((res && res.error) ? res.error : 'Station bootstrap failed.', 'error');
+          return;
+        }
+        stationApplyBootstrap_(res);
+        if (!res.hostInheritEnabled) {
+          stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
+          return;
+        }
+        const bootHost = stationIsDesktopKiosk_() ? null : stationReadHostSession_();
+        if (bootHost) {
+          // Wall-clock eject may have passed while the tablet slept — check before restoring host.
+          stationCheckHostEjectDeadline_();
+          if (stationReadHostSession_()) {
+            // Re-run the full write so the reload restores the host globals AND stationHostRbac
+            // (host-inherit) + warms projects — not just the rendered chrome.
+            stationWriteHostSession_(bootHost);
+            stationRenderShellState_();
+          } else {
+            stationRenderShellState_();
+          }
+        } else {
+          stationSetStatus_('Pull trigger and scan your crew badge.', '');
+          stationCheckNoHostParkDeadline_();
+        }
+      } catch (e) {
+        stationSetStatus_('Profile load error: ' + (e && e.message ? e.message : String(e)), 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      stationSetStatus_('Bootstrap error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .getStationShellBootstrap(ACTIVE_USER_NAME);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.IS_STATION_DEVICE) initStationShell_();
+});
+document.addEventListener('visibilitychange', function() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (document.visibilityState === 'visible') stationAnnounceReady_();
+});
+window.addEventListener('pageshow', function(ev) {
+  if (!window.IS_STATION_DEVICE) return;
+  if (ev.persisted) stationAnnounceReady_();
+});
+</script>

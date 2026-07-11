@@ -1,0 +1,144 @@
+<!-- @INDEX: STATION -> Settings overlay markup -->
+<div id="station-settings" aria-label="Station setup">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Station setup</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseSettings()">Done</button>
+  </div>
+  <div class="station-settings-body">
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Session</div>
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-eject">Sign the host out after (minutes of inactivity)</label>
+        <select id="station-set-eject" onchange="stationSaveEjectMinutes()">
+          <option value="1">1 minute</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected.</div>
+      </div>
+      <div class="station-field" id="station-gunsleep-field" style="display:none;">
+        <label class="station-field__label" for="station-set-gunsleep">Sleep the gun after (minutes idle)</label>
+        <select id="station-set-gunsleep" onchange="stationSaveGunSleepMinutes()">
+          <option value="0">Never (stay on)</option>
+          <option value="1">1 minute</option>
+          <option value="2">2 minutes</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">Saves battery — the gun powers down after this long with no reads. Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
+      <div id="station-no-host-park-fields" style="display:none;">
+        <div class="station-field">
+          <label class="station-field__label" for="station-set-no-host-grace">Keep gun connected between hosts (minutes)</label>
+          <select id="station-set-no-host-grace" onchange="stationSaveNoHostGraceMinutes()">
+            <option value="1">1 minute</option>
+            <option value="2">2 minutes</option>
+            <option value="3">3 minutes</option>
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+          <div class="station-field__hint">After host signs out, the gun stays connected for this long, then parks (SDK disconnect + short beep). Pull trigger to wake and reconnect.</div>
+        </div>
+        <div class="station-field" id="station-gun-park-delay-field">
+          <label class="station-field__label" for="station-set-gun-park-delay">Disconnect gun after grace (minutes)</label>
+          <select id="station-set-gun-park-delay" onchange="stationSaveGunParkDelayMinutes()">
+            <option value="0">Immediately when grace ends (recommended)</option>
+            <option value="1">1 minute after grace</option>
+          </select>
+          <div class="station-field__hint">Extra wait after grace before the disconnect beep and SDK park (saves gun battery).</div>
+        </div>
+      </div>
+      <div id="station-eject-saved" class="station-settings-saved"></div>
+    </div>
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Scanner (gun)</div>
+
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-power">Read power / sensitivity</label>
+        <div class="station-range-row">
+          <input type="range" id="station-set-power" min="5" max="30" step="1" oninput="stationOnPowerInput()" onchange="stationSavePower()">
+          <output id="station-set-power-out">—</output>
+        </div>
+        <div class="station-field__hint">Lower = shorter range (badge tap only). Higher = reads across the room. Test a value that reads a badge held to the gun but not tags on the shelf.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Per trigger pull</label>
+        <div class="station-read-mode-toggle">
+          <button type="button" id="station-panel-mode-single" onclick="stationSetPanelReadMode('single')">Single</button>
+          <button type="button" id="station-panel-mode-multi" onclick="stationSetPanelReadMode('multi')">Multi</button>
+        </div>
+        <div class="station-field__hint">Single = one tag per pull. Multi = every tag in range on one pull.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Sensitivity presets</label>
+        <div class="station-scan-panel__presets">
+          <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
+        </div>
+        <div class="station-field__hint">Tap preset to load · hold 1s to save current sensitivity</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-mode">Scan mode</label>
+        <select id="station-set-mode" onchange="stationSaveScanMode()">
+          <option value="single">Single — one pull, one tag</option>
+          <option value="multi">Multi — one pull, many tags</option>
+          <option value="continuous">Continuous — pull to start/stop a burst</option>
+        </select>
+        <div class="station-field__hint">Single reads one tag per trigger pull. Multi reads every tag in range on one pull. Continuous toggles a hands-free burst (pull to start, pull again to stop).</div>
+      </div>
+
+      <div class="station-field" id="station-speed-field" style="display:none;">
+        <label class="station-field__label" for="station-set-speed">Continuous scan speed</label>
+        <div class="station-range-row">
+          <input type="range" id="station-set-speed" min="100" max="2000" step="50" oninput="stationOnSpeedInput()" onchange="stationSaveSpeed()">
+          <output id="station-set-speed-out">—</output>
+        </div>
+        <div class="station-field__hint">Time between repeat reads in Continuous mode. Left = faster (machine-gun), right = slower / gentler.</div>
+      </div>
+
+      <div class="station-field">
+        <div class="station-toggle-row">
+          <label class="station-field__label" for="station-set-beep" style="margin:0;">Gun beeper</label>
+          <input type="checkbox" id="station-set-beep" checked onchange="stationSaveBeep()" style="width:22px; height:22px;">
+        </div>
+        <div class="station-field__hint">Turn off to silence the gun's own beep on every read.</div>
+      </div>
+
+      <div id="station-gun-unavailable" class="station-settings-note" style="display:none;">
+        Gun controls appear here when the station app is connected to the RFID gun. (Not available in a plain browser.)
+      </div>
+    </div>
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Device info</div>
+      <div class="station-device-info">
+        <div><span>Gun connection</span><span id="station-info-conn">—</span></div>
+        <div><span>Battery</span><span id="station-info-battery">—</span></div>
+        <div><span>Firmware</span><span id="station-info-fw">—</span></div>
+      </div>
+      <div class="station-field" style="margin-top:12px;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f97316; color:#fb923c;" onclick="stationReconnectGun_()">Reconnect gun</button>
+        <div class="station-field__hint">Use when Bluetooth shows connected but scans do not work — forces a fresh driver handshake.</div>
+      </div>
+      <div class="station-field" id="station-gun-sleep-field" style="margin-top:8px; display:none;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#64748b; color:#cbd5e1;" onclick="stationSleepGun_()">Disconnect + sleep gun</button>
+        <div class="station-field__hint">Powers the gun down (no on/off button on this reader). Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
+      <div class="station-field" style="margin-top:8px;">
+        <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="stationDeviceSignOut()">Sign out device</button>
+        <div class="station-field__hint">Signs out this station profile (e.g. CW1) from Showrunner — not the hosted crew member.</div>
+      </div>
+    </div>
+
+  </div>
+</div>

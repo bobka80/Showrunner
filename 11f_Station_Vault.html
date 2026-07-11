@@ -1,0 +1,57 @@
+<!-- @INDEX: STATION -> Vault overlay markup -->
+<div id="station-vault" aria-label="Vault equipment">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Vault</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseVault()">Done</button>
+  </div>
+  <!-- Tabs: Equipment (all hosts) | Crew (ROOT only — badge provisioning) -->
+  <div id="station-vault-tabs" class="station-vault-tabs">
+    <button type="button" id="station-vault-tab-btn-equip" class="station-vault-tab is-active" onclick="stationVaultSwitchTab_('equip')">Equipment</button>
+    <button type="button" id="station-vault-tab-btn-crew" class="station-vault-tab" style="display:none;" onclick="stationVaultSwitchTab_('crew')">Crew</button>
+  </div>
+
+  <!-- EQUIPMENT tab -->
+  <div id="station-vault-pane-equip">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-search" placeholder="Search equipment by name, unit or tag…" autocomplete="off" oninput="stationVaultRenderList_()">
+    </div>
+    <div id="station-vault-status" class="station-shell-status" style="text-align:center;">Loading vault…</div>
+    <div id="station-vault-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- CREW tab (ROOT only): assign/overwrite crew badge RFIDs -->
+  <div id="station-vault-pane-crew" style="display:none;">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-crew-search" placeholder="Search crew by name…" autocomplete="off" oninput="stationVaultRenderCrew_()">
+    </div>
+    <div id="station-vault-crew-status" class="station-shell-status" style="text-align:center;">Loading crew…</div>
+    <div id="station-vault-crew-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- Record-mode banner: armed while recording equipment OR crew tags (with cascade). -->
+  <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
+    <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
+    <button type="button" id="station-vault-record-overwrite" class="btn-main" style="display:none; margin:0;" onclick="stationVaultConfirmOverwrite_()">Overwrite</button>
+    <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>
+  </div>
+
+  <!-- Tap a line → action sheet (keeps the lines clean, like the real vault). -->
+  <div id="station-vault-sheet" class="station-vault-sheet" aria-hidden="true">
+    <div class="station-vault-sheet__backdrop" onclick="stationVaultCloseSheet_()"></div>
+    <div class="station-vault-sheet__panel">
+      <div class="station-vault-sheet__head">
+        <div class="station-vault-sheet__title" id="station-vault-sheet-title">Item</div>
+        <button type="button" class="btn-close" style="width:auto; margin:0; padding:6px 12px;" onclick="stationVaultCloseSheet_()">Close</button>
+      </div>
+      <div class="station-vault-sheet__meta" id="station-vault-sheet-meta"></div>
+      <textarea id="station-vault-sheet-note" class="station-scan-panel__note" rows="2" placeholder="Describe the problem (required for Damaged) — e.g. gobo rotation error" style="display:none; margin:0 16px 12px;"></textarea>
+      <div class="station-vault-sheet__actions">
+        <button type="button" class="btn-outline" id="station-vault-act-maint" onclick="stationVaultSheetStatus_('Maintenance')">Maintenance</button>
+        <button type="button" class="btn-outline" id="station-vault-act-damaged" style="border-color:#eab308;color:#eab308;" onclick="stationVaultSheetStatus_('Damaged')">Damaged</button>
+        <button type="button" class="btn-outline" id="station-vault-act-broken" style="border-color:#ef4444;color:#ef4444;" onclick="stationVaultSheetStatus_('Broken')">Broken</button>
+        <button type="button" class="btn-outline" id="station-vault-act-repaired" style="border-color:#10b981;color:#10b981;" onclick="stationVaultSheetStatus_('Repaired')">Repaired</button>
+        <button type="button" class="btn-main" id="station-vault-act-record" style="display:none;" onclick="stationVaultSheetRecord_()">Record RFID</button>
+      </div>
+    </div>
+  </div>
+</div>

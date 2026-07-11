@@ -29,7 +29,7 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 | Formula / CLI / equipment list sync | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (Triangle of Truth) |
 | Deploy, mobile black screen, session | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (boot) → [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) |
 | Phone QR scan panel, shell camera, `host-boot.js` mobile paths | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Mobile QR handoff |
-| Station gun scans, `RfidManager`, `showrunnerStationDeliverScan` | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Station RFID delivery |
+| Station gun scans, `RfidManager`, `showrunnerStationDeliverScan`, station UI split | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Station RFID · [STATION_UI.md](docs/ai/STATION_UI.md) |
 | Cursor IDE session, rules, review gates | [CURSOR_WORKFLOW.md](docs/ai/CURSOR_WORKFLOW.md) |
 | Warehouse gate, guns, station profile, PA concurrency | [topics/logistics-warehouse.md](docs/ai/topics/logistics-warehouse.md) + [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) |
 
