@@ -201,6 +201,7 @@ function stationPanelHandleScan_(tag, tid) {
     }
   }
   stationPanelRenderLast_();
+  if (typeof stationRenderScanFeed_ === 'function') stationRenderScanFeed_();
 }
 
 function stationPanelRenderLast_() {

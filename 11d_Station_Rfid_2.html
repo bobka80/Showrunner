@@ -7,9 +7,39 @@ function stationSetLastScan_(tag) {
   el.textContent = tag ? ('Last scan: ' + tag) : '';
 }
 
+function stationScanFeedEscAttr_(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
+    return c === '&' ? '&amp;' : (c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&#39;')));
+  });
+}
+
+function stationScanFeedSelectedNorm_() {
+  const sel = window.stationPanelSelection;
+  if (!sel || !sel.tag) return '';
+  return stationNormalizeEpc_(sel.tag);
+}
+
+function stationSelectFeedRow_(tag, tid) {
+  if (!tag || typeof stationPanelHandleScan_ !== 'function') return;
+  stationPanelHandleScan_(tag, tid || '');
+}
+
+function stationWireScanFeedClicks_() {
+  const list = document.getElementById('station-scan-feed-list');
+  if (!list || list.dataset.bound === '1') return;
+  list.dataset.bound = '1';
+  list.addEventListener('click', function(ev) {
+    const row = ev.target.closest ? ev.target.closest('.station-scan-feed__row') : null;
+    if (!row) return;
+    const tag = row.getAttribute('data-tag');
+    if (tag) stationSelectFeedRow_(tag, row.getAttribute('data-tid') || '');
+  });
+}
+
 function stationRenderScanFeed_() {
   const list = document.getElementById('station-scan-feed-list');
   if (!list) return;
+  stationWireScanFeedClicks_();
   const scans = window.stationRecentScans || [];
   if (!scans.length) {
     list.innerHTML = '<span class="station-scan-feed__empty">Waiting for scans…</span>';
@@ -20,6 +50,15 @@ function stationRenderScanFeed_() {
       return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
     });
   };
+  const selNorm = stationScanFeedSelectedNorm_();
+  const rowAttrs = function(s, extraCls) {
+    const norm = s.norm || stationNormalizeEpc_(s.tag);
+    const selCls = (selNorm && norm === selNorm) ? ' is-selected' : '';
+    return ' class="station-scan-feed__row' + (extraCls || '') + selCls + '"'
+      + ' data-tag="' + stationScanFeedEscAttr_(s.tag) + '"'
+      + ' data-tid="' + stationScanFeedEscAttr_(s.tid || '') + '"'
+      + ' role="button" tabindex="0"';
+  };
   const rows = scans.map(function(s) {
     const time = stationFormatTime24_(s.ts);
     var hit = stationResolveEpc_(s.tag);
@@ -29,7 +68,7 @@ function stationRenderScanFeed_() {
     }
     if (hit && hit.name) {
       if (hit.kind === 'crew') {
-        return '<div class="station-scan-feed__row is-crew">'
+        return '<div' + rowAttrs(s, ' is-crew') + '>'
           + '<span class="name">' + esc(hit.name) + '</span>'
           + '<span class="unit">crew</span>'
           + '<span class="station-scan-feed__spacer"></span>'
@@ -37,18 +76,20 @@ function stationRenderScanFeed_() {
       }
       const unit = hit.unitNumber || hit.unitId || '';
       const statusHtml = stationScanFeedStatusHtml_(hit, esc);
-      return '<div class="station-scan-feed__row">'
+      return '<div' + rowAttrs(s, '') + '>'
         + '<span class="name">' + esc(hit.name) + '</span>'
         + (unit ? '<span class="unit">#' + esc(unit) + '</span>' : '<span class="unit unit--empty"></span>')
         + statusHtml
         + '<span class="time">' + time + '</span></div>';
     }
-    return '<div class="station-scan-feed__row is-unknown" title="' + esc(s.tag) + '">'
+    return '<div' + rowAttrs(s, ' is-unknown') + ' title="' + esc(s.tag) + '">'
       + '<span class="name">' + esc(s.tag) + '</span>'
       + '<span class="time">' + time + '</span></div>';
   });
   list.innerHTML = rows.join('');
 }
+
+window.stationSelectFeedRow_ = stationSelectFeedRow_;
 
 window.stationRenderScanFeed_ = stationRenderScanFeed_;
 

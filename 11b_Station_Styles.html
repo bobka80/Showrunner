@@ -406,6 +406,17 @@ html.station-device-root #station-device-controls { display: flex; }
   cursor: pointer;
 }
 .station-project-item:active { border-color: #f97316; }
+.station-project-item__row,
+.station-dock-project-card__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.station-project-item__main,
+.station-dock-project-card__main {
+  flex: 1;
+  min-width: 0;
+}
 .station-project-item__name {
   font-size: 15px;
   font-weight: 800;
@@ -744,8 +755,23 @@ html.station-device-root #station-device-controls { display: flex; }
   font-family: monospace;
   font-size: 13px;
   color: #e4e4e7;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  box-sizing: border-box;
 }
-.station-scan-feed__row:first-child {
+.station-scan-feed__row.is-selected {
+  border-color: #f4f4f5;
+  background: rgba(24, 24, 27, 0.85);
+  color: #f4f4f5;
+  font-weight: 700;
+}
+.station-scan-feed__row.is-selected .time {
+  color: #71717a;
+}
+.station-scan-feed__row:first-child:not(.is-selected) {
   color: #10b981;
   font-weight: 700;
 }

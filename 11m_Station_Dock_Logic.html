@@ -210,18 +210,31 @@
       else if (rawStatus === 'NOT APPROVED') statusColor = '#f97316';
       else if (rawStatus === 'CANCELLED') statusColor = '#ef4444';
       var dateStr = p.start ? new Date(p.start).toLocaleDateString() : 'No Date';
+      var isOutdoor = typeof stationProjectIsOutdoor_ === 'function'
+        ? stationProjectIsOutdoor_(p)
+        : (typeof projectIsOutdoorMobile === 'function' ? projectIsOutdoorMobile(p) : false);
+      var weatherSlot = isOutdoor
+        ? '<div id="dock-weather-' + esc_(p.id) + '" class="mob-event-weather-badge"></div>'
+        : '';
       html += '<button type="button" class="station-dock-project-card" style="border-left:4px solid ' + statusColor + ';" '
         + 'onclick="stationDockPickProject_(\'' + esc_(p.id) + '\')">'
+        + '<div class="station-dock-project-card__row">'
+        + '<div class="station-dock-project-card__main">'
         + '<div class="station-dock-project-card__title">' + esc_(p.title || p.name || 'Untitled') + '</div>'
         + '<div class="station-dock-project-card__meta">'
         + '<span>📅 ' + esc_(dateStr) + '</span>'
         + '<span style="color:' + statusColor + ';font-weight:700;">' + esc_(rawStatus) + '</span>'
+        + '</div></div>'
+        + weatherSlot
         + '</div></button>';
     });
 
     if (!html) html = '<div class="station-dock-project-empty">No upcoming events.</div>';
     listEl.innerHTML = html;
     if (statusEl) statusEl.style.display = 'none';
+    if (typeof stationApplyProjectListWeather_ === 'function') {
+      stationApplyProjectListWeather_(sorted, 'dock-weather-');
+    }
   };
 
   window.stationDockPickProject_ = function(pId) {

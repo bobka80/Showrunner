@@ -45,8 +45,11 @@ function stationHandleRfidScan_(rawTag, rawTid) {
       );
       return;
     }
-    // Not a crew badge → equipment scan during an open checkout / existing behavior.
-    stationForwardCheckoutScan_(tag);
+    // Not a crew badge → checkout when PA operation is open; else update dock scan rail selection.
+    if (stationForwardCheckoutScan_(tag)) return;
+    if (document.documentElement.classList.contains('station-dock-root') && typeof stationPanelHandleScan_ === 'function') {
+      stationPanelHandleScan_(tag, tid);
+    }
     return;
   }
 

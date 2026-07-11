@@ -41,6 +41,22 @@ function stationOpenProjectPicker_() {
     .getRefreshPayload(host.name);
 }
 
+function stationProjectIsOutdoor_(p) {
+  if (typeof projectIsOutdoorMobile === 'function') return projectIsOutdoorMobile(p);
+  const rs = p && p.readinessState;
+  return !!(rs && (rs.isOutdoor || rs.outdoor));
+}
+
+function stationApplyProjectListWeather_(projects, idPrefix) {
+  if (typeof renderMobileWeatherSummaryBadge !== 'function') return;
+  (projects || []).forEach(function(p) {
+    if (!stationProjectIsOutdoor_(p)) return;
+    const host = document.getElementById(String(idPrefix || 'stn-weather-') + p.id);
+    if (host) renderMobileWeatherSummaryBadge(host, p, { interactive: false });
+  });
+}
+window.stationApplyProjectListWeather_ = stationApplyProjectListWeather_;
+
 function stationRenderProjectList_(projects) {
   const statusEl = document.getElementById('station-project-picker-status');
   const listEl = document.getElementById('station-project-picker-list');
@@ -49,6 +65,7 @@ function stationRenderProjectList_(projects) {
     return String(a.start || '').localeCompare(String(b.start || ''));
   });
   if (!list.length) {
+    listEl.innerHTML = '';
     if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'No projects assigned to you.'; }
     return;
   }
@@ -60,11 +77,19 @@ function stationRenderProjectList_(projects) {
   };
   listEl.innerHTML = list.map(function(p) {
     const when = [p.start, p.end].filter(Boolean).join(' → ');
+    const weatherSlot = stationProjectIsOutdoor_(p)
+      ? '<div id="stn-weather-' + esc(p.id) + '" class="mob-event-weather-badge"></div>'
+      : '';
     return '<button type="button" class="station-project-item" onclick="stationPickProject_(\'' + esc(p.id) + '\')">'
+      + '<div class="station-project-item__row">'
+      + '<div class="station-project-item__main">'
       + '<div class="station-project-item__name">' + esc(p.title || p.name || 'Untitled') + '</div>'
       + (when ? '<div class="station-project-item__meta">' + esc(when) + '</div>' : '')
-      + '</button>';
+      + '</div>'
+      + weatherSlot
+      + '</div></button>';
   }).join('');
+  stationApplyProjectListWeather_(list, 'stn-weather-');
 }
 
 window.stationPickProject_ = function(pId) {
