@@ -1,3 +1,4 @@
-Showrunner Station Desktop v0.1.1
+Showrunner Station Desktop v0.1.2
 
-- TSL iframe gun relay + fresh inventory read per trigger
+- TSL trigger inventory + valid 10-29 dBm power
+- skip push on desktop

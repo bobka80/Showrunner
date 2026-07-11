@@ -16,8 +16,9 @@ public sealed class TslRfidManager : IDisposable
     public const string ScanModeSingle = "single";
     public const string ScanModeContinuous = "continuous";
 
-    private const int PowerMin = 5;
-    private const int PowerMax = 30;
+    // TSL SDK: AntennaParameters.OutputPower valid range is 10–29 dBm.
+    private const int PowerMin = 10;
+    private const int PowerMax = 29;
     private const int PollMin = 100;
     private const int PollMax = 2000;
 
@@ -30,7 +31,7 @@ public sealed class TslRfidManager : IDisposable
     private string _portName = "";
     private string _linkState = "disconnected";
     private bool _connected;
-    private int _powerDbm = 30;
+    private int _powerDbm = 29;
     private string _scanMode = ScanModeSingle;
     private int _pollMs = 500;
     private bool _beepEnabled = true;
@@ -70,7 +71,7 @@ public sealed class TslRfidManager : IDisposable
         // A COM port in prefs is an OVERRIDE only; blank means auto-detect the TSL gun.
         _manualPort = (prefs.ComPort ?? "").Trim();
         _portName = _manualPort;
-        _powerDbm = prefs.PowerDbm is >= PowerMin and <= PowerMax ? prefs.PowerDbm : 30;
+        _powerDbm = prefs.PowerDbm is >= PowerMin and <= PowerMax ? prefs.PowerDbm : 29;
         _beepEnabled = prefs.Beep;
         _scanMode = prefs.ScanMode == ScanModeContinuous ? ScanModeContinuous : ScanModeSingle;
         _pollMs = prefs.PollMs is >= PollMin and <= PollMax ? prefs.PollMs : 500;
@@ -174,9 +175,11 @@ public sealed class TslRfidManager : IDisposable
 
                 SetupResponders();
                 ReadFirmware();
+                ConfigureChainInventory();
+                SeedInventoryParameters();
                 EnableSwitchReporting();
                 _linkState = "live";
-                PostStatus("Gun connected");
+                PostStatus("Gun connected — pull trigger to scan");
                 // Persist manual COM override only — auto-detected ports change after re-pair.
                 DesktopPrefs.Save(new DesktopPrefsData
                 {
@@ -295,6 +298,12 @@ public sealed class TslRfidManager : IDisposable
     {
         _powerDbm = Math.Clamp(power, PowerMin, PowerMax);
         DesktopPrefs.SavePartial(p => p.PowerDbm = _powerDbm);
+        lock (_commandLock)
+        {
+            if (!_commander.IsConnected) return;
+            ConfigureChainInventory();
+            SeedInventoryParameters();
+        }
     }
 
     public void SetScanMode(string? mode)
@@ -368,6 +377,37 @@ public sealed class TslRfidManager : IDisposable
         }
     }
 
+    private void ConfigureChainInventory()
+    {
+        _inventory.OutputPower = _powerDbm;
+        _inventory.QuerySession = QuerySession.S0;
+        _inventory.QueryTarget = QueryTarget.TargetA;
+        _inventory.TakeNoAction = false;
+        _inventory.IsIndexedCommand = false;
+        _inventory.IsLibraryCommand = false;
+        _inventory.FastIdentifier = TriState.Yes;
+        _inventory.TagFocus = TriState.Yes;
+    }
+
+    /// <summary>
+    /// SwitchAction.Inventory uses the gun's last inventory parameters — seed them on connect
+    /// (matches TSL ASCII Protocol Explorer / Switch sample behaviour).
+    /// </summary>
+    private void SeedInventoryParameters()
+    {
+        try
+        {
+            ConfigureChainInventory();
+            _commander.ExecuteCommand(_inventory, _inventory.Responder);
+            if (!_inventory.Response.IsSuccessful)
+                PostStatus("Inventory setup failed");
+        }
+        catch (Exception ex)
+        {
+            PostStatus("Inventory setup: " + ex.Message);
+        }
+    }
+
     private void EnableSwitchReporting()
     {
         try
@@ -375,7 +415,8 @@ public sealed class TslRfidManager : IDisposable
             var sw = new SwitchActionCommand
             {
                 AsynchronousReportingEnabled = TriState.Yes,
-                SinglePressAction = SwitchAction.Off,
+                // Explorer default: trigger runs inventory with last seeded parameters.
+                SinglePressAction = SwitchAction.Inventory,
                 DoublePressAction = SwitchAction.Off,
             };
             _commander.ExecuteCommand(sw, sw.Responder);
@@ -425,7 +466,7 @@ public sealed class TslRfidManager : IDisposable
                 StartContinuous();
             return;
         }
-        PerformSingleRead();
+        // Single mode: gun inventories natively via SinglePressAction.Inventory; chain responder delivers tags.
     }
 
     private void PerformSingleRead()
@@ -433,41 +474,17 @@ public sealed class TslRfidManager : IDisposable
         lock (_commandLock)
         {
             if (!_commander.IsConnected) return;
-        }
-        Task.Run(() =>
-        {
-            lock (_commandLock)
+            try
             {
-                if (!_commander.IsConnected) return;
-                InventoryCommand? inventory = null;
-                try
-                {
-                    // Fresh command per pull — matches TSL SDK samples (reuse caused silent no-reads).
-                    inventory = new InventoryCommand
-                    {
-                        OutputPower = _powerDbm,
-                        QuerySession = QuerySession.S0,
-                        QueryTarget = QueryTarget.TargetA,
-                        TakeNoAction = false,
-                        IsIndexedCommand = false,
-                        IsLibraryCommand = false,
-                        FastIdentifier = TriState.Yes,
-                        TagFocus = TriState.Yes,
-                    };
-                    inventory.TransponderReceived += OnInventoryTransponder;
-                    _commander.ExecuteCommand(inventory, inventory.Responder);
-                }
-                catch (Exception ex)
-                {
-                    PostStatus("Read failed: " + ex.Message);
-                }
-                finally
-                {
-                    if (inventory != null)
-                        inventory.TransponderReceived -= OnInventoryTransponder;
-                }
+                ConfigureChainInventory();
+                // Async inventory — same command instance as chain responder (TSL inventory sample pattern).
+                _commander.ExecuteCommand(_inventory, null);
             }
-        });
+            catch (Exception ex)
+            {
+                PostStatus("Read failed: " + ex.Message);
+            }
+        }
     }
 
     private void OnInventoryTransponder(object? sender, TransponderDataEventArgs e)

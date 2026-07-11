@@ -34,6 +34,13 @@ public partial class MainWindow : Window
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShowrunnerStation", "WebView2"));
             await WebView.EnsureCoreWebView2Async(env);
 
+            WebView.CoreWebView2.PermissionRequested += (_, args) =>
+            {
+                // Station kiosk does not use web push; deny so the green banner cannot stick open.
+                if (args.PermissionKind == CoreWebView2PermissionKind.Notifications)
+                    args.State = CoreWebView2PermissionState.Deny;
+            };
+
             var settings = WebView.CoreWebView2.Settings;
             settings.AreDefaultContextMenusEnabled = false;
             settings.AreDevToolsEnabled = true;

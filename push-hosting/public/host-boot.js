@@ -1553,6 +1553,10 @@
     return /ShowrunnerStation/i.test(navigator.userAgent || '');
   }
 
+  function isDesktopStationApp() {
+    return /ShowrunnerStationDesktop/i.test(navigator.userAgent || '');
+  }
+
   function isStandalonePwa() {
     // The native station app is already "installed" — never nag it to add-to-home-screen.
     return isNativeStationApp() ||
@@ -1927,6 +1931,10 @@
   }
 
   function showPushPrompt(mode) {
+    if (isDesktopStationApp()) {
+      hidePushDockFully();
+      return;
+    }
     var m = mode || 'allow';
     if (isIosInBrowserTab()) {
       showInstallPanel();
@@ -2148,6 +2156,10 @@
   }
 
   function maybePromptForPushIfNeeded(crewName) {
+    if (isDesktopStationApp()) {
+      hidePushDockFully();
+      return;
+    }
     if (!crewName || serverSaveConfirmed) return;
     if (Notification.permission === 'denied') {
       if (!readPushOkLocal(crewName, fcmToken)) showPushPrompt('denied');
@@ -2779,6 +2791,11 @@
   }
 
   async function requestNotificationsAndRegister() {
+    if (isDesktopStationApp()) {
+      pushStarted = false;
+      hidePushDockFully();
+      return;
+    }
     if (pushStarted) return;
     pushStarted = true;
     try {
@@ -2818,6 +2835,10 @@
   }
 
   async function evaluatePushStateOnStartup() {
+    if (isDesktopStationApp()) {
+      hidePushDockFully();
+      return;
+    }
     if (!('Notification' in window)) return;
     if (isIosInBrowserTab()) {
       showInstallPanel();
@@ -2979,4 +3000,5 @@
 
   startShellOnce();
   if (shouldShowInstallPanel()) showInstallPanel();
+  if (isDesktopStationApp()) hidePushDockFully();
 })();

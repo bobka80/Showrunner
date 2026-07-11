@@ -6,7 +6,7 @@ namespace Showrunner.Station.Desktop;
 public sealed class DesktopPrefsData
 {
     public string ComPort { get; set; } = "";
-    public int PowerDbm { get; set; } = 30;
+    public int PowerDbm { get; set; } = 29;
     public bool Beep { get; set; } = true;
     public string ScanMode { get; set; } = TslRfidManager.ScanModeSingle;
     public int PollMs { get; set; } = 500;
