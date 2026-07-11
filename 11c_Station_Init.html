@@ -139,4 +139,16 @@ function initStationShell_() {
     })
     .getStationShellBootstrap(ACTIVE_USER_NAME);
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.IS_STATION_DEVICE) initStationShell_();
+});
+document.addEventListener('visibilitychange', function() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (document.visibilityState === 'visible') stationAnnounceReady_();
+});
+window.addEventListener('pageshow', function(ev) {
+  if (!window.IS_STATION_DEVICE) return;
+  if (ev.persisted) stationAnnounceReady_();
+});
 </script>

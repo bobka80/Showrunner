@@ -52,3 +52,19 @@ Numbered host folders (`01_WORKSPACE` … `05_DATABASE`), live spreadsheets, bac
 
 ## Transfer Tags (Planned)
 - `[TRANSFER_FROM]`: Tag for gear that bypasses the warehouse (direct venue-to-venue or vendor-to-site). See [topics/availability-fleet.md](topics/availability-fleet.md).
+
+## Station UI families (director terms)
+
+Director vocabulary for **which station UI** we mean — not the native app binary, not tablet (for now):
+
+| Term | Meaning | Native shell | UI skin (code) |
+|------|---------|--------------|----------------|
+| **Mobile station** | Phone-sized station UI | Android APK (`station-android/`) | `phone_sled` — layout `chainway_handheld` |
+| **Desktop station** | Desktop / gate-PC station UI | Windows EXE (`station-desktop/`) | `dock_panel` — layout `tsl_dock_desktop`, future `gate` |
+
+**Rules:**
+- **Mobile station** = Android phone in the Chainway sled only.
+- **Desktop station** = gate PC (TSL dock today); **does not** include large tablets — those stay on the dock-panel skin when added, but director says **desktop station** for the PC UI only until tablet scope is explicit.
+- Shared station **logic** (host session, RFID, vault, project) is one codebase; the terms above refer to **UI layout / chrome**, not separate products.
+
+See [STATION_UI.md](STATION_UI.md) · [active/rfid-station-profiles.md](active/rfid-station-profiles.md).

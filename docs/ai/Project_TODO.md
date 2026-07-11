@@ -80,6 +80,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | **Equipment custody / cable case bind** | Optional later | same § C |
 | **Crew EPC+TID, kiosk, gate hardware** | When floor stable | same § D |
 | **Prep session, PA concurrency, pull sheets** | Platform track — do not absorb into RFID fixes | same § E |
+| **Desktop gate PC power schedule** | Spec captured 2026-07-11 — hibernate + weekday 09:50 wake; not built | [topics/deferred-when-operational.md](topics/deferred-when-operational.md) § F |
 
 **Full checklist + rejected approaches:** [topics/deferred-when-operational.md](topics/deferred-when-operational.md)
 

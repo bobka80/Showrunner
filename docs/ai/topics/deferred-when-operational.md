@@ -4,7 +4,7 @@
 
 **Status:** Backlog only — **do not start** until the director confirms core warehouse/station flows are operational on the floor. These items are documented so we can return without re-litigating decisions.
 
-**Last captured:** 2026-07-11 (director session — gate checkout model, Chainway gun sleep, RFID allocation).
+**Last captured:** 2026-07-11 (director session — gate checkout model, Chainway gun sleep, RFID allocation, **desktop gate PC power schedule**).
 
 ---
 
@@ -98,6 +98,41 @@ Blocked on DAL / operational priority — listed here so RFID work does not abso
 - [ ] Warehouse prep session — [warehouse-prep-session.md](warehouse-prep-session.md)
 - [ ] Project Assets concurrency + digests — [project-assets-concurrency.md](project-assets-concurrency.md)
 - [ ] Handover protocols, pull sheets — [logistics-warehouse.md](logistics-warehouse.md)
+
+---
+
+## F. Desktop gate PC — power schedule (not built)
+
+**Director spec (2026-07-11).** Native work in `station-desktop/` + one-time Windows image setup per gate PC. **Do not start** until promoted after station UI rework is stable.
+
+**Open question:** Weekdays **10:00–18:00** — if nobody touches the PC all day, stay on (**A**, implied) vs hibernate after 2 h idle (**B**)? Director to confirm before build.
+
+### Policy
+
+| When | Behavior |
+|------|----------|
+| **Mon–Fri 09:50** | Auto **wake** (10 minutes before work start) + launch station app |
+| **Mon–Fri 10:00–18:00** | **Work hours** — PC available for station use |
+| **Mon–Fri after 18:00** | **Hibernate** after **2 hours** of keyboard/mouse/scan inactivity (not at 18:00 sharp) |
+| **Sat–Sun (all day)** | No scheduled wake; **hibernate** after **2 hours** inactivity |
+| **Any time** | **Keyboard/mouse wake** — BIOS + Windows “allow wake timers” / USB keyboard wake (PC setup, not app-only) |
+
+Use **hibernate** (S4), not shutdown (S5). Local PC clock / timezone. Sleep TSL gun cleanly before hibernate (`SleepAndDisconnect`).
+
+### Implementation checklist (when resumed)
+
+| Item | Notes |
+|------|--------|
+| [ ] **Idle tracker** | `GetLastInputInfo` + reset on RFID/trigger activity |
+| [ ] **Schedule engine** | Weekday vs weekend; after-18:00 gate on weekdays; 2 h idle threshold |
+| [ ] **Hibernate action** | `SetSuspendState(hibernate: true)` or equivalent from WPF shell |
+| [ ] **Weekday wake task** | Task Scheduler: Mon–Fri **09:50**, “Wake the computer to run this task”, start `ShowrunnerStationDesktop.exe` |
+| [ ] **Re-arm wake** | Before each hibernate (Thu/Fri/Sun night), ensure next weekday 09:50 task exists |
+| [ ] **Gate PC image checklist** | `powercfg /waketimers`, `wake_armed`, BIOS RTC wake, keyboard wake enabled |
+| [ ] **Settings UI (optional)** | Show next wake / idle countdown in desktop station settings — later polish |
+| [ ] **Holidays / overrides** | Not specified — manual keyboard wake only unless calendar added later |
+
+**Related:** [GLOSSARY.md](../GLOSSARY.md) § Desktop station · [active/tsl-desktop-handoff.md](../active/tsl-desktop-handoff.md)
 
 ---
 

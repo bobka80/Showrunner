@@ -8,6 +8,8 @@
 
 ## Decision (director 2026-07-11)
 
+**Director terms:** **mobile station** = phone UI (Android APK); **desktop station** = gate-PC UI only (not tablet). See [GLOSSARY.md](GLOSSARY.md) § Station UI families.
+
 One shared station **logic** core; **two UI families** keyed off station layout / skin selector:
 
 | UI skin | Layout ids | Devices | Screen context |

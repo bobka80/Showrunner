@@ -107,6 +107,16 @@ Lock (desktop)
   Idle screensaver with clock + PIN. Optional timer in Personal Hub.
   Manual padlock on nav bar works even when timer is Disabled.
 
+Mobile station
+  The station UI on an Android phone in the Chainway sled.
+  Native app: station-android APK. UI skin: phone_sled (chainway_handheld).
+  Say "mobile station" when you mean phone station chrome — not the gate PC.
+
+Desktop station
+  The station UI on a gate PC (TSL dock today). Native app: station-desktop EXE.
+  UI skin: dock_panel (tsl_dock_desktop). Does NOT mean tablet — PC only for now.
+  Say "desktop station" when you mean gate-PC station layout, not the phone sled.
+
 Showrunner Sync
   Google Drive shortcuts copied into a project folder (Personal Hub config).
 
@@ -163,6 +173,10 @@ MobileRFID        Phone MAP RFID — assign tags in the field (mobile-view-rfid)
 CrewHub           Mobile crew briefing for one event (mobile-crew-hub-overlay).
 
 DesktopLock       Idle lock / screensaver overlay (desktop-lock-overlay).
+
+MobileStation     Phone station shell — Chainway APK, phone_sled UI (see Mobile station above).
+
+DesktopStation    Gate PC station shell — station-desktop EXE, dock_panel UI (see Desktop station above).
 
 ================================================================================
 PART 3 — RESOURCES TABS (inside Resources)
