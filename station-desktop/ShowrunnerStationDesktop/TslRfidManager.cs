@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.IO.Ports;
+using System.Management;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -23,6 +24,10 @@ public sealed class TslRfidManager : IDisposable
     private const int PollMin = 100;
     private const int PollMax = 2000;
     private const int WatchdogMs = 2500;
+    private const int WatchdogDisconnectedMs = 1000;
+    private const int PortArrivalConnectDelayMs = 1200;
+    private const int FirmwareWakeRetries = 4;
+    private const int FirmwareWakeDelayMs = 500;
     private const int TriggerDebounceMs = 2200;
     private const int ScanDedupeMs = 1500;
     private const int MultiBurstMs = 700;
@@ -52,6 +57,10 @@ public sealed class TslRfidManager : IDisposable
 
     private string _manualPort = "";
     private System.Threading.Timer? _watchdog;
+    private int _watchdogIntervalMs;
+    private ManagementEventWatcher? _portWatcher;
+    private volatile bool _portArrivalPending;
+    private string _lastPortSignature = "";
     private volatile bool _connecting;
     private volatile bool _userSleep;
     private bool _disposed;
@@ -96,9 +105,107 @@ public sealed class TslRfidManager : IDisposable
             : $"Looking for TSL gun on {_manualPort}…");
 
         StartGunWorker();
+        StartPortWatcher();
         // Brief delay before first sweep — BT virtual COM needs a moment after process start / taskkill.
-        _watchdog = new System.Threading.Timer(_ => WatchdogTick(), null, 800, WatchdogMs);
+        _watchdogIntervalMs = WatchdogDisconnectedMs;
+        _watchdog = new System.Threading.Timer(_ => WatchdogTick(), null, 800, WatchdogDisconnectedMs);
         ConnectLockLog.Record("start", _portName, null, _readGate, "scanMode=" + _scanMode);
+    }
+
+    private void StartPortWatcher()
+    {
+        try
+        {
+            var query = new WqlEventQuery(
+                "SELECT * FROM __InstanceCreationEvent WITHIN 2 WHERE " +
+                "TargetInstance ISA 'Win32_PnPEntity' AND TargetInstance.Name LIKE '%(COM%'");
+            _portWatcher = new ManagementEventWatcher(query);
+            _portWatcher.EventArrived += OnComPortArrived;
+            _portWatcher.Start();
+            ConnectLockLog.Record("port-watcher", _portName, null, _readGate, "started");
+        }
+        catch (Exception ex)
+        {
+            ConnectLockLog.Record("port-watcher-fail", _portName, null, _readGate, ex.Message);
+        }
+    }
+
+    private void StopPortWatcher()
+    {
+        try
+        {
+            if (_portWatcher == null) return;
+            _portWatcher.EventArrived -= OnComPortArrived;
+            _portWatcher.Stop();
+            _portWatcher.Dispose();
+        }
+        catch
+        {
+            // ignore
+        }
+        finally
+        {
+            _portWatcher = null;
+        }
+    }
+
+    private void OnComPortArrived(object sender, EventArrivedEventArgs e)
+    {
+        if (_disposed || _commanderLive) return;
+        try
+        {
+            var target = (ManagementBaseObject)e.NewEvent["TargetInstance"];
+            var deviceId = (target["DeviceID"] as string) ?? "";
+            if (!GunPortDetector.LooksLikeTsl(deviceId))
+                return;
+        }
+        catch
+        {
+            return;
+        }
+
+        // Gun powered on — resume auto-connect even after idle sleep parked the driver.
+        _userSleep = false;
+        _lastDetectLog = "";
+        ConnectLockLog.Record("port-arrival", _portName, null, _readGate, "TSL COM created");
+        PostStatus("Gun detected — connecting…");
+        SchedulePortArrivalReconnect();
+    }
+
+    private void SchedulePortArrivalReconnect()
+    {
+        if (_portArrivalPending || _disposed || _commanderLive) return;
+        _portArrivalPending = true;
+        Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(PortArrivalConnectDelayMs);
+                if (_disposed || _userSleep || _commanderLive) return;
+                if (_connecting) return;
+                _connecting = true;
+                RunGun(() =>
+                {
+                    try { TryConnectFromWatchdog(); }
+                    catch (Exception ex)
+                    {
+                        ConnectLockLog.Record("port-arrival-connect", _portName, false, _readGate, ex.Message);
+                    }
+                    finally { _connecting = false; }
+                });
+            }
+            finally
+            {
+                _portArrivalPending = false;
+            }
+        });
+    }
+
+    private void SetWatchdogInterval(int ms)
+    {
+        if (_watchdog == null || _watchdogIntervalMs == ms) return;
+        _watchdogIntervalMs = ms;
+        _watchdog.Change(ms, ms);
     }
 
     private void StartGunWorker()
@@ -154,6 +261,7 @@ public sealed class TslRfidManager : IDisposable
         if (_commanderLive)
         {
             _connected = true;
+            SetWatchdogInterval(WatchdogMs);
             if (_linkState != "live")
             {
                 _linkState = "live";
@@ -162,6 +270,7 @@ public sealed class TslRfidManager : IDisposable
             return;
         }
 
+        SetWatchdogInterval(WatchdogDisconnectedMs);
         _connected = false;
         if (_connecting) return;
 
@@ -195,6 +304,14 @@ public sealed class TslRfidManager : IDisposable
             }
 
             var candidates = GunPortDetector.Detect(_lastGunDeviceId);
+            var sig = string.Join("|", candidates.Select(c => c.ComPort));
+            if (!string.IsNullOrEmpty(sig) && sig != _lastPortSignature)
+            {
+                _lastPortSignature = sig;
+                _lastDetectLog = "";
+                ConnectLockLog.Record("ports-changed", _portName, null, _readGate, sig);
+            }
+
             if (candidates.Count == 0)
             {
                 if (_linkState != "waiting")
@@ -274,10 +391,9 @@ public sealed class TslRfidManager : IDisposable
                 }
 
                 ReadFirmware();
-                if (string.IsNullOrWhiteSpace(_firmware))
+                for (var attempt = 0; string.IsNullOrWhiteSpace(_firmware) && attempt < FirmwareWakeRetries; attempt++)
                 {
-                    // Gun may still be waking from sleep — one short retry before giving up on this port.
-                    Thread.Sleep(450);
+                    Thread.Sleep(FirmwareWakeDelayMs + attempt * 250);
                     ReadFirmware();
                 }
                 if (string.IsNullOrWhiteSpace(_firmware))
@@ -536,6 +652,7 @@ public sealed class TslRfidManager : IDisposable
         _userSleep = true;
         StopContinuous();
         ResetReadGate();
+        StopPortWatcher();
         _watchdog?.Dispose();
         _watchdog = null;
 

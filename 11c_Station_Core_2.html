@@ -213,6 +213,14 @@ function stationArmGunSleepTimer_() {
     var br = stationSleepCapableBridge_();
     if (!br) return;
     try {
+      var live = false;
+      if (typeof br.getConfig === 'function') {
+        try {
+          var cfg = JSON.parse(br.getConfig() || '{}');
+          live = !!(cfg && (cfg.connected || cfg.linkState === 'live'));
+        } catch (e) { /* ignore */ }
+      }
+      if (!live) return;
       br.sleepGun();
       stationToast_('Gun disconnecting (idle ' + mins + ' min) — LED off in ~1 min after link drop', '');
       setTimeout(function() { stationRequestGunConfig_(); }, 1200);
