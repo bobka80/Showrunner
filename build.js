@@ -63,7 +63,9 @@ function build() {
       window.__srPendingRfidScans = window.__srPendingRfidScans || [];
       if (!window.onStationRfidScan) {
         window.onStationRfidScan = function(tag, tid) {
-          window.__srPendingRfidScans.push({ tag: String(tag || ''), tid: String(tid || ''), ts: Date.now() });
+          var t = String(tag || ''), i = String(tid || '');
+          window.__srPendingRfidScans.push({ tag: t, tid: i, ts: Date.now() });
+          if (typeof window.stationPushScanFeed_ === 'function') window.stationPushScanFeed_(t, i);
         };
       }
       if (!window.stationMessageListenerBound) {

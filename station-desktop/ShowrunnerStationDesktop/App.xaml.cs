@@ -23,6 +23,11 @@ public partial class App : Application
             Shutdown(0);
             return;
         }
+        SessionEnding += (_, _) =>
+        {
+            if (Current.MainWindow is MainWindow mw)
+                mw.ShutdownRfid();
+        };
         base.OnStartup(e);
     }
 }

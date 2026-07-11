@@ -34,18 +34,23 @@ public partial class MainWindow : Window
                 DeliverScanToPage(epc, tid ?? "");
             });
         Loaded += async (_, _) => await InitWebViewAsync();
-        Closed += (_, _) =>
+        Closed += (_, _) => ShutdownRfid();
+    }
+
+    private bool _rfidShutdown;
+
+    internal void ShutdownRfid()
+    {
+        if (_rfidShutdown) return;
+        _rfidShutdown = true;
+        _gunPushTimer?.Dispose();
+        _gunPushTimer = null;
+        if (_diagWindow != null)
         {
-            _gunPushTimer?.Dispose();
-            _gunPushTimer = null;
-            if (_diagWindow != null)
-            {
-                _diagWindow.Detach();
-                _diagWindow = null;
-            }
-            // Do not block UI shutdown on COM disconnect — can hang several seconds.
-            Task.Run(() => _rfid.Dispose());
-        };
+            _diagWindow.Detach();
+            _diagWindow = null;
+        }
+        _rfid.ShutdownGracefully(TslRfidManager.ShutdownTimeoutMs);
     }
 
     private async Task InitWebViewAsync()
@@ -177,12 +182,14 @@ public partial class MainWindow : Window
             try
             {
                 if (WebView.CoreWebView2 == null) return;
-                WebView.CoreWebView2.PostWebMessageAsJson(
-                    JsonSerializer.Serialize(new { type = "SR_GUN_CONFIG", json = cfg }));
+                var cfgMsg = JsonSerializer.Serialize(new { type = "SR_GUN_CONFIG", json = cfg });
+                WebView.CoreWebView2.PostWebMessageAsJson(cfgMsg);
+                PostJsonToChildFrames(cfgMsg, "push", "SR_GUN_CONFIG");
                 if (!string.IsNullOrWhiteSpace(scans) && scans != "[]")
                 {
-                    WebView.CoreWebView2.PostWebMessageAsJson(
-                        JsonSerializer.Serialize(new { type = "SR_GUN_SCANS", scansRaw = scans }));
+                    var scansMsg = JsonSerializer.Serialize(new { type = "SR_GUN_SCANS", scansRaw = scans });
+                    WebView.CoreWebView2.PostWebMessageAsJson(scansMsg);
+                    PostJsonToChildFrames(scansMsg, "push", "SR_GUN_SCANS");
                     RelayScanBatchToWeb(scans, "push");
                 }
             }
@@ -219,6 +226,74 @@ public partial class MainWindow : Window
         }
         if (posted > 0)
             ScanDiagnostics.Log("WEB", pass + ": SR_RFID_SCAN → " + posted + " frame(s)");
+    }
+
+    /// <summary>
+    /// Direct script invoke into each WebView2 frame — reliable for cross-origin GAS iframe where
+    /// postMessage and frame PostWebMessage may not reach onStationRfidScan.
+    /// </summary>
+    private void InvokeScanHandlerInChildFrames(string epc, string tid, string pass)
+    {
+        var tagJson = JsonSerializer.Serialize(epc);
+        var tidJson = JsonSerializer.Serialize(tid ?? "");
+        var js =
+            "(function(){try{var t=" + tagJson + ",i=" + tidJson + ";" +
+            "if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);return 'ok';}" +
+            "window.__srPendingRfidScans=window.__srPendingRfidScans||[];" +
+            "window.__srPendingRfidScans.push({tag:t,tid:i,ts:Date.now()});return 'queued';" +
+            "}catch(e){return 'err:'+e.message;}})()";
+
+        CoreWebView2Frame[] frames;
+        lock (_frameLock) frames = _childFrames.ToArray();
+        var invoked = 0;
+        foreach (var frame in frames)
+        {
+            try
+            {
+                _ = frame.ExecuteScriptAsync(js).ContinueWith(t =>
+                {
+                    if (!t.IsCompletedSuccessfully || t.IsFaulted) return;
+                    try
+                    {
+                        var result = UnwrapScriptResult(t.Result);
+                        if (result is "ok" or "queued")
+                            ScanDiagnostics.Log("WEB", pass + ": frame script → " + result);
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                }, TaskScheduler.Default);
+                invoked++;
+            }
+            catch (Exception ex)
+            {
+                ScanDiagnostics.Log("WEB", pass + ": frame ExecuteScript failed — " + ex.Message);
+            }
+        }
+        if (invoked > 0)
+            ScanDiagnostics.Log("WEB", pass + ": ExecuteScript scan → " + invoked + " frame(s)");
+    }
+
+    private void PostJsonToChildFrames(string json, string pass, string label)
+    {
+        CoreWebView2Frame[] frames;
+        lock (_frameLock) frames = _childFrames.ToArray();
+        var posted = 0;
+        foreach (var frame in frames)
+        {
+            try
+            {
+                frame.PostWebMessageAsJson(json);
+                posted++;
+            }
+            catch
+            {
+                // ignore per-frame failures
+            }
+        }
+        if (posted > 0)
+            ScanDiagnostics.Log("WEB", pass + ": " + label + " → " + posted + " frame(s)");
     }
 
     private void RelayScanBatchToWeb(string scansRaw, string pass)
@@ -456,6 +531,7 @@ public partial class MainWindow : Window
         }
 
         PostScanToChildFrames(epc, tid, pass);
+        InvokeScanHandlerInChildFrames(epc, tid, pass);
     }
 
     private void ShowDiagnosticWindow()
@@ -523,7 +599,9 @@ public partial class MainWindow : Window
               androidStation: !!(window.AndroidStation && typeof window.AndroidStation.getConfig === 'function'),
               chromeHost: !!(window.chrome && window.chrome.webview && window.chrome.webview.hostObjects && window.chrome.webview.hostObjects.sync && window.chrome.webview.hostObjects.sync.androidStation),
               deliverFn: typeof window.showrunnerStationDeliverScan === 'function',
-              appFrame: !!(document.getElementById && document.getElementById('app-frame'))
+              appFrame: !!(document.getElementById && document.getElementById('app-frame')),
+              desktopBridge: !!window.__srDesktopBridge,
+              pendingRfid: (window.__srPendingRfidScans || []).length
             });
           } catch (e) { return JSON.stringify({ error: String(e) }); }
         })()

@@ -63,6 +63,8 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 
 Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showrunner station web UI in **WebView2** and exposes a native **`window.AndroidStation`** bridge (identical API to the Chainway APK) so `11_Station_Shell.html` needs no fork. Full setup, prefs, and troubleshooting: [station-desktop/README.md](../../../station-desktop/README.md). TSL vendor reference (PDFs, SDK samples, Explorer): [stage-desktop-info/README.md](../../../stage-desktop-info/README.md). File index: [../FILE_MAP.md](../FILE_MAP.md) §8 (`station-desktop/`, `stage-desktop-info/`, `build-station-desktop.js`).
 
+**New-chat handoff (TSL desktop blockers, bat launch, version history):** [tsl-desktop-handoff.md](tsl-desktop-handoff.md)
+
 - **Gun I/O:** TSL ASCII protocol over Bluetooth virtual COM; auto-detects the reader by its `PID_1128` signature (no COM port to configure) with a background watchdog that re-acquires after sleep/drop — mirrors the ASCII Protocol Explorer "always connected" feel (`GunPortDetector.cs`, `TslRfidManager.cs`).
 - **App sleep:** Disconnect+Sleep sends ASCII `.sl`, suppresses watchdog reconnect until manual **Reconnect gun** (`SleepAndDisconnect()`, `_userSleep`).
 - **Build / ship (separate from GAS and APK):** `node build-station-desktop.js "<notes>"` (add `--self-contained` to bundle .NET) → zips `ShowrunnerStationDesktop.exe`. Node-only tool — excluded from GAS via `gas-node-only.js` + `.claspignore` (a leak caused a `require is not defined` white screen, fixed v493).

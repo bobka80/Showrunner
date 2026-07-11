@@ -29,6 +29,7 @@ public sealed class TslRfidManager : IDisposable
     private const int MultiBurstMaxReads = 20;
     private const int MultiReadGapMs = 40;
     private const int ConnectPortTimeoutMs = 3500;
+    public const int ShutdownTimeoutMs = 3000;
 
     private readonly BlockingCollection<Action> _gunQueue = new();
     private Thread? _gunThread;
@@ -166,8 +167,23 @@ public sealed class TslRfidManager : IDisposable
     /// <summary>Connect runs off the gun worker so a sleeping gun cannot freeze reads/shutdown.</summary>
     private void ConnectWatchdogWorker()
     {
-        try { TryConnectFromWatchdog(); }
-        finally { _connecting = false; }
+        Exception? error = null;
+        var worker = new Thread(() =>
+        {
+            try { TryConnectFromWatchdog(); }
+            catch (Exception ex) { error = ex; }
+        })
+        {
+            IsBackground = true,
+            Name = "TslConnectWatchdog",
+        };
+        worker.Start();
+        var sweepMs = Math.Max(ConnectPortTimeoutMs * 2, 7000);
+        if (!worker.Join(sweepMs))
+            ConnectLockLog.Record("connect-sweep-timeout", _portName, false, _readGate, ">" + sweepMs + "ms");
+        else if (error != null)
+            ConnectLockLog.Record("connect-error", _portName, false, _readGate, error.Message);
+        _connecting = false;
     }
 
     private void TryConnectFromWatchdog()
@@ -505,19 +521,75 @@ public sealed class TslRfidManager : IDisposable
         ScanDiagnostics.Log("GUN", "Poll interval → " + _pollMs + " ms");
     }
 
-    public void Dispose()
+    /// <summary>Sleep gun, release COM, then tear down — bounded wait for app exit.</summary>
+    public void ShutdownGracefully(int timeoutMs = ShutdownTimeoutMs)
     {
-        _disposed = true;
+        if (_disposed) return;
+
+        ConnectLockLog.RecordSync("dispose-start", _portName, null, _readGate, "timeout=" + timeoutMs + "ms");
+
+        _userSleep = true;
+        StopContinuous();
+        ResetReadGate();
         _watchdog?.Dispose();
         _watchdog = null;
-        StopContinuous();
+
+        WaitForConnectingIdle(Math.Min(800, timeoutMs / 3));
+
+        var sleepBudget = Math.Max(600, timeoutMs - 400);
+        var slept = RunWithTimeout(SleepAndDisconnectCore, sleepBudget);
+        if (!slept)
+            ConnectLockLog.RecordSync("dispose-timeout", _portName, false, _readGate, "sleep/disconnect");
+
+        DisposeCore();
+
+        ConnectLockLog.RecordSync("dispose-done", _portName, slept, _readGate, slept ? "sleep+disconnect" : "partial");
+    }
+
+    public void Dispose() => ShutdownGracefully(ShutdownTimeoutMs);
+
+    private void WaitForConnectingIdle(int waitMs)
+    {
+        if (waitMs <= 0) return;
+        var deadline = Environment.TickCount64 + waitMs;
+        while (_connecting && Environment.TickCount64 < deadline)
+            Thread.Sleep(40);
+    }
+
+    private static bool RunWithTimeout(Action work, int timeoutMs)
+    {
+        Exception? error = null;
+        var thread = new Thread(() =>
+        {
+            try { work(); }
+            catch (Exception ex) { error = ex; }
+        })
+        {
+            IsBackground = true,
+            Name = "TslShutdown",
+        };
+        thread.Start();
+        if (!thread.Join(timeoutMs))
+            return false;
+        if (error != null)
+            ConnectLockLog.RecordSync("dispose-error", "-", false, 0, error.Message);
+        return error == null;
+    }
+
+    private void DisposeCore()
+    {
+        if (_disposed) return;
+        _disposed = true;
         _switchResponder.SwitchStateChanged -= OnSwitchStateChanged;
         try { _gunQueue.CompleteAdding(); } catch { /* ignore */ }
-        try { _gunThread?.Join(2000); } catch { /* ignore */ }
+        try { _gunThread?.Join(1500); } catch { /* ignore */ }
         try
         {
-            if (_commander.IsConnected)
-                _commander.Disconnect();
+            lock (_commandLock)
+            {
+                if (_commander.IsConnected)
+                    _commander.Disconnect();
+            }
         }
         catch
         {
@@ -635,7 +707,7 @@ public sealed class TslRfidManager : IDisposable
                 ScanDiagnostics.Log("GUN", "Trigger debounced");
                 return;
             }
-            if (Volatile.Read(ref _readGate) != 0)
+            if (_readGate != 0)
             {
                 ScanDiagnostics.Log("GUN", "Trigger ignored — read in flight");
                 return;

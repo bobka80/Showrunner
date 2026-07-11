@@ -18,6 +18,13 @@ public static class ConnectLockLog
     public static string LogFilePath => LogPath;
 
     public static void Record(string phase, string port, bool? ok, int readGate, string detail)
+        => Write(phase, port, ok, readGate, detail, async: true);
+
+    /// <summary>Flush to disk before process exit.</summary>
+    public static void RecordSync(string phase, string port, bool? ok, int readGate, string detail)
+        => Write(phase, port, ok, readGate, detail, async: false);
+
+    private static void Write(string phase, string port, bool? ok, int readGate, string detail, bool async)
     {
         var line = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")
                    + " | " + phase
@@ -28,20 +35,28 @@ public static class ConnectLockLog
 
         ScanDiagnostics.Log("CONN", detail.Length > 120 ? detail[..120] : detail);
 
-        _ = Task.Run(() =>
+        if (async)
         {
-            try
-            {
-                var dir = Path.GetDirectoryName(LogPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                lock (FileLock)
-                    File.AppendAllText(LogPath, line + Environment.NewLine, Encoding.UTF8);
-            }
-            catch
-            {
-                // ignore
-            }
-        });
+            _ = Task.Run(() => AppendLine(line));
+            return;
+        }
+
+        AppendLine(line);
+    }
+
+    private static void AppendLine(string line)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(LogPath);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            lock (FileLock)
+                File.AppendAllText(LogPath, line + Environment.NewLine, Encoding.UTF8);
+        }
+        catch
+        {
+            // ignore
+        }
     }
 }

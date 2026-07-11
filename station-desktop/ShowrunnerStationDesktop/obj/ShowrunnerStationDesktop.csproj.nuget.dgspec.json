@@ -5,12 +5,12 @@
   },
   "projects": {
     "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj": {
-      "version": "0.1.24",
+      "version": "0.1.26",
       "restore": {
         "projectUniqueName": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
         "projectName": "ShowrunnerStationDesktop",
         "projectPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
-        "packagesPath": "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\8aa3bcd654b08c65dbe16ddfab5a70cb\\nuget",
+        "packagesPath": "C:\\Users\\bobby\\.nuget\\packages\\",
         "outputPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
@@ -76,11 +76,6 @@
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.301/PortableRuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "win-x64": {
-          "#import": []
         }
       }
     }

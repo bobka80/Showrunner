@@ -2080,6 +2080,7 @@ function stationPushScanFeed_(tag, tidOpt) {
   }
   stationRenderScanFeed_();
 }
+window.stationPushScanFeed_ = stationPushScanFeed_;
 
 function stationRenderShellState_() {
   const host = stationReadHostSession_();

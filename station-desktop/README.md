@@ -32,7 +32,7 @@ Vendor reference (protocol PDFs, SDK samples, Explorer installer): [`stage-deskt
 node build-station-desktop.js "First gate shell build"
 ```
 
-**Field launch:** double-click [`RUN-STATION.bat`](RUN-STATION.bat) in this folder — it kills stale copies, then starts `bin/publish/win-x64-launch/ShowrunnerStationDesktop.exe` (v0.1.22+).
+**Field launch:** double-click [`RUN-STATION.bat`](RUN-STATION.bat) in this folder — it kills stale copies, waits briefly, then starts `bin/publish/win-x64/ShowrunnerStationDesktop.exe` (current canonical build output).
 
 Optional larger zip with bundled .NET:
 
