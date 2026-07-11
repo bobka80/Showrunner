@@ -1,5 +1,4031 @@
-<!--
-  Station shell — split into 11b–11l modules (Phase A, behavior-neutral).
-  Wired from Index.html. Do not add logic here.
-  See docs/ai/active/station-shell-structure-map.md and docs/ai/FILE_MAP.md §11
--->
+<style>
+html.station-device-root .dashboard,
+html.station-device-root #mobile-dashboard,
+html.station-device-root #sr-hosting-only-banner,
+html.station-device-root #floating-bell-container {
+  display: none !important;
+}
+html.station-device-root,
+html.station-device-root body {
+  overflow: hidden;
+  height: 100%;
+}
+#station-shell {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+html.station-device-root #station-shell {
+  display: flex;
+}
+.station-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  min-height: 46px;
+  box-sizing: border-box;
+  background: #111114;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+.station-shell-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.station-shell-brand__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #f97316;
+  text-transform: uppercase;
+}
+.station-shell-brand__device {
+  font-size: 14px;
+  font-weight: 900;
+  color: #fff;
+}
+.station-shell-brand__profile {
+  font-size: 11px;
+  color: #71717a;
+  font-weight: 600;
+}
+.station-shell-brand__line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.station-shell-brand__host {
+  font-size: 14px;
+  font-weight: 900;
+  color: #10b981;
+}
+/* Gun controls — in header bar beside device / host name */
+#station-device-controls {
+  display: none;
+  position: relative;
+  flex-direction: column;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+html.station-device-root #station-device-controls { display: flex; }
+.station-device-controls__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.station-ctrl-scan {
+  min-width: 0;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  border: 1px solid #f97316;
+  background: rgba(249, 115, 22, 0.15);
+  color: #fb923c;
+  cursor: pointer;
+}
+.station-ctrl-scan.is-panel-open {
+  border-color: #fb923c;
+  background: rgba(249, 115, 22, 0.28);
+}
+.station-ctrl-cog {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #f97316;
+  font-size: 15px;
+  cursor: pointer;
+}
+/* Scan panel — full height below header when open */
+#station-scan-panel {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  width: 100%;
+  flex-direction: column;
+  background: #0d0d10;
+  border: none;
+  border-top: 1px solid #f97316;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  z-index: 60040;
+}
+#station-scan-panel.is-open { display: flex; }
+.station-scan-panel__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+#station-scan-panel.is-open .station-scan-feed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+  padding: 0;
+  background: transparent;
+  border-bottom: none;
+}
+#station-scan-panel.is-open .station-scan-feed__list {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+#station-scan-panel.is-open .station-scan-panel__last {
+  flex-shrink: 0;
+}
+.station-scan-panel__presets {
+  display: flex;
+  gap: 8px;
+}
+.station-scan-panel__presets button {
+  flex: 1;
+  margin: 0;
+  padding: 10px 8px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.station-scan-panel__presets button.station-preset-saved {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: #10b981;
+  color: #10b981;
+}
+.station-read-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.station-read-mode-row__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-read-mode-toggle {
+  flex: 1;
+  display: flex;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.station-read-mode-toggle button {
+  flex: 1;
+  margin: 0;
+  padding: 8px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: none;
+  border-radius: 0;
+  background: #111114;
+  color: #71717a;
+  cursor: pointer;
+}
+.station-read-mode-toggle button + button { border-left: 1px solid #3f3f46; }
+.station-read-mode-toggle button.is-active {
+  background: rgba(249, 115, 22, 0.2);
+  color: #fb923c;
+}
+.station-scan-panel__last {
+  background: #111114;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 12px;
+}
+.station-scan-panel__last-name {
+  font-size: 16px;
+  font-weight: 800;
+  color: #fff;
+}
+.station-scan-panel__last-meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #71717a;
+}
+.station-scan-panel__last-status {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.station-scan-panel__note {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 10px;
+  padding: 10px;
+  background: #0a0a0c;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  color: #e4e4e7;
+  font-size: 14px;
+}
+.station-scan-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.station-scan-panel__actions button { margin: 0; flex: 1 1 calc(50% - 4px); min-width: 120px; }
+.station-scan-panel__hint {
+  font-size: 11px;
+  color: #71717a;
+  line-height: 1.4;
+}
+.station-sens-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: #0d0d10;
+  border-bottom: 1px solid #1c1c1f;
+}
+.station-sens-bar__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-sens-bar input[type="range"] { flex: 1; }
+.station-sens-bar output {
+  font-family: monospace;
+  font-size: 13px;
+  font-weight: 800;
+  color: #10b981;
+  min-width: 56px;
+  text-align: right;
+}
+/* Long PROJECT / VAULT nav buttons at the bottom */
+.station-shell-footer .station-nav-btn {
+  width: 100%;
+  margin: 0;
+  padding: 15px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+.station-nav-btn[disabled],
+.station-nav-btn.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.station-scan-feed__row .name {
+  font-family: Inter, sans-serif;
+  font-weight: 700;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__row .unit {
+  font-family: monospace;
+  font-size: 11px;
+  color: #a1a1aa;
+  flex-shrink: 0;
+}
+.station-scan-feed__status {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__status.is-damaged { color: #eab308; }
+.station-scan-feed__status.is-broken { color: #ef4444; }
+.station-scan-feed__status.is-maintenance { color: #f59e0b; }
+.station-scan-feed__row.is-unknown .name {
+  color: #eab308;
+  font-weight: 600;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.station-scan-feed__row.is-unknown .time { margin-left: 8px; }
+.station-scan-feed__row.is-crew .name { color: #38bdf8; }
+.station-scan-feed__row.is-crew .unit {
+  color: #0ea5e9;
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  align-self: center;
+}
+/* Station project picker overlay */
+#station-project-picker {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50002;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+#station-project-picker.is-open { display: flex; }
+.station-project-picker__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-project-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.station-project-item {
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #27272a;
+  background: #111114;
+  color: #f4f4f5;
+  cursor: pointer;
+}
+.station-project-item:active { border-color: #f97316; }
+.station-project-item__name {
+  font-size: 15px;
+  font-weight: 800;
+}
+.station-project-item__meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #71717a;
+}
+/* Station vault overlay */
+#station-vault {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50002;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+#station-vault.is-open { display: flex; }
+.station-vault-tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #27272a;
+  background: #0d0d10;
+}
+.station-vault-tab {
+  flex: 1;
+  margin: 0;
+  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #a1a1aa;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.station-vault-tab.is-active { color: #fff; border-bottom-color: #10b981; }
+/* Panes grow so their inner list scrolls (vault is a flex column). */
+#station-vault-pane-equip,
+#station-vault-pane-crew {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.station-vault-crew-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #1a1a1d;
+  cursor: pointer;
+  user-select: none;
+}
+.station-vault-crew-row:active { background: #161619; }
+.station-vault-crew-row__name { color: #fff; font-weight: bold; font-size: 14px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.station-vault-crew-row__tag { flex-shrink: 0; font-family: monospace; font-size: 11px; }
+.station-vault-crew-row__tag.has-tag { color: #10b981; }
+.station-vault-crew-row__tag.no-tag { color: #71717a; }
+.station-vault__search {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid #27272a;
+}
+.station-vault__search input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #10b981;
+  background: #0a0a0c;
+  color: #fff;
+  font-size: 15px;
+  box-sizing: border-box;
+  outline: none;
+}
+.station-vault__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Lines styled like the real Equipment Vault rows (name white/bold, muted meta, status pill). */
+.station-vault-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #1a1a1d;
+  cursor: pointer;
+  user-select: none;
+}
+.station-vault-row:active { background: #161619; }
+.station-vault-row__name {
+  color: #fff;
+  font-weight: bold;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.station-vault-row__unit {
+  color: #a1a1aa;
+  font-weight: bold;
+  font-family: monospace;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.station-vault-row__parent {
+  color: #a5b4fc;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.station-vault-row__status {
+  flex-shrink: 0;
+  border: 1px solid;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+/* Rollup folder line (identical units collapse under a logical parent, like the real vault). */
+.station-vault-row.is-group { background: #151518; }
+.station-vault-row__caret {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  color: #e4e4e7;
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+.station-vault-row__caret.is-open { transform: rotate(90deg); }
+.station-vault-row__count {
+  flex-shrink: 0;
+  color: #fff;
+  font-weight: 800;
+  font-size: 12px;
+  background: #27272a;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+/* Indented children container + child rows. */
+.station-vault-children {
+  border-left: 2px solid #3f3f46;
+  margin-left: 15px;
+  background: rgba(255,255,255,0.03);
+}
+.station-vault-children .station-vault-row { padding-left: 20px; }
+.station-vault-children .station-vault-row__name { font-weight: 600; color: #e4e4e7; }
+/* Action sheet (tap a line) */
+.station-vault-sheet { display: none; position: absolute; inset: 0; z-index: 5; }
+.station-vault-sheet.is-open { display: block; }
+.station-vault-sheet__backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); }
+.station-vault-sheet__panel {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  background: #111114;
+  border-top: 1px solid #3f3f46;
+  border-radius: 14px 14px 0 0;
+  padding: 16px 16px 22px;
+}
+.station-vault-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.station-vault-sheet__title { font-size: 17px; font-weight: 900; color: #fff; }
+.station-vault-sheet__meta { font-size: 12px; color: #a1a1aa; margin-bottom: 14px; line-height: 1.5; }
+.station-vault-sheet__actions { display: flex; flex-direction: column; gap: 8px; }
+.station-vault-sheet__actions button { width: 100%; margin: 0; }
+.station-vault-record-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #10251f;
+  border-top: 1px solid #10b981;
+}
+.station-vault-record-bar__text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 700;
+  color: #6ee7b7;
+}
+.station-shell-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 20px;
+  gap: 16px;
+  text-align: center;
+}
+.station-shell-state-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #71717a;
+}
+.station-shell-prompt {
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1.25;
+  max-width: 320px;
+}
+.station-shell-host-name {
+  font-size: 28px;
+  font-weight: 900;
+  color: #10b981;
+  word-break: break-word;
+}
+.station-shell-status {
+  display: none;
+}
+.station-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(12px);
+  z-index: 65000;
+  max-width: min(92vw, 360px);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(17, 17, 20, 0.94);
+  border: 1px solid #3f3f46;
+  color: #e4e4e7;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.station-toast.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.station-toast.is-ok { border-color: #10b981; color: #10b981; }
+.station-toast.is-error { border-color: #ef4444; color: #fca5a5; }
+.station-shell-last-scan {
+  font-family: monospace;
+  font-size: 11px;
+  color: #52525b;
+  word-break: break-all;
+  max-width: 100%;
+}
+.station-shell-lanes {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 8px;
+}
+.station-shell-lane {
+  flex: 1;
+  padding: 14px 10px;
+  border-radius: 8px;
+  border: 1px solid #333;
+  background: #111;
+  opacity: 0.45;
+}
+.station-shell-lane.is-ready {
+  opacity: 1;
+  border-color: #f97316;
+}
+.station-shell-lane__label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f97316;
+}
+.station-shell-lane__hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: #71717a;
+  line-height: 1.35;
+}
+.station-shell-footer {
+  flex-shrink: 0;
+  padding: 12px 16px 20px;
+  border-top: 1px solid #27272a;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-shell-footer .btn-main,
+.station-shell-footer .btn-close {
+  width: 100%;
+  margin: 0;
+}
+/* Live RFID scan strip (scan panel) */
+.station-scan-feed {
+  flex-shrink: 0;
+  padding: 10px 16px 12px;
+  background: #0d0d10;
+  border-bottom: 1px solid #27272a;
+}
+.station-scan-feed__label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f97316;
+  margin-bottom: 6px;
+}
+.station-scan-feed__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 132px;
+  overflow-y: auto;
+}
+.station-scan-feed__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: monospace;
+  font-size: 13px;
+  color: #e4e4e7;
+}
+.station-scan-feed__row:first-child {
+  color: #10b981;
+  font-weight: 700;
+}
+.station-scan-feed__row .tag {
+  word-break: break-all;
+}
+.station-scan-feed__row .time {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #52525b;
+}
+.station-scan-feed__empty {
+  font-size: 12px;
+  color: #52525b;
+}
+#station-btn-enroll {
+  width: 100%;
+  margin: 0;
+}
+#station-btn-enroll.is-active {
+  border-color: #10b981;
+  color: #10b981;
+}
+/* Station setup / settings view */
+#station-settings {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 60100;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+#station-settings.is-open { display: flex; }
+.station-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: #111114;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+.station-settings-header__title {
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+}
+.station-settings-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.station-settings-section {
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 14px 14px 16px;
+  background: #111114;
+}
+.station-settings-section__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f97316;
+  margin-bottom: 12px;
+}
+.station-field { margin-bottom: 16px; }
+.station-field:last-child { margin-bottom: 0; }
+.station-field__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e4e4e7;
+  margin-bottom: 6px;
+}
+.station-field__hint {
+  font-size: 11px;
+  color: #71717a;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.station-field input[type="number"],
+.station-field select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #f4f4f5;
+  font-size: 15px;
+  font-weight: 600;
+}
+.station-field input[type="range"] { width: 100%; }
+.station-range-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.station-range-row output {
+  font-family: monospace;
+  font-size: 15px;
+  font-weight: 800;
+  color: #10b981;
+  min-width: 60px;
+  text-align: right;
+}
+.station-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.station-device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.station-device-info div {
+  display: flex;
+  justify-content: space-between;
+}
+.station-device-info span:last-child {
+  font-family: monospace;
+  color: #a1a1aa;
+}
+.station-settings-note {
+  font-size: 12px;
+  color: #eab308;
+  line-height: 1.4;
+}
+.station-settings-saved {
+  font-size: 12px;
+  font-weight: 700;
+  color: #10b981;
+  min-height: 16px;
+}
+</style>
+
+<div id="station-shell" aria-label="Warehouse station">
+  <div class="station-shell-header">
+    <div class="station-shell-brand">
+      <div class="station-shell-brand__line">
+        <span id="station-shell-profile-name" class="station-shell-brand__device">—</span>
+        <span id="station-shell-host-inline" class="station-shell-brand__host" style="display:none;"></span>
+      </div>
+    </div>
+    <div id="station-device-controls" aria-label="Gun controls">
+      <div class="station-device-controls__row">
+        <button type="button" id="station-btn-scan-panel" class="station-ctrl-scan" onclick="stationToggleScanPanel()" title="Scan panel">Scan</button>
+        <button type="button" id="station-btn-settings-cog" class="station-ctrl-cog" onclick="stationOpenSettings()" title="Station setup" aria-label="Settings">&#9881;</button>
+      </div>
+      <div id="station-scan-panel" aria-label="RFID scan panel" aria-hidden="true">
+        <div class="station-scan-panel__body">
+          <div id="station-scan-feed" class="station-scan-feed" aria-label="Live RFID scans" style="display:flex;flex-direction:column;flex:1;min-height:120px;">
+            <div class="station-scan-feed__label">Live RFID scans</div>
+            <div id="station-scan-feed-list" class="station-scan-feed__list">
+              <span class="station-scan-feed__empty">Waiting for scans…</span>
+            </div>
+          </div>
+          <div class="station-scan-panel__last" id="station-panel-last">
+            <div class="station-scan-panel__last-name" id="station-panel-last-name">Scan equipment to select</div>
+            <div class="station-scan-panel__last-meta" id="station-panel-last-meta"></div>
+            <div class="station-scan-panel__last-status" id="station-panel-last-status"></div>
+            <textarea id="station-panel-note" class="station-scan-panel__note" rows="2" placeholder="Describe the problem (required) — e.g. gobo rotation error" style="display:none;"></textarea>
+            <div class="station-scan-panel__actions" id="station-panel-actions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button type="button" id="station-shell-layout-pill" onclick="stationOpenSettings()" title="Station setup" style="display:none;"></button>
+  </div>
+
+  <div class="station-shell-main">
+    <div id="station-shell-state-label" class="station-shell-state-label">Waiting for host</div>
+    <div id="station-shell-prompt" class="station-shell-prompt">Scan your crew badge</div>
+    <div id="station-shell-status" class="station-shell-status" aria-hidden="true"></div>
+  </div>
+  <div id="station-toast" class="station-toast" aria-live="polite" aria-atomic="true"></div>
+
+  <div class="station-shell-footer">
+    <button type="button" id="station-btn-project" class="btn-main station-nav-btn" onclick="stationOpenProject()">PROJECT</button>
+    <button type="button" id="station-btn-vault" class="btn-main station-nav-btn" onclick="stationOpenVault()">VAULT</button>
+    <button type="button" id="station-btn-logout-host" class="btn-close" style="display:none;" onclick="stationLogoutHost()">LOG OUT HOST</button>
+  </div>
+</div>
+
+<span id="station-shell-layout-text" style="display:none;">HANDHELD</span>
+
+<div id="station-settings" aria-label="Station setup">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Station setup</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseSettings()">Done</button>
+  </div>
+  <div class="station-settings-body">
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Session</div>
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-eject">Sign the host out after (minutes of inactivity)</label>
+        <select id="station-set-eject" onchange="stationSaveEjectMinutes()">
+          <option value="1">1 minute</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">The device stays logged in — only the hosted crew member is ejected.</div>
+      </div>
+      <div class="station-field" id="station-gunsleep-field" style="display:none;">
+        <label class="station-field__label" for="station-set-gunsleep">Sleep the gun after (minutes idle)</label>
+        <select id="station-set-gunsleep" onchange="stationSaveGunSleepMinutes()">
+          <option value="0">Never (stay on)</option>
+          <option value="1">1 minute</option>
+          <option value="2">2 minutes</option>
+          <option value="3">3 minutes</option>
+          <option value="5">5 minutes</option>
+          <option value="10">10 minutes</option>
+        </select>
+        <div class="station-field__hint">Saves battery — the gun powers down after this long with no reads. Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
+      <div id="station-no-host-park-fields" style="display:none;">
+        <div class="station-field">
+          <label class="station-field__label" for="station-set-no-host-grace">Keep gun connected between hosts (minutes)</label>
+          <select id="station-set-no-host-grace" onchange="stationSaveNoHostGraceMinutes()">
+            <option value="1">1 minute</option>
+            <option value="2">2 minutes</option>
+            <option value="3">3 minutes</option>
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+          <div class="station-field__hint">After host signs out, the gun stays connected for this long, then parks (SDK disconnect + short beep). Pull trigger to wake and reconnect.</div>
+        </div>
+        <div class="station-field" id="station-gun-park-delay-field">
+          <label class="station-field__label" for="station-set-gun-park-delay">Disconnect gun after grace (minutes)</label>
+          <select id="station-set-gun-park-delay" onchange="stationSaveGunParkDelayMinutes()">
+            <option value="0">Immediately when grace ends (recommended)</option>
+            <option value="1">1 minute after grace</option>
+          </select>
+          <div class="station-field__hint">Extra wait after grace before the disconnect beep and SDK park (saves gun battery).</div>
+        </div>
+      </div>
+      <div id="station-eject-saved" class="station-settings-saved"></div>
+    </div>
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Scanner (gun)</div>
+
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-power">Read power / sensitivity</label>
+        <div class="station-range-row">
+          <input type="range" id="station-set-power" min="5" max="30" step="1" oninput="stationOnPowerInput()" onchange="stationSavePower()">
+          <output id="station-set-power-out">—</output>
+        </div>
+        <div class="station-field__hint">Lower = shorter range (badge tap only). Higher = reads across the room. Test a value that reads a badge held to the gun but not tags on the shelf.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Per trigger pull</label>
+        <div class="station-read-mode-toggle">
+          <button type="button" id="station-panel-mode-single" onclick="stationSetPanelReadMode('single')">Single</button>
+          <button type="button" id="station-panel-mode-multi" onclick="stationSetPanelReadMode('multi')">Multi</button>
+        </div>
+        <div class="station-field__hint">Single = one tag per pull. Multi = every tag in range on one pull.</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label">Sensitivity presets</label>
+        <div class="station-scan-panel__presets">
+          <button type="button" class="btn-outline btn-sm" id="station-preset-low" data-preset="low">Low</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-mid" data-preset="mid">Mid</button>
+          <button type="button" class="btn-outline btn-sm" id="station-preset-high" data-preset="high">High</button>
+        </div>
+        <div class="station-field__hint">Tap preset to load · hold 1s to save current sensitivity</div>
+      </div>
+
+      <div class="station-field">
+        <label class="station-field__label" for="station-set-mode">Scan mode</label>
+        <select id="station-set-mode" onchange="stationSaveScanMode()">
+          <option value="single">Single — one pull, one tag</option>
+          <option value="multi">Multi — one pull, many tags</option>
+          <option value="continuous">Continuous — pull to start/stop a burst</option>
+        </select>
+        <div class="station-field__hint">Single reads one tag per trigger pull. Multi reads every tag in range on one pull. Continuous toggles a hands-free burst (pull to start, pull again to stop).</div>
+      </div>
+
+      <div class="station-field" id="station-speed-field" style="display:none;">
+        <label class="station-field__label" for="station-set-speed">Continuous scan speed</label>
+        <div class="station-range-row">
+          <input type="range" id="station-set-speed" min="100" max="2000" step="50" oninput="stationOnSpeedInput()" onchange="stationSaveSpeed()">
+          <output id="station-set-speed-out">—</output>
+        </div>
+        <div class="station-field__hint">Time between repeat reads in Continuous mode. Left = faster (machine-gun), right = slower / gentler.</div>
+      </div>
+
+      <div class="station-field">
+        <div class="station-toggle-row">
+          <label class="station-field__label" for="station-set-beep" style="margin:0;">Gun beeper</label>
+          <input type="checkbox" id="station-set-beep" checked onchange="stationSaveBeep()" style="width:22px; height:22px;">
+        </div>
+        <div class="station-field__hint">Turn off to silence the gun's own beep on every read.</div>
+      </div>
+
+      <div id="station-gun-unavailable" class="station-settings-note" style="display:none;">
+        Gun controls appear here when the station app is connected to the RFID gun. (Not available in a plain browser.)
+      </div>
+    </div>
+
+    <div class="station-settings-section">
+      <div class="station-settings-section__title">Device info</div>
+      <div class="station-device-info">
+        <div><span>Gun connection</span><span id="station-info-conn">—</span></div>
+        <div><span>Battery</span><span id="station-info-battery">—</span></div>
+        <div><span>Firmware</span><span id="station-info-fw">—</span></div>
+      </div>
+      <div class="station-field" style="margin-top:12px;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#f97316; color:#fb923c;" onclick="stationReconnectGun_()">Reconnect gun</button>
+        <div class="station-field__hint">Use when Bluetooth shows connected but scans do not work — forces a fresh driver handshake.</div>
+      </div>
+      <div class="station-field" id="station-gun-sleep-field" style="margin-top:8px; display:none;">
+        <button type="button" class="btn-outline btn-sm" style="margin:0; width:100%; border-color:#64748b; color:#cbd5e1;" onclick="stationSleepGun_()">Disconnect + sleep gun</button>
+        <div class="station-field__hint">Powers the gun down (no on/off button on this reader). Pull the trigger to wake it, then tap Reconnect gun.</div>
+      </div>
+      <div class="station-field" style="margin-top:8px;">
+        <button type="button" id="station-btn-device-signout" class="btn-outline btn-sm" style="margin:0; width:100%;" onclick="stationDeviceSignOut()">Sign out device</button>
+        <div class="station-field__hint">Signs out this station profile (e.g. CW1) from Showrunner — not the hosted crew member.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="station-project-picker" aria-label="Pick a project">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Open a project</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseProjectPicker()">Cancel</button>
+  </div>
+  <div class="station-project-picker__body">
+    <div id="station-project-picker-status" class="station-shell-status" style="text-align:center;">Loading projects…</div>
+    <div id="station-project-picker-list" class="station-project-picker__list"></div>
+  </div>
+</div>
+
+<div id="station-vault" aria-label="Vault equipment">
+  <div class="station-settings-header">
+    <div class="station-settings-header__title">Vault</div>
+    <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseVault()">Done</button>
+  </div>
+  <!-- Tabs: Equipment (all hosts) | Crew (ROOT only — badge provisioning) -->
+  <div id="station-vault-tabs" class="station-vault-tabs">
+    <button type="button" id="station-vault-tab-btn-equip" class="station-vault-tab is-active" onclick="stationVaultSwitchTab_('equip')">Equipment</button>
+    <button type="button" id="station-vault-tab-btn-crew" class="station-vault-tab" style="display:none;" onclick="stationVaultSwitchTab_('crew')">Crew</button>
+  </div>
+
+  <!-- EQUIPMENT tab -->
+  <div id="station-vault-pane-equip">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-search" placeholder="Search equipment by name, unit or tag…" autocomplete="off" oninput="stationVaultRenderList_()">
+    </div>
+    <div id="station-vault-status" class="station-shell-status" style="text-align:center;">Loading vault…</div>
+    <div id="station-vault-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- CREW tab (ROOT only): assign/overwrite crew badge RFIDs -->
+  <div id="station-vault-pane-crew" style="display:none;">
+    <div class="station-vault__search">
+      <input type="text" id="station-vault-crew-search" placeholder="Search crew by name…" autocomplete="off" oninput="stationVaultRenderCrew_()">
+    </div>
+    <div id="station-vault-crew-status" class="station-shell-status" style="text-align:center;">Loading crew…</div>
+    <div id="station-vault-crew-list" class="station-vault__list"></div>
+  </div>
+
+  <!-- Record-mode banner: armed while recording equipment OR crew tags (with cascade). -->
+  <div id="station-vault-record-bar" class="station-vault-record-bar" style="display:none;">
+    <div class="station-vault-record-bar__text" id="station-vault-record-text">Pull the trigger on the tag…</div>
+    <button type="button" id="station-vault-record-overwrite" class="btn-main" style="display:none; margin:0;" onclick="stationVaultConfirmOverwrite_()">Overwrite</button>
+    <button type="button" class="btn-close" style="margin:0;" onclick="stationVaultCancelRecord_()">Cancel</button>
+  </div>
+
+  <!-- Tap a line → action sheet (keeps the lines clean, like the real vault). -->
+  <div id="station-vault-sheet" class="station-vault-sheet" aria-hidden="true">
+    <div class="station-vault-sheet__backdrop" onclick="stationVaultCloseSheet_()"></div>
+    <div class="station-vault-sheet__panel">
+      <div class="station-vault-sheet__head">
+        <div class="station-vault-sheet__title" id="station-vault-sheet-title">Item</div>
+        <button type="button" class="btn-close" style="width:auto; margin:0; padding:6px 12px;" onclick="stationVaultCloseSheet_()">Close</button>
+      </div>
+      <div class="station-vault-sheet__meta" id="station-vault-sheet-meta"></div>
+      <textarea id="station-vault-sheet-note" class="station-scan-panel__note" rows="2" placeholder="Describe the problem (required for Damaged) — e.g. gobo rotation error" style="display:none; margin:0 16px 12px;"></textarea>
+      <div class="station-vault-sheet__actions">
+        <button type="button" class="btn-outline" id="station-vault-act-maint" onclick="stationVaultSheetStatus_('Maintenance')">Maintenance</button>
+        <button type="button" class="btn-outline" id="station-vault-act-damaged" style="border-color:#eab308;color:#eab308;" onclick="stationVaultSheetStatus_('Damaged')">Damaged</button>
+        <button type="button" class="btn-outline" id="station-vault-act-broken" style="border-color:#ef4444;color:#ef4444;" onclick="stationVaultSheetStatus_('Broken')">Broken</button>
+        <button type="button" class="btn-outline" id="station-vault-act-repaired" style="border-color:#10b981;color:#10b981;" onclick="stationVaultSheetStatus_('Repaired')">Repaired</button>
+        <button type="button" class="btn-main" id="station-vault-act-record" style="display:none;" onclick="stationVaultSheetRecord_()">Record RFID</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/**
+ * 11_Station_Shell.html
+ * Warehouse gun / fixed station UI — host badge inherit first.
+ * Native Chainway SDK calls: window.onStationRfidScan(epcString)
+ */
+
+window.stationShellBootstrap = null;
+window.stationHostSession = null;
+window.stationScanBusy = false;
+window.stationHostIdleTimer = null;
+window.stationHostIdleListenersBound = false;
+window.stationEnrollMode = false;
+window.stationRecentScans = [];
+
+/**
+ * Host-inherit RBAC. While a crew member is hosted at this station, the whole app evaluates
+ * permissions as the HOST (their real tier + IAM keys) — a warehouse computer/gun is a surface,
+ * not a stripped-down role. `stationHostRbac` is set in stationWriteHostSession_ from the host
+ * payload and cleared on eject/logout. Guarded so a non-station page or host-less state is
+ * untouched. Plus a station BASELINE: any host can check-in/out + set status even if their own
+ * tier normally can't (warehouse-context grant). Design/packing add-remove stays on real creds.
+ */
+window.stationHostRbac = null; // { access:'MANAGER', permissions:{event_assets_window:true,...} }
+var STATION_TIER_ORDER = ['CREW', 'EDITOR', 'MANAGER', 'ADMIN', 'ROOT'];
+var STATION_IMPLICIT_MANAGER_KEYS = [
+  'event_create_standard', 'event_create_crossrent', 'event_edit_timeline', 'event_assets_window',
+  'event_view_pricing', 'task_manage_global', 'task_manage_personal'
+];
+
+function stationTierRank_(tier) {
+  var i = STATION_TIER_ORDER.indexOf(String(tier || 'CREW').toUpperCase());
+  return i === -1 ? 1 : i + 1;
+}
+window.stationHostActive_ = function() {
+  return !!(window.IS_STATION_DEVICE && window.stationHostRbac);
+};
+
+(function installStationRbacOverride_() {
+  if (typeof window.stationEnsureDeviceMode_ === 'function') window.stationEnsureDeviceMode_();
+  if (!window.IS_STATION_DEVICE) return;
+  var _userHasPerm = window.userHasPerm;
+  var _effectiveHasPerm = window.effectiveHasPerm;
+  var _accessTierAtLeast = window.accessTierAtLeast;
+
+  window.userHasPerm = function(key) {
+    if (window.stationHostActive_()) {
+      var p = window.stationHostRbac.permissions || {};
+      return p[key] === true || p[key] === 'true';
+    }
+    return _userHasPerm ? _userHasPerm(key) : false;
+  };
+
+  window.accessTierAtLeast = function(minTier) {
+    if (window.stationHostActive_()) {
+      return stationTierRank_(window.stationHostRbac.access) >= stationTierRank_(minTier);
+    }
+    return _accessTierAtLeast ? _accessTierAtLeast(minTier) : false;
+  };
+
+  window.effectiveHasPerm = function(key) {
+    if (window.stationHostActive_()) {
+      if (!key) return false;
+      if (key === 'task_manage_personal') return true;
+      if (String(window.stationHostRbac.access || '').toUpperCase() === 'ROOT') return true;
+      if (window.userHasPerm(key)) return true;
+      if (STATION_IMPLICIT_MANAGER_KEYS.indexOf(key) !== -1 && window.accessTierAtLeast('MANAGER')) return true;
+      return false;
+    }
+    return _effectiveHasPerm ? _effectiveHasPerm(key) : false;
+  };
+  // NOTE: canEditAssets()/canUseAssetCheckout() intentionally follow the host's REAL credentials
+  // (via the effectiveHasPerm override above) so the client and the backend
+  // (assertActorCanPerformAssetOperations) agree — no misleading buttons. Equipment status changes
+  // (Maintenance/Broken/Repaired) are the true any-host baseline, handled in the Vault backend.
+})();
+
+/** How many recent scans to keep in the always-on top strip. */
+var STATION_SCAN_FEED_MAX = 8;
+
+/** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
+var STATION_HOST_IDLE_DEFAULT_MIN = 10;
+// After an explicit log-out / idle-eject, ignore re-reads of the SAME badge for this long. One
+// trigger pull emits a burst of reads for a tag; without this window a stray tail-end read arriving
+// after the 1.5s scan-dedup would instantly re-host the person the operator just ejected.
+var STATION_HOST_EJECT_COOLDOWN_MS = 3000;
+var STATION_EJECT_STORAGE_KEY = 'sm_station_eject_min';
+var STATION_EJECT_CHOICES = [1, 3, 5, 10];
+// Gun idle auto-sleep (TSL desktop only — Chainway uses no-host park below).
+var STATION_GUNSLEEP_STORAGE_KEY = 'sm_station_gunsleep_min';
+var STATION_GUNSLEEP_CHOICES = [0, 1, 2, 3, 5, 10];
+var STATION_GUNSLEEP_DEFAULT_MIN = 5;
+// Chainway: grace after host leaves before parking; then optional extra delay before disconnect.
+var STATION_NO_HOST_GRACE_KEY = 'sm_station_no_host_grace_min';
+var STATION_NO_HOST_GRACE_CHOICES = [1, 2, 3, 5, 10, 15, 30];
+var STATION_NO_HOST_GRACE_DEFAULT_MIN = 3;
+var STATION_GUN_PARK_DELAY_KEY = 'sm_station_gun_park_delay_min';
+var STATION_GUN_PARK_DELAY_CHOICES = [0, 1];
+var STATION_GUN_PARK_DELAY_DEFAULT_MIN = 0;
+
+/**
+ * Device-local gun settings. The web setup is the source of truth (survives app
+ * updates), and is pushed down to the native gun on every startup so the screen
+ * and the gun never disagree.
+ */
+var STATION_MODE_KEY = 'sm_station_scan_mode';
+var STATION_POLL_KEY = 'sm_station_poll_ms';
+var STATION_POWER_KEY = 'sm_station_power';
+var STATION_BEEP_KEY = 'sm_station_beep';
+
+/**
+ * Equipment RFID map (epc -> { name, unitId, unitNumber }) preloaded from the vault so the
+ * live scan strip can show a human name/unit instead of the raw tag — instantly and offline.
+ */
+var STATION_EQUIP_MAP_KEY = 'sm_station_equip_map_v2';
+var STATION_CREW_HOST_KEY = 'sm_station_crew_host_v1';
+var STATION_EQUIP_MAP_REFRESH_MS = 5 * 60 * 1000;
+var STATION_PRESET_STORAGE_KEY = 'sm_station_power_presets_v1';
+var STATION_PRESET_HOLD_MS = 1000;
+window.stationScanPanelOpen = false;
+window.stationPanelSelection = null;
+window.stationPanelPendingStatus = null;
+window.stationEquipMap = window.stationEquipMap || {};
+window.stationCrewHostRoster = window.stationCrewHostRoster || [];
+
+/** True when two TID reads are the same chip (exact or shorter 4-word vs longer 6-word read). */
+function stationRfidTidEquivalent_(a, b) {
+  var x = stationNormalizeEpc_(a);
+  var y = stationNormalizeEpc_(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  var short = x.length <= y.length ? x : y;
+  var long = x.length <= y.length ? y : x;
+  if (short.length >= 12 && long.indexOf(short) === 0) return true;
+  return false;
+}
+
+/** Local crew host lookup — mirrors lookupCrewMemberByRfidPair_ for optimistic badge-in. */
+function stationLookupCrewHostLocal_(epc, tid) {
+  var needleEpc = stationNormalizeEpc_(epc);
+  var needleTid = stationNormalizeEpc_(tid);
+  var roster = window.stationCrewHostRoster || [];
+  var tidMismatch = false;
+  var tidMissing = false;
+
+  for (var i = 0; i < roster.length; i++) {
+    var row = roster[i];
+    var rowEpc = stationNormalizeEpc_(row.rfidTag);
+    if (!rowEpc || rowEpc !== needleEpc) continue;
+    var rowTid = stationNormalizeEpc_(row.rfidTid || '');
+    if (rowTid) {
+      if (!needleTid) {
+        tidMissing = true;
+        continue;
+      }
+      if (!stationRfidTidEquivalent_(rowTid, needleTid)) {
+        tidMismatch = true;
+        continue;
+      }
+    }
+    return {
+      crew: {
+        uid: row.uid || '',
+        name: row.name,
+        rfidTag: row.rfidTag,
+        rfidTid: rowTid,
+        access: row.access || 'CREW',
+        permissions: row.permissions || {}
+      },
+      tidMismatch: false,
+      tidMissing: false
+    };
+  }
+  return { crew: null, tidMismatch: tidMismatch, tidMissing: tidMissing };
+}
+
+/** Same trim/lowercase contract the backend uses for tag matching. */
+function stationNormalizeEpc_(epc) {
+  return String(epc == null ? '' : epc).trim().toLowerCase();
+}
+
+function stationParseScanPayload_(raw, tidOpt) {
+  if (raw != null && typeof raw === 'object') {
+    return {
+      epc: String(raw.epc || raw.tag || '').trim(),
+      tid: String(raw.tid || '').trim()
+    };
+  }
+  return {
+    epc: String(raw == null ? '' : raw).trim(),
+    tid: String(tidOpt || '').trim()
+  };
+}
+
+function stationResolveEpc_(epc) {
+  var key = stationNormalizeEpc_(epc);
+  if (!key) return null;
+  var m = window.stationEquipMap || {};
+  return m[key] || null;
+}
+window.stationResolveEpc = stationResolveEpc_;
+window.stationNormalizeEpc = stationNormalizeEpc_;
+
+function stationScanFeedStatusHtml_(hit, esc) {
+  if (!hit || !hit.status || String(hit.status).toLowerCase() === 'active') return '';
+  var st = String(hit.status);
+  var note = hit.statusNote ? (' · ' + String(hit.statusNote).substring(0, 36)) : '';
+  var cls = 'station-scan-feed__status';
+  var low = st.toLowerCase();
+  if (low.indexOf('damage') !== -1) cls += ' is-damaged';
+  else if (low.indexOf('broken') !== -1) cls += ' is-broken';
+  else if (low.indexOf('maintenance') !== -1) cls += ' is-maintenance';
+  return '<span class="' + cls + '">' + esc(st + note) + '</span>';
+}
+
+function stationPaOperationActive_() {
+  var overlay = document.getElementById('project-assets-modal-overlay');
+  if (!overlay || overlay.style.display === 'none') return false;
+  return document.body.classList.contains('mobile-pa-mode-operation');
+}
+
+/** Forward a gun scan into the open Project Assets checkout/check-in session. */
+function stationForwardCheckoutScan_(tag) {
+  if (!stationPaOperationActive_()) return false;
+  var projectEl = document.getElementById('edit-folder-id');
+  var input = document.getElementById('pa-rfid-scanner');
+  if (!projectEl || !projectEl.value || !input) return false;
+
+  var hit = stationResolveEpc_(tag);
+  if (hit && hit.unitId && hit.kind !== 'crew' && typeof executeManualScanCall === 'function') {
+    var assetId = hit.unitId;
+    if (typeof currentProjectAssets !== 'undefined') {
+      var onProj = currentProjectAssets.some(function(p) { return String(p.assetId) === String(assetId); });
+      if (!onProj) return false;
+    } else if (typeof globalAssets !== 'undefined' && globalAssets.length) {
+      var ga = globalAssets.find(function(a) { return String(a.id) === String(assetId); });
+      if (!ga) return false;
+      assetId = ga.id;
+    }
+
+    var st = String(hit.status || 'Active').toLowerCase();
+    if (st.indexOf('damage') !== -1 && typeof window.showMobilePaToast === 'function') {
+      var dmgNote = hit.statusNote ? (' — ' + hit.statusNote) : '';
+      window.showMobilePaToast('Damaged unit', (hit.name || 'Asset') + dmgNote + ' — still OK to check out.');
+    } else if (st.indexOf('broken') !== -1 && typeof window.showMobilePaToast === 'function') {
+      window.showMobilePaToast('Broken unit', (hit.name || 'Asset') + ' is marked Broken — still scanning.');
+    }
+
+    executeManualScanCall(projectEl.value, assetId, input, 1);
+    stationSetStatus_('Checkout: ' + (hit.name || assetId), 'ok');
+    return true;
+  }
+
+  if (typeof handleRfidScan === 'function') {
+    input.value = stationNormalizeEpc_(tag);
+    handleRfidScan();
+    stationSetStatus_('Checkout scan…', '');
+    return true;
+  }
+  return false;
+}
+
+function stationLoadEquipMapCache_() {
+  try {
+    var raw = localStorage.getItem(STATION_EQUIP_MAP_KEY);
+    if (!raw) return;
+    var parsed = JSON.parse(raw);
+    if (parsed && parsed.map) window.stationEquipMap = parsed.map;
+  } catch (e) { /* ignore */ }
+  try {
+    var crewRaw = localStorage.getItem(STATION_CREW_HOST_KEY);
+    if (!crewRaw) return;
+    var crewParsed = JSON.parse(crewRaw);
+    if (crewParsed && crewParsed.roster) window.stationCrewHostRoster = crewParsed.roster;
+  } catch (e2) { /* ignore */ }
+}
+
+function stationStoreCrewHostRoster_(roster) {
+  if (!roster || !roster.length) return;
+  window.stationCrewHostRoster = roster;
+  try {
+    localStorage.setItem(STATION_CREW_HOST_KEY, JSON.stringify({ roster: roster, ts: Date.now() }));
+  } catch (e) { /* ignore */ }
+}
+
+function stationRefreshEquipMap_() {
+  if (!window.IS_STATION_DEVICE) return;
+  try {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success || !res.map) return;
+        window.stationEquipMap = res.map;
+        try { localStorage.setItem(STATION_EQUIP_MAP_KEY, JSON.stringify({ map: res.map, ts: Date.now() })); } catch (e) { /* ignore */ }
+        if (res.crewHostRoster) stationStoreCrewHostRoster_(res.crewHostRoster);
+        stationDebug_('equip map: ' + (res.count || 0) + ' crew roster: ' + ((res.crewHostRoster && res.crewHostRoster.length) || 0));
+        stationRenderScanFeed_();
+      })
+      .withFailureHandler(function(err) { stationDebug_('equip map ERR'); })
+      .getStationEquipmentRfidMap(ACTIVE_USER_NAME);
+  } catch (e) { /* ignore */ }
+}
+
+/**
+ * Per-station settings namespace. Every station (one profile per device) keeps its OWN copy of the
+ * driver/gun settings, so two same-model guns on two different profiles never share values. The
+ * settings VIEW/MODEL is identical for all; only the stored bucket (and the active driver it talks
+ * to) differs. Keyed by the station profile name from the bootstrap, falling back to the device
+ * account name, then a safe default before the bootstrap arrives.
+ */
+function stationSettingsNs_() {
+  try {
+    var boot = window.stationShellBootstrap;
+    var id = boot && (boot.profileName || boot.deviceName);
+    if (!id && typeof ACTIVE_USER_NAME !== 'undefined') id = ACTIVE_USER_NAME;
+    if (id) {
+      var slug = String(id).trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (slug) return slug;
+    }
+  } catch (e) { /* ignore */ }
+  return 'default';
+}
+function stationNsKey_(key) { return key + '::' + stationSettingsNs_(); }
+
+/**
+ * Read a station setting from THIS station's namespace. If the namespaced slot is empty but a legacy
+ * global value exists (pre per-station keys), migrate it into this station's namespace on first read
+ * so nothing resets. All gun settings (power/scanMode/pollMs/beep) plus eject + gun-sleep flow here.
+ */
+function stationStoredSetting_(key) {
+  try {
+    var nsk = stationNsKey_(key);
+    var v = localStorage.getItem(nsk);
+    if (v !== null && v !== undefined) return v;
+    var legacy = localStorage.getItem(key); // one-time migration from the old global key
+    if (legacy !== null && legacy !== undefined) {
+      try { localStorage.setItem(nsk, legacy); } catch (e2) { /* ignore */ }
+      return legacy;
+    }
+    return null;
+  } catch (e) { return null; }
+}
+function stationSetStoredSetting_(key, val) {
+  try { localStorage.setItem(stationNsKey_(key), String(val)); } catch (e) { /* ignore */ }
+}
+
+/** Configurable per-device eject timeout (minutes) — set in the station setup view. */
+function stationEjectMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_EJECT_STORAGE_KEY), 10);
+    if (STATION_EJECT_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_HOST_IDLE_DEFAULT_MIN;
+}
+
+function stationHostIdleMs_() {
+  return stationEjectMinutes_() * 60 * 1000;
+}
+
+/** Configurable gun auto-sleep (minutes idle). 0 = never. */
+function stationGunSleepMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_GUNSLEEP_STORAGE_KEY), 10);
+    if (STATION_GUNSLEEP_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_GUNSLEEP_DEFAULT_MIN;
+}
+
+function stationNoHostGraceMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_NO_HOST_GRACE_KEY), 10);
+    if (STATION_NO_HOST_GRACE_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_NO_HOST_GRACE_DEFAULT_MIN;
+}
+
+function stationGunParkDelayMinutes_() {
+  try {
+    var v = parseInt(stationStoredSetting_(STATION_GUN_PARK_DELAY_KEY), 10);
+    if (STATION_GUN_PARK_DELAY_CHOICES.indexOf(v) !== -1) return v;
+  } catch (e) { /* ignore */ }
+  return STATION_GUN_PARK_DELAY_DEFAULT_MIN;
+}
+
+function stationNoHostParkDeadlineKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_no_host_park_deadline_v1_' + dev;
+}
+
+function stationClearNoHostParkDeadline_() {
+  if (window.stationNoHostParkTimer) {
+    clearTimeout(window.stationNoHostParkTimer);
+    window.stationNoHostParkTimer = null;
+  }
+  try { localStorage.removeItem(stationNoHostParkDeadlineKey_()); } catch (e) { /* ignore */ }
+}
+
+/** Arm between-hosts notice after host clears (Chainway: no SDK disconnect). */
+function stationArmNoHostParkDeadline_() {
+  stationClearNoHostParkDeadline_();
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('noHostPark')) return;
+  if (stationReadHostSession_()) return;
+  var grace = stationNoHostGraceMinutes_();
+  var delay = stationGunParkDelayMinutes_();
+  var autoPark = (typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark'));
+  var totalMs = (autoPark ? (grace + delay) : grace) * 60 * 1000;
+  if (totalMs <= 0) {
+    stationNoHostParkExpired_();
+    return;
+  }
+  var deadline = Date.now() + totalMs;
+  try { localStorage.setItem(stationNoHostParkDeadlineKey_(), String(deadline)); } catch (e) { /* ignore */ }
+  window.stationNoHostParkTimer = setTimeout(stationNoHostParkExpired_, totalMs);
+  if (autoPark) {
+    stationSetStatus_(
+      'No host — gun stays connected ' + grace + ' min' +
+      (delay ? (' then disconnects in ' + delay + ' min') : ' then parks') +
+      ' (~1 min more until LED off).',
+      ''
+    );
+  } else {
+    stationSetStatus_(
+      'No host — gun stays connected. Scan crew badge when ready (notice after ' + grace + ' min).',
+      ''
+    );
+  }
+}
+
+function stationNoHostParkExpired_() {
+  window.stationNoHostParkTimer = null;
+  if (stationReadHostSession_()) {
+    stationClearNoHostParkDeadline_();
+    return;
+  }
+  stationClearNoHostParkDeadline_();
+  if (typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark')) {
+    stationParkGun_();
+    return;
+  }
+  stationSetStatus_(
+    'No host — gun still connected. Scan badge to host, or power off the gun to save battery.',
+    ''
+  );
+}
+
+function stationCheckNoHostParkDeadline_() {
+  if (stationReadHostSession_()) {
+    stationClearNoHostParkDeadline_();
+    return;
+  }
+  if (typeof stationGunCap_ !== 'function' || !stationGunCap_('noHostPark')) return;
+  try {
+    var raw = localStorage.getItem(stationNoHostParkDeadlineKey_());
+    if (!raw) return;
+    var deadline = parseInt(raw, 10);
+    if (!deadline || isNaN(deadline)) return;
+    if (Date.now() >= deadline) stationNoHostParkExpired_();
+    else if (!window.stationNoHostParkTimer) {
+      var ms = Math.max(0, deadline - Date.now());
+      window.stationNoHostParkTimer = setTimeout(stationNoHostParkExpired_, ms);
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function stationParkGun_() {
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('autoSdkPark')) return;
+  stationClearNoHostParkDeadline_();
+  var br = stationSleepCapableBridge_();
+  if (!br || typeof br.sleepGun !== 'function') return;
+  try {
+    br.sleepGun();
+    stationSetStatus_('Gun parked (disconnect beep) — pull trigger to wake and reconnect.', '');
+  } catch (e) { /* ignore */ }
+}
+
+/** Native bridge that can sleep the gun (desktop TSL or Chainway with sleepGun support). */
+function stationSleepCapableBridge_() {
+  if (stationNativeBridge_()) return stationNativeBridge_();
+  if (!window.IS_STATION_DEVICE) return null;
+  return {
+    sleepGun: function() { stationInvokeGunNative_('sleepGun'); },
+    reconnectGun: function() { stationInvokeGunNative_('reconnectGun'); }
+  };
+}
+
+function stationClearGunIdleTimer_() {
+  if (window.stationGunIdleTimer) {
+    clearTimeout(window.stationGunIdleTimer);
+    window.stationGunIdleTimer = null;
+  }
+  // Chainway native idle is managed in RfidManager — do not zero it here on link drop.
+}
+
+/**
+ * Arm the gun idle-sleep countdown (wall-clock). Fires sleepGun() → BLE disconnect so firmware
+ * can power down. Only call when minutes change, on boot, or after manual reconnect — NOT on
+ * every config refresh (that was resetting the timer and preventing sleep).
+ */
+function stationArmGunSleepTimer_() {
+  stationClearGunIdleTimer_();
+  if (typeof stationGunCap_ === 'function' && !stationGunCap_('appSleep')) return;
+  var mins = stationGunSleepMinutes_();
+  if (!mins) {
+    window.stationGunSleepArmedMins = 0;
+    return;
+  }
+  if (!stationSleepCapableBridge_()) return;
+  window.stationGunSleepArmedMins = mins;
+  window.stationGunIdleTimer = setTimeout(function() {
+    window.stationGunIdleTimer = null;
+    window.stationGunSleepArmedMins = 0;
+    var br = stationSleepCapableBridge_();
+    if (!br) return;
+    try {
+      br.sleepGun();
+      stationToast_('Gun disconnecting (idle ' + mins + ' min) — LED off in ~1 min after link drop', '');
+      setTimeout(function() { stationRequestGunConfig_(); }, 1200);
+    } catch (e) { /* ignore */ }
+  }, mins * 60 * 1000);
+}
+
+/** @deprecated use stationArmGunSleepTimer_ — kept so old call sites only re-arm when minutes change */
+function stationResetGunIdleTimer_() {
+  var mins = stationGunSleepMinutes_();
+  if (window.stationGunSleepArmedMins === mins && window.stationGunIdleTimer) return;
+  stationArmGunSleepTimer_();
+}
+
+function stationHostEjectDeadlineKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_host_eject_deadline_v1_' + dev;
+}
+
+function stationClearHostEjectDeadline_() {
+  try { localStorage.removeItem(stationHostEjectDeadlineKey_()); } catch (e) { /* ignore */ }
+}
+
+/** Wall-clock eject deadline — survives screen-off / setTimeout suspension. */
+function stationArmHostEjectDeadline_() {
+  if (!stationReadHostSession_()) return 0;
+  var deadline = Date.now() + stationHostIdleMs_();
+  try { localStorage.setItem(stationHostEjectDeadlineKey_(), String(deadline)); } catch (e) { /* ignore */ }
+  return deadline;
+}
+
+function stationCheckHostEjectDeadline_() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (!stationReadHostSession_()) {
+    stationClearHostEjectDeadline_();
+    return;
+  }
+  try {
+    var raw = localStorage.getItem(stationHostEjectDeadlineKey_());
+    if (!raw) return;
+    var deadline = parseInt(raw, 10);
+    if (!deadline || isNaN(deadline)) return;
+    if (Date.now() >= deadline) stationHostIdleExpired_();
+  } catch (e) { /* ignore */ }
+}
+
+function stationClearHostIdleTimer_() {
+  if (window.stationHostIdleTimer) {
+    clearTimeout(window.stationHostIdleTimer);
+    window.stationHostIdleTimer = null;
+  }
+}
+
+function stationResetHostIdleTimer_() {
+  stationClearHostIdleTimer_();
+  if (!window.IS_STATION_DEVICE) return;
+  if (!stationReadHostSession_()) {
+    stationClearHostEjectDeadline_();
+    return;
+  }
+  var deadline = stationArmHostEjectDeadline_();
+  var msUntil = Math.max(0, deadline - Date.now());
+  window.stationHostIdleTimer = setTimeout(stationHostIdleExpired_, msUntil);
+}
+
+function stationHostIdleExpired_() {
+  stationClearHostIdleTimer_();
+  stationClearHostEjectDeadline_();
+  if (!stationReadHostSession_()) return;
+  // Invalidate any in-flight badge-in confirmation so it can't re-host after a wall-clock eject.
+  window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+  window.stationScanBusy = false;
+  stationWriteHostSession_(null);
+  stationRenderShellState_();
+  var mins = stationEjectMinutes_();
+  stationSetStatus_('Signed out after ' + mins + ' min of inactivity. Scan your badge.', 'error');
+  stationSetLastScan_('');
+}
+
+function stationBindHostIdleListeners_() {
+  if (window.stationHostIdleListenersBound) return;
+  window.stationHostIdleListenersBound = true;
+  var onActivity = function() {
+    if (stationReadHostSession_()) stationResetHostIdleTimer_();
+  };
+  ['touchstart', 'pointerdown', 'mousedown', 'keydown', 'click'].forEach(function(evt) {
+    document.addEventListener(evt, onActivity, { passive: true });
+  });
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+      stationCheckHostEjectDeadline_();
+      stationCheckNoHostParkDeadline_();
+    }
+  });
+  window.addEventListener('pageshow', function() {
+    stationCheckHostEjectDeadline_();
+    stationCheckNoHostParkDeadline_();
+  });
+  window.addEventListener('focus', function() {
+    stationCheckHostEjectDeadline_();
+    stationCheckNoHostParkDeadline_();
+  });
+}
+
+function stationHostStorageKey_() {
+  const dev = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME).trim().toLowerCase().replace(/\s+/g, '_')
+    : 'device';
+  return 'sm_station_host_v1_' + dev;
+}
+
+/** TSL desktop gate PC — crew host must not survive app restart (badge in fresh each launch). */
+function stationIsDesktopKiosk_() {
+  try {
+    return /ShowrunnerStationDesktop/i.test(navigator.userAgent || '');
+  } catch (e) { return false; }
+}
+
+function stationPersistHostToParent_(host) {
+  var key = stationHostStorageKey_();
+  if (stationIsDesktopKiosk_()) {
+    try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+    try {
+      stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_SESSION', deviceKey: key, host: null });
+    } catch (e) { /* ignore */ }
+    return;
+  }
+  try {
+    if (host) localStorage.setItem(key, JSON.stringify(host));
+    else localStorage.removeItem(key);
+  } catch (e) { /* ignore */ }
+  try {
+    stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_SESSION', deviceKey: key, host: host || null });
+  } catch (e) { /* ignore */ }
+}
+
+function stationRequestHostRestoreFromParent_() {
+  try {
+    stationPostToHosting_({ type: 'SHOWRUNNER_STATION_HOST_RESTORE_REQUEST', deviceKey: stationHostStorageKey_() });
+  } catch (e) { /* ignore */ }
+}
+
+function stationReadHostSession_() {
+  var key = stationHostStorageKey_();
+  try {
+    var raw = sessionStorage.getItem(key);
+    if (!raw && !stationIsDesktopKiosk_()) raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.name) return null;
+    return parsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+function stationWriteHostSession_(host) {
+  if (!host) {
+    // Arm the eject cooldown: capture the badge we're clearing so a lingering read from the same
+    // trigger burst (or a tag left in the antenna field) cannot instantly re-host them. A deliberate
+    // re-scan after the cooldown, or a DIFFERENT badge at any time, still works.
+    var outgoing = stationReadHostSession_() || window.stationHostSession || null;
+    var outNorm = outgoing ? stationNormalizeEpc_(outgoing.rfidTag || '') : '';
+    window.stationEjectedHostNorm = outNorm || null;
+    window.stationEjectCooldownUntil = outNorm ? (Date.now() + STATION_HOST_EJECT_COOLDOWN_MS) : 0;
+  } else {
+    // Someone is now hosted — clear any eject cooldown from a prior logout.
+    window.stationEjectedHostNorm = null;
+    window.stationEjectCooldownUntil = 0;
+  }
+  window.stationHostSession = host;
+  try {
+    if (host) sessionStorage.setItem(stationHostStorageKey_(), JSON.stringify(host));
+    else {
+      sessionStorage.removeItem(stationHostStorageKey_());
+      stationClearHostEjectDeadline_();
+    }
+  } catch (e) { /* ignore */ }
+  stationPersistHostToParent_(host);
+  // Host-inherit RBAC: while hosted, the app evaluates permissions as the HOST (their real tier +
+  // IAM), not the low-tier device account. Cleared on eject/logout. See stationHostRbac override.
+  if (host && (host.access || host.permissions)) {
+    window.stationHostRbac = { access: host.access || 'CREW', permissions: host.permissions || {} };
+  } else {
+    window.stationHostRbac = null;
+  }
+  // Warm the project list for THIS host in the background so pressing PROJECT opens instantly
+  // (same list their personal profile sees). Clearing the host drops the cache + wipes the device.
+  if (host && host.name) {
+    stationPreloadProjects_(host.name);
+    stationClearNoHostParkDeadline_();
+  } else {
+    window.stationProjectsCache = null; window.stationProjectsFor = null;
+    stationResetDeviceToPristine_();
+    stationArmNoHostParkDeadline_();
+  }
+}
+
+/**
+ * Eject/logout returns the gun to a never-used state so the next person sees nothing of the last
+ * session: clear the live scan strip, cancel any armed vault record, drop cached lists, close
+ * overlays, and reset status/last-scan.
+ */
+function stationResetDeviceToPristine_() {
+  window.stationRecentScans = [];
+  try { if (typeof stationRenderScanFeed_ === 'function') stationRenderScanFeed_(); } catch (e) {}
+  window.stationLastScanTag = null;
+  window.stationLastScanAt = 0;
+  try { if (typeof stationVaultCancelRecord_ === 'function') stationVaultCancelRecord_(); } catch (e) {}
+  window.stationVaultItems = [];
+  window.stationVaultCrew = null;
+  window.stationVaultExpanded = {};
+  window.stationEnrollMode = false;
+  try { if (typeof stationSetEnrollButton_ === 'function') stationSetEnrollButton_('idle'); } catch (e) {}
+  try { if (typeof stationCloseVault === 'function') stationCloseVault(); } catch (e) {}
+  try { if (typeof stationCloseProjectPicker === 'function') stationCloseProjectPicker(); } catch (e) {}
+  try { if (typeof stationSetLastScan_ === 'function') stationSetLastScan_(''); } catch (e) {}
+}
+
+/** Background-fetch the host's projects (getRefreshPayload scoped to the person, not the device). */
+function stationPreloadProjects_(hostName) {
+  if (!hostName) return;
+  if (window.stationProjectsFor === hostName && window.stationProjectsCache) return;
+  window.stationProjectsFor = hostName;
+  window.stationProjectsCache = null;
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      const projects = (payload && payload.projects) ? payload.projects : [];
+      stationCacheProjectsPayload_(payload, projects);
+      window.stationProjectsCache = projects;
+      // If the picker is already open and waiting, fill it now.
+      const panel = document.getElementById('station-project-picker');
+      if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(projects);
+    })
+    .withFailureHandler(function() { window.stationProjectsFor = null; })
+    .getRefreshPayload(hostName);
+}
+
+/** Persist the payload into sm_phantom_payload so the phone PA resolver (resolveMobileProject) works. */
+function stationCacheProjectsPayload_(payload, projects) {
+  try {
+    const phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+    phantom.projects = projects;
+    if (payload && payload.monthData) phantom.monthData = payload.monthData;
+    if (payload && payload.tasks) phantom.tasks = payload.tasks;
+    if (payload && payload.notifs) phantom.notifs = payload.notifs;
+    localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+  } catch (e) { /* ignore */ }
+}
+
+function stationFormatTime24_(ts) {
+  var d = new Date(ts);
+  var h = d.getHours();
+  var m = d.getMinutes();
+  var s = d.getSeconds();
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  return pad(h) + ':' + pad(m) + ':' + pad(s);
+}
+
+var stationToastTimer_ = null;
+function stationToast_(msg, kind) {
+  if (!msg) return;
+  var el = document.getElementById('station-toast');
+  if (!el) return;
+  if (stationToastTimer_) clearTimeout(stationToastTimer_);
+  el.textContent = msg;
+  el.classList.remove('is-ok', 'is-error', 'is-visible');
+  if (kind === 'error') el.classList.add('is-error');
+  else if (kind === 'ok') el.classList.add('is-ok');
+  requestAnimationFrame(function() { el.classList.add('is-visible'); });
+  stationToastTimer_ = setTimeout(function() {
+    el.classList.remove('is-visible');
+  }, kind === 'error' ? 4500 : 2800);
+}
+
+function stationSetStatus_(msg, kind) {
+  if (msg) stationToast_(msg, kind);
+}
+
+/** Native APK forwards BLE status strings here (replaces the old bottom status bar). */
+window.stationOnGunStatus_ = function(msg) {
+  if (!msg) return;
+  var low = String(msg).toLowerCase();
+  var kind = '';
+  if (low.indexOf('fail') !== -1 || low.indexOf('error') !== -1 || low.indexOf('not found') !== -1) kind = 'error';
+  else if (low.indexOf('connected') !== -1 && low.indexOf('disconnect') === -1) kind = 'ok';
+  stationToast_(msg, kind);
+};
+
+// Diagnostic: native WebView renderer death breadcrumb. If this ever fires with count>0 after a
+// gun disconnect/reconnect, the renderer-priority fix did NOT hold and the reload came from a
+// renderer kill (not from session/nav logic). Surfaced once as a toast so it's visible on-device.
+window.stationOnRendererBreadcrumb_ = function(info) {
+  try {
+    if (!info || !info.count || window.__srRendererBreadcrumbShown_) return;
+    window.__srRendererBreadcrumbShown_ = true;
+    var when = info.at ? new Date(info.at).toLocaleTimeString() : '?';
+    stationToast_('WebView reloaded ' + info.count + '× (renderer ' +
+      (info.crashed ? 'crashed' : 'killed') + ', last ' + when + ')', 'error');
+  } catch (e) {}
+};
+
+// Diagnostic: the RFID gun is an HID keyboard, so connect/disconnect fires an Android
+// keyboard/navigation config change. With the manifest fix, that no longer recreates the Activity
+// — it lands in onConfigurationChanged and the WebView survives. If this counter climbs while the
+// UI stays put (no reload), the fix is working: gun flap absorbed, session intact.
+window.stationOnGunConfigChange_ = function(count) {
+  try {
+    if (!count) return;
+    stationToast_('Gun link changed (' + count + ') — session kept', 'ok');
+  } catch (e) {}
+};
+
+window.stationReconnectGun_ = function() {
+  stationToast_('Reconnecting gun…', '');
+  stationInvokeGunNative_('reconnectGun');
+  setTimeout(function() { stationRequestGunConfig_(); }, 2500);
+};
+
+/**
+ * Disconnect + sleep the gun (desktop TSL bridge only). Sends the reader to sleep like a power
+ * button — the reader has no physical on/off. Waking is a trigger pull + Reconnect gun.
+ */
+window.stationSleepGun_ = function() {
+  stationToast_('Gun going to sleep…', '');
+  stationInvokeGunNative_('sleepGun');
+  setTimeout(function() { stationRequestGunConfig_(); }, 1200);
+};
+
+/** Invoke reconnect/sleep on desktop WebView2, native bridge, or hosting parent relay. */
+function stationInvokeGunNative_(method) {
+  if (!method) return;
+  var relayType = method === 'sleepGun' ? 'SHOWRUNNER_STATION_GUN_SLEEP' : 'SHOWRUNNER_STATION_GUN_RECONNECT';
+  var isDesktop = window.__srDesktopBridge || /ShowrunnerStation/i.test(navigator.userAgent || '');
+
+  // Desktop nested GAS iframe: always relay to hosting shell → native COM (same as gun settings).
+  if (isDesktop) {
+    stationRelayGunCommandToTop_(method, []);
+    stationPostToHosting_({ type: relayType });
+    return;
+  }
+
+  try {
+    var h = chrome && chrome.webview && chrome.webview.hostObjects &&
+      chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;
+    if (h && typeof h[method] === 'function') { h[method](); return; }
+  } catch (e) { /* ignore */ }
+  try {
+    var a = window.AndroidStation;
+    if (a && typeof a[method] === 'function') { a[method](); return; }
+  } catch (e2) { /* ignore */ }
+  try {
+    if (chrome && chrome.webview && chrome.webview.postMessage) {
+      chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: [] }));
+      return;
+    }
+  } catch (e3) { /* ignore */ }
+  stationPostToHosting_({ type: relayType });
+}
+
+/**
+ * Show the sleep controls only for gun drivers that support them AND when the native bridge can
+ * sleep the gun. (Next step: keep the screen identical for every gun and gray these out instead
+ * of hiding — driven by the same stationGunCap_ flags.)
+ */
+function stationSyncGunSleepButton_() {
+  var bridge = stationSleepCapableBridge_();
+  var cap = (typeof stationGunCap_ === 'function') ? stationGunCap_ : function() { return true; };
+  var btnField = document.getElementById('station-gun-sleep-field');
+  if (btnField) btnField.style.display = (bridge && cap('disconnectSleep')) ? 'block' : 'none';
+  var dropField = document.getElementById('station-gunsleep-field');
+  if (dropField) dropField.style.display = (bridge && cap('appSleep')) ? 'block' : 'none';
+  var dropEl = document.getElementById('station-set-gunsleep');
+  if (dropEl) dropEl.value = String(stationGunSleepMinutes_());
+  var parkFields = document.getElementById('station-no-host-park-fields');
+  if (parkFields) parkFields.style.display = (bridge && cap('noHostPark')) ? 'block' : 'none';
+  var parkDelayField = document.getElementById('station-gun-park-delay-field');
+  if (parkDelayField) parkDelayField.style.display = (bridge && cap('autoSdkPark')) ? 'block' : 'none';
+  var graceEl = document.getElementById('station-set-no-host-grace');
+  if (graceEl) graceEl.value = String(stationNoHostGraceMinutes_());
+  var parkDelayEl = document.getElementById('station-set-gun-park-delay');
+  if (parkDelayEl) parkDelayEl.value = String(stationGunParkDelayMinutes_());
+}
+
+function stationSetLastScan_(tag) {
+  const el = document.getElementById('station-shell-last-scan');
+  if (!el) return;
+  el.textContent = tag ? ('Last scan: ' + tag) : '';
+}
+
+function stationRenderScanFeed_() {
+  const list = document.getElementById('station-scan-feed-list');
+  if (!list) return;
+  const scans = window.stationRecentScans || [];
+  if (!scans.length) {
+    list.innerHTML = '<span class="station-scan-feed__empty">Waiting for scans…</span>';
+    return;
+  }
+  const esc = function(v) {
+    return String(v == null ? '' : v).replace(/[<&>]/g, function(c) {
+      return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
+    });
+  };
+  const rows = scans.map(function(s) {
+    const time = stationFormatTime24_(s.ts);
+    var hit = stationResolveEpc_(s.tag);
+    if (!hit || !hit.name) {
+      var crewHit = stationLookupCrewHostLocal_(s.tag, s.tid || '');
+      if (crewHit.crew) hit = { kind: 'crew', name: crewHit.crew.name };
+    }
+    if (hit && hit.name) {
+      if (hit.kind === 'crew') {
+        return '<div class="station-scan-feed__row is-crew">'
+          + '<span class="name">' + esc(hit.name) + '</span>'
+          + '<span class="unit">crew</span>'
+          + '<span class="time">' + time + '</span></div>';
+      }
+      const unit = hit.unitNumber || hit.unitId || '';
+      const statusHtml = stationScanFeedStatusHtml_(hit, esc);
+      return '<div class="station-scan-feed__row">'
+        + '<span class="name">' + esc(hit.name) + '</span>'
+        + statusHtml
+        + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '')
+        + '<span class="time">' + time + '</span></div>';
+    }
+    return '<div class="station-scan-feed__row is-unknown" title="' + esc(s.tag) + '">'
+      + '<span class="name">' + esc(s.tag) + '</span>'
+      + '<span class="time">' + time + '</span></div>';
+  });
+  list.innerHTML = rows.join('');
+}
+
+window.stationRenderScanFeed_ = stationRenderScanFeed_;
+
+function stationPushScanFeed_(tag, tidOpt) {
+  const floatEl = document.getElementById('sr-desktop-scan-feed');
+  if (floatEl) floatEl.style.display = 'none';
+  const clean = String(tag || '').trim();
+  if (!clean) return;
+  const norm = stationNormalizeEpc_(clean);
+  const tid = String(tidOpt || '').trim();
+  const now = Date.now();
+  window.stationRecentScans = window.stationRecentScans || [];
+  if (window.stationRecentScans.length) {
+    const last = window.stationRecentScans[0];
+    const lastNorm = last.norm || stationNormalizeEpc_(last.tag);
+    const sameRecent = lastNorm === norm && (now - (last.ts || 0)) < 1500;
+    if (sameRecent && (last.tid || !tid)) return;
+  }
+  window.stationRecentScans.unshift({ tag: clean, norm: norm, tid: tid, ts: now });
+  if (window.stationRecentScans.length > STATION_SCAN_FEED_MAX) {
+    window.stationRecentScans.length = STATION_SCAN_FEED_MAX;
+  }
+  stationRenderScanFeed_();
+}
+window.stationPushScanFeed_ = stationPushScanFeed_;
+
+function stationRenderShellState_() {
+  const host = stationReadHostSession_();
+  window.stationHostSession = host;
+  const stateLabel = document.getElementById('station-shell-state-label');
+  const prompt = document.getElementById('station-shell-prompt');
+  const hostNameEl = document.getElementById('station-shell-host-name');
+  const logoutHostBtn = document.getElementById('station-btn-logout-host');
+  const enrollBtn = document.getElementById('station-btn-enroll');
+  const hostInline = document.getElementById('station-shell-host-inline');
+  const projectBtn = document.getElementById('station-btn-project');
+  const vaultBtn = document.getElementById('station-btn-vault');
+
+  if (host) {
+    if (stateLabel) stateLabel.textContent = 'Hosted session';
+    if (prompt) prompt.style.display = 'none';
+    if (hostNameEl) {
+      hostNameEl.style.display = 'block';
+      hostNameEl.textContent = host.name;
+    }
+    if (hostInline) {
+      hostInline.style.display = 'inline';
+      hostInline.textContent = '— ' + host.name;
+    }
+    if (logoutHostBtn) logoutHostBtn.style.display = 'block';
+    if (enrollBtn) enrollBtn.style.display = 'none';
+    if (projectBtn) projectBtn.classList.remove('is-disabled');
+    if (vaultBtn) vaultBtn.classList.remove('is-disabled');
+    stationSetStatus_('Ready — ' + host.name + ' hosting.', 'ok');
+    stationResetHostIdleTimer_();
+  } else {
+    if (stateLabel) stateLabel.textContent = 'Waiting for host';
+    if (prompt) {
+      prompt.style.display = 'block';
+      prompt.textContent = 'Scan your crew badge';
+    }
+    if (hostNameEl) hostNameEl.style.display = 'none';
+    if (hostInline) { hostInline.style.display = 'none'; hostInline.textContent = ''; }
+    if (logoutHostBtn) logoutHostBtn.style.display = 'none';
+    if (enrollBtn) enrollBtn.style.display = 'none';
+    if (projectBtn) projectBtn.classList.add('is-disabled');
+    if (vaultBtn) vaultBtn.classList.add('is-disabled');
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    stationSetStatus_('', '');
+    stationClearHostIdleTimer_();
+    // No host → close any hosted-only overlays and stop recording.
+    if (typeof window.stationCloseVault === 'function') window.stationCloseVault();
+    if (typeof window.stationCloseProjectPicker === 'function') window.stationCloseProjectPicker();
+  }
+}
+
+function stationSetEnrollButton_(mode) {
+  const btn = document.getElementById('station-btn-enroll');
+  if (!btn) return;
+  if (mode === 'active') {
+    btn.textContent = 'CANCEL — scan the badge now…';
+    btn.classList.add('is-active');
+  } else {
+    btn.textContent = 'LINK MY RFID BADGE';
+    btn.classList.remove('is-active');
+  }
+}
+
+window.stationToggleEnroll = function() {
+  const host = stationReadHostSession_();
+  if (!host) return;
+  if (window.stationEnrollMode) {
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    stationSetStatus_('Enrollment cancelled.', '');
+    return;
+  }
+  window.stationEnrollMode = true;
+  stationSetEnrollButton_('active');
+  stationSetStatus_('Pull the trigger on the badge to link it to ' + host.name + '.', '');
+};
+
+function stationApplyBootstrap_(data) {
+  window.stationShellBootstrap = data;
+  const profEl = document.getElementById('station-shell-profile-name');
+  const layoutEl = document.getElementById('station-shell-layout-text');
+  // Device account name (e.g. CW1) — not the hardware profile label (e.g. Chainway).
+  if (profEl) profEl.textContent = data.deviceName || ACTIVE_USER_NAME || data.profileName || 'Station';
+  if (layoutEl) {
+    const layout = (data.layout || 'chainway_handheld').replace(/_/g, ' ');
+    layoutEl.textContent = layout.toUpperCase();
+  }
+}
+
+function stationHandleRfidScan_(rawTag, rawTid) {
+  const tag = String(rawTag || '').trim();
+  let tid = String(rawTid || '').trim();
+  if (!tid && window.stationLastScanTid) tid = String(window.stationLastScanTid).trim();
+  if (!tag || window.stationScanBusy) return;
+  if (!window.IS_STATION_DEVICE) return;
+
+  const host = stationReadHostSession_();
+
+  if (host) {
+    stationResetHostIdleTimer_();
+    stationSetLastScan_(tag);
+    const norm = stationNormalizeEpc_(tag);
+    const hostTag = stationNormalizeEpc_(host.rfidTag || '');
+    // Same badge as the current host → just keep the session alive (idle already reset above).
+    if (norm && hostTag && norm === hostTag) return;
+    // Different crew badge while someone is hosted → reject (must LOG OUT HOST / idle eject first).
+    const swap = stationLookupCrewHostLocal_(tag, tid);
+    if (swap.tidMismatch) {
+      stationSetStatus_('Badge chip ID does not match — possible cloned tag.', 'error');
+      return;
+    }
+    if (swap.tidMissing) {
+      stationSetStatus_('Gun did not read chip TID. Hold the badge still and scan again.', 'error');
+      return;
+    }
+    let scanIsCrewBadge = !!swap.crew;
+    if (!scanIsCrewBadge) {
+      const hit = stationResolveEpc_(tag);
+      if (hit && hit.kind === 'crew') scanIsCrewBadge = true; // known crew badge via equip map
+    }
+    if (scanIsCrewBadge) {
+      // Same person on a host record that carried no stored tag → don't bounce the session.
+      if (swap.crew && (
+        (host.uid && swap.crew.uid && String(host.uid) === String(swap.crew.uid)) ||
+        (!host.uid && host.name && swap.crew.name && host.name === swap.crew.name)
+      )) return;
+      // Hosted state machine: reject further host badges until explicit logout / idle eject.
+      stationSetStatus_(
+        host.name + ' is signed in — tap LOG OUT HOST first, then scan the next badge.',
+        'error'
+      );
+      return;
+    }
+    // Not a crew badge → equipment scan during an open checkout / existing behavior.
+    stationForwardCheckoutScan_(tag);
+    return;
+  }
+
+  stationBeginHostLogin_(tag, tid);
+}
+
+/**
+ * Optimistic badge-in: host instantly from the local crew cache when the EPC(+TID) pair is
+ * recognized, then let the server confirm. Only used when no host is signed in yet.
+ */
+function stationBeginHostLogin_(tag, tid) {
+  // Eject cooldown: swallow residual reads of the badge we JUST logged out so the eject sticks.
+  // A different badge falls through (norm mismatch) and re-hosting the same person is allowed again
+  // once the short window passes.
+  const cooldownNorm = stationNormalizeEpc_(tag);
+  if (cooldownNorm && cooldownNorm === window.stationEjectedHostNorm &&
+      Date.now() < (window.stationEjectCooldownUntil || 0)) {
+    stationSetLastScan_(tag);
+    stationSetStatus_('Logged out — scan again to sign back in.', '');
+    return;
+  }
+  const localLookup = stationLookupCrewHostLocal_(tag, tid);
+  let optimisticHost = null;
+  if (localLookup.tidMismatch) {
+    stationSetStatus_('Badge chip ID does not match — possible cloned tag.', 'error');
+    return;
+  }
+  if (localLookup.crew) {
+    optimisticHost = localLookup.crew;
+  } else if (localLookup.tidMissing) {
+    stationSetStatus_('Gun did not read chip TID. Hold the badge still and scan again.', 'error');
+    return;
+  }
+
+  window.stationScanBusy = true;
+  window.stationScanBusyAt = Date.now();
+  stationSetLastScan_(tag);
+
+  // Race guard — "eject beats the server". processStationRfidScan takes ~1s. If the operator logs
+  // the host out (or scans a different badge) BEFORE this reply lands, the confirmation must be
+  // ignored, otherwise the slow success handler re-writes the host and signs the ejected person
+  // straight back in. Every login and every eject bumps stationHostLoginSeq; a callback whose
+  // captured seq no longer matches is stale and does nothing.
+  const loginSeq = window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+
+  if (optimisticHost) {
+    stationWriteHostSession_(optimisticHost);
+    stationRenderShellState_();
+    stationSetStatus_('Hosted as ' + optimisticHost.name + ' — confirming…', '');
+  } else {
+    stationSetStatus_('Looking up badge…', '');
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationScanBusy = false;
+      // Stale reply: operator ejected or switched badge while this was in flight → do not re-host.
+      if (loginSeq !== window.stationHostLoginSeq) return;
+      if (!res || !res.success) {
+        if (optimisticHost) {
+          stationWriteHostSession_(null);
+          stationRenderShellState_();
+        }
+        stationSetStatus_((res && res.error) ? res.error : 'Scan failed.', 'error');
+        return;
+      }
+      if (res.scanType === 'host' && res.host) {
+        stationWriteHostSession_(res.host);
+        stationRenderShellState_();
+        stationSetStatus_('Hosted as ' + res.host.name, 'ok');
+        return;
+      }
+      if (optimisticHost) {
+        stationWriteHostSession_(null);
+        stationRenderShellState_();
+      }
+      stationSetStatus_('Unrecognized scan.', 'error');
+    })
+    .withFailureHandler(function(err) {
+      window.stationScanBusy = false;
+      // Stale reply: operator ejected or switched badge while this was in flight → leave state alone.
+      if (loginSeq !== window.stationHostLoginSeq) return;
+      if (optimisticHost) {
+        stationWriteHostSession_(null);
+        stationRenderShellState_();
+      }
+      stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .processStationRfidScan(ACTIVE_USER_NAME, tag, { hostOnly: true, tid: tid });
+}
+
+function stationDrainPendingRfidScans_() {
+  var q = window.__srPendingRfidScans;
+  if (!q || !q.length || typeof window.onStationRfidScan !== 'function') return;
+  var pending = q.splice(0, q.length);
+  for (var i = 0; i < pending.length; i++) {
+    window.onStationRfidScan(pending[i].tag, pending[i].tid || '');
+  }
+}
+
+/** Entry point for Chainway Android SDK bridge. */
+window.onStationRfidScan = function(rawTag, rawTid) {
+  if (window.stationScanBusy && (Date.now() - (window.stationScanBusyAt || 0)) > 8000) {
+    window.stationScanBusy = false;
+  }
+  // Do not reset the idle-sleep timer on RFID reads — only stationArmGunSleepTimer_ on boot/save/reconnect.
+  const scan = stationParseScanPayload_(rawTag, rawTid);
+  const tag = scan.epc;
+  const tid = scan.tid;
+  const norm = stationNormalizeEpc_(tag);
+  stationDebug_('scan IN: ' + (tag || '(empty)') + (tid ? ' tid:' + tid : ''));
+  if (tag) stationPushScanFeed_(tag, tid);
+  // Dedup: one physical scan can arrive via BOTH poll and relay (case/format may differ).
+  if (norm) {
+    var now = Date.now();
+    var priorTid = String(window.stationLastScanTid || '').trim();
+    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500;
+    // Drop duplicate EPC-only delivery when we already handled this scan; allow upgrade when TID arrives.
+    if (sameEpcRecent && (priorTid || !tid)) return;
+    window.stationLastScanNorm = norm;
+    window.stationLastScanTag = tag;
+    window.stationLastScanTid = tid || priorTid;
+    window.stationLastScanAt = now;
+  }
+  if (tag && !stationReadHostSession_()) {
+    stationSetLastScan_(tag);
+    if (!tid) stationSetStatus_('Badge read — confirming chip ID…', '');
+    else stationSetStatus_('Badge read — signing in…', '');
+  }
+  // ROOT recording a crew badge (Vault → Crew tab) takes top priority.
+  if (tag && window.stationCrewRecord) {
+    if (stationCrewConsumeScan_(tag, tid)) return;
+  }
+  // Manager recording a tag onto equipment (Vault) is next.
+  if (tag && window.stationVaultRecord && window.stationVaultRecord.queue && window.stationVaultRecord.queue.length) {
+    if (stationVaultConsumeScan_(tag)) return;
+  }
+  // Scan panel open: consume scans for status/sensitivity — never checkout or host flows.
+  if (window.stationScanPanelOpen) {
+    if (tag) stationPanelHandleScan_(tag, tid);
+    return;
+  }
+  stationHandleRfidScan_(tag, tid);
+};
+stationDrainPendingRfidScans_();
+
+/**
+ * Pull scans straight from the gun via the injected native bridge — the reliable path when
+ * native=true, since the top-frame relay proved lossy. Started once the shell mounts.
+ */
+function stationStartScanPoll_() {
+  if (window.stationScanPollTimer) return;
+  stationBindMessageListener_();
+
+  var native = stationNativeBridge_();
+  if (!native || typeof native.pollScans !== 'function') {
+    // Desktop cache shim: drain __srScanQueue even if pollScans path is unavailable.
+    if (window.__srDesktopBridge) {
+      window.stationScanPollTimer = setInterval(function() {
+        var q = window.__srScanQueue;
+        if (!q || !q.length) return;
+        var batch = q.splice(0, q.length);
+        for (var i = 0; i < batch.length; i++) {
+          var item = batch[i];
+          if (!item) continue;
+          var tag = item.epc || item.tag || '';
+          if (!tag) continue;
+          if (typeof window.onStationRfidScan === 'function') {
+            window.onStationRfidScan(tag, item.tid || '');
+          }
+        }
+      }, 200);
+      return;
+    }
+    if (!window.stationScanPollRetryTimer && window.IS_STATION_DEVICE) {
+      window.stationScanPollRetryTimer = setTimeout(function() {
+        window.stationScanPollRetryTimer = null;
+        stationStartScanPoll_();
+      }, 1500);
+    }
+    return;
+  }
+  window.stationScanPollTimer = setInterval(function() {
+    var raw;
+    try { raw = native.pollScans(); } catch (e) { return; }
+    if (!raw || raw === '[]') return;
+    var arr;
+    try { arr = JSON.parse(raw); } catch (e) { return; }
+    for (var i = 0; i < arr.length; i++) {
+      var item = arr[i];
+      if (item && typeof item === 'object') {
+        window.onStationRfidScan(item.epc || item.tag || '', item.tid || '');
+      } else {
+        window.onStationRfidScan(item);
+      }
+    }
+  }, 300);
+}
+
+window.stationLogoutHost = function() {
+  // Cancel any in-flight badge-in confirmation so a slow (~1s) server reply can't re-host the
+  // person we're logging out, and free the scan lock so the next badge works immediately.
+  window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+  window.stationScanBusy = false;
+  stationWriteHostSession_(null);
+  stationRenderShellState_();
+  stationSetStatus_('Host cleared. Scan crew badge.', '');
+  stationSetLastScan_('');
+};
+
+/* ---- Project lane: reuse the phone's compact Project Assets view ---- */
+
+window.stationOpenProject = function() {
+  if (!stationReadHostSession_()) {
+    stationSetStatus_('Scan your badge to host a session first.', 'error');
+    return;
+  }
+  stationOpenProjectPicker_();
+};
+
+/* ---- Vault lane: compact station equipment list (search, status, manager RFID recording) ---- */
+
+window.stationVaultItems = [];
+window.stationVaultCanRecord = false;
+window.stationVaultRecord = null; // { queue:[ids], names:{id:name} } while armed
+
+window.stationOpenVault = function() {
+  const host = stationReadHostSession_();
+  if (!host) {
+    stationSetStatus_('Scan your badge to host a session first.', 'error');
+    return;
+  }
+  const panel = document.getElementById('station-vault');
+  if (!panel) return;
+  panel.classList.add('is-open');
+  const searchEl = document.getElementById('station-vault-search');
+  if (searchEl) searchEl.value = '';
+  // Crew tab is a ROOT-only badge-provisioning surface.
+  const isRoot = (window.stationHostRbac && String(window.stationHostRbac.access || '').toUpperCase() === 'ROOT');
+  const crewTabBtn = document.getElementById('station-vault-tab-btn-crew');
+  if (crewTabBtn) crewTabBtn.style.display = isRoot ? 'block' : 'none';
+  stationVaultCancelRecord_();
+  stationVaultSwitchTab_('equip');
+  stationVaultLoad_();
+};
+
+/** Toggle between the Equipment and Crew panes inside the Vault overlay. */
+window.stationVaultSwitchTab_ = function(tab) {
+  const paneEquip = document.getElementById('station-vault-pane-equip');
+  const paneCrew = document.getElementById('station-vault-pane-crew');
+  const btnEquip = document.getElementById('station-vault-tab-btn-equip');
+  const btnCrew = document.getElementById('station-vault-tab-btn-crew');
+  const isCrew = (tab === 'crew');
+  if (paneEquip) paneEquip.style.display = isCrew ? 'none' : 'flex';
+  if (paneCrew) paneCrew.style.display = isCrew ? 'flex' : 'none';
+  if (btnEquip) btnEquip.classList.toggle('is-active', !isCrew);
+  if (btnCrew) btnCrew.classList.toggle('is-active', isCrew);
+  if (isCrew) stationVaultLoadCrew_();
+};
+
+window.stationCloseVault = function() {
+  stationVaultCancelRecord_();
+  if (typeof window.stationVaultCloseSheet_ === 'function') window.stationVaultCloseSheet_();
+  const panel = document.getElementById('station-vault');
+  if (panel) panel.classList.remove('is-open');
+};
+
+function stationVaultIsOpen_() {
+  const panel = document.getElementById('station-vault');
+  return !!(panel && panel.classList.contains('is-open'));
+}
+
+function stationVaultLoad_() {
+  const host = stationReadHostSession_();
+  const statusEl = document.getElementById('station-vault-status');
+  const listEl = document.getElementById('station-vault-list');
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading vault…'; }
+  if (listEl) listEl.innerHTML = '';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = (res && res.error) ? res.error : 'Could not load vault.'; }
+        return;
+      }
+      window.stationVaultItems = res.items || [];
+      window.stationVaultCanRecord = !!res.canRecordRfid;
+      stationVaultRenderList_();
+    })
+    .withFailureHandler(function(err) {
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); }
+    })
+    .getStationVaultList(ACTIVE_USER_NAME, host ? host.name : '');
+}
+
+function stationVaultEsc_(v) {
+  return String(v == null ? '' : v).replace(/[<&>"']/g, function(c) {
+    return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : (c === "'" ? '&#39;' : '&amp;')));
+  });
+}
+
+/** Same status colours the real vault uses. */
+function stationVaultStatusColor_(status) {
+  const s = String(status || '').toLowerCase();
+  if (s.indexOf('maintenance') !== -1) return '#f59e0b';
+  if (s.indexOf('damaged') !== -1) return '#eab308';
+  if (s.indexOf('broken') !== -1 || s.indexOf('retired') !== -1) return '#ef4444';
+  return '#10b981';
+}
+
+function stationPanelPerm_(key) {
+  const boot = window.stationShellBootstrap;
+  if (boot && boot.permissions && boot.permissions[key] === true) return true;
+  // Legacy profiles: damaged permission column may be empty while broken is on.
+  if (key === 'station_vault_damaged' && boot && boot.permissions && boot.permissions.station_vault_broken === true) return true;
+  return false;
+}
+
+window.stationToggleScanPanel = function() {
+  if (window.stationScanPanelOpen) stationCloseScanPanel();
+  else stationOpenScanPanel();
+};
+
+function stationScanPanelOutsideClick_(e) {
+  var ctrls = document.getElementById('station-device-controls');
+  if (ctrls && ctrls.contains(e.target)) return;
+  stationCloseScanPanel();
+}
+
+function stationPositionScanPanel_() {
+  var header = document.querySelector('.station-shell-header');
+  var panel = document.getElementById('station-scan-panel');
+  if (!header || !panel) return;
+  var top = header.getBoundingClientRect().bottom;
+  panel.style.top = top + 'px';
+  panel.style.bottom = '0';
+}
+
+function stationScanPanelResize_() {
+  if (window.stationScanPanelOpen) stationPositionScanPanel_();
+}
+
+window.stationOpenScanPanel = function() {
+  window.stationScanPanelOpen = true;
+  const panel = document.getElementById('station-scan-panel');
+  const btn = document.getElementById('station-btn-scan-panel');
+  if (panel) {
+    panel.classList.add('is-open');
+    panel.setAttribute('aria-hidden', 'false');
+    stationPositionScanPanel_();
+  }
+  if (btn) btn.classList.add('is-panel-open');
+  stationSyncPanelReadModeUI_();
+  stationPanelRenderLast_();
+  window.addEventListener('resize', stationScanPanelResize_);
+  setTimeout(function() {
+    document.addEventListener('pointerdown', stationScanPanelOutsideClick_, true);
+  }, 0);
+};
+
+window.stationCloseScanPanel = function() {
+  window.stationScanPanelOpen = false;
+  window.stationPanelPendingStatus = null;
+  document.removeEventListener('pointerdown', stationScanPanelOutsideClick_, true);
+  window.removeEventListener('resize', stationScanPanelResize_);
+  const panel = document.getElementById('station-scan-panel');
+  const btn = document.getElementById('station-btn-scan-panel');
+  if (panel) {
+    panel.classList.remove('is-open');
+    panel.setAttribute('aria-hidden', 'true');
+    panel.style.top = '';
+    panel.style.bottom = '';
+  }
+  if (btn) btn.classList.remove('is-panel-open');
+  const noteEl = document.getElementById('station-panel-note');
+  if (noteEl) { noteEl.style.display = 'none'; noteEl.value = ''; }
+};
+
+function stationSyncPanelReadModeUI_() {
+  var mode = stationStoredSetting_(STATION_MODE_KEY) || 'single';
+  var singleBtn = document.getElementById('station-panel-mode-single');
+  var multiBtn = document.getElementById('station-panel-mode-multi');
+  var isMulti = (mode === 'multi');
+  var isContinuous = (mode === 'continuous');
+  if (singleBtn) singleBtn.classList.toggle('is-active', !isMulti && !isContinuous);
+  if (multiBtn) multiBtn.classList.toggle('is-active', isMulti);
+}
+
+window.stationSetPanelReadMode = function(mode) {
+  if (mode !== 'single' && mode !== 'multi') return;
+  stationSetStoredSetting_(STATION_MODE_KEY, mode);
+  var modeEl = document.getElementById('station-set-mode');
+  if (modeEl) modeEl.value = mode;
+  stationUpdateSpeedVisibility_();
+  stationApplyGunSetting_('scanMode', mode);
+  stationSyncPanelReadModeUI_();
+};
+
+function stationPanelReadPresets_() {
+  try {
+    const raw = localStorage.getItem(STATION_PRESET_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch (e) { return {}; }
+}
+
+function stationPanelWritePresets_(obj) {
+  try { localStorage.setItem(STATION_PRESET_STORAGE_KEY, JSON.stringify(obj || {})); } catch (e) { /* ignore */ }
+}
+
+function stationPanelApplyPreset_(slot) {
+  const presets = stationPanelReadPresets_();
+  const val = presets[slot];
+  if (val == null) {
+    stationSetStatus_('No saved preset for ' + slot + ' — hold the button to save.', 'error');
+    return;
+  }
+  const powerEl = document.getElementById('station-set-power');
+  if (powerEl) powerEl.value = val;
+  stationSavePower();
+  stationSetStatus_('Loaded ' + slot + ' preset (' + val + ' dBm).', 'ok');
+}
+
+function stationPanelSavePreset_(slot) {
+  const powerEl = document.getElementById('station-set-power');
+  if (!powerEl || !powerEl.value) return;
+  const presets = stationPanelReadPresets_();
+  presets[slot] = parseInt(powerEl.value, 10);
+  stationPanelWritePresets_(presets);
+  const btn = document.getElementById('station-preset-' + slot);
+  if (btn) {
+    btn.classList.add('station-preset-saved');
+    setTimeout(function() { btn.classList.remove('station-preset-saved'); }, 1200);
+  }
+  stationSetStatus_('Saved ' + slot + ' preset (' + powerEl.value + ' dBm).', 'ok');
+}
+
+function stationBindPresetButtons_() {
+  ['low', 'mid', 'high'].forEach(function(slot) {
+    const btn = document.getElementById('station-preset-' + slot);
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    let holdTimer = null;
+    let held = false;
+    function clearHold() {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    }
+    btn.addEventListener('pointerdown', function() {
+      held = false;
+      clearHold();
+      holdTimer = setTimeout(function() {
+        held = true;
+        stationPanelSavePreset_(slot);
+      }, STATION_PRESET_HOLD_MS);
+    });
+    btn.addEventListener('pointerup', function() {
+      clearHold();
+      if (!held) stationPanelApplyPreset_(slot);
+    });
+    btn.addEventListener('pointerleave', clearHold);
+    btn.addEventListener('pointercancel', clearHold);
+  });
+}
+
+function stationPanelUpdateEquipEntry_(unitId, status, statusNote) {
+  if (!unitId) return;
+  const map = window.stationEquipMap || {};
+  Object.keys(map).forEach(function(epc) {
+    const e = map[epc];
+    if (e && String(e.unitId) === String(unitId)) {
+      e.status = status;
+      e.statusNote = statusNote || '';
+    }
+  });
+  try {
+    localStorage.setItem(STATION_EQUIP_MAP_KEY, JSON.stringify({ map: map, ts: Date.now() }));
+  } catch (e) { /* ignore */ }
+  const items = window.stationVaultItems || [];
+  items.forEach(function(it) {
+    if (String(it.id) === String(unitId)) {
+      it.status = status;
+      it.statusNote = statusNote || '';
+    }
+  });
+}
+
+function stationPanelHandleScan_(tag, tid) {
+  stationResetHostIdleTimer_();
+  const hit = stationResolveEpc_(tag);
+  if (hit && hit.kind === 'crew') {
+    window.stationPanelSelection = { kind: 'crew', tag: tag, name: hit.name };
+  } else {
+    const crewHit = stationLookupCrewHostLocal_(tag, tid || '');
+    if (crewHit.crew) {
+      window.stationPanelSelection = { kind: 'crew', tag: tag, name: crewHit.crew.name };
+    } else if (hit && hit.unitId) {
+      window.stationPanelSelection = {
+        kind: 'equipment',
+        tag: tag,
+        unitId: hit.unitId,
+        name: hit.name,
+        unitNumber: hit.unitNumber,
+        status: hit.status || 'Active',
+        statusNote: hit.statusNote || ''
+      };
+    } else {
+      window.stationPanelSelection = { kind: 'unknown', tag: tag };
+    }
+  }
+  stationPanelRenderLast_();
+}
+
+function stationPanelRenderLast_() {
+  const nameEl = document.getElementById('station-panel-last-name');
+  const metaEl = document.getElementById('station-panel-last-meta');
+  const statusEl = document.getElementById('station-panel-last-status');
+  const noteEl = document.getElementById('station-panel-note');
+  const sel = window.stationPanelSelection;
+  if (!nameEl) return;
+  if (!sel) {
+    nameEl.textContent = 'Scan equipment to select';
+    if (metaEl) metaEl.textContent = '';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) { noteEl.style.display = 'none'; noteEl.value = ''; }
+    stationPanelRenderActions_();
+    return;
+  }
+  if (sel.kind === 'crew') {
+    nameEl.textContent = sel.name || 'Crew badge';
+    if (metaEl) metaEl.textContent = 'Crew badge — status actions apply to equipment only';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) noteEl.style.display = 'none';
+    stationPanelRenderActions_();
+    return;
+  }
+  if (sel.kind === 'unknown') {
+    nameEl.textContent = 'Unknown tag';
+    if (metaEl) metaEl.textContent = sel.tag || '';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) noteEl.style.display = 'none';
+    stationPanelRenderActions_();
+    return;
+  }
+  nameEl.textContent = sel.name || 'Equipment';
+  if (metaEl) metaEl.textContent = (sel.unitNumber ? ('Unit ' + sel.unitNumber + ' · ') : '') + (sel.tag || '');
+  const st = sel.status || 'Active';
+  const color = stationVaultStatusColor_(st);
+  if (statusEl) {
+    statusEl.innerHTML = '<span style="color:' + color + '; font-weight:800;">' + st.toUpperCase() + '</span>'
+      + (sel.statusNote ? (' — ' + sel.statusNote) : '');
+  }
+  if (noteEl && window.stationPanelPendingStatus !== 'Damaged') {
+    noteEl.style.display = 'none';
+    noteEl.value = sel.statusNote || '';
+  }
+  stationPanelRenderActions_();
+}
+
+function stationPanelRenderActions_() {
+  const wrap = document.getElementById('station-panel-actions');
+  if (!wrap) return;
+  const sel = window.stationPanelSelection;
+  const host = stationReadHostSession_();
+  if (!host) {
+    wrap.innerHTML = '<div class="station-scan-panel__hint">Scan your crew badge to host before changing status.</div>';
+    return;
+  }
+  if (!sel || sel.kind !== 'equipment') {
+    wrap.innerHTML = '<div class="station-scan-panel__hint">Scan a tagged piece of equipment.</div>';
+    return;
+  }
+  const st = String(sel.status || 'Active').toLowerCase();
+  const btns = [];
+  function add(label, status, style) {
+    btns.push('<button type="button" class="btn-outline btn-sm" style="margin:0;' + (style || '') + '" onclick="stationPanelAskStatus_(\'' + status + '\')">' + label + '</button>');
+  }
+  if (st === 'active' || st === '') {
+    if (stationPanelPerm_('station_vault_maintenance')) add('Maintenance', 'Maintenance', 'border-color:#f59e0b;color:#f59e0b;');
+    if (stationPanelPerm_('station_vault_damaged')) add('Damaged', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (stationPanelPerm_('station_vault_broken')) add('Broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+  } else if (st.indexOf('damaged') !== -1) {
+    if (stationPanelPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+    if (stationPanelPerm_('station_vault_damaged')) add('Edit problem', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (stationPanelPerm_('station_vault_broken')) add('Mark broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+    if (stationPanelPerm_('station_vault_maintenance')) add('Maintenance', 'Maintenance', 'border-color:#f59e0b;color:#f59e0b;');
+  } else if (st.indexOf('broken') !== -1 || st.indexOf('maintenance') !== -1) {
+    if (stationPanelPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+    if (st.indexOf('maintenance') !== -1 && stationPanelPerm_('station_vault_damaged')) add('Damaged', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (st.indexOf('maintenance') !== -1 && stationPanelPerm_('station_vault_broken')) add('Broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+  } else {
+    if (stationPanelPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+  }
+  if (window.stationPanelPendingStatus === 'Damaged') {
+    btns.push('<button type="button" class="btn-main btn-sm" style="margin:0; flex:1 1 100%;" onclick="stationPanelConfirmDamaged_()">Save damaged</button>');
+    btns.push('<button type="button" class="btn-close btn-sm" style="margin:0;" onclick="stationPanelCancelNote_()">Cancel</button>');
+  }
+  wrap.innerHTML = btns.join('');
+}
+
+window.stationPanelAskStatus_ = function(status) {
+  const sel = window.stationPanelSelection;
+  if (!sel || sel.kind !== 'equipment') return;
+  if (status === 'Damaged') {
+    window.stationPanelPendingStatus = 'Damaged';
+    const noteEl = document.getElementById('station-panel-note');
+    if (noteEl) {
+      noteEl.style.display = 'block';
+      noteEl.value = sel.statusNote || '';
+      noteEl.focus();
+    }
+    stationPanelRenderActions_();
+    return;
+  }
+  const noteEl = document.getElementById('station-panel-note');
+  const note = (noteEl && noteEl.value) ? noteEl.value.trim() : '';
+  stationPanelCommitStatus_(status, note);
+};
+
+window.stationPanelConfirmDamaged_ = function() {
+  const noteEl = document.getElementById('station-panel-note');
+  const note = noteEl ? noteEl.value.trim() : '';
+  if (!note) {
+    stationSetStatus_('Describe what is wrong before marking Damaged.', 'error');
+    if (noteEl) noteEl.focus();
+    return;
+  }
+  stationPanelCommitStatus_('Damaged', note);
+};
+
+window.stationPanelCancelNote_ = function() {
+  window.stationPanelPendingStatus = null;
+  const noteEl = document.getElementById('station-panel-note');
+  if (noteEl) noteEl.style.display = 'none';
+  stationPanelRenderActions_();
+};
+
+function stationPanelCommitStatus_(status, note) {
+  const host = stationReadHostSession_();
+  const sel = window.stationPanelSelection;
+  if (!host || !sel || !sel.unitId) return;
+  stationSetStatus_('Saving…', '');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationPanelPendingStatus = null;
+      if (!res || !res.success) {
+        stationSetStatus_((res && res.error) ? res.error : 'Could not update status.', 'error');
+        return;
+      }
+      sel.status = res.status;
+      sel.statusNote = res.statusNote || '';
+      stationPanelUpdateEquipEntry_(sel.unitId, res.status, res.statusNote);
+      stationPanelRenderLast_();
+      stationSetStatus_('Updated → ' + (res.label || res.status), 'ok');
+      stationRenderScanFeed_();
+    })
+    .withFailureHandler(function(err) {
+      stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .setStationAssetStatus(ACTIVE_USER_NAME, host.name, sel.unitId, status, note || '');
+}
+
+/**
+ * Logical-parent rollup: identical unique units (same name|manufacturer|length) collapse under
+ * one folder line — mirrors renderAssetRegistry in the real vault (06b1). Bulk rows stay standalone
+ * (keyed by id) because they can't carry per-piece RFID. Returns [{ key, items:[...] }].
+ */
+function stationVaultBuildGroups_(items) {
+  const map = {};
+  const groups = [];
+  (items || []).forEach(function(a) {
+    let key = (a.name || 'Unnamed') + '|' + (a.manufacturer || '') + '|' + (a.length || '');
+    if (a.isBulk) key += '|' + a.id;
+    if (!map[key]) { map[key] = { key: key, items: [] }; groups.push(map[key]); }
+    map[key].items.push(a);
+  });
+  return groups;
+}
+
+/** Which unit ids inside a group still need a tag (drives untagged-only cascade recording). */
+function stationVaultUntaggedIds_(group) {
+  return (group.items || []).filter(function(x) { return !x.isBulk && !String(x.rfidTag || '').trim(); }).map(function(x) { return String(x.id); });
+}
+
+function stationVaultRowHtml_(it, isChild) {
+  const statusLabel = it.status || 'Active';
+  const color = stationVaultStatusColor_(statusLabel);
+  const idAttr = stationVaultEsc_(it.id);
+  return '<div class="station-vault-row' + (isChild ? ' is-child' : '') + '" onclick="stationVaultOpenSheet_(\'' + idAttr + '\')">'
+    + '<span class="station-vault-row__name">' + stationVaultEsc_(it.name || 'Unnamed') + '</span>'
+    + (it.unitNumber ? '<span class="station-vault-row__unit">#' + stationVaultEsc_(it.unitNumber) + '</span>' : '')
+    + '<span class="station-vault-row__status" style="color:' + color + '; border-color:' + color + ';">' + stationVaultEsc_(statusLabel) + '</span>'
+    + '</div>';
+}
+
+function stationVaultRenderList_() {
+  const listEl = document.getElementById('station-vault-list');
+  const statusEl = document.getElementById('station-vault-status');
+  if (!listEl) return;
+  const q = (document.getElementById('station-vault-search') || {}).value || '';
+  const needle = q.trim().toLowerCase();
+  let items = window.stationVaultItems || [];
+  if (needle) {
+    items = items.filter(function(it) {
+      return (String(it.name || '') + ' ' + String(it.unitNumber || '') + ' ' + String(it.rfidTag || '')).toLowerCase().indexOf(needle) !== -1;
+    });
+  }
+  if (!items.length) {
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = (window.stationVaultItems || []).length ? 'No matches.' : 'Vault is empty.'; }
+    listEl.innerHTML = '';
+    window.stationVaultGroups = [];
+    return;
+  }
+  if (statusEl) statusEl.style.display = 'none';
+
+  let groups = stationVaultBuildGroups_(items).slice(0, 250);
+  window.stationVaultGroups = groups;
+  if (!window.stationVaultExpanded) window.stationVaultExpanded = {};
+  const expanded = window.stationVaultExpanded;
+
+  let html = '';
+  groups.forEach(function(g, gi) {
+    if (g.items.length === 1) {
+      html += stationVaultRowHtml_(g.items[0], false);
+      return;
+    }
+    // Folder line: identical units collapsed under a logical parent (▶ triangle expands).
+    const a = g.items[0];
+    const mixedStatus = !g.items.every(function(x) { return x.status === a.status; });
+    const statusLabel = mixedStatus ? 'Mixed' : (a.status || 'Active');
+    const color = mixedStatus ? '#888' : stationVaultStatusColor_(statusLabel);
+    const isOpen = needle ? true : !!expanded[g.key];
+    html += '<div class="station-vault-row is-group" onclick="stationVaultOpenGroupSheet_(' + gi + ')">'
+      + '<span class="station-vault-row__caret' + (isOpen ? ' is-open' : '') + '" onclick="event.stopPropagation(); stationVaultToggleGroup_(' + gi + ')">&#9654;</span>'
+      + '<span class="station-vault-row__name">' + stationVaultEsc_(a.name || 'Unnamed') + '</span>'
+      + '<span class="station-vault-row__count">' + g.items.length + '</span>'
+      + '<span class="station-vault-row__status" style="color:' + color + '; border-color:' + color + ';">' + stationVaultEsc_(statusLabel) + '</span>'
+      + '</div>';
+    html += '<div class="station-vault-children" id="station-vault-grp-' + gi + '" style="display:' + (isOpen ? 'block' : 'none') + ';">';
+    g.items.forEach(function(child) { html += stationVaultRowHtml_(child, true); });
+    html += '</div>';
+  });
+  listEl.innerHTML = html;
+}
+
+window.stationVaultToggleGroup_ = function(gi) {
+  const groups = window.stationVaultGroups || [];
+  const g = groups[gi];
+  if (!g) return;
+  if (!window.stationVaultExpanded) window.stationVaultExpanded = {};
+  const nowOpen = !window.stationVaultExpanded[g.key];
+  window.stationVaultExpanded[g.key] = nowOpen;
+  const box = document.getElementById('station-vault-grp-' + gi);
+  if (box) box.style.display = nowOpen ? 'block' : 'none';
+  const row = box && box.previousElementSibling;
+  const caret = row && row.querySelector('.station-vault-row__caret');
+  if (caret) caret.classList.toggle('is-open', nowOpen);
+};
+
+/* ---- Vault action sheet (tap a line or a folder) ---- */
+// { type:'unit'|'group', unitIds:[...], name:'', canRecord:bool }
+window.stationVaultActive = null;
+
+/** Tap a single unit line. */
+window.stationVaultOpenSheet_ = function(assetId) {
+  const it = (window.stationVaultItems || []).find(function(x) { return String(x.id) === String(assetId); });
+  if (!it) return;
+  const canRec = window.stationVaultCanRecord && !it.isBulk;
+  window.stationVaultActive = { type: 'unit', unitIds: [String(assetId)], name: it.name || 'Unnamed', canRecord: canRec };
+  const bits = [];
+  if (it.unitNumber) bits.push('Unit #' + it.unitNumber);
+  bits.push('Status: ' + (it.status || 'Active'));
+  if (it.statusNote) bits.push('Problem: ' + it.statusNote);
+  bits.push(it.rfidTag ? ('Tag: ' + it.rfidTag) : (it.isBulk ? 'Bulk — no per-piece tag' : 'No tag yet'));
+  stationVaultShowSheet_(it.name || 'Unnamed', bits.join('  ·  '), canRec ? 'Record RFID' : '');
+};
+
+/** Tap a collapsed folder (logical parent of identical units). */
+window.stationVaultOpenGroupSheet_ = function(gi) {
+  const g = (window.stationVaultGroups || [])[gi];
+  if (!g) return;
+  const a = g.items[0];
+  const unitIds = g.items.filter(function(x) { return !x.isBulk; }).map(function(x) { return String(x.id); });
+  const untagged = stationVaultUntaggedIds_(g);
+  const canRec = window.stationVaultCanRecord && untagged.length > 0;
+  window.stationVaultActive = { type: 'group', unitIds: unitIds, untaggedIds: untagged, name: a.name || 'Unnamed', canRecord: canRec };
+  const bits = [g.items.length + ' identical units', (g.items.length - untagged.length) + ' tagged', untagged.length + ' untagged'];
+  const recLabel = untagged.length ? ('Record RFID · ' + untagged.length + ' to tag') : '';
+  stationVaultShowSheet_(a.name || 'Unnamed', bits.join('  ·  '), recLabel);
+};
+
+function stationVaultShowSheet_(title, meta, recordLabel) {
+  const titleEl = document.getElementById('station-vault-sheet-title');
+  const metaEl = document.getElementById('station-vault-sheet-meta');
+  const recBtn = document.getElementById('station-vault-act-record');
+  const noteEl = document.getElementById('station-vault-sheet-note');
+  window.stationVaultPendingDamaged = false;
+  if (titleEl) titleEl.textContent = title;
+  if (metaEl) metaEl.textContent = meta;
+  if (noteEl) { noteEl.style.display = 'none'; noteEl.value = ''; }
+  if (recBtn) {
+    recBtn.style.display = recordLabel ? 'block' : 'none';
+    recBtn.textContent = recordLabel || 'Record RFID';
+  }
+  const sheet = document.getElementById('station-vault-sheet');
+  if (sheet) sheet.classList.add('is-open');
+}
+
+window.stationVaultCloseSheet_ = function() {
+  window.stationVaultActive = null;
+  const sheet = document.getElementById('station-vault-sheet');
+  if (sheet) sheet.classList.remove('is-open');
+};
+
+window.stationVaultSheetStatus_ = function(status) {
+  const act = window.stationVaultActive;
+  if (!act || !act.unitIds.length) return;
+  if (status === 'Damaged') {
+    const noteEl = document.getElementById('station-vault-sheet-note');
+    if (!window.stationVaultPendingDamaged) {
+      window.stationVaultPendingDamaged = true;
+      if (noteEl) {
+        noteEl.style.display = 'block';
+        const first = (window.stationVaultItems || []).find(function(x) { return String(x.id) === String(act.unitIds[0]); });
+        noteEl.value = (first && first.statusNote) ? first.statusNote : '';
+        noteEl.focus();
+      }
+      stationSetStatus_('Describe the problem, then tap Damaged again to save.', '');
+      return;
+    }
+    const note = noteEl ? noteEl.value.trim() : '';
+    if (!note) { alert('Describe what is wrong (e.g. gobo rotation error).'); if (noteEl) noteEl.focus(); return; }
+    window.stationVaultPendingDamaged = false;
+    stationVaultCloseSheet_();
+    stationVaultSetStatusMany_(act.unitIds, status, note);
+    return;
+  }
+  window.stationVaultPendingDamaged = false;
+  stationVaultCloseSheet_();
+  stationVaultSetStatusMany_(act.unitIds, status);
+};
+
+window.stationVaultSheetRecord_ = function() {
+  const act = window.stationVaultActive;
+  if (!act) return;
+  stationVaultCloseSheet_();
+  // Groups cascade through the still-untagged units; a single unit records just itself.
+  const ids = act.type === 'group' ? (act.untaggedIds || []) : act.unitIds;
+  stationVaultStartRecord_(ids);
+};
+
+/** Apply a status to one or many units sequentially, then re-render once. */
+window.stationVaultSetStatusMany_ = function(ids, status, note) {
+  const host = stationReadHostSession_();
+  if (!host) { stationCloseVault(); stationSetStatus_('Scan your badge first.', 'error'); return; }
+  stationResetHostIdleTimer_();
+  const queue = (ids || []).slice();
+  let failed = 0;
+  function next() {
+    if (!queue.length) {
+      stationVaultRenderList_();
+      if (failed) alert(failed + ' unit(s) could not be updated.');
+      stationRefreshEquipMap_();
+      return;
+    }
+    const assetId = queue.shift();
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res && res.success) {
+          const it = (window.stationVaultItems || []).find(function(x) { return String(x.id) === String(assetId); });
+          if (it) {
+            it.status = res.status;
+            it.statusNote = res.statusNote || '';
+          }
+          stationPanelUpdateEquipEntry_(assetId, res.status, res.statusNote);
+        } else { failed++; }
+        next();
+      })
+      .withFailureHandler(function() { failed++; next(); })
+      .setStationAssetStatus(ACTIVE_USER_NAME, host.name, assetId, status, note || '');
+  }
+  next();
+};
+
+/** Arm record mode with a queue of unit ids (cascade). */
+window.stationVaultStartRecord_ = function(ids) {
+  if (!window.stationVaultCanRecord) { alert('Only managers can record equipment RFIDs.'); return; }
+  const host = stationReadHostSession_();
+  if (!host) { stationCloseVault(); stationSetStatus_('Scan your badge first.', 'error'); return; }
+  const list = (ids || []).map(String);
+  if (!list.length) { alert('Nothing to tag — every unit already has a tag.'); return; }
+  const names = {};
+  list.forEach(function(id) {
+    const it = (window.stationVaultItems || []).find(function(x) { return String(x.id) === id; });
+    names[id] = it ? ((it.name || id) + (it.unitNumber ? ' #' + it.unitNumber : '')) : id;
+  });
+  window.stationVaultRecord = { queue: list, names: names };
+  stationVaultRenderRecordBar_();
+};
+
+function stationVaultRenderRecordBar_() {
+  const bar = document.getElementById('station-vault-record-bar');
+  const txt = document.getElementById('station-vault-record-text');
+  const rec = window.stationVaultRecord;
+  if (!bar) return;
+  if (!rec || !rec.queue.length) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const id = rec.queue[0];
+  const remain = rec.queue.length > 1 ? (' · ' + (rec.queue.length - 1) + ' more after') : '';
+  if (txt) txt.textContent = 'Pull the trigger on the tag for: ' + (rec.names[id] || id) + remain;
+}
+
+window.stationVaultCancelRecord_ = function() {
+  window.stationVaultRecord = null;
+  window.stationCrewRecord = null;
+  window.stationPendingOverwrite_ = null;
+  const ow = document.getElementById('station-vault-record-overwrite');
+  if (ow) ow.style.display = 'none';
+  stationVaultRenderRecordBar_();
+};
+
+/**
+ * A scanned tag came back already-owned. Reconfigure the record bar into an Overwrite / Cancel
+ * confirm, stashing the retry (which re-issues the same write with force=true = steal the tag).
+ */
+function stationShowOverwritePrompt_(owner, retryFn) {
+  window.stationPendingOverwrite_ = retryFn;
+  const bar = document.getElementById('station-vault-record-bar');
+  const txt = document.getElementById('station-vault-record-text');
+  const ow = document.getElementById('station-vault-record-overwrite');
+  if (bar) bar.style.display = 'flex';
+  if (txt) txt.textContent = 'Tag already on ' + (owner.kind === 'crew' ? 'crew: ' : '') + (owner.name || 'another record') + '. Overwrite (move it here) or Cancel?';
+  if (ow) ow.style.display = 'inline-block';
+}
+
+window.stationVaultConfirmOverwrite_ = function() {
+  const fn = window.stationPendingOverwrite_;
+  window.stationPendingOverwrite_ = null;
+  const ow = document.getElementById('station-vault-record-overwrite');
+  if (ow) ow.style.display = 'none';
+  if (typeof fn === 'function') fn();
+};
+
+/** Consume a scan into the current record target. Returns true if the scan was used. */
+function stationVaultConsumeScan_(tag) {
+  const rec = window.stationVaultRecord;
+  if (!rec || !rec.queue.length) return false;
+  if (window.stationVaultRecordBusy) return true; // swallow scans while a save is in flight
+  const host = stationReadHostSession_();
+  if (!host) { stationVaultCancelRecord_(); return true; }
+  const assetId = rec.queue[0];
+  stationVaultRecordCall_(assetId, tag, false);
+  return true;
+}
+
+/** The actual record write, split out so the Overwrite button can re-issue it with force=true. */
+function stationVaultRecordCall_(assetId, tag, force) {
+  const host = stationReadHostSession_();
+  if (!host) { stationVaultCancelRecord_(); return; }
+  window.stationVaultRecordBusy = true;
+  stationResetHostIdleTimer_();
+  const rec = window.stationVaultRecord;
+  const label = (rec && rec.names && rec.names[assetId]) ? rec.names[assetId] : assetId;
+  const txt = document.getElementById('station-vault-record-text');
+  if (txt) txt.textContent = (force ? 'Overwriting tag for ' : 'Saving tag for ') + label + '…';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationVaultRecordBusy = false;
+      if (res && res.duplicate) {
+        stationShowOverwritePrompt_(res.duplicate, function() { stationVaultRecordCall_(assetId, tag, true); });
+        return;
+      }
+      if (!res || !res.success) {
+        if (txt) txt.textContent = ((res && res.error) ? res.error : 'Record failed.') + ' Try again or Cancel.';
+        return;
+      }
+      const it = (window.stationVaultItems || []).find(function(x) { return String(x.id) === String(assetId); });
+      if (it) it.rfidTag = res.rfidTag;
+      // Refresh the live-strip resolver so the new tag shows a name immediately.
+      stationRefreshEquipMap_();
+      const cur = window.stationVaultRecord;
+      if (cur && cur.queue.length) cur.queue.shift();
+      stationVaultRenderList_();
+      window.stationVaultRecord = (cur && cur.queue.length) ? cur : null;
+      stationVaultRenderRecordBar_();
+    })
+    .withFailureHandler(function(err) {
+      window.stationVaultRecordBusy = false;
+      if (txt) txt.textContent = 'Error: ' + (err && err.message ? err.message : String(err)) + ' — Cancel to stop.';
+    })
+    .recordStationAssetRfid(ACTIVE_USER_NAME, host.name, assetId, tag, !!force);
+}
+
+/* ==========================================================================
+   VAULT → CREW TAB (ROOT only): assign / overwrite crew badge RFIDs
+   ========================================================================== */
+window.stationVaultCrew = null;   // cached crew list [{uid,name,rfidTag}]
+window.stationCrewRecord = null;  // { ref, name } while armed for a crew badge scan
+
+function stationVaultLoadCrew_() {
+  const host = stationReadHostSession_();
+  const statusEl = document.getElementById('station-vault-crew-status');
+  const listEl = document.getElementById('station-vault-crew-list');
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading crew…'; }
+  if (listEl) listEl.innerHTML = '';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = (res && res.error) ? res.error : 'Could not load crew.'; }
+        return;
+      }
+      window.stationVaultCrew = res.crew || [];
+      stationVaultRenderCrew_();
+    })
+    .withFailureHandler(function(err) {
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Error: ' + (err && err.message ? err.message : String(err)); }
+    })
+    .getStationCrewRfidList(ACTIVE_USER_NAME, host ? host.name : '');
+}
+
+window.stationVaultRenderCrew_ = function() {
+  const listEl = document.getElementById('station-vault-crew-list');
+  const statusEl = document.getElementById('station-vault-crew-status');
+  if (!listEl) return;
+  const all = window.stationVaultCrew || [];
+  const q = (document.getElementById('station-vault-crew-search') || {}).value || '';
+  const needle = q.toLowerCase().trim();
+  const rows = needle ? all.filter(function(c) { return String(c.name).toLowerCase().indexOf(needle) !== -1; }) : all;
+  if (statusEl) statusEl.style.display = 'none';
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="station-shell-status" style="text-align:center;padding:20px;">No crew match.</div>';
+    return;
+  }
+  listEl.innerHTML = rows.map(function(c) {
+    const ref = stationVaultEsc_(c.uid || c.name);
+    const nm = stationVaultEsc_(c.name);
+    const tag = c.rfidTag
+      ? '<span class="station-vault-crew-row__tag has-tag">' + stationVaultEsc_(c.rfidTag) + '</span>'
+      : '<span class="station-vault-crew-row__tag no-tag">no badge</span>';
+    return '<div class="station-vault-crew-row" onclick="stationVaultStartCrewRecord_(\'' + ref + '\',\'' + nm.replace(/'/g, "\\'") + '\')">'
+      + '<span class="station-vault-crew-row__name">' + nm + '</span>' + tag + '</div>';
+  }).join('');
+};
+
+window.stationVaultStartCrewRecord_ = function(ref, name) {
+  const host = stationReadHostSession_();
+  if (!host) { stationSetStatus_('Scan your badge first.', 'error'); return; }
+  window.stationVaultRecord = null; // never mix with equipment recording
+  window.stationCrewRecord = { ref: ref, name: name };
+  const bar = document.getElementById('station-vault-record-bar');
+  const txt = document.getElementById('station-vault-record-text');
+  if (bar) bar.style.display = 'flex';
+  if (txt) txt.textContent = 'Pull the trigger on ' + name + '’s badge…';
+  stationResetHostIdleTimer_();
+};
+
+/** Consume a scan onto the armed crew member. Returns true if used. */
+function stationCrewConsumeScan_(tag, tid) {
+  const rec = window.stationCrewRecord;
+  if (!rec) return false;
+  if (window.stationCrewRecordBusy) return true;
+  const host = stationReadHostSession_();
+  if (!host) { stationVaultCancelRecord_(); return true; }
+  stationCrewRecordCall_(rec, tag, tid, false);
+  return true;
+}
+
+/** Crew enroll write, split out so the Overwrite button can re-issue it with force=true. */
+function stationCrewRecordCall_(rec, tag, tid, force) {
+  const host = stationReadHostSession_();
+  if (!host) { stationVaultCancelRecord_(); return; }
+  window.stationCrewRecordBusy = true;
+  stationResetHostIdleTimer_();
+  const txt = document.getElementById('station-vault-record-text');
+  if (txt) txt.textContent = (force ? 'Overwriting badge for ' : 'Linking badge to ') + rec.name + '…';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationCrewRecordBusy = false;
+      if (res && res.duplicate) {
+        stationShowOverwritePrompt_(res.duplicate, function() { stationCrewRecordCall_(rec, tag, tid, true); });
+        return;
+      }
+      if (!res || !res.success) {
+        if (txt) txt.textContent = ((res && res.error) ? res.error : 'Enrollment failed.') + ' Try again or Cancel.';
+        return;
+      }
+      // Reflect the new tag in the cached crew row + refresh the live-strip resolver.
+      const c = (window.stationVaultCrew || []).find(function(x) { return String(x.uid || x.name) === String(rec.ref) || String(x.name) === String(rec.name); });
+      if (c) {
+        c.rfidTag = tag;
+        c.rfidTid = tid || '';
+      }
+      stationVaultRenderCrew_();
+      stationRefreshEquipMap_();
+      window.stationCrewRecord = null;
+      stationVaultRenderRecordBar_();
+      stationSetStatus_('Badge linked to ' + rec.name + (tid ? ' (TID ok)' : ''), 'ok');
+    })
+    .withFailureHandler(function(err) {
+      window.stationCrewRecordBusy = false;
+      if (txt) txt.textContent = 'Error: ' + (err && err.message ? err.message : String(err)) + ' — Cancel to stop.';
+    })
+    .enrollStationCrewRfidTag(ACTIVE_USER_NAME, host.name, rec.ref, tag, !!force, tid || '');
+}
+
+window.stationCloseProjectPicker = function() {
+  const panel = document.getElementById('station-project-picker');
+  if (panel) panel.classList.remove('is-open');
+};
+
+function stationOpenProjectPicker_() {
+  const panel = document.getElementById('station-project-picker');
+  const statusEl = document.getElementById('station-project-picker-status');
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!panel) return;
+  panel.classList.add('is-open');
+
+  // Instant path: the host's projects were warmed on sign-in (same list as their personal profile).
+  if (window.stationProjectsCache && window.stationProjectsCache.length) {
+    stationRenderProjectList_(window.stationProjectsCache);
+    return;
+  }
+  if (listEl) listEl.innerHTML = '';
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading projects…'; }
+
+  const host = stationReadHostSession_();
+  if (!host || !host.name) {
+    if (statusEl) statusEl.textContent = 'Scan your badge first.';
+    return;
+  }
+  // Fetch scoped to the HOST (person), never the device account — that's why it used to hang.
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      const projects = (payload && payload.projects) ? payload.projects : [];
+      stationCacheProjectsPayload_(payload, projects);
+      window.stationProjectsCache = projects;
+      window.stationProjectsFor = host.name;
+      if (panel.classList.contains('is-open')) stationRenderProjectList_(projects);
+    })
+    .withFailureHandler(function(err) {
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Could not load projects: ' + (err && err.message ? err.message : String(err)); }
+    })
+    .getRefreshPayload(host.name);
+}
+
+function stationRenderProjectList_(projects) {
+  const statusEl = document.getElementById('station-project-picker-status');
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!listEl) return;
+  const list = (projects || []).slice().sort(function(a, b) {
+    return String(a.start || '').localeCompare(String(b.start || ''));
+  });
+  if (!list.length) {
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'No projects assigned to you.'; }
+    return;
+  }
+  if (statusEl) statusEl.style.display = 'none';
+  const esc = function(v) {
+    return String(v == null ? '' : v).replace(/[<&>"]/g, function(c) {
+      return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&amp;'));
+    });
+  };
+  listEl.innerHTML = list.map(function(p) {
+    const when = [p.start, p.end].filter(Boolean).join(' → ');
+    return '<button type="button" class="station-project-item" onclick="stationPickProject_(\'' + esc(p.id) + '\')">'
+      + '<div class="station-project-item__name">' + esc(p.title || p.name || 'Untitled') + '</div>'
+      + (when ? '<div class="station-project-item__meta">' + esc(when) + '</div>' : '')
+      + '</button>';
+  }).join('');
+}
+
+window.stationPickProject_ = function(pId) {
+  stationCloseProjectPicker();
+  if (typeof window.openMobileProjectAssets !== 'function') {
+    stationSetStatus_('Project view unavailable on this build.', 'error');
+    return;
+  }
+  // Resolve the picked project from our cache (fall back to the phantom payload the phone uses).
+  let proj = (window.stationProjectsCache || []).find(function(p) { return String(p.id) === String(pId); });
+  if (!proj) {
+    try {
+      const ph = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+      if (ph && ph.projects) proj = ph.projects.find(function(p) { return String(p.id) === String(pId); });
+    } catch (e) { /* ignore */ }
+  }
+  if (!proj) {
+    // No project object anywhere → openMobileProjectAssets would just toast and bail. Say so.
+    stationSetStatus_('Could not open: project data missing. Reopen the list and try again.', 'error');
+    window.stationProjectsCache = null; window.stationProjectsFor = null; // force a fresh fetch next time
+    return;
+  }
+  // Pre-seed the project object + hidden fields so openProjectAssetsModal doesn't bail on an
+  // empty edit-folder-id (the station has no calendar for resolveMobileProject to fall back on).
+  window.mobileCrewHubProject = proj;
+  window.mobileCrewHubProjectId = pId;
+  window.isProjectDirty = false;
+  if (typeof window.syncProjectEditorHiddenFields === 'function') {
+    try { window.syncProjectEditorHiddenFields(proj, pId); } catch (e) { /* ignore */ }
+  } else {
+    const fid = document.getElementById('edit-folder-id');
+    if (fid) fid.value = pId;
+  }
+
+  const shell = document.getElementById('station-shell');
+  if (shell) shell.style.display = 'none';
+  stationSetStatus_('Opening ' + (proj.title || proj.name || 'project') + '…', '');
+  try {
+    window.openMobileProjectAssets(pId);
+  } catch (e) {
+    if (shell) shell.style.display = 'flex';
+    document.body.classList.remove('mobile-pa-compact');
+    stationSetStatus_('Could not open project: ' + (e && e.message ? e.message : String(e)), 'error');
+    return;
+  }
+  // openMobileProjectAssets can bail *silently* (a toast, no throw) if it can't resolve the
+  // project — the overlay stays hidden and the user sees a blank screen. Detect that, recover
+  // the shell, and report it instead of getting stuck.
+  setTimeout(function() {
+    const ov = document.getElementById('project-assets-modal-overlay');
+    const opened = ov && ov.style.display !== 'none';
+    if (opened) {
+      stationWatchPaExit_();
+    } else {
+      if (shell) shell.style.display = 'flex';
+      document.body.classList.remove('mobile-pa-compact');
+      stationSetStatus_('Project didn’t open (equipment list unavailable for it). Try again.', 'error');
+    }
+  }, 250);
+};
+
+/** Restore the station shell once the phone PA compact view is closed (any exit path). */
+function stationWatchPaExit_() {
+  if (window.stationPaWatchTimer) return;
+  window.stationPaWatchTimer = setInterval(function() {
+    if (!document.body.classList.contains('mobile-pa-compact')) {
+      clearInterval(window.stationPaWatchTimer);
+      window.stationPaWatchTimer = null;
+      const shell = document.getElementById('station-shell');
+      if (shell) shell.style.display = 'flex';
+      stationRenderShellState_();
+    }
+  }, 400);
+}
+
+window.stationDeviceSignOut = function() {
+  if (!confirm('Sign this warehouse device out of Showrunner?')) return;
+  stationCloseSettings();
+  stationCloseScanPanel();
+  stationWriteHostSession_(null);
+  try {
+    localStorage.removeItem('sm_session_token');
+    localStorage.removeItem('sm_session_expires');
+  } catch (e) { /* ignore */ }
+  const base = document.querySelector('base');
+  const scriptUrl = base && base.href ? base.href.split('?')[0] : '';
+  if (scriptUrl) window.top.location.href = scriptUrl;
+  else window.top.location.reload();
+};
+
+function stationPostToHosting_(payload) {
+  try { if (window.parent && window.parent !== window) window.parent.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+  try { if (window.top && window.top !== window) window.top.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+}
+
+function stationRelayGunCommandToTop_(method, args) {
+  if (!method) return;
+  args = args || [];
+  try {
+    if (window.top && window.top !== window) {
+      window.top.postMessage({ type: 'SR_STATION_GUN', method: method, args: args }, '*');
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function stationApplyGunSetting_(key, value) {
+  var method = null;
+  var args = [];
+  if (key === 'power') { method = 'setPower'; args = [parseInt(value, 10)]; }
+  else if (key === 'scanMode') { method = 'setScanMode'; args = [String(value)]; }
+  else if (key === 'pollMs') { method = 'setPollMs'; args = [parseInt(value, 10)]; }
+  else if (key === 'beep') { method = 'setBeep'; args = [!!value]; }
+
+  var b = stationNativeBridge_();
+  if (b && method) {
+    try {
+      if (method === 'setPower' && typeof b.setPower === 'function') b.setPower(args[0]);
+      else if (method === 'setScanMode' && typeof b.setScanMode === 'function') b.setScanMode(args[0]);
+      else if (method === 'setPollMs' && typeof b.setPollMs === 'function') b.setPollMs(args[0]);
+      else if (method === 'setBeep' && typeof b.setBeep === 'function') b.setBeep(args[0]);
+    } catch (e) { /* ignore */ }
+  }
+
+  // Desktop nested GAS iframe: mirror every setting change to hosting shell → native COM.
+  if (method && (window.__srDesktopBridge || /ShowrunnerStation/i.test(navigator.userAgent || ''))) {
+    stationRelayGunCommandToTop_(method, args);
+  }
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_SET', key: key, value: value });
+}
+
+/**
+ * Direct native bridge when injected in-frame (Android APK). On desktop WebView2 the GAS iframe
+ * is cross-origin so AndroidStation lives on the hosting parent — use postMessage relay stubs.
+ */
+function stationGunBridge_() {
+  var b = stationNativeBridge_();
+  if (b) return b;
+  if (!window.IS_STATION_DEVICE) return null;
+  return {
+    sleepGun: function() { stationInvokeGunNative_('sleepGun'); },
+    reconnectGun: function() { stationInvokeGunNative_('reconnectGun'); },
+    pollScans: function() { return '[]'; },
+    getConfig: function() { return '{}'; }
+  };
+}
+
+function stationNativeBridge_() {
+  try {
+    var b = window.AndroidStation;
+    if (b && typeof b.getConfig === 'function' && typeof b.setScanMode === 'function') return b;
+  } catch (e) { /* ignore */ }
+  // Desktop cache shim without chrome.webview in this frame — use hosting relay for settings.
+  if (window.__srDesktopBridge) {
+    var hasPost = false;
+    try { hasPost = !!(window.chrome && window.chrome.webview && window.chrome.webview.postMessage); } catch (e0) { /* ignore */ }
+    if (!hasPost) {
+      try {
+        hasPost = !!(window.top && window.top.chrome && window.top.chrome.webview && window.top.chrome.webview.postMessage);
+      } catch (e1) { /* ignore */ }
+    }
+    if (!hasPost) return null;
+  }
+  try {
+    var h = chrome && chrome.webview && chrome.webview.hostObjects &&
+      chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;
+    if (h && typeof h.getConfig === 'function' && typeof h.setScanMode === 'function') {
+      return {
+        getConfig: function() { return h.getConfig(); },
+        setPower: function(p) { h.setPower(p); },
+        setScanMode: function(m) { h.setScanMode(m); },
+        setBeep: function(b) { h.setBeep(b); },
+        setPollMs: function(ms) { h.setPollMs(ms); },
+        pollScans: function() { return h.pollScans(); },
+        reconnectGun: function() { h.reconnectGun(); },
+        sleepGun: function() { h.sleepGun(); },
+        shellReady: function() { try { h.shellReady(); } catch (e) { /* ignore */ } },
+        loginNeeded: function() { try { h.loginNeeded(); } catch (e) { /* ignore */ } },
+        saveSession: function(t, e) { h.saveSession(t, e); },
+        getSavedSession: function() { return h.getSavedSession(); }
+      };
+    }
+  } catch (e2) { /* ignore */ }
+  return null;
+}
+
+/**
+ * Retired diagnostic hook — kept as no-op so old cached shells don't throw.
+ */
+function stationDebug_(msg) { /* retired */ }
+
+window.stationOpenSettings = function() {
+  const panel = document.getElementById('station-settings');
+  if (!panel) return;
+  if (panel.classList.contains('is-open')) {
+    stationCloseSettings();
+    return;
+  }
+  stationCloseScanPanel();
+  panel.classList.add('is-open');
+  var ctrls = document.getElementById('station-device-controls');
+  if (ctrls) ctrls.style.display = 'none';
+  const ejectEl = document.getElementById('station-set-eject');
+  if (ejectEl) ejectEl.value = String(stationEjectMinutes_());
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) savedEl.textContent = '';
+  stationPopulateGunControlsFromStorage_();
+  stationSyncGunSleepButton_();
+  stationRequestGunConfig_();
+};
+
+window.stationCloseSettings = function() {
+  const panel = document.getElementById('station-settings');
+  if (panel) panel.classList.remove('is-open');
+  var ctrls = document.getElementById('station-device-controls');
+  if (ctrls && document.documentElement.classList.contains('station-device-root')) {
+    ctrls.style.display = 'flex';
+  }
+};
+
+function stationRequestGunConfig_() {
+  var b = stationNativeBridge_();
+  if (b) {
+    try {
+      var cfg = JSON.parse(b.getConfig());
+      stationApplyGunConfig_(cfg);
+      stationDebug_('config ←native');
+      return;
+    } catch (e) { stationDebug_('direct getConfig ERR'); }
+  }
+  stationPostToHosting_({ type: 'SHOWRUNNER_STATION_CONFIG_GET' });
+  stationDebug_('config req →relay');
+}
+
+function stationSpeedLabel_(ms) {
+  var n = parseInt(ms, 10);
+  if (isNaN(n)) return '—';
+  return n + ' ms';
+}
+
+function stationUpdateSpeedVisibility_() {
+  var modeEl = document.getElementById('station-set-mode');
+  var field = document.getElementById('station-speed-field');
+  if (field) field.style.display = (modeEl && modeEl.value === 'continuous') ? 'block' : 'none';
+}
+
+/** Reflect the stored (web source-of-truth) gun settings in the controls. */
+function stationPopulateGunControlsFromStorage_() {
+  var powerEl = document.getElementById('station-set-power');
+  var powerOut = document.getElementById('station-set-power-out');
+  var modeEl = document.getElementById('station-set-mode');
+  var speedEl = document.getElementById('station-set-speed');
+  var speedOut = document.getElementById('station-set-speed-out');
+  var beepEl = document.getElementById('station-set-beep');
+
+  var storedPower = stationStoredSetting_(STATION_POWER_KEY);
+  if (powerEl && storedPower != null) powerEl.value = storedPower;
+  stationSyncPowerControls_(powerEl ? powerEl.value : null);
+
+  var storedMode = stationStoredSetting_(STATION_MODE_KEY);
+  if (modeEl && storedMode) modeEl.value = storedMode;
+
+  var storedPoll = stationStoredSetting_(STATION_POLL_KEY);
+  if (speedEl && storedPoll != null) speedEl.value = storedPoll;
+  if (speedOut && speedEl && speedEl.value) speedOut.textContent = stationSpeedLabel_(speedEl.value);
+
+  var storedBeep = stationStoredSetting_(STATION_BEEP_KEY);
+  if (beepEl && storedBeep != null) beepEl.checked = (storedBeep === '1');
+
+  stationUpdateSpeedVisibility_();
+  stationSyncPanelReadModeUI_();
+}
+
+/** Push the stored settings down to the native gun (screen ↔ gun stay in sync). */
+function stationSyncSettingsToGun_() {
+  var mode = stationStoredSetting_(STATION_MODE_KEY);
+  if (mode) stationApplyGunSetting_('scanMode', mode);
+  var poll = stationStoredSetting_(STATION_POLL_KEY);
+  if (poll != null) stationApplyGunSetting_('pollMs', parseInt(poll, 10));
+  var power = stationStoredSetting_(STATION_POWER_KEY);
+  if (power != null) stationApplyGunSetting_('power', parseInt(power, 10));
+  var beep = stationStoredSetting_(STATION_BEEP_KEY);
+  if (beep != null) stationApplyGunSetting_('beep', (beep === '1'));
+  if (typeof stationGunCap_ === 'function' && stationGunCap_('appSleep')) stationArmGunSleepTimer_();
+}
+
+function stationApplyGunConfig_(cfg) {
+  const unavailable = document.getElementById('station-gun-unavailable');
+  const powerEl = document.getElementById('station-set-power');
+  const powerOut = document.getElementById('station-set-power-out');
+  const modeEl = document.getElementById('station-set-mode');
+  const speedEl = document.getElementById('station-set-speed');
+  const speedOut = document.getElementById('station-set-speed-out');
+  const beepEl = document.getElementById('station-set-beep');
+  const connEl = document.getElementById('station-info-conn');
+  const battEl = document.getElementById('station-info-battery');
+  const fwEl = document.getElementById('station-info-fw');
+  const gunControls = [powerEl, modeEl, speedEl, beepEl];
+
+  if (!cfg) {
+    if (unavailable) unavailable.style.display = 'block';
+    gunControls.forEach(function(el) { if (el) el.disabled = true; });
+    if (connEl) connEl.textContent = 'App not detected';
+    return;
+  }
+  if (unavailable) unavailable.style.display = 'none';
+  gunControls.forEach(function(el) { if (el) el.disabled = false; });
+
+  // Power — web value wins if set, otherwise seed from the gun.
+  if (powerEl) {
+    if (cfg.powerMin != null) powerEl.min = cfg.powerMin;
+    if (cfg.powerMax != null) powerEl.max = cfg.powerMax;
+    var storedPower = stationStoredSetting_(STATION_POWER_KEY);
+    var pv = (storedPower != null) ? storedPower : cfg.power;
+    if (pv != null) powerEl.value = pv;
+    if (storedPower == null && cfg.power != null) stationSetStoredSetting_(STATION_POWER_KEY, cfg.power);
+    stationSyncPowerControls_(powerEl.value);
+  }
+
+  // Scan mode
+  var storedMode = stationStoredSetting_(STATION_MODE_KEY);
+  var mv = storedMode || cfg.scanMode;
+  if (modeEl && mv) modeEl.value = mv;
+  if (storedMode == null && cfg.scanMode) stationSetStoredSetting_(STATION_MODE_KEY, cfg.scanMode);
+
+  // Continuous speed
+  if (speedEl) {
+    if (cfg.pollMin != null) speedEl.min = cfg.pollMin;
+    if (cfg.pollMax != null) speedEl.max = cfg.pollMax;
+    var storedPoll = stationStoredSetting_(STATION_POLL_KEY);
+    var sv = (storedPoll != null) ? storedPoll : cfg.pollMs;
+    if (sv != null) speedEl.value = sv;
+    if (storedPoll == null && cfg.pollMs != null) stationSetStoredSetting_(STATION_POLL_KEY, cfg.pollMs);
+    if (speedOut && speedEl.value) speedOut.textContent = stationSpeedLabel_(speedEl.value);
+  }
+  stationUpdateSpeedVisibility_();
+
+  // Beeper
+  if (beepEl) {
+    var storedBeep = stationStoredSetting_(STATION_BEEP_KEY);
+    beepEl.checked = (storedBeep != null) ? (storedBeep === '1') : (cfg.beep !== false);
+    if (storedBeep == null) stationSetStoredSetting_(STATION_BEEP_KEY, (cfg.beep !== false) ? '1' : '0');
+  }
+
+  if (connEl) {
+    var connLabel = 'Not connected';
+    if (cfg.linkState === 'live' || (cfg.connected && !cfg.linkState)) connLabel = 'Connected';
+    else if (cfg.linkState === 'connecting' || cfg.linkState === 'reconnecting') connLabel = 'Connecting…';
+    else if (cfg.linkState === 'zombie') connLabel = 'Link stale — reconnecting';
+    else if (cfg.linkState === 'asleep') connLabel = 'Asleep — pull trigger + Reconnect';
+    connEl.textContent = connLabel;
+  }
+  var liveNow = !!(cfg.connected || cfg.linkState === 'live');
+  if (typeof window.stationLastGunConnected === 'undefined') window.stationLastGunConnected = null;
+  if (window.stationLastGunConnected !== null && window.stationLastGunConnected !== liveNow) {
+    stationToast_(liveNow ? 'RFID gun connected' : 'RFID gun disconnected', liveNow ? 'ok' : 'error');
+  }
+  window.stationLastGunConnected = liveNow;
+  if (liveNow && typeof stationGunCap_ === 'function' && stationGunCap_('appSleep') &&
+      !window.stationGunIdleTimer && stationGunSleepMinutes_()) {
+    stationArmGunSleepTimer_();
+  }
+  if (battEl) battEl.textContent = (cfg.battery != null && cfg.battery >= 0) ? (cfg.battery + '%') : '—';
+  if (fwEl) fwEl.textContent = cfg.firmware || '—';
+  stationSyncPanelReadModeUI_();
+}
+
+/** Keep the Settings power slider in sync with the gun. */
+function stationSyncPowerControls_(val) {
+  const setEl = document.getElementById('station-set-power');
+  const setOut = document.getElementById('station-set-power-out');
+  if (val != null && setEl) setEl.value = val;
+  const shown = (setEl && setEl.value) || val || '';
+  if (setOut) setOut.textContent = shown ? (shown + ' dBm') : '—';
+}
+
+window.stationOnPowerInput = function() {
+  const powerEl = document.getElementById('station-set-power');
+  if (powerEl) stationSyncPowerControls_(powerEl.value);
+};
+
+window.stationSavePower = function() {
+  const powerEl = document.getElementById('station-set-power');
+  if (!powerEl) return;
+  stationSetStoredSetting_(STATION_POWER_KEY, powerEl.value);
+  stationSyncPowerControls_(powerEl.value);
+  stationApplyGunSetting_('power', parseInt(powerEl.value, 10));
+};
+
+window.stationSaveScanMode = function() {
+  const modeEl = document.getElementById('station-set-mode');
+  if (!modeEl) return;
+  stationSetStoredSetting_(STATION_MODE_KEY, modeEl.value);
+  stationUpdateSpeedVisibility_();
+  stationApplyGunSetting_('scanMode', modeEl.value);
+  stationSyncPanelReadModeUI_();
+};
+
+window.stationOnSpeedInput = function() {
+  const speedEl = document.getElementById('station-set-speed');
+  const speedOut = document.getElementById('station-set-speed-out');
+  if (speedEl && speedOut) speedOut.textContent = stationSpeedLabel_(speedEl.value);
+};
+
+window.stationSaveSpeed = function() {
+  const speedEl = document.getElementById('station-set-speed');
+  if (!speedEl) return;
+  stationSetStoredSetting_(STATION_POLL_KEY, speedEl.value);
+  stationApplyGunSetting_('pollMs', parseInt(speedEl.value, 10));
+};
+
+window.stationSaveBeep = function() {
+  const beepEl = document.getElementById('station-set-beep');
+  if (!beepEl) return;
+  stationSetStoredSetting_(STATION_BEEP_KEY, beepEl.checked ? '1' : '0');
+  stationApplyGunSetting_('beep', !!beepEl.checked);
+};
+
+window.stationSaveEjectMinutes = function() {
+  const ejectEl = document.getElementById('station-set-eject');
+  const savedEl = document.getElementById('station-eject-saved');
+  if (!ejectEl) return;
+  let mins = parseInt(ejectEl.value, 10);
+  if (STATION_EJECT_CHOICES.indexOf(mins) === -1) mins = STATION_HOST_IDLE_DEFAULT_MIN;
+  ejectEl.value = String(mins);
+  stationSetStoredSetting_(STATION_EJECT_STORAGE_KEY, mins);
+  if (stationReadHostSession_()) stationResetHostIdleTimer_();
+  if (savedEl) {
+    savedEl.textContent = 'Saved — host ejects after ' + mins + ' min.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
+window.stationSaveGunSleepMinutes = function() {
+  const el = document.getElementById('station-set-gunsleep');
+  if (!el) return;
+  let mins = parseInt(el.value, 10);
+  if (STATION_GUNSLEEP_CHOICES.indexOf(mins) === -1) mins = STATION_GUNSLEEP_DEFAULT_MIN;
+  el.value = String(mins);
+  stationSetStoredSetting_(STATION_GUNSLEEP_STORAGE_KEY, mins);
+  stationArmGunSleepTimer_();
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) {
+    savedEl.textContent = mins ? ('Saved — gun sleeps after ' + mins + ' min idle.') : 'Saved — gun stays on.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
+window.stationSaveNoHostGraceMinutes = function() {
+  const el = document.getElementById('station-set-no-host-grace');
+  if (!el) return;
+  let mins = parseInt(el.value, 10);
+  if (STATION_NO_HOST_GRACE_CHOICES.indexOf(mins) === -1) mins = STATION_NO_HOST_GRACE_DEFAULT_MIN;
+  el.value = String(mins);
+  stationSetStoredSetting_(STATION_NO_HOST_GRACE_KEY, mins);
+  if (!stationReadHostSession_() && typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark')) {
+    stationArmNoHostParkDeadline_();
+  }
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) {
+    savedEl.textContent = 'Saved — gun stays connected ' + mins + ' min between hosts.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
+window.stationSaveGunParkDelayMinutes = function() {
+  const el = document.getElementById('station-set-gun-park-delay');
+  if (!el) return;
+  let mins = parseInt(el.value, 10);
+  if (STATION_GUN_PARK_DELAY_CHOICES.indexOf(mins) === -1) mins = STATION_GUN_PARK_DELAY_DEFAULT_MIN;
+  el.value = String(mins);
+  stationSetStoredSetting_(STATION_GUN_PARK_DELAY_KEY, mins);
+  if (!stationReadHostSession_() && typeof stationGunCap_ === 'function' && stationGunCap_('autoSdkPark')) {
+    stationArmNoHostParkDeadline_();
+  }
+  const savedEl = document.getElementById('station-eject-saved');
+  if (savedEl) {
+    savedEl.textContent = mins
+      ? ('Saved — disconnect ' + mins + ' min after grace ends.')
+      : 'Saved — disconnect as soon as grace ends.';
+    setTimeout(function() { if (savedEl) savedEl.textContent = ''; }, 2500);
+  }
+};
+
+function stationAnnounceReady_() {
+  try { stationCheckHostEjectDeadline_(); } catch (e) { /* ignore */ }
+  try { stationCheckNoHostParkDeadline_(); } catch (e) { /* ignore */ }
+  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY', full: true }); } catch (e) { /* ignore */ }
+}
+
+function stationBindMessageListener_() {
+  if (window.__srShimMessageHandler) {
+    try { window.removeEventListener('message', window.__srShimMessageHandler); } catch (e) { /* ignore */ }
+    window.__srShimMessageHandler = null;
+    window.__srShimMessageBound = false;
+  }
+  if (window.stationMessageListenerBound) return;
+  window.stationMessageListenerBound = true;
+  window.addEventListener('message', function(ev) {
+    const d = ev && ev.data;
+    if (!d) return;
+    if (d.type === 'SHOWRUNNER_RFID_SCAN') {
+      stationDebug_('relay scan: ' + (d.tag || '(empty)') + (d.tid ? ' tid:' + d.tid : ''));
+      if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag, d.tid || '');
+    } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
+      stationDebug_('relay config');
+      try { if (d.config) window.__srGunConfigJson = JSON.stringify(d.config); } catch (e) { /* ignore */ }
+      stationApplyGunConfig_(d.config || null);
+    } else if (d.type === 'SHOWRUNNER_STATION_GUN_STATUS' && d.message) {
+      if (typeof window.stationOnGunStatus_ === 'function') window.stationOnGunStatus_(d.message);
+    } else if (d.type === 'SHOWRUNNER_STATION_HOST_RESTORE' && d.host && d.host.name) {
+      if (!stationIsDesktopKiosk_() && !stationReadHostSession_()) {
+        stationWriteHostSession_(d.host);
+        stationRenderShellState_();
+      }
+    }
+  });
+}
+
+function initStationShell_() {
+  if (typeof window.stationEnsureDeviceMode_ === 'function') window.stationEnsureDeviceMode_();
+  if (!window.IS_STATION_DEVICE) return;
+
+  // Show the shell and tell the native app to drop its splash FIRST, so a later error can never
+  // strand the initial screen. Everything after this is wrapped so boot failures surface on-screen
+  // instead of leaving a blank kiosk.
+  try {
+    document.documentElement.classList.add('station-device-root');
+    const shell = document.getElementById('station-shell');
+    if (shell) shell.style.display = 'flex';
+  } catch (e) { /* ignore */ }
+  try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
+  if (stationIsDesktopKiosk_()) {
+    try { stationWriteHostSession_(null); } catch (e) { /* ignore */ }
+  } else {
+    try { stationRequestHostRestoreFromParent_(); } catch (e) { /* ignore */ }
+  }
+
+  try {
+    stationBindHostIdleListeners_();
+    stationBindMessageListener_();
+    stationRenderShellState_();
+    stationSetStatus_('Loading station profile…', '');
+
+    // Retire the removed "hold" mode on any device that stored it during testing.
+    if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
+
+    // Push device-local gun settings down so the screen and the gun agree on boot.
+    stationSyncSettingsToGun_();
+    // Seed the on-screen sensitivity bar from the stored (source-of-truth) power value.
+    stationSyncPowerControls_(stationStoredSetting_(STATION_POWER_KEY));
+    stationDrainPendingRfidScans_();
+    // Pull scans directly from the gun (reliable path; relay stays as fallback).
+    stationStartScanPoll_();
+    stationBindPresetButtons_();
+
+    // Equipment name/unit resolution for the live scan strip: show cache instantly, then refresh.
+    stationLoadEquipMapCache_();
+    stationRenderScanFeed_();
+    stationRefreshEquipMap_();
+    if (!window.stationEquipMapTimer) {
+      window.stationEquipMapTimer = setInterval(stationRefreshEquipMap_, STATION_EQUIP_MAP_REFRESH_MS);
+    }
+  } catch (bootErr) {
+    try { stationSetStatus_('Boot error: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr)), 'error'); } catch (e) {}
+    try { stationDebug_('BOOT ERROR: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr))); } catch (e) {}
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      try {
+        if (!res || !res.success) {
+          stationSetStatus_((res && res.error) ? res.error : 'Station bootstrap failed.', 'error');
+          return;
+        }
+        stationApplyBootstrap_(res);
+        if (!res.hostInheritEnabled) {
+          stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
+          return;
+        }
+        const bootHost = stationIsDesktopKiosk_() ? null : stationReadHostSession_();
+        if (bootHost) {
+          // Wall-clock eject may have passed while the tablet slept — check before restoring host.
+          stationCheckHostEjectDeadline_();
+          if (stationReadHostSession_()) {
+            // Re-run the full write so the reload restores the host globals AND stationHostRbac
+            // (host-inherit) + warms projects — not just the rendered chrome.
+            stationWriteHostSession_(bootHost);
+            stationRenderShellState_();
+          } else {
+            stationRenderShellState_();
+          }
+        } else {
+          stationSetStatus_('Pull trigger and scan your crew badge.', '');
+          stationCheckNoHostParkDeadline_();
+        }
+      } catch (e) {
+        stationSetStatus_('Profile load error: ' + (e && e.message ? e.message : String(e)), 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      stationSetStatus_('Bootstrap error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .getStationShellBootstrap(ACTIVE_USER_NAME);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.IS_STATION_DEVICE) initStationShell_();
+});
+document.addEventListener('visibilitychange', function() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (document.visibilityState === 'visible') stationAnnounceReady_();
+});
+window.addEventListener('pageshow', function(ev) {
+  if (!window.IS_STATION_DEVICE) return;
+  if (ev.persisted) stationAnnounceReady_();
+});
+</script>

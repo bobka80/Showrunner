@@ -95,20 +95,14 @@ function build() {
       }
       if (!window.__srEarlyBootMsgBound) {
         window.__srEarlyBootMsgBound = true;
-        window.__srEarlyBootMsgHandler = function(ev) {
+        window.addEventListener('message', function(ev) {
           var d = ev && ev.data;
           if (d && d.type === 'SHOWRUNNER_RFID_SCAN' && typeof window.onStationRfidScan === 'function') {
             window.onStationRfidScan(d.tag, d.tid || '');
           }
-        };
-        window.addEventListener('message', window.__srEarlyBootMsgHandler);
+        });
       }
-      try {
-        var readyMsg = { type: 'SHOWRUNNER_STATION_READY', early: true };
-        if (window.parent && window.parent !== window) window.parent.postMessage(readyMsg, '*');
-        if (window.top && window.top !== window) window.top.postMessage(readyMsg, '*');
-      } catch (eReady) { /* ignore */ }
-      // Full SHOWRUNNER_STATION_READY (splash drop) still comes from initStationShell_ only.
+      // Do not post SHOWRUNNER_STATION_READY here — only initStationShell_ / stationAnnounceReady_ may signal native splash.
     } catch (e) { /* ignore */ }
   })();
 

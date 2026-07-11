@@ -1,33 +1,14 @@
 {
-  "versionName": "0.1.53",
-  "versionCode": 55,
+  "versionName": "0.1.51",
+  "versionCode": 53,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-11T14:08:16.067Z",
+  "updatedAt": "2026-07-10T15:26:59.090Z",
   "sizeBytes": 12073677,
   "notes": [
-    "Scan delivery: queue-only (no duplicate relay+poll)",
-    "host-boot poll is single path to web UI"
+    "disconnect beep + no-host auto park (build 52)"
   ],
   "history": [
-    {
-      "versionName": "0.1.53",
-      "versionCode": 55,
-      "date": "2026-07-11T14:08:16.067Z",
-      "notes": [
-        "Scan delivery: queue-only (no duplicate relay+poll)",
-        "host-boot poll is single path to web UI"
-      ]
-    },
-    {
-      "versionName": "0.1.52",
-      "versionCode": 54,
-      "date": "2026-07-11T13:50:14.789Z",
-      "notes": [
-        "Multi mode: one beep per trigger (mute SDK beep during burst loop)",
-        "Retire hold scan mode → single in native prefs"
-      ]
-    },
     {
       "versionName": "0.1.51",
       "versionCode": 53,
@@ -196,6 +177,23 @@
       "notes": [
         "Restore hosting shell (revert v483)",
         "Fix install: versionCode must exceed build 34"
+      ]
+    },
+    {
+      "versionName": "0.1.31",
+      "versionCode": 33,
+      "date": "2026-07-08T05:08:53.998Z",
+      "notes": [
+        "Revert v483 direct-GAS",
+        "restore hosting shell startup"
+      ]
+    },
+    {
+      "versionName": "0.1.32",
+      "versionCode": 34,
+      "date": "2026-07-08T04:52:21.302Z",
+      "notes": [
+        "BLE decouple: GAS direct load, host session native persist, flap guard"
       ]
     }
   ]
