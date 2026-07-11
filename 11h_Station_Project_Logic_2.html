@@ -80,7 +80,7 @@ function stationRenderProjectList_(projects) {
     const weatherSlot = stationProjectIsOutdoor_(p)
       ? '<div id="stn-weather-' + esc(p.id) + '" class="mob-event-weather-badge"></div>'
       : '';
-    return '<button type="button" class="station-project-item" onclick="stationPickProject_(\'' + esc(p.id) + '\')">'
+    return '<button type="button" class="station-project-item" onclick="stationPickProject_(' + JSON.stringify(String(p.id)) + ')">'
       + '<div class="station-project-item__row">'
       + '<div class="station-project-item__main">'
       + '<div class="station-project-item__name">' + esc(p.title || p.name || 'Untitled') + '</div>'

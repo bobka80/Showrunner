@@ -217,7 +217,7 @@
         ? '<div id="dock-weather-' + esc_(p.id) + '" class="mob-event-weather-badge"></div>'
         : '';
       html += '<button type="button" class="station-dock-project-card" style="border-left:4px solid ' + statusColor + ';" '
-        + 'onclick="stationDockPickProject_(\'' + esc_(p.id) + '\')">'
+        + 'onclick="stationDockPickProject_(' + JSON.stringify(String(p.id)) + ')">'
         + '<div class="station-dock-project-card__row">'
         + '<div class="station-dock-project-card__main">'
         + '<div class="station-dock-project-card__title">' + esc_(p.title || p.name || 'Untitled') + '</div>'
