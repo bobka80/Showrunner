@@ -49,12 +49,15 @@ public partial class MainWindow : Window
             settings.AreDevToolsEnabled = true;
             settings.IsStatusBarEnabled = false;
             settings.IsZoomControlEnabled = false;
+            settings.IsWebMessageEnabled = true;
 
             var defaultUa = WebView.CoreWebView2.Settings.UserAgent;
             if (!defaultUa.Contains("ShowrunnerStationDesktop", StringComparison.OrdinalIgnoreCase))
                 WebView.CoreWebView2.Settings.UserAgent = defaultUa + UserAgentSuffix;
 
-            _bridge = new StationBridge(_rfid, HideSplash);
+            _bridge = new StationBridge(_rfid, HideSplash, action => Dispatcher.Invoke(action));
+
+            WebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
 
             // Top frame (web.app shell).
             WebView.CoreWebView2.AddHostObjectToScript("androidStation", _bridge);
@@ -139,6 +142,54 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(args.WebMessageAsJson);
+            var root = doc.RootElement;
+            if (root.GetProperty("type").GetString() != "SR_STATION_GUN") return;
+            var method = root.GetProperty("method").GetString();
+            Dispatcher.Invoke(() =>
+            {
+                switch (method)
+                {
+                    case "reconnectGun":
+                        _rfid.ForceReconnect();
+                        RelayGunConfigToPage();
+                        break;
+                    case "sleepGun":
+                        _rfid.SleepAndDisconnect();
+                        RelayGunConfigToPage();
+                        break;
+                }
+            });
+        }
+        catch
+        {
+            // ignore malformed messages
+        }
+    }
+
+    private void RelayGunConfigToPage()
+    {
+        if (WebView.CoreWebView2 == null) return;
+        var cfgJson = _rfid.CurrentConfigJson();
+        var js =
+            "(function(c){try{var cfg=JSON.parse(c);" +
+            "var f=document.getElementById('app-frame');" +
+            "if(f&&f.contentWindow)f.contentWindow.postMessage({type:'SHOWRUNNER_STATION_CONFIG',config:cfg},'*');" +
+            "}catch(e){}})(" + JsonSerializer.Serialize(cfgJson) + ");";
+        try
+        {
+            _ = WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
     private void OnGunStatus(string msg)
     {
         Dispatcher.Invoke(() =>
@@ -161,6 +212,11 @@ public partial class MainWindow : Window
                         tid = msg[(tidIdx + 4)..].Trim();
                     DeliverScanToPage(epc, tid);
                 }
+            }
+            else if (low.Contains("asleep") || low.Contains("reconnect") ||
+                     (low.Contains("connect") && !low.Contains("disconnect")))
+            {
+                RelayGunConfigToPage();
             }
         });
     }
@@ -251,6 +307,13 @@ public partial class MainWindow : Window
           function host() {
             try { return chrome.webview.hostObjects.sync.androidStation; } catch (e) { return null; }
           }
+          function gunCmd(method) {
+            var h = host();
+            try { if (h && typeof h[method] === 'function') { h[method](); return; } } catch (e) {}
+            try {
+              chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method }));
+            } catch (e2) {}
+          }
           window.__srDesktopBridge = true;
           window.AndroidStation = {
             getConfig: function() { var h = host(); return h ? h.getConfig() : '{}'; },
@@ -259,8 +322,8 @@ public partial class MainWindow : Window
             setBeep: function(b) { var h = host(); if (h) h.setBeep(b); },
             setPollMs: function(ms) { var h = host(); if (h) h.setPollMs(ms); },
             pollScans: function() { var h = host(); return h ? h.pollScans() : '[]'; },
-            reconnectGun: function() { var h = host(); if (h) h.reconnectGun(); },
-            sleepGun: function() { var h = host(); if (h) h.sleepGun(); },
+            reconnectGun: function() { gunCmd('reconnectGun'); },
+            sleepGun: function() { gunCmd('sleepGun'); },
             shellReady: function() { var h = host(); if (h) h.shellReady(); },
             loginNeeded: function() { var h = host(); if (h) h.loginNeeded(); },
             saveSession: function(t, e) { var h = host(); if (h) h.saveSession(t, e); },

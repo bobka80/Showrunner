@@ -1614,8 +1614,12 @@ function stationParkGun_() {
 
 /** Native bridge that can sleep the gun (desktop TSL or Chainway with sleepGun support). */
 function stationSleepCapableBridge_() {
-  var b = stationGunBridge_();
-  return (b && typeof b.sleepGun === 'function') ? b : null;
+  if (stationNativeBridge_()) return stationNativeBridge_();
+  if (!window.IS_STATION_DEVICE) return null;
+  return {
+    sleepGun: function() { stationInvokeGunNative_('sleepGun'); },
+    reconnectGun: function() { stationInvokeGunNative_('reconnectGun'); }
+  };
 }
 
 function stationClearGunIdleTimer_() {
@@ -1949,14 +1953,9 @@ window.stationOnGunConfigChange_ = function(count) {
 };
 
 window.stationReconnectGun_ = function() {
-  var b = stationGunBridge_();
-  if (b && typeof b.reconnectGun === 'function') {
-    stationToast_('Reconnecting gun…', '');
-    try { b.reconnectGun(); } catch (e) { stationToast_('Reconnect failed.', 'error'); return; }
-    setTimeout(function() { stationRequestGunConfig_(); }, 2500);
-    return;
-  }
-  stationToast_('Reconnect works in the station app with the RFID gun.', 'error');
+  stationToast_('Reconnecting gun…', '');
+  stationInvokeGunNative_('reconnectGun');
+  setTimeout(function() { stationRequestGunConfig_(); }, 2500);
 };
 
 /**
@@ -1964,14 +1963,30 @@ window.stationReconnectGun_ = function() {
  * button — the reader has no physical on/off. Waking is a trigger pull + Reconnect gun.
  */
 window.stationSleepGun_ = function() {
-  var b = stationGunBridge_();
-  if (b && typeof b.sleepGun === 'function') {
-    stationToast_('Gun going to sleep…', '');
-    try { b.sleepGun(); } catch (e) { stationToast_('Sleep failed.', 'error'); return; }
-    setTimeout(function() { stationRequestGunConfig_(); }, 1200);
-    return;
-  }
-  stationToast_('Sleep is available on the desktop station with the TSL gun.', 'error');
+  stationToast_('Gun going to sleep…', '');
+  stationInvokeGunNative_('sleepGun');
+  setTimeout(function() { stationRequestGunConfig_(); }, 1200);
+};
+
+/** Invoke reconnect/sleep on desktop WebView2, native bridge, or hosting parent relay. */
+function stationInvokeGunNative_(method) {
+  var relayType = method === 'sleepGun' ? 'SHOWRUNNER_STATION_GUN_SLEEP' : 'SHOWRUNNER_STATION_GUN_RECONNECT';
+  try {
+    var h = chrome && chrome.webview && chrome.webview.hostObjects &&
+      chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;
+    if (h && typeof h[method] === 'function') { h[method](); return; }
+  } catch (e) { /* ignore */ }
+  try {
+    var a = window.AndroidStation;
+    if (a && typeof a[method] === 'function') { a[method](); return; }
+  } catch (e2) { /* ignore */ }
+  try {
+    if (chrome && chrome.webview && chrome.webview.postMessage) {
+      chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method }));
+      return;
+    }
+  } catch (e3) { /* ignore */ }
+  stationPostToHosting_({ type: relayType });
 };
 
 /**
@@ -3426,8 +3441,8 @@ function stationGunBridge_() {
   if (b) return b;
   if (!window.IS_STATION_DEVICE) return null;
   return {
-    sleepGun: function() { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_GUN_SLEEP' }); },
-    reconnectGun: function() { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_GUN_RECONNECT' }); },
+    sleepGun: function() { stationInvokeGunNative_('sleepGun'); },
+    reconnectGun: function() { stationInvokeGunNative_('reconnectGun'); },
     pollScans: function() { return '[]'; },
     getConfig: function() { return '{}'; }
   };

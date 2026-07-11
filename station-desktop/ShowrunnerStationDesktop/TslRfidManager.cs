@@ -201,13 +201,14 @@ public sealed class TslRfidManager : IDisposable
 
     public void ForceReconnect()
     {
-        // A manual reconnect clears a user-requested sleep so the watchdog can grab the gun again.
+        // Manual reconnect clears user sleep so the watchdog can grab the gun after trigger wake.
         _userSleep = false;
         lock (_commandLock)
         {
             try
             {
                 StopContinuous();
+                AbortIfConnected();
                 if (_commander.IsConnected)
                     _commander.Disconnect();
             }
@@ -216,16 +217,16 @@ public sealed class TslRfidManager : IDisposable
                 // ignore
             }
             _connected = false;
-            _linkState = "disconnected";
+            _linkState = "connecting";
         }
-        // Let the watchdog re-detect and re-acquire (handles a changed COM port after re-pair).
         _lastDetectLog = "";
+        PostStatus("Reconnecting…");
         WatchdogTick();
     }
 
     /// <summary>
-    /// Sends the gun to sleep (ASCII .sl) then drops the link — like a power button. The watchdog
-    /// stays suppressed so we don't immediately wake it; ForceReconnect() (or an app restart) resumes.
+    /// SDK SleepCommand (.sl): reader sleeps once it responds, then disconnects from the terminal.
+    /// Watchdog stays suppressed until ForceReconnect() so we do not immediately wake the gun.
     /// </summary>
     public void SleepAndDisconnect()
     {
@@ -237,14 +238,15 @@ public sealed class TslRfidManager : IDisposable
                 StopContinuous();
                 if (_commander.IsConnected)
                 {
-                    // .sl tells the reader to sleep after it acknowledges, then it disconnects itself.
-                    var sleep = new SleepCommand { AutoReconnect = TriState.No };
+                    AbortIfConnected();
+                    // TSL Commands sample: synchronous SleepCommand — disconnects after response.
+                    var sleep = new SleepCommand();
                     _commander.ExecuteCommand(sleep, sleep.Responder);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // best effort — still drop our side below
+                PostStatus("Sleep failed: " + ex.Message);
             }
 
             try
@@ -260,6 +262,19 @@ public sealed class TslRfidManager : IDisposable
             _linkState = "asleep";
         }
         PostStatus("Gun asleep — pull the trigger to wake it, then tap Reconnect");
+    }
+
+    private void AbortIfConnected()
+    {
+        if (!_commander.IsConnected) return;
+        try
+        {
+            _commander.ExecuteCommand(new AbortCommand(), null);
+        }
+        catch
+        {
+            // ignore
+        }
     }
 
     public string DrainPendingScans()

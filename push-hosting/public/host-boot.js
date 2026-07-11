@@ -73,6 +73,12 @@
         return true;
       }
     } catch (e) { /* ignore */ }
+    try {
+      if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+        window.chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method }));
+        return true;
+      }
+    } catch (e2) { /* ignore */ }
     return false;
   }
 
