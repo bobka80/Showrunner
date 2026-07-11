@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         _rfid.StatusChanged += OnGunStatus;
+        _rfid.ScanReceived += (epc, tid) =>
+            Dispatcher.BeginInvoke(() => DeliverScanToPage(epc, tid));
         Loaded += async (_, _) => await InitWebViewAsync();
         Closed += (_, _) => _rfid.Dispose();
     }
@@ -227,25 +229,12 @@ public partial class MainWindow : Window
         {
             var low = msg.ToLowerInvariant();
             if (low.Contains("fail") || low.Contains("error") || low.Contains("connect") ||
-                low.Contains("read:") || low.Contains("scanning") || low.Contains("waiting") ||
-                low.Contains("found tsl") || low.Contains("port(s)") || low.Contains("no tsl"))
+                low.Contains("scanning") || low.Contains("waiting") ||
+                low.Contains("found tsl") || low.Contains("port(s)") || low.Contains("no tsl") ||
+                low.Contains("trigger"))
                 ShowStatus(msg, persistent: false);
 
-            // Also push scans to the page when they arrive (belt-and-suspenders with pollScans).
-            if (low.StartsWith("read:"))
-            {
-                var parts = msg.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 2)
-                {
-                    var epc = parts[1];
-                    var tid = "";
-                    var tidIdx = msg.IndexOf("tid:", StringComparison.OrdinalIgnoreCase);
-                    if (tidIdx >= 0)
-                        tid = msg[(tidIdx + 4)..].Trim();
-                    DeliverScanToPage(epc, tid);
-                }
-            }
-            else if (low.Contains("gun connected") || low.Contains("gun asleep") || low.StartsWith("reconnecting"))
+            if (low.Contains("gun connected") || low.Contains("gun asleep") || low.StartsWith("reconnecting"))
             {
                 RelayGunConfigToPage();
             }

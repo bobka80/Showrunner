@@ -50,6 +50,7 @@ public sealed class TslRfidManager : IDisposable
     private const int WatchdogMs = 2500;
 
     public event Action<string>? StatusChanged;
+    public event Action<string, string>? ScanReceived;
 
     public TslRfidManager()
     {
@@ -542,7 +543,8 @@ public sealed class TslRfidManager : IDisposable
                 StartContinuous();
             return;
         }
-        // Single mode: gun inventories natively via SinglePressAction.Inventory; chain responder delivers tags.
+        // Gun firmware also inventories on trigger — app-side read ensures the SDK callback fires.
+        PerformSingleRead();
     }
 
     private void PerformSingleRead()
@@ -566,7 +568,10 @@ public sealed class TslRfidManager : IDisposable
     private void OnInventoryTransponder(object? sender, TransponderDataEventArgs e)
     {
         var epc = NormalizeHex(e.Transponder.Epc);
+        if (string.IsNullOrEmpty(epc))
+            epc = NormalizeHex(e.Transponder.ReadData);
         if (string.IsNullOrEmpty(epc)) return;
+
         var tid = NormalizeHex(e.Transponder.TransponderIdentifier);
         if (!string.IsNullOrEmpty(tid) && tid == epc)
             tid = "";
@@ -575,25 +580,24 @@ public sealed class TslRfidManager : IDisposable
         if (!string.IsNullOrEmpty(tid) && tid == epc)
             tid = "";
 
-        if (!string.IsNullOrEmpty(tid))
-        {
-            DeliverScan(epc, tid);
-            return;
-        }
+        DeliverScan(epc, tid);
 
-        // Second-pass TID read (Chainway/Android pattern) — defer off the inventory callback thread.
+        if (!string.IsNullOrEmpty(tid)) return;
+
         var epcCopy = epc;
         Task.Run(() =>
         {
-            Thread.Sleep(40);
+            Thread.Sleep(50);
             var readTid = TryReadTidForEpc(epcCopy);
-            DeliverScan(epcCopy, readTid);
+            if (!string.IsNullOrEmpty(readTid) && !readTid.Equals(epcCopy, StringComparison.OrdinalIgnoreCase))
+                DeliverScan(epcCopy, readTid);
         });
     }
 
     private void DeliverScan(string epc, string tid)
     {
         EnqueueScan(epc, tid);
+        ScanReceived?.Invoke(epc, tid);
         PostStatus("Read: " + epc + (string.IsNullOrEmpty(tid) ? " (no TID — hold badge still)" : " tid:" + tid));
     }
 
