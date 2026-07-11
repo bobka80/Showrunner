@@ -27,7 +27,10 @@
   }
   // The native app injects `AndroidStation` and calls `showrunnerStationDeliverScan`
   // in THIS (top) frame; Showrunner itself runs in the iframe, so we relay by postMessage.
-  window.showrunnerStationDeliverScan = function(tag, tid) {
+  var stationIframeScanReady_ = false;
+  window.__srHostScanBuffer = window.__srHostScanBuffer || [];
+
+  function deliverScanToIframe_(tag, tid) {
     var msg = {
       type: 'SHOWRUNNER_RFID_SCAN',
       tag: String(tag == null ? '' : tag),
@@ -36,13 +39,30 @@
     try {
       if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
     } catch (e) { /* ignore */ }
-    // Belt-and-suspenders: post to every iframe (GAS may nest or redirect).
     try {
       var frames = document.querySelectorAll('iframe');
       for (var i = 0; i < frames.length; i++) {
         if (frames[i].contentWindow) frames[i].contentWindow.postMessage(msg, '*');
       }
     } catch (e2) { /* ignore */ }
+  }
+
+  function flushHostScanBuffer_() {
+    var buf = window.__srHostScanBuffer || [];
+    window.__srHostScanBuffer = [];
+    for (var i = 0; i < buf.length; i++) {
+      var row = buf[i];
+      if (row && row.tag) deliverScanToIframe_(row.tag, row.tid || '');
+    }
+  }
+
+  window.showrunnerStationDeliverScan = function(tag, tid) {
+    if (!stationIframeScanReady_) {
+      window.__srHostScanBuffer.push({ tag: String(tag == null ? '' : tag), tid: tid ? String(tid) : '' });
+      while (window.__srHostScanBuffer.length > 32) window.__srHostScanBuffer.shift();
+      return;
+    }
+    deliverScanToIframe_(tag, tid);
   };
 
   // Desktop WebView2: AndroidStation is on this (top) frame; the GAS station shell is cross-origin
@@ -1443,7 +1463,8 @@
     setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
   }
   if (isNativeStationApp() && !stationSplashDismissed_()) showStationSplash();
-  if (isNativeStationApp()) setTimeout(startStationGunPoll_, 800);
+  // Do NOT poll before the GAS iframe early-boot listener is wired — queue-only APK builds
+  // lose scans when the native queue is drained into an iframe that is not listening yet.
 
   // Relay shell-ready / login-needed to the native kiosk splash (StationWebActivity).
   function notifyNativeSplash(method) {
@@ -2577,10 +2598,19 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_READY') {
+      if (ev.data.early === true) {
+        stationIframeScanReady_ = true;
+        try { localStorage.setItem('sr_station_iframe_ready', '1'); } catch (e) { /* ignore */ }
+        flushHostScanBuffer_();
+        startStationGunPoll_();
+        return;
+      }
       if (ev.data.full !== true) return;
+      stationIframeScanReady_ = true;
       hideStationSplash();
       notifyNativeSplash('shellReady');
       try { localStorage.setItem('sr_station_iframe_ready', '1'); } catch (e) { /* ignore */ }
+      flushHostScanBuffer_();
       startStationGunPoll_();
       return;
     }
