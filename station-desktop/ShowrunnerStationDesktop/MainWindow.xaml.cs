@@ -238,7 +238,8 @@ public partial class MainWindow : Window
         var tidJson = JsonSerializer.Serialize(tid ?? "");
         var js =
             "(function(){try{var t=" + tagJson + ",i=" + tidJson + ";" +
-            "if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);return 'ok';}" +
+            "if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);return 'scan';}" +
+            "if(typeof window.stationPushScanFeed_==='function'){window.stationPushScanFeed_(t,i);return 'feed';}" +
             "window.__srPendingRfidScans=window.__srPendingRfidScans||[];" +
             "window.__srPendingRfidScans.push({tag:t,tid:i,ts:Date.now()});return 'queued';" +
             "}catch(e){return 'err:'+e.message;}})()";
@@ -256,7 +257,7 @@ public partial class MainWindow : Window
                     try
                     {
                         var result = UnwrapScriptResult(t.Result);
-                        if (result is "ok" or "queued")
+                        if (!string.IsNullOrEmpty(result))
                             ScanDiagnostics.Log("WEB", pass + ": frame script → " + result);
                     }
                     catch
@@ -311,6 +312,7 @@ public partial class MainWindow : Window
                 if (string.IsNullOrWhiteSpace(epc)) continue;
                 RelayScanToTopHosting(epc, tid ?? "");
                 PostScanToChildFrames(epc, tid ?? "", pass);
+                InvokeScanHandlerInChildFrames(epc, tid ?? "", pass);
             }
         }
         catch (Exception ex)
@@ -498,7 +500,8 @@ public partial class MainWindow : Window
             ScanDiagnostics.Log("WEB", "DeliverScan skipped — WebView not ready");
             return;
         }
-        ScanDiagnostics.Log("WEB", "DeliverScanToPage EPC=" + epc);
+        ScanDiagnostics.Log("WEB", "DeliverScanToPage EPC=" + epc + " desktop="
+            + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "?"));
         DeliverScanToPageCore(epc, tid, "immediate");
         ScheduleScanDeliveryRetries(epc, tid);
     }
@@ -532,6 +535,15 @@ public partial class MainWindow : Window
 
         PostScanToChildFrames(epc, tid, pass);
         InvokeScanHandlerInChildFrames(epc, tid, pass);
+        try
+        {
+            var topMsg = BuildNativeScanMessageJson(epc, tid);
+            WebView.CoreWebView2.PostWebMessageAsJson(topMsg);
+        }
+        catch (Exception ex)
+        {
+            ScanDiagnostics.Log("WEB", pass + ": top PostWebMessage failed — " + ex.Message);
+        }
     }
 
     private void ShowDiagnosticWindow()
@@ -740,6 +752,8 @@ public partial class MainWindow : Window
                   var tid = String(d.tid || '').trim();
                   if (epc && typeof window.onStationRfidScan === 'function') {
                     window.onStationRfidScan(epc, tid);
+                  } else if (epc && typeof window.stationPushScanFeed_ === 'function') {
+                    window.stationPushScanFeed_(epc, tid);
                   } else if (epc && window.showrunnerStationDeliverScan) {
                     window.showrunnerStationDeliverScan(epc, tid);
                   }
@@ -756,6 +770,8 @@ public partial class MainWindow : Window
                       if (!se) continue;
                       if (typeof window.onStationRfidScan === 'function') {
                         window.onStationRfidScan(se, st);
+                      } else if (typeof window.stationPushScanFeed_ === 'function') {
+                        window.stationPushScanFeed_(se, st);
                       } else if (window.showrunnerStationDeliverScan) {
                         window.showrunnerStationDeliverScan(se, st);
                       }

@@ -50,15 +50,16 @@ function build() {
   // Meta flag (IAM station login) OR ShowrunnerStation WebView UA (Chainway APK).
   (function stationEarlyBoot_() {
     try {
-      if (window.IS_STATION_DEVICE) return;
       var meta = document.querySelector('meta[name="station-device"]');
       var fromMeta = meta && String(meta.content).trim() === '1';
       var fromUa = /ShowrunnerStation/i.test(navigator.userAgent || '');
-      if (!fromMeta && !fromUa) return;
-      window.IS_STATION_DEVICE = true;
-      document.documentElement.classList.add('station-device-root');
-      var shell = document.getElementById('station-shell');
-      if (shell) shell.style.display = 'flex';
+      if (!window.IS_STATION_DEVICE && (fromMeta || fromUa)) {
+        window.IS_STATION_DEVICE = true;
+        document.documentElement.classList.add('station-device-root');
+        var shell = document.getElementById('station-shell');
+        if (shell) shell.style.display = 'flex';
+      }
+      if (!window.IS_STATION_DEVICE) return;
       // Queue RFID scans until the full station shell assigns onStationRfidScan (LogicPayload is async).
       window.__srPendingRfidScans = window.__srPendingRfidScans || [];
       if (!window.onStationRfidScan) {
