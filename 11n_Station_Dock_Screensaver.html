@@ -24,9 +24,11 @@
   </div>
   <aside class="station-dock-ss-right" aria-label="Weather bulletin">
     <div class="station-dock-ss-bulletin-panel">
-      <div id="station-dock-ss-event-title" class="station-dock-ss-event-title">Loading forecasts…</div>
-      <div class="station-dock-ss-credits-viewport">
-        <div id="station-dock-ss-credits-track" class="station-dock-ss-credits-track"></div>
+      <div class="station-dock-ss-slot-body">
+        <div id="station-dock-ss-event-title" class="station-dock-ss-event-title">Loading forecasts…</div>
+        <div class="station-dock-ss-credits-viewport">
+          <div id="station-dock-ss-credits-track" class="station-dock-ss-credits-track"></div>
+        </div>
       </div>
     </div>
   </aside>
@@ -48,7 +50,9 @@
   var ssWeatherById = {};
   var ssSofiaDays = null;
   var SS_FADE_MS = 500;
-  var SS_ROTATE_MS = 10000;
+  var SS_ROTATE_MS = 15000;
+  var SS_SLOT_FADE_MS = 1000;
+  var SS_SCROLL_SEC_PER_DAY = 14;
   var SS_DIM_PAD = 25;
   var SS_DIM_FADE = 50;
   var SS_SOFIA = { lat: 42.6977, lng: 23.3219, label: 'Sofia' };
@@ -232,12 +236,51 @@
     }).join('');
   }
 
-  function ssRestartCreditsAnim_() {
+  function ssRestartCreditsAnim_(dayCount) {
     var track = document.getElementById('station-dock-ss-credits-track');
     if (!track) return;
+    var count = Math.max(1, dayCount || 1);
+    var sec = Math.max(90, count * SS_SCROLL_SEC_PER_DAY);
+    track.style.setProperty('--ss-scroll-duration', sec + 's');
     track.style.animation = 'none';
     void track.offsetHeight;
     track.style.animation = '';
+  }
+
+  function ssSlotBody_() {
+    return document.querySelector('.station-dock-ss-slot-body');
+  }
+
+  function ssFadeSlotBody_(targetOpacity, done) {
+    var body = ssSlotBody_();
+    if (!body) {
+      if (done) done();
+      return;
+    }
+    body.style.transition = 'opacity ' + SS_SLOT_FADE_MS + 'ms ease';
+    if (Number(targetOpacity) === 0) {
+      body.style.opacity = '1';
+      void body.offsetHeight;
+      body.style.opacity = '0';
+    } else {
+      body.style.opacity = '0';
+      void body.offsetHeight;
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          body.style.opacity = '1';
+        });
+      });
+    }
+    if (!done) return;
+    var finished = false;
+    function finish_() {
+      if (finished) return;
+      finished = true;
+      body.removeEventListener('transitionend', finish_);
+      done();
+    }
+    body.addEventListener('transitionend', finish_);
+    setTimeout(finish_, SS_SLOT_FADE_MS + 120);
   }
 
   function ssBuildSlots_() {
@@ -303,7 +346,19 @@
 
     var block = ssBuildCreditsHtml_(days);
     track.innerHTML = block + block;
-    ssRestartCreditsAnim_();
+    ssRestartCreditsAnim_(days.length);
+  }
+
+  function ssAdvanceSlot_() {
+    if (!ssActive || ssSlots.length <= 1) return;
+    ssFadeSlotBody_(0, function() {
+      if (!ssActive || ssSlots.length <= 1) return;
+      ssRenderSlotAt_(ssSlotIndex + 1);
+      ssFadeSlotBody_(1, function() {
+        if (!ssActive || ssSlots.length <= 1) return;
+        ssRotateTimer = setTimeout(ssAdvanceSlot_, SS_ROTATE_MS);
+      });
+    });
   }
 
   function ssPrefetchWeather_(done) {
@@ -333,16 +388,15 @@
   }
 
   function ssStartRotate_() {
-    if (ssRotateTimer) clearInterval(ssRotateTimer);
+    if (ssRotateTimer) clearTimeout(ssRotateTimer);
+    ssRotateTimer = null;
     if (ssSlots.length <= 1) return;
-    ssRotateTimer = setInterval(function() {
-      ssRenderSlotAt_(ssSlotIndex + 1);
-    }, SS_ROTATE_MS);
+    ssRotateTimer = setTimeout(ssAdvanceSlot_, SS_ROTATE_MS);
   }
 
   function ssStopTimers_() {
     if (ssClockTimer) { clearInterval(ssClockTimer); ssClockTimer = null; }
-    if (ssRotateTimer) { clearInterval(ssRotateTimer); ssRotateTimer = null; }
+    if (ssRotateTimer) { clearTimeout(ssRotateTimer); ssRotateTimer = null; }
   }
 
   window.stationDockOpenScreensaver_ = function() {
@@ -373,8 +427,20 @@
 
     ssPrefetchWeather_(function() {
       if (!ssActive) return;
+      var body = ssSlotBody_();
+      if (body) {
+        body.style.transition = 'opacity ' + SS_SLOT_FADE_MS + 'ms ease';
+        body.style.opacity = '0';
+      }
       ssRenderSlotAt_(0);
-      ssStartRotate_();
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          ssFadeSlotBody_(1, function() {
+            if (!ssActive) return;
+            ssStartRotate_();
+          });
+        });
+      });
     });
   };
 
@@ -385,6 +451,11 @@
     function teardown_() {
       ssActive = false;
       ssStopTimers_();
+      var body = ssSlotBody_();
+      if (body) {
+        body.style.opacity = '';
+        body.style.transition = '';
+      }
       overlay.classList.remove('is-visible', 'is-leaving', 'is-mounted');
       overlay.style.display = 'none';
       overlay.setAttribute('aria-hidden', 'true');

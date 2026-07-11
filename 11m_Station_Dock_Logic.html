@@ -170,10 +170,7 @@
     if (statusEl) {
       statusEl.style.display = 'block';
       statusEl.textContent = 'Could not load projects' + (msg ? ': ' + msg : '') + '. Tap to retry.';
-      statusEl.style.cursor = 'pointer';
       statusEl.onclick = function() {
-        statusEl.onclick = null;
-        statusEl.style.cursor = '';
         window.stationProjectsCache = null;
         window.stationProjectsFor = null;
         window.__stationProjectsFetchHost = null;
