@@ -2358,10 +2358,11 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   stationDebug_('scan IN: ' + (tag || '(empty)') + (tid ? ' tid:' + tid : ''));
   if (tag) stationPushScanFeed_(tag, tid);
   // Dedup: one physical scan can arrive via BOTH poll and relay (case/format may differ).
+  // Short window only — do not block legitimate rescans of the same badge.
   if (norm) {
     var now = Date.now();
     var priorTid = String(window.stationLastScanTid || '').trim();
-    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500;
+    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 350;
     // Drop duplicate EPC-only delivery when we already handled this scan; allow upgrade when TID arrives.
     if (sameEpcRecent && (priorTid || !tid)) return;
     window.stationLastScanNorm = norm;
@@ -3906,6 +3907,11 @@ function stationBindMessageListener_() {
     try { window.removeEventListener('message', window.__srShimMessageHandler); } catch (e) { /* ignore */ }
     window.__srShimMessageHandler = null;
     window.__srShimMessageBound = false;
+  }
+  if (window.__srEarlyBootMsgHandler) {
+    try { window.removeEventListener('message', window.__srEarlyBootMsgHandler); } catch (e) { /* ignore */ }
+    window.__srEarlyBootMsgHandler = null;
+    window.__srEarlyBootMsgBound = false;
   }
   if (window.stationMessageListenerBound) return;
   window.stationMessageListenerBound = true;

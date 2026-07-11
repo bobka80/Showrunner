@@ -55,7 +55,10 @@
   var stationGunPollTimer = null;
   function startStationGunPoll_() {
     if (stationGunPollTimer) return;
+    // Top-frame poll drains the native queue before the iframe can pull (reliable path).
+    // Chainway iframe AndroidStation.pollScans() is primary; immediate relay is fallback only.
     if (isDesktopWebView2_()) return;
+    if (isNativeStationApp()) return;
     if (!window.AndroidStation || typeof AndroidStation.pollScans !== 'function') return;
     stationGunPollTimer = setInterval(function() {
       try {

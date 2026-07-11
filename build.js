@@ -95,12 +95,13 @@ function build() {
       }
       if (!window.__srEarlyBootMsgBound) {
         window.__srEarlyBootMsgBound = true;
-        window.addEventListener('message', function(ev) {
+        window.__srEarlyBootMsgHandler = function(ev) {
           var d = ev && ev.data;
           if (d && d.type === 'SHOWRUNNER_RFID_SCAN' && typeof window.onStationRfidScan === 'function') {
             window.onStationRfidScan(d.tag, d.tid || '');
           }
-        });
+        };
+        window.addEventListener('message', window.__srEarlyBootMsgHandler);
       }
       // Do not post SHOWRUNNER_STATION_READY here — only initStationShell_ / stationAnnounceReady_ may signal native splash.
     } catch (e) { /* ignore */ }

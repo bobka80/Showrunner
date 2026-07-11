@@ -36,16 +36,16 @@ const SEGMENTS = [
   { file: '11c_Station_Core_2.html', a: 1441, b: 2038, head: '<!-- @INDEX: STATION -> Per-station settings keys + shell helpers (2/5) -->\n<script>\n', foot: '</script>\n' },
   { file: '11d_Station_Rfid_2.html', a: 2039, b: 2111, head: '<!-- @INDEX: STATION -> Live scan feed (2/3) -->\n<script>\n', foot: '</script>\n' },
   { file: '11c_Station_Core_3.html', a: 2112, b: 2200, head: '<!-- @INDEX: STATION -> Shell state renderer (3/5) -->\n<script>\n', foot: '</script>\n' },
-  { file: '11d_Station_Rfid_3.html', a: 2201, b: 2456, head: '<!-- @INDEX: STATION -> RFID scan routing + host login (3/3) -->\n<script>\n', foot: '</script>\n' },
-  { file: '11h_Station_Project_Logic.html', a: 2457, b: 2466, head: '<!-- @INDEX: STATION -> Project picker logic (1/2) -->\n<script>\n', foot: '</script>\n' },
-  { file: '11g_Station_Vault.html', a: 2467, b: 2555, head: '<!-- @INDEX: STATION -> Vault equipment rollup (1/2) -->\n<script>\n', foot: '</script>\n' },
-  { file: '11e_Station_ScanPanel.html', a: 2556, b: 2906, head: '<!-- @INDEX: STATION -> Scan panel UI + status actions -->\n<script>\n', foot: '</script>\n' },
-  { file: '11g_Station_Vault_2.html', a: 2907, b: 3244, head: '<!-- @INDEX: STATION -> Vault record RFID (2/2) -->\n<script>\n', foot: '</script>\n' },
-  { file: '11g_Station_Vault_Crew.html', a: 3245, b: 3349, head: '<!-- @INDEX: STATION -> Vault crew tab ROOT badge enroll -->\n<script>\n', foot: '</script>\n' },
-  { file: '11h_Station_Project_Logic_2.html', a: 3350, b: 3488, head: '<!-- @INDEX: STATION -> Project picker logic (2/2) -->\n<script>\n', foot: '</script>\n' },
-  { file: '11c_Station_Core_4.html', a: 3489, b: 3518, head: '<!-- @INDEX: STATION -> Eject grace UI (4/5) -->\n<script>\n', foot: '</script>\n' },
-  { file: '11i_Station_Settings_Logic.html', a: 3519, b: 3896, head: '<!-- @INDEX: STATION -> Settings + gun config sync -->\n<script>\n', foot: '</script>\n' },
-  { file: '11c_Station_Init.html', a: 3897, b: 4030, head: '<!-- @INDEX: STATION -> Bootstrap init (5/5) — must stay last in logic chain -->\n<script>\n', foot: '</script>\n' },
+  { file: '11d_Station_Rfid_3.html', a: 2201, b: 2457, head: '<!-- @INDEX: STATION -> RFID scan routing + host login (3/3) -->\n<script>\n', foot: '</script>\n' },
+  { file: '11h_Station_Project_Logic.html', a: 2458, b: 2467, head: '<!-- @INDEX: STATION -> Project picker logic (1/2) -->\n<script>\n', foot: '</script>\n' },
+  { file: '11g_Station_Vault.html', a: 2468, b: 2556, head: '<!-- @INDEX: STATION -> Vault equipment rollup (1/2) -->\n<script>\n', foot: '</script>\n' },
+  { file: '11e_Station_ScanPanel.html', a: 2557, b: 2907, head: '<!-- @INDEX: STATION -> Scan panel UI + status actions -->\n<script>\n', foot: '</script>\n' },
+  { file: '11g_Station_Vault_2.html', a: 2908, b: 3238, head: '<!-- @INDEX: STATION -> Vault record RFID (2/2) -->\n<script>\n', foot: '</script>\n' },
+  { file: '11g_Station_Vault_Crew.html', a: 3239, b: 3350, head: '<!-- @INDEX: STATION -> Vault crew tab ROOT badge enroll -->\n<script>\n', foot: '</script>\n' },
+  { file: '11h_Station_Project_Logic_2.html', a: 3351, b: 3489, head: '<!-- @INDEX: STATION -> Project picker logic (2/2) -->\n<script>\n', foot: '</script>\n' },
+  { file: '11c_Station_Core_4.html', a: 3490, b: 3519, head: '<!-- @INDEX: STATION -> Eject grace UI (4/5) -->\n<script>\n', foot: '</script>\n' },
+  { file: '11i_Station_Settings_Logic.html', a: 3520, b: 3897, head: '<!-- @INDEX: STATION -> Settings + gun config sync -->\n<script>\n', foot: '</script>\n' },
+  { file: '11c_Station_Init.html', a: 3898, b: 4036, head: '<!-- @INDEX: STATION -> Bootstrap init (5/5) — must stay last in logic chain -->\n<script>\n', foot: '</script>\n' },
 ];
 
 /** Index include order for Phase A (no 11k/11l — Phase B only). */
@@ -75,13 +75,13 @@ if (origMarkup !== rebuiltMarkup) {
 
 let rebuiltLogic = '';
 SEGMENTS.forEach(function(seg) { rebuiltLogic += slice(seg.a, seg.b); });
-const origLogic = monoLines.slice(1139, 4030).join('\n') + '\n';
+const origLogic = monoLines.slice(1139, 4036).join('\n') + '\n';
 if (origLogic !== rebuiltLogic) {
-  console.error('VERIFY FAILED: logic regen does not match monolith script lines 1140–4030');
+  console.error('VERIFY FAILED: logic regen does not match monolith script lines 1140–4036');
   process.exit(1);
 }
 
 console.log('VERIFY OK: markup lines 1–1137 match monolith');
-console.log('VERIFY OK: logic lines 1140–4030 match monolith');
+console.log('VERIFY OK: logic lines 1140–4036 match monolith');
 console.log('Index include order (' + INDEX_INCLUDES.length + ' modules):');
 INDEX_INCLUDES.forEach(function(name) { console.log('  ' + name); });

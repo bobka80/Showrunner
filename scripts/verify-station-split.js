@@ -71,7 +71,7 @@ if (!fs.existsSync(monoPath)) fail('Missing 11_Station_Shell.html monolith refer
 const mono = read('11_Station_Shell.html');
 const monoLines = mono.split(/\r?\n/);
 
-if (monoLines.length < 4030) {
+if (monoLines.length < 4036) {
   fail('Monolith shorter than expected (' + monoLines.length + ' lines)');
 }
 
@@ -120,7 +120,7 @@ LOGIC_FILES.forEach(function(f) {
 });
 
 const origMarkup = monoLines.slice(0, 1137).join('\n') + '\n';
-const origLogic = monoLines.slice(1139, 4030).join('\n') + '\n';
+const origLogic = monoLines.slice(1139, 4036).join('\n') + '\n';
 
 if (origMarkup !== rebuiltMarkup) {
   fail('Markup concat !== monolith lines 1–1137');
@@ -128,9 +128,9 @@ if (origMarkup !== rebuiltMarkup) {
 console.log('concat OK: markup === monolith 1–1137');
 
 if (origLogic !== rebuiltLogic) {
-  fail('Logic concat !== monolith script 1140–4030');
+  fail('Logic concat !== monolith script 1140–4036');
 }
-console.log('concat OK: logic === monolith 1140–4030');
+console.log('concat OK: logic === monolith 1140–4036');
 
 const hash = crypto.createHash('sha256').update(origMarkup + origLogic).digest('hex').slice(0, 16);
 console.log('\nGolden hash (markup+logic): ' + hash);

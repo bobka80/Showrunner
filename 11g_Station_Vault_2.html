@@ -331,11 +331,4 @@ function stationVaultRecordCall_(assetId, tag, force) {
     })
     .recordStationAssetRfid(ACTIVE_USER_NAME, host.name, assetId, tag, !!force);
 }
-
-/* ==========================================================================
-   VAULT → CREW TAB (ROOT only): assign / overwrite crew badge RFIDs
-   ========================================================================== */
-window.stationVaultCrew = null;   // cached crew list [{uid,name,rfidTag}]
-window.stationCrewRecord = null;  // { ref, name } while armed for a crew badge scan
-
 </script>
