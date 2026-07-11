@@ -1,4 +1,3 @@
-Showrunner Station Desktop v0.1.48
+Showrunner Station Desktop v0.1.49
 
-- v0.1.48 Stagebusters red A app icon
-- bulletin screensaver button
+- v0.1.49 Fix RUN-STATION.bat fast launch + reliable start check

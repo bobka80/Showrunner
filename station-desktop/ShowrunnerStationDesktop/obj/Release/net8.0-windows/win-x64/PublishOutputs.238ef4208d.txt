@@ -1,4 +1,5 @@
 S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\bin\publish\win-x64\ShowrunnerStationDesktop.exe
+S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\bin\publish\win-x64\app.ico
 S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\bin\publish\win-x64\runtimes\win-x64\native\WebView2Loader.dll
 S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\bin\publish\win-x64\ShowrunnerStationDesktop.dll
 S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\bin\publish\win-x64\ShowrunnerStationDesktop.deps.json

@@ -927,6 +927,13 @@ html.station-dock-root,
 html.station-dock-root body {
   overflow: hidden;
   height: 100%;
+  --station-dock-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Ccircle cx='18' cy='18' r='15.5' fill='%23ffffff' fill-opacity='0.94' stroke='rgba(0,0,0,0.28)' stroke-width='1.2'/%3E%3Ccircle cx='18' cy='18' r='5.5' fill='rgba(30,30,35,0.35)'/%3E%3C/svg%3E") 18 18, auto;
+  cursor: var(--station-dock-cursor);
+}
+html.station-dock-root input,
+html.station-dock-root textarea,
+html.station-dock-root select {
+  cursor: text;
 }
 html.station-dock-root #station-shell {
   display: none !important;
@@ -1369,15 +1376,25 @@ body.station-dock-screensaver-active { overflow: hidden; }
   inset: 0;
   z-index: 52000;
   grid-template-columns: var(--dock-split) calc(100% - var(--dock-split));
-  background: rgba(0, 0, 0, 0.70);
   overflow: hidden;
   user-select: none;
   opacity: 0;
   transition: opacity 0.5s ease;
+  background: #0a0a0c;
 }
 .station-dock-screensaver.is-mounted { display: grid; }
 .station-dock-screensaver.is-visible { opacity: 1; }
 .station-dock-screensaver.is-leaving { opacity: 0; }
+.station-dock-ss-left {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+}
 .station-dock-ss-filters {
   position: absolute;
   width: 0;
@@ -1397,23 +1414,19 @@ body.station-dock-screensaver-active { overflow: hidden; }
   inset: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: center;
   overflow: hidden;
-  padding-left: 33.333%;
-  box-sizing: border-box;
-  transform: translateX(-16.666%);
 }
 .station-dock-ss-hero-a {
-  height: calc(100vh - 40px);
-  height: calc(100dvh - 40px);
+  height: calc(100% - 40px);
   width: auto;
   opacity: 0.07;
   transform-origin: center center;
   animation: station-dock-ss-hero-pulse 52s ease-in-out infinite alternate;
 }
 @keyframes station-dock-ss-hero-pulse {
-  0% { transform: translateX(2vw) scale(1); opacity: 0.06; }
-  100% { transform: translateX(2vw) scale(14); opacity: 0.10; }
+  0% { transform: scale(1); opacity: 0.06; }
+  100% { transform: scale(14); opacity: 0.10; }
 }
 .station-dock-ss-bus-lanes {
   position: absolute;
@@ -1451,21 +1464,13 @@ body.station-dock-screensaver-active { overflow: hidden; }
   0%   { transform: translateX(-110%); opacity: 0; }
   7%   { opacity: var(--bus-o, 0.15); }
   93%  { opacity: var(--bus-o, 0.15); }
-  100% { transform: translateX(110vw); opacity: 0; }
+  100% { transform: translateX(110%); opacity: 0; }
 }
 @keyframes station-dock-ss-bus-rtl {
-  0%   { transform: translateX(110vw); opacity: 0; }
+  0%   { transform: translateX(110%); opacity: 0; }
   7%   { opacity: var(--bus-o, 0.15); }
   93%  { opacity: var(--bus-o, 0.15); }
   100% { transform: translateX(-110%); opacity: 0; }
-}
-.station-dock-ss-left {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
 }
 .station-dock-ss-clock-panel {
   position: relative;
@@ -1493,7 +1498,7 @@ body.station-dock-screensaver-active { overflow: hidden; }
 }
 .station-dock-ss-clock {
   font-family: "Bahnschrift", "Segoe UI", sans-serif;
-  font-size: clamp(72px, 10vw, 132px);
+  font-size: clamp(64px, 8vw, 120px);
   font-weight: 700;
   color: #8a939f;
   letter-spacing: 2px;
@@ -1553,13 +1558,8 @@ body.station-dock-screensaver-active { overflow: hidden; }
   min-height: 0;
   padding: 24px 20px 20px;
   box-sizing: border-box;
-}
-.station-dock-ss-right-dim {
-  position: absolute;
-  inset: 0;
-  background: rgba(5, 5, 8, 0.78);
-  pointer-events: none;
-  z-index: 0;
+  background: rgba(5, 5, 8, 0.92);
+  border-left: 1px solid #27272a;
 }
 .station-dock-ss-event-title {
   position: relative;
@@ -1641,7 +1641,7 @@ body.station-dock-screensaver-active { overflow: hidden; }
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  cursor: pointer;
+  cursor: var(--station-dock-cursor);
 }
 .station-dock-ss-exit:hover {
   border-color: #f97316;

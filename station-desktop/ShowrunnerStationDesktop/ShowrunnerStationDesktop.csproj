@@ -8,10 +8,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ShowrunnerStationDesktop</AssemblyName>
     <RootNamespace>Showrunner.Station.Desktop</RootNamespace>
-    <Version>0.1.48</Version>
+    <Version>0.1.49</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2957.106" />

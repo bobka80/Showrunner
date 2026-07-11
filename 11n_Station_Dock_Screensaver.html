@@ -1,30 +1,29 @@
 <!-- @INDEX: STATION -> Dock bulletin / screensaver (desktop only) -->
 <div id="station-dock-screensaver" class="station-dock-screensaver" style="display:none;" aria-hidden="true">
-  <svg class="station-dock-ss-filters" aria-hidden="true" focusable="false">
-    <defs>
-      <filter id="station-dock-ss-sandy" x="-12%" y="-30%" width="124%" height="160%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="8" result="noise"/>
-        <feColorMatrix in="noise" type="saturate" values="0" result="grain"/>
-        <feDisplacementMap in="SourceGraphic" in2="grain" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
-        <feGaussianBlur in="displaced" stdDeviation="0.35" result="soft"/>
-        <feBlend in="soft" in2="SourceGraphic" mode="normal"/>
-      </filter>
-    </defs>
-  </svg>
-  <div class="station-dock-ss-bg" aria-hidden="true">
-    <div class="station-dock-ss-hero">
-      <svg class="station-dock-ss-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
+  <div class="station-dock-ss-left" aria-hidden="false">
+    <svg class="station-dock-ss-filters" aria-hidden="true" focusable="false">
+      <defs>
+        <filter id="station-dock-ss-sandy" x="-12%" y="-30%" width="124%" height="160%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="8" result="noise"/>
+          <feColorMatrix in="noise" type="saturate" values="0" result="grain"/>
+          <feDisplacementMap in="SourceGraphic" in2="grain" scale="2.2" xChannelSelector="R" yChannelSelector="G" result="displaced"/>
+          <feGaussianBlur in="displaced" stdDeviation="0.35" result="soft"/>
+          <feBlend in="soft" in2="SourceGraphic" mode="normal"/>
+        </filter>
+      </defs>
+    </svg>
+    <div class="station-dock-ss-bg" aria-hidden="true">
+      <div class="station-dock-ss-hero">
+        <svg class="station-dock-ss-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
+      </div>
+      <div id="station-dock-ss-bus-lanes" class="station-dock-ss-bus-lanes"></div>
     </div>
-    <div id="station-dock-ss-bus-lanes" class="station-dock-ss-bus-lanes"></div>
-  </div>
-  <div class="station-dock-ss-left">
     <div class="station-dock-ss-clock-panel">
       <div id="station-dock-ss-clock" class="station-dock-ss-clock"></div>
     </div>
   </div>
-  <aside class="station-dock-ss-right" aria-label="Outdoor forecast bulletin">
-    <div class="station-dock-ss-right-dim" aria-hidden="true"></div>
-    <div id="station-dock-ss-event-title" class="station-dock-ss-event-title">Loading outdoor events…</div>
+  <aside class="station-dock-ss-right" aria-label="Weather bulletin">
+    <div id="station-dock-ss-event-title" class="station-dock-ss-event-title">Loading forecasts…</div>
     <div class="station-dock-ss-credits-viewport">
       <div id="station-dock-ss-credits-track" class="station-dock-ss-credits-track"></div>
     </div>
@@ -42,12 +41,15 @@
   var ssClockTimer = null;
   var ssRotateTimer = null;
   var ssEvents = [];
-  var ssEventIndex = 0;
+  var ssSlots = [];
+  var ssSlotIndex = 0;
   var ssWeatherById = {};
+  var ssSofiaDays = null;
   var SS_FADE_MS = 500;
-  var SS_ROTATE_MS = 9000;
+  var SS_ROTATE_MS = 10000;
   var SS_DIM_PAD = 25;
   var SS_DIM_FADE = 50;
+  var SS_SOFIA = { lat: 42.6977, lng: 23.3219, label: 'Sofia' };
 
   function ssIsDock_() {
     return document.documentElement.classList.contains('station-dock-root');
@@ -64,18 +66,18 @@
     if (!lanes || lanes.dataset.built === 'v1') return;
     lanes.dataset.built = 'v1';
     var configs = [
-      { top: '6%',  width: '250vw', dur: 56,  delay: 0,   dir: 'ltr' },
-      { top: '14%', width: '80vw',  dur: 108, delay: -14, dir: 'rtl' },
-      { top: '22%', width: '152vw', dur: 62,  delay: -28, dir: 'ltr' },
-      { top: '30%', width: '104vw', dur: 80,  delay: -8,  dir: 'rtl' },
-      { top: '38%', width: '240vw', dur: 52,  delay: -3,  dir: 'ltr' },
-      { top: '46%', width: '72vw',  dur: 130, delay: -52, dir: 'rtl' },
-      { top: '54%', width: '136vw', dur: 54,  delay: -20, dir: 'ltr' },
-      { top: '62%', width: '280vw', dur: 54,  delay: -1,  dir: 'rtl' },
-      { top: '70%', width: '88vw',  dur: 92,  delay: -62, dir: 'ltr' },
-      { top: '78%', width: '164vw', dur: 56,  delay: -12, dir: 'rtl' },
-      { top: '86%', width: '116vw', dur: 68,  delay: -36, dir: 'ltr' },
-      { top: '50%', width: '245vw', dur: 52,  delay: -6,  dir: 'rtl' }
+      { top: '6%',  width: '280%', dur: 56,  delay: 0,   dir: 'ltr' },
+      { top: '14%', width: '95%',  dur: 108, delay: -14, dir: 'rtl' },
+      { top: '22%', width: '170%', dur: 62,  delay: -28, dir: 'ltr' },
+      { top: '30%', width: '115%', dur: 80,  delay: -8,  dir: 'rtl' },
+      { top: '38%', width: '265%', dur: 52,  delay: -3,  dir: 'ltr' },
+      { top: '46%', width: '85%',  dur: 130, delay: -52, dir: 'rtl' },
+      { top: '54%', width: '150%', dur: 54,  delay: -20, dir: 'ltr' },
+      { top: '62%', width: '310%', dur: 54,  delay: -1,  dir: 'rtl' },
+      { top: '70%', width: '98%',  dur: 92,  delay: -62, dir: 'ltr' },
+      { top: '78%', width: '180%', dur: 56,  delay: -12, dir: 'rtl' },
+      { top: '86%', width: '128%', dur: 68,  delay: -36, dir: 'ltr' },
+      { top: '50%', width: '275%', dur: 52,  delay: -6,  dir: 'rtl' }
     ];
     var html = '';
     configs.forEach(function(cfg) {
@@ -236,56 +238,103 @@
     track.style.animation = '';
   }
 
-  function ssRenderEventAt_(idx) {
+  function ssBuildSlots_() {
+    ssSlots = [{ kind: 'sofia', title: SS_SOFIA.label + ' · 14-day outlook' }];
+    ssEvents.forEach(function(p) {
+      var when = p.start ? new Date(p.start).toLocaleDateString() : '';
+      ssSlots.push({
+        kind: 'event',
+        project: p,
+        title: (p.title || p.name || 'Untitled') + (when ? (' · ' + when) : '')
+      });
+    });
+    ssSlotIndex = 0;
+  }
+
+  function ssSofiaStubProject_() {
+    var now = new Date();
+    now.setHours(0, 0, 0, 0);
+    var end = new Date(now);
+    end.setDate(end.getDate() + 13);
+    function iso(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    return {
+      id: '__sofia_bulletin__',
+      title: SS_SOFIA.label,
+      start: iso(now),
+      end: iso(end),
+      readinessState: { coords: { lat: SS_SOFIA.lat, lng: SS_SOFIA.lng }, isOutdoor: true }
+    };
+  }
+
+  function ssFetchSofiaWeather_() {
+    if (ssSofiaDays) return Promise.resolve(ssSofiaDays);
+    if (typeof fetchMobileWeatherDaysForProject !== 'function') {
+      return Promise.resolve([]);
+    }
+    return fetchMobileWeatherDaysForProject(ssSofiaStubProject_()).then(function(result) {
+      ssSofiaDays = (result && result.days) ? result.days : [];
+      return ssSofiaDays;
+    }).catch(function() {
+      ssSofiaDays = [];
+      return ssSofiaDays;
+    });
+  }
+
+  function ssRenderSlotAt_(idx) {
     var titleEl = document.getElementById('station-dock-ss-event-title');
     var track = document.getElementById('station-dock-ss-credits-track');
-    if (!titleEl || !track) return;
-    if (!ssEvents.length) {
-      titleEl.textContent = 'No outdoor events in the next 14 days';
-      track.innerHTML = '<div class="station-dock-ss-credit-line station-dock-ss-credit-line--muted">—</div>';
-      ssRestartCreditsAnim_();
-      return;
+    if (!titleEl || !track || !ssSlots.length) return;
+
+    ssSlotIndex = ((idx % ssSlots.length) + ssSlots.length) % ssSlots.length;
+    var slot = ssSlots[ssSlotIndex];
+    titleEl.textContent = slot.title;
+
+    var days = [];
+    if (slot.kind === 'sofia') {
+      days = ssSofiaDays || [];
+    } else if (slot.project) {
+      var cached = ssWeatherById[slot.project.id];
+      days = (cached && cached.days) ? cached.days : [];
     }
-    ssEventIndex = ((idx % ssEvents.length) + ssEvents.length) % ssEvents.length;
-    var p = ssEvents[ssEventIndex];
-    var when = p.start ? new Date(p.start).toLocaleDateString() : '';
-    titleEl.textContent = (p.title || p.name || 'Untitled') + (when ? (' · ' + when) : '');
-    var cached = ssWeatherById[p.id];
-    var block = ssBuildCreditsHtml_(cached && cached.days ? cached.days : []);
+
+    var block = ssBuildCreditsHtml_(days);
     track.innerHTML = block + block;
     ssRestartCreditsAnim_();
   }
 
   function ssPrefetchWeather_(done) {
     ssEvents = ssCollectOutdoorEvents_();
-    if (!ssEvents.length) {
-      ssWeatherById = {};
-      if (done) done();
-      return;
-    }
-    if (typeof fetchMobileWeatherDaysForProject !== 'function') {
-      if (done) done();
-      return;
-    }
-    var pending = ssEvents.length;
-    ssEvents.forEach(function(p) {
-      fetchMobileWeatherDaysForProject(p).then(function(result) {
-        ssWeatherById[p.id] = result || { days: [] };
-        pending--;
-        if (pending <= 0 && done) done();
-      }).catch(function() {
-        ssWeatherById[p.id] = { days: [] };
-        pending--;
-        if (pending <= 0 && done) done();
+    ssBuildSlots_();
+
+    var pending = 1;
+    if (ssEvents.length && typeof fetchMobileWeatherDaysForProject === 'function') {
+      pending += ssEvents.length;
+      ssEvents.forEach(function(p) {
+        fetchMobileWeatherDaysForProject(p).then(function(result) {
+          ssWeatherById[p.id] = result || { days: [] };
+          pending--;
+          if (pending <= 0 && done) done();
+        }).catch(function() {
+          ssWeatherById[p.id] = { days: [] };
+          pending--;
+          if (pending <= 0 && done) done();
+        });
       });
+    }
+
+    ssFetchSofiaWeather_().then(function() {
+      pending--;
+      if (pending <= 0 && done) done();
     });
   }
 
   function ssStartRotate_() {
     if (ssRotateTimer) clearInterval(ssRotateTimer);
-    if (ssEvents.length <= 1) return;
+    if (ssSlots.length <= 1) return;
     ssRotateTimer = setInterval(function() {
-      ssRenderEventAt_(ssEventIndex + 1);
+      ssRenderSlotAt_(ssSlotIndex + 1);
     }, SS_ROTATE_MS);
   }
 
@@ -322,7 +371,7 @@
 
     ssPrefetchWeather_(function() {
       if (!ssActive) return;
-      ssRenderEventAt_(0);
+      ssRenderSlotAt_(0);
       ssStartRotate_();
     });
   };

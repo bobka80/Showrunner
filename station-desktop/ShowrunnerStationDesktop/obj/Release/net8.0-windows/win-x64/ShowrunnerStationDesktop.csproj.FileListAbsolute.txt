@@ -36,3 +36,4 @@ S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\obj\Relea
 S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\bin\Release\net8.0-windows\win-x64\System.Management.dll
 S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\obj\Release\net8.0-windows\win-x64\DiagnosticWindow.baml
 S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\obj\Release\net8.0-windows\win-x64\DiagnosticWindow.g.cs
+S:\Gdrive\3Showrider\Code Env\station-desktop\ShowrunnerStationDesktop\bin\Release\net8.0-windows\win-x64\app.ico
