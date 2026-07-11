@@ -66,7 +66,13 @@ class RfidManager(
     private var ladderStep = 0
 
     @Volatile private var powerDbm = prefs.getInt(PREF_POWER, DEFAULT_POWER)
-    @Volatile private var scanMode = prefs.getString(PREF_SCAN_MODE, SCAN_MODE_SINGLE) ?: SCAN_MODE_SINGLE
+    @Volatile private var scanMode = (prefs.getString(PREF_SCAN_MODE, SCAN_MODE_SINGLE) ?: SCAN_MODE_SINGLE).let {
+        if (it == SCAN_MODE_HOLD) SCAN_MODE_SINGLE else it
+    }.also { normalized ->
+        if (normalized != prefs.getString(PREF_SCAN_MODE, SCAN_MODE_SINGLE)) {
+            prefs.edit().putString(PREF_SCAN_MODE, normalized).apply()
+        }
+    }
     @Volatile private var beepEnabled = prefs.getBoolean(PREF_BEEP, true)
     @Volatile private var pollMs = prefs.getInt(PREF_POLL_MS, DEFAULT_POLL_MS)
     @Volatile private var battery = -1
@@ -785,19 +791,44 @@ class RfidManager(
         readWorker.execute {
             val deadline = SystemClock.elapsedRealtime() + MULTI_BURST_MS
             var attempts = 0
-            while (
-                SystemClock.elapsedRealtime() < deadline &&
-                attempts < MULTI_BURST_MAX_READS &&
-                !readCancelled.get()
-            ) {
-                try {
-                    val pair = readTagPair()
-                    if (pair != null) deliverTag(pair.first, pair.second)
-                } catch (e: Exception) {
-                    Log.e(TAG, "multi read failed", e)
+            var delivered = false
+            var mutedBeep = false
+            try {
+                // One trigger pull → one beep. Mute SDK beep during the burst loop; ack once if any tag read.
+                if (beepEnabled && sdkStatus() == ConnectionStatus.CONNECTED) {
+                    try {
+                        uhf.setBeep(false)
+                        mutedBeep = true
+                    } catch (e: Exception) {
+                        Log.w(TAG, "multi mute beep failed", e)
+                    }
                 }
-                attempts++
-                if (SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(MULTI_READ_GAP_MS)
+                while (
+                    SystemClock.elapsedRealtime() < deadline &&
+                    attempts < MULTI_BURST_MAX_READS &&
+                    !readCancelled.get()
+                ) {
+                    try {
+                        val pair = readTagPair()
+                        if (pair != null) {
+                            deliverTag(pair.first, pair.second)
+                            delivered = true
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "multi read failed", e)
+                    }
+                    attempts++
+                    if (SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(MULTI_READ_GAP_MS)
+                }
+            } finally {
+                if (mutedBeep && beepEnabled) {
+                    try {
+                        uhf.setBeep(true)
+                        if (delivered) uhf.triggerBeep(1)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "multi restore beep failed", e)
+                    }
+                }
             }
         }
     }
@@ -1036,7 +1067,7 @@ class RfidManager(
     fun setScanMode(mode: String) {
         scanMode = when (mode) {
             SCAN_MODE_CONTINUOUS -> SCAN_MODE_CONTINUOUS
-            SCAN_MODE_HOLD -> SCAN_MODE_HOLD
+            SCAN_MODE_HOLD -> SCAN_MODE_SINGLE // retired web mode
             SCAN_MODE_MULTI -> SCAN_MODE_MULTI
             else -> SCAN_MODE_SINGLE
         }

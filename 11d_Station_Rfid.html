@@ -387,6 +387,7 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   }
   stationHandleRfidScan_(tag, tid);
 };
+stationBindMessageListener_();
 stationDrainPendingRfidScans_();
 
 /**
@@ -417,14 +418,18 @@ function stationStartScanPoll_() {
       }, 200);
       return;
     }
-    if (!window.stationScanPollRetryTimer && window.IS_STATION_DEVICE) {
-      window.stationScanPollRetryTimer = setTimeout(function() {
-        window.stationScanPollRetryTimer = null;
-        stationStartScanPoll_();
-      }, 1500);
+    if (window.IS_STATION_DEVICE) {
+      window.stationScanPollAttempts_ = (window.stationScanPollAttempts_ || 0) + 1;
+      if (window.stationScanPollAttempts_ <= 20 && !window.stationScanPollRetryTimer) {
+        window.stationScanPollRetryTimer = setTimeout(function() {
+          window.stationScanPollRetryTimer = null;
+          stationStartScanPoll_();
+        }, 1500);
+      }
     }
     return;
   }
+  window.stationScanPollAttempts_ = 0;
   window.stationScanPollTimer = setInterval(function() {
     var raw;
     try { raw = native.pollScans(); } catch (e) { return; }

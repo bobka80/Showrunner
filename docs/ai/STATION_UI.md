@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Campaign:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) · **Handoff:** [active/station-ui-handoff.md](active/station-ui-handoff.md) · **REWIND baseline:** [active/REWIND-pre-station-ui-split.md](active/REWIND-pre-station-ui-split.md)
 
-**Status:** **Approved spec — not built.** Production and source are at **GAS v530 REWIND** (monolithic `11_Station_Shell.html`). Do not ship UI rework until director says **OK go** after reading the handoff doc.
+**Status:** **Phase A shipped (GAS v533).** Field regression pending. Dock panel UI is Phase B only.
 
 ---
 
@@ -84,13 +84,13 @@ One shared station **logic** core; **two UI families** keyed off station layout 
 
 **Goal:** Split `11_Station_Shell.html` (~4k lines) into doctrine-sized modules (~≤1000 lines each). **Zero logic changes.** Phone sled must pass regression on Chainway before Phase B.
 
-- [ ] Re-create `scripts/split-station-shell-once.js` from handoff § Split module map (fix chunk boundaries — see § Split failure lessons)
-- [ ] Wire modules in `Index.html` (order matters — see handoff)
-- [ ] Update [FILE_MAP.md](FILE_MAP.md) §11 Station with module index
-- [ ] **Parse-check every `<script>` block** (`node` vm.Script) before milestone
+- [x] Re-create `scripts/split-station-shell-once.js` from handoff § Split module map (fix chunk boundaries — see § Split failure lessons)
+- [x] Wire modules in `Index.html` (order matters — see handoff)
+- [x] Update [FILE_MAP.md](FILE_MAP.md) §11 Station with module index
+- [x] **Parse-check every `<script>` block** (`node` vm.Script) before milestone
 - [ ] Field test Chainway: badge, buttons, scan feed
 - [ ] Field test TSL desktop: login, scan → name+unit (unchanged behavior)
-- [ ] Milestone with note: “Station shell split Phase A (behavior-neutral)”
+- [x] Milestone with note: “Station shell split Phase A (behavior-neutral)”
 
 **Planned modules:**
 

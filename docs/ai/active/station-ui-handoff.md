@@ -4,7 +4,7 @@
 
 **Director:** Copy the prompt at the bottom into a new Cursor chat.
 
-**Last updated:** 2026-07-11 · **Production:** GAS **530** (REWIND) · **Source:** monolith `11_Station_Shell.html` on branch `docs/deferred-when-operational`
+**Last updated:** 2026-07-11 · **Production:** GAS **533** (Phase A split) · **Source:** modules `11b`–`11l` on branch `docs/deferred-when-operational`
 
 ---
 
@@ -12,9 +12,9 @@
 
 | Surface | Status | Pin |
 |---------|--------|-----|
-| **Chainway phone in R6 sled** | Badge host, PROJECT/VAULT/Scan/Settings, equipment → name+unit | APK **build 53**, GAS **530** |
-| **TSL gate PC** | Login/logout, RFID in real station UI, settings, cold start = no host restore | Desktop **0.1.44**, host-boot **?v=499**, GAS **530** |
-| **Station logic** | Monolith `11_Station_Shell.html` + `11a_Station_Gun_Drivers.html` | All in one GAS deploy |
+| **Chainway phone in R6 sled** | Badge host, PROJECT/VAULT/Scan/Settings, equipment → name+unit | APK **build 53**, GAS **533** |
+| **TSL gate PC** | Login/logout, RFID in real station UI, settings, cold start = no host restore | Desktop **0.1.44**, host-boot **?v=499**, GAS **533** |
+| **Station logic** | Modules `11b`–`11l` + stub `11_Station_Shell.html` | GAS **533** |
 
 **Test URL:** `https://sm-showrunner-97405.web.app`
 
@@ -82,7 +82,7 @@ Full post-mortem: [STATION_UI.md](../STATION_UI.md) § Split failure lessons.
 
 1. Read [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Station RFID · § Desktop WebView2 · § TSL 1128.
 2. Read [tsl-desktop-handoff.md](tsl-desktop-handoff.md) if touching desktop paths.
-3. Baseline = monolith at GAS **530** (`11_Station_Shell.html` ~4030 lines).
+3. Baseline = monolith at GAS **530** (`11_Station_Shell.html` ~4030 lines). **Structure map:** [station-shell-structure-map.md](station-shell-structure-map.md)
 
 ### Mechanical split rules
 
@@ -147,13 +147,14 @@ const fs=require('fs');const vm=require('vm');
 |---|------|-----|
 | 1 | **This file** | Context, rewind, split protocol |
 | 2 | [STATION_UI.md](../STATION_UI.md) | UI skins + phase checklist |
-| 3 | [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) | Version pins |
-| 4 | [rfid-station-profiles.md](rfid-station-profiles.md) | Guns, layouts, campaign backlog |
-| 5 | [tsl-desktop-handoff.md](tsl-desktop-handoff.md) | Desktop only |
-| 6 | [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) | Do-not-break |
-| 7 | [FILE_MAP.md](../FILE_MAP.md) §11 | File index (update after split) |
+| 3 | [station-shell-structure-map.md](station-shell-structure-map.md) | Line-range module map (Phase A split) |
+| 4 | [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) | Version pins |
+| 5 | [rfid-station-profiles.md](rfid-station-profiles.md) | Guns, layouts, campaign backlog |
+| 6 | [tsl-desktop-handoff.md](tsl-desktop-handoff.md) | Desktop only |
+| 7 | [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) | Do-not-break |
+| 8 | [FILE_MAP.md](../FILE_MAP.md) §11 | File index |
 
-**Code entry points:** `11_Station_Shell.html` (monolith today), `11a_Station_Gun_Drivers.html`, `Index.html` includes, `Station_Security.js`.
+**Code entry points:** `11b`–`11l` modules + stub `11_Station_Shell.html`, `11a_Station_Gun_Drivers.html`, `Index.html` includes, `Station_Security.js`.
 
 ---
 

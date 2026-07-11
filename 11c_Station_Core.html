@@ -105,6 +105,14 @@ var STATION_GUN_PARK_DELAY_DEFAULT_MIN = 0;
  * and the gun never disagree.
  */
 var STATION_MODE_KEY = 'sm_station_scan_mode';
+
+/** Retired hold mode + unknown values → valid dropdown id (single | multi | continuous). */
+function stationNormalizeScanMode_(mode) {
+  var m = String(mode || 'single').toLowerCase();
+  if (m === 'hold') return 'single';
+  if (m === 'multi' || m === 'continuous') return m;
+  return 'single';
+}
 var STATION_POLL_KEY = 'sm_station_poll_ms';
 var STATION_POWER_KEY = 'sm_station_power';
 var STATION_BEEP_KEY = 'sm_station_beep';
@@ -938,6 +946,10 @@ function initStationShell_() {
     const shell = document.getElementById('station-shell');
     if (shell) shell.style.display = 'flex';
   } catch (e) { /* ignore */ }
+  // Bind scan relay BEFORE telling host-boot to poll — otherwise the first connect beeps can
+  // postMessage into the iframe before the listener exists (split shell made this race easier).
+  try { stationBindMessageListener_(); } catch (e) { /* ignore */ }
+  try { stationDrainPendingRfidScans_(); } catch (e) { /* ignore */ }
   try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
   if (stationIsDesktopKiosk_()) {
     try { stationWriteHostSession_(null); } catch (e) { /* ignore */ }
@@ -947,12 +959,14 @@ function initStationShell_() {
 
   try {
     stationBindHostIdleListeners_();
-    stationBindMessageListener_();
     stationRenderShellState_();
     stationSetStatus_('Loading station profile…', '');
 
-    // Retire the removed "hold" mode on any device that stored it during testing.
-    if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
+    // Retire removed "hold" mode (no dropdown option — breaks scan mode UI if left on gun/storage).
+    var bootMode = stationNormalizeScanMode_(stationStoredSetting_(STATION_MODE_KEY));
+    if (bootMode !== stationStoredSetting_(STATION_MODE_KEY)) {
+      stationSetStoredSetting_(STATION_MODE_KEY, bootMode);
+    }
 
     // Push device-local gun settings down so the screen and the gun agree on boot.
     stationSyncSettingsToGun_();

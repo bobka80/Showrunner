@@ -169,7 +169,7 @@ function stationPopulateGunControlsFromStorage_() {
 
 /** Push the stored settings down to the native gun (screen ↔ gun stay in sync). */
 function stationSyncSettingsToGun_() {
-  var mode = stationStoredSetting_(STATION_MODE_KEY);
+  var mode = stationNormalizeScanMode_(stationStoredSetting_(STATION_MODE_KEY));
   if (mode) stationApplyGunSetting_('scanMode', mode);
   var poll = stationStoredSetting_(STATION_POLL_KEY);
   if (poll != null) stationApplyGunSetting_('pollMs', parseInt(poll, 10));
@@ -213,11 +213,16 @@ function stationApplyGunConfig_(cfg) {
     stationSyncPowerControls_(powerEl.value);
   }
 
-  // Scan mode
+  // Scan mode — normalize retired "hold" so the select always shows a real option (incl. continuous).
   var storedMode = stationStoredSetting_(STATION_MODE_KEY);
-  var mv = storedMode || cfg.scanMode;
+  var mv = stationNormalizeScanMode_(storedMode || cfg.scanMode);
   if (modeEl && mv) modeEl.value = mv;
-  if (storedMode == null && cfg.scanMode) stationSetStoredSetting_(STATION_MODE_KEY, cfg.scanMode);
+  if (storedMode == null && cfg.scanMode) {
+    stationSetStoredSetting_(STATION_MODE_KEY, stationNormalizeScanMode_(cfg.scanMode));
+  } else if (storedMode && mv !== storedMode) {
+    stationSetStoredSetting_(STATION_MODE_KEY, mv);
+    stationApplyGunSetting_('scanMode', mv);
+  }
 
   // Continuous speed
   if (speedEl) {
@@ -286,9 +291,11 @@ window.stationSavePower = function() {
 window.stationSaveScanMode = function() {
   const modeEl = document.getElementById('station-set-mode');
   if (!modeEl) return;
-  stationSetStoredSetting_(STATION_MODE_KEY, modeEl.value);
+  var mode = stationNormalizeScanMode_(modeEl.value);
+  if (modeEl.value !== mode) modeEl.value = mode;
+  stationSetStoredSetting_(STATION_MODE_KEY, mode);
   stationUpdateSpeedVisibility_();
-  stationApplyGunSetting_('scanMode', modeEl.value);
+  stationApplyGunSetting_('scanMode', mode);
   stationSyncPanelReadModeUI_();
 };
 
