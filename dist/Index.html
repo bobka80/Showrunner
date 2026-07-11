@@ -8116,14 +8116,31 @@ html.station-device-root #station-device-controls { display: flex; }
         if (shell) shell.style.display = 'flex';
       }
       if (!window.IS_STATION_DEVICE) return;
-      // Queue RFID scans until the full station shell assigns onStationRfidScan (LogicPayload is async).
+      // Minimal live strip before async LogicPayload (desktop inject may arrive later).
       window.__srPendingRfidScans = window.__srPendingRfidScans || [];
+      function __srBootFeed(tag, tid) {
+        var list = document.getElementById('station-scan-feed-list');
+        if (!list) return;
+        var esc = function(v) { return String(v == null ? '' : v).replace(/[<&>]/g, function(c) { return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;'); }); };
+        var empty = list.querySelector('.station-scan-feed__empty');
+        if (empty) empty.remove();
+        var row = document.createElement('div');
+        row.className = 'station-scan-feed__row is-unknown';
+        row.innerHTML = '<span class="name">' + esc(tag) + '</span><span class="time">now</span>';
+        list.insertBefore(row, list.firstChild);
+        while (list.children.length > 24) list.removeChild(list.lastChild);
+      }
+      if (typeof window.stationPushScanFeed_ !== 'function') {
+        window.stationPushScanFeed_ = function(tag, tid) { __srBootFeed(tag, tid); };
+        window.stationPushScanFeed_.__srShim = true;
+      }
       if (!window.onStationRfidScan) {
         window.onStationRfidScan = function(tag, tid) {
           var t = String(tag || ''), i = String(tid || '');
+          __srBootFeed(t, i);
           window.__srPendingRfidScans.push({ tag: t, tid: i, ts: Date.now() });
-          if (typeof window.stationPushScanFeed_ === 'function') window.stationPushScanFeed_(t, i);
         };
+        window.onStationRfidScan.__srEarlyBoot = true;
       }
       if (!window.stationMessageListenerBound) {
         window.stationMessageListenerBound = true;

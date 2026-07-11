@@ -237,11 +237,8 @@ public partial class MainWindow : Window
         "var info={href:String(location.href||'').substring(0,72),isStation:!!window.IS_STATION_DEVICE," +
         "hasOnScan:typeof window.onStationRfidScan,hasFeed:typeof window.stationPushScanFeed_,bridge:!!window.__srDesktopBridge};" +
         "if(typeof window.__srInjectScan==='function'){window.__srInjectScan(t,i);info.action='inject';}" +
-        "else if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);info.action='scan';}" +
-        "else if(typeof window.stationPushScanFeed_==='function'){window.stationPushScanFeed_(t,i);info.action='feed';}" +
-        "else{window.__srPendingRfidScans=window.__srPendingRfidScans||[];" +
-        "window.__srPendingRfidScans.push({tag:t,tid:i,ts:Date.now()});info.action='queued';}" +
         "info.recent=(window.stationRecentScans||[]).length;info.q=(window.__srScanQueue||[]).length;" +
+        "info.feedRows=(document.getElementById('station-scan-feed-list')||{}).children?document.getElementById('station-scan-feed-list').children.length:0;" +
         "return JSON.stringify(info);}catch(e){return JSON.stringify({err:String(e.message||e)});}})()";
 
     private async Task InjectScanIntoFramesAsync(string epc, string tid, string pass)
@@ -743,87 +740,145 @@ public partial class MainWindow : Window
     // Sync hostObjects blocked the UI thread (hourglass) when COM connect was in flight.
     private const string BridgeShimScript = """
         (function() {
-          if (window.__srDesktopBridge) return;
-          window.__srScanQueue = [];
-          window.__srGunConfigJson = '{"connected":false,"linkState":"disconnected"}';
-          try {
-            chrome.webview.addEventListener('message', function(ev) {
-              try {
-                var d = ev.data;
-                if (typeof d === 'string') d = JSON.parse(d);
-                if (!d || !d.type) return;
-                if (d.type === 'SR_GUN_CONFIG' && d.json) window.__srGunConfigJson = d.json;
-                if (d.type === 'SR_RFID_SCAN') {
-                  var epc = String(d.tag || d.epc || '').trim();
-                  var tid = String(d.tid || '').trim();
-                  if (epc && typeof window.onStationRfidScan === 'function') {
-                    window.onStationRfidScan(epc, tid);
-                  } else if (epc && typeof window.stationPushScanFeed_ === 'function') {
-                    window.stationPushScanFeed_(epc, tid);
-                  } else if (epc && window.showrunnerStationDeliverScan) {
-                    window.showrunnerStationDeliverScan(epc, tid);
-                  }
-                }
-                if (d.type === 'SR_GUN_SCANS' && d.scansRaw) {
-                  var batch = JSON.parse(d.scansRaw);
-                  if (batch && batch.length) {
-                    window.__srScanQueue.push.apply(window.__srScanQueue, batch);
-                    while (window.__srScanQueue.length > 32) window.__srScanQueue.shift();
-                    for (var si = 0; si < batch.length; si++) {
-                      var it = batch[si];
-                      var se = (it && (it.epc || it.tag)) || '';
-                      var st = (it && it.tid) || '';
-                      if (!se) continue;
-                      if (typeof window.onStationRfidScan === 'function') {
-                        window.onStationRfidScan(se, st);
-                      } else if (typeof window.stationPushScanFeed_ === 'function') {
-                        window.stationPushScanFeed_(se, st);
-                      } else if (window.showrunnerStationDeliverScan) {
-                        window.showrunnerStationDeliverScan(se, st);
-                      }
-                    }
-                  }
-                }
-              } catch (e) {}
+          window.__srScanQueue = window.__srScanQueue || [];
+          window.__srGunConfigJson = window.__srGunConfigJson || '{"connected":false,"linkState":"disconnected"}';
+          window.__srPendingRfidScans = window.__srPendingRfidScans || [];
+
+          function __srShimEsc(v) {
+            return String(v == null ? '' : v).replace(/[<&>]/g, function(c) {
+              return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
             });
-          } catch (e) {}
-          function postGun(method, args) {
-            try {
-              chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: args || [] }));
-            } catch (e2) {}
           }
-          window.__srDesktopBridge = true;
+          function __srShimPushFeed(tag, tid) {
+            if (typeof window.stationPushScanFeed_ === 'function' && window.stationPushScanFeed_.__srShim !== true) {
+              window.stationPushScanFeed_(tag, tid);
+              return;
+            }
+            var list = document.getElementById('station-scan-feed-list');
+            if (!list) return;
+            var empty = list.querySelector('.station-scan-feed__empty');
+            if (empty) empty.remove();
+            var row = document.createElement('div');
+            row.className = 'station-scan-feed__row is-unknown';
+            row.title = String(tag || '');
+            row.innerHTML = '<span class="name">' + __srShimEsc(tag) + '</span><span class="time">now</span>';
+            list.insertBefore(row, list.firstChild);
+            while (list.children.length > 24) list.removeChild(list.lastChild);
+          }
+          if (typeof window.stationPushScanFeed_ !== 'function' || window.stationPushScanFeed_.__srShim === true) {
+            window.stationPushScanFeed_ = function(tag, tid) { __srShimPushFeed(tag, tid); };
+            window.stationPushScanFeed_.__srShim = true;
+          }
+          if (/ShowrunnerStation/i.test(navigator.userAgent || '')) {
+            window.IS_STATION_DEVICE = true;
+            try { document.documentElement.classList.add('station-device-root'); } catch (e) {}
+            var shell = document.getElementById('station-shell');
+            if (shell) shell.style.display = 'flex';
+          }
+          if (typeof window.onStationRfidScan !== 'function' || window.onStationRfidScan.__srDesktopShim === true ||
+              window.onStationRfidScan.__srEarlyBoot === true) {
+            window.onStationRfidScan = function(tag, tid) {
+              var t = String(tag || ''), i = String(tid || '');
+              __srShimPushFeed(t, i);
+              window.__srPendingRfidScans.push({ tag: t, tid: i, ts: Date.now() });
+            };
+            window.onStationRfidScan.__srDesktopShim = true;
+          }
+          if (!window.stationMessageListenerBound) {
+            window.stationMessageListenerBound = true;
+            window.addEventListener('message', function(ev) {
+              var d = ev && ev.data;
+              if (d && d.type === 'SHOWRUNNER_RFID_SCAN' && typeof window.onStationRfidScan === 'function') {
+                window.onStationRfidScan(d.tag, d.tid || '');
+              }
+            });
+          }
           window.__srInjectScan = function(tag, tid) {
             var t = String(tag || ''), i = String(tid || '');
-            window.__srScanQueue = window.__srScanQueue || [];
+            if (!t) return;
             window.__srScanQueue.push({ epc: t, tag: t, tid: i });
             while (window.__srScanQueue.length > 32) window.__srScanQueue.shift();
             if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(t, i);
-            else if (typeof window.stationPushScanFeed_ === 'function') window.stationPushScanFeed_(t, i);
+            else __srShimPushFeed(t, i);
           };
-          window.AndroidStation = {
-            getConfig: function() { return window.__srGunConfigJson || '{}'; },
-            setPower: function(p) { postGun('setPower', [p]); },
-            setScanMode: function(m) { postGun('setScanMode', [m]); },
-            setBeep: function(b) { postGun('setBeep', [b]); },
-            setPollMs: function(ms) { postGun('setPollMs', [ms]); },
-            pollScans: function() {
+          if (!window.__srScanDrainTimer) {
+            window.__srScanDrainTimer = setInterval(function() {
               var q = window.__srScanQueue || [];
-              window.__srScanQueue = [];
-              return q.length ? JSON.stringify(q) : '[]';
-            },
-            reconnectGun: function() { postGun('reconnectGun'); },
-            sleepGun: function() { postGun('sleepGun'); },
-            shellReady: function() { postGun('shellReady'); },
-            loginNeeded: function() { postGun('loginNeeded'); },
-            saveSession: function(t, e) { postGun('saveSession', [t, e]); },
-            getSavedSession: function() {
+              while (q.length && typeof window.onStationRfidScan === 'function') {
+                var it = q.shift();
+                if (!it) break;
+                window.onStationRfidScan(it.epc || it.tag || '', it.tid || '');
+              }
+              var p = window.__srPendingRfidScans;
+              if (p && p.length && typeof window.onStationRfidScan === 'function' &&
+                  typeof window.stationPushScanFeed_ === 'function' &&
+                  window.stationPushScanFeed_.__srShim !== true &&
+                  window.onStationRfidScan.__srDesktopShim !== true) {
+                var batch = p.splice(0, p.length);
+                for (var pi = 0; pi < batch.length; pi++) {
+                  window.onStationRfidScan(batch[pi].tag, batch[pi].tid || '');
+                }
+              }
+            }, 300);
+          }
+          if (!window.__srWebViewBridgeBound) {
+            window.__srWebViewBridgeBound = true;
+            try {
+              chrome.webview.addEventListener('message', function(ev) {
+                try {
+                  var d = ev.data;
+                  if (typeof d === 'string') d = JSON.parse(d);
+                  if (!d || !d.type) return;
+                  if (d.type === 'SR_GUN_CONFIG' && d.json) window.__srGunConfigJson = d.json;
+                  if (d.type === 'SR_RFID_SCAN') {
+                    var epc = String(d.tag || d.epc || '').trim();
+                    var tid = String(d.tid || '').trim();
+                    if (epc) window.__srInjectScan(epc, tid);
+                  }
+                  if (d.type === 'SR_GUN_SCANS' && d.scansRaw) {
+                    var batch = JSON.parse(d.scansRaw);
+                    if (batch && batch.length) {
+                      for (var si = 0; si < batch.length; si++) {
+                        var it = batch[si];
+                        var se = (it && (it.epc || it.tag)) || '';
+                        var st = (it && it.tid) || '';
+                        if (se) window.__srInjectScan(se, st);
+                      }
+                    }
+                  }
+                } catch (e) {}
+              });
+            } catch (e) {}
+            function postGun(method, args) {
               try {
-                var h = chrome.webview.hostObjects.sync.androidStation;
-                return h ? h.getSavedSession() : '';
-              } catch (e) { return ''; }
+                chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: args || [] }));
+              } catch (e2) {}
             }
-          };
+            window.AndroidStation = {
+              getConfig: function() { return window.__srGunConfigJson || '{}'; },
+              setPower: function(p) { postGun('setPower', [p]); },
+              setScanMode: function(m) { postGun('setScanMode', [m]); },
+              setBeep: function(b) { postGun('setBeep', [b]); },
+              setPollMs: function(ms) { postGun('setPollMs', [ms]); },
+              pollScans: function() {
+                var q = window.__srScanQueue || [];
+                window.__srScanQueue = [];
+                return q.length ? JSON.stringify(q) : '[]';
+              },
+              reconnectGun: function() { postGun('reconnectGun'); },
+              sleepGun: function() { postGun('sleepGun'); },
+              shellReady: function() { postGun('shellReady'); },
+              loginNeeded: function() { postGun('loginNeeded'); },
+              saveSession: function(t, e) { postGun('saveSession', [t, e]); },
+              getSavedSession: function() {
+                try {
+                  var h = chrome.webview.hostObjects.sync.androidStation;
+                  return h ? h.getSavedSession() : '';
+                } catch (e) { return ''; }
+              }
+            };
+          }
+          window.__srDesktopBridge = true;
         })();
         """;
 }
