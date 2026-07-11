@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ShowrunnerStationDesktop</AssemblyName>
     <RootNamespace>Showrunner.Station.Desktop</RootNamespace>
-    <Version>0.1.35</Version>
+    <Version>0.1.38</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
