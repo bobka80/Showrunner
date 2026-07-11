@@ -2657,13 +2657,13 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_GUN_RECONNECT') {
-      invokeStationGun_('reconnectGun');
+      relayStationGunCommand_('reconnectGun', []);
       setTimeout(relayStationConfigToIframe, 800);
       setTimeout(relayStationConfigToIframe, 2500);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_GUN_SLEEP') {
-      invokeStationGun_('sleepGun');
+      relayStationGunCommand_('sleepGun', []);
       setTimeout(relayStationConfigToIframe, 800);
       setTimeout(relayStationConfigToIframe, 2500);
       return;

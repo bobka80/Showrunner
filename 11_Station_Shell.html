@@ -1970,7 +1970,17 @@ window.stationSleepGun_ = function() {
 
 /** Invoke reconnect/sleep on desktop WebView2, native bridge, or hosting parent relay. */
 function stationInvokeGunNative_(method) {
+  if (!method) return;
   var relayType = method === 'sleepGun' ? 'SHOWRUNNER_STATION_GUN_SLEEP' : 'SHOWRUNNER_STATION_GUN_RECONNECT';
+  var isDesktop = window.__srDesktopBridge || /ShowrunnerStation/i.test(navigator.userAgent || '');
+
+  // Desktop nested GAS iframe: always relay to hosting shell → native COM (same as gun settings).
+  if (isDesktop) {
+    stationRelayGunCommandToTop_(method, []);
+    stationPostToHosting_({ type: relayType });
+    return;
+  }
+
   try {
     var h = chrome && chrome.webview && chrome.webview.hostObjects &&
       chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;
@@ -1982,12 +1992,12 @@ function stationInvokeGunNative_(method) {
   } catch (e2) { /* ignore */ }
   try {
     if (chrome && chrome.webview && chrome.webview.postMessage) {
-      chrome.webview.postMessage({ type: 'SR_STATION_GUN', method: method });
+      chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: [] }));
       return;
     }
   } catch (e3) { /* ignore */ }
   stationPostToHosting_({ type: relayType });
-};
+}
 
 /**
  * Show the sleep controls only for gun drivers that support them AND when the native bridge can

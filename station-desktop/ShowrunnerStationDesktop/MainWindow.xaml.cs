@@ -298,10 +298,12 @@ public partial class MainWindow : Window
             {
                 case "reconnectGun":
                     _rfid.ForceReconnect();
+                    _lastGunConfigPushed = null;
                     ScheduleRelayGunConfig();
                     break;
                 case "sleepGun":
                     _rfid.SleepAndDisconnect();
+                    _lastGunConfigPushed = null;
                     ScheduleRelayGunConfig();
                     break;
                 case "setPower":
@@ -1079,6 +1081,9 @@ public partial class MainWindow : Window
                 try { if (window.top && window.top !== window) window.top.postMessage(d, '*'); } catch (e) {}
               }
               if (d.type === 'SHOWRUNNER_STATION_CONFIG_SET' && __srIsGasWrapperFrame_()) {
+                try { if (window.top && window.top !== window) window.top.postMessage(d, '*'); } catch (e) {}
+              }
+              if ((d.type === 'SHOWRUNNER_STATION_GUN_SLEEP' || d.type === 'SHOWRUNNER_STATION_GUN_RECONNECT') && __srIsGasWrapperFrame_()) {
                 try { if (window.top && window.top !== window) window.top.postMessage(d, '*'); } catch (e) {}
               }
             }, true);
