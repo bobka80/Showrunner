@@ -1760,6 +1760,7 @@
 
   function isDesktopAutoLoginOff() {
     try {
+      if (isStationShellApp()) return false;
       if (!window.matchMedia('(min-width: 769px)').matches) return false;
       var crew = localStorage.getItem('sm_crew_name') || '';
       var crewKey = String(crew).toLowerCase().trim().replace(/\s+/g, '_');
@@ -2527,6 +2528,7 @@
     if (ev.data.type === 'SHOWRUNNER_SESSION_TOKEN') {
       saveParentSession(ev.data.token, ev.data.crewName, ev.data.expiresAt);
       if (ev.data.crewName) lastCrewName = ev.data.crewName;
+      if (isDesktopStationApp()) ensureDesktopStationBoot_('session_token');
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_NAVIGATE_LOGIN_GATE') {

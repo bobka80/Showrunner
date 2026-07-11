@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 
     private readonly TslRfidManager _rfid = new();
     private readonly List<CoreWebView2Frame> _childFrames = new();
+    private CoreWebView2Frame? _gasFrame;
     private readonly object _frameLock = new();
     private StationBridge? _bridge;
     private bool _splashHidden;
@@ -118,7 +119,11 @@ public partial class MainWindow : Window
                 lock (_frameLock) _childFrames.Add(child);
                 child.Destroyed += (_, _) =>
                 {
-                    lock (_frameLock) _childFrames.Remove(child);
+                    lock (_frameLock)
+                    {
+                        _childFrames.Remove(child);
+                        if (_gasFrame == child) _gasFrame = null;
+                    }
                 };
                 try
                 {
@@ -140,6 +145,20 @@ public partial class MainWindow : Window
                     catch (Exception ex)
                     {
                         ScanDiagnostics.Log("WEB", "Child shim failed: " + ex.Message);
+                    }
+                    try
+                    {
+                        var hrefRaw = await child.ExecuteScriptAsync("JSON.stringify(String(location.href||''))");
+                        var href = UnwrapScriptResult(hrefRaw) ?? "";
+                        if (href.Contains("script.google.com", StringComparison.OrdinalIgnoreCase))
+                        {
+                            lock (_frameLock) _gasFrame = child;
+                            ScanDiagnostics.Log("WEB", "GAS frame tracked " + Trunc(href, 96));
+                        }
+                    }
+                    catch
+                    {
+                        // ignore href probe failures
                     }
                 };
             };
@@ -215,7 +234,7 @@ public partial class MainWindow : Window
         });
     }
 
-    private static string BuildFrameScanInjectJs(string epc, string tid) =>
+    private static string BuildFrameScanProbeJs() =>
         "(function(){try{" +
         "var info={href:String(location.href||'').substring(0,72),isStation:!!window.IS_STATION_DEVICE," +
         "hasOnScan:typeof window.onStationRfidScan,hasFeed:typeof window.stationPushScanFeed_,bridge:!!window.__srDesktopBridge," +
@@ -223,6 +242,7 @@ public partial class MainWindow : Window
         "info.recent=(window.stationRecentScans||[]).length;info.q=(window.__srScanQueue||[]).length;" +
         "info.feedRows=(function(){var l=document.getElementById('station-scan-feed-list');return l&&l.children?l.children.length:0;})();" +
         "info.hasFeedList=!!document.getElementById('station-scan-feed-list');info.onLogin=!!document.getElementById('login-form');" +
+        "info.hasStationShell=!!document.getElementById('station-shell');" +
         "return JSON.stringify(info);}catch(e){return JSON.stringify({err:String(e.message||e)});}})()";
 
     private void PostJsonToChildFrames(string json, string pass, string label)
@@ -314,6 +334,7 @@ public partial class MainWindow : Window
                 case "shellReady":
                     _shellReady = true;
                     HideSplash();
+                    _ = DrainPendingScansOnGasFrameAsync();
                     break;
                 case "loginNeeded":
                     _shellReady = false;
@@ -325,6 +346,8 @@ public partial class MainWindow : Window
                         var token = payload[0].GetString();
                         var exp = payload[1].TryGetInt64(out var e) ? e : 0L;
                         _bridge?.saveSession(token, exp);
+                        ScanDiagnostics.Log("WEB", "Session saved to desktop prefs (expires " + exp + ")");
+                        ScheduleDesktopSessionBootChecks();
                     }
                     break;
             }
@@ -484,9 +507,8 @@ public partial class MainWindow : Window
         try
         {
             var raw = await WebView.CoreWebView2.ExecuteScriptAsync(js);
-            var result = Trunc(UnwrapScriptResult(raw), 80);
-            if (result.Contains("boot"))
-                ScanDiagnostics.Log("WEB", "Forced sessionboot on app-frame");
+            var result = Trunc(UnwrapScriptResult(raw), 120);
+            ScanDiagnostics.Log("WEB", "sessionboot check: " + result);
         }
         catch
         {
@@ -494,40 +516,85 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string BuildInvokeScanJs(string epc, string tid) =>
+        "(function(){try{var t=" + JsonSerializer.Serialize(epc) + ",i=" + JsonSerializer.Serialize(tid ?? "") + ";" +
+        "if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);return 'ok';}" +
+        "return 'no-handler';}catch(e){return 'err:'+String(e.message||e);}})()";
+
     private async Task DeliverScanToPageCoreAsync(string epc, string tid, string pass)
     {
         if (WebView.CoreWebView2 == null) return;
         if (!ShouldDeliverScanToWeb(epc, tid, pass)) return;
 
-        RelayScanToTopHosting(epc, tid);
-        ScanDiagnostics.Log("WEB", pass + ": relay EPC=" + epc);
+        var invoke = await InvokeScanOnGasFrameAsync(epc, tid);
+        ScanDiagnostics.Log("WEB", pass + ": GAS invoke=" + (invoke ?? "no-frame"));
+        if (invoke != "ok")
+            RelayScanToTopHosting(epc, tid);
 
         if (pass == "immediate")
-            await InjectScanIntoGasFrameAsync(epc, tid, pass);
+            await ProbeGasFrameAsync(pass);
     }
 
-    private async Task InjectScanIntoGasFrameAsync(string epc, string tid, string pass)
+    private async Task<string?> InvokeScanOnGasFrameAsync(string epc, string tid)
     {
-        var js = BuildFrameScanInjectJs(epc, tid);
-        CoreWebView2Frame? gasFrame = null;
+        CoreWebView2Frame? frame;
         lock (_frameLock)
+            frame = _gasFrame ?? (_childFrames.Count > 0 ? _childFrames[^1] : null);
+        if (frame == null) return null;
+        try
         {
-            if (_childFrames.Count > 0)
-                gasFrame = _childFrames[^1];
+            var raw = await frame.ExecuteScriptAsync(BuildInvokeScanJs(epc, tid));
+            return UnwrapScriptResult(raw);
         }
-        if (gasFrame == null)
+        catch (Exception ex)
         {
-            ScanDiagnostics.Log("WEB", pass + ": no GAS frame tracked");
+            return "err:" + ex.Message;
+        }
+    }
+
+    private async Task DrainPendingScansOnGasFrameAsync()
+    {
+        CoreWebView2Frame? frame;
+        lock (_frameLock)
+            frame = _gasFrame ?? (_childFrames.Count > 0 ? _childFrames[^1] : null);
+        if (frame == null) return;
+        const string js =
+            "(function(){try{if(typeof stationDrainPendingRfidScans_==='function'){stationDrainPendingRfidScans_();return 'drained';}return 'no-drain';}catch(e){return 'err';}})()";
+        try
+        {
+            var raw = await frame.ExecuteScriptAsync(js);
+            ScanDiagnostics.Log("WEB", "Pending scan drain: " + Trunc(UnwrapScriptResult(raw), 40));
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task ProbeGasFrameAsync(string pass)
+    {
+        var js = BuildFrameScanProbeJs();
+        CoreWebView2Frame? frame;
+        lock (_frameLock)
+            frame = _gasFrame ?? (_childFrames.Count > 0 ? _childFrames[^1] : null);
+        if (frame == null)
+        {
+            ScanDiagnostics.Log("WEB", pass + ": no GAS frame for probe");
             return;
         }
         try
         {
-            var raw = await gasFrame.ExecuteScriptAsync(js);
-            ScanDiagnostics.Log("WEB", pass + ": GAS " + Trunc(UnwrapScriptResult(raw), 220));
+            var raw = await frame.ExecuteScriptAsync(js);
+            var probe = Trunc(UnwrapScriptResult(raw), 240);
+            ScanDiagnostics.Log("WEB", pass + ": GAS " + probe);
+            if (probe.Contains("\"onLogin\":true"))
+                ShowStatus("Station device login required — enter gate PC name + passcode on screen", persistent: true);
+            else if (probe.Contains("\"shellReady\":false") && probe.Contains("\"hasStationShell\":true"))
+                ShowStatus("Station loading… wait for profile, then scan crew badge", persistent: false);
         }
         catch (Exception ex)
         {
-            ScanDiagnostics.Log("WEB", pass + ": GAS ERR " + ex.Message);
+            ScanDiagnostics.Log("WEB", pass + ": GAS probe ERR " + ex.Message);
         }
     }
 

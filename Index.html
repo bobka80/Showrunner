@@ -34,7 +34,8 @@
         var crew = crewMeta && crewMeta.content ? String(crewMeta.content).trim() : '';
         var crewKey = crew.toLowerCase().replace(/\s+/g, '_');
         var desktop = window.matchMedia('(min-width: 769px)').matches;
-        var autoLoginOff = desktop && crewKey && localStorage.getItem('sm_auto_login_off_' + crewKey) === '1';
+        var stationUa = /ShowrunnerStation/i.test(navigator.userAgent || '');
+        var autoLoginOff = !stationUa && desktop && crewKey && localStorage.getItem('sm_auto_login_off_' + crewKey) === '1';
         if (!autoLoginOff) {
           localStorage.setItem('sm_session_token', String(t.content).trim());
           localStorage.setItem('sm_session_expires', String(Date.now() + SESSION_MS));
@@ -49,6 +50,7 @@
     var SESSION_MS = 30 * 24 * 60 * 60 * 1000;
     function shouldPersistSessionToken(crew) {
       try {
+        if (/ShowrunnerStation/i.test(navigator.userAgent || '')) return true;
         if (!window.matchMedia('(min-width: 769px)').matches) return true;
         var crewKey = String(crew || '').toLowerCase().trim().replace(/\s+/g, '_');
         if (!crewKey) return true;
