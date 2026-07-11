@@ -1,7 +1,7 @@
 # REWIND POINT — pre station UI split (major milestone)
 
 **Status:** **ACTIVE REWIND** — restore here before the **11-series shell split** and **dock panel UI** rework.  
-**Pinned:** 2026-07-11 · **GAS v530** · **Hosting host-boot v499** · **Desktop 0.1.44** · **APK build 53** · **Last updated:** 2026-07-11
+**Pinned:** 2026-07-11 · **GAS v530** = monolith baseline · **GAS v531** = split modules (same behavior) · **Hosting host-boot v499** · **Desktop 0.1.44** · **APK build 53**
 
 **Next work after this point:** [rfid-station-profiles.md](rfid-station-profiles.md) — mechanical split of `11_Station_Shell.html`, then **phone sled** vs **dock panel** UI. See session plan in chat / `STATION_UI.md` (when added).
 
