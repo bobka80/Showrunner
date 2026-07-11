@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     private StationBridge? _bridge;
     private bool _splashHidden;
     private DiagnosticWindow? _diagWindow;
+    private System.Threading.Timer? _gunPushTimer;
 
     public MainWindow()
     {
@@ -35,12 +36,15 @@ public partial class MainWindow : Window
         Loaded += async (_, _) => await InitWebViewAsync();
         Closed += (_, _) =>
         {
+            _gunPushTimer?.Dispose();
+            _gunPushTimer = null;
             if (_diagWindow != null)
             {
                 _diagWindow.Detach();
                 _diagWindow = null;
             }
-            _rfid.Dispose();
+            // Do not block UI shutdown on COM disconnect — can hang several seconds.
+            Task.Run(() => _rfid.Dispose());
         };
     }
 
@@ -124,6 +128,9 @@ public partial class MainWindow : Window
 
             WebView.Source = new Uri(ShowrunnerUrl);
             ScanDiagnostics.Log("WEB", "Navigating to " + ShowrunnerUrl);
+
+            // Push config + scans into JS cache — iframe pollScans/getConfig must never block on sync COM.
+            _gunPushTimer = new System.Threading.Timer(_ => PushGunStateToWeb(), null, 400, 300);
         }
         catch (Exception ex)
         {
@@ -161,11 +168,99 @@ public partial class MainWindow : Window
         }
     }
 
+    private void PushGunStateToWeb()
+    {
+        var cfg = _rfid.CurrentConfigJson();
+        var scans = _rfid.DrainPendingScans();
+        Dispatcher.BeginInvoke(() =>
+        {
+            try
+            {
+                if (WebView.CoreWebView2 == null) return;
+                WebView.CoreWebView2.PostWebMessageAsJson(
+                    JsonSerializer.Serialize(new { type = "SR_GUN_CONFIG", json = cfg }));
+                if (!string.IsNullOrWhiteSpace(scans) && scans != "[]")
+                {
+                    WebView.CoreWebView2.PostWebMessageAsJson(
+                        JsonSerializer.Serialize(new { type = "SR_GUN_SCANS", scansRaw = scans }));
+                    RelayScanBatchToWeb(scans, "push");
+                }
+            }
+            catch
+            {
+                // ignore
+            }
+        });
+    }
+
+    private static string BuildNativeScanMessageJson(string epc, string tid) =>
+        JsonSerializer.Serialize(new { type = "SR_RFID_SCAN", tag = epc, tid = tid ?? "" });
+
+    /// <summary>
+    /// Post directly into GAS iframe(s) via chrome.webview message — reliable when cross-origin postMessage is lossy.
+    /// </summary>
+    private void PostScanToChildFrames(string epc, string tid, string pass)
+    {
+        var msg = BuildNativeScanMessageJson(epc, tid);
+        CoreWebView2Frame[] frames;
+        lock (_frameLock) frames = _childFrames.ToArray();
+        var posted = 0;
+        foreach (var frame in frames)
+        {
+            try
+            {
+                frame.PostWebMessageAsJson(msg);
+                posted++;
+            }
+            catch (Exception ex)
+            {
+                ScanDiagnostics.Log("WEB", pass + ": frame PostWebMessage failed — " + ex.Message);
+            }
+        }
+        if (posted > 0)
+            ScanDiagnostics.Log("WEB", pass + ": SR_RFID_SCAN → " + posted + " frame(s)");
+    }
+
+    private void RelayScanBatchToWeb(string scansRaw, string pass)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(scansRaw);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return;
+            foreach (var item in doc.RootElement.EnumerateArray())
+            {
+                var epc = item.TryGetProperty("epc", out var epcEl) ? epcEl.GetString() : null;
+                if (string.IsNullOrWhiteSpace(epc) && item.TryGetProperty("tag", out var tagEl))
+                    epc = tagEl.GetString();
+                var tid = item.TryGetProperty("tid", out var tidEl) ? tidEl.GetString() : "";
+                if (string.IsNullOrWhiteSpace(epc)) continue;
+                RelayScanToTopHosting(epc, tid ?? "");
+                PostScanToChildFrames(epc, tid ?? "", pass);
+            }
+        }
+        catch (Exception ex)
+        {
+            ScanDiagnostics.Log("WEB", pass + ": batch relay failed — " + ex.Message);
+        }
+    }
+
+    private void RelayScanToTopHosting(string epc, string tid)
+    {
+        if (WebView.CoreWebView2 == null) return;
+        var tagJs = JsonSerializer.Serialize(epc);
+        var tidJs = JsonSerializer.Serialize(tid);
+        var topJs =
+            $"(function(){{try{{var e={tagJs},t={tidJs};" +
+            "if(window.showrunnerStationDeliverScan)window.showrunnerStationDeliverScan(e,t);" +
+            "}catch(x){{}}}})();";
+        _ = WebView.CoreWebView2.ExecuteScriptAsync(topJs);
+    }
+
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs args)
     {
         try
         {
-            if (!TryParseGunWebMessage(args, out var method)) return;
+            if (!TryParseGunWebMessage(args, out var method, out var payload)) return;
             switch (method)
             {
                 case "reconnectGun":
@@ -176,6 +271,56 @@ public partial class MainWindow : Window
                     _rfid.SleepAndDisconnect();
                     ScheduleRelayGunConfig();
                     break;
+                case "setPower":
+                {
+                    var power = 0;
+                    if (payload.ValueKind == JsonValueKind.Array && payload.GetArrayLength() > 0)
+                        payload[0].TryGetInt32(out power);
+                    else
+                        payload.TryGetInt32(out power);
+                    if (power > 0)
+                        _rfid.SetPowerLevel(power);
+                    break;
+                }
+                case "setScanMode":
+                {
+                    var mode = payload.ValueKind == JsonValueKind.Array && payload.GetArrayLength() > 0
+                        ? payload[0].GetString()
+                        : payload.GetString();
+                    _rfid.SetScanMode(mode);
+                    break;
+                }
+                case "setBeep":
+                {
+                    var on = payload.ValueKind == JsonValueKind.Array && payload.GetArrayLength() > 0
+                        ? payload[0].ValueKind == JsonValueKind.True
+                        : payload.ValueKind == JsonValueKind.True;
+                    _rfid.SetBeepEnabled(on);
+                    break;
+                }
+                case "setPollMs":
+                {
+                    var ms = 0;
+                    if (payload.ValueKind == JsonValueKind.Array && payload.GetArrayLength() > 0)
+                        payload[0].TryGetInt32(out ms);
+                    else
+                        payload.TryGetInt32(out ms);
+                    if (ms > 0)
+                        _rfid.SetPollMs(ms);
+                    break;
+                }
+                case "shellReady":
+                case "loginNeeded":
+                    HideSplash();
+                    break;
+                case "saveSession":
+                    if (payload.ValueKind == JsonValueKind.Array && payload.GetArrayLength() >= 2)
+                    {
+                        var token = payload[0].GetString();
+                        var exp = payload[1].TryGetInt64(out var e) ? e : 0L;
+                        _bridge?.saveSession(token, exp);
+                    }
+                    break;
             }
         }
         catch
@@ -184,9 +329,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private static bool TryParseGunWebMessage(CoreWebView2WebMessageReceivedEventArgs args, out string? method)
+    private static bool TryParseGunWebMessage(
+        CoreWebView2WebMessageReceivedEventArgs args,
+        out string? method,
+        out JsonElement payload)
     {
         method = null;
+        payload = default;
         JsonElement root;
         try
         {
@@ -210,13 +359,19 @@ public partial class MainWindow : Window
 
         if (root.GetProperty("type").GetString() != "SR_STATION_GUN") return false;
         method = root.GetProperty("method").GetString();
+        if (root.TryGetProperty("args", out var argsEl))
+            payload = argsEl;
+        else if (root.TryGetProperty("payload", out var payEl))
+            payload = payEl;
+        else
+            payload = default;
         return !string.IsNullOrWhiteSpace(method);
     }
 
     private void ScheduleRelayGunConfig()
     {
         RelayGunConfigToPage();
-        Task.Delay(1200).ContinueWith(_ => Dispatcher.Invoke(RelayGunConfigToPage));
+        Task.Delay(1200).ContinueWith(_ => Dispatcher.BeginInvoke(RelayGunConfigToPage));
     }
 
     private void RelayGunConfigToPage()
@@ -254,7 +409,9 @@ public partial class MainWindow : Window
                 RelayGunConfigToPage();
 
             if (low.StartsWith("read:") || low.Contains("gun connected") ||
-                low.Contains("connect fail") || low.StartsWith("rfid connect"))
+                low.Contains("connect fail") || low.StartsWith("rfid connect") ||
+                low.Contains("connecting ") || low.Contains("looking for tsl") ||
+                low.Contains("is not a tsl") || low.Contains("no serial link"))
                 ScanDiagnostics.Log("GUN", msg);
         });
     }
@@ -284,20 +441,10 @@ public partial class MainWindow : Window
     private void DeliverScanToPageCore(string epc, string tid, string pass)
     {
         if (WebView.CoreWebView2 == null) return;
-        var tagJs = JsonSerializer.Serialize(epc);
-        var tidJs = JsonSerializer.Serialize(tid);
         var msgJs = JsonSerializer.Serialize(new { type = "SHOWRUNNER_RFID_SCAN", tag = epc, tid });
-        var topJs =
-            $"(function(){{try{{var e={tagJs},t={tidJs};" +
-            "if(window.showrunnerStationDeliverScan)window.showrunnerStationDeliverScan(e,t);" +
-            "}catch(x){{}}}})();";
-        var childJs =
-            $"(function(){{try{{var m={msgJs};" +
-            "if(typeof window.onStationRfidScan==='function')window.onStationRfidScan(m.tag,m.tid||'');" +
-            "}catch(x){{}}}})();";
         try
         {
-            _ = WebView.CoreWebView2.ExecuteScriptAsync(topJs);
+            RelayScanToTopHosting(epc, tid);
             _ = WebView.CoreWebView2.ExecuteScriptAsync(
                 $"(function(m){{try{{var f=document.getElementById('app-frame');" +
                 "if(f&&f.contentWindow)f.contentWindow.postMessage(m,'*');}}catch(e){{}}}})({msgJs});");
@@ -308,24 +455,7 @@ public partial class MainWindow : Window
             ScanDiagnostics.Log("WEB", pass + ": top relay failed — " + ex.Message);
         }
 
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
-        ScanDiagnostics.Log("WEB", pass + ": child frames=" + frames.Length);
-        var injected = 0;
-        foreach (var frame in frames)
-        {
-            try
-            {
-                _ = frame.ExecuteScriptAsync(childJs);
-                injected++;
-            }
-            catch (Exception ex)
-            {
-                ScanDiagnostics.Log("WEB", pass + ": frame script failed — " + ex.Message);
-            }
-        }
-        if (injected > 0)
-            ScanDiagnostics.Log("WEB", pass + ": onStationRfidScan injected into " + injected + " frame(s)");
+        PostScanToChildFrames(epc, tid, pass);
     }
 
     private void ShowDiagnosticWindow()
@@ -490,7 +620,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Window_OnKeyDown(object sender, KeyEventArgs e)
+    private void Window_OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.F12 || (e.Key == Key.D && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift)))
         {
@@ -498,50 +628,93 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        // F11 toggles borderless fullscreen; Escape exits app (kiosk ops).
         if (e.Key == Key.F11)
         {
             WindowStyle = WindowStyle == WindowStyle.None ? WindowStyle.SingleBorderWindow : WindowStyle.None;
             WindowState = WindowState.Maximized;
+            e.Handled = true;
+            return;
         }
-        else if (e.Key == Key.Escape)
+        // PreviewKeyDown so WebView focus cannot swallow Escape when the UI thread is busy.
+        if (e.Key == Key.Escape)
         {
-            Close();
+            e.Handled = true;
+            Application.Current.Shutdown(0);
         }
     }
 
-    // Resolve the host object lazily on every call: FrameCreated may add it AFTER this shim runs,
-    // so capturing it once at document-created can miss it. window.AndroidStation must LOOK present
-    // (getConfig + setScanMode) for the shell's stationNativeBridge_() to accept it and start polling.
+    // Cache-only bridge: pollScans/getConfig read JS memory updated by native PostWebMessage.
+    // Sync hostObjects blocked the UI thread (hourglass) when COM connect was in flight.
     private const string BridgeShimScript = """
         (function() {
           if (window.__srDesktopBridge) return;
-          function host() {
-            try { return chrome.webview.hostObjects.sync.androidStation; } catch (e) { return null; }
-          }
-          function gunCmd(method) {
-            var h = host();
-            if (h && typeof h[method] === 'function') {
-              try { h[method](); return; } catch (e) {}
-            }
+          window.__srScanQueue = [];
+          window.__srGunConfigJson = '{"connected":false,"linkState":"disconnected"}';
+          try {
+            chrome.webview.addEventListener('message', function(ev) {
+              try {
+                var d = ev.data;
+                if (typeof d === 'string') d = JSON.parse(d);
+                if (!d || !d.type) return;
+                if (d.type === 'SR_GUN_CONFIG' && d.json) window.__srGunConfigJson = d.json;
+                if (d.type === 'SR_RFID_SCAN') {
+                  var epc = String(d.tag || d.epc || '').trim();
+                  var tid = String(d.tid || '').trim();
+                  if (epc && typeof window.onStationRfidScan === 'function') {
+                    window.onStationRfidScan(epc, tid);
+                  } else if (epc && window.showrunnerStationDeliverScan) {
+                    window.showrunnerStationDeliverScan(epc, tid);
+                  }
+                }
+                if (d.type === 'SR_GUN_SCANS' && d.scansRaw) {
+                  var batch = JSON.parse(d.scansRaw);
+                  if (batch && batch.length) {
+                    window.__srScanQueue.push.apply(window.__srScanQueue, batch);
+                    while (window.__srScanQueue.length > 32) window.__srScanQueue.shift();
+                    for (var si = 0; si < batch.length; si++) {
+                      var it = batch[si];
+                      var se = (it && (it.epc || it.tag)) || '';
+                      var st = (it && it.tid) || '';
+                      if (!se) continue;
+                      if (typeof window.onStationRfidScan === 'function') {
+                        window.onStationRfidScan(se, st);
+                      } else if (window.showrunnerStationDeliverScan) {
+                        window.showrunnerStationDeliverScan(se, st);
+                      }
+                    }
+                  }
+                }
+              } catch (e) {}
+            });
+          } catch (e) {}
+          function postGun(method, args) {
             try {
-              chrome.webview.postMessage({ type: 'SR_STATION_GUN', method: method });
+              chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: args || [] }));
             } catch (e2) {}
           }
           window.__srDesktopBridge = true;
           window.AndroidStation = {
-            getConfig: function() { var h = host(); return h ? h.getConfig() : '{}'; },
-            setPower: function(p) { var h = host(); if (h) h.setPower(p); },
-            setScanMode: function(m) { var h = host(); if (h) h.setScanMode(m); },
-            setBeep: function(b) { var h = host(); if (h) h.setBeep(b); },
-            setPollMs: function(ms) { var h = host(); if (h) h.setPollMs(ms); },
-            pollScans: function() { var h = host(); return h ? h.pollScans() : '[]'; },
-            reconnectGun: function() { gunCmd('reconnectGun'); },
-            sleepGun: function() { gunCmd('sleepGun'); },
-            shellReady: function() { var h = host(); if (h) h.shellReady(); },
-            loginNeeded: function() { var h = host(); if (h) h.loginNeeded(); },
-            saveSession: function(t, e) { var h = host(); if (h) h.saveSession(t, e); },
-            getSavedSession: function() { var h = host(); return h ? h.getSavedSession() : ''; }
+            getConfig: function() { return window.__srGunConfigJson || '{}'; },
+            setPower: function(p) { postGun('setPower', [p]); },
+            setScanMode: function(m) { postGun('setScanMode', [m]); },
+            setBeep: function(b) { postGun('setBeep', [b]); },
+            setPollMs: function(ms) { postGun('setPollMs', [ms]); },
+            pollScans: function() {
+              var q = window.__srScanQueue || [];
+              window.__srScanQueue = [];
+              return q.length ? JSON.stringify(q) : '[]';
+            },
+            reconnectGun: function() { postGun('reconnectGun'); },
+            sleepGun: function() { postGun('sleepGun'); },
+            shellReady: function() { postGun('shellReady'); },
+            loginNeeded: function() { postGun('loginNeeded'); },
+            saveSession: function(t, e) { postGun('saveSession', [t, e]); },
+            getSavedSession: function() {
+              try {
+                var h = chrome.webview.hostObjects.sync.androidStation;
+                return h ? h.getSavedSession() : '';
+              } catch (e) { return ''; }
+            }
           };
         })();
         """;

@@ -1,6 +1,15 @@
 # Showrunner Station Desktop (thin shell)
 
-Windows gate PC / TV shell for the **TSL 1128-EU** RFID gun. Same Showrunner station web UI as the Android tablet, with a native bridge for gun I/O.
+Windows gate PC / TV shell for the **TSL 1128-EU** RFID gun.
+
+## Which folder is which?
+
+| Path | What it is |
+|------|------------|
+| **`station-desktop/`** | **The app — build and run this** |
+| **`stage-desktop-info/`** | TSL vendor SDK, PDFs, Explorer installer — **reference only**. See [stage-desktop-info/README.md](../stage-desktop-info/README.md). |
+
+There is only one Showrunner desktop app. `stage-desktop-info/` is manufacturer reference material (renamed from the old typo folder `station-desctop`).
 
 ## What it is
 
@@ -8,7 +17,7 @@ Windows gate PC / TV shell for the **TSL 1128-EU** RFID gun. Same Showrunner sta
 - **TSL ASCII protocol** over Bluetooth virtual **COM** (outgoing port)
 - **`window.AndroidStation`** bridge (same API as the Chainway APK) so `11_Station_Shell.html` needs no fork
 
-Reference SDK/docs only: `station-desctop/` (typo folder — do not ship). App code: `station-desktop/`.
+Vendor reference (protocol PDFs, SDK samples, Explorer installer): [`stage-desktop-info/`](../stage-desktop-info/) — not shipped.
 
 ## Requirements
 
@@ -23,6 +32,8 @@ Reference SDK/docs only: `station-desctop/` (typo folder — do not ship). App c
 node build-station-desktop.js "First gate shell build"
 ```
 
+**Field launch:** double-click [`RUN-STATION.bat`](RUN-STATION.bat) in this folder — it kills stale copies, then starts `bin/publish/win-x64-launch/ShowrunnerStationDesktop.exe` (v0.1.22+).
+
 Optional larger zip with bundled .NET:
 
 ```bash
@@ -36,7 +47,9 @@ cd station-desktop/ShowrunnerStationDesktop
 dotnet build -c Release
 ```
 
-Output: `bin/Release/net8.0-windows/ShowrunnerStationDesktop.exe`
+Output: `station-desktop/ShowrunnerStationDesktop/bin/publish/win-x64/ShowrunnerStationDesktop.exe`
+
+**Run only that exe.** Do not keep old copies in `win-x64-v019`, `win-x64-v020`, etc. — those were debug publish folders. The build script always writes to `bin/publish/win-x64/`.
 
 ## Field setup (TSL 1128)
 

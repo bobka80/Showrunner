@@ -1,5 +1,5 @@
-Showrunner Station Desktop v0.1.13
+Showrunner Station Desktop v0.1.24
 
-- v0.1.13 gun-native inventory
-- stop top-frame poll steal
-- scan delivery retry
+- Frame PostWebMessage scan relay into GAS iframe
+- trigger debounce 2200ms
+- live feed before dedup

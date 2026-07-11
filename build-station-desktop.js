@@ -103,7 +103,7 @@ function main() {
   log('\nDone.');
   log('  Folder: ' + publishDir);
   log('  Zip:    ' + zipPath);
-  log('\nField test: pair TSL 1128 in Bluetooth, set COM port in desktop-prefs.json, run exe.\n');
+  log('\nField test: pair TSL 1128 in Bluetooth, run bin/publish/win-x64/ShowrunnerStationDesktop.exe (only one copy).\n');
 }
 
 main();

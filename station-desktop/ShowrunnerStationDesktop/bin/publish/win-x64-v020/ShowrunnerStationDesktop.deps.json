@@ -1,0 +1,238 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0/win-x64",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {},
+    ".NETCoreApp,Version=v8.0/win-x64": {
+      "ShowrunnerStationDesktop/0.1.20": {
+        "dependencies": {
+          "Microsoft.Web.WebView2": "1.0.2957.106",
+          "System.Management": "8.0.0",
+          "Tsl.AsciiProtocol": "6.3.4",
+          "Microsoft.Web.WebView2.Core": "1.0.2957.106",
+          "Microsoft.Web.WebView2.WinForms": "1.0.2957.106",
+          "Microsoft.Web.WebView2.Wpf": "1.0.2957.106"
+        },
+        "runtime": {
+          "ShowrunnerStationDesktop.dll": {}
+        }
+      },
+      "Microsoft.Web.WebView2/1.0.2957.106": {
+        "native": {
+          "runtimes/win-x64/native/WebView2Loader.dll": {
+            "fileVersion": "1.0.2957.106"
+          }
+        }
+      },
+      "runtime.linux-arm.runtime.native.System.IO.Ports/8.0.0": {},
+      "runtime.linux-arm64.runtime.native.System.IO.Ports/8.0.0": {},
+      "runtime.linux-x64.runtime.native.System.IO.Ports/8.0.0": {},
+      "runtime.native.System.IO.Ports/8.0.0": {
+        "dependencies": {
+          "runtime.linux-arm.runtime.native.System.IO.Ports": "8.0.0",
+          "runtime.linux-arm64.runtime.native.System.IO.Ports": "8.0.0",
+          "runtime.linux-x64.runtime.native.System.IO.Ports": "8.0.0",
+          "runtime.osx-arm64.runtime.native.System.IO.Ports": "8.0.0",
+          "runtime.osx-x64.runtime.native.System.IO.Ports": "8.0.0"
+        }
+      },
+      "runtime.osx-arm64.runtime.native.System.IO.Ports/8.0.0": {},
+      "runtime.osx-x64.runtime.native.System.IO.Ports/8.0.0": {},
+      "System.CodeDom/8.0.0": {},
+      "System.IO.Ports/8.0.0": {
+        "dependencies": {
+          "runtime.native.System.IO.Ports": "8.0.0"
+        },
+        "runtime": {
+          "runtimes/win/lib/net8.0/System.IO.Ports.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.23.53103"
+          }
+        }
+      },
+      "System.Management/8.0.0": {
+        "dependencies": {
+          "System.CodeDom": "8.0.0"
+        },
+        "runtime": {
+          "runtimes/win/lib/net8.0/System.Management.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.23.53103"
+          }
+        }
+      },
+      "Tsl.AsciiProtocol/6.3.4": {
+        "dependencies": {
+          "System.IO.Ports": "8.0.0",
+          "Tsl.Rfid.AsciiProtocol.Core": "6.3.4",
+          "Tsl.Rfid.Operations": "6.3.4"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/TechnologySolutions.Rfid.AsciiProtocol.dll": {
+            "assemblyVersion": "6.3.4.0",
+            "fileVersion": "6.3.4.0"
+          }
+        }
+      },
+      "Tsl.Rfid.AsciiProtocol.Core/6.3.4": {
+        "runtime": {
+          "lib/netstandard2.0/TechnologySolutions.Rfid.AsciiProtocol.Core.dll": {
+            "assemblyVersion": "6.3.4.0",
+            "fileVersion": "6.3.4.0"
+          }
+        }
+      },
+      "Tsl.Rfid.Operations/6.3.4": {
+        "dependencies": {
+          "Tsl.Rfid.AsciiProtocol.Core": "6.3.4"
+        },
+        "runtime": {
+          "lib/netstandard2.0/TechnologySolutions.Rfid.Operations.dll": {
+            "assemblyVersion": "6.3.4.0",
+            "fileVersion": "6.3.4.0"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2.Core/1.0.2957.106": {
+        "runtime": {
+          "Microsoft.Web.WebView2.Core.dll": {
+            "assemblyVersion": "1.0.2957.106",
+            "fileVersion": "1.0.2957.106"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2.WinForms/1.0.2957.106": {
+        "runtime": {
+          "Microsoft.Web.WebView2.WinForms.dll": {
+            "assemblyVersion": "1.0.2957.106",
+            "fileVersion": "1.0.2957.106"
+          }
+        }
+      },
+      "Microsoft.Web.WebView2.Wpf/1.0.2957.106": {
+        "runtime": {
+          "Microsoft.Web.WebView2.Wpf.dll": {
+            "assemblyVersion": "1.0.2957.106",
+            "fileVersion": "1.0.2957.106"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ShowrunnerStationDesktop/0.1.20": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Web.WebView2/1.0.2957.106": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-eHc2yKD//d1a6Razu6jl373RGKdzLhxDBk/wc/i//tC9+nEVXcO38pvjZwR2s0C34y+0trzKvbGHffrEx7vyVw==",
+      "path": "microsoft.web.webview2/1.0.2957.106",
+      "hashPath": "microsoft.web.webview2.1.0.2957.106.nupkg.sha512"
+    },
+    "runtime.linux-arm.runtime.native.System.IO.Ports/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-gK720fg6HemDg8sXcfy+xCMZ9+hF78Gc7BmREbmkS4noqlu1BAr9qZtuWGhLzFjBfgecmdtl4+SYVwJ1VneZBQ==",
+      "path": "runtime.linux-arm.runtime.native.system.io.ports/8.0.0",
+      "hashPath": "runtime.linux-arm.runtime.native.system.io.ports.8.0.0.nupkg.sha512"
+    },
+    "runtime.linux-arm64.runtime.native.System.IO.Ports/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-KYG6/3ojhEWbb3FwQAKgGWPHrY+HKUXXdVjJlrtyCLn3EMcNTaNcPadb2c0ndQzixZSmAxZKopXJr0nLwhOrpQ==",
+      "path": "runtime.linux-arm64.runtime.native.system.io.ports/8.0.0",
+      "hashPath": "runtime.linux-arm64.runtime.native.system.io.ports.8.0.0.nupkg.sha512"
+    },
+    "runtime.linux-x64.runtime.native.System.IO.Ports/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Wnw5vhA4mgGbIFoo6l9Fk3iEcwRSq49a1aKwJgXUCUtEQLCSUDjTGSxqy/oMUuOyyn7uLHsH8KgZzQ1y3lReiQ==",
+      "path": "runtime.linux-x64.runtime.native.system.io.ports/8.0.0",
+      "hashPath": "runtime.linux-x64.runtime.native.system.io.ports.8.0.0.nupkg.sha512"
+    },
+    "runtime.native.System.IO.Ports/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-Ee7Sz5llLpTgyKIWzKI/GeuRSbFkOABgJRY00SqTY0OkTYtkB+9l5rFZfE7fxPA3c22RfytCBYkUdAkcmwMjQg==",
+      "path": "runtime.native.system.io.ports/8.0.0",
+      "hashPath": "runtime.native.system.io.ports.8.0.0.nupkg.sha512"
+    },
+    "runtime.osx-arm64.runtime.native.System.IO.Ports/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-rbUBLAaFW9oVkbsb0+XSrAo2QdhBeAyzLl5KQ6Oci9L/u626uXGKInsVJG6B9Z5EO8bmplC8tsMiaHK8wOBZ+w==",
+      "path": "runtime.osx-arm64.runtime.native.system.io.ports/8.0.0",
+      "hashPath": "runtime.osx-arm64.runtime.native.system.io.ports.8.0.0.nupkg.sha512"
+    },
+    "runtime.osx-x64.runtime.native.System.IO.Ports/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IcfB4jKtM9pkzP9OpYelEcUX1MiDt0IJPBh3XYYdEISFF+6Mc+T8WWi0dr9wVh1gtcdVjubVEIBgB8BHESlGfQ==",
+      "path": "runtime.osx-x64.runtime.native.system.io.ports/8.0.0",
+      "hashPath": "runtime.osx-x64.runtime.native.system.io.ports.8.0.0.nupkg.sha512"
+    },
+    "System.CodeDom/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-WTlRjL6KWIMr/pAaq3rYqh0TJlzpouaQ/W1eelssHgtlwHAH25jXTkUphTYx9HaIIf7XA6qs/0+YhtLEQRkJ+Q==",
+      "path": "system.codedom/8.0.0",
+      "hashPath": "system.codedom.8.0.0.nupkg.sha512"
+    },
+    "System.IO.Ports/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-MaiPbx2/QXZc62gm/DrajRrGPG1lU4m08GWMoWiymPYM+ba4kfACp2PbiYpqJ4QiFGhHD00zX3RoVDTucjWe9g==",
+      "path": "system.io.ports/8.0.0",
+      "hashPath": "system.io.ports.8.0.0.nupkg.sha512"
+    },
+    "System.Management/8.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-jrK22i5LRzxZCfGb+tGmke2VH7oE0DvcDlJ1HAKYU8cPmD8XnpUT0bYn2Gy98GEhGjtfbR/sxKTVb+dE770pfA==",
+      "path": "system.management/8.0.0",
+      "hashPath": "system.management.8.0.0.nupkg.sha512"
+    },
+    "Tsl.AsciiProtocol/6.3.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-5WYQNhweAzWDD+uYnWNAEuGS91l81XBMHj1K3ze1Oap7lg2vaLfUucNnxePdyb3H4zzmto8KJzqIhcATEpkN8A==",
+      "path": "tsl.asciiprotocol/6.3.4",
+      "hashPath": "tsl.asciiprotocol.6.3.4.nupkg.sha512"
+    },
+    "Tsl.Rfid.AsciiProtocol.Core/6.3.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-/EhkaJjGlVWI+YlPCeewIMwh9M8pb5MUcfLJvSCKKzHbw2GrKSiV7Q811Y45kXTRi/M5mkh8eC0vUm9zx+MRhw==",
+      "path": "tsl.rfid.asciiprotocol.core/6.3.4",
+      "hashPath": "tsl.rfid.asciiprotocol.core.6.3.4.nupkg.sha512"
+    },
+    "Tsl.Rfid.Operations/6.3.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-s6vh0cDt+qD24++n+AkABWTLGAoDiUyrw+NhaTy26J96dmHldZdspNUJwrOSxUM/zgIsGGTxXT4UgXwii/PdSw==",
+      "path": "tsl.rfid.operations/6.3.4",
+      "hashPath": "tsl.rfid.operations.6.3.4.nupkg.sha512"
+    },
+    "Microsoft.Web.WebView2.Core/1.0.2957.106": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Web.WebView2.WinForms/1.0.2957.106": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Microsoft.Web.WebView2.Wpf/1.0.2957.106": {
+      "type": "reference",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

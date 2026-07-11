@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.IO.Ports;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using TechnologySolutions.Rfid.AsciiProtocol;
 using TechnologySolutions.Rfid.AsciiProtocol.Commands;
 using TechnologySolutions.Rfid.AsciiProtocol.Extensions;
@@ -9,7 +10,7 @@ using TechnologySolutions.Rfid.AsciiProtocol.Extensions;
 namespace Showrunner.Station.Desktop;
 
 /// <summary>
-/// TSL 1128 over Bluetooth virtual COM — connect, trigger-driven single inventory, scan queue for the web bridge.
+/// TSL 1128 over Bluetooth virtual COM — serialized command queue, app-owned trigger reads.
 /// </summary>
 public sealed class TslRfidManager : IDisposable
 {
@@ -17,12 +18,20 @@ public sealed class TslRfidManager : IDisposable
     public const string ScanModeMulti = "multi";
     public const string ScanModeContinuous = "continuous";
 
-    // TSL SDK: AntennaParameters.OutputPower valid range is 10–29 dBm.
     private const int PowerMin = 10;
     private const int PowerMax = 29;
     private const int PollMin = 100;
     private const int PollMax = 2000;
+    private const int WatchdogMs = 2500;
+    private const int TriggerDebounceMs = 2200;
+    private const int ScanDedupeMs = 1500;
+    private const int MultiBurstMs = 700;
+    private const int MultiBurstMaxReads = 20;
+    private const int MultiReadGapMs = 40;
+    private const int ConnectPortTimeoutMs = 3500;
 
+    private readonly BlockingCollection<Action> _gunQueue = new();
+    private Thread? _gunThread;
     private readonly AsciiCommander _commander = new();
     private readonly SwitchAsynchronousResponder _switchResponder = new();
     private readonly InventoryCommand _inventory = new();
@@ -50,15 +59,8 @@ public sealed class TslRfidManager : IDisposable
     private long _lastTriggerMs;
     private string _lastDeliverNorm = "";
     private long _lastDeliverMs;
-    private volatile bool _suppressTransponderDelivery;
-    private volatile bool _appDrivenRead;
-
-    private const int WatchdogMs = 2500;
-    private const int TriggerDebounceMs = 1200;
-    private const int ScanDedupeMs = 1200;
-    private const int MultiBurstMs = 700;
-    private const int MultiBurstMaxReads = 20;
-    private const int MultiReadGapMs = 40;
+    private volatile int _readGate;
+    private volatile bool _commanderLive;
 
     public event Action<string>? StatusChanged;
     public event Action<string, string>? ScanReceived;
@@ -68,7 +70,6 @@ public sealed class TslRfidManager : IDisposable
         _switchResponder.SwitchStateChanged += OnSwitchStateChanged;
         _inventory.FastIdentifier = TriState.Yes;
         _inventory.TagFocus = TriState.Yes;
-        _inventory.TransponderReceived += OnInventoryTransponder;
     }
 
     public string PortName
@@ -81,64 +82,109 @@ public sealed class TslRfidManager : IDisposable
     {
         _userSleep = false;
         var prefs = DesktopPrefs.Load();
-        // A COM port in prefs is an OVERRIDE only; blank means auto-detect the TSL gun.
         _manualPort = (prefs.ComPort ?? "").Trim();
         _lastGunDeviceId = (prefs.LastGunDeviceId ?? "").Trim();
         _portName = _manualPort;
         _powerDbm = prefs.PowerDbm is >= PowerMin and <= PowerMax ? prefs.PowerDbm : 29;
         _beepEnabled = prefs.Beep;
-        _scanMode = prefs.ScanMode switch
-        {
-            ScanModeContinuous => ScanModeContinuous,
-            ScanModeMulti => ScanModeMulti,
-            _ => ScanModeSingle,
-        };
+        _scanMode = NormalizeScanMode(prefs.ScanMode);
         _pollMs = prefs.PollMs is >= PollMin and <= PollMax ? prefs.PollMs : 500;
 
         PostStatus(string.IsNullOrWhiteSpace(_manualPort)
             ? "Looking for TSL gun…"
             : $"Looking for TSL gun on {_manualPort}…");
 
-        // Watchdog owns connecting: it auto-detects the gun and reconnects when it wakes.
+        StartGunWorker();
         _watchdog = new System.Threading.Timer(_ => WatchdogTick(), null, 0, WatchdogMs);
+        ConnectLockLog.Record("start", _portName, null, _readGate, "scanMode=" + _scanMode);
     }
 
-    /// <summary>
-    /// Runs on the watchdog thread. Keeps the link alive: detect the TSL port, connect when the
-    /// gun is present/awake, and re-acquire it after sleep/BT drop — mirrors the Explorer grabbing
-    /// the port the moment the reader comes up.
-    /// </summary>
+    private void StartGunWorker()
+    {
+        _gunThread = new Thread(GunWorkerMain)
+        {
+            IsBackground = true,
+            Name = "TslGunWorker",
+        };
+        _gunThread.Start();
+    }
+
+    private void RunGun(Action work)
+    {
+        if (_disposed) return;
+        try { _gunQueue.Add(work); }
+        catch (InvalidOperationException) { /* queue completed on dispose */ }
+    }
+
+    private void GunWorkerMain()
+    {
+        try
+        {
+            foreach (var work in _gunQueue.GetConsumingEnumerable())
+            {
+                if (_disposed) break;
+                try { work(); }
+                catch (Exception ex)
+                {
+                    ConnectLockLog.Record("gun-worker-error", _portName, false, _readGate, ex.Message);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            ConnectLockLog.Record("gun-worker-fatal", _portName, false, _readGate, ex.Message);
+        }
+    }
+
     private void WatchdogTick()
     {
-        if (_disposed || _connecting) return;
-        // User put the gun to sleep on purpose — don't re-open the port and wake it back up.
-        if (_userSleep) return;
+        if (_disposed || _userSleep) return;
 
-        bool linkAlive;
-        lock (_commandLock)
-            linkAlive = _commander.IsConnected;
-
-        if (linkAlive)
+        if (_commanderLive)
         {
             _connected = true;
+            if (_linkState != "live")
+            {
+                _linkState = "live";
+                ConnectLockLog.Record("watchdog-live", _portName, true, _readGate, "link restored");
+            }
             return;
         }
 
-        // Link down — manual override wins; else try every outgoing BT COM candidate.
-        TryConnectFromWatchdog();
+        _connected = false;
+        if (!_connecting)
+        {
+            _connecting = true;
+            new Thread(ConnectWatchdogWorker)
+            {
+                IsBackground = true,
+                Name = "TslConnectWatchdog",
+            }.Start();
+        }
+    }
+
+    /// <summary>Connect runs off the gun worker so a sleeping gun cannot freeze reads/shutdown.</summary>
+    private void ConnectWatchdogWorker()
+    {
+        try { TryConnectFromWatchdog(); }
+        finally { _connecting = false; }
     }
 
     private void TryConnectFromWatchdog()
     {
         if (_disposed || _userSleep) return;
-        _connecting = true;
+        StopContinuous();
+        ResetReadGate();
+        ConnectLockLog.Record("watchdog-tick", _portName, null, _readGate, "begin connect sweep");
         try
         {
             if (!string.IsNullOrWhiteSpace(_manualPort))
             {
                 _portName = _manualPort;
-                ConnectToPort(new GunPortDetector.GunPort(_manualPort, "manual override", ""));
-                return;
+                if (ConnectToPort(new GunPortDetector.GunPort(_manualPort, "manual override", "")))
+                    return;
+                SafeDisconnect();
+                ConnectLockLog.Record("manual-fail", _manualPort, false, _readGate, "manual COM failed — trying auto-detect");
             }
 
             var candidates = GunPortDetector.Detect(_lastGunDeviceId);
@@ -148,6 +194,7 @@ public sealed class TslRfidManager : IDisposable
                 {
                     _linkState = "waiting";
                     PostStatus("Waiting for TSL gun — pair it and press the trigger to wake it");
+                    ConnectLockLog.Record("no-ports", "", false, _readGate, "no COM candidates");
                 }
                 return;
             }
@@ -169,9 +216,9 @@ public sealed class TslRfidManager : IDisposable
             _linkState = "disconnected";
             PostStatus("RFID connect failed on " + candidates.Count + " port(s) — pull trigger to wake gun");
         }
-        finally
+        catch (Exception ex)
         {
-            _connecting = false;
+            ConnectLockLog.Record("connect-error", _portName, false, _readGate, ex.Message);
         }
     }
 
@@ -182,14 +229,15 @@ public sealed class TslRfidManager : IDisposable
             PostStatus("No COM port configured");
             return;
         }
-        ConnectToPort(new GunPortDetector.GunPort(_portName, "", ""));
+        RunGun(() => ConnectToPort(new GunPortDetector.GunPort(_portName, "", "")));
     }
 
-    /// <summary>Try one COM port; must answer a TSL version probe before we accept it.</summary>
     private bool ConnectToPort(GunPortDetector.GunPort candidate)
     {
         var port = candidate.ComPort;
         if (string.IsNullOrWhiteSpace(port)) return false;
+
+        ConnectLockLog.Record("connect-try", port, null, _readGate, candidate.FriendlyName);
 
         try
         {
@@ -209,10 +257,12 @@ public sealed class TslRfidManager : IDisposable
                 var serial = new SerialPortWrapper(port);
                 _commander.Connect(serial);
                 _connected = _commander.IsConnected;
+                _commanderLive = _connected;
                 if (!_connected)
                 {
                     _linkState = "disconnected";
                     PostStatus("No serial link on " + port);
+                    ConnectLockLog.Record("connect-fail", port, false, _readGate, "no serial link");
                     return false;
                 }
 
@@ -220,18 +270,23 @@ public sealed class TslRfidManager : IDisposable
                 if (string.IsNullOrWhiteSpace(_firmware))
                 {
                     _linkState = "disconnected";
-                    PostStatus(port + " is not a TSL reader — trying next port…");
+                    PostStatus("Gun asleep on " + port + " — pull trigger to wake it");
+                    ConnectLockLog.Record("connect-fail", port, false, _readGate, "version probe failed/asleep");
                     try { _commander.Disconnect(); } catch { /* ignore */ }
                     _connected = false;
+                    _commanderLive = false;
                     return false;
                 }
 
                 ConfigureChainInventory();
-                SeedInventoryParameters();
+                PushInventoryDefaultsSilent();
                 EnableSwitchReporting();
+                ApplyBeep();
                 _linkState = "live";
+                _commanderLive = true;
                 _portName = port;
-                PostStatus("Gun connected on " + port + " (" + _firmware + ")");
+                PostStatus("Gun connected on " + port + " (" + _firmware + ") mode=" + _scanMode);
+                ConnectLockLog.Record("connect-ok", port, true, _readGate, "fw=" + _firmware);
                 DesktopPrefs.SavePartial(p =>
                 {
                     p.ComPort = _manualPort;
@@ -250,8 +305,13 @@ public sealed class TslRfidManager : IDisposable
         catch (Exception ex)
         {
             _connected = false;
+            _commanderLive = false;
             _linkState = "disconnected";
-            PostStatus("Connect error on " + port + ": " + ex.Message);
+            var hint = ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase)
+                ? "COM port in use — close other Showrunner Station or ASCII Explorer, then retry"
+                : ex.Message;
+            PostStatus("Connect error on " + port + ": " + hint);
+            ConnectLockLog.Record("connect-error", port, false, _readGate, ex.Message);
             SafeDisconnect();
             return false;
         }
@@ -266,6 +326,7 @@ public sealed class TslRfidManager : IDisposable
                 if (_commander.IsConnected)
                     _commander.Disconnect();
             }
+            _commanderLive = false;
         }
         catch
         {
@@ -276,11 +337,20 @@ public sealed class TslRfidManager : IDisposable
     public void ForceReconnect()
     {
         _userSleep = false;
+        StopContinuous();
+        ResetReadGate();
+        ConnectLockLog.Record("force-reconnect", _portName, null, _readGate, "user requested");
+        PostStatus("Reconnecting…");
+        _lastDetectLog = "";
+        RunGun(ForceReconnectCore);
+    }
+
+    private void ForceReconnectCore()
+    {
         lock (_commandLock)
         {
             try
             {
-                StopContinuous();
                 AbortIfConnected();
                 if (_commander.IsConnected)
                     _commander.Disconnect();
@@ -290,56 +360,65 @@ public sealed class TslRfidManager : IDisposable
                 // ignore
             }
             _connected = false;
+            _commanderLive = false;
             _linkState = "connecting";
         }
-        _lastDetectLog = "";
-        PostStatus("Reconnecting…");
-        // Run outside any in-flight watchdog connect (_connecting) — do not call WatchdogTick inline.
-        Task.Run(async () =>
+        Thread.Sleep(300);
+        if (!_disposed)
         {
-            await Task.Delay(300);
-            if (_disposed) return;
-            TryConnectFromWatchdog();
-        });
+            _connecting = true;
+            new Thread(ConnectWatchdogWorker) { IsBackground = true, Name = "TslConnectWatchdog" }.Start();
+        }
     }
 
-    /// <summary>
-    /// SDK SleepCommand (.sl): reader sleeps once it responds, then disconnects from the terminal.
-    /// Watchdog stays suppressed until ForceReconnect() so we do not immediately wake the gun.
-    /// </summary>
     public void SleepAndDisconnect()
     {
         _userSleep = true;
-        lock (_commandLock)
-        {
-            try
-            {
-                StopContinuous();
-                AbortIfConnected();
-                if (_commander.IsConnected)
-                {
-                    var sleep = new SleepCommand();
-                    _commander.ExecuteCommand(sleep, sleep.Responder);
-                }
-            }
-            catch (Exception ex)
-            {
-                PostStatus("Sleep failed: " + ex.Message);
-            }
+        StopContinuous();
+        ResetReadGate();
+        ConnectLockLog.Record("sleep", _portName, null, _readGate, "user sleep");
+        RunGun(SleepAndDisconnectCore);
+    }
 
-            try
+    private void SleepAndDisconnectCore()
+    {
+        try
+        {
+            lock (_commandLock)
             {
-                if (_commander.IsConnected)
-                    _commander.Disconnect();
+                try
+                {
+                    AbortIfConnected();
+                    if (_commander.IsConnected)
+                    {
+                        var sleep = new SleepCommand();
+                        _commander.ExecuteCommand(sleep, sleep.Responder);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    PostStatus("Sleep failed: " + ex.Message);
+                }
+
+                try
+                {
+                    if (_commander.IsConnected)
+                        _commander.Disconnect();
+                }
+                catch
+                {
+                    // ignore
+                }
+                _connected = false;
+                _commanderLive = false;
+                _linkState = "asleep";
             }
-            catch
-            {
-                // ignore
-            }
-            _connected = false;
-            _linkState = "asleep";
+            PostStatus("Gun asleep — pull the trigger to wake it, then tap Reconnect");
         }
-        PostStatus("Gun asleep — pull the trigger to wake it, then tap Reconnect");
+        catch (Exception ex)
+        {
+            ConnectLockLog.Record("sleep-error", _portName, false, _readGate, ex.Message);
+        }
     }
 
     private void AbortIfConnected()
@@ -391,11 +470,7 @@ public sealed class TslRfidManager : IDisposable
     {
         _powerDbm = Math.Clamp(power, PowerMin, PowerMax);
         DesktopPrefs.SavePartial(p => p.PowerDbm = _powerDbm);
-        lock (_commandLock)
-        {
-            if (!_commander.IsConnected) return;
-            ConfigureChainInventory();
-        }
+        ConfigureChainInventory();
         ScanDiagnostics.Log("GUN", "Power → " + _powerDbm + " dBm");
         PostStatus("Sensitivity " + _powerDbm + " dBm");
     }
@@ -408,30 +483,18 @@ public sealed class TslRfidManager : IDisposable
         DesktopPrefs.SavePartial(p => p.ScanMode = _scanMode);
         if (_scanMode != ScanModeContinuous)
             StopContinuous();
-        lock (_commandLock)
-        {
-            if (_commander.IsConnected)
-                EnableSwitchReporting();
-        }
+        if (_commander.IsConnected)
+            RunConfigAction(EnableSwitchReporting);
         ScanDiagnostics.Log("GUN", "Scan mode → " + _scanMode);
         PostStatus("Scan mode: " + _scanMode);
-    }
-
-    private static string NormalizeScanMode(string? mode)
-    {
-        if (ScanModeContinuous.Equals(mode, StringComparison.OrdinalIgnoreCase))
-            return ScanModeContinuous;
-        if (ScanModeMulti.Equals(mode, StringComparison.OrdinalIgnoreCase))
-            return ScanModeMulti;
-        return ScanModeSingle;
     }
 
     public void SetBeepEnabled(bool enabled)
     {
         _beepEnabled = enabled;
         DesktopPrefs.SavePartial(p => p.Beep = _beepEnabled);
-        lock (_commandLock)
-            ApplyBeep();
+        if (_commander.IsConnected)
+            RunConfigAction(ApplyBeep);
         ScanDiagnostics.Log("GUN", "Beep → " + (_beepEnabled ? "on" : "off"));
     }
 
@@ -449,7 +512,8 @@ public sealed class TslRfidManager : IDisposable
         _watchdog = null;
         StopContinuous();
         _switchResponder.SwitchStateChanged -= OnSwitchStateChanged;
-        _inventory.TransponderReceived -= OnInventoryTransponder;
+        try { _gunQueue.CompleteAdding(); } catch { /* ignore */ }
+        try { _gunThread?.Join(2000); } catch { /* ignore */ }
         try
         {
             if (_commander.IsConnected)
@@ -459,12 +523,12 @@ public sealed class TslRfidManager : IDisposable
         {
             // ignore
         }
+        _commanderLive = false;
         _commander.Dispose();
     }
 
     private void SetupResponders()
     {
-        // Match TSL sample order: switch → synchronous slot → inventory async responder.
         _commander.ClearResponders();
         _commander.AddResponder(_switchResponder);
         _commander.AddSynchronousResponder();
@@ -502,26 +566,22 @@ public sealed class TslRfidManager : IDisposable
         _inventory.TagFocus = TriState.Yes;
     }
 
-    /// <summary>
-    /// SwitchAction.Inventory uses the gun's last inventory parameters — seed them on connect
-    /// (matches TSL ASCII Protocol Explorer / Switch sample behaviour).
-    /// </summary>
-    private void SeedInventoryParameters()
+    /// <summary>Push default inventory params to gun firmware without an RF read (TakeNoAction).</summary>
+    private void PushInventoryDefaultsSilent()
     {
         try
         {
-            _suppressTransponderDelivery = true;
             ConfigureChainInventory();
+            _inventory.TakeNoAction = true;
             _commander.ExecuteCommand(_inventory, _inventory.Responder);
         }
         catch (Exception ex)
         {
-            // Non-fatal — switch-trigger inventory may still work with partial params.
-            PostStatus("Inventory seed: " + ex.Message);
+            ScanDiagnostics.Log("GUN", "Silent param push: " + ex.Message);
         }
         finally
         {
-            _suppressTransponderDelivery = false;
+            _inventory.TakeNoAction = false;
         }
     }
 
@@ -532,12 +592,10 @@ public sealed class TslRfidManager : IDisposable
             var sw = new SwitchActionCommand
             {
                 AsynchronousReportingEnabled = TriState.Yes,
-                // App owns every inventory — gun only reports the trigger (one read per press in single).
                 SinglePressAction = SwitchAction.Off,
                 DoublePressAction = SwitchAction.Off,
             };
             _commander.ExecuteCommand(sw, sw.Responder);
-            ApplyBeep();
         }
         catch (Exception ex)
         {
@@ -560,10 +618,15 @@ public sealed class TslRfidManager : IDisposable
 
     private void OnSwitchStateChanged(object? sender, SwitchStateEventArgs e)
     {
-        lock (_commandLock)
-        {
-            if (!_commander.IsConnected) return;
-        }
+        if (!_commanderLive) return;
+
+        RunGun(() => HandleSwitchState(e));
+    }
+
+    private void HandleSwitchState(SwitchStateEventArgs e)
+    {
+        if (!_commander.IsConnected) return;
+
         if (e.State == SwitchState.Single)
         {
             var now = Environment.TickCount64;
@@ -572,8 +635,14 @@ public sealed class TslRfidManager : IDisposable
                 ScanDiagnostics.Log("GUN", "Trigger debounced");
                 return;
             }
+            if (Volatile.Read(ref _readGate) != 0)
+            {
+                ScanDiagnostics.Log("GUN", "Trigger ignored — read in flight");
+                return;
+            }
             _lastTriggerMs = now;
             ScanDiagnostics.Log("GUN", "Trigger → mode=" + _scanMode);
+
             switch (_scanMode)
             {
                 case ScanModeContinuous:
@@ -581,15 +650,17 @@ public sealed class TslRfidManager : IDisposable
                     OnTriggerPressed();
                     break;
                 case ScanModeMulti:
-                    Task.Run(PerformMultiReadBurst);
+                    RunTriggerRead(PerformMultiReadBurst);
                     break;
                 default:
-                    Task.Run(PerformSingleRead);
+                    RunTriggerRead(() => PerformSingleRead());
                     break;
             }
         }
-        else if (e.State is SwitchState.Off)
+        else if (e.State is SwitchState.Off && _continuousRunning)
+        {
             StopContinuous();
+        }
     }
 
     private void OnTriggerPressed()
@@ -598,12 +669,6 @@ public sealed class TslRfidManager : IDisposable
             StopContinuous();
         else
             StartContinuous();
-    }
-
-    /// <summary>Inventory responder hook — delivery is via PerformSingleRead / multi burst only.</summary>
-    private void OnInventoryTransponder(object? sender, TransponderDataEventArgs ev)
-    {
-        // Gun switch uses SinglePressAction=Off; ignore async inventory noise here.
     }
 
     private void PerformMultiReadBurst()
@@ -619,32 +684,11 @@ public sealed class TslRfidManager : IDisposable
         }
     }
 
-    private static string ExtractEpc(TransponderDataEventArgs ev)
-    {
-        var tag = NormalizeHex(ev.Transponder.Epc);
-        if (string.IsNullOrEmpty(tag))
-            tag = NormalizeHex(ev.Transponder.ReadData);
-        return tag;
-    }
-
-    private static string ExtractTid(TransponderDataEventArgs ev, string epc)
-    {
-        var chip = NormalizeHex(ev.Transponder.TransponderIdentifier);
-        if (!string.IsNullOrEmpty(chip) && chip == epc)
-            chip = "";
-        if (string.IsNullOrEmpty(chip))
-            chip = NormalizeHex(ev.Transponder.ReadData);
-        if (!string.IsNullOrEmpty(chip) && chip == epc)
-            chip = "";
-        return chip;
-    }
-
     private void PerformSingleRead(bool deliverAllTags = false)
     {
         lock (_commandLock)
         {
             if (!_commander.IsConnected) return;
-            _appDrivenRead = true;
             try
             {
                 ConfigureChainInventory();
@@ -677,7 +721,7 @@ public sealed class TslRfidManager : IDisposable
                 {
                     var tid = tidHint;
                     if (string.IsNullOrEmpty(tid))
-                        tid = TryReadTidForEpc(epc);
+                        tid = ReadTidForEpcUnlocked(epc);
                     DeliverScan(epc, tid ?? "");
                 }
             }
@@ -685,10 +729,65 @@ public sealed class TslRfidManager : IDisposable
             {
                 PostStatus("Read failed: " + ex.Message);
             }
+        }
+    }
+
+    private string ReadTidForEpcUnlocked(string epcHex)
+    {
+        foreach (var words in new[] { 6, 4 })
+        {
+            var tid = ReadTidForEpcWordsUnlocked(epcHex, words);
+            if (!string.IsNullOrEmpty(tid) && !tid.Equals(epcHex, StringComparison.OrdinalIgnoreCase))
+                return tid;
+        }
+        return "";
+    }
+
+    private string ReadTidForEpcWordsUnlocked(string epcHex, int lengthWords)
+    {
+        if (!_commander.IsConnected) return "";
+        try
+        {
+            var epcBlock = new DataBlock(epcHex);
+            var read = new ReadTransponderCommand
+            {
+                Bank = Databank.TransponderIdentifier,
+                Length = lengthWords,
+                Offset = 0,
+                InventoryOnly = TriState.No,
+                SelectBank = Databank.ElectronicProductCode,
+                SelectData = epcBlock.Base16,
+                SelectLength = epcBlock.LengthBits,
+                SelectOffset = 32,
+                OutputPower = _powerDbm,
+                QuerySession = QuerySession.S0,
+                QueryTarget = QueryTarget.TargetA,
+            };
+
+            string? captured = null;
+            void OnRead(object? s, TransponderDataEventArgs args)
+            {
+                var t = NormalizeHex(args.Transponder.TransponderIdentifier);
+                if (string.IsNullOrEmpty(t))
+                    t = NormalizeHex(args.Transponder.ReadData);
+                if (!string.IsNullOrEmpty(t))
+                    captured = t;
+            }
+
+            read.TransponderReceived += OnRead;
+            try
+            {
+                _commander.ExecuteCommand(read, read.Responder);
+            }
             finally
             {
-                _appDrivenRead = false;
+                read.TransponderReceived -= OnRead;
             }
+            return NormalizeHex(captured);
+        }
+        catch
+        {
+            return "";
         }
     }
 
@@ -705,72 +804,9 @@ public sealed class TslRfidManager : IDisposable
         _lastDeliverMs = now;
 
         EnqueueScan(epc, tid);
-        ScanDiagnostics.Log("NATIVE", "DeliverScan queue+event EPC=" + epc + " TID=" + (tid ?? ""));
+        ScanDiagnostics.Log("NATIVE", "DeliverScan EPC=" + epc + " TID=" + (tid ?? ""));
         ScanReceived?.Invoke(epc, tid ?? "");
         PostStatus("Read: " + epc + (string.IsNullOrEmpty(tid) ? " (no TID — hold badge still)" : " tid:" + tid));
-    }
-
-    /// <summary>Explicit TID bank read filtered by EPC — mirrors Android readTidBank().</summary>
-    private string TryReadTidForEpc(string epcHex)
-    {
-        foreach (var words in new[] { 6, 4 })
-        {
-            var tid = ReadTidForEpcWords(epcHex, words);
-            if (!string.IsNullOrEmpty(tid) && !tid.Equals(epcHex, StringComparison.OrdinalIgnoreCase))
-                return tid;
-        }
-        return "";
-    }
-
-    private string ReadTidForEpcWords(string epcHex, int lengthWords)
-    {
-        lock (_commandLock)
-        {
-            if (!_commander.IsConnected) return "";
-            try
-            {
-                var epcBlock = new DataBlock(epcHex);
-                var read = new ReadTransponderCommand
-                {
-                    Bank = Databank.TransponderIdentifier,
-                    Length = lengthWords,
-                    Offset = 0,
-                    InventoryOnly = TriState.No,
-                    SelectBank = Databank.ElectronicProductCode,
-                    SelectData = epcBlock.Base16,
-                    SelectLength = epcBlock.LengthBits,
-                    SelectOffset = 32,
-                    OutputPower = _powerDbm,
-                    QuerySession = QuerySession.S0,
-                    QueryTarget = QueryTarget.TargetA,
-                };
-
-                string? captured = null;
-                void OnRead(object? s, TransponderDataEventArgs args)
-                {
-                    var t = NormalizeHex(args.Transponder.TransponderIdentifier);
-                    if (string.IsNullOrEmpty(t))
-                        t = NormalizeHex(args.Transponder.ReadData);
-                    if (!string.IsNullOrEmpty(t))
-                        captured = t;
-                }
-
-                read.TransponderReceived += OnRead;
-                try
-                {
-                    _commander.ExecuteCommand(read, read.Responder);
-                }
-                finally
-                {
-                    read.TransponderReceived -= OnRead;
-                }
-                return NormalizeHex(captured);
-            }
-            catch
-            {
-                return "";
-            }
-        }
     }
 
     private void EnqueueScan(string epc, string tid)
@@ -791,7 +827,20 @@ public sealed class TslRfidManager : IDisposable
             PostStatus("Scanning tags…");
             while (!token.IsCancellationRequested && _continuousRunning)
             {
-                PerformSingleRead();
+                if (!TryEnterRead())
+                {
+                    try { await Task.Delay(50, token); } catch (TaskCanceledException) { break; }
+                    continue;
+                }
+                try
+                {
+                    lock (_commandLock)
+                        PerformSingleRead();
+                }
+                finally
+                {
+                    ExitRead();
+                }
                 try
                 {
                     await Task.Delay(_pollMs, token);
@@ -806,20 +855,90 @@ public sealed class TslRfidManager : IDisposable
 
     private void StopContinuous()
     {
+        if (!_continuousRunning && _continuousCts == null) return;
         _continuousRunning = false;
         _continuousCts?.Cancel();
         _continuousCts = null;
+        ResetReadGate();
         try
         {
             lock (_commandLock)
             {
-                _commander.ExecuteCommand(new AbortCommand(), null);
+                if (_commander.IsConnected)
+                    AbortIfConnected();
             }
         }
         catch
         {
             // ignore
         }
+    }
+
+    private bool TryEnterRead() => Interlocked.CompareExchange(ref _readGate, 1, 0) == 0;
+
+    private void ExitRead() => Interlocked.Exchange(ref _readGate, 0);
+
+    private void ResetReadGate()
+    {
+        var was = Interlocked.Exchange(ref _readGate, 0);
+        if (was != 0)
+            ConnectLockLog.Record("read-gate-reset", _portName, null, 0, "was locked");
+    }
+
+    /// <summary>Trigger reads only — never used for connect/disconnect/config.</summary>
+    private void RunTriggerRead(Action work)
+    {
+        if (!TryEnterRead())
+        {
+            ScanDiagnostics.Log("GUN", "Read skipped — previous read still running");
+            ConnectLockLog.Record("read-skipped", _portName, false, _readGate, "read gate busy");
+            return;
+        }
+        RunGun(() =>
+        {
+            try { work(); }
+            finally { ExitRead(); }
+        });
+    }
+
+    /// <summary>Live config (power already in memory) — uses command lock, not read gate.</summary>
+    private void RunConfigAction(Action work)
+    {
+        RunGun(() =>
+        {
+            if (!_commander.IsConnected) return;
+            try { work(); }
+            catch (Exception ex) { ScanDiagnostics.Log("GUN", "Config failed: " + ex.Message); }
+        });
+    }
+
+    private static string ExtractEpc(TransponderDataEventArgs ev)
+    {
+        var tag = NormalizeHex(ev.Transponder.Epc);
+        if (string.IsNullOrEmpty(tag))
+            tag = NormalizeHex(ev.Transponder.ReadData);
+        return tag;
+    }
+
+    private static string ExtractTid(TransponderDataEventArgs ev, string epc)
+    {
+        var chip = NormalizeHex(ev.Transponder.TransponderIdentifier);
+        if (!string.IsNullOrEmpty(chip) && chip == epc)
+            chip = "";
+        if (string.IsNullOrEmpty(chip))
+            chip = NormalizeHex(ev.Transponder.ReadData);
+        if (!string.IsNullOrEmpty(chip) && chip == epc)
+            chip = "";
+        return chip;
+    }
+
+    private static string NormalizeScanMode(string? mode)
+    {
+        if (ScanModeContinuous.Equals(mode, StringComparison.OrdinalIgnoreCase))
+            return ScanModeContinuous;
+        if (ScanModeMulti.Equals(mode, StringComparison.OrdinalIgnoreCase))
+            return ScanModeMulti;
+        return ScanModeSingle;
     }
 
     private static string NormalizeHex(string? raw)
@@ -839,7 +958,6 @@ public sealed class TslRfidManager : IDisposable
     private void PostStatus(string msg)
     {
         if (string.IsNullOrWhiteSpace(msg)) return;
-        // Watchdog retries every few seconds — don't spam identical lines (except live reads).
         if (msg == _lastStatus && !msg.StartsWith("Read:", StringComparison.Ordinal)) return;
         _lastStatus = msg;
         StatusChanged?.Invoke(msg);

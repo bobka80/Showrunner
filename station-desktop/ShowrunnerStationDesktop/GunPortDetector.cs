@@ -68,8 +68,12 @@ public static class GunPortDetector
 
     private static bool IsConnectCandidate(GunPort port)
     {
+        // USB TSL (rare on gate PCs).
         if (LooksLikeTsl(port.DeviceId) && !port.IsBluetooth)
             return true;
+        // Bluetooth: only outgoing SPP ports that advertise PID_1128 — skip random BT devices (COM5 etc.).
+        if (!LooksLikeTsl(port.DeviceId))
+            return false;
         if (!IsBluetoothSerialPort(port.FriendlyName, port.DeviceId))
             return false;
         return IsOutgoingBluetoothPort(port.DeviceId);

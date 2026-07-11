@@ -61,7 +61,7 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 
-Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showrunner station web UI in **WebView2** and exposes a native **`window.AndroidStation`** bridge (identical API to the Chainway APK) so `11_Station_Shell.html` needs no fork. Full setup, prefs, and troubleshooting: [station-desktop/README.md](../../../station-desktop/README.md). File index: [../FILE_MAP.md](../FILE_MAP.md) §8 (`station-desktop/`, `build-station-desktop.js`).
+Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showrunner station web UI in **WebView2** and exposes a native **`window.AndroidStation`** bridge (identical API to the Chainway APK) so `11_Station_Shell.html` needs no fork. Full setup, prefs, and troubleshooting: [station-desktop/README.md](../../../station-desktop/README.md). TSL vendor reference (PDFs, SDK samples, Explorer): [stage-desktop-info/README.md](../../../stage-desktop-info/README.md). File index: [../FILE_MAP.md](../FILE_MAP.md) §8 (`station-desktop/`, `stage-desktop-info/`, `build-station-desktop.js`).
 
 - **Gun I/O:** TSL ASCII protocol over Bluetooth virtual COM; auto-detects the reader by its `PID_1128` signature (no COM port to configure) with a background watchdog that re-acquires after sleep/drop — mirrors the ASCII Protocol Explorer "always connected" feel (`GunPortDetector.cs`, `TslRfidManager.cs`).
 - **App sleep:** Disconnect+Sleep sends ASCII `.sl`, suppresses watchdog reconnect until manual **Reconnect gun** (`SleepAndDisconnect()`, `_userSleep`).

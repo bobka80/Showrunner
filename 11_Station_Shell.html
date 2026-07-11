@@ -2326,6 +2326,8 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   const tag = scan.epc;
   const tid = scan.tid;
   const norm = stationNormalizeEpc_(tag);
+  stationDebug_('scan IN: ' + (tag || '(empty)') + (tid ? ' tid:' + tid : ''));
+  if (tag) stationPushScanFeed_(tag, tid);
   // Dedup: one physical scan can arrive via BOTH poll and relay (case/format may differ).
   if (norm) {
     var now = Date.now();
@@ -2338,8 +2340,6 @@ window.onStationRfidScan = function(rawTag, rawTid) {
     window.stationLastScanTid = tid || priorTid;
     window.stationLastScanAt = now;
   }
-  stationDebug_('scan IN: ' + (tag || '(empty)') + (tid ? ' tid:' + tid : ''));
-  if (tag) stationPushScanFeed_(tag, tid);
   if (tag && !stationReadHostSession_()) {
     stationSetLastScan_(tag);
     if (!tid) stationSetStatus_('Badge read — confirming chip ID…', '');
@@ -3481,7 +3481,8 @@ function stationNativeBridge_() {
     var b = window.AndroidStation;
     if (b && typeof b.getConfig === 'function' && typeof b.setScanMode === 'function') return b;
   } catch (e) { /* ignore */ }
-  // Desktop WebView2: host object is injected per-frame but the shim only runs on the top shell.
+  // Desktop WebView2 sync hostObjects block the UI thread — only use when cache shim is absent.
+  if (window.__srDesktopBridge) return null;
   try {
     var h = chrome && chrome.webview && chrome.webview.hostObjects &&
       chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;

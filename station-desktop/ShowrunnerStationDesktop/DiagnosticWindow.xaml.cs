@@ -17,7 +17,8 @@ public partial class DiagnosticWindow : Window
         _gunSummary = gunSummary;
 
         var ver = typeof(DiagnosticWindow).Assembly.GetName().Version?.ToString(3) ?? "?";
-        FooterText.Text = "Desktop v" + ver + " · F12 to hide · Log: " + ScanDiagnostics.LogFilePath;
+        FooterText.Text = "Desktop v" + ver + " · F12 to hide · Scan: " + ScanDiagnostics.LogFilePath
+            + " · Connect: " + ConnectLockLog.LogFilePath;
 
         foreach (var line in ScanDiagnostics.Snapshot())
             AppendLine(line);

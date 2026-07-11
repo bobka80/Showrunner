@@ -29,7 +29,7 @@ When the director reports a bug in these areas, state the risk in plain language
 | **RBAC boot payload** | `Main.js`, `Index.html`, `Security.js` | Inject raw JSON permissions into HTML without Base64 | Keep `userPermissionsB64` + `atob()` pattern |
 | **PWA session + login boot** | `push-hosting/public/host-boot.js`, `Login.html`, `Index.html` (session `postMessage`), `Main.js` (`sessionboot`, `sessioncheck`), `Security.js` | Change iframe load order; skip `sessioncheck` before `sessionboot`; clear parent session on every login screen paint; single-token login that kicks other devices without director approval | Token sync only via `SHOWRUNNER_SESSION_TOKEN`; validate server-side before `sessionboot`; multi-device sessions in `Security.js` |
 | **Mobile QR camera (PWA)** | `push-hosting/public/host-boot.js`, `01j_Mobile_Scan.html`, `Main.js` (`sessionboot`/`mobscanstage`), `Station_Security.js`, `Index.html` | `getUserMedia` in GAS iframe; **`postMessage` as sole handoff**; parallel retry loops (relay + pending flush + burst pull + reload); forget `host-boot.js?v=` bump | Camera on **shell** (`#sr-mobile-shell-cam`); **primary handoff = iframe reload** `sessionboot&srScan=`; 20s dedupe; see § Two-layer shell bridge + § Mobile QR handoff |
-| **Station RFID / native gun bridge** | `host-boot.js`, `11_Station_Shell.html`, `station-android/RfidManager.kt` | Rely on **`postMessage` or `evaluateJavascript` alone** for scan delivery; remove `pollScans()` pull path; share BLE read/config workers | **Primary = iframe `AndroidStation.pollScans()`** (~300 ms); relay + `showrunnerStationDeliverScan` = fallback; direct `AndroidStation` for settings; see § Two-layer shell bridge + § Station RFID delivery |
+| **Station RFID / native gun bridge** | `host-boot.js`, `11_Station_Shell.html`, `station-android/RfidManager.kt`, `station-desktop/TslRfidManager.cs` | Rely on **`postMessage` or `evaluateJavascript` alone** for scan delivery; remove `pollScans()` pull path; share BLE read/config workers; **TSL:** double inventory (gun + app), inventory on connect, overlapping reads — see § TSL 1128 desktop gun driver | **Primary = iframe `AndroidStation.pollScans()`** (~300 ms); relay + `showrunnerStationDeliverScan` = fallback; direct `AndroidStation` for settings; **TSL:** SinglePressAction=Off + one gated read per trigger; see § Two-layer shell bridge + § Station RFID delivery + § TSL desktop |
 | **Station native app lifecycle (APK)** | `station-android/AndroidManifest.xml`, `StationWebActivity.kt`, `RfidManager.kt` | Remove `keyboard`/`navigation` from `android:configChanges` (gun is an HID keyboard → connect/disconnect recreates the Activity → full WebView reboot); chase gun-flap resets in JS/session before ruling out Activity recreation | Keep the full `configChanges` list; absorb gun flap in `onConfigurationChanged`; see § Station native app — Android Activity lifecycle |
 | **Station APK + hosting deploy** | `build-station-apk.js`, `deploy-hosting.js`, `push-hosting/prepare-hosting.js`, `station-manifest.json` | Add stdin prompts without `isTTY` guard (wedges shell); leave HTTP fetches undrained (hangs deploy); ship a lower `versionCode`; trust "deploy ran" without live verify | `--non-interactive` firebase + heartbeat/timeout; drain redirects + `process.exit(0)`; downgrade guard; post-deploy live-manifest verify; see § Station APK + Firebase hosting deploy pipeline |
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
@@ -223,6 +223,71 @@ web.app (host-boot.js)                 GAS iframe (Index / station shell)
 `stationLastScanTag` + ~1.5 s window — one physical pull must not enqueue duplicate strip rows (poll + relay both active).
 
 **Full field chronology:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) · [topics/logistics-warehouse.md](topics/logistics-warehouse.md).
+
+---
+
+## TSL 1128 desktop gun driver (Critical)
+
+**Files:** `station-desktop/ShowrunnerStationDesktop/TslRfidManager.cs`, `GunPortDetector.cs`, `MainWindow.xaml.cs` (WebView scan relay).
+
+**Profile:** `tsl_dock_desktop` · **Not** Chainway — different SDK (TSL ASCII over virtual COM), same web bridge surface.
+
+### Connect path (must never share the read gate)
+
+```
+Watchdog (2.5s) → GunPortDetector → ConnectToPort → serial open → .vr version probe → switch/beep setup → live
+```
+
+| Rule | Why |
+|------|-----|
+| **Connect uses `_commandLock` only** | v0.1.17 put connect behind the same gate as trigger reads → watchdog logged `Connect skipped — command in progress` forever while continuous/trigger held the gate |
+| **Read gate (`_readGate`) is trigger-only** | Serializes inventory reads; connect/config/sleep bypass it |
+| **Watchdog fires immediately** (`dueTime=0`) | Delayed first tick added 2.5s dead time on cold boot |
+| **Before each connect sweep:** `StopContinuous()` + `ResetReadGate()` | Stale read loop must not block reconnect |
+| **Outgoing BT COM only** | Incoming `000000000000` ports never connect — see `GunPortDetector` |
+
+**Audit log (persists across restarts):** `%LOCALAPPDATA%\ShowrunnerStation\connect-lock.log`  
+Each line: timestamp · phase · port · ok · readGate · detail. Phases: `connect-try`, `connect-ok`, `connect-fail`, `connect-error`, `no-ports`, `read-gate-reset`, `watchdog-tick`.  
+Mirror in F12 diagnostics under `[CONN]`.
+
+### Stable trigger model (v0.1.17+)
+
+```
+Trigger pull → Switch Single event (debounced) → ONE serialized inventory command → DeliverScan → web
+```
+
+| Rule | Why |
+|------|-----|
+| **`SinglePressAction = Off` always** | Gun firmware must **not** inventory on its own — app owns the only inventory per trigger |
+| **One read gate** (`_readGate`) | TSL SDK sample uses *connected and idle* — overlapping trigger reads cause multi-beep; **not** for connect |
+| **No full inventory on connect/reconnect** | `SeedInventoryParameters` + watchdog reconnect = **unprompted beeps** — use `TakeNoAction=true` param push only |
+| **Do not `Abort` on every Switch Off** | Only abort when **continuous** mode is running — abort in single mode disrupts in-flight reads |
+| **Scan modes:** `single` \| `multi` \| `continuous` | Must match web settings (`11_Station_Shell.html`) — `multi` is **not** the same as `continuous` |
+
+### Never do (regression magnets)
+
+- Set **`SinglePressAction = Inventory`** while **also** calling app `PerformSingleRead` on trigger → **double inventory** (4 beeps, erratic counts).
+- Run **`ExecuteCommand(_inventory)`** on connect, power change, or watchdog retry → **RF without trigger**.
+- Put **connect / sleep / ForceReconnect** behind the **read gate** — connect silently fails until app restart (v0.1.17 regression).
+- Fire **`Task.Run(PerformSingleRead)`** without a read gate → overlapping reads when switch bounces.
+- Call **`StopContinuous()` / `AbortCommand`** on every `SwitchState.Off` in single mode.
+- Remove **`pollScans()`** pull or top-frame queue steal fixes while “fixing” live strip — see § Station RFID scan delivery above.
+- Pick **incoming** BT COM port (`000000000000`) — use `GunPortDetector` outgoing filter only.
+
+### Settings path (web → gun)
+
+`stationSyncSettingsToGun_()` → `AndroidStation.setPower/setScanMode/setBeep/setPollMs` (iframe or host-boot relay) → `TslRfidManager`. Power updates `_inventory.OutputPower` only — **no inventory command**.
+
+### Test checklist (after any TSL desktop touch)
+
+0. Cold start — within a few seconds status shows **Connecting** then **Gun connected** (check `connect-lock.log` for `connect-ok`).
+1. Connect — **no beep** until trigger pulled.
+2. **Single** mode — one pull → **one beep** → one `Read:` line → live strip row (or diagnostic `DeliverScan`).
+3. Change sensitivity in Settings → status shows `Sensitivity N dBm` — **no extra beep**.
+4. **Multi** mode — one pull → short burst, not endless.
+5. No beeps when gun sits idle for 30 s.
+
+**Chronology:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) § Desktop TSL station.
 
 ---
 
