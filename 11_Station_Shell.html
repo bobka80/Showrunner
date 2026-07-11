@@ -1614,7 +1614,7 @@ function stationParkGun_() {
 
 /** Native bridge that can sleep the gun (desktop TSL or Chainway with sleepGun support). */
 function stationSleepCapableBridge_() {
-  var b = stationNativeBridge_();
+  var b = stationGunBridge_();
   return (b && typeof b.sleepGun === 'function') ? b : null;
 }
 
@@ -1949,7 +1949,7 @@ window.stationOnGunConfigChange_ = function(count) {
 };
 
 window.stationReconnectGun_ = function() {
-  var b = stationNativeBridge_();
+  var b = stationGunBridge_();
   if (b && typeof b.reconnectGun === 'function') {
     stationToast_('Reconnecting gun…', '');
     try { b.reconnectGun(); } catch (e) { stationToast_('Reconnect failed.', 'error'); return; }
@@ -1964,7 +1964,7 @@ window.stationReconnectGun_ = function() {
  * button — the reader has no physical on/off. Waking is a trigger pull + Reconnect gun.
  */
 window.stationSleepGun_ = function() {
-  var b = stationNativeBridge_();
+  var b = stationGunBridge_();
   if (b && typeof b.sleepGun === 'function') {
     stationToast_('Gun going to sleep…', '');
     try { b.sleepGun(); } catch (e) { stationToast_('Sleep failed.', 'error'); return; }
@@ -2328,8 +2328,13 @@ window.onStationRfidScan = function(rawTag, rawTid) {
  */
 function stationStartScanPoll_() {
   if (window.stationScanPollTimer) return;
-  var b = stationNativeBridge_();
+  var b = stationGunBridge_();
+  // Desktop iframe relay: parent host-boot polls AndroidStation and postMessages scans.
   if (!b || typeof b.pollScans !== 'function') { stationDebug_('poll: unavailable'); return; }
+  if (b.pollScans() === '[]' && !stationNativeBridge_()) {
+    stationDebug_('poll: parent relay');
+    return;
+  }
   stationDebug_('poll: on');
   window.stationScanPollTimer = setInterval(function() {
     var raw;
@@ -3409,10 +3414,21 @@ function stationPostToHosting_(payload) {
 }
 
 /**
- * Android injects @JavascriptInterface objects into every frame (including this iframe),
- * so prefer calling the native gun bridge DIRECTLY — no postMessage/host-boot hop to lose.
- * Returns the bridge if it looks usable, else null (plain browser / relay fallback).
+ * Direct native bridge when injected in-frame (Android APK). On desktop WebView2 the GAS iframe
+ * is cross-origin so AndroidStation lives on the hosting parent — use postMessage relay stubs.
  */
+function stationGunBridge_() {
+  var b = stationNativeBridge_();
+  if (b) return b;
+  if (!window.IS_STATION_DEVICE) return null;
+  return {
+    sleepGun: function() { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_GUN_SLEEP' }); },
+    reconnectGun: function() { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_GUN_RECONNECT' }); },
+    pollScans: function() { return '[]'; },
+    getConfig: function() { return '{}'; }
+  };
+}
+
 function stationNativeBridge_() {
   try {
     var b = window.AndroidStation;

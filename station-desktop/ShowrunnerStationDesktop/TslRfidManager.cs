@@ -177,9 +177,10 @@ public sealed class TslRfidManager : IDisposable
                 EnableSwitchReporting();
                 _linkState = "live";
                 PostStatus("Gun connected");
+                // Persist manual COM override only — auto-detected ports change after re-pair.
                 DesktopPrefs.Save(new DesktopPrefsData
                 {
-                    ComPort = _portName,
+                    ComPort = _manualPort,
                     PowerDbm = _powerDbm,
                     Beep = _beepEnabled,
                     ScanMode = _scanMode,
@@ -341,10 +342,13 @@ public sealed class TslRfidManager : IDisposable
 
     private void SetupResponders()
     {
+        // Match TSL sample order: switch → synchronous slot → inventory async responder.
         _commander.ClearResponders();
         _commander.AddResponder(_switchResponder);
-        _commander.AddResponder(_inventory.Responder);
         _commander.AddSynchronousResponder();
+        _commander.AddResponder(_inventory.Responder);
+        _inventory.IsIndexedCommand = false;
+        _inventory.IsLibraryCommand = false;
     }
 
     private void ReadFirmware()
@@ -398,9 +402,15 @@ public sealed class TslRfidManager : IDisposable
 
     private void OnSwitchStateChanged(object? sender, SwitchStateEventArgs e)
     {
-        if (!_connected) return;
+        lock (_commandLock)
+        {
+            if (!_commander.IsConnected) return;
+        }
         if (e.State == SwitchState.Single)
+        {
+            PostStatus("Trigger");
             OnTriggerPressed();
+        }
         else if (e.State is SwitchState.Off)
             StopContinuous();
     }
@@ -420,22 +430,41 @@ public sealed class TslRfidManager : IDisposable
 
     private void PerformSingleRead()
     {
-        if (!_connected) return;
+        lock (_commandLock)
+        {
+            if (!_commander.IsConnected) return;
+        }
         Task.Run(() =>
         {
             lock (_commandLock)
             {
+                if (!_commander.IsConnected) return;
+                InventoryCommand? inventory = null;
                 try
                 {
-                    _inventory.OutputPower = _powerDbm;
-                    _inventory.QuerySession = QuerySession.S0;
-                    _inventory.QueryTarget = QueryTarget.TargetA;
-                    _inventory.TakeNoAction = false;
-                    _commander.ExecuteCommand(_inventory, _inventory.Responder);
+                    // Fresh command per pull — matches TSL SDK samples (reuse caused silent no-reads).
+                    inventory = new InventoryCommand
+                    {
+                        OutputPower = _powerDbm,
+                        QuerySession = QuerySession.S0,
+                        QueryTarget = QueryTarget.TargetA,
+                        TakeNoAction = false,
+                        IsIndexedCommand = false,
+                        IsLibraryCommand = false,
+                        FastIdentifier = TriState.Yes,
+                        TagFocus = TriState.Yes,
+                    };
+                    inventory.TransponderReceived += OnInventoryTransponder;
+                    _commander.ExecuteCommand(inventory, inventory.Responder);
                 }
                 catch (Exception ex)
                 {
                     PostStatus("Read failed: " + ex.Message);
+                }
+                finally
+                {
+                    if (inventory != null)
+                        inventory.TransponderReceived -= OnInventoryTransponder;
                 }
             }
         });

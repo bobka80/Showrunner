@@ -695,15 +695,15 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\cfb63cdfc0fc5f7f97d1c30de63acf65\\nuget": {}
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\8aa3bcd654b08c65dbe16ddfab5a70cb\\nuget": {}
   },
   "project": {
-    "version": "0.1.0",
+    "version": "0.1.1",
     "restore": {
       "projectUniqueName": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
       "projectName": "ShowrunnerStationDesktop",
       "projectPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
-      "packagesPath": "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\cfb63cdfc0fc5f7f97d1c30de63acf65\\nuget",
+      "packagesPath": "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\8aa3bcd654b08c65dbe16ddfab5a70cb\\nuget",
       "outputPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [

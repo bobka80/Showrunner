@@ -57,7 +57,7 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 
 **Why the fork exists (regression that triggered it):** a shared auto-sleep timer force-disconnected *any* connected gun to "sleep" it. On Chainway that suppressed the reconnect ladder and killed the trigger→wake-screen handler. The fork means each gun sleeps with its **own** SDK path instead of one shared force-disconnect.
 
-**Chainway no-host park (build 52 / v505+):** After host eject/logout, grace (+ optional park delay) → `sleepGun()` → **`triggerBeep` (~200 ms) then SDK disconnect** so the operator hears when the app drops the link. Pull trigger → wake + reconnect (reconnect may beep again). **Risk:** partial SDK disconnect can leave phone Bluetooth HID up (dead zone on screen-off) — field-tune grace/delay; power off gun manually if stuck. TSL unchanged (`autoSdkPark` via `.sl`).
+**Chainway no-host park (build 53 / GAS v505+):** After host eject/logout, grace (+ optional park delay) → `sleepGun()` → **`triggerBeep` (~200 ms) then SDK disconnect** so the operator hears when the app drops the link. Pull trigger → wake + reconnect (reconnect may beep again). **Risk:** partial SDK disconnect can leave phone Bluetooth HID up (dead zone on screen-off) — field-tune grace/delay; power off gun manually if stuck. TSL unchanged (`autoSdkPark` via `.sl`).
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 

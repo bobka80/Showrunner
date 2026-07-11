@@ -39,6 +39,37 @@
     } catch (e) { /* ignore */ }
   };
 
+  // Desktop WebView2: AndroidStation is on this (top) frame; the GAS station shell is cross-origin
+  // in the iframe and cannot call reconnect/sleep/poll directly — relay here.
+  var stationGunPollTimer = null;
+  function startStationGunPoll_() {
+    if (stationGunPollTimer) return;
+    if (!window.AndroidStation || typeof AndroidStation.pollScans !== 'function') return;
+    stationGunPollTimer = setInterval(function() {
+      try {
+        var raw = AndroidStation.pollScans();
+        if (!raw || raw === '[]') return;
+        var arr = JSON.parse(raw);
+        for (var i = 0; i < arr.length; i++) {
+          var item = arr[i];
+          var epc = (item && (item.epc || item.tag)) || item;
+          var tid = (item && item.tid) || '';
+          if (epc) showrunnerStationDeliverScan(String(epc), tid ? String(tid) : '');
+        }
+      } catch (e) { /* ignore */ }
+    }, 300);
+  }
+
+  function invokeStationGun_(method) {
+    try {
+      if (window.AndroidStation && typeof AndroidStation[method] === 'function') {
+        AndroidStation[method]();
+        return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+
   function relayStationConfigToIframe() {
     if (!frame || !frame.contentWindow) return;
     var cfg = null;
@@ -1380,6 +1411,7 @@
     setTimeout(function() { if (el && el.parentNode) el.parentNode.removeChild(el); }, 400);
   }
   if (isNativeStationApp() && !stationSplashDismissed_()) showStationSplash();
+  if (isNativeStationApp()) setTimeout(startStationGunPoll_, 800);
 
   // Relay shell-ready / login-needed to the native kiosk splash (StationWebActivity).
   function notifyNativeSplash(method) {
@@ -2468,6 +2500,7 @@
       hideStationSplash();
       notifyNativeSplash('shellReady');
       try { localStorage.setItem('sr_station_iframe_ready', '1'); } catch (e) { /* ignore */ }
+      startStationGunPoll_();
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_HOST_SESSION') {
@@ -2536,6 +2569,16 @@
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_SET') {
       applyStationConfig(ev.data.key, ev.data.value);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_STATION_GUN_RECONNECT') {
+      invokeStationGun_('reconnectGun');
+      setTimeout(relayStationConfigToIframe, 1500);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_STATION_GUN_SLEEP') {
+      invokeStationGun_('sleepGun');
+      setTimeout(relayStationConfigToIframe, 1200);
       return;
     }
     if (hostMobileScanIsScanPageMsg_(ev)) {
