@@ -19,8 +19,12 @@ public partial class MainWindow : Window
     private readonly object _frameLock = new();
     private StationBridge? _bridge;
     private bool _splashHidden;
+    private bool _shellReady;
     private DiagnosticWindow? _diagWindow;
     private System.Threading.Timer? _gunPushTimer;
+    private string _lastWebDeliverNorm = "";
+    private long _lastWebDeliverMs;
+    private const int WebDeliverDedupeMs = 1500;
 
     public MainWindow()
     {
@@ -32,6 +36,7 @@ public partial class MainWindow : Window
             {
                 ScanDiagnostics.Log("NATIVE", "ScanReceived event EPC=" + epc);
                 DeliverScanToPage(epc, tid ?? "");
+                _rfid.ClearPendingScans();
             });
         Loaded += async (_, _) => await InitWebViewAsync();
         Closed += (_, _) => ShutdownRfid();
@@ -51,6 +56,22 @@ public partial class MainWindow : Window
             _diagWindow = null;
         }
         _rfid.ShutdownGracefully(TslRfidManager.ShutdownTimeoutMs);
+    }
+
+    private static string BuildSessionSeedScript()
+    {
+        var prefs = DesktopPrefs.Load();
+        var token = (prefs.SessionToken ?? "").Trim();
+        if (token.Length < 20 || prefs.SessionExpires <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            return "(function(){})();";
+        var tokenJson = JsonSerializer.Serialize(token);
+        var exp = prefs.SessionExpires;
+        return "(function(){try{var t=" + tokenJson + ",exp=" + exp + ";" +
+               "if(!t||exp<=Date.now())return;" +
+               "if(!localStorage.getItem('sm_session_token')){" +
+               "localStorage.setItem('sm_session_token',t);" +
+               "localStorage.setItem('sm_session_expires',String(exp));}" +
+               "}catch(e){}})();";
     }
 
     private async Task InitWebViewAsync()
@@ -123,12 +144,14 @@ public partial class MainWindow : Window
                 };
             };
 
+            await WebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(BuildSessionSeedScript());
             await WebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(BridgeShimScript);
 
             WebView.CoreWebView2.NavigationCompleted += async (_, e) =>
             {
                 if (!e.IsSuccess) return;
                 await InjectDeliverScanHelperAsync();
+                ScheduleDesktopSessionBootChecks();
             };
 
             WebView.Source = new Uri(ShowrunnerUrl);
@@ -184,12 +207,6 @@ public partial class MainWindow : Window
                 if (WebView.CoreWebView2 == null) return;
                 var cfgMsg = JsonSerializer.Serialize(new { type = "SR_GUN_CONFIG", json = cfg });
                 WebView.CoreWebView2.PostWebMessageAsJson(cfgMsg);
-                if (!string.IsNullOrWhiteSpace(scans) && scans != "[]")
-                {
-                    var scansMsg = JsonSerializer.Serialize(new { type = "SR_GUN_SCANS", scansRaw = scans });
-                    PostJsonToChildFrames(scansMsg, "push", "SR_GUN_SCANS");
-                    RelayScanBatchToWeb(scans, "push");
-                }
             }
             catch
             {
@@ -198,69 +215,15 @@ public partial class MainWindow : Window
         });
     }
 
-    private static string BuildNativeScanMessageJson(string epc, string tid) =>
-        JsonSerializer.Serialize(new { type = "SR_RFID_SCAN", tag = epc, tid = tid ?? "" });
-
-    /// <summary>
-    /// Post directly into GAS iframe(s) via chrome.webview message — reliable when cross-origin postMessage is lossy.
-    /// </summary>
-    private void PostScanToChildFrames(string epc, string tid, string pass)
-    {
-        var msg = BuildNativeScanMessageJson(epc, tid);
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
-        var posted = 0;
-        foreach (var frame in frames)
-        {
-            try
-            {
-                frame.PostWebMessageAsJson(msg);
-                posted++;
-            }
-            catch (Exception ex)
-            {
-                ScanDiagnostics.Log("WEB", pass + ": frame PostWebMessage failed — " + ex.Message);
-            }
-        }
-        if (posted > 0)
-            ScanDiagnostics.Log("WEB", pass + ": SR_RFID_SCAN → " + posted + " frame(s)");
-    }
-
-    /// <summary>
-    /// Push scan into each frame's JS queue and invoke handler — awaited on UI thread for diagnostics.
-    /// </summary>
     private static string BuildFrameScanInjectJs(string epc, string tid) =>
-        "(function(){try{var t=" + JsonSerializer.Serialize(epc) + ",i=" + JsonSerializer.Serialize(tid ?? "") + ";" +
-        "window.__srScanQueue=window.__srScanQueue||[];" +
-        "window.__srScanQueue.push({epc:t,tag:t,tid:i});" +
-        "while(window.__srScanQueue.length>32)window.__srScanQueue.shift();" +
+        "(function(){try{" +
         "var info={href:String(location.href||'').substring(0,72),isStation:!!window.IS_STATION_DEVICE," +
-        "hasOnScan:typeof window.onStationRfidScan,hasFeed:typeof window.stationPushScanFeed_,bridge:!!window.__srDesktopBridge};" +
-        "if(typeof window.__srInjectScan==='function'){window.__srInjectScan(t,i);info.action='inject';}" +
+        "hasOnScan:typeof window.onStationRfidScan,hasFeed:typeof window.stationPushScanFeed_,bridge:!!window.__srDesktopBridge," +
+        "shellReady:!!(window.onStationRfidScan&&window.onStationRfidScan.__srDesktopShim!==true&&window.onStationRfidScan.__srEarlyBoot!==true)};" +
         "info.recent=(window.stationRecentScans||[]).length;info.q=(window.__srScanQueue||[]).length;" +
-        "info.feedRows=(document.getElementById('station-scan-feed-list')||{}).children?document.getElementById('station-scan-feed-list').children.length:0;" +
+        "info.feedRows=(function(){var l=document.getElementById('station-scan-feed-list');return l&&l.children?l.children.length:0;})();" +
+        "info.hasFeedList=!!document.getElementById('station-scan-feed-list');info.onLogin=!!document.getElementById('login-form');" +
         "return JSON.stringify(info);}catch(e){return JSON.stringify({err:String(e.message||e)});}})()";
-
-    private async Task InjectScanIntoFramesAsync(string epc, string tid, string pass)
-    {
-        var js = BuildFrameScanInjectJs(epc, tid);
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
-        if (frames.Length == 0)
-            ScanDiagnostics.Log("WEB", pass + ": no child frames tracked");
-        for (var i = 0; i < frames.Length; i++)
-        {
-            try
-            {
-                var raw = await frames[i].ExecuteScriptAsync(js);
-                ScanDiagnostics.Log("WEB", pass + ": FRAME[" + i + "] " + Trunc(UnwrapScriptResult(raw), 160));
-            }
-            catch (Exception ex)
-            {
-                ScanDiagnostics.Log("WEB", pass + ": FRAME[" + i + "] ERR " + ex.Message);
-            }
-        }
-    }
 
     private void PostJsonToChildFrames(string json, string pass, string label)
     {
@@ -281,28 +244,6 @@ public partial class MainWindow : Window
         }
         if (posted > 0)
             ScanDiagnostics.Log("WEB", pass + ": " + label + " → " + posted + " frame(s)");
-    }
-
-    private void RelayScanBatchToWeb(string scansRaw, string pass)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(scansRaw);
-            if (doc.RootElement.ValueKind != JsonValueKind.Array) return;
-            foreach (var item in doc.RootElement.EnumerateArray())
-            {
-                var epc = item.TryGetProperty("epc", out var epcEl) ? epcEl.GetString() : null;
-                if (string.IsNullOrWhiteSpace(epc) && item.TryGetProperty("tag", out var tagEl))
-                    epc = tagEl.GetString();
-                var tid = item.TryGetProperty("tid", out var tidEl) ? tidEl.GetString() : "";
-                if (string.IsNullOrWhiteSpace(epc)) continue;
-                _ = DeliverScanToPageCoreAsync(epc, tid ?? "", pass);
-            }
-        }
-        catch (Exception ex)
-        {
-            ScanDiagnostics.Log("WEB", pass + ": batch relay failed — " + ex.Message);
-        }
     }
 
     private void RelayScanToTopHosting(string epc, string tid)
@@ -371,7 +312,11 @@ public partial class MainWindow : Window
                     break;
                 }
                 case "shellReady":
+                    _shellReady = true;
+                    HideSplash();
+                    break;
                 case "loginNeeded":
+                    _shellReady = false;
                     HideSplash();
                     break;
                 case "saveSession":
@@ -487,65 +432,102 @@ public partial class MainWindow : Window
         ScanDiagnostics.Log("WEB", "DeliverScanToPage EPC=" + epc + " desktop="
             + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "?"));
         _ = DeliverScanToPageCoreAsync(epc, tid, "immediate");
-        ScheduleScanDeliveryRetries(epc, tid);
+        if (!_shellReady)
+        {
+            Task.Delay(800).ContinueWith(_ =>
+                Dispatcher.BeginInvoke(() => _ = DeliverScanToPageCoreAsync(epc, tid, "retry@800ms")));
+        }
     }
 
-    private void ScheduleScanDeliveryRetries(string epc, string tid)
+    private bool ShouldDeliverScanToWeb(string epc, string tid, string pass)
     {
-        foreach (var delayMs in new[] { 400, 1200, 2500 })
+        var norm = epc.Trim().ToUpperInvariant();
+        var now = Environment.TickCount64;
+        if (norm.Length > 0 && norm == _lastWebDeliverNorm && now - _lastWebDeliverMs < WebDeliverDedupeMs)
         {
-            var capturedDelay = delayMs;
-            Task.Delay(capturedDelay).ContinueWith(_ =>
-                Dispatcher.BeginInvoke(() => _ = DeliverScanToPageCoreAsync(epc, tid, "retry@" + capturedDelay + "ms")));
+            ScanDiagnostics.Log("WEB", pass + ": deduped EPC=" + norm);
+            return false;
+        }
+        _lastWebDeliverNorm = norm;
+        _lastWebDeliverMs = now;
+        return true;
+    }
+
+    private void ScheduleDesktopSessionBootChecks()
+    {
+        foreach (var delayMs in new[] { 600, 2000, 5000 })
+        {
+            Task.Delay(delayMs).ContinueWith(_ =>
+                Dispatcher.BeginInvoke(() => _ = EnsureDesktopSessionBootAsync()));
+        }
+    }
+
+    private async Task EnsureDesktopSessionBootAsync()
+    {
+        if (WebView.CoreWebView2 == null) return;
+        const string js = """
+            (function(){try{
+              var f=document.getElementById('app-frame');
+              if(!f)return JSON.stringify({skip:'no-frame'});
+              var src=String(f.src||'');
+              if(src.indexOf('sessionboot')>=0)return JSON.stringify({skip:'sessionboot'});
+              var token=localStorage.getItem('sm_session_token')||'';
+              var exp=parseInt(localStorage.getItem('sm_session_expires')||'0',10);
+              if(!token||token.length<20||!exp||exp<=Date.now())return JSON.stringify({skip:'no-session'});
+              var m=src.match(/script\.google\.com\/macros\/s\/[^/]+\/exec/);
+              var base=m?('https://'+m[0]):'';
+              if(!base)return JSON.stringify({skip:'no-base'});
+              f.src=base+'?action=sessionboot&token='+encodeURIComponent(token);
+              return JSON.stringify({boot:true});
+            }catch(e){return JSON.stringify({err:String(e.message||e)});}})()
+            """;
+        try
+        {
+            var raw = await WebView.CoreWebView2.ExecuteScriptAsync(js);
+            var result = Trunc(UnwrapScriptResult(raw), 80);
+            if (result.Contains("boot"))
+                ScanDiagnostics.Log("WEB", "Forced sessionboot on app-frame");
+        }
+        catch
+        {
+            // ignore
         }
     }
 
     private async Task DeliverScanToPageCoreAsync(string epc, string tid, string pass)
     {
         if (WebView.CoreWebView2 == null) return;
-        var msgJs = JsonSerializer.Serialize(new { type = "SHOWRUNNER_RFID_SCAN", tag = epc, tid });
-        try
-        {
-            RelayScanToTopHosting(epc, tid);
-            _ = WebView.CoreWebView2.ExecuteScriptAsync(
-                $"(function(m){{try{{var f=document.getElementById('app-frame');" +
-                "if(f&&f.contentWindow)f.contentWindow.postMessage(m,'*');}}catch(e){{}}}})({msgJs});");
-            ScanDiagnostics.Log("WEB", pass + ": top relay + postMessage sent");
-        }
-        catch (Exception ex)
-        {
-            ScanDiagnostics.Log("WEB", pass + ": top relay failed — " + ex.Message);
-        }
+        if (!ShouldDeliverScanToWeb(epc, tid, pass)) return;
 
-        PostScanToChildFrames(epc, tid, pass);
-        await InjectScanIntoFramesAsync(epc, tid, pass);
-        try
-        {
-            var topMsg = BuildNativeScanMessageJson(epc, tid);
-            WebView.CoreWebView2.PostWebMessageAsJson(topMsg);
-        }
-        catch (Exception ex)
-        {
-            ScanDiagnostics.Log("WEB", pass + ": top PostWebMessage failed — " + ex.Message);
-        }
+        RelayScanToTopHosting(epc, tid);
+        ScanDiagnostics.Log("WEB", pass + ": relay EPC=" + epc);
 
+        if (pass == "immediate")
+            await InjectScanIntoGasFrameAsync(epc, tid, pass);
+    }
+
+    private async Task InjectScanIntoGasFrameAsync(string epc, string tid, string pass)
+    {
+        var js = BuildFrameScanInjectJs(epc, tid);
+        CoreWebView2Frame? gasFrame = null;
+        lock (_frameLock)
+        {
+            if (_childFrames.Count > 0)
+                gasFrame = _childFrames[^1];
+        }
+        if (gasFrame == null)
+        {
+            ScanDiagnostics.Log("WEB", pass + ": no GAS frame tracked");
+            return;
+        }
         try
         {
-            var tagJson = JsonSerializer.Serialize(epc);
-            var tidJson = JsonSerializer.Serialize(tid ?? "");
-            var topDiag =
-                "(function(){try{var t=" + tagJson + ",i=" + tidJson + ",m={type:'SHOWRUNNER_RFID_SCAN',tag:t,tid:i};" +
-                "var r={iframes:0,posted:0,deliver:typeof window.showrunnerStationDeliverScan};" +
-                "var fs=document.querySelectorAll('iframe');r.iframes=fs.length;" +
-                "for(var n=0;n<fs.length;n++){try{if(fs[n].contentWindow){fs[n].contentWindow.postMessage(m,'*');r.posted++;}}catch(x){}}" +
-                "if(window.showrunnerStationDeliverScan)window.showrunnerStationDeliverScan(t,i);" +
-                "return JSON.stringify(r);}catch(e){return JSON.stringify({err:e.message});}})()";
-            var raw = await WebView.CoreWebView2.ExecuteScriptAsync(topDiag);
-            ScanDiagnostics.Log("WEB", pass + ": top diag " + Trunc(UnwrapScriptResult(raw), 100));
+            var raw = await gasFrame.ExecuteScriptAsync(js);
+            ScanDiagnostics.Log("WEB", pass + ": GAS " + Trunc(UnwrapScriptResult(raw), 160));
         }
         catch (Exception ex)
         {
-            ScanDiagnostics.Log("WEB", pass + ": top diag ERR " + ex.Message);
+            ScanDiagnostics.Log("WEB", pass + ": GAS ERR " + ex.Message);
         }
     }
 
@@ -749,12 +731,53 @@ public partial class MainWindow : Window
               return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
             });
           }
+          function __srNormEpc_(tag) {
+            return String(tag || '').toUpperCase().replace(/[^A-F0-9]/g, '');
+          }
+          function __srDedupeScan_(tag, tid) {
+            var norm = __srNormEpc_(tag);
+            if (!norm) return true;
+            var now = Date.now();
+            var priorTid = String(window.__srLastInjectTid || '').trim();
+            if (norm === window.__srLastInjectNorm && (now - (window.__srLastInjectAt || 0)) < 1500) {
+              if (priorTid || !tid) return true;
+            }
+            window.__srLastInjectNorm = norm;
+            window.__srLastInjectAt = now;
+            if (tid) window.__srLastInjectTid = String(tid);
+            return false;
+          }
+          function __srHideFloatFeed_() {
+            var f = document.getElementById('sr-desktop-scan-feed');
+            if (f) f.style.display = 'none';
+          }
+          function __srEnsureFeedList_() {
+            var list = document.getElementById('station-scan-feed-list');
+            if (list) {
+              __srHideFloatFeed_();
+              return list;
+            }
+            if (!/ShowrunnerStation/i.test(navigator.userAgent || '')) return null;
+            if (document.getElementById('station-shell')) return null;
+            var panel = document.getElementById('sr-desktop-scan-feed');
+            if (!panel) {
+              panel = document.createElement('div');
+              panel.id = 'sr-desktop-scan-feed';
+              panel.setAttribute('aria-label', 'Live RFID scans');
+              panel.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;max-height:140px;overflow:auto;z-index:2147483646;background:#18181b;border:1px solid #3f3f46;border-radius:8px;padding:8px;font:12px Inter,system-ui,sans-serif;color:#f4f4f5;';
+              panel.innerHTML = '<div style="font-weight:800;margin-bottom:6px;color:#10b981;">Live RFID scans</div><div id="station-scan-feed-list" class="station-scan-feed__list"></div>';
+              (document.body || document.documentElement).appendChild(panel);
+            }
+            return document.getElementById('station-scan-feed-list');
+          }
           function __srShimPushFeed(tag, tid) {
             if (typeof window.stationPushScanFeed_ === 'function' && window.stationPushScanFeed_.__srShim !== true) {
+              __srHideFloatFeed_();
               window.stationPushScanFeed_(tag, tid);
               return;
             }
-            var list = document.getElementById('station-scan-feed-list');
+            if (__srDedupeScan_(tag, tid)) return;
+            var list = __srEnsureFeedList_();
             if (!list) return;
             var empty = list.querySelector('.station-scan-feed__empty');
             if (empty) empty.remove();
@@ -795,7 +818,7 @@ public partial class MainWindow : Window
           }
           window.__srInjectScan = function(tag, tid) {
             var t = String(tag || ''), i = String(tid || '');
-            if (!t) return;
+            if (!t || __srDedupeScan_(t, i)) return;
             window.__srScanQueue.push({ epc: t, tag: t, tid: i });
             while (window.__srScanQueue.length > 32) window.__srScanQueue.shift();
             if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(t, i);
@@ -803,12 +826,6 @@ public partial class MainWindow : Window
           };
           if (!window.__srScanDrainTimer) {
             window.__srScanDrainTimer = setInterval(function() {
-              var q = window.__srScanQueue || [];
-              while (q.length && typeof window.onStationRfidScan === 'function') {
-                var it = q.shift();
-                if (!it) break;
-                window.onStationRfidScan(it.epc || it.tag || '', it.tid || '');
-              }
               var p = window.__srPendingRfidScans;
               if (p && p.length && typeof window.onStationRfidScan === 'function' &&
                   typeof window.stationPushScanFeed_ === 'function' &&

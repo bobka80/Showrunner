@@ -2062,6 +2062,8 @@ function stationRenderScanFeed_() {
 }
 
 function stationPushScanFeed_(tag, tidOpt) {
+  const floatEl = document.getElementById('sr-desktop-scan-feed');
+  if (floatEl) floatEl.style.display = 'none';
   const clean = String(tag || '').trim();
   if (!clean) return;
   const norm = stationNormalizeEpc_(clean);

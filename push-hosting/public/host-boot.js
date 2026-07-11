@@ -1575,6 +1575,10 @@
     return /ShowrunnerStationDesktop/i.test(navigator.userAgent || '');
   }
 
+  function isStationShellApp() {
+    return isNativeStationApp() || isDesktopStationApp();
+  }
+
   function isStandalonePwa() {
     // The native station app is already "installed" — never nag it to add-to-home-screen.
     return isNativeStationApp() ||
@@ -1729,8 +1733,19 @@
 
   function restoreParentSessionFromNative() {
     try {
-      if (!window.AndroidStation || typeof AndroidStation.getSavedSession !== 'function') return;
-      var raw = AndroidStation.getSavedSession();
+      var raw = '';
+      try {
+        if (window.AndroidStation && typeof AndroidStation.getSavedSession === 'function') {
+          raw = AndroidStation.getSavedSession() || '';
+        }
+      } catch (e) { /* ignore */ }
+      if (!raw) {
+        try {
+          var h = window.chrome && window.chrome.webview && window.chrome.webview.hostObjects &&
+            window.chrome.webview.hostObjects.sync && window.chrome.webview.hostObjects.sync.androidStation;
+          if (h && typeof h.getSavedSession === 'function') raw = h.getSavedSession() || '';
+        } catch (e2) { /* ignore */ }
+      }
       if (!raw) return;
       var data = JSON.parse(raw);
       if (!data || !data.token || String(data.token).length < 20) return;
@@ -1760,7 +1775,7 @@
   }
 
   function shouldDeferSessionClear() {
-    if (isNativeStationApp() && readParentSession()) {
+    if (isStationShellApp() && readParentSession()) {
       if (window.__srBleReconnecting) return true;
       if (window.__srBleFlapUntil && Date.now() < window.__srBleFlapUntil) return true;
     }
@@ -1768,9 +1783,9 @@
     return Date.now() < shellBootGraceUntil && !!readParentSession();
   }
 
-  /** Native station: do not reload the GAS iframe during BLE flap or while logged in. */
+  /** Station shell (native or desktop): do not reload the GAS iframe during flap or while logged in. */
   function shouldBlockIframeNavigation(reason) {
-    if (!isNativeStationApp() || !readParentSession()) return false;
+    if (!isStationShellApp() || !readParentSession()) return false;
     if (window.__srBleReconnecting) return true;
     if (window.__srBleFlapUntil && Date.now() < window.__srBleFlapUntil) return true;
     if (iframeLoggedIn && (reason === 'login_gate' || reason === 'session_clear' || reason === 'login_state')) {
@@ -1816,6 +1831,25 @@
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
     return base;
+  }
+
+  function ensureDesktopStationBoot_(reason) {
+    if (!isDesktopStationApp() || !frame) return;
+    restoreParentSessionFromNative();
+    var sess = readParentSession();
+    if (!sess || !sess.token) return;
+    var src = String(frame.src || '');
+    if (src.indexOf('sessionboot') >= 0) return;
+    var base = getGasBaseUrl();
+    if (!base) return;
+    setAppFrameSrc(base + '?action=sessionboot&token=' + encodeURIComponent(sess.token), reason || 'desktop_boot');
+  }
+
+  function scheduleDesktopStationBoot_() {
+    if (!isDesktopStationApp()) return;
+    [600, 2000, 5000].forEach(function(ms) {
+      setTimeout(function() { ensureDesktopStationBoot_('desktop_boot_' + ms); }, ms);
+    });
   }
 
   function startShellBootGrace() {
@@ -1885,7 +1919,7 @@
     if (shouldDeferSessionClear() || window.__srBleReconnecting) {
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
-    if (isNativeStationApp() && readParentSession()) {
+    if (isStationShellApp() && readParentSession()) {
       return base + '?action=sessionboot&token=' + encodeURIComponent(sess.token);
     }
     clearParentSession();
@@ -2502,13 +2536,13 @@
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION_CLEAR') {
       if (shouldDeferSessionClear()) return;
-      if (isNativeStationApp() && readParentSession()) return;
+      if (isStationShellApp() && readParentSession()) return;
       navigateHostingToLoginGate();
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_LOGIN_STATE' && ev.data.loggedIn === false) {
       if (shouldDeferSessionClear()) return;
-      if (isNativeStationApp() && readParentSession() && ev.data.clearSession !== true) {
+      if (isStationShellApp() && readParentSession() && ev.data.clearSession !== true) {
         return;
       }
       if (shouldBlockIframeNavigation('login_state')) return;
@@ -2900,7 +2934,7 @@
     startShellBootGrace();
     if (frame) {
       var skipNav = false;
-      if (isNativeStationApp() && readParentSession()) {
+      if (isStationShellApp() && readParentSession()) {
         var cur = String(frame.src || '');
         if (cur.indexOf('script.google.com') >= 0 && cur.indexOf('sessionboot') >= 0) {
           skipNav = true;
@@ -2914,6 +2948,7 @@
         }
       }
     }
+    scheduleDesktopStationBoot_();
     try {
       firebaseConfig = await loadConfigJsonp();
       if (!firebaseConfig.apiKey || !firebaseConfig.vapidKey || firebaseConfig.vapidKeyValid === false) {
@@ -3001,7 +3036,7 @@
 
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState !== 'visible') return;
-    if (isNativeStationApp()) return;
+    if (isStationShellApp()) return;
     if (shouldDeferSessionClear()) return;
     var sess = readParentSession();
     if (!sess || !sess.token || !frame) return;

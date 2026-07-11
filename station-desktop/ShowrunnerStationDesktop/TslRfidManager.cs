@@ -460,6 +460,11 @@ public sealed class TslRfidManager : IDisposable
         return JsonSerializer.Serialize(list);
     }
 
+    public void ClearPendingScans()
+    {
+        while (_pendingScans.TryDequeue(out _)) { }
+    }
+
     public string CurrentConfigJson()
     {
         var live = _connected && _linkState == "live";

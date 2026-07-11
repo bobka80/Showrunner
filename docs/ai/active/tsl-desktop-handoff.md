@@ -4,7 +4,7 @@
 
 **Parent campaign:** [rfid-station-profiles.md](rfid-station-profiles.md) · **App readme:** [station-desktop/README.md](../../../station-desktop/README.md) · **Vendor reference only:** [stage-desktop-info/README.md](../../../stage-desktop-info/README.md)
 
-**Last updated:** 2026-07-11 · **Director habit:** always launch via **`station-desktop/RUN-STATION.bat`** (never double-click a random exe in an old publish folder).
+**Last updated:** 2026-07-11 (v0.1.29 / GAS v520) · **Director habit:** always launch via **`station-desktop/RUN-STATION.bat`** (never double-click a random exe in an old publish folder).
 
 ---
 
@@ -40,8 +40,8 @@ Requires **.NET 8 SDK** on the gate PC for auto-build. If SDK is missing, the ba
 
 | Layer | Version | Notes |
 |-------|---------|--------|
-| **GAS (web app)** | **516** | Includes live-feed-before-dedup + desktop bridge poll fix in `11_Station_Shell.html` |
-| **Desktop EXE** | **0.1.25** | Graceful exit sleep+disconnect; connect sweep timeout; dispose audit log |
+| **GAS (web app)** | **520** | Bootloader early feed + pending queue; full shell in LogicPayload |
+| **Desktop EXE** | **0.1.29** | BridgeShimScript = station early boot + live feed shim before LogicPayload; no early-return on re-inject |
 | **Hosting** | `sm-showrunner-97405.web.app` | Firebase shell; `host-boot.js` defines `showrunnerStationDeliverScan` |
 | **TSL profile layout** | `tsl_dock_desktop` | Assigned in admin station profiles to this device account |
 | **Chainway APK** | separate track | `station-android/` — not this handoff |
