@@ -523,7 +523,7 @@ public partial class MainWindow : Window
         try
         {
             var raw = await gasFrame.ExecuteScriptAsync(js);
-            ScanDiagnostics.Log("WEB", pass + ": GAS " + Trunc(UnwrapScriptResult(raw), 160));
+            ScanDiagnostics.Log("WEB", pass + ": GAS " + Trunc(UnwrapScriptResult(raw), 220));
         }
         catch (Exception ex)
         {
@@ -758,6 +758,15 @@ public partial class MainWindow : Window
               return list;
             }
             if (!/ShowrunnerStation/i.test(navigator.userAgent || '')) return null;
+            var host = document.getElementById('station-scan-feed');
+            if (host) {
+              list = document.createElement('div');
+              list.id = 'station-scan-feed-list';
+              list.className = 'station-scan-feed__list';
+              host.appendChild(list);
+              __srHideFloatFeed_();
+              return list;
+            }
             if (document.getElementById('station-shell')) return null;
             var panel = document.getElementById('sr-desktop-scan-feed');
             if (!panel) {
@@ -777,7 +786,24 @@ public partial class MainWindow : Window
               return;
             }
             if (__srDedupeScan_(tag, tid)) return;
-            var list = __srEnsureFeedList_();
+            var t = String(tag || ''), i = String(tid || '');
+            window.stationRecentScans = window.stationRecentScans || [];
+            window.stationRecentScans.unshift({ tag: t, norm: __srNormEpc_(t), tid: i, ts: Date.now() });
+            while (window.stationRecentScans.length > 24) window.stationRecentScans.pop();
+            if (typeof window.stationRenderScanFeed_ === 'function') {
+              try { window.stationRenderScanFeed_(); __srHideFloatFeed_(); return; } catch (e) {}
+            }
+            var list = document.getElementById('station-scan-feed-list');
+            if (list && document.getElementById('station-shell')) {
+              __srHideFloatFeed_();
+              var rows = window.stationRecentScans.map(function(s) {
+                return '<div class="station-scan-feed__row is-unknown" title="' + __srShimEsc(s.tag) + '">'
+                  + '<span class="name">' + __srShimEsc(s.tag) + '</span><span class="time">now</span></div>';
+              });
+              list.innerHTML = rows.join('');
+              return;
+            }
+            list = __srEnsureFeedList_();
             if (!list) return;
             var empty = list.querySelector('.station-scan-feed__empty');
             if (empty) empty.remove();
@@ -807,14 +833,15 @@ public partial class MainWindow : Window
             };
             window.onStationRfidScan.__srDesktopShim = true;
           }
-          if (!window.stationMessageListenerBound) {
-            window.stationMessageListenerBound = true;
-            window.addEventListener('message', function(ev) {
+          if (!window.__srShimMessageBound) {
+            window.__srShimMessageBound = true;
+            window.__srShimMessageHandler = function(ev) {
               var d = ev && ev.data;
               if (d && d.type === 'SHOWRUNNER_RFID_SCAN' && typeof window.onStationRfidScan === 'function') {
                 window.onStationRfidScan(d.tag, d.tid || '');
               }
-            });
+            };
+            window.addEventListener('message', window.__srShimMessageHandler);
           }
           window.__srInjectScan = function(tag, tid) {
             var t = String(tag || ''), i = String(tid || '');

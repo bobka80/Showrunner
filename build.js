@@ -63,6 +63,13 @@ function build() {
       // Minimal live strip before async LogicPayload (desktop inject may arrive later).
       window.__srPendingRfidScans = window.__srPendingRfidScans || [];
       function __srBootFeed(tag, tid) {
+        var t = String(tag || ''), i = String(tid || '');
+        window.stationRecentScans = window.stationRecentScans || [];
+        window.stationRecentScans.unshift({ tag: t, norm: t.toUpperCase().replace(/[^A-F0-9]/g, ''), tid: i, ts: Date.now() });
+        while (window.stationRecentScans.length > 24) window.stationRecentScans.pop();
+        if (typeof window.stationRenderScanFeed_ === 'function') {
+          try { window.stationRenderScanFeed_(); return; } catch (e) {}
+        }
         var list = document.getElementById('station-scan-feed-list');
         if (!list) return;
         var esc = function(v) { return String(v == null ? '' : v).replace(/[<&>]/g, function(c) { return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;'); }); };
@@ -86,8 +93,8 @@ function build() {
         };
         window.onStationRfidScan.__srEarlyBoot = true;
       }
-      if (!window.stationMessageListenerBound) {
-        window.stationMessageListenerBound = true;
+      if (!window.__srEarlyBootMsgBound) {
+        window.__srEarlyBootMsgBound = true;
         window.addEventListener('message', function(ev) {
           var d = ev && ev.data;
           if (d && d.type === 'SHOWRUNNER_RFID_SCAN' && typeof window.onStationRfidScan === 'function') {
