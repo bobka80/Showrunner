@@ -5,12 +5,10 @@ function stationHandleRfidScan_(rawTag, rawTid) {
   const tag = String(rawTag || '').trim();
   let tid = String(rawTid || '').trim();
   if (!tid && window.stationLastScanTid) tid = String(window.stationLastScanTid).trim();
-  if (!tag) return;
+  if (!tag || window.stationScanBusy) return;
   if (!window.IS_STATION_DEVICE) return;
 
   const host = stationReadHostSession_();
-  // scanBusy gates badge-in retries only — never block equipment reads after someone is hosted.
-  if (window.stationScanBusy && !host) return;
 
   if (host) {
     stationResetHostIdleTimer_();
@@ -165,7 +163,7 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   if (norm) {
     var now = Date.now();
     var priorTid = String(window.stationLastScanTid || '').trim();
-    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < STATION_SCAN_DELIVERY_DEDUPE_MS;
+    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500;
     // Drop duplicate EPC-only delivery when we already handled this scan; allow upgrade when TID arrives.
     if (sameEpcRecent && (priorTid || !tid)) return;
     window.stationLastScanNorm = norm;

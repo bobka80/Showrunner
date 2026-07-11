@@ -1,29 +1,35 @@
 /**
- * Regenerate station logic modules from v530 monolith (757bf35) in monolith eval order.
- * Splitting by feature reordered top-level assignments vs the single script — this restores
- * byte-identical concatenation when Index includes follow SEGMENTS below.
+ * Regenerate station shell modules from the live monolith in monolith document order.
+ * Logic segments preserve eval order (Core/RFID interleaved; Init last).
  *
  * Run: node scripts/regen-station-split-order.js
  */
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
-const monoLines = execSync('git show 757bf35:11_Station_Shell.html', { encoding: 'utf8', cwd: root })
-  .split(/\r?\n/);
+const monoPath = path.join(root, '11_Station_Shell.html');
+const monoLines = fs.readFileSync(monoPath, 'utf8').split(/\r?\n/);
 
 function slice(a, b) {
   return monoLines.slice(a - 1, b).join('\n') + '\n';
 }
 
-function writeScript(name, body, head, foot) {
-  const out = (head || '') + body + (foot || '');
-  fs.writeFileSync(path.join(root, name), out, 'utf8');
-  console.log('wrote ' + name + ' (' + out.split(/\r?\n/).length + ' lines)');
+function writeFile(name, content) {
+  fs.writeFileSync(path.join(root, name), content, 'utf8');
+  console.log('wrote ' + name + ' (' + content.split(/\r?\n/).length + ' lines)');
 }
 
-/** Monolith-order segments (1140–4030 inclusive, gaps attached to following chunk). */
+/** Markup + CSS — same order as monolith lines 1–1137. */
+const MARKUP = [
+  { file: '11b_Station_Styles.html', a: 1, b: 876, head: '', foot: '' },
+  { file: '11j_Station_Phone_UI.html', a: 877, b: 926, head: '<!-- @INDEX: STATION -> Phone sled shell markup -->\n', foot: '' },
+  { file: '11i_Station_Settings.html', a: 927, b: 1070, head: '<!-- @INDEX: STATION -> Settings overlay markup -->\n', foot: '' },
+  { file: '11h_Station_Project.html', a: 1071, b: 1081, head: '<!-- @INDEX: STATION -> Project picker markup -->\n', foot: '' },
+  { file: '11f_Station_Vault.html', a: 1082, b: 1137, head: '<!-- @INDEX: STATION -> Vault overlay markup -->\n', foot: '' },
+];
+
+/** Logic — monolith script lines 1140–4030 in eval order. */
 const SEGMENTS = [
   { file: '11c_Station_Core.html', a: 1140, b: 1315, head: '<!-- @INDEX: STATION -> Core host session, RBAC (1/5) -->\n<script>\n', foot: '</script>\n' },
   { file: '11d_Station_Rfid.html', a: 1316, b: 1440, head: '<!-- @INDEX: STATION -> RFID helpers (1/3) -->\n<script>\n', foot: '</script>\n' },
@@ -42,18 +48,40 @@ const SEGMENTS = [
   { file: '11c_Station_Init.html', a: 3897, b: 4030, head: '<!-- @INDEX: STATION -> Bootstrap init (5/5) — must stay last in logic chain -->\n<script>\n', foot: '</script>\n' },
 ];
 
-SEGMENTS.forEach(function(seg) {
-  writeScript(seg.file, slice(seg.a, seg.b), seg.head, seg.foot);
+/** Index include order for Phase A (no 11k/11l — Phase B only). */
+const INDEX_INCLUDES = [
+  '11b_Station_Styles',
+  '11j_Station_Phone_UI',
+  '11i_Station_Settings',
+  '11h_Station_Project',
+  '11f_Station_Vault',
+].concat(SEGMENTS.map(function(s) { return s.file.replace('.html', ''); }));
+
+MARKUP.forEach(function(seg) {
+  writeFile(seg.file, seg.head + slice(seg.a, seg.b) + seg.foot);
 });
 
-// Verify concatenated script body matches monolith 1140–4030
-let rebuilt = '';
 SEGMENTS.forEach(function(seg) {
-  rebuilt += slice(seg.a, seg.b);
+  writeFile(seg.file, seg.head + slice(seg.a, seg.b) + seg.foot);
 });
-const orig = monoLines.slice(1139, 4030).join('\n') + '\n';
-if (orig !== rebuilt) {
-  console.error('VERIFY FAILED: regen does not match monolith script body');
+
+let rebuiltMarkup = '';
+MARKUP.forEach(function(seg) { rebuiltMarkup += slice(seg.a, seg.b); });
+const origMarkup = monoLines.slice(0, 1137).join('\n') + '\n';
+if (origMarkup !== rebuiltMarkup) {
+  console.error('VERIFY FAILED: markup regen does not match monolith lines 1–1137');
   process.exit(1);
 }
-console.log('VERIFY OK: regen matches monolith script lines 1140–4030 exactly');
+
+let rebuiltLogic = '';
+SEGMENTS.forEach(function(seg) { rebuiltLogic += slice(seg.a, seg.b); });
+const origLogic = monoLines.slice(1139, 4030).join('\n') + '\n';
+if (origLogic !== rebuiltLogic) {
+  console.error('VERIFY FAILED: logic regen does not match monolith script lines 1140–4030');
+  process.exit(1);
+}
+
+console.log('VERIFY OK: markup lines 1–1137 match monolith');
+console.log('VERIFY OK: logic lines 1140–4030 match monolith');
+console.log('Index include order (' + INDEX_INCLUDES.length + ' modules):');
+INDEX_INCLUDES.forEach(function(name) { console.log('  ' + name); });

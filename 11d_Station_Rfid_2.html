@@ -63,7 +63,7 @@ function stationPushScanFeed_(tag, tidOpt) {
   if (window.stationRecentScans.length) {
     const last = window.stationRecentScans[0];
     const lastNorm = last.norm || stationNormalizeEpc_(last.tag);
-    const sameRecent = lastNorm === norm && (now - (last.ts || 0)) < STATION_SCAN_DELIVERY_DEDUPE_MS;
+    const sameRecent = lastNorm === norm && (now - (last.ts || 0)) < 1500;
     if (sameRecent && (last.tid || !tid)) return;
   }
   window.stationRecentScans.unshift({ tag: clean, norm: norm, tid: tid, ts: now });

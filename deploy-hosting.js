@@ -17,6 +17,8 @@ const https = require('https');
 const root = path.join(__dirname);
 const hostingDir = path.join(root, 'push-hosting');
 const manifestPath = path.join(hostingDir, 'public', 'downloads', 'station-manifest.json');
+const apkPath = path.join(hostingDir, 'public', 'downloads', 'showrunner-station.bin');
+const MIN_APK_BYTES = 1024 * 1024; // 1 MB — real debug APK is ~11 MB; 0-byte uploads break /station-app
 const DEPLOY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes: generous, but never infinite.
 
 function readLocalManifest() {
@@ -48,6 +50,59 @@ function fetchJson(url) {
       });
     }).on('error', () => resolve({ status: 0, json: null }));
   });
+}
+
+/** APK zips start with PK — quick sanity check without downloading 12 MB. */
+function fetchApkMagicOk(url) {
+  return new Promise((resolve) => {
+    https.get(url, (res) => {
+      const chunks = [];
+      let size = 0;
+      res.on('data', (c) => {
+        chunks.push(c);
+        size += c.length;
+        if (size >= 2) {
+          res.destroy();
+          const buf = Buffer.concat(chunks);
+          resolve({ status: res.statusCode, ok: buf[0] === 0x50 && buf[1] === 0x4b, bytesSeen: size });
+        }
+      });
+      res.on('end', () => {
+        const buf = Buffer.concat(chunks);
+        resolve({
+          status: res.statusCode,
+          ok: buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b,
+          bytesSeen: buf.length,
+        });
+      });
+    }).on('error', () => resolve({ status: 0, ok: false, bytesSeen: 0 }));
+  });
+}
+
+function assertLocalApkReady() {
+  if (!fs.existsSync(apkPath)) {
+    throw new Error(
+      'Missing push-hosting/public/downloads/showrunner-station.bin\n' +
+      '  Run: node build-station-apk.js "your release notes"\n' +
+      '  then re-run: node deploy-hosting.js'
+    );
+  }
+  const size = fs.statSync(apkPath).size;
+  if (size < MIN_APK_BYTES) {
+    throw new Error(
+      `APK file is too small (${size} bytes) — likely empty or corrupt.\n` +
+      '  Do NOT deploy. Rebuild with:\n' +
+      '    node build-station-apk.js "your release notes"\n' +
+      '  then re-run: node deploy-hosting.js'
+    );
+  }
+  const manifest = readLocalManifest();
+  if (manifest && manifest.sizeBytes && Math.abs(manifest.sizeBytes - size) > 4096) {
+    console.warn(
+      `[warn] APK size (${size}) differs from manifest sizeBytes (${manifest.sizeBytes}) — ` +
+      'updating manifest on next build-station-apk.js run.'
+    );
+  }
 }
 
 // Run `firebase deploy` so it can never hang on a prompt, with a live heartbeat
@@ -115,10 +170,34 @@ async function verifyLive() {
   const base = readHostingUrl();
   const url = `${base}/downloads/station-manifest.json?t=${Date.now()}`;
   console.log(`\n[verify] Checking live manifest: ${url}`);
+  const localApkSize = fs.existsSync(apkPath) ? fs.statSync(apkPath).size : 0;
   for (let attempt = 1; attempt <= 5; attempt++) {
     const { status, json } = await fetchJson(url);
     if (json && String(json.versionCode) === String(local.versionCode)) {
       console.log(`[verify] OK — live site serves v${json.versionName} (build ${json.versionCode}).`);
+      const liveSize = parseInt(json.sizeBytes, 10) || 0;
+      if (liveSize < MIN_APK_BYTES) {
+        console.warn(
+          `\n[verify] WARNING: live manifest sizeBytes=${liveSize} — APK on server is empty or corrupt.\n` +
+          '  Re-run: node build-station-apk.js "notes" && node deploy-hosting.js'
+        );
+        process.exitCode = 2;
+        return;
+      }
+      const apkUrl = `${base}/downloads/showrunner-station.bin?t=${Date.now()}`;
+      const magic = await fetchApkMagicOk(apkUrl);
+      if (magic.status !== 200 || !magic.ok) {
+        console.warn(
+          `\n[verify] WARNING: live APK failed sanity check (HTTP ${magic.status}).\n` +
+          '  Re-run: node build-station-apk.js "notes" && node deploy-hosting.js'
+        );
+        process.exitCode = 2;
+      } else {
+        console.log(
+          `[verify] OK — live APK ${(liveSize / 1024 / 1024).toFixed(2)} MB ` +
+          `(local ${(localApkSize / 1024 / 1024).toFixed(2)} MB).`
+        );
+      }
       return;
     }
     const got = json ? `v${json.versionName} (build ${json.versionCode})` : `HTTP ${status}`;
@@ -139,6 +218,7 @@ async function verifyLive() {
 
 async function main() {
   console.log('\n=== Firebase Hosting deploy ===\n');
+  assertLocalApkReady();
   execSync('node generate-icons.js', { cwd: hostingDir, stdio: 'inherit' });
   execSync('node push-hosting/prepare-hosting.js', { cwd: root, stdio: 'inherit' });
   await firebaseDeploy();

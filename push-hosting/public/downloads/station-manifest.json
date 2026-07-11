@@ -1,14 +1,22 @@
 {
-  "versionName": "0.1.51",
-  "versionCode": 53,
+  "versionName": "0.1.55",
+  "versionCode": 57,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-10T15:26:59.090Z",
+  "updatedAt": "2026-07-11T14:56:57.457Z",
   "sizeBytes": 12073677,
   "notes": [
-    "disconnect beep + no-host auto park (build 52)"
+    "Re-upload station APK after empty hosting file broke /station-app download"
   ],
   "history": [
+    {
+      "versionName": "0.1.55",
+      "versionCode": 57,
+      "date": "2026-07-11T14:56:57.457Z",
+      "notes": [
+        "Re-upload station APK after empty hosting file broke /station-app download"
+      ]
+    },
     {
       "versionName": "0.1.51",
       "versionCode": 53,
@@ -186,14 +194,6 @@
       "notes": [
         "Revert v483 direct-GAS",
         "restore hosting shell startup"
-      ]
-    },
-    {
-      "versionName": "0.1.32",
-      "versionCode": 34,
-      "date": "2026-07-08T04:52:21.302Z",
-      "notes": [
-        "BLE decouple: GAS direct load, host session native persist, flap guard"
       ]
     }
   ]

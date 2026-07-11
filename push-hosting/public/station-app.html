@@ -197,20 +197,20 @@
           verLine.textContent = 'Version ' + name + code;
           renderChangelog(m);
 
-          return fetch(APK_URL, { method: 'HEAD', cache: 'no-store' })
-            .then(function (head) {
-              if (!head.ok || !published) {
-                btn.disabled = true;
-                btn.textContent = 'APK not published yet';
-                setStatus('Ask ops to run build-station-apk.js and deploy hosting.', 'warn');
-                return;
-              }
-              btn.disabled = false;
-              btn.textContent = isAndroid ? 'Download & install' : 'Download APK';
-              if (isAndroid && autoInstall) {
-                setTimeout(startDownload, 600);
-              }
-            });
+          var apkBytes = (m && m.sizeBytes) ? parseInt(m.sizeBytes, 10) : 0;
+          if (!published || apkBytes < 1000000) {
+            btn.disabled = true;
+            btn.textContent = 'APK not published yet';
+            setStatus(apkBytes < 1000000 && published
+              ? 'APK file on server is empty or corrupt — ask ops to rebuild and deploy hosting.'
+              : 'Ask ops to run build-station-apk.js and deploy hosting.', 'warn');
+            return;
+          }
+          btn.disabled = false;
+          btn.textContent = isAndroid ? 'Download & install' : 'Download APK';
+          if (isAndroid && autoInstall) {
+            setTimeout(startDownload, 600);
+          }
         })
         .catch(function () {
           verLine.textContent = 'Version unknown';
