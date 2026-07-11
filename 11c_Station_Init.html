@@ -49,9 +49,14 @@ function initStationShell_() {
   // strand the initial screen. Everything after this is wrapped so boot failures surface on-screen
   // instead of leaving a blank kiosk.
   try {
-    document.documentElement.classList.add('station-device-root');
-    const shell = document.getElementById('station-shell');
-    if (shell) shell.style.display = 'flex';
+    if (typeof window.stationActiveUiSkin_ === 'function' && window.stationActiveUiSkin_() === 'dock_panel') {
+      document.documentElement.classList.add('station-dock-root');
+      if (typeof window.stationInitDockUi_ === 'function') window.stationInitDockUi_();
+    } else {
+      document.documentElement.classList.add('station-device-root');
+      const shell = document.getElementById('station-shell');
+      if (shell) shell.style.display = 'flex';
+    }
   } catch (e) { /* ignore */ }
   try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
   if (stationIsDesktopKiosk_()) {

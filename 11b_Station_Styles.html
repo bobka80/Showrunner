@@ -872,5 +872,220 @@ html.station-device-root #station-device-controls { display: flex; }
   color: #10b981;
   min-height: 16px;
 }
+
+/* --- Dock panel (desktop station): 2/3 workspace + 1/3 scan rail, no sidebar --- */
+html.station-dock-root .dashboard,
+html.station-dock-root #mobile-dashboard,
+html.station-dock-root #sr-hosting-only-banner,
+html.station-dock-root #floating-bell-container {
+  display: none !important;
+}
+html.station-dock-root,
+html.station-dock-root body {
+  overflow: hidden;
+  height: 100%;
+}
+html.station-dock-root #station-shell {
+  display: none !important;
+}
+#station-dock-shell {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  flex-direction: row;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+}
+html.station-dock-root #station-dock-shell {
+  display: flex;
+}
+.station-dock-workspace {
+  flex: 2 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #27272a;
+  background: #0a0a0c;
+}
+.station-dock-workspace__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #27272a;
+  flex-shrink: 0;
+}
+.station-dock-workspace__title {
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.station-dock-host-prompt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+.station-dock-host-prompt__label {
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
+}
+.station-dock-host-prompt__hint {
+  font-size: 14px;
+  color: #a1a1aa;
+}
+.station-dock-home {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.station-dock-project-status {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #a1a1aa;
+  text-align: center;
+  flex-shrink: 0;
+}
+.station-dock-project-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-dock-project-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin: 0;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1a1a1e;
+  color: #fff;
+  cursor: pointer;
+}
+.station-dock-project-card:hover {
+  background: #222228;
+}
+.station-dock-project-card__title {
+  font-size: 16px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.station-dock-project-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+.station-dock-project-empty {
+  color: #71717a;
+  text-align: center;
+  padding: 24px;
+}
+.station-dock-scan-rail {
+  flex: 1 1 0;
+  min-width: calc(260px * var(--station-ui-scale, 1));
+  max-width: 33.333%;
+  display: flex;
+  flex-direction: column;
+  background: #111114;
+}
+.station-dock-rail__top {
+  flex-shrink: 0;
+  border-bottom: 1px solid #27272a;
+}
+.station-dock-rail__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.station-dock-rail__foot {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid #27272a;
+}
+html.station-dock-root #station-btn-logout-host {
+  display: none;
+  width: 100%;
+  margin: 0;
+}
+html.station-dock-root #station-btn-scan-panel {
+  display: none !important;
+}
+html.station-dock-root #station-scan-panel {
+  display: flex !important;
+  position: static !important;
+  flex: 1;
+  min-height: 0;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  z-index: 1;
+}
+html.station-dock-root #station-scan-panel.is-open .station-scan-feed {
+  flex: 1;
+  min-height: 0;
+}
+html.station-dock-root #station-device-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  gap: 8px;
+}
+html.station-dock-root .station-shell-brand {
+  padding: 8px 12px 0;
+}
+html.station-dock-root #station-settings {
+  left: auto !important;
+  right: 0 !important;
+  width: 33.333% !important;
+  max-width: 33.333vw;
+}
+html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay {
+  display: flex !important;
+  left: 0 !important;
+  right: 33.333% !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  align-items: stretch;
+  justify-content: stretch;
+  z-index: 49000;
+  background: rgba(0, 0, 0, 0.35);
+}
+html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal {
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0;
+}
 </style>
 

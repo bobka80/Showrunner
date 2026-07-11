@@ -96,7 +96,8 @@ public sealed class TslRfidManager : IDisposable
             : $"Looking for TSL gun on {_manualPort}…");
 
         StartGunWorker();
-        _watchdog = new System.Threading.Timer(_ => WatchdogTick(), null, 0, WatchdogMs);
+        // Brief delay before first sweep — BT virtual COM needs a moment after process start / taskkill.
+        _watchdog = new System.Threading.Timer(_ => WatchdogTick(), null, 800, WatchdogMs);
         ConnectLockLog.Record("start", _portName, null, _readGate, "scanMode=" + _scanMode);
     }
 
@@ -143,6 +144,15 @@ public sealed class TslRfidManager : IDisposable
 
         if (_commanderLive)
         {
+            lock (_commandLock)
+            {
+                if (!_commander.IsConnected)
+                    _commanderLive = false;
+            }
+        }
+
+        if (_commanderLive)
+        {
             _connected = true;
             if (_linkState != "live")
             {
@@ -153,37 +163,18 @@ public sealed class TslRfidManager : IDisposable
         }
 
         _connected = false;
-        if (!_connecting)
-        {
-            _connecting = true;
-            new Thread(ConnectWatchdogWorker)
-            {
-                IsBackground = true,
-                Name = "TslConnectWatchdog",
-            }.Start();
-        }
-    }
+        if (_connecting) return;
 
-    /// <summary>Connect runs off the gun worker so a sleeping gun cannot freeze reads/shutdown.</summary>
-    private void ConnectWatchdogWorker()
-    {
-        Exception? error = null;
-        var worker = new Thread(() =>
+        _connecting = true;
+        RunGun(() =>
         {
             try { TryConnectFromWatchdog(); }
-            catch (Exception ex) { error = ex; }
-        })
-        {
-            IsBackground = true,
-            Name = "TslConnectWatchdog",
-        };
-        worker.Start();
-        var sweepMs = Math.Max(ConnectPortTimeoutMs * 2, 7000);
-        if (!worker.Join(sweepMs))
-            ConnectLockLog.Record("connect-sweep-timeout", _portName, false, _readGate, ">" + sweepMs + "ms");
-        else if (error != null)
-            ConnectLockLog.Record("connect-error", _portName, false, _readGate, error.Message);
-        _connecting = false;
+            catch (Exception ex)
+            {
+                ConnectLockLog.Record("connect-error", _portName, false, _readGate, ex.Message);
+            }
+            finally { _connecting = false; }
+        });
     }
 
     private void TryConnectFromWatchdog()
@@ -285,6 +276,12 @@ public sealed class TslRfidManager : IDisposable
                 ReadFirmware();
                 if (string.IsNullOrWhiteSpace(_firmware))
                 {
+                    // Gun may still be waking from sleep — one short retry before giving up on this port.
+                    Thread.Sleep(450);
+                    ReadFirmware();
+                }
+                if (string.IsNullOrWhiteSpace(_firmware))
+                {
                     _linkState = "disconnected";
                     PostStatus("Gun asleep on " + port + " — pull trigger to wake it");
                     ConnectLockLog.Record("connect-fail", port, false, _readGate, "version probe failed/asleep");
@@ -358,7 +355,13 @@ public sealed class TslRfidManager : IDisposable
         ConnectLockLog.Record("force-reconnect", _portName, null, _readGate, "user requested");
         PostStatus("Reconnecting…");
         _lastDetectLog = "";
-        RunGun(ForceReconnectCore);
+        if (_connecting) return;
+        _connecting = true;
+        RunGun(() =>
+        {
+            try { ForceReconnectCore(); }
+            finally { _connecting = false; }
+        });
     }
 
     private void ForceReconnectCore()
@@ -381,10 +384,7 @@ public sealed class TslRfidManager : IDisposable
         }
         Thread.Sleep(300);
         if (!_disposed)
-        {
-            _connecting = true;
-            new Thread(ConnectWatchdogWorker) { IsBackground = true, Name = "TslConnectWatchdog" }.Start();
-        }
+            TryConnectFromWatchdog();
     }
 
     public void SleepAndDisconnect()

@@ -81,5 +81,15 @@
     var d = window.stationActiveGunDriver_();
     return !!(d && d.caps && d.caps[name]);
   };
+
+  /** UI skin fork: phone sled kiosk vs gate-PC dock panel (desktop station). */
+  window.stationActiveUiSkin_ = function() {
+    try {
+      if (/ShowrunnerStationDesktop/i.test(navigator.userAgent || '')) return 'dock_panel';
+    } catch (e) { /* ignore */ }
+    var layout = window.stationActiveGunLayout_();
+    if (layout === 'tsl_dock_desktop' || layout === 'gate') return 'dock_panel';
+    return 'phone_sled';
+  };
 })();
 </script>

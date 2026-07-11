@@ -1,0 +1,268 @@
+<!-- @INDEX: STATION -> Dock panel navigation + layout glue (desktop only) -->
+<script>
+(function stationDockLogicInit_() {
+  if (!window.IS_STATION_DEVICE) return;
+
+  function dockSkin_() {
+    return (typeof window.stationActiveUiSkin_ === 'function' && window.stationActiveUiSkin_() === 'dock_panel');
+  }
+
+  function esc_(v) {
+    return String(v == null ? '' : v).replace(/[<&>"]/g, function(c) {
+      return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&amp;'));
+    });
+  }
+
+  window.stationInitDockUi_ = function() {
+    if (!dockSkin_()) return;
+    document.documentElement.classList.add('station-dock-root');
+    document.documentElement.classList.remove('station-device-root');
+    var phoneShell = document.getElementById('station-shell');
+    if (phoneShell) phoneShell.style.display = 'none';
+    var dockShell = document.getElementById('station-dock-shell');
+    if (dockShell) dockShell.style.display = 'flex';
+    stationDockMountScanRail_();
+    stationDockSyncWorkspace_();
+  };
+
+  window.stationRefreshDockUiSkin_ = function() {
+    if (dockSkin_()) window.stationInitDockUi_();
+  };
+
+  function stationDockMountScanRail_() {
+    if (window.__srDockScanMounted) return;
+    var railTop = document.getElementById('station-dock-rail-top');
+    var railBody = document.getElementById('station-dock-rail-body');
+    var railFoot = document.getElementById('station-dock-rail-foot');
+    if (!railTop || !railBody || !railFoot) return;
+
+    var brand = document.querySelector('.station-shell-brand');
+    var controls = document.getElementById('station-device-controls');
+    var panel = document.getElementById('station-scan-panel');
+    var logoutBtn = document.getElementById('station-btn-logout-host');
+    var scanBtn = document.getElementById('station-btn-scan-panel');
+
+    if (brand) railTop.appendChild(brand);
+    if (controls) railTop.appendChild(controls);
+    if (scanBtn) scanBtn.style.display = 'none';
+    if (panel) {
+      panel.classList.add('is-open');
+      panel.setAttribute('aria-hidden', 'false');
+      railBody.appendChild(panel);
+    }
+    if (logoutBtn) railFoot.appendChild(logoutBtn);
+
+    window.__srDockScanMounted = true;
+  }
+
+  function stationDockSyncWorkspace_() {
+    var host = (typeof stationReadHostSession_ === 'function') ? stationReadHostSession_() : null;
+    var prompt = document.getElementById('station-dock-host-prompt');
+    var home = document.getElementById('station-dock-home');
+    var backBtn = document.getElementById('station-dock-back-projects');
+    var title = document.getElementById('station-dock-workspace-title');
+    var paOpen = document.body.classList.contains('station-dock-pa-open');
+
+    if (paOpen) return;
+
+    if (!host) {
+      if (prompt) prompt.style.display = 'flex';
+      if (home) home.style.display = 'none';
+      if (backBtn) backBtn.style.display = 'none';
+      if (title) title.textContent = 'Projects';
+      return;
+    }
+
+    if (prompt) prompt.style.display = 'none';
+    if (home) home.style.display = 'flex';
+    if (backBtn) backBtn.style.display = 'none';
+    if (title) title.textContent = 'Projects';
+    stationDockLoadProjects_();
+  }
+
+  window.stationDockLoadProjects_ = function() {
+    var statusEl = document.getElementById('station-dock-project-status');
+    var listEl = document.getElementById('station-dock-project-list');
+    if (!listEl) return;
+
+    var host = (typeof stationReadHostSession_ === 'function') ? stationReadHostSession_() : null;
+    if (!host || !host.name) {
+      if (statusEl) statusEl.textContent = 'Scan your crew badge first.';
+      listEl.innerHTML = '';
+      return;
+    }
+
+    if (window.stationProjectsCache && window.stationProjectsCache.length &&
+        window.stationProjectsFor === host.name) {
+      stationDockRenderProjectList_(window.stationProjectsCache);
+      return;
+    }
+
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading projects…'; }
+    listEl.innerHTML = '';
+
+    google.script.run
+      .withSuccessHandler(function(payload) {
+        var projects = (payload && payload.projects) ? payload.projects : [];
+        if (typeof stationCacheProjectsPayload_ === 'function') stationCacheProjectsPayload_(payload, projects);
+        window.stationProjectsCache = projects;
+        window.stationProjectsFor = host.name;
+        stationDockRenderProjectList_(projects);
+      })
+      .withFailureHandler(function(err) {
+        if (statusEl) {
+          statusEl.style.display = 'block';
+          statusEl.textContent = 'Could not load projects: ' + (err && err.message ? err.message : String(err));
+        }
+      })
+      .getRefreshPayload(host.name);
+  };
+
+  window.stationDockRenderProjectList_ = function(projects) {
+    var statusEl = document.getElementById('station-dock-project-status');
+    var listEl = document.getElementById('station-dock-project-list');
+    if (!listEl) return;
+
+    var sorted = (projects || []).slice().sort(function(a, b) {
+      var d1 = a.start ? new Date(a.start) : new Date(8640000000000000);
+      var d2 = b.start ? new Date(b.start) : new Date(8640000000000000);
+      return d1 - d2;
+    });
+
+    var html = '';
+    sorted.forEach(function(p) {
+      var rawStatus = String(p.status || 'Draft').toUpperCase();
+      if (rawStatus === 'TRASHED') return;
+      var statusColor = '#a1a1aa';
+      if (rawStatus === 'APPROVED') statusColor = '#10b981';
+      else if (rawStatus === 'NOT APPROVED') statusColor = '#f97316';
+      else if (rawStatus === 'CANCELLED') statusColor = '#ef4444';
+      var dateStr = p.start ? new Date(p.start).toLocaleDateString() : 'No Date';
+      html += '<button type="button" class="station-dock-project-card" style="border-left:4px solid ' + statusColor + ';" '
+        + 'onclick="stationDockPickProject_(\'' + esc_(p.id) + '\')">'
+        + '<div class="station-dock-project-card__title">' + esc_(p.title || p.name || 'Untitled') + '</div>'
+        + '<div class="station-dock-project-card__meta">'
+        + '<span>📅 ' + esc_(dateStr) + '</span>'
+        + '<span style="color:' + statusColor + ';font-weight:700;">' + esc_(rawStatus) + '</span>'
+        + '</div></button>';
+    });
+
+    if (!html) html = '<div class="station-dock-project-empty">No upcoming events.</div>';
+    listEl.innerHTML = html;
+    if (statusEl) statusEl.style.display = 'none';
+  };
+
+  window.stationDockPickProject_ = function(pId) {
+    if (typeof window.openMobileProjectAssets !== 'function') {
+      if (typeof stationSetStatus_ === 'function') stationSetStatus_('Project view unavailable on this build.', 'error');
+      return;
+    }
+
+    var proj = (window.stationProjectsCache || []).find(function(p) { return String(p.id) === String(pId); });
+    if (!proj) {
+      try {
+        var ph = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+        if (ph && ph.projects) proj = ph.projects.find(function(p) { return String(p.id) === String(pId); });
+      } catch (e) { /* ignore */ }
+    }
+    if (!proj) {
+      if (typeof stationSetStatus_ === 'function') stationSetStatus_('Could not open: project data missing.', 'error');
+      window.stationProjectsCache = null;
+      window.stationProjectsFor = null;
+      return;
+    }
+
+    window.mobileCrewHubProject = proj;
+    window.mobileCrewHubProjectId = pId;
+    window.isProjectDirty = false;
+    if (typeof window.syncProjectEditorHiddenFields === 'function') {
+      try { window.syncProjectEditorHiddenFields(proj, pId); } catch (e) { /* ignore */ }
+    } else {
+      var fid = document.getElementById('edit-folder-id');
+      if (fid) fid.value = pId;
+    }
+
+    document.body.classList.add('station-dock-pa-open', 'mobile-pa-compact');
+    var home = document.getElementById('station-dock-home');
+    var prompt = document.getElementById('station-dock-host-prompt');
+    var backBtn = document.getElementById('station-dock-back-projects');
+    var title = document.getElementById('station-dock-workspace-title');
+    if (home) home.style.display = 'none';
+    if (prompt) prompt.style.display = 'none';
+    if (backBtn) backBtn.style.display = 'inline-flex';
+    if (title) title.textContent = proj.title || proj.name || 'Project';
+
+    if (typeof stationSetStatus_ === 'function') {
+      stationSetStatus_('Opening ' + (proj.title || proj.name || 'project') + '…', '');
+    }
+
+    try {
+      window.openMobileProjectAssets(pId);
+    } catch (e) {
+      stationDockBackToProjects_();
+      if (typeof stationSetStatus_ === 'function') {
+        stationSetStatus_('Could not open project: ' + (e && e.message ? e.message : String(e)), 'error');
+      }
+      return;
+    }
+
+    setTimeout(function() {
+      var ov = document.getElementById('project-assets-modal-overlay');
+      var opened = ov && ov.style.display !== 'none';
+      if (opened) stationDockWatchPaExit_();
+      else {
+        stationDockBackToProjects_();
+        if (typeof stationSetStatus_ === 'function') {
+          stationSetStatus_('Project didn’t open. Try again.', 'error');
+        }
+      }
+    }, 250);
+  };
+
+  window.stationDockBackToProjects_ = function() {
+    document.body.classList.remove('station-dock-pa-open', 'mobile-pa-compact');
+    window.mobilePaCompactActive = false;
+    var ov = document.getElementById('project-assets-modal-overlay');
+    if (ov) ov.style.display = 'none';
+    if (typeof window.closeMobilePaChoiceSheet === 'function') {
+      try { window.closeMobilePaChoiceSheet(); } catch (e) { /* ignore */ }
+    }
+    stationDockSyncWorkspace_();
+  };
+
+  function stationDockWatchPaExit_() {
+    if (window.stationDockPaWatchTimer) return;
+    window.stationDockPaWatchTimer = setInterval(function() {
+      var ov = document.getElementById('project-assets-modal-overlay');
+      var closed = !ov || ov.style.display === 'none';
+      if (closed || !document.body.classList.contains('mobile-pa-compact')) {
+        clearInterval(window.stationDockPaWatchTimer);
+        window.stationDockPaWatchTimer = null;
+        stationDockBackToProjects_();
+      }
+    }, 400);
+  }
+
+  var origRender = window.stationRenderShellState_;
+  if (typeof origRender === 'function' && !window.__srDockRenderWrapped) {
+    window.__srDockRenderWrapped = true;
+    window.stationRenderShellState_ = function() {
+      origRender.apply(this, arguments);
+      if (dockSkin_()) stationDockSyncWorkspace_();
+    };
+  }
+
+  var origBootstrap = window.stationApplyBootstrap_;
+  if (typeof origBootstrap === 'function' && !window.__srDockBootstrapWrapped) {
+    window.__srDockBootstrapWrapped = true;
+    window.stationApplyBootstrap_ = function(data) {
+      origBootstrap(data);
+      if (dockSkin_()) window.stationInitDockUi_();
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    if (dockSkin_()) window.stationInitDockUi_();
+  });
+})();
+</script>

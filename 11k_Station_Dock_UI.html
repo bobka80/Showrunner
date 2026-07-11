@@ -1,49 +1,22 @@
-<!-- @INDEX: STATION -> Dock panel shell (gate PC, high-res tablet) — scaffold for UI rework -->
-<style>
-#station-dock-shell {
-  display: none;
-  position: fixed;
-  inset: 0;
-  z-index: 49999;
-  pointer-events: none;
-}
-html.station-dock-root #station-dock-shell {
-  display: block;
-}
-html.station-dock-root #station-shell {
-  /* Phone sled chrome hidden when dock skin active — Phase B will refine layout. */
-}
-#station-dock-scan-rail {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: calc(280px * var(--station-ui-scale, 1));
-  pointer-events: auto;
-  display: none;
-}
-#station-dock-eject-host {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: none;
-  pointer-events: auto;
-}
-</style>
-<div id="station-dock-shell" aria-hidden="true">
-  <aside id="station-dock-scan-rail" aria-label="Live scans"></aside>
-  <div id="station-dock-eject-host"></div>
+<!-- @INDEX: STATION -> Dock panel shell (desktop gate PC) — 2/3 workspace + 1/3 scan rail -->
+<div id="station-dock-shell" aria-label="Desktop station">
+  <main id="station-dock-workspace" class="station-dock-workspace" aria-label="Projects and equipment">
+    <header id="station-dock-workspace-head" class="station-dock-workspace__head">
+      <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
+      <button type="button" id="station-dock-back-projects" class="btn-outline btn-sm station-dock-back-btn" style="display:none;" onclick="stationDockBackToProjects_()">← Projects</button>
+    </header>
+    <div id="station-dock-host-prompt" class="station-dock-host-prompt">
+      <div class="station-dock-host-prompt__label">Waiting for host</div>
+      <div class="station-dock-host-prompt__hint">Scan your crew badge on the gun</div>
+    </div>
+    <div id="station-dock-home" class="station-dock-home" style="display:none;">
+      <div id="station-dock-project-status" class="station-dock-project-status">Loading projects…</div>
+      <div id="station-dock-project-list" class="station-dock-project-list"></div>
+    </div>
+  </main>
+  <aside id="station-dock-scan-rail" class="station-dock-scan-rail" aria-label="Live scans">
+    <div id="station-dock-rail-top" class="station-dock-rail__top"></div>
+    <div id="station-dock-rail-body" class="station-dock-rail__body"></div>
+    <div id="station-dock-rail-foot" class="station-dock-rail__foot"></div>
+  </aside>
 </div>
-<script>
-(function stationDockUiBootstrap_() {
-  if (!window.IS_STATION_DEVICE) return;
-  function applyDockRoot_() {
-    if (typeof window.stationActiveUiSkin_ !== 'function') return;
-    if (window.stationActiveUiSkin_() !== 'dock_panel') return;
-    document.documentElement.classList.add('station-dock-root');
-  }
-  document.addEventListener('DOMContentLoaded', applyDockRoot_);
-  window.stationRefreshDockUiSkin_ = applyDockRoot_;
-})();
-</script>

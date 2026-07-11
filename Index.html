@@ -442,8 +442,13 @@
   const ACTIVE_USER_UID = (document.querySelector('meta[name="user-uid"]') || {}).content || '';
   const ACTIVE_USER_EMAIL = (document.querySelector('meta[name="user-email"]') || {}).content || '';
   window.stationEnsureDeviceMode_ = function() {
+    var dockUa = false;
+    try { dockUa = /ShowrunnerStationDesktop/i.test(navigator.userAgent || ''); } catch (e) { /* ignore */ }
     if (window.IS_STATION_DEVICE) {
-      try { document.documentElement.classList.add('station-device-root'); } catch (e) { /* ignore */ }
+      try {
+        if (dockUa) document.documentElement.classList.add('station-dock-root');
+        else document.documentElement.classList.add('station-device-root');
+      } catch (e) { /* ignore */ }
       return true;
     }
     var meta = document.querySelector('meta[name="station-device"]');
@@ -451,7 +456,10 @@
     var fromUa = /ShowrunnerStation/i.test(navigator.userAgent || '');
     if (fromMeta || fromUa) {
       window.IS_STATION_DEVICE = true;
-      try { document.documentElement.classList.add('station-device-root'); } catch (e) { /* ignore */ }
+      try {
+        if (dockUa) document.documentElement.classList.add('station-dock-root');
+        else document.documentElement.classList.add('station-device-root');
+      } catch (e) { /* ignore */ }
       return true;
     }
     return false;
@@ -541,6 +549,8 @@
 <?!= include('11a_Station_Gun_Drivers'); ?>
 <?!= include('11b_Station_Styles'); ?>
 <?!= include('11j_Station_Phone_UI'); ?>
+<?!= include('11k_Station_Dock_UI'); ?>
+<?!= include('11l_Station_Dock_Scale'); ?>
 <?!= include('11i_Station_Settings'); ?>
 <?!= include('11h_Station_Project'); ?>
 <?!= include('11f_Station_Vault'); ?>
@@ -558,6 +568,7 @@
 <?!= include('11h_Station_Project_Logic_2'); ?>
 <?!= include('11c_Station_Core_4'); ?>
 <?!= include('11i_Station_Settings_Logic'); ?>
+<?!= include('11m_Station_Dock_Logic'); ?>
 <?!= include('11c_Station_Init'); ?>
 <!-- Phase A split: 11_Station_Shell.html monolith kept as regen reference; not included. -->
 <?!= include('01i_Desktop_Lock'); ?>
