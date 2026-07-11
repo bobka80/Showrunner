@@ -6281,6 +6281,21 @@ html.station-device-root #station-device-controls { display: flex; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.station-scan-feed__identity {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.station-scan-feed__identity .name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.station-scan-feed__identity .unit {
+  flex-shrink: 0;
+  margin-left: 0;
+}
 .station-scan-feed__row .unit {
   font-family: monospace;
   font-size: 11px;
@@ -6860,30 +6875,66 @@ html.station-dock-root #station-shell {
   position: fixed;
   inset: 0;
   z-index: 50000;
-  flex-direction: row;
+  flex-direction: column;
   background: var(--bg-dark, #0a0a0c);
   color: var(--text-main, #f4f4f5);
   font-family: Inter, sans-serif;
+  --station-dock-head-h: 48px;
 }
 html.station-dock-root #station-dock-shell {
   display: flex;
+}
+.station-dock-unified-head {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-height: var(--station-dock-head-h);
+  border-bottom: 1px solid #27272a;
+  background: #111114;
+}
+.station-dock-unified-head__left {
+  flex: 2 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-right: 1px solid #27272a;
+}
+.station-dock-unified-head__right {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 33.333%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+}
+.station-dock-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
 }
 .station-dock-workspace {
   flex: 2 1 0;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #27272a;
+  position: relative;
   background: #0a0a0c;
+  font-size: 100%;
 }
-.station-dock-workspace__head {
+.station-dock-workspace[data-dock-scale="125"] { font-size: 125%; }
+.station-dock-workspace[data-dock-scale="150"] { font-size: 150%; }
+.station-dock-workspace[data-dock-scale="175"] { font-size: 175%; }
+.station-dock-workspace__content {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #27272a;
-  flex-shrink: 0;
+  flex-direction: column;
+  overflow: hidden;
 }
 .station-dock-workspace__title {
   font-size: 16px;
@@ -6891,6 +6942,70 @@ html.station-dock-root #station-dock-shell {
   color: #fff;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+.station-dock-workspace__foot {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-top: 1px solid #27272a;
+  background: #0d0d10;
+}
+.station-dock-app-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #a1a1aa;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.station-dock-app-settings-btn:hover {
+  color: #fff;
+  border-color: #52525b;
+}
+.station-dock-app-settings {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 52px;
+  z-index: 10;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.station-dock-app-settings__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f97316;
+}
+.station-dock-app-settings__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #e4e4e7;
+}
+.station-dock-app-settings__field select {
+  min-width: 88px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: #0a0a0c;
+  color: #fff;
+  font-size: 13px;
 }
 .station-dock-host-prompt {
   flex: 1;
@@ -6967,16 +7082,17 @@ html.station-dock-root #station-dock-shell {
 }
 .station-dock-scan-rail {
   flex: 1 1 0;
-  min-width: calc(260px * var(--station-ui-scale, 1));
+  min-width: 260px;
   max-width: 33.333%;
   display: flex;
   flex-direction: column;
   background: #111114;
+  border-left: 1px solid #27272a;
+  font-size: 100%;
 }
-.station-dock-rail__top {
-  flex-shrink: 0;
-  border-bottom: 1px solid #27272a;
-}
+.station-dock-scan-rail[data-dock-scale="125"] { font-size: 125%; }
+.station-dock-scan-rail[data-dock-scale="150"] { font-size: 150%; }
+.station-dock-scan-rail[data-dock-scale="175"] { font-size: 175%; }
 .station-dock-rail__body {
   flex: 1;
   min-height: 0;
@@ -7015,21 +7131,31 @@ html.station-dock-root #station-scan-panel {
 html.station-dock-root #station-scan-panel.is-open .station-scan-feed {
   flex: 1;
   min-height: 0;
-}
-html.station-dock-root #station-device-controls {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  gap: 8px;
+  flex-direction: column;
+  border-bottom: none;
+}
+html.station-dock-root .station-scan-feed__list {
+  max-height: none;
+  flex: 1;
+  overflow-y: auto;
 }
 html.station-dock-root .station-shell-brand {
-  padding: 8px 12px 0;
+  padding: 0;
+  margin-right: auto;
+  min-width: 0;
+}
+html.station-dock-root #station-dock-head-right .station-ctrl-cog {
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+html.station-dock-root #station-device-controls {
+  display: none !important;
 }
 html.station-dock-root #station-settings {
   left: auto !important;
   right: 0 !important;
+  top: var(--station-dock-head-h) !important;
   width: 33.333% !important;
   max-width: 33.333vw;
 }
@@ -7037,7 +7163,7 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay {
   display: flex !important;
   left: 0 !important;
   right: 33.333% !important;
-  top: 0 !important;
+  top: var(--station-dock-head-h) !important;
   bottom: 0 !important;
   width: auto !important;
   height: auto !important;
@@ -7111,36 +7237,59 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
 
 <!-- @INDEX: STATION -> Dock panel shell (desktop gate PC) — 2/3 workspace + 1/3 scan rail -->
 <div id="station-dock-shell" aria-label="Desktop station">
-  <main id="station-dock-workspace" class="station-dock-workspace" aria-label="Projects and equipment">
-    <header id="station-dock-workspace-head" class="station-dock-workspace__head">
+  <header id="station-dock-unified-head" class="station-dock-unified-head">
+    <div class="station-dock-unified-head__left">
       <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
       <button type="button" id="station-dock-back-projects" class="btn-outline btn-sm station-dock-back-btn" style="display:none;" onclick="stationDockBackToProjects_()">← Projects</button>
-    </header>
-    <div id="station-dock-host-prompt" class="station-dock-host-prompt">
-      <div class="station-dock-host-prompt__label">Waiting for host</div>
-      <div class="station-dock-host-prompt__hint">Scan your crew badge on the gun</div>
     </div>
-    <div id="station-dock-home" class="station-dock-home" style="display:none;">
-      <div id="station-dock-project-status" class="station-dock-project-status">Loading projects…</div>
-      <div id="station-dock-project-list" class="station-dock-project-list"></div>
-    </div>
-  </main>
-  <aside id="station-dock-scan-rail" class="station-dock-scan-rail" aria-label="Live scans">
-    <div id="station-dock-rail-top" class="station-dock-rail__top"></div>
-    <div id="station-dock-rail-body" class="station-dock-rail__body"></div>
-    <div id="station-dock-rail-foot" class="station-dock-rail__foot"></div>
-  </aside>
+    <div id="station-dock-head-right" class="station-dock-unified-head__right" aria-label="Station device"></div>
+  </header>
+  <div class="station-dock-body">
+    <main id="station-dock-workspace" class="station-dock-workspace" aria-label="Projects and equipment">
+      <div class="station-dock-workspace__content">
+        <div id="station-dock-host-prompt" class="station-dock-host-prompt">
+          <div class="station-dock-host-prompt__label">Waiting for host</div>
+          <div class="station-dock-host-prompt__hint">Scan your crew badge on the gun</div>
+        </div>
+        <div id="station-dock-home" class="station-dock-home" style="display:none;">
+          <div id="station-dock-project-status" class="station-dock-project-status">Loading projects…</div>
+          <div id="station-dock-project-list" class="station-dock-project-list"></div>
+        </div>
+      </div>
+      <footer class="station-dock-workspace__foot">
+        <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn" onclick="stationDockToggleAppSettings_()" title="Display settings" aria-label="Display settings">&#9881; Display</button>
+      </footer>
+      <div id="station-dock-app-settings" class="station-dock-app-settings" style="display:none;" aria-hidden="true">
+        <div class="station-dock-app-settings__title">Display zoom</div>
+        <label class="station-dock-app-settings__field" for="station-dock-zoom-left">
+          <span>Left pane</span>
+          <select id="station-dock-zoom-left" onchange="stationDockApplyZoomLeft_(this.value)">
+            <option value="100">100%</option>
+            <option value="125">125%</option>
+            <option value="150">150%</option>
+            <option value="175">175%</option>
+          </select>
+        </label>
+        <label class="station-dock-app-settings__field" for="station-dock-zoom-right">
+          <span>Right pane (scans)</span>
+          <select id="station-dock-zoom-right" onchange="stationDockApplyZoomRight_(this.value)">
+            <option value="100">100%</option>
+            <option value="125">125%</option>
+            <option value="150">150%</option>
+            <option value="175">175%</option>
+          </select>
+        </label>
+        <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationDockToggleAppSettings_(false)">Done</button>
+      </div>
+    </main>
+    <aside id="station-dock-scan-rail" class="station-dock-scan-rail" aria-label="Live scans">
+      <div id="station-dock-rail-body" class="station-dock-rail__body"></div>
+      <div id="station-dock-rail-foot" class="station-dock-rail__foot"></div>
+    </aside>
+  </div>
 </div>
 
-<!-- @INDEX: STATION -> Dock panel UI scale (magnification presets) -->
-<style>
-html.station-dock-root {
-  --station-ui-scale: 1;
-}
-html.station-dock-root[data-ui-scale="125"] { --station-ui-scale: 1.25; }
-html.station-dock-root[data-ui-scale="150"] { --station-ui-scale: 1.5; }
-html.station-dock-root[data-ui-scale="175"] { --station-ui-scale: 1.75; }
-</style>
+<!-- @INDEX: STATION -> Dock panel per-pane zoom (left + right) -->
 
 
 <!-- @INDEX: STATION -> Settings overlay markup -->

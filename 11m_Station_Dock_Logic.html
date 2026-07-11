@@ -31,19 +31,19 @@
 
   function stationDockMountScanRail_() {
     if (window.__srDockScanMounted) return;
-    var railTop = document.getElementById('station-dock-rail-top');
+    var headRight = document.getElementById('station-dock-head-right');
     var railBody = document.getElementById('station-dock-rail-body');
     var railFoot = document.getElementById('station-dock-rail-foot');
-    if (!railTop || !railBody || !railFoot) return;
+    if (!headRight || !railBody || !railFoot) return;
 
     var brand = document.querySelector('.station-shell-brand');
-    var controls = document.getElementById('station-device-controls');
     var panel = document.getElementById('station-scan-panel');
     var logoutBtn = document.getElementById('station-btn-logout-host');
     var scanBtn = document.getElementById('station-btn-scan-panel');
+    var gunCog = document.getElementById('station-btn-settings-cog');
 
-    if (brand) railTop.appendChild(brand);
-    if (controls) railTop.appendChild(controls);
+    if (brand) headRight.appendChild(brand);
+    if (gunCog) headRight.appendChild(gunCog);
     if (scanBtn) scanBtn.style.display = 'none';
     if (panel) {
       panel.classList.add('is-open');
@@ -51,6 +51,8 @@
       railBody.appendChild(panel);
     }
     if (logoutBtn) railFoot.appendChild(logoutBtn);
+
+    if (typeof window.stationDockApplyAllZoom_ === 'function') window.stationDockApplyAllZoom_();
 
     window.__srDockScanMounted = true;
   }

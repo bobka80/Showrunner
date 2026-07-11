@@ -1,37 +1,67 @@
-<!-- @INDEX: STATION -> Dock panel UI scale (magnification presets) -->
-<style>
-html.station-dock-root {
-  --station-ui-scale: 1;
-}
-html.station-dock-root[data-ui-scale="125"] { --station-ui-scale: 1.25; }
-html.station-dock-root[data-ui-scale="150"] { --station-ui-scale: 1.5; }
-html.station-dock-root[data-ui-scale="175"] { --station-ui-scale: 1.75; }
-</style>
+<!-- @INDEX: STATION -> Dock panel per-pane zoom (left + right) -->
 <script>
 (function stationDockScaleInit_() {
-  var KEY = 'sm_station_ui_scale';
+  var KEY_LEFT = 'sm_station_dock_zoom_left';
+  var KEY_RIGHT = 'sm_station_dock_zoom_right';
   var PRESETS = { '100': 1, '125': 1.25, '150': 1.5, '175': 1.75 };
 
-  window.stationUiScalePreset_ = function() {
+  function dockSkin_() {
+    return typeof window.stationActiveUiSkin_ === 'function' && window.stationActiveUiSkin_() === 'dock_panel';
+  }
+
+  function readPreset_(key) {
     try {
-      var v = localStorage.getItem(KEY);
+      var v = localStorage.getItem(key);
       return (v && PRESETS[v]) ? v : '100';
     } catch (e) { return '100'; }
-  };
+  }
 
-  window.stationApplyUiScale_ = function(preset) {
+  window.stationDockZoomLeftPreset_ = function() { return readPreset_(KEY_LEFT); };
+  window.stationDockZoomRightPreset_ = function() { return readPreset_(KEY_RIGHT); };
+
+  window.stationDockApplyZoomLeft_ = function(preset) {
     var p = String(preset || '100');
     if (!PRESETS[p]) p = '100';
-    try { localStorage.setItem(KEY, p); } catch (e) { /* ignore */ }
-    if (typeof window.stationActiveUiSkin_ === 'function' &&
-        window.stationActiveUiSkin_() === 'dock_panel') {
-      document.documentElement.setAttribute('data-ui-scale', p);
+    try { localStorage.setItem(KEY_LEFT, p); } catch (e) { /* ignore */ }
+    var ws = document.getElementById('station-dock-workspace');
+    if (ws) ws.setAttribute('data-dock-scale', p);
+    var sel = document.getElementById('station-dock-zoom-left');
+    if (sel) sel.value = p;
+  };
+
+  window.stationDockApplyZoomRight_ = function(preset) {
+    var p = String(preset || '100');
+    if (!PRESETS[p]) p = '100';
+    try { localStorage.setItem(KEY_RIGHT, p); } catch (e) { /* ignore */ }
+    var rail = document.getElementById('station-dock-scan-rail');
+    if (rail) rail.setAttribute('data-dock-scale', p);
+    var sel = document.getElementById('station-dock-zoom-right');
+    if (sel) sel.value = p;
+  };
+
+  window.stationDockApplyAllZoom_ = function() {
+    if (!dockSkin_()) return;
+    window.stationDockApplyZoomLeft_(window.stationDockZoomLeftPreset_());
+    window.stationDockApplyZoomRight_(window.stationDockZoomRightPreset_());
+  };
+
+  window.stationDockToggleAppSettings_ = function(force) {
+    var panel = document.getElementById('station-dock-app-settings');
+    if (!panel) return;
+    var show = (force === true) ? true : (force === false) ? false : panel.style.display === 'none';
+    panel.style.display = show ? 'flex' : 'none';
+    panel.setAttribute('aria-hidden', show ? 'false' : 'true');
+    if (show) {
+      var l = document.getElementById('station-dock-zoom-left');
+      var r = document.getElementById('station-dock-zoom-right');
+      if (l) l.value = window.stationDockZoomLeftPreset_();
+      if (r) r.value = window.stationDockZoomRightPreset_();
     }
   };
 
   if (window.IS_STATION_DEVICE) {
     document.addEventListener('DOMContentLoaded', function() {
-      window.stationApplyUiScale_(window.stationUiScalePreset_());
+      window.stationDockApplyAllZoom_();
     });
   }
 })();
