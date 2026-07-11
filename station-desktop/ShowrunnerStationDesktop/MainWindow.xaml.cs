@@ -32,6 +32,9 @@ public partial class MainWindow : Window
     {
         try
         {
+            // Start the COM watchdog before WebView boot so gun connect is not blocked by shell init.
+            _rfid.Start();
+
             var env = await CoreWebView2Environment.CreateAsync(
                 null,
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ShowrunnerStation", "WebView2"));
@@ -55,7 +58,7 @@ public partial class MainWindow : Window
             if (!defaultUa.Contains("ShowrunnerStationDesktop", StringComparison.OrdinalIgnoreCase))
                 WebView.CoreWebView2.Settings.UserAgent = defaultUa + UserAgentSuffix;
 
-            _bridge = new StationBridge(_rfid, HideSplash, action => Dispatcher.Invoke(action));
+            _bridge = new StationBridge(_rfid, HideSplash);
 
             WebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
 
@@ -104,7 +107,6 @@ public partial class MainWindow : Window
             };
 
             WebView.Source = new Uri(ShowrunnerUrl);
-            _rfid.Start();
         }
         catch (Exception ex)
         {
@@ -150,20 +152,17 @@ public partial class MainWindow : Window
             var root = doc.RootElement;
             if (root.GetProperty("type").GetString() != "SR_STATION_GUN") return;
             var method = root.GetProperty("method").GetString();
-            Dispatcher.Invoke(() =>
+            switch (method)
             {
-                switch (method)
-                {
-                    case "reconnectGun":
-                        _rfid.ForceReconnect();
-                        RelayGunConfigToPage();
-                        break;
-                    case "sleepGun":
-                        _rfid.SleepAndDisconnect();
-                        RelayGunConfigToPage();
-                        break;
-                }
-            });
+                case "reconnectGun":
+                    _rfid.ForceReconnect();
+                    RelayGunConfigToPage();
+                    break;
+                case "sleepGun":
+                    _rfid.SleepAndDisconnect();
+                    RelayGunConfigToPage();
+                    break;
+            }
         }
         catch
         {
@@ -213,8 +212,7 @@ public partial class MainWindow : Window
                     DeliverScanToPage(epc, tid);
                 }
             }
-            else if (low.Contains("asleep") || low.Contains("reconnect") ||
-                     (low.Contains("connect") && !low.Contains("disconnect")))
+            else if (low.Contains("gun connected") || low.Contains("gun asleep") || low.StartsWith("reconnecting"))
             {
                 RelayGunConfigToPage();
             }
@@ -309,7 +307,9 @@ public partial class MainWindow : Window
           }
           function gunCmd(method) {
             var h = host();
-            try { if (h && typeof h[method] === 'function') { h[method](); return; } } catch (e) {}
+            if (h && typeof h[method] === 'function') {
+              try { h[method](); return; } catch (e) {}
+            }
             try {
               chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method }));
             } catch (e2) {}

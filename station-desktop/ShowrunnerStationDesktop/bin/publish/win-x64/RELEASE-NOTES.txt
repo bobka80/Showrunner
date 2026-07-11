@@ -1,3 +1,3 @@
-Showrunner Station Desktop v0.1.4
+Showrunner Station Desktop v0.1.5
 
-- Fix reconnect/sleep: SDK SleepCommand, WebView2 postMessage gun commands, UI-thread serial
+- Fix connect regression: remove UI-thread deadlock, start watchdog before WebView

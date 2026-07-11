@@ -67,6 +67,7 @@ public sealed class TslRfidManager : IDisposable
 
     public void Start()
     {
+        _userSleep = false;
         var prefs = DesktopPrefs.Load();
         // A COM port in prefs is an OVERRIDE only; blank means auto-detect the TSL gun.
         _manualPort = (prefs.ComPort ?? "").Trim();
@@ -201,7 +202,6 @@ public sealed class TslRfidManager : IDisposable
 
     public void ForceReconnect()
     {
-        // Manual reconnect clears user sleep so the watchdog can grab the gun after trigger wake.
         _userSleep = false;
         lock (_commandLock)
         {
@@ -221,7 +221,13 @@ public sealed class TslRfidManager : IDisposable
         }
         _lastDetectLog = "";
         PostStatus("Reconnecting…");
-        WatchdogTick();
+        // Run outside any in-flight watchdog connect (_connecting) — do not call WatchdogTick inline.
+        Task.Run(async () =>
+        {
+            await Task.Delay(300);
+            if (_disposed) return;
+            TryConnectFromWatchdog();
+        });
     }
 
     /// <summary>
@@ -335,7 +341,8 @@ public sealed class TslRfidManager : IDisposable
     {
         _beepEnabled = enabled;
         DesktopPrefs.SavePartial(p => p.Beep = _beepEnabled);
-        ApplyBeep();
+        lock (_commandLock)
+            ApplyBeep();
     }
 
     public void SetPollMs(int ms)
@@ -414,12 +421,11 @@ public sealed class TslRfidManager : IDisposable
         {
             ConfigureChainInventory();
             _commander.ExecuteCommand(_inventory, _inventory.Responder);
-            if (!_inventory.Response.IsSuccessful)
-                PostStatus("Inventory setup failed");
         }
         catch (Exception ex)
         {
-            PostStatus("Inventory setup: " + ex.Message);
+            // Non-fatal — switch-trigger inventory may still work with partial params.
+            PostStatus("Inventory seed: " + ex.Message);
         }
     }
 
