@@ -1,0 +1,92 @@
+<!-- @INDEX: STATION -> Shell state renderer (3/5) -->
+<script>
+
+function stationRenderShellState_() {
+  const host = stationReadHostSession_();
+  window.stationHostSession = host;
+  const stateLabel = document.getElementById('station-shell-state-label');
+  const prompt = document.getElementById('station-shell-prompt');
+  const hostNameEl = document.getElementById('station-shell-host-name');
+  const logoutHostBtn = document.getElementById('station-btn-logout-host');
+  const enrollBtn = document.getElementById('station-btn-enroll');
+  const hostInline = document.getElementById('station-shell-host-inline');
+  const projectBtn = document.getElementById('station-btn-project');
+  const vaultBtn = document.getElementById('station-btn-vault');
+
+  if (host) {
+    if (stateLabel) stateLabel.textContent = 'Hosted session';
+    if (prompt) prompt.style.display = 'none';
+    if (hostNameEl) {
+      hostNameEl.style.display = 'block';
+      hostNameEl.textContent = host.name;
+    }
+    if (hostInline) {
+      hostInline.style.display = 'inline';
+      hostInline.textContent = '— ' + host.name;
+    }
+    if (logoutHostBtn) logoutHostBtn.style.display = 'block';
+    if (enrollBtn) enrollBtn.style.display = 'none';
+    if (projectBtn) projectBtn.classList.remove('is-disabled');
+    if (vaultBtn) vaultBtn.classList.remove('is-disabled');
+    stationSetStatus_('Ready — ' + host.name + ' hosting.', 'ok');
+    stationResetHostIdleTimer_();
+  } else {
+    if (stateLabel) stateLabel.textContent = 'Waiting for host';
+    if (prompt) {
+      prompt.style.display = 'block';
+      prompt.textContent = 'Scan your crew badge';
+    }
+    if (hostNameEl) hostNameEl.style.display = 'none';
+    if (hostInline) { hostInline.style.display = 'none'; hostInline.textContent = ''; }
+    if (logoutHostBtn) logoutHostBtn.style.display = 'none';
+    if (enrollBtn) enrollBtn.style.display = 'none';
+    if (projectBtn) projectBtn.classList.add('is-disabled');
+    if (vaultBtn) vaultBtn.classList.add('is-disabled');
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    stationSetStatus_('', '');
+    stationClearHostIdleTimer_();
+    // No host → close any hosted-only overlays and stop recording.
+    if (typeof window.stationCloseVault === 'function') window.stationCloseVault();
+    if (typeof window.stationCloseProjectPicker === 'function') window.stationCloseProjectPicker();
+  }
+}
+
+function stationSetEnrollButton_(mode) {
+  const btn = document.getElementById('station-btn-enroll');
+  if (!btn) return;
+  if (mode === 'active') {
+    btn.textContent = 'CANCEL — scan the badge now…';
+    btn.classList.add('is-active');
+  } else {
+    btn.textContent = 'LINK MY RFID BADGE';
+    btn.classList.remove('is-active');
+  }
+}
+
+window.stationToggleEnroll = function() {
+  const host = stationReadHostSession_();
+  if (!host) return;
+  if (window.stationEnrollMode) {
+    window.stationEnrollMode = false;
+    stationSetEnrollButton_('idle');
+    stationSetStatus_('Enrollment cancelled.', '');
+    return;
+  }
+  window.stationEnrollMode = true;
+  stationSetEnrollButton_('active');
+  stationSetStatus_('Pull the trigger on the badge to link it to ' + host.name + '.', '');
+};
+
+function stationApplyBootstrap_(data) {
+  window.stationShellBootstrap = data;
+  const profEl = document.getElementById('station-shell-profile-name');
+  const layoutEl = document.getElementById('station-shell-layout-text');
+  // Device account name (e.g. CW1) — not the hardware profile label (e.g. Chainway).
+  if (profEl) profEl.textContent = data.deviceName || ACTIVE_USER_NAME || data.profileName || 'Station';
+  if (layoutEl) {
+    const layout = (data.layout || 'chainway_handheld').replace(/_/g, ' ');
+    layoutEl.textContent = layout.toUpperCase();
+  }
+}
+</script>

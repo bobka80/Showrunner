@@ -1,0 +1,76 @@
+<!-- @INDEX: STATION -> Live scan feed (2/3) -->
+<script>
+
+function stationSetLastScan_(tag) {
+  const el = document.getElementById('station-shell-last-scan');
+  if (!el) return;
+  el.textContent = tag ? ('Last scan: ' + tag) : '';
+}
+
+function stationRenderScanFeed_() {
+  const list = document.getElementById('station-scan-feed-list');
+  if (!list) return;
+  const scans = window.stationRecentScans || [];
+  if (!scans.length) {
+    list.innerHTML = '<span class="station-scan-feed__empty">Waiting for scans…</span>';
+    return;
+  }
+  const esc = function(v) {
+    return String(v == null ? '' : v).replace(/[<&>]/g, function(c) {
+      return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
+    });
+  };
+  const rows = scans.map(function(s) {
+    const time = stationFormatTime24_(s.ts);
+    var hit = stationResolveEpc_(s.tag);
+    if (!hit || !hit.name) {
+      var crewHit = stationLookupCrewHostLocal_(s.tag, s.tid || '');
+      if (crewHit.crew) hit = { kind: 'crew', name: crewHit.crew.name };
+    }
+    if (hit && hit.name) {
+      if (hit.kind === 'crew') {
+        return '<div class="station-scan-feed__row is-crew">'
+          + '<span class="name">' + esc(hit.name) + '</span>'
+          + '<span class="unit">crew</span>'
+          + '<span class="time">' + time + '</span></div>';
+      }
+      const unit = hit.unitNumber || hit.unitId || '';
+      const statusHtml = stationScanFeedStatusHtml_(hit, esc);
+      return '<div class="station-scan-feed__row">'
+        + '<span class="name">' + esc(hit.name) + '</span>'
+        + statusHtml
+        + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '')
+        + '<span class="time">' + time + '</span></div>';
+    }
+    return '<div class="station-scan-feed__row is-unknown" title="' + esc(s.tag) + '">'
+      + '<span class="name">' + esc(s.tag) + '</span>'
+      + '<span class="time">' + time + '</span></div>';
+  });
+  list.innerHTML = rows.join('');
+}
+
+window.stationRenderScanFeed_ = stationRenderScanFeed_;
+
+function stationPushScanFeed_(tag, tidOpt) {
+  const floatEl = document.getElementById('sr-desktop-scan-feed');
+  if (floatEl) floatEl.style.display = 'none';
+  const clean = String(tag || '').trim();
+  if (!clean) return;
+  const norm = stationNormalizeEpc_(clean);
+  const tid = String(tidOpt || '').trim();
+  const now = Date.now();
+  window.stationRecentScans = window.stationRecentScans || [];
+  if (window.stationRecentScans.length) {
+    const last = window.stationRecentScans[0];
+    const lastNorm = last.norm || stationNormalizeEpc_(last.tag);
+    const sameRecent = lastNorm === norm && (now - (last.ts || 0)) < 1500;
+    if (sameRecent && (last.tid || !tid)) return;
+  }
+  window.stationRecentScans.unshift({ tag: clean, norm: norm, tid: tid, ts: now });
+  if (window.stationRecentScans.length > STATION_SCAN_FEED_MAX) {
+    window.stationRecentScans.length = STATION_SCAN_FEED_MAX;
+  }
+  stationRenderScanFeed_();
+}
+window.stationPushScanFeed_ = stationPushScanFeed_;
+</script>

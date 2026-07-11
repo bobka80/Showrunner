@@ -1,0 +1,142 @@
+<!-- @INDEX: STATION -> Project picker logic (2/2) -->
+<script>
+
+window.stationCloseProjectPicker = function() {
+  const panel = document.getElementById('station-project-picker');
+  if (panel) panel.classList.remove('is-open');
+};
+
+function stationOpenProjectPicker_() {
+  const panel = document.getElementById('station-project-picker');
+  const statusEl = document.getElementById('station-project-picker-status');
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!panel) return;
+  panel.classList.add('is-open');
+
+  // Instant path: the host's projects were warmed on sign-in (same list as their personal profile).
+  if (window.stationProjectsCache && window.stationProjectsCache.length) {
+    stationRenderProjectList_(window.stationProjectsCache);
+    return;
+  }
+  if (listEl) listEl.innerHTML = '';
+  if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading projects…'; }
+
+  const host = stationReadHostSession_();
+  if (!host || !host.name) {
+    if (statusEl) statusEl.textContent = 'Scan your badge first.';
+    return;
+  }
+  // Fetch scoped to the HOST (person), never the device account — that's why it used to hang.
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      const projects = (payload && payload.projects) ? payload.projects : [];
+      stationCacheProjectsPayload_(payload, projects);
+      window.stationProjectsCache = projects;
+      window.stationProjectsFor = host.name;
+      if (panel.classList.contains('is-open')) stationRenderProjectList_(projects);
+    })
+    .withFailureHandler(function(err) {
+      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Could not load projects: ' + (err && err.message ? err.message : String(err)); }
+    })
+    .getRefreshPayload(host.name);
+}
+
+function stationRenderProjectList_(projects) {
+  const statusEl = document.getElementById('station-project-picker-status');
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!listEl) return;
+  const list = (projects || []).slice().sort(function(a, b) {
+    return String(a.start || '').localeCompare(String(b.start || ''));
+  });
+  if (!list.length) {
+    if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'No projects assigned to you.'; }
+    return;
+  }
+  if (statusEl) statusEl.style.display = 'none';
+  const esc = function(v) {
+    return String(v == null ? '' : v).replace(/[<&>"]/g, function(c) {
+      return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&amp;'));
+    });
+  };
+  listEl.innerHTML = list.map(function(p) {
+    const when = [p.start, p.end].filter(Boolean).join(' → ');
+    return '<button type="button" class="station-project-item" onclick="stationPickProject_(\'' + esc(p.id) + '\')">'
+      + '<div class="station-project-item__name">' + esc(p.title || p.name || 'Untitled') + '</div>'
+      + (when ? '<div class="station-project-item__meta">' + esc(when) + '</div>' : '')
+      + '</button>';
+  }).join('');
+}
+
+window.stationPickProject_ = function(pId) {
+  stationCloseProjectPicker();
+  if (typeof window.openMobileProjectAssets !== 'function') {
+    stationSetStatus_('Project view unavailable on this build.', 'error');
+    return;
+  }
+  // Resolve the picked project from our cache (fall back to the phantom payload the phone uses).
+  let proj = (window.stationProjectsCache || []).find(function(p) { return String(p.id) === String(pId); });
+  if (!proj) {
+    try {
+      const ph = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+      if (ph && ph.projects) proj = ph.projects.find(function(p) { return String(p.id) === String(pId); });
+    } catch (e) { /* ignore */ }
+  }
+  if (!proj) {
+    // No project object anywhere → openMobileProjectAssets would just toast and bail. Say so.
+    stationSetStatus_('Could not open: project data missing. Reopen the list and try again.', 'error');
+    window.stationProjectsCache = null; window.stationProjectsFor = null; // force a fresh fetch next time
+    return;
+  }
+  // Pre-seed the project object + hidden fields so openProjectAssetsModal doesn't bail on an
+  // empty edit-folder-id (the station has no calendar for resolveMobileProject to fall back on).
+  window.mobileCrewHubProject = proj;
+  window.mobileCrewHubProjectId = pId;
+  window.isProjectDirty = false;
+  if (typeof window.syncProjectEditorHiddenFields === 'function') {
+    try { window.syncProjectEditorHiddenFields(proj, pId); } catch (e) { /* ignore */ }
+  } else {
+    const fid = document.getElementById('edit-folder-id');
+    if (fid) fid.value = pId;
+  }
+
+  const shell = document.getElementById('station-shell');
+  if (shell) shell.style.display = 'none';
+  stationSetStatus_('Opening ' + (proj.title || proj.name || 'project') + '…', '');
+  try {
+    window.openMobileProjectAssets(pId);
+  } catch (e) {
+    if (shell) shell.style.display = 'flex';
+    document.body.classList.remove('mobile-pa-compact');
+    stationSetStatus_('Could not open project: ' + (e && e.message ? e.message : String(e)), 'error');
+    return;
+  }
+  // openMobileProjectAssets can bail *silently* (a toast, no throw) if it can't resolve the
+  // project — the overlay stays hidden and the user sees a blank screen. Detect that, recover
+  // the shell, and report it instead of getting stuck.
+  setTimeout(function() {
+    const ov = document.getElementById('project-assets-modal-overlay');
+    const opened = ov && ov.style.display !== 'none';
+    if (opened) {
+      stationWatchPaExit_();
+    } else {
+      if (shell) shell.style.display = 'flex';
+      document.body.classList.remove('mobile-pa-compact');
+      stationSetStatus_('Project didn’t open (equipment list unavailable for it). Try again.', 'error');
+    }
+  }, 250);
+};
+
+/** Restore the station shell once the phone PA compact view is closed (any exit path). */
+function stationWatchPaExit_() {
+  if (window.stationPaWatchTimer) return;
+  window.stationPaWatchTimer = setInterval(function() {
+    if (!document.body.classList.contains('mobile-pa-compact')) {
+      clearInterval(window.stationPaWatchTimer);
+      window.stationPaWatchTimer = null;
+      const shell = document.getElementById('station-shell');
+      if (shell) shell.style.display = 'flex';
+      stationRenderShellState_();
+    }
+  }, 400);
+}
+</script>

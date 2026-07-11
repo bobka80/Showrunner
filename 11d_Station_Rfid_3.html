@@ -1,0 +1,259 @@
+<!-- @INDEX: STATION -> RFID scan routing + host login (3/3) -->
+<script>
+
+function stationHandleRfidScan_(rawTag, rawTid) {
+  const tag = String(rawTag || '').trim();
+  let tid = String(rawTid || '').trim();
+  if (!tid && window.stationLastScanTid) tid = String(window.stationLastScanTid).trim();
+  if (!tag || window.stationScanBusy) return;
+  if (!window.IS_STATION_DEVICE) return;
+
+  const host = stationReadHostSession_();
+
+  if (host) {
+    stationResetHostIdleTimer_();
+    stationSetLastScan_(tag);
+    const norm = stationNormalizeEpc_(tag);
+    const hostTag = stationNormalizeEpc_(host.rfidTag || '');
+    // Same badge as the current host → just keep the session alive (idle already reset above).
+    if (norm && hostTag && norm === hostTag) return;
+    // Different crew badge while someone is hosted → reject (must LOG OUT HOST / idle eject first).
+    const swap = stationLookupCrewHostLocal_(tag, tid);
+    if (swap.tidMismatch) {
+      stationSetStatus_('Badge chip ID does not match — possible cloned tag.', 'error');
+      return;
+    }
+    if (swap.tidMissing) {
+      stationSetStatus_('Gun did not read chip TID. Hold the badge still and scan again.', 'error');
+      return;
+    }
+    let scanIsCrewBadge = !!swap.crew;
+    if (!scanIsCrewBadge) {
+      const hit = stationResolveEpc_(tag);
+      if (hit && hit.kind === 'crew') scanIsCrewBadge = true; // known crew badge via equip map
+    }
+    if (scanIsCrewBadge) {
+      // Same person on a host record that carried no stored tag → don't bounce the session.
+      if (swap.crew && (
+        (host.uid && swap.crew.uid && String(host.uid) === String(swap.crew.uid)) ||
+        (!host.uid && host.name && swap.crew.name && host.name === swap.crew.name)
+      )) return;
+      // Hosted state machine: reject further host badges until explicit logout / idle eject.
+      stationSetStatus_(
+        host.name + ' is signed in — tap LOG OUT HOST first, then scan the next badge.',
+        'error'
+      );
+      return;
+    }
+    // Not a crew badge → equipment scan during an open checkout / existing behavior.
+    stationForwardCheckoutScan_(tag);
+    return;
+  }
+
+  stationBeginHostLogin_(tag, tid);
+}
+
+/**
+ * Optimistic badge-in: host instantly from the local crew cache when the EPC(+TID) pair is
+ * recognized, then let the server confirm. Only used when no host is signed in yet.
+ */
+function stationBeginHostLogin_(tag, tid) {
+  // Eject cooldown: swallow residual reads of the badge we JUST logged out so the eject sticks.
+  // A different badge falls through (norm mismatch) and re-hosting the same person is allowed again
+  // once the short window passes.
+  const cooldownNorm = stationNormalizeEpc_(tag);
+  if (cooldownNorm && cooldownNorm === window.stationEjectedHostNorm &&
+      Date.now() < (window.stationEjectCooldownUntil || 0)) {
+    stationSetLastScan_(tag);
+    stationSetStatus_('Logged out — scan again to sign back in.', '');
+    return;
+  }
+  const localLookup = stationLookupCrewHostLocal_(tag, tid);
+  let optimisticHost = null;
+  if (localLookup.tidMismatch) {
+    stationSetStatus_('Badge chip ID does not match — possible cloned tag.', 'error');
+    return;
+  }
+  if (localLookup.crew) {
+    optimisticHost = localLookup.crew;
+  } else if (localLookup.tidMissing) {
+    stationSetStatus_('Gun did not read chip TID. Hold the badge still and scan again.', 'error');
+    return;
+  }
+
+  window.stationScanBusy = true;
+  window.stationScanBusyAt = Date.now();
+  stationSetLastScan_(tag);
+
+  // Race guard — "eject beats the server". processStationRfidScan takes ~1s. If the operator logs
+  // the host out (or scans a different badge) BEFORE this reply lands, the confirmation must be
+  // ignored, otherwise the slow success handler re-writes the host and signs the ejected person
+  // straight back in. Every login and every eject bumps stationHostLoginSeq; a callback whose
+  // captured seq no longer matches is stale and does nothing.
+  const loginSeq = window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+
+  if (optimisticHost) {
+    stationWriteHostSession_(optimisticHost);
+    stationRenderShellState_();
+    stationSetStatus_('Hosted as ' + optimisticHost.name + ' — confirming…', '');
+  } else {
+    stationSetStatus_('Looking up badge…', '');
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationScanBusy = false;
+      // Stale reply: operator ejected or switched badge while this was in flight → do not re-host.
+      if (loginSeq !== window.stationHostLoginSeq) return;
+      if (!res || !res.success) {
+        if (optimisticHost) {
+          stationWriteHostSession_(null);
+          stationRenderShellState_();
+        }
+        stationSetStatus_((res && res.error) ? res.error : 'Scan failed.', 'error');
+        return;
+      }
+      if (res.scanType === 'host' && res.host) {
+        stationWriteHostSession_(res.host);
+        stationRenderShellState_();
+        stationSetStatus_('Hosted as ' + res.host.name, 'ok');
+        return;
+      }
+      if (optimisticHost) {
+        stationWriteHostSession_(null);
+        stationRenderShellState_();
+      }
+      stationSetStatus_('Unrecognized scan.', 'error');
+    })
+    .withFailureHandler(function(err) {
+      window.stationScanBusy = false;
+      // Stale reply: operator ejected or switched badge while this was in flight → leave state alone.
+      if (loginSeq !== window.stationHostLoginSeq) return;
+      if (optimisticHost) {
+        stationWriteHostSession_(null);
+        stationRenderShellState_();
+      }
+      stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .processStationRfidScan(ACTIVE_USER_NAME, tag, { hostOnly: true, tid: tid });
+}
+
+function stationDrainPendingRfidScans_() {
+  var q = window.__srPendingRfidScans;
+  if (!q || !q.length || typeof window.onStationRfidScan !== 'function') return;
+  var pending = q.splice(0, q.length);
+  for (var i = 0; i < pending.length; i++) {
+    window.onStationRfidScan(pending[i].tag, pending[i].tid || '');
+  }
+}
+
+/** Entry point for Chainway Android SDK bridge. */
+window.onStationRfidScan = function(rawTag, rawTid) {
+  if (window.stationScanBusy && (Date.now() - (window.stationScanBusyAt || 0)) > 8000) {
+    window.stationScanBusy = false;
+  }
+  // Do not reset the idle-sleep timer on RFID reads — only stationArmGunSleepTimer_ on boot/save/reconnect.
+  const scan = stationParseScanPayload_(rawTag, rawTid);
+  const tag = scan.epc;
+  const tid = scan.tid;
+  const norm = stationNormalizeEpc_(tag);
+  stationDebug_('scan IN: ' + (tag || '(empty)') + (tid ? ' tid:' + tid : ''));
+  if (tag) stationPushScanFeed_(tag, tid);
+  // Dedup: one physical scan can arrive via BOTH poll and relay (case/format may differ).
+  if (norm) {
+    var now = Date.now();
+    var priorTid = String(window.stationLastScanTid || '').trim();
+    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500;
+    // Drop duplicate EPC-only delivery when we already handled this scan; allow upgrade when TID arrives.
+    if (sameEpcRecent && (priorTid || !tid)) return;
+    window.stationLastScanNorm = norm;
+    window.stationLastScanTag = tag;
+    window.stationLastScanTid = tid || priorTid;
+    window.stationLastScanAt = now;
+  }
+  if (tag && !stationReadHostSession_()) {
+    stationSetLastScan_(tag);
+    if (!tid) stationSetStatus_('Badge read — confirming chip ID…', '');
+    else stationSetStatus_('Badge read — signing in…', '');
+  }
+  // ROOT recording a crew badge (Vault → Crew tab) takes top priority.
+  if (tag && window.stationCrewRecord) {
+    if (stationCrewConsumeScan_(tag, tid)) return;
+  }
+  // Manager recording a tag onto equipment (Vault) is next.
+  if (tag && window.stationVaultRecord && window.stationVaultRecord.queue && window.stationVaultRecord.queue.length) {
+    if (stationVaultConsumeScan_(tag)) return;
+  }
+  // Scan panel open: consume scans for status/sensitivity — never checkout or host flows.
+  if (window.stationScanPanelOpen) {
+    if (tag) stationPanelHandleScan_(tag, tid);
+    return;
+  }
+  stationHandleRfidScan_(tag, tid);
+};
+stationDrainPendingRfidScans_();
+
+/**
+ * Pull scans straight from the gun via the injected native bridge — the reliable path when
+ * native=true, since the top-frame relay proved lossy. Started once the shell mounts.
+ */
+function stationStartScanPoll_() {
+  if (window.stationScanPollTimer) return;
+  stationBindMessageListener_();
+
+  var native = stationNativeBridge_();
+  if (!native || typeof native.pollScans !== 'function') {
+    // Desktop cache shim: drain __srScanQueue even if pollScans path is unavailable.
+    if (window.__srDesktopBridge) {
+      window.stationScanPollTimer = setInterval(function() {
+        var q = window.__srScanQueue;
+        if (!q || !q.length) return;
+        var batch = q.splice(0, q.length);
+        for (var i = 0; i < batch.length; i++) {
+          var item = batch[i];
+          if (!item) continue;
+          var tag = item.epc || item.tag || '';
+          if (!tag) continue;
+          if (typeof window.onStationRfidScan === 'function') {
+            window.onStationRfidScan(tag, item.tid || '');
+          }
+        }
+      }, 200);
+      return;
+    }
+    if (!window.stationScanPollRetryTimer && window.IS_STATION_DEVICE) {
+      window.stationScanPollRetryTimer = setTimeout(function() {
+        window.stationScanPollRetryTimer = null;
+        stationStartScanPoll_();
+      }, 1500);
+    }
+    return;
+  }
+  window.stationScanPollTimer = setInterval(function() {
+    var raw;
+    try { raw = native.pollScans(); } catch (e) { return; }
+    if (!raw || raw === '[]') return;
+    var arr;
+    try { arr = JSON.parse(raw); } catch (e) { return; }
+    for (var i = 0; i < arr.length; i++) {
+      var item = arr[i];
+      if (item && typeof item === 'object') {
+        window.onStationRfidScan(item.epc || item.tag || '', item.tid || '');
+      } else {
+        window.onStationRfidScan(item);
+      }
+    }
+  }, 300);
+}
+
+window.stationLogoutHost = function() {
+  // Cancel any in-flight badge-in confirmation so a slow (~1s) server reply can't re-host the
+  // person we're logging out, and free the scan lock so the next badge works immediately.
+  window.stationHostLoginSeq = (window.stationHostLoginSeq || 0) + 1;
+  window.stationScanBusy = false;
+  stationWriteHostSession_(null);
+  stationRenderShellState_();
+  stationSetStatus_('Host cleared. Scan crew badge.', '');
+  stationSetLastScan_('');
+};
+</script>

@@ -1,0 +1,137 @@
+<!-- @INDEX: STATION -> Bootstrap init (5/5) — must stay last in logic chain -->
+<script>
+
+function stationAnnounceReady_() {
+  try { stationCheckHostEjectDeadline_(); } catch (e) { /* ignore */ }
+  try { stationCheckNoHostParkDeadline_(); } catch (e) { /* ignore */ }
+  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY', full: true }); } catch (e) { /* ignore */ }
+}
+
+function stationBindMessageListener_() {
+  if (window.__srShimMessageHandler) {
+    try { window.removeEventListener('message', window.__srShimMessageHandler); } catch (e) { /* ignore */ }
+    window.__srShimMessageHandler = null;
+    window.__srShimMessageBound = false;
+  }
+  if (window.stationMessageListenerBound) return;
+  window.stationMessageListenerBound = true;
+  window.addEventListener('message', function(ev) {
+    const d = ev && ev.data;
+    if (!d) return;
+    if (d.type === 'SHOWRUNNER_RFID_SCAN') {
+      stationDebug_('relay scan: ' + (d.tag || '(empty)') + (d.tid ? ' tid:' + d.tid : ''));
+      if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag, d.tid || '');
+    } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
+      stationDebug_('relay config');
+      try { if (d.config) window.__srGunConfigJson = JSON.stringify(d.config); } catch (e) { /* ignore */ }
+      stationApplyGunConfig_(d.config || null);
+    } else if (d.type === 'SHOWRUNNER_STATION_GUN_STATUS' && d.message) {
+      if (typeof window.stationOnGunStatus_ === 'function') window.stationOnGunStatus_(d.message);
+    } else if (d.type === 'SHOWRUNNER_STATION_HOST_RESTORE' && d.host && d.host.name) {
+      if (!stationIsDesktopKiosk_() && !stationReadHostSession_()) {
+        stationWriteHostSession_(d.host);
+        stationRenderShellState_();
+      }
+    }
+  });
+}
+
+function initStationShell_() {
+  if (typeof window.stationEnsureDeviceMode_ === 'function') window.stationEnsureDeviceMode_();
+  if (!window.IS_STATION_DEVICE) return;
+
+  // Show the shell and tell the native app to drop its splash FIRST, so a later error can never
+  // strand the initial screen. Everything after this is wrapped so boot failures surface on-screen
+  // instead of leaving a blank kiosk.
+  try {
+    document.documentElement.classList.add('station-device-root');
+    const shell = document.getElementById('station-shell');
+    if (shell) shell.style.display = 'flex';
+  } catch (e) { /* ignore */ }
+  try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
+  if (stationIsDesktopKiosk_()) {
+    try { stationWriteHostSession_(null); } catch (e) { /* ignore */ }
+  } else {
+    try { stationRequestHostRestoreFromParent_(); } catch (e) { /* ignore */ }
+  }
+
+  try {
+    stationBindHostIdleListeners_();
+    stationBindMessageListener_();
+    stationRenderShellState_();
+    stationSetStatus_('Loading station profile…', '');
+
+    // Retire the removed "hold" mode on any device that stored it during testing.
+    if (stationStoredSetting_(STATION_MODE_KEY) === 'hold') stationSetStoredSetting_(STATION_MODE_KEY, 'single');
+
+    // Push device-local gun settings down so the screen and the gun agree on boot.
+    stationSyncSettingsToGun_();
+    // Seed the on-screen sensitivity bar from the stored (source-of-truth) power value.
+    stationSyncPowerControls_(stationStoredSetting_(STATION_POWER_KEY));
+    stationDrainPendingRfidScans_();
+    // Pull scans directly from the gun (reliable path; relay stays as fallback).
+    stationStartScanPoll_();
+    stationBindPresetButtons_();
+
+    // Equipment name/unit resolution for the live scan strip: show cache instantly, then refresh.
+    stationLoadEquipMapCache_();
+    stationRenderScanFeed_();
+    stationRefreshEquipMap_();
+    if (!window.stationEquipMapTimer) {
+      window.stationEquipMapTimer = setInterval(stationRefreshEquipMap_, STATION_EQUIP_MAP_REFRESH_MS);
+    }
+  } catch (bootErr) {
+    try { stationSetStatus_('Boot error: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr)), 'error'); } catch (e) {}
+    try { stationDebug_('BOOT ERROR: ' + (bootErr && bootErr.message ? bootErr.message : String(bootErr))); } catch (e) {}
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      try {
+        if (!res || !res.success) {
+          stationSetStatus_((res && res.error) ? res.error : 'Station bootstrap failed.', 'error');
+          return;
+        }
+        stationApplyBootstrap_(res);
+        if (!res.hostInheritEnabled) {
+          stationSetStatus_('Host inherit is disabled on this device profile.', 'error');
+          return;
+        }
+        const bootHost = stationIsDesktopKiosk_() ? null : stationReadHostSession_();
+        if (bootHost) {
+          // Wall-clock eject may have passed while the tablet slept — check before restoring host.
+          stationCheckHostEjectDeadline_();
+          if (stationReadHostSession_()) {
+            // Re-run the full write so the reload restores the host globals AND stationHostRbac
+            // (host-inherit) + warms projects — not just the rendered chrome.
+            stationWriteHostSession_(bootHost);
+            stationRenderShellState_();
+          } else {
+            stationRenderShellState_();
+          }
+        } else {
+          stationSetStatus_('Pull trigger and scan your crew badge.', '');
+          stationCheckNoHostParkDeadline_();
+        }
+      } catch (e) {
+        stationSetStatus_('Profile load error: ' + (e && e.message ? e.message : String(e)), 'error');
+      }
+    })
+    .withFailureHandler(function(err) {
+      stationSetStatus_('Bootstrap error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .getStationShellBootstrap(ACTIVE_USER_NAME);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.IS_STATION_DEVICE) initStationShell_();
+});
+document.addEventListener('visibilitychange', function() {
+  if (!window.IS_STATION_DEVICE) return;
+  if (document.visibilityState === 'visible') stationAnnounceReady_();
+});
+window.addEventListener('pageshow', function(ev) {
+  if (!window.IS_STATION_DEVICE) return;
+  if (ev.persisted) stationAnnounceReady_();
+});
+</script>

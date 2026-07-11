@@ -1,0 +1,33 @@
+<!-- @INDEX: STATION -> Eject grace UI (4/5) -->
+<script>
+
+window.stationDeviceSignOut = function() {
+  if (!confirm('Sign this warehouse device out of Showrunner?')) return;
+  stationCloseSettings();
+  stationCloseScanPanel();
+  stationWriteHostSession_(null);
+  try {
+    localStorage.removeItem('sm_session_token');
+    localStorage.removeItem('sm_session_expires');
+  } catch (e) { /* ignore */ }
+  const base = document.querySelector('base');
+  const scriptUrl = base && base.href ? base.href.split('?')[0] : '';
+  if (scriptUrl) window.top.location.href = scriptUrl;
+  else window.top.location.reload();
+};
+
+function stationPostToHosting_(payload) {
+  try { if (window.parent && window.parent !== window) window.parent.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+  try { if (window.top && window.top !== window) window.top.postMessage(payload, '*'); } catch (e) { /* ignore */ }
+}
+
+function stationRelayGunCommandToTop_(method, args) {
+  if (!method) return;
+  args = args || [];
+  try {
+    if (window.top && window.top !== window) {
+      window.top.postMessage({ type: 'SR_STATION_GUN', method: method, args: args }, '*');
+    }
+  } catch (e) { /* ignore */ }
+}
+</script>

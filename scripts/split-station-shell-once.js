@@ -2,7 +2,12 @@
  * Mechanical split of 11_Station_Shell.html — zero logic changes.
  * Structure map: docs/ai/active/station-shell-structure-map.md
  *
- * Run once from repo root: node scripts/split-station-shell-once.js
+ * Logic modules MUST concatenate in monolith line order (1140–4030). Run:
+ *   node scripts/regen-station-split-order.js
+ * from repo root after editing monolith boundaries. Markup slices below still use the stub
+ * 11_Station_Shell.html body when present; restore monolith from git for a full re-split.
+ *
+ * Legacy one-shot markup split: node scripts/split-station-shell-once.js
  */
 const fs = require('fs');
 const path = require('path');

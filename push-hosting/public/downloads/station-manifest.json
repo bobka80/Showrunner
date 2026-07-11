@@ -1,15 +1,24 @@
 {
-  "versionName": "0.1.52",
-  "versionCode": 54,
+  "versionName": "0.1.53",
+  "versionCode": 55,
   "apkFile": "showrunner-station.bin",
   "published": true,
-  "updatedAt": "2026-07-11T13:50:14.789Z",
+  "updatedAt": "2026-07-11T14:08:16.067Z",
   "sizeBytes": 12073677,
   "notes": [
-    "Multi mode: one beep per trigger (mute SDK beep during burst loop)",
-    "Retire hold scan mode → single in native prefs"
+    "Scan delivery: queue-only (no duplicate relay+poll)",
+    "host-boot poll is single path to web UI"
   ],
   "history": [
+    {
+      "versionName": "0.1.53",
+      "versionCode": 55,
+      "date": "2026-07-11T14:08:16.067Z",
+      "notes": [
+        "Scan delivery: queue-only (no duplicate relay+poll)",
+        "host-boot poll is single path to web UI"
+      ]
+    },
     {
       "versionName": "0.1.52",
       "versionCode": 54,
@@ -187,15 +196,6 @@
       "notes": [
         "Restore hosting shell (revert v483)",
         "Fix install: versionCode must exceed build 34"
-      ]
-    },
-    {
-      "versionName": "0.1.31",
-      "versionCode": 33,
-      "date": "2026-07-08T05:08:53.998Z",
-      "notes": [
-        "Revert v483 direct-GAS",
-        "restore hosting shell startup"
       ]
     }
   ]
