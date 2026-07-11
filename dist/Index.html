@@ -6282,18 +6282,20 @@ html.station-device-root #station-device-controls { display: flex; }
   white-space: nowrap;
 }
 .station-scan-feed__identity {
-  display: inline-flex;
+  display: flex;
   align-items: baseline;
-  gap: 4px;
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 72%;
+  gap: 4px;
 }
 .station-scan-feed__identity .name {
   flex: 1 1 auto;
   min-width: 0;
+  max-width: none;
 }
 .station-scan-feed__identity .unit {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   margin-left: 0;
 }
 .station-scan-feed__row .unit {
@@ -6307,8 +6309,9 @@ html.station-device-root #station-device-controls { display: flex; }
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  flex-shrink: 0;
-  max-width: 42%;
+  flex: 0 0 auto;
+  margin-left: auto;
+  max-width: 28%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6330,8 +6333,8 @@ html.station-device-root #station-device-controls { display: flex; }
 .station-scan-feed__row.is-crew .unit {
   color: #0ea5e9;
   text-transform: uppercase;
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   align-self: center;
 }
 /* Station project picker overlay */
@@ -6704,8 +6707,7 @@ html.station-device-root #station-device-controls { display: flex; }
 .station-scan-feed__row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   font-family: monospace;
   font-size: 13px;
   color: #e4e4e7;
@@ -7151,6 +7153,21 @@ html.station-dock-root .station-shell-brand {
   padding: 0;
   margin-right: auto;
   min-width: 0;
+  font-family: monospace;
+  font-size: 11px;
+}
+html.station-dock-root .station-shell-brand__device,
+html.station-dock-root .station-shell-brand__host {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: monospace;
+  line-height: 1.2;
+}
+html.station-dock-root .station-shell-brand__host {
+  color: #10b981;
+}
+html.station-dock-root .station-shell-brand__line {
+  gap: 8px;
 }
 html.station-dock-root #station-dock-head-right .station-ctrl-cog {
   flex-shrink: 0;
@@ -7174,12 +7191,9 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay {
   bottom: 0 !important;
   width: auto !important;
   height: auto !important;
-  zoom: var(--dock-left-zoom, 1);
-  width: auto !important;
-  height: auto !important;
   align-items: stretch;
   justify-content: stretch;
-  z-index: 49000;
+  z-index: 51000 !important;
   background: rgba(0, 0, 0, 0.35);
 }
 html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal {
@@ -7189,6 +7203,7 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
   max-height: none !important;
   margin: 0 !important;
   border-radius: 0;
+  zoom: var(--dock-left-zoom, 1);
 }
 </style>
 

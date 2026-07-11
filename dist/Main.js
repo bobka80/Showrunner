@@ -328,6 +328,18 @@ function getRefreshPayload(crewName) {
   return { projects: projects, monthData: monthData, managerConfig: getManagerConfig(crewName), tasks: extras.tasks, notifs: extras.notifs, conflicts: conflicts };
 }
 
+/** Fast project list for station dock / picker — skips tasks, notifs, conflicts, manager config. */
+function getStationHostProjects(crewName) {
+  IS_READ_ONLY_EXECUTION = true;
+  const profile = getUserSecurityProfile(crewName);
+  let projects = getExistingProjects();
+  if (typeof shouldFilterCalendarToAssignedShifts === 'function' && shouldFilterCalendarToAssignedShifts(profile)) {
+    const monthData = getGlobalMonthData(projects);
+    projects = applyShiftCalendarFilter(profile, projects, monthData, []).projects;
+  }
+  return { projects: projects };
+}
+
 /** Fast path for task drawer + notification list only (avoids full calendar payload). */
 function getTasksNotifsPayload(crewName) {
   IS_READ_ONLY_EXECUTION = true;

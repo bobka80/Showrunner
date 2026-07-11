@@ -413,6 +413,7 @@ function stationWriteHostSession_(host) {
   // (same list their personal profile sees). Clearing the host drops the cache + wipes the device.
   if (host && host.name) {
     stationPreloadProjects_(host.name);
+    if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
     stationClearNoHostParkDeadline_();
   } else {
     window.stationProjectsCache = null; window.stationProjectsFor = null;
@@ -442,6 +443,74 @@ function stationResetDeviceToPristine_() {
   try { if (typeof stationSetLastScan_ === 'function') stationSetLastScan_(''); } catch (e) {}
 }
 
+/** Session cache for instant dock project list paint on host re-login. */
+function stationHostProjectsCacheKey_(hostName) {
+  return 'sm_dock_host_projects_' + String(hostName || '').trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+function stationPersistHostProjectsCache_(hostName, projects) {
+  try {
+    sessionStorage.setItem(stationHostProjectsCacheKey_(hostName), JSON.stringify({
+      ts: Date.now(),
+      projects: projects || []
+    }));
+  } catch (e) { /* ignore */ }
+}
+
+function stationReadHostProjectsCache_(hostName) {
+  try {
+    const raw = sessionStorage.getItem(stationHostProjectsCacheKey_(hostName));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return (obj && obj.projects && obj.projects.length) ? obj.projects : null;
+  } catch (e) { return null; }
+}
+
+function stationPreloadProjectsFull_(hostName) {
+  if (!hostName || window.__stationProjectsFullFetchHost === hostName) return;
+  window.__stationProjectsFullFetchHost = hostName;
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      window.__stationProjectsFullFetchHost = null;
+      const projects = (payload && payload.projects) ? payload.projects : [];
+      stationCacheProjectsPayload_(payload, projects);
+      if (window.stationProjectsFor === hostName && projects.length) {
+        window.stationProjectsCache = projects;
+        stationPersistHostProjectsCache_(hostName, projects);
+        if (typeof stationDockRenderProjectList_ === 'function') stationDockRenderProjectList_(projects);
+        const panel = document.getElementById('station-project-picker');
+        if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(projects);
+      }
+    })
+    .withFailureHandler(function() { window.__stationProjectsFullFetchHost = null; })
+    .getRefreshPayload(hostName);
+}
+
+/** Preload vault registry so project assets modal can render on station (no calendar boot). */
+function stationPreloadVaultForPa_() {
+  if (typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length) return;
+  try {
+    const cached = localStorage.getItem('sm_vault_cache');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.assets && parsed.assets.length) {
+        globalAssets = parsed.assets;
+        return;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  if (window.__stationVaultFetchPending) return;
+  window.__stationVaultFetchPending = true;
+  google.script.run
+    .withSuccessHandler(function(assets) {
+      window.__stationVaultFetchPending = false;
+      globalAssets = assets || [];
+      try { localStorage.setItem('sm_vault_cache', JSON.stringify({ assets: globalAssets })); } catch (e) { /* ignore */ }
+    })
+    .withFailureHandler(function() { window.__stationVaultFetchPending = false; })
+    .getAssetRegistry(typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '');
+}
+
 /** Background-fetch the host's projects (getRefreshPayload scoped to the person, not the device). */
 function stationPreloadProjects_(hostName) {
   if (!hostName) return;
@@ -450,33 +519,51 @@ function stationPreloadProjects_(hostName) {
     if (typeof stationDockRenderProjectList_ === 'function') stationDockRenderProjectList_(window.stationProjectsCache);
     const panel = document.getElementById('station-project-picker');
     if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(window.stationProjectsCache);
+    stationPreloadProjectsFull_(hostName);
     return;
+  }
+
+  var instant = stationReadHostProjectsCache_(hostName);
+  if (instant && instant.length) {
+    window.stationProjectsFor = hostName;
+    window.stationProjectsCache = instant;
+    if (typeof stationDockRenderProjectList_ === 'function') stationDockRenderProjectList_(instant);
+    const panel = document.getElementById('station-project-picker');
+    if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(instant);
   }
 
   if (window.__stationProjectsFetchHost === hostName) return;
 
   window.__stationProjectsFetchHost = hostName;
   window.stationProjectsFor = hostName;
-  window.stationProjectsCache = null;
+  if (!instant || !instant.length) window.stationProjectsCache = null;
 
   google.script.run
     .withSuccessHandler(function(payload) {
       window.__stationProjectsFetchHost = null;
       const projects = (payload && payload.projects) ? payload.projects : [];
-      stationCacheProjectsPayload_(payload, projects);
       window.stationProjectsCache = projects;
+      stationPersistHostProjectsCache_(hostName, projects);
+      try {
+        const phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+        phantom.projects = projects;
+        localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+      } catch (e) { /* ignore */ }
       const panel = document.getElementById('station-project-picker');
       if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(projects);
       if (typeof stationDockRenderProjectList_ === 'function') stationDockRenderProjectList_(projects);
+      stationPreloadProjectsFull_(hostName);
     })
     .withFailureHandler(function(err) {
       window.__stationProjectsFetchHost = null;
-      window.stationProjectsFor = null;
+      if (!window.stationProjectsCache || !window.stationProjectsCache.length) {
+        window.stationProjectsFor = null;
+      }
       if (typeof stationDockShowProjectsError_ === 'function') {
         stationDockShowProjectsError_(err && err.message ? err.message : String(err));
       }
     })
-    .getRefreshPayload(hostName);
+    .getStationHostProjects(hostName);
 }
 
 /** Persist the payload into sm_phantom_payload so the phone PA resolver (resolveMobileProject) works. */

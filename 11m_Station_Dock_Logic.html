@@ -23,6 +23,7 @@
     if (dockShell) dockShell.style.display = 'flex';
     stationDockMountScanRail_();
     stationDockSyncWorkspace_();
+    if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
   };
 
   window.stationRefreshDockUiSkin_ = function() {
@@ -211,6 +212,18 @@
     if (typeof stationSetStatus_ === 'function') {
       stationSetStatus_('Opening ' + (proj.title || proj.name || 'project') + '…', '');
     }
+
+    if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
+
+    try {
+      var phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+      if (phantom && phantom.projects) {
+        var idx = phantom.projects.findIndex(function(p) { return String(p.id) === String(pId); });
+        if (idx >= 0) phantom.projects[idx] = proj;
+        else phantom.projects.push(proj);
+        localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+      }
+    } catch (e) { /* ignore */ }
 
     try {
       window.openMobileProjectAssets(pId);
