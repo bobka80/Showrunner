@@ -79,7 +79,8 @@ Session token is saved in `desktop-prefs.json` like the Android prefs.
 
 | Symptom | Check |
 |--------|--------|
-| “Waiting for TSL gun…” | Gun not paired, off, or another app (Explorer) holds the port — close it |
+| “Waiting for TSL gun…” | Gun not paired, off, or asleep — pull trigger to wake |
+| “No TSL reader on COMx” / tries multiple COM ports | Wrong BT port direction — app now skips incoming ports and tries each outgoing port; or set `ComPort` in prefs to the same COM Explorer uses |
 | Connects to wrong reader | Multiple TSL guns paired — set `ComPort` override in prefs |
 | Web blank | WebView2 runtime; network to web.app |
 | Scans not in UI | Gun connected? Status shows “Gun connected”? Profile is a station layout? |

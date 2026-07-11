@@ -6,6 +6,8 @@ namespace Showrunner.Station.Desktop;
 public sealed class DesktopPrefsData
 {
     public string ComPort { get; set; } = "";
+    /// <summary>Win32 PnP DeviceID of the last COM port that answered a TSL version probe.</summary>
+    public string LastGunDeviceId { get; set; } = "";
     public int PowerDbm { get; set; } = 29;
     public bool Beep { get; set; } = true;
     public string ScanMode { get; set; } = TslRfidManager.ScanModeSingle;

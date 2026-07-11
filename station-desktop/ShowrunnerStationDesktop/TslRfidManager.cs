@@ -44,6 +44,7 @@ public sealed class TslRfidManager : IDisposable
     private volatile bool _connecting;
     private volatile bool _userSleep;
     private bool _disposed;
+    private string _lastGunDeviceId = "";
     private string _lastDetectLog = "";
 
     private const int WatchdogMs = 2500;
@@ -52,7 +53,6 @@ public sealed class TslRfidManager : IDisposable
 
     public TslRfidManager()
     {
-        _commander.AddResponder(_switchResponder);
         _switchResponder.SwitchStateChanged += OnSwitchStateChanged;
         _inventory.TransponderReceived += OnInventoryTransponder;
         _inventory.FastIdentifier = TriState.Yes;
@@ -71,6 +71,7 @@ public sealed class TslRfidManager : IDisposable
         var prefs = DesktopPrefs.Load();
         // A COM port in prefs is an OVERRIDE only; blank means auto-detect the TSL gun.
         _manualPort = (prefs.ComPort ?? "").Trim();
+        _lastGunDeviceId = (prefs.LastGunDeviceId ?? "").Trim();
         _portName = _manualPort;
         _powerDbm = prefs.PowerDbm is >= PowerMin and <= PowerMax ? prefs.PowerDbm : 29;
         _beepEnabled = prefs.Beep;
@@ -106,45 +107,55 @@ public sealed class TslRfidManager : IDisposable
             return;
         }
 
-        // Link down — find the gun's port (manual override wins) and try to grab it.
-        var target = !string.IsNullOrWhiteSpace(_manualPort) ? _manualPort : ResolveGunPort();
-        if (string.IsNullOrWhiteSpace(target))
-        {
-            if (_linkState != "waiting")
-            {
-                _linkState = "waiting";
-                PostStatus("Waiting for TSL gun — pair it and press the trigger to wake it");
-            }
-            return;
-        }
-
-        _portName = target;
+        // Link down — manual override wins; else try every outgoing BT COM candidate.
         TryConnectFromWatchdog();
     }
 
     private void TryConnectFromWatchdog()
     {
+        if (_disposed || _userSleep) return;
         _connecting = true;
         try
         {
-            Connect();
+            if (!string.IsNullOrWhiteSpace(_manualPort))
+            {
+                _portName = _manualPort;
+                ConnectToPort(new GunPortDetector.GunPort(_manualPort, "manual override", ""));
+                return;
+            }
+
+            var candidates = GunPortDetector.Detect(_lastGunDeviceId);
+            if (candidates.Count == 0)
+            {
+                if (_linkState != "waiting")
+                {
+                    _linkState = "waiting";
+                    PostStatus("Waiting for TSL gun — pair it and press the trigger to wake it");
+                }
+                return;
+            }
+
+            var summary = string.Join(", ", candidates.Select(c => c.ComPort));
+            if (summary != _lastDetectLog)
+            {
+                _lastDetectLog = summary;
+                PostStatus("Found TSL port(s): " + summary);
+            }
+
+            foreach (var candidate in candidates)
+            {
+                if (ConnectToPort(candidate))
+                    return;
+                SafeDisconnect();
+            }
+
+            _linkState = "disconnected";
+            PostStatus("RFID connect failed on " + candidates.Count + " port(s) — pull trigger to wake gun");
         }
         finally
         {
             _connecting = false;
         }
-    }
-
-    /// <summary>Detect the TSL 1128 COM port by its PID_1128 signature; logs the port once.</summary>
-    private string? ResolveGunPort()
-    {
-        var port = GunPortDetector.DetectPort();
-        if (!string.IsNullOrWhiteSpace(port) && port != _lastDetectLog)
-        {
-            _lastDetectLog = port!;
-            PostStatus($"Found TSL gun on {port}");
-        }
-        return port;
     }
 
     public void Connect()
@@ -154,49 +165,94 @@ public sealed class TslRfidManager : IDisposable
             PostStatus("No COM port configured");
             return;
         }
+        ConnectToPort(new GunPortDetector.GunPort(_portName, "", ""));
+    }
+
+    /// <summary>Try one COM port; must answer a TSL version probe before we accept it.</summary>
+    private bool ConnectToPort(GunPortDetector.GunPort candidate)
+    {
+        var port = candidate.ComPort;
+        if (string.IsNullOrWhiteSpace(port)) return false;
 
         try
         {
             lock (_commandLock)
             {
+                SetupResponders();
+
                 if (_commander.IsConnected)
                     _commander.Disconnect();
 
                 _linkState = "connecting";
-                PostStatus($"Connecting {_portName}…");
-                var serial = new SerialPortWrapper(_portName);
+                var label = string.IsNullOrWhiteSpace(candidate.FriendlyName)
+                    ? port
+                    : port + " — " + candidate.FriendlyName;
+                PostStatus("Connecting " + label + "…");
+
+                var serial = new SerialPortWrapper(port);
                 _commander.Connect(serial);
                 _connected = _commander.IsConnected;
                 if (!_connected)
                 {
                     _linkState = "disconnected";
-                    PostStatus("RFID connect failed");
-                    return;
+                    PostStatus("No serial link on " + port);
+                    return false;
                 }
 
-                SetupResponders();
                 ReadFirmware();
+                if (string.IsNullOrWhiteSpace(_firmware))
+                {
+                    _linkState = "disconnected";
+                    PostStatus(port + " is not a TSL reader — trying next port…");
+                    try { _commander.Disconnect(); } catch { /* ignore */ }
+                    _connected = false;
+                    return false;
+                }
+
                 ConfigureChainInventory();
                 SeedInventoryParameters();
                 EnableSwitchReporting();
                 _linkState = "live";
-                PostStatus("Gun connected — pull trigger to scan");
-                // Persist manual COM override only — auto-detected ports change after re-pair.
-                DesktopPrefs.Save(new DesktopPrefsData
+                _portName = port;
+                PostStatus("Gun connected on " + port + " (" + _firmware + ")");
+                DesktopPrefs.SavePartial(p =>
                 {
-                    ComPort = _manualPort,
-                    PowerDbm = _powerDbm,
-                    Beep = _beepEnabled,
-                    ScanMode = _scanMode,
-                    PollMs = _pollMs,
+                    p.ComPort = _manualPort;
+                    if (!string.IsNullOrWhiteSpace(candidate.DeviceId))
+                        p.LastGunDeviceId = candidate.DeviceId;
+                    p.PowerDbm = _powerDbm;
+                    p.Beep = _beepEnabled;
+                    p.ScanMode = _scanMode;
+                    p.PollMs = _pollMs;
                 });
+                if (!string.IsNullOrWhiteSpace(candidate.DeviceId))
+                    _lastGunDeviceId = candidate.DeviceId;
+                return true;
             }
         }
         catch (Exception ex)
         {
             _connected = false;
             _linkState = "disconnected";
-            PostStatus("Connect error: " + ex.Message);
+            PostStatus("Connect error on " + port + ": " + ex.Message);
+            SafeDisconnect();
+            return false;
+        }
+    }
+
+    private void SafeDisconnect()
+    {
+        try
+        {
+            lock (_commandLock)
+            {
+                if (_commander.IsConnected)
+                    _commander.Disconnect();
+            }
+        }
+        catch
+        {
+            // ignore
         }
     }
 
@@ -512,15 +568,97 @@ public sealed class TslRfidManager : IDisposable
         var epc = NormalizeHex(e.Transponder.Epc);
         if (string.IsNullOrEmpty(epc)) return;
         var tid = NormalizeHex(e.Transponder.TransponderIdentifier);
-        // Fast ID must not duplicate EPC into the TID field — that fails host pair-match.
         if (!string.IsNullOrEmpty(tid) && tid == epc)
             tid = "";
         if (string.IsNullOrEmpty(tid))
             tid = NormalizeHex(e.Transponder.ReadData);
         if (!string.IsNullOrEmpty(tid) && tid == epc)
             tid = "";
+
+        if (!string.IsNullOrEmpty(tid))
+        {
+            DeliverScan(epc, tid);
+            return;
+        }
+
+        // Second-pass TID read (Chainway/Android pattern) — defer off the inventory callback thread.
+        var epcCopy = epc;
+        Task.Run(() =>
+        {
+            Thread.Sleep(40);
+            var readTid = TryReadTidForEpc(epcCopy);
+            DeliverScan(epcCopy, readTid);
+        });
+    }
+
+    private void DeliverScan(string epc, string tid)
+    {
         EnqueueScan(epc, tid);
-        PostStatus("Read: " + epc + (string.IsNullOrEmpty(tid) ? "" : " tid:" + tid));
+        PostStatus("Read: " + epc + (string.IsNullOrEmpty(tid) ? " (no TID — hold badge still)" : " tid:" + tid));
+    }
+
+    /// <summary>Explicit TID bank read filtered by EPC — mirrors Android readTidBank().</summary>
+    private string TryReadTidForEpc(string epcHex)
+    {
+        foreach (var words in new[] { 6, 4 })
+        {
+            var tid = ReadTidForEpcWords(epcHex, words);
+            if (!string.IsNullOrEmpty(tid) && !tid.Equals(epcHex, StringComparison.OrdinalIgnoreCase))
+                return tid;
+        }
+        return "";
+    }
+
+    private string ReadTidForEpcWords(string epcHex, int lengthWords)
+    {
+        lock (_commandLock)
+        {
+            if (!_commander.IsConnected) return "";
+            try
+            {
+                AbortIfConnected();
+                var epcBlock = new DataBlock(epcHex);
+                var read = new ReadTransponderCommand
+                {
+                    Bank = Databank.TransponderIdentifier,
+                    Length = lengthWords,
+                    Offset = 0,
+                    InventoryOnly = TriState.No,
+                    SelectBank = Databank.ElectronicProductCode,
+                    SelectData = epcBlock.Base16,
+                    SelectLength = epcBlock.LengthBits,
+                    SelectOffset = 32,
+                    OutputPower = _powerDbm,
+                    QuerySession = QuerySession.S0,
+                    QueryTarget = QueryTarget.TargetA,
+                };
+
+                string? captured = null;
+                void OnRead(object? s, TransponderDataEventArgs args)
+                {
+                    var t = NormalizeHex(args.Transponder.TransponderIdentifier);
+                    if (string.IsNullOrEmpty(t))
+                        t = NormalizeHex(args.Transponder.ReadData);
+                    if (!string.IsNullOrEmpty(t))
+                        captured = t;
+                }
+
+                read.TransponderReceived += OnRead;
+                try
+                {
+                    _commander.ExecuteCommand(read, read.Responder);
+                }
+                finally
+                {
+                    read.TransponderReceived -= OnRead;
+                }
+                return NormalizeHex(captured);
+            }
+            catch
+            {
+                return "";
+            }
+        }
     }
 
     private void EnqueueScan(string epc, string tid)

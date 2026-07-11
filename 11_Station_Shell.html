@@ -2323,7 +2323,8 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   if (tag) stationPushScanFeed_(tag);
   if (tag && !stationReadHostSession_()) {
     stationSetLastScan_(tag);
-    if (!tid) stationSetStatus_('Badge EPC read — confirming host…', '');
+    if (!tid) stationSetStatus_('Badge read — confirming chip ID…', '');
+    else stationSetStatus_('Badge read — signing in…', '');
   }
   // ROOT recording a crew badge (Vault → Crew tab) takes top priority.
   if (tag && window.stationCrewRecord) {

@@ -227,7 +227,8 @@ public partial class MainWindow : Window
         {
             var low = msg.ToLowerInvariant();
             if (low.Contains("fail") || low.Contains("error") || low.Contains("connect") ||
-                low.Contains("read:") || low.Contains("scanning"))
+                low.Contains("read:") || low.Contains("scanning") || low.Contains("waiting") ||
+                low.Contains("found tsl") || low.Contains("port(s)") || low.Contains("no tsl"))
                 ShowStatus(msg, persistent: false);
 
             // Also push scans to the page when they arrive (belt-and-suspenders with pollScans).
