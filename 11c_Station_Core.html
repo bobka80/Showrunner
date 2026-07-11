@@ -906,6 +906,11 @@ function stationAnnounceReady_() {
 }
 
 function stationBindMessageListener_() {
+  if (window.__srEarlyBootMsgHandler) {
+    try { window.removeEventListener('message', window.__srEarlyBootMsgHandler); } catch (e) { /* ignore */ }
+    window.__srEarlyBootMsgHandler = null;
+    window.__srEarlyBootMsgBound = false;
+  }
   if (window.__srShimMessageHandler) {
     try { window.removeEventListener('message', window.__srShimMessageHandler); } catch (e) { /* ignore */ }
     window.__srShimMessageHandler = null;

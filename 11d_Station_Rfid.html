@@ -187,7 +187,7 @@ function stationPushScanFeed_(tag, tidOpt) {
   if (window.stationRecentScans.length) {
     const last = window.stationRecentScans[0];
     const lastNorm = last.norm || stationNormalizeEpc_(last.tag);
-    const sameRecent = lastNorm === norm && (now - (last.ts || 0)) < 1500;
+    const sameRecent = lastNorm === norm && (now - (last.ts || 0)) < 400;
     if (sameRecent && (last.tid || !tid)) return;
   }
   window.stationRecentScans.unshift({ tag: clean, norm: norm, tid: tid, ts: now });
@@ -201,10 +201,12 @@ function stationHandleRfidScan_(rawTag, rawTid) {
   const tag = String(rawTag || '').trim();
   let tid = String(rawTid || '').trim();
   if (!tid && window.stationLastScanTid) tid = String(window.stationLastScanTid).trim();
-  if (!tag || window.stationScanBusy) return;
+  if (!tag) return;
   if (!window.IS_STATION_DEVICE) return;
 
   const host = stationReadHostSession_();
+  // scanBusy only gates badge-in while no host — never block equipment reads after someone is hosted.
+  if (window.stationScanBusy && !host) return;
 
   if (host) {
     stationResetHostIdleTimer_();
@@ -359,7 +361,7 @@ window.onStationRfidScan = function(rawTag, rawTid) {
   if (norm) {
     var now = Date.now();
     var priorTid = String(window.stationLastScanTid || '').trim();
-    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 1500;
+    var sameEpcRecent = norm === window.stationLastScanNorm && (now - (window.stationLastScanAt || 0)) < 400;
     // Drop duplicate EPC-only delivery when we already handled this scan; allow upgrade when TID arrives.
     if (sameEpcRecent && (priorTid || !tid)) return;
     window.stationLastScanNorm = norm;

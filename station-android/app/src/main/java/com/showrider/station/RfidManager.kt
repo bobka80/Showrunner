@@ -866,7 +866,8 @@ class RfidManager(
         pendingScans.add(PendingScan(epc, tid))
         while (pendingScans.size > 32) pendingScans.poll()
         onGunActivity()
-        mainHandler.post { onTagScanned(epc, tid) }
+        // Queue only — host-boot pollScans() is the single delivery path into the GAS iframe.
+        // Immediate onTagScanned here duplicated every read (relay + poll) and client dedup ate scans.
     }
 
     /** EPC-only inventory for tag select; TID comes from an explicit bank read after. */
