@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v502** · APK **v0.1.48 (build 50)** · Desktop EXE **ShowrunnerStationDesktop v0.1.0** · Hosting **host-boot v480** · **Last swept:** 2026-07-10
+**Opened:** 2026-07-02 · **Production:** GAS **v525** · APK **v0.1.48 (build 50)** · Desktop EXE **ShowrunnerStationDesktop v0.1.40** · Hosting **web.app** (host-boot; bump `?v=` on change) · **Last swept:** 2026-07-11
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -61,14 +61,21 @@ Stored via `stationSetStoredSetting_(key)` → `key::<stationNs>` where `station
 
 ## Desktop TSL station (thin shell) — `station-desktop/`
 
-Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showrunner station web UI in **WebView2** and exposes a native **`window.AndroidStation`** bridge (identical API to the Chainway APK) so `11_Station_Shell.html` needs no fork. Full setup, prefs, and troubleshooting: [station-desktop/README.md](../../../station-desktop/README.md). TSL vendor reference (PDFs, SDK samples, Explorer): [stage-desktop-info/README.md](../../../stage-desktop-info/README.md). File index: [../FILE_MAP.md](../FILE_MAP.md) §8 (`station-desktop/`, `stage-desktop-info/`, `build-station-desktop.js`).
+**Field status (2026-07-11):** **Working** on gate PC — station login/logout, auto pin, RFID scans show **equipment name + unit #** in the real station Scan panel (not raw EPC, not the grey emergency shim). Desktop **v0.1.40**, GAS **525**.
 
-**New-chat handoff (TSL desktop blockers, bat launch, version history):** [tsl-desktop-handoff.md](tsl-desktop-handoff.md)
+Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showrunner station web UI in **WebView2** and exposes a native **`window.AndroidStation`** bridge (identical API to the Chainway APK) so `11_Station_Shell.html` needs no fork.
 
-- **Gun I/O:** TSL ASCII protocol over Bluetooth virtual COM; auto-detects the reader by its `PID_1128` signature (no COM port to configure) with a background watchdog that re-acquires after sleep/drop — mirrors the ASCII Protocol Explorer "always connected" feel (`GunPortDetector.cs`, `TslRfidManager.cs`).
-- **App sleep:** Disconnect+Sleep sends ASCII `.sl`, suppresses watchdog reconnect until manual **Reconnect gun** (`SleepAndDisconnect()`, `_userSleep`).
-- **Build / ship (separate from GAS and APK):** `node build-station-desktop.js "<notes>"` (add `--self-contained` to bundle .NET) → zips `ShowrunnerStationDesktop.exe`. Node-only tool — excluded from GAS via `gas-node-only.js` + `.claspignore` (a leak caused a `require is not defined` white screen, fixed v493).
-- **Profile:** assign layout **`tsl_dock_desktop`** to the device account.
+**Architecture + fragile points (read before any desktop work):** [tsl-desktop-handoff.md](tsl-desktop-handoff.md) · [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Desktop WebView2 station · § TSL 1128 desktop gun driver.
+
+Setup and field ops: [station-desktop/README.md](../../../station-desktop/README.md). TSL vendor reference: [stage-desktop-info/README.md](../../../stage-desktop-info/README.md). File index: [../FILE_MAP.md](../FILE_MAP.md) §8.
+
+- **WebView2 is four layers**, not two: native exe → `web.app` host-boot → GAS wrapper iframe → GAS inner Index (`#station-shell`). Scans and session must reach **layer 4**; the grey `#sr-desktop-scan-feed` bar is layer 3 emergency only.
+- **Gun I/O:** TSL ASCII over Bluetooth virtual COM; auto-detect `PID_1128` + watchdog reconnect (`GunPortDetector.cs`, `TslRfidManager.cs`).
+- **Scan delivery:** top `showrunnerStationDeliverScan` + nested iframe forward + all-frame invoke (`MainWindow.xaml.cs`).
+- **Session:** inner login → `window.top.postMessage` + `AndroidStation.saveSession` → `desktop-prefs.json` → parent `sessionboot`.
+- **Launch:** **`station-desktop/RUN-STATION.bat`** only (taskkill + publish + start).
+- **Build / ship:** `node build-station-desktop.js "<notes>"` — separate from GAS/APK milestone.
+- **Profile:** layout **`tsl_dock_desktop`** on the device account.
 
 ## Shipped (this campaign)
 
@@ -85,6 +92,7 @@ Windows gate-PC / TV shell for the **TSL 1128-EU** gun. Runs the **same** Showru
 - [x] **App versioning + changelog** — `build-station-apk.js` auto-bumps `versionCode`/`versionName`, requires release notes, records build timestamp + history; `/station-app` page shows version, upload time, "What's fixed", and previous builds. Doctrine Rule 6 + [station-android README](../../../station-android/README.md).
 - [x] **Per-device gun-driver fork (v495)** — `11a_Station_Gun_Drivers.html` registry + `stationGunCap_`; Chainway/TSL/gate isolated by `caps`; Chainway auto-sleep regression reverted (`appSleep:false`, trigger-wake restored). See § Gun driver fork.
 - [x] **TSL 1128 desktop thin shell** — `station-desktop/` (WebView2 + TSL ASCII, `PID_1128` auto-detect + watchdog, `.sl` app-sleep), `window.AndroidStation` bridge parity; build via `build-station-desktop.js`. See § Desktop TSL station.
+- [x] **TSL desktop — login + RFID in real station UI (v0.1.40, GAS 525, 2026-07-11)** — four-layer WebView routing, session to `window.top`, nested scan forward, session dedupe, diagnostic window fix. Equipment scans resolve to **name + unit** in Scan panel. Handoff: [tsl-desktop-handoff.md](tsl-desktop-handoff.md).
 - [x] **Gun auto-sleep timer** — Session-settings dropdown (`sm_station_gunsleep_min`, default 5, Never=0); fires `sleepGun()` only for `appSleep:true` drivers (TSL).
 - [x] **Chainway park + HID trigger reconnect (build 50, 2026-07-10)** — no-host grace + park delay dropdowns; `sleepGun` restored; 3-state trigger; firmware sleep pinned 1 min.
 - [x] **Host badge lock while hosted (v501, 2026-07-10)** — scanning a different crew badge while someone is signed in is rejected; operator must **LOG OUT HOST** (or wait for idle eject) so `stationResetDeviceToPristine_` runs before the next badge-in. Restores the hosted-state machine in [logistics-warehouse.md](../topics/logistics-warehouse.md).

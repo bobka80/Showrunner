@@ -29,7 +29,7 @@ When the director reports a bug in these areas, state the risk in plain language
 | **RBAC boot payload** | `Main.js`, `Index.html`, `Security.js` | Inject raw JSON permissions into HTML without Base64 | Keep `userPermissionsB64` + `atob()` pattern |
 | **PWA session + login boot** | `push-hosting/public/host-boot.js`, `Login.html`, `Index.html` (session `postMessage`), `Main.js` (`sessionboot`, `sessioncheck`), `Security.js` | Change iframe load order; skip `sessioncheck` before `sessionboot`; clear parent session on every login screen paint; single-token login that kicks other devices without director approval | Token sync only via `SHOWRUNNER_SESSION_TOKEN`; validate server-side before `sessionboot`; multi-device sessions in `Security.js` |
 | **Mobile QR camera (PWA)** | `push-hosting/public/host-boot.js`, `01j_Mobile_Scan.html`, `Main.js` (`sessionboot`/`mobscanstage`), `Station_Security.js`, `Index.html` | `getUserMedia` in GAS iframe; **`postMessage` as sole handoff**; parallel retry loops (relay + pending flush + burst pull + reload); forget `host-boot.js?v=` bump | Camera on **shell** (`#sr-mobile-shell-cam`); **primary handoff = iframe reload** `sessionboot&srScan=`; 20s dedupe; see § Two-layer shell bridge + § Mobile QR handoff |
-| **Station RFID / native gun bridge** | `host-boot.js`, `11_Station_Shell.html`, `station-android/RfidManager.kt`, `station-desktop/TslRfidManager.cs` | Rely on **`postMessage` or `evaluateJavascript` alone** for scan delivery; remove `pollScans()` pull path; share BLE read/config workers; **TSL:** double inventory (gun + app), inventory on connect, overlapping reads — see § TSL 1128 desktop gun driver | **Primary = iframe `AndroidStation.pollScans()`** (~300 ms); relay + `showrunnerStationDeliverScan` = fallback; direct `AndroidStation` for settings; **TSL:** SinglePressAction=Off + one gated read per trigger; see § Two-layer shell bridge + § Station RFID delivery + § TSL desktop |
+| **Station RFID / native gun bridge** | `host-boot.js`, `11_Station_Shell.html`, `station-android/RfidManager.kt`, `station-desktop/MainWindow.xaml.cs`, `TslRfidManager.cs` | Rely on **`postMessage` or `ExecuteScript` on outer GAS frame only**; remove Chainway `pollScans()` pull; share BLE read/config workers; **TSL:** double inventory, inventory on connect; **Desktop:** grey `#sr-desktop-scan-feed` as “success”; `DiagnosticWindow.Owner = MainWindow`; session save on every Index ping — see § Desktop WebView2 + § TSL 1128 | **Chainway:** iframe `pollScans()` (~300 ms) primary; relay fallback. **Desktop TSL:** top `showrunnerStationDeliverScan` + nested iframe forward + all-frame invoke; inner `#station-shell` owns UI. **TSL gun:** SinglePressAction=Off + one gated read; see § Two-layer bridge + § Station RFID + § Desktop WebView2 + § TSL desktop |
 | **Station native app lifecycle (APK)** | `station-android/AndroidManifest.xml`, `StationWebActivity.kt`, `RfidManager.kt` | Remove `keyboard`/`navigation` from `android:configChanges` (gun is an HID keyboard → connect/disconnect recreates the Activity → full WebView reboot); chase gun-flap resets in JS/session before ruling out Activity recreation | Keep the full `configChanges` list; absorb gun flap in `onConfigurationChanged`; see § Station native app — Android Activity lifecycle |
 | **Station APK + hosting deploy** | `build-station-apk.js`, `deploy-hosting.js`, `push-hosting/prepare-hosting.js`, `station-manifest.json` | Add stdin prompts without `isTTY` guard (wedges shell); leave HTTP fetches undrained (hangs deploy); ship a lower `versionCode`; trust "deploy ran" without live verify | `--non-interactive` firebase + heartbeat/timeout; drain redirects + `process.exit(0)`; downgrade guard; post-deploy live-manifest verify; see § Station APK + Firebase hosting deploy pipeline |
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
@@ -114,7 +114,8 @@ web.app (host-boot.js)                 GAS iframe (Index / station shell)
 |------------|----------|----------|
 | Phone QR camera | Top-level `web.app` shell (`#sr-mobile-shell-cam`) | `getUserMedia` inside GAS iframe; nested `web.app` iframe inside GAS |
 | Scan result → app UI | Iframe reload with `srScan` (QR); server cache pull (backup) | Shell `postMessage` alone into `#app-frame` |
-| Gun EPC → station strip | Iframe `AndroidStation.pollScans()` every ~300 ms | `evaluateJavascript('onStationRfidScan')` into iframe; lossy `postMessage` relay |
+| Gun EPC → station strip (Chainway APK) | Iframe `AndroidStation.pollScans()` every ~300 ms | `evaluateJavascript('onStationRfidScan')` into iframe; lossy `postMessage` relay alone |
+| Gun EPC → station strip (TSL desktop) | Top `showrunnerStationDeliverScan` → nested iframe → `onStationRfidScan` in **inner** GAS frame | `ExecuteScript` on **wrapper** `script.google.com` only → grey `#sr-desktop-scan-feed` shim; session in wrapper only → `no-session` |
 
 **Shared AI rules (both bridges):**
 
@@ -127,7 +128,7 @@ web.app (host-boot.js)                 GAS iframe (Index / station shell)
 7. **Deploy pairing** — `host-boot.js` changes need `node deploy-hosting.js` **and** GAS milestone when `01j` / `Main.js` / `Station_Security.js` also change.
 8. **`host-boot.js` is shared** — mobile QR camera paths and station RFID relay live in the same file; read both sections below before editing either.
 
-**Active campaign (in flight):** phone QR polish — [active/rfid-station-profiles.md](active/rfid-station-profiles.md) § Phone QR scan panel.
+**Active campaign (in flight):** RFID station + TSL desktop gate PC — [active/rfid-station-profiles.md](active/rfid-station-profiles.md) · **Desktop architecture:** [active/tsl-desktop-handoff.md](active/tsl-desktop-handoff.md). Phone QR polish closed — see [topics/mobile-crew.md](topics/mobile-crew.md).
 
 ---
 
@@ -193,9 +194,9 @@ web.app (host-boot.js)                 GAS iframe (Index / station shell)
 
 ## Station RFID scan delivery (shipped v419+)
 
-**Goal:** Chainway gun on warehouse tablet — EPC reaches station live strip and host/vault flows.
+**Goal:** Gun EPC reaches station live strip and host/vault flows — **Chainway APK** and **TSL desktop** use different native delivery but the **same inner station shell** (`11_Station_Shell.html`).
 
-### End-to-end flow (working path)
+### Chainway APK — end-to-end (working path)
 
 ```
 1. RfidManager.kt reads tag on BLE trigger
@@ -204,25 +205,40 @@ web.app (host-boot.js)                 GAS iframe (Index / station shell)
 4. onStationRfidScan(epc) → strip / host login / vault record / checkout
 ```
 
-**Fallback (keep, do not rely on):**
+**Fallback (keep, do not rely on for Chainway):**
 
 - Top frame `showrunnerStationDeliverScan(tag)` → `postMessage SHOWRUNNER_RFID_SCAN` into iframe (`host-boot.js`).
 - Direct `evaluateJavascript('onStationRfidScan…')` — only hits top frame, not station listeners.
 
-**Gun settings:** prefer **direct** `window.AndroidStation.setPower/setScanMode/setBeep/setPollMs` when `native=true`; `SHOWRUNNER_STATION_CONFIG_GET/SET` via `host-boot.js` relay only when interface absent.
+### TSL desktop — end-to-end (working path, v0.1.40+)
+
+```
+1. TslRfidManager.cs trigger read → DeliverScanToPage
+2. RelayScanToTopHosting → web.app showrunnerStationDeliverScan (relay=top)
+3. host-boot.js postMessage SHOWRUNNER_RFID_SCAN → #app-frame
+4. GAS wrapper forwards to nested iframe(s) (__srForwardScanToNested_)
+5. Inner Index / station-shell: onStationRfidScan → stationHandleRfidScan_ → equipment name in Scan panel
+6. Backup: ExecuteScript on all live WebView2 frames (prefer ok/forwarded, not shim)
+```
+
+**Desktop session (required for host login + resolved names):** inner login → `window.top.postMessage(SHOWRUNNER_SESSION_TOKEN)` + `AndroidStation.saveSession` → `desktop-prefs.json` → parent `sessionboot`. See § Desktop WebView2 station.
+
+**Gun settings (both):** prefer **direct** `window.AndroidStation.setPower/setScanMode/setBeep/setPollMs` when `native=true`; `SHOWRUNNER_STATION_CONFIG_GET/SET` via `host-boot.js` relay only when interface absent.
 
 ### Never do
 
-- Remove **`pollScans()` pull** while “fixing” the relay — relay alone was the v414 “gun beeps, nothing in app” bug.
+- Remove **Chainway `pollScans()` pull** while “fixing” the relay — relay alone was the v414 “gun beeps, nothing in app” bug.
+- **Desktop:** deliver scans only to the **outer** `script.google.com` frame — hits BridgeShim grey box, not `#station-scan-panel`.
+- **Desktop:** treat grey `#sr-desktop-scan-feed` as the product UI when profile name is visible (means wrong layer).
 - Share BLE **read worker** with config/device-info SDK calls — hung trigger reads (v412).
 - Ship `host-boot.js` RFID handlers without `?v=` bump.
-- Assume `postMessage` from shell always reaches `11_Station_Shell.html` listeners.
+- Assume `postMessage` from shell always reaches `11_Station_Shell.html` listeners without **nested forward** (desktop GAS nesting).
 
 ### Dedupe
 
-`stationLastScanTag` + ~1.5 s window — one physical pull must not enqueue duplicate strip rows (poll + relay both active).
+`stationLastScanTag` + ~1.5 s window — one physical pull must not enqueue duplicate strip rows (poll + relay both active on Chainway; native + web dedupe on desktop).
 
-**Full field chronology:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) · [topics/logistics-warehouse.md](topics/logistics-warehouse.md).
+**Full field chronology:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) · [active/tsl-desktop-handoff.md](active/tsl-desktop-handoff.md) · [topics/logistics-warehouse.md](topics/logistics-warehouse.md).
 
 ---
 
@@ -287,7 +303,75 @@ Trigger pull → Switch Single event (debounced) → ONE serialized inventory co
 4. **Multi** mode — one pull → short burst, not endless.
 5. No beeps when gun sits idle for 30 s.
 
-**Chronology:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) § Desktop TSL station.
+**Chronology:** [active/rfid-station-profiles.md](active/rfid-station-profiles.md) § Desktop TSL station · [active/tsl-desktop-handoff.md](active/tsl-desktop-handoff.md).
+
+---
+
+## Desktop WebView2 station delivery (Critical)
+
+**Files:** `station-desktop/ShowrunnerStationDesktop/MainWindow.xaml.cs`, `StationBridge.cs`, `DesktopPrefs.cs`, `ScanDiagnostics.cs`, `push-hosting/public/host-boot.js`, `Index.html`, `Login.html`, `build.js`, `11_Station_Shell.html`.
+
+**Profile:** `tsl_dock_desktop` · **Field status (2026-07-11):** login, logout, RFID → **equipment name + unit** in real station UI (Desktop **0.1.40**, GAS **525**).
+
+**Full architecture:** [active/tsl-desktop-handoff.md](active/tsl-desktop-handoff.md) — four WebView layers, session path, scan path, diagnostics.
+
+### Layer model (do not collapse to “two layers”)
+
+| Layer | URL / host | Owns |
+|-------|------------|------|
+| 1 Native | WPF WebView2 host | COM gun, `DeliverScanToPage`, prefs file, F12 diag |
+| 2 Hosting | `sm-showrunner-97405.web.app` | Parent `localStorage`, `showrunnerStationDeliverScan`, `#app-frame` |
+| 3 GAS wrapper | `script.google.com/.../exec` | Nested iframe shell; BridgeShim **emergency only** |
+| 4 GAS inner | `googleusercontent` / Index | `#station-shell`, LogicPayload, `onStationRfidScan`, host login |
+
+### Session fragile points
+
+| Rule | Why |
+|------|-----|
+| **`postSessionToParent` → `window.top`** (not parent only) | Wrapper is layer 3; web.app parent is layer 2 — token never reached `sessionboot` otherwise |
+| **`AndroidStation.saveSession` + `desktop-prefs.json`** | Desktop native boot reads prefs before iframe has token |
+| **Dedupe `TryPersistSession`** | Index `pingHostingParent` every ~1.5 s — undeduped saves caused boot reschedule loop + log spam |
+| **`SHOWRUNNER_STATION_READY` only when `full: true`** | Early boot in `build.js` must not notify native — false `shellReady` |
+| **Do not clear parent session on desktop kiosk** | `ShowrunnerStation` UA + auto pin — clearing parent breaks sessionboot |
+
+### Scan fragile points
+
+| Rule | Why |
+|------|-----|
+| **Top relay first** (`relay=top`) | Matches Android; hits `host-boot.js` before frame guessing |
+| **Nested iframe forward** in wrapper shim | Layer 2 postMessage stops at layer 3 without forward |
+| **All live frames invoke** | Backup when postMessage lost; pick inner frame with `hasStationShell:true` |
+| **Never treat `GAS invoke=shim` as success** when profile UI visible | Shim = `#sr-desktop-scan-feed` grey box, not Scan panel |
+| **Do not re-enable top `pollScans()` on WebView2** | Steals queue from iframe path; desktop uses direct invoke + relay |
+| **Serialize WebView scripts** (`_webScriptLock`) | Concurrent ExecuteScript caused races and empty probes |
+
+### Diagnostics fragile points
+
+| Rule | Why |
+|------|-----|
+| **Never `DiagnosticWindow.Owner = MainWindow`** | Disables main window → WebView2 crash on F12 (v0.1.39 fix) |
+| **Always log to `scan-diag.log`** | `%LOCALAPPDATA%\ShowrunnerStation\scan-diag.log` — survives UI crash |
+| **Launch via `RUN-STATION.bat` only** | Stale exe holds COM3; old publish folders mislead field tests |
+
+### Never do (regression magnets)
+
+- Probe or invoke **only** the first `script.google.com` frame — that is the wrapper, not `#station-shell`.
+- Remove nested forward or top `showrunnerStationDeliverScan` while “simplifying” desktop delivery.
+- Re-add sync `hostObjects.sync.androidStation` calls from iframe on the UI thread.
+- Post `SHOWRUNNER_STATION_READY` from `build.js` early boot block.
+- Save session on every bridge ping without token/expiry dedupe.
+- Change `host-boot.js` mobile QR paths without reading § Mobile QR handoff (shared file).
+
+### Test checklist (after any desktop WebView / session / scan touch)
+
+1. `RUN-STATION.bat` — one process, COM connects after trigger wake if needed.
+2. Login or auto pin — **one** “Session saved to desktop prefs” per login (not scrolling loop).
+3. `sessionboot check: {"boot":true}` in log when appropriate.
+4. Scan asset tag — **equipment name + unit** in Scan panel; **no** grey bottom bar.
+5. Scan crew badge — host badge appears; equipment scan respects host.
+6. Logout — clean host-empty state; can log in again.
+7. F12 diagnostics — opens without crash; Escape hides; “Open log file” works.
+8. Phone PWA / Chainway APK smoke if `host-boot.js` or `Index.html` session posts changed.
 
 ---
 

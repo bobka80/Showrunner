@@ -1,235 +1,287 @@
-# TSL desktop station — new-chat handoff
+# TSL desktop station — handoff & architecture
 
-**Purpose:** Paste or point the next Cursor chat at this file so it can pick up TSL 1128 desktop work without re-discovering the whole thread.
+**Purpose:** Single entry for new Cursor chats on the **TSL 1128 gate PC** (`tsl_dock_desktop`). Read this before touching `station-desktop/` or desktop-specific paths in `host-boot.js` / `Index.html`.
 
-**Parent campaign:** [rfid-station-profiles.md](rfid-station-profiles.md) · **App readme:** [station-desktop/README.md](../../../station-desktop/README.md) · **Vendor reference only:** [stage-desktop-info/README.md](../../../stage-desktop-info/README.md)
+**Parent campaign:** [rfid-station-profiles.md](rfid-station-profiles.md) · **Fragile rules:** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge · § Desktop WebView2 station · § TSL 1128 desktop gun driver · **App readme:** [station-desktop/README.md](../../../station-desktop/README.md)
 
-**Last updated:** 2026-07-11 (v0.1.29 / GAS v520) · **Director habit:** always launch via **`station-desktop/RUN-STATION.bat`** (never double-click a random exe in an old publish folder).
+**Last updated:** 2026-07-11 · **Field status:** **Working** — station login/logout, auto pin, RFID scans show **equipment name + unit #** in the real station UI (Scan panel / live strip), crew badge host flow.
+
+**Director launch:** always **`station-desktop/RUN-STATION.bat`** (never an old exe in a legacy publish folder).
 
 ---
 
 ## One-line brief for a new chat
 
-> TSL 1128 desktop gate PC (`tsl_dock_desktop` profile). App = `station-desktop/` WebView2 thin shell. **Always start with `RUN-STATION.bat`.** Current blockers: **gun not connecting on boot (again)** and **app exit does not sleep/disconnect the gun**, leaving COM3 locked. Live RFID strip relay was fixed in v0.1.24 / GAS v516 but connect/disconnect reliability is still open. Read this file + `TslRfidManager.cs` + `MainWindow.xaml.cs` before changing code.
+> TSL 1128 desktop gate PC (`tsl_dock_desktop`). WPF + WebView2 thin shell runs the **same** station web UI as Chainway. Gun = COM3 Bluetooth TSL. Scans and session cross **four WebView layers** (desktop → web.app → GAS wrapper → GAS inner app). **Do not** “fix” scans by hitting only the outer GAS frame or by re-enabling sync `hostObjects` on the UI thread. Read this file + [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Desktop WebView2 before code. Say **OK go** before changes.
 
 ---
 
-## How the director runs the app (important)
+## Versions (verified working 2026-07-11)
 
-The director **always** starts the station this way:
+| Layer | Version | Notes |
+|-------|---------|--------|
+| **Desktop EXE** | **0.1.40** | Session dedupe, diag window fix (no `Owner`), nested iframe forward |
+| **GAS** | **525** | `postSessionToParent` → `window.top`; early boot does not fake `SHOWRUNNER_STATION_READY` |
+| **Hosting** | `sm-showrunner-97405.web.app` | `host-boot.js` — `showrunnerStationDeliverScan`, `full:true` on real shell ready |
+| **Profile layout** | `tsl_dock_desktop` | One station profile per gate PC device account |
+
+Build / deploy:
+
+```bash
+# Desktop (gate PC or dev machine)
+station-desktop/RUN-STATION.bat          # taskkill + publish + start
+node build-station-desktop.js "<notes>"  # release zip
+
+# Web (only when GAS/hosting changed)
+node milestone.js "<note>"
+node deploy-hosting.js "<note>"          # if host-boot.js changed
+```
+
+---
+
+## Architecture — four layers (not two)
+
+The station **looks** like one fullscreen app. Under WebView2 it is **four documents**:
+
+```mermaid
+flowchart TB
+  subgraph L1["Layer 1 — Desktop native"]
+    EXE["ShowrunnerStationDesktop.exe"]
+    TSL["TslRfidManager COM3"]
+    PREFS["desktop-prefs.json"]
+    LOG["scan-diag.log"]
+  end
+
+  subgraph L2["Layer 2 — Hosting shell web.app"]
+    HB["host-boot.js"]
+    AF["#app-frame iframe"]
+  end
+
+  subgraph L3["Layer 3 — GAS wrapper script.google.com"]
+    WRAP["Outer GAS document — often has nested iframe only"]
+    SHIM["BridgeShimScript — must NOT own scans when inner shell exists"]
+  end
+
+  subgraph L4["Layer 4 — GAS inner app googleusercontent / Index"]
+    INDEX["Index.html + station-shell"]
+    LP["LogicPayload — real onStationRfidScan"]
+    FEED["Equipment names via stationPushScanFeed_ / vault map"]
+  end
+
+  TSL --> EXE
+  EXE --> HB
+  HB --> AF
+  AF --> WRAP
+  WRAP --> INDEX
+  PREFS --> EXE
+  INDEX -.->|SHOWRUNNER_SESSION_TOKEN window.top| HB
+```
+
+| Layer | What the operator sees | What code runs there |
+|-------|------------------------|----------------------|
+| **1 Native** | Status bar, F12 diagnostics | COM gun, `DeliverScanToPage`, session file |
+| **2 web.app** | (Usually invisible chrome) | `showrunnerStationDeliverScan` → `postMessage` into `#app-frame` |
+| **3 GAS wrapper** | **Grey “Live RFID scans” box** if miswired | Emergency shim only — **no** `#station-shell` |
+| **4 GAS inner** | Profile name top-left, Scan panel, host badge prompt | Real station shell, host login, equipment name resolution |
+
+**Android Chainway uses the same layers 2–4** but one WebView hides the split. Desktop **must** treat WebView2 **child frames** explicitly.
+
+---
+
+## Session path (login / auto pin / sessionboot)
+
+**Symptom we debugged for weeks:** UI shows logged-in station profile + auto 6-digit pin, but logs said `sessionboot check: {"skip":"no-session"}`.
+
+**Cause:** Session token lived in **layer 4** (`localStorage` in inner Index) but `postSessionToParent()` only posted to **`window.parent`** (layer 3 wrapper). Desktop prefs and web.app parent never received the token → `sessionboot` never ran from hosting.
+
+**Working path (v525 + v0.1.38+):**
+
+1. Operator logs in (or auto pin) in **layer 4** → `sm_session_token` in iframe storage + meta tags.
+2. `Index.html` / `Login.html` call `AndroidStation.saveSession` (native prefs) **and** `postMessage` to **`window.parent` and `window.top`** (`SHOWRUNNER_SESSION_TOKEN`).
+3. **Layer 2** `host-boot.js` `saveParentSession` → parent `localStorage` + `AndroidStation.saveSession` on top frame.
+4. **Layer 1** `StationBridge.saveSession` → `%LOCALAPPDATA%\ShowrunnerStation\desktop-prefs.json` (deduped — Index pings every 1.5s must not spam saves).
+5. When parent has token: iframe navigates to `?action=sessionboot&token=…` → server validates → full Index boot → LogicPayload loads.
+
+**Fragile:**
+
+- Do **not** clear parent session on desktop station kiosk (`isDesktopAutoLoginOff` false for `ShowrunnerStation` UA).
+- Do **not** schedule unlimited sessionboot retries on every save — use `_sessionBootChecksScheduled` / stop sync timer after boot.
+- **`SHOWRUNNER_STATION_READY`** only when `full: true` from `stationAnnounceReady_()` — early boot in `build.js` must **not** notify native shell ready.
+
+---
+
+## Scan delivery path (gun → equipment name in UI)
+
+**Success criterion:** Scan panel / live strip shows **“Robin WashBeam #20”** (resolved name), not raw EPC hex. Grey box at bottom = **wrong layer**.
+
+```mermaid
+sequenceDiagram
+  participant Gun as TSL gun
+  participant C# as Desktop C#
+  participant Top as web.app L2
+  participant Wrap as GAS wrapper L3
+  participant Shell as Station shell L4
+
+  Gun->>C#: EPC + TID
+  C#->>Top: showrunnerStationDeliverScan relay=top
+  Top->>Wrap: postMessage SHOWRUNNER_RFID_SCAN
+  Wrap->>Shell: forward to nested iframe(s)
+  C#->>Wrap: ExecuteScript forward + all live frames
+  Shell->>Shell: onStationRfidScan → stationHandleRfidScan_
+  Shell->>Shell: stationPushScanFeed_ + vault equip map
+```
+
+**Primary (match Android):** `RelayScanToTopHosting` → `showrunnerStationDeliverScan` in **layer 2**.
+
+**Required for desktop:** GAS **wrapper** forwards `postMessage` into **nested** iframes (`__srForwardScanToNested_` in `BridgeShimScript`). Without this, layer 2 only talks to layer 3.
+
+**Direct frame invoke:** Run `BuildInvokeScanJs` on **all** live `CoreWebView2Frame`s; prefer result `ok` or `forwarded` over `shim`. Treat `shim` as wrong frame / emergency handler.
+
+**Never rely on alone:**
+
+- `ExecuteScript` on the first `script.google.com` frame only (hits wrapper → grey box).
+- `postMessage` without nested forward.
+- Top-frame `pollScans()` on WebView2 (disabled in `host-boot.js` — would steal queue from iframe).
+
+**Dedupe:** 1.5s native + web (`ShouldDeliverScanToWeb`, `__srDedupeScan_`).
+
+---
+
+## Grey box vs real station UI
+
+| UI element | Layer | Meaning |
+|------------|-------|---------|
+| Station profile name top-left | 4 | Real `#station-shell` |
+| “Scan your crew badge” | 4 | Host-empty state — working |
+| **Scan** menu → Live RFID scans | 4 | Real feed (`#station-scan-panel`) |
+| **Grey bar “Live RFID scans”** bottom | 3 (or wrong frame) | **`#sr-desktop-scan-feed` emergency shim** — not success |
+
+Shim is allowed **only** before inner shell exists (pre-login). If operator sees profile name **and** grey box, delivery is still hitting layer 3 — do not ship.
+
+---
+
+## How the director runs the app
 
 ```text
 station-desktop/RUN-STATION.bat
 ```
 
-What the bat does:
+1. `taskkill /F /IM ShowrunnerStationDesktop.exe` — stale instance holds COM3.
+2. ~2 s delay for Bluetooth COM release.
+3. `dotnet publish` → `ShowrunnerStationDesktop/bin/publish/win-x64/`.
+4. Starts published exe.
 
-1. `cd` to the bat folder (works from a **desktop shortcut** with any working directory)
-2. `taskkill /F /IM ShowrunnerStationDesktop.exe` — kills stale copies (critical; two instances fight for COM3 → “Access denied”).
-3. `ping` delay (~2 s) — lets Windows release the Bluetooth virtual COM port.
-4. **`dotnet publish`** → **`ShowrunnerStationDesktop\bin\publish\win-x64\`** (always latest source — no manual build step)
-5. Starts **`ShowrunnerStationDesktop.exe`** from that folder
-
-Requires **.NET 8 SDK** on the gate PC for auto-build. If SDK is missing, the bat starts the last published exe if one exists.
-
-**Do not** launch from `win-x64-launch`, `win-x64-v019`, `win-x64-v020`, or an old zip — those were debug/legacy folders and caused version confusion (e.g. running v0.1.17 while thinking v0.1.23 was live).
+**Prefs:** `%LOCALAPPDATA%\ShowrunnerStation\desktop-prefs.json` (`SessionToken`, `SessionExpires`, optional `ComPort`).
 
 ---
 
-## Versions (as of 2026-07-11)
+## Diagnostics
 
-| Layer | Version | Notes |
-|-------|---------|--------|
-| **GAS (web app)** | **520** | Bootloader early feed + pending queue; full shell in LogicPayload |
-| **Desktop EXE** | **0.1.29** | BridgeShimScript = station early boot + live feed shim before LogicPayload; no early-return on re-inject |
-| **Hosting** | `sm-showrunner-97405.web.app` | Firebase shell; `host-boot.js` defines `showrunnerStationDeliverScan` |
-| **TSL profile layout** | `tsl_dock_desktop` | Assigned in admin station profiles to this device account |
-| **Chainway APK** | separate track | `station-android/` — not this handoff |
+| Tool | Path / key |
+|------|------------|
+| **Log file (always written)** | `%LOCALAPPDATA%\ShowrunnerStation\scan-diag.log` |
+| **Connect audit** | `%LOCALAPPDATA%\ShowrunnerStation\connect-lock.log` |
+| **F12 panel** | Toggle diagnostics — **must not** set `Owner = MainWindow` (disables WebView → crash) |
+| **Escape** | Quit app (focus main window) |
+| **F12 / Esc on diag** | Hide diagnostic window |
 
-Build desktop:
+**Healthy scan log (abbreviated):**
 
-```bash
-node build-station-desktop.js "<release notes>"
+```text
+[NATIVE] ScanReceived event EPC=...
+[WEB] DeliverScanToPage EPC=...
+[WEB] immediate: relay=top
+[WEB] immediate: GAS invoke=ok   (or forwarded)
 ```
 
-Output: `station-desktop/ShowrunnerStationDesktop/bin/publish/win-x64/`
+**Healthy session (once per login, not looping):**
 
-Deploy GAS (only when shell/backend JS changes):
-
-```bash
-node milestone.js "<note>"
+```text
+[WEB] Session saved to desktop prefs (bridge, expires ...)
+[WEB] sessionboot check: {"boot":true}
 ```
 
----
-
-## Folder map (do not confuse)
-
-| Path | Role |
-|------|------|
-| **`station-desktop/`** | **The Showrunner desktop app** — WPF + WebView2 + TSL COM |
-| **`stage-desktop-info/`** | TSL vendor PDFs, SDK samples, Explorer installer — **reference only**, not the app |
-| **`station-android/`** | Chainway handheld APK — different gun, same web shell |
-| **`push-hosting/public/`** | Firebase hosting shell (`index.html`, `host-boot.js`) |
-| **`11_Station_Shell.html`** | GAS station UI (compiled into LogicPayload) |
-
----
-
-## Architecture (how scans are supposed to flow)
-
-```mermaid
-flowchart LR
-  TSL[TSL 1128 trigger] --> COM[Bluetooth virtual COM]
-  COM --> Native[TslRfidManager.cs]
-  Native --> Bridge[StationBridge / ScanReceived]
-  Bridge --> Top[Hosting page top frame]
-  Top --> Relay[showrunnerStationDeliverScan]
-  Relay --> PM[postMessage SHOWRUNNER_RFID_SCAN]
-  PM --> GAS[GAS iframe station shell]
-  Native --> FramePM[CoreWebView2Frame.PostWebMessageAsJson]
-  FramePM --> Shim[Bridge shim SR_RFID_SCAN]
-  Shim --> Handler[onStationRfidScan]
-  Handler --> Feed[stationPushScanFeed_ live strip]
-```
-
-**Key idea:** Showrunner’s station UI runs **inside a cross-origin GAS iframe** (`#app-frame`). The native host object (`window.AndroidStation`) is injected per frame, but **`PostWebMessageAsJson` from the host only reliably updates the top hosting document’s cache**. The GAS iframe must receive scans via:
-
-1. **Primary (v0.1.24):** `CoreWebView2Frame.PostWebMessageAsJson({ type: 'SR_RFID_SCAN', tag, tid })` → bridge shim in iframe → `onStationRfidScan`.
-2. **Backup:** top frame `showrunnerStationDeliverScan` → `postMessage` into `#app-frame`.
-3. **Legacy / weak:** `ExecuteScriptAsync` into child frames (often hit wrong frames — Firebase, etc.).
-
-**Desktop must not poll on the top hosting frame** — `host-boot.js` skips top-frame poll on WebView2 so it doesn’t drain the native queue before the iframe sees scans.
-
----
-
-## Machine state (director’s PC, last known)
-
-| Item | Value |
-|------|--------|
-| Gun model | TSL 1128-EU |
-| Bluetooth COM | **COM3** (outgoing port — confirmed working when connect succeeds) |
-| Prefs file | `%LOCALAPPDATA%\ShowrunnerStation\desktop-prefs.json` |
-| Typical prefs | `"ComPort": "COM3"` (can leave blank for auto-detect by `PID_1128`) |
-| Recurring failure | **Access denied / connect fail** when a previous process or unclean exit still holds COM3 |
-| Recurring failure | **Two exe instances** fighting for the same port |
-
----
-
-## Problem history (what this chat already went through)
-
-### Fixed (do not regress)
-
-| Symptom | Root cause | Fix (approx version) |
-|---------|------------|----------------------|
-| Connect failed / hourglass | Sync `hostObjects` blocked UI during COM connect; read gate blocked connect | Cache-only bridge shim; connect on watchdog thread (v0.1.21–22) |
-| App instant exit on launch | `PushGunStateToWeb` touched WebView off UI thread | UI-thread-only gun push (v0.1.23) |
-| Two apps on COM3 | Stale exe + no single-instance | `ProcessGuard`, `RUN-STATION.bat` taskkill, mutex (v0.1.20–21) |
-| Folder confusion | Typo folder `station-desctop` vs real app | Renamed vendor folder to **`stage-desktop-info/`** |
-| Live strip empty while F12 shows reads | Scans never reached GAS iframe reliably | Frame `PostWebMessage` + shim `SR_RFID_SCAN` (v0.1.24 / GAS 516) |
-| Irrational double trigger | TSL double switch events + read overlap | Debounce 2200 ms; ignore trigger while read gate busy (v0.1.24) |
-
-### Open (prioritize in next session)
-
-| Symptom | Likely cause | Suggested direction |
-|---------|--------------|---------------------|
-| **Connect still flaky after v0.1.25** | Gun asleep; BT stack slow; zombie thread after sweep timeout | Check `connect-sweep-timeout` in connect-lock.log; pull trigger; verify `dispose-done` on close |
-| Live strip still empty after v0.1.24 | Field still on old exe, or GAS cache, or station shell not mounted | F12 probe: `FRAME[n] isStation/hasOnScan/recentScans`; confirm v0.1.25 + GAS 516 |
+**Probe (F12 → Probe web bridge):** `FRAME[n]` JSON with `"hasStationShell":true`, `"shellReady":true` on **inner** frame — not only wrapper.
 
 ---
 
 ## Key source files
 
-| File | Responsibility |
-|------|----------------|
-| `station-desktop/RUN-STATION.bat` | **Director’s launch path** — taskkill + start `win-x64` exe |
-| `station-desktop/ShowrunnerStationDesktop/MainWindow.xaml.cs` | WebView2 boot, frame tracking, `DeliverScanToPage`, bridge shim, F12 diagnostics |
-| `station-desktop/ShowrunnerStationDesktop/TslRfidManager.cs` | COM connect watchdog, trigger reads, `SleepAndDisconnect`, `Dispose` |
-| `station-desktop/ShowrunnerStationDesktop/StationBridge.cs` | WebView2 host object (`AndroidStation` API) |
-| `station-desktop/ShowrunnerStationDesktop/GunPortDetector.cs` | Auto-detect TSL `PID_1128` outgoing COM |
-| `station-desktop/ShowrunnerStationDesktop/ProcessGuard.cs` | Kill sibling exe on startup |
-| `push-hosting/public/host-boot.js` | `showrunnerStationDeliverScan`, desktop skip top poll |
-| `11_Station_Shell.html` | `onStationRfidScan`, live feed, `stationNativeBridge_`, scan poll |
-| `build-station-desktop.js` | Publish to `bin/publish/win-x64` |
+| File | Role |
+|------|------|
+| `station-desktop/RUN-STATION.bat` | Director launch path |
+| `MainWindow.xaml.cs` | WebView2, frame tracking, scan relay, session sync, `BridgeShimScript`, diagnostics |
+| `TslRfidManager.cs` | COM connect, trigger read, sleep/disconnect |
+| `StationBridge.cs` | `AndroidStation` host object API |
+| `DesktopPrefs.cs` | Session + gun prefs on disk |
+| `ScanDiagnostics.cs` | Ring buffer + `scan-diag.log` |
+| `push-hosting/public/host-boot.js` | Top relay, desktop session boot, `SHOWRUNNER_STATION_READY` gate |
+| `Index.html` | Session → `window.top` + `AndroidStation.saveSession` |
+| `Login.html` | Same session posts on login / auto boot |
+| `build.js` | Station early boot — **no** premature `SHOWRUNNER_STATION_READY` |
+| `11_Station_Shell.html` | Real `onStationRfidScan`, feed, host login, `stationAnnounceReady_({full:true})` |
 
 ---
 
-## Diagnostics (F12 in the desktop app)
+## Problem history — fixed (do not regress)
 
-Press **F12** to toggle the diagnostic window.
-
-**Healthy scan (v0.1.24+):**
-
-```text
-[NATIVE] ScanReceived event EPC=...
-[WEB] DeliverScanToPage EPC=...
-[WEB] immediate: top relay + postMessage sent
-[WEB] immediate: SR_RFID_SCAN → N frame(s)
-[GUN] Read: ... tid:...
-```
-
-Use the probe button (or startup probe) — look for:
-
-```text
-TOP  { role:'top', deliverFn:true, appFrame:true, ... }
-FRAME[0] { role:'child', isStation:true, hasOnScan:true, recentScans:1, ... }
-```
-
-If `hasOnScan:false` on all frames, the station shell hasn’t mounted yet (async GAS boot) or device isn’t in station mode (UA / profile).
-
-Connect logs use `ConnectLockLog` / `[GUN]` / watchdog messages — grep `connect-try`, `connect-fail`, `connect-ok`, `Access denied`.
+| Symptom | Root cause | Fix |
+|---------|------------|-----|
+| Gun beeps, nothing in app | Sync `hostObjects` blocked UI; relay-only | Cache shim; frame postMessage; COM on watchdog thread |
+| Live strip empty | Scans never reached GAS iframe | Top relay + nested forward + all-frame invoke |
+| Profile visible, logs `no-session` | Token posted to wrapper not web.app | `window.top.postMessage` + iframe sync to prefs |
+| Scans only in grey box | Invoke/probe on GAS **wrapper** frame | Forward nested; skip shim on wrapper; Android-first relay |
+| `shellReady` but no host login | Early boot posted `SHOWRUNNER_STATION_READY` | Only `full:true` from `stationAnnounceReady_` |
+| F12 crashes app | `DiagnosticWindow.Owner = MainWindow` disabled WebView | Remove Owner; log file + Open log file button |
+| Diagnostic log scroll loop | Index `pingHostingParent` every 1.5s → saveSession storm | Dedupe `TryPersistSession`; boot schedule once |
+| False probe `(empty)` | JS typo in frame probe script | Fixed `info.isWrapper=` in probe |
+| Two exe on COM3 | Stale process | `RUN-STATION.bat` taskkill + `ProcessGuard` |
 
 ---
 
-## Exit / disconnect behaviour (v0.1.25)
+## Open / lower priority (not blocking success)
 
-**Explicit sleep (works):** station settings → Disconnect+sleep → `SleepAndDisconnect()` → ASCII `.sl` then `Disconnect()`.
-
-**App close (v0.1.25):** `MainWindow.ShutdownRfid()` → `TslRfidManager.ShutdownGracefully(3000ms)` — sends sleep, disconnects COM, logs `dispose-start` / `dispose-done` (or `dispose-timeout`) synchronously to `connect-lock.log`. Also hooked on `Application.SessionEnding`.
-
-**RUN-STATION.bat taskkill** still skips graceful shutdown if a stale copy is killed — prefer closing the window normally before relaunching.
+| Item | Notes |
+|------|--------|
+| COM connect noise on boot | Bluetooth sleep / semaphore — gun often connects after trigger wake |
+| Graceful exit + COM release | `ShutdownGracefully`; bat `taskkill` skips graceful path |
+| Re-enable iframe `pollScans` with dedupe | Optional Android parity; direct invoke + relay work when session booted |
 
 ---
 
 ## What not to do
 
-- Do not edit `stage-desktop-info/` expecting it to change the app — it’s vendor reference only.
-- Do not run multiple `ShowrunnerStationDesktop.exe` copies (use the bat).
-- Do not use old publish folders (`win-x64-v019`, `win-x64-v020`, `win-x64-launch`) as the field exe.
-- Do not reintroduce **sync** `hostObjects.sync.androidStation.pollScans()` on the UI thread in the GAS iframe — caused hourglass / freeze.
-- Do not “fix” scan relay in `host-boot.js` in a way that breaks phone QR scan — read [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge first.
+See [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Desktop WebView2 station. Summary:
 
----
-
-## Suggested priority for next implementation session
-
-1. **Clean exit** — sleep + disconnect on app close (with timeout); verify COM3 released and gun sleeps.
-2. **Connect on boot** — after exit fix, retest; if still failing, improve watchdog logging and manual COM fallback UX.
-3. **Verify live strip** — one trigger → EPC in strip + probe `recentScans:1` (regression check after connect work).
-4. **Doc hygiene** — update version line in [rfid-station-profiles.md](rfid-station-profiles.md) header when shipping.
-
-Say **OK go** in the new chat before code changes (director workflow).
+- Do **not** set diagnostic window `Owner` to main window.
+- Do **not** deliver scans only via `ExecuteScript` on first `script.google.com` frame.
+- Do **not** remove nested iframe forward or top `showrunnerStationDeliverScan` relay.
+- Do **not** re-add early `SHOWRUNNER_STATION_READY` in `build.js`.
+- Do **not** log/save session on every 1.5s Index ping without dedupe.
+- Do **not** use sync `hostObjects.sync.androidStation` from iframe on UI thread.
+- Do **not** edit `stage-desktop-info/` expecting app changes — vendor reference only.
+- Do **not** break Chainway / phone QR paths in `host-boot.js` while fixing desktop.
 
 ---
 
 ## Copy-paste starter for a new Cursor chat
 
 ```text
-Read docs/ai/active/tsl-desktop-handoff.md first.
+Read docs/ai/active/tsl-desktop-handoff.md and FRAGILE_ZONES.md § Desktop WebView2.
 
-TSL desktop station — I always launch with station-desktop/RUN-STATION.bat.
+TSL desktop gate PC — RUN-STATION.bat. Field status: login + RFID working (equipment names in Scan panel).
 
-Current problems:
-1. Gun not connecting on app start again.
-2. Last time I closed the app the gun did not disconnect/sleep.
+Task: [describe]
 
-Please diagnose connect logs and the exit/disconnect gap (Task.Run Dispose with no wait).
 Do not code until I say OK go.
 ```
 
 ---
 
-## Session changelog (2026-07-11)
+## Session changelog
 
-- **v0.1.25:** Graceful exit — `ShutdownGracefully(3s)` sends TSL sleep + disconnect on window close / logoff; `dispose-*` lines in connect-lock.log; connect sweep timeout (7s max per watchdog pass).
-- **v0.1.24:** `PostScanToChildFrames` via `CoreWebView2Frame.PostWebMessageAsJson`; bridge shim handles `SR_RFID_SCAN`; trigger debounce 2200 ms; `RUN-STATION.bat` → `win-x64`.
-- **GAS v516:** `stationPushScanFeed_` before dedup; `stationNativeBridge_` skips sync host when `__srDesktopBridge` present.
-- **Not verified in field after deploy:** connect reliability + live strip on director’s machine (connect failed before retest).
+| Date | Version | Note |
+|------|---------|------|
+| 2026-07-11 | Desktop 0.1.40, GAS 525 | **Field success** — session to top, nested scan forward, session dedupe, diag fix; doc rewrite |
+| 2026-07-11 | 0.1.25–0.1.39 | Iterative fix: relay, frames, session sync, wrapper detection |
+| 2026-07-11 | 0.1.24 / GAS 516 | Frame PostWebMessage + SR_RFID_SCAN shim |

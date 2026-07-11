@@ -24,6 +24,7 @@
       <Button x:Name="TestScanBtn" Content="Inject test scan" Padding="10,6" Margin="0,0,8,0" Click="TestScanBtn_OnClick"/>
       <Button x:Name="ClearBtn" Content="Clear" Padding="10,6" Margin="0,0,8,0" Click="ClearBtn_OnClick"/>
       <Button x:Name="CopyBtn" Content="Copy all" Padding="10,6" Margin="0,0,8,0" Click="CopyBtn_OnClick"/>
+      <Button x:Name="OpenLogBtn" Content="Open log file" Padding="10,6" Margin="0,0,8,0" Click="OpenLogBtn_OnClick"/>
       <CheckBox x:Name="AutoScrollBox" Content="Auto-scroll" IsChecked="True" Foreground="#c4c7cc"
                 VerticalAlignment="Center" Margin="8,0,0,0"/>
     </StackPanel>

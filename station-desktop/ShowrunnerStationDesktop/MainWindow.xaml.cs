@@ -18,10 +18,13 @@ public partial class MainWindow : Window
     private readonly List<CoreWebView2Frame> _childFrames = new();
     private CoreWebView2Frame? _gasFrame;
     private readonly object _frameLock = new();
+    private readonly SemaphoreSlim _webScriptLock = new(1, 1);
     private StationBridge? _bridge;
     private bool _splashHidden;
     private bool _shellReady;
     private bool _sessionBootDone;
+    private bool _sessionBootChecksScheduled;
+    private bool _sessionSyncInFlight;
     private DiagnosticWindow? _diagWindow;
     private System.Threading.Timer? _sessionSyncTimer;
     private System.Threading.Timer? _gunPushTimer;
@@ -143,7 +146,7 @@ public partial class MainWindow : Window
                     ScanDiagnostics.Log("WEB", "Child frame navigation completed");
                     try
                     {
-                        await child.ExecuteScriptAsync(BridgeShimScript);
+                        await SafeFrameScriptAsync(child, BridgeShimScript);
                         ScanDiagnostics.Log("WEB", "Bridge shim injected into child frame");
                     }
                     catch (Exception ex)
@@ -152,8 +155,7 @@ public partial class MainWindow : Window
                     }
                     try
                     {
-                        var hrefRaw = await child.ExecuteScriptAsync("JSON.stringify(String(location.href||''))");
-                        var href = UnwrapScriptResult(hrefRaw) ?? "";
+                        var href = await SafeFrameScriptAsync(child, "JSON.stringify(String(location.href||''))") ?? "";
                         ScanDiagnostics.Log("WEB", "Frame nav " + Trunc(href, 96));
                         _ = UpdateBestGasFrameAsync();
                     }
@@ -347,9 +349,8 @@ public partial class MainWindow : Window
                     {
                         var token = payload[0].GetString();
                         var exp = payload[1].TryGetInt64(out var e) ? e : 0L;
-                        _bridge?.saveSession(token, exp);
-                        ScanDiagnostics.Log("WEB", "Session saved to desktop prefs (expires " + exp + ")");
-                        ScheduleDesktopSessionBootChecks();
+                        if (TryPersistSession(token, exp, "bridge"))
+                            MaybeScheduleSessionBoot();
                     }
                     break;
             }
@@ -478,9 +479,41 @@ public partial class MainWindow : Window
         return true;
     }
 
+    private void MaybeScheduleSessionBoot()
+    {
+        if (_sessionBootDone || _sessionBootChecksScheduled) return;
+        _sessionBootChecksScheduled = true;
+        ScheduleDesktopSessionBootChecks();
+    }
+
+    private bool TryPersistSession(string? token, long expiresAt, string source)
+    {
+        var t = (token ?? "").Trim();
+        var prefs = DesktopPrefs.Load();
+        if (t.Length < 20)
+        {
+            if (string.IsNullOrEmpty(prefs.SessionToken) && prefs.SessionExpires == 0)
+                return false;
+            _bridge?.saveSession(null, 0);
+            ScanDiagnostics.Log("WEB", "Session cleared (" + source + ")");
+            return true;
+        }
+        if (t == (prefs.SessionToken ?? "") && expiresAt == prefs.SessionExpires)
+            return false;
+        _bridge?.saveSession(t, expiresAt);
+        ScanDiagnostics.Log("WEB", "Session saved to desktop prefs (" + source + ", expires " + expiresAt + ")");
+        return true;
+    }
+
+    private void StopSessionSyncTimer()
+    {
+        _sessionSyncTimer?.Dispose();
+        _sessionSyncTimer = null;
+    }
+
     private void ScheduleDesktopSessionBootChecks()
     {
-        foreach (var delayMs in new[] { 600, 2000, 5000, 10000, 20000, 30000, 45000, 60000, 90000, 120000 })
+        foreach (var delayMs in new[] { 600, 2000, 5000, 10000, 20000 })
         {
             Task.Delay(delayMs).ContinueWith(_ =>
                 Dispatcher.BeginInvoke(() => _ = EnsureDesktopSessionBootAsync()));
@@ -489,14 +522,28 @@ public partial class MainWindow : Window
 
     private void StartSessionSyncTimer()
     {
-        _sessionSyncTimer?.Dispose();
+        if (_sessionBootDone) return;
+        var prefs = DesktopPrefs.Load();
+        var token = (prefs.SessionToken ?? "").Trim();
+        if (token.Length >= 20 && prefs.SessionExpires > DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            return;
+        StopSessionSyncTimer();
+        var runs = 0;
         _sessionSyncTimer = new System.Threading.Timer(_ =>
-            Dispatcher.BeginInvoke(() => _ = SyncSessionFromAllFramesAsync()), null, 3000, 8000);
+        {
+            if (_sessionBootDone || runs >= 6)
+            {
+                Dispatcher.BeginInvoke(StopSessionSyncTimer);
+                return;
+            }
+            runs++;
+            Dispatcher.BeginInvoke(() => _ = SyncSessionFromAllFramesAsync());
+        }, null, 4000, 15000);
     }
 
     private async Task EnsureDesktopSessionBootAsync()
     {
-        if (WebView.CoreWebView2 == null) return;
+        if (WebView.CoreWebView2 == null || _sessionBootDone) return;
         await SyncSessionFromAllFramesAsync();
         await SeedParentSessionFromDesktopPrefsAsync();
 
@@ -518,12 +565,14 @@ public partial class MainWindow : Window
             """;
         try
         {
-            var raw = await WebView.CoreWebView2.ExecuteScriptAsync(js);
-            var result = Trunc(UnwrapScriptResult(raw), 120);
-            ScanDiagnostics.Log("WEB", "sessionboot check: " + result);
-            if (result.Contains("\"boot\":true"))
+            var result = Trunc(await SafeTopScriptAsync(js), 120);
+            ScanDiagnostics.Log("WEB", "sessionboot check: " + (result ?? "(null)"));
+            if (result != null && (result.Contains("\"boot\":true") || result.Contains("\"skip\":\"sessionboot\"")))
+            {
                 _sessionBootDone = true;
-            if (result.Contains("\"skip\":\"no-session\"") && !_sessionBootDone)
+                StopSessionSyncTimer();
+            }
+            if (result != null && result.Contains("\"skip\":\"no-session\"") && !_sessionBootDone)
                 ShowStatus("Syncing station login… if scans stay in grey box, tap station name and re-enter passcode once", persistent: true);
         }
         catch
@@ -547,56 +596,54 @@ public partial class MainWindow : Window
 
     private async Task SyncSessionFromAllFramesAsync()
     {
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
-        foreach (var frame in frames)
-            await SyncIframeSessionToParentAsync(frame);
+        if (_sessionBootDone || _sessionSyncInFlight) return;
+        _sessionSyncInFlight = true;
+        try
+        {
+            foreach (var frame in SnapshotLiveFrames())
+                await SyncIframeSessionToParentAsync(frame);
+        }
+        finally
+        {
+            _sessionSyncInFlight = false;
+        }
     }
 
     private async Task UpdateBestGasFrameAsync()
     {
-        var best = await FindBestScanFrameAsync();
-        if (best != null)
-            await SyncIframeSessionToParentAsync(best);
+        await FindBestScanFrameAsync();
     }
 
     private async Task<CoreWebView2Frame?> FindBestScanFrameAsync()
     {
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
+        var frames = SnapshotLiveFrames();
         CoreWebView2Frame? best = null;
         var bestScore = -1;
         var bestHref = "";
         foreach (var frame in frames)
         {
-            try
-            {
-                var hrefRaw = await frame.ExecuteScriptAsync("JSON.stringify(String(location.href||'').substring(0,80))");
-                var href = UnwrapScriptResult(hrefRaw) ?? "";
-                if (href.Contains("about:blank", StringComparison.OrdinalIgnoreCase) ||
-                    href.Contains("camera-embed", StringComparison.OrdinalIgnoreCase))
-                    continue;
+            var href = await SafeFrameScriptAsync(frame, "JSON.stringify(String(location.href||'').substring(0,80))") ?? "";
 
-                var shellRaw = await frame.ExecuteScriptAsync(BuildFrameHasStationShellJs());
-                var hasShell = string.Equals(UnwrapScriptResult(shellRaw), "true", StringComparison.OrdinalIgnoreCase);
+            if (href.Contains("about:blank", StringComparison.OrdinalIgnoreCase) ||
+                href.Contains("camera-embed", StringComparison.OrdinalIgnoreCase))
+                continue;
 
-                var probeRaw = await frame.ExecuteScriptAsync(BuildFrameScanProbeJs());
-                var probe = UnwrapScriptResult(probeRaw) ?? "";
-                var score = 0;
-                if (hasShell) score += 10;
-                if (probe.Contains("\"shellReady\":true", StringComparison.Ordinal)) score += 5;
-                if (probe.Contains("\"hasStationShell\":true", StringComparison.Ordinal)) score += 3;
-                if (probe.Contains("\"isWrapper\":true", StringComparison.Ordinal)) score -= 8;
+            var hasShell = string.Equals(
+                await SafeFrameScriptAsync(frame, BuildFrameHasStationShellJs()),
+                "true",
+                StringComparison.OrdinalIgnoreCase);
 
-                if (score <= bestScore) continue;
-                bestScore = score;
-                best = frame;
-                bestHref = href;
-            }
-            catch
-            {
-                // ignore per-frame probe failures
-            }
+            var probe = await SafeFrameScriptAsync(frame, BuildFrameScanProbeJs()) ?? "";
+            var score = 0;
+            if (hasShell) score += 10;
+            if (probe.Contains("\"shellReady\":true", StringComparison.Ordinal)) score += 5;
+            if (probe.Contains("\"hasStationShell\":true", StringComparison.Ordinal)) score += 3;
+            if (probe.Contains("\"isWrapper\":true", StringComparison.Ordinal)) score -= 8;
+
+            if (score <= bestScore) continue;
+            bestScore = score;
+            best = frame;
+            bestHref = href;
         }
 
         if (best != null)
@@ -623,51 +670,54 @@ public partial class MainWindow : Window
 
     private async Task<bool> ProbeGasFrameShellReadyAsync()
     {
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
-        foreach (var frame in frames)
+        foreach (var frame in SnapshotLiveFrames())
         {
-            try
-            {
-                var raw = await frame.ExecuteScriptAsync(BuildFrameScanProbeJs());
-                var probe = UnwrapScriptResult(raw) ?? "";
-                if (probe.Contains("\"shellReady\":true", StringComparison.Ordinal))
-                    return true;
-            }
-            catch
-            {
-                // ignore
-            }
+            var probe = await SafeFrameScriptAsync(frame, BuildFrameScanProbeJs()) ?? "";
+            if (probe.Contains("\"shellReady\":true", StringComparison.Ordinal))
+                return true;
         }
         return false;
     }
 
     private async Task SyncIframeSessionToParentAsync(CoreWebView2Frame frame)
     {
+        if (_sessionBootDone) return;
         const string js = """
             (function(){try{
               var t=localStorage.getItem('sm_session_token')||'';
-              var meta=document.querySelector('meta[name="session-token"]');
-              if(meta&&meta.content)t=String(meta.content).trim()||t;
+              var metaTok=document.querySelector('meta[name="session-token"]');
+              if(metaTok&&metaTok.content)t=String(metaTok.content).trim()||t;
               var exp=parseInt(localStorage.getItem('sm_session_expires')||'0',10);
               if(!exp&&t&&t.length>=20)exp=Date.now()+2592000000;
               if(!t||t.length<20||!exp||exp<=Date.now())return JSON.stringify({skip:'no-iframe-session'});
               var crew=localStorage.getItem('sm_crew_name')||'';
-              var meta=document.querySelector('meta[name="user-name"]');
-              if(meta&&meta.content)crew=String(meta.content).trim()||crew;
-              if(window.AndroidStation&&typeof AndroidStation.saveSession==='function')
-                AndroidStation.saveSession(t,exp);
-              if(window.parent&&window.parent!==window)
-                window.parent.postMessage({type:'SHOWRUNNER_SESSION_TOKEN',token:t,crewName:crew,expiresAt:exp},'*');
-              return JSON.stringify({sync:true,crew:String(crew||'').substring(0,24)});
+              var metaCrew=document.querySelector('meta[name="user-name"]');
+              if(metaCrew&&metaCrew.content)crew=String(metaCrew.content).trim()||crew;
+              if(window.parent&&window.parent!==window){
+                var msg={type:'SHOWRUNNER_SESSION_TOKEN',token:t,crewName:crew,expiresAt:exp};
+                window.parent.postMessage(msg,'*');
+                if(window.top&&window.top!==window)window.top.postMessage(msg,'*');
+              }
+              return JSON.stringify({sync:true,token:t,exp:exp,crew:String(crew||'').substring(0,24)});
             }catch(e){return JSON.stringify({err:String(e.message||e)});}})()
             """;
         try
         {
-            var raw = await frame.ExecuteScriptAsync(js);
-            var result = Trunc(UnwrapScriptResult(raw), 80);
-            if (result.Contains("\"sync\":true"))
-                ScanDiagnostics.Log("WEB", "iframe session sync: " + result);
+            var result = await SafeFrameScriptAsync(frame, js) ?? "";
+            if (!result.Contains("\"sync\":true")) return;
+            try
+            {
+                using var doc = JsonDocument.Parse(result);
+                var root = doc.RootElement;
+                var token = root.TryGetProperty("token", out var tokEl) ? tokEl.GetString() : null;
+                var exp = root.TryGetProperty("exp", out var expEl) && expEl.TryGetInt64(out var e) ? e : 0L;
+                if (TryPersistSession(token, exp, "iframe-sync"))
+                    MaybeScheduleSessionBoot();
+            }
+            catch
+            {
+                // ignore parse failures
+            }
         }
         catch
         {
@@ -691,7 +741,7 @@ public partial class MainWindow : Window
                  "}catch(e){}})();";
         try
         {
-            await WebView.CoreWebView2.ExecuteScriptAsync(js);
+            await SafeTopScriptAsync(js);
         }
         catch
         {
@@ -717,25 +767,16 @@ public partial class MainWindow : Window
 
     private async Task<string> InvokeScanOnAllFramesAsync(string epc, string tid)
     {
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
+        var frames = SnapshotLiveFrames();
         if (frames.Length == 0) return "no-frame";
         var js = BuildInvokeScanJs(epc, tid);
         var best = "no-handler";
         foreach (var frame in frames)
         {
-            try
-            {
-                var raw = await frame.ExecuteScriptAsync(js);
-                var result = UnwrapScriptResult(raw) ?? "";
-                if (result is "ok" or "forwarded") return result;
-                if (result == "shim" && best is not ("ok" or "forwarded")) best = "shim";
-                else if (best is "no-handler" or "shim" && result.Length > 0 && result is not "shim") best = result;
-            }
-            catch
-            {
-                // ignore per-frame failures
-            }
+            var result = await SafeFrameScriptAsync(frame, js) ?? "";
+            if (result is "ok" or "forwarded") return result;
+            if (result == "shim" && best is not ("ok" or "forwarded")) best = "shim";
+            else if (best is "no-handler" or "shim" && result.Length > 0 && result is not "shim") best = result;
         }
         return best;
     }
@@ -744,23 +785,13 @@ public partial class MainWindow : Window
     {
         const string js =
             "(function(){try{if(typeof stationDrainPendingRfidScans_==='function'){stationDrainPendingRfidScans_();return 'drained';}return 'no-drain';}catch(e){return 'err';}})()";
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
-        foreach (var frame in frames)
+        foreach (var frame in SnapshotLiveFrames())
         {
-            try
+            var result = await SafeFrameScriptAsync(frame, js) ?? "";
+            if (result == "drained")
             {
-                var raw = await frame.ExecuteScriptAsync(js);
-                var result = UnwrapScriptResult(raw) ?? "";
-                if (result == "drained")
-                {
-                    ScanDiagnostics.Log("WEB", "Pending scan drain: drained");
-                    return;
-                }
-            }
-            catch
-            {
-                // ignore
+                ScanDiagnostics.Log("WEB", "Pending scan drain: drained");
+                return;
             }
         }
         ScanDiagnostics.Log("WEB", "Pending scan drain: no-drain");
@@ -768,47 +799,43 @@ public partial class MainWindow : Window
 
     private async Task ProbeAllFramesAsync(string pass)
     {
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
+        var frames = SnapshotLiveFrames();
         ScanDiagnostics.Log("WEB", pass + ": probing " + frames.Length + " frame(s)");
         for (var i = 0; i < frames.Length; i++)
         {
-            try
-            {
-                var raw = await frames[i].ExecuteScriptAsync(BuildFrameScanProbeJs());
-                var probe = Trunc(UnwrapScriptResult(raw), 220);
-                ScanDiagnostics.Log("WEB", pass + ": FRAME[" + i + "] " + probe);
-                if (probe.Contains("\"onLogin\":true"))
-                    ShowStatus("Station device login required — enter gate PC name + passcode on screen", persistent: true);
-                else if (probe.Contains("\"shellReady\":false") && probe.Contains("\"hasStationShell\":true"))
-                    ShowStatus("Station loading… wait for profile, then scan crew badge", persistent: false);
-            }
-            catch (Exception ex)
-            {
-                ScanDiagnostics.Log("WEB", pass + ": FRAME[" + i + "] ERR " + ex.Message);
-            }
+            var probe = Trunc(await SafeFrameScriptAsync(frames[i], BuildFrameScanProbeJs()), 220);
+            ScanDiagnostics.Log("WEB", pass + ": FRAME[" + i + "] " + (probe ?? "(null)"));
+            if (probe != null && probe.Contains("\"onLogin\":true"))
+                ShowStatus("Station device login required — enter gate PC name + passcode on screen", persistent: true);
+            else if (probe != null && probe.Contains("\"shellReady\":false") && probe.Contains("\"hasStationShell\":true"))
+                ShowStatus("Station loading… wait for profile, then scan crew badge", persistent: false);
         }
     }
 
     private void ShowDiagnosticWindow()
     {
-        if (_diagWindow == null)
+        try
         {
-            _diagWindow = new DiagnosticWindow(ProbeWebBridgeAsync, DeliverScanToPage, GunSummary)
+            if (_diagWindow == null)
             {
-                Owner = this,
-            };
-        }
+                // Do NOT set Owner — WPF disables the owner window, which crashes/hangs WebView2.
+                _diagWindow = new DiagnosticWindow(ProbeWebBridgeAsync, DeliverScanToPage, GunSummary);
+            }
 
-        if (_diagWindow.IsVisible)
-        {
+            if (_diagWindow.IsVisible)
+            {
+                _diagWindow.Activate();
+                return;
+            }
+
+            _diagWindow.Show();
             _diagWindow.Activate();
-            return;
+            ScanDiagnostics.Log("DIAG", "Diagnostic window opened (F12 to hide) · log file: " + ScanDiagnostics.LogFilePath);
         }
-
-        _diagWindow.Show();
-        _diagWindow.Activate();
-        ScanDiagnostics.Log("DIAG", "Diagnostic window opened (F12 to hide)");
+        catch (Exception ex)
+        {
+            ScanDiagnostics.Log("DIAG", "Diagnostic window failed: " + ex.Message);
+        }
     }
 
     private void HideDiagnosticWindow()
@@ -871,41 +898,19 @@ public partial class MainWindow : Window
             return;
         }
 
-        try
-        {
-            var topRaw = await WebView.CoreWebView2.ExecuteScriptAsync(WebProbeScript);
-            ScanDiagnostics.Log("WEB", "TOP " + UnwrapScriptResult(topRaw));
-        }
-        catch (Exception ex)
-        {
-            ScanDiagnostics.Log("WEB", "TOP probe error: " + ex.Message);
-        }
+        var top = await SafeTopScriptAsync(WebProbeScript);
+        ScanDiagnostics.Log("WEB", "TOP " + (top ?? "(null)"));
 
-        try
-        {
-            var iframeMeta = await WebView.CoreWebView2.ExecuteScriptAsync(
-                "(function(){try{var f=document.getElementById('app-frame');if(!f)return 'no app-frame';return 'app-frame src='+String(f.src||'').substring(0,100);}catch(e){return String(e);}})()");
-            ScanDiagnostics.Log("WEB", UnwrapScriptResult(iframeMeta));
-        }
-        catch (Exception ex)
-        {
-            ScanDiagnostics.Log("WEB", "app-frame probe error: " + ex.Message);
-        }
+        var iframeMeta = await SafeTopScriptAsync(
+            "(function(){try{var f=document.getElementById('app-frame');if(!f)return 'no app-frame';return 'app-frame src='+String(f.src||'').substring(0,100);}catch(e){return String(e);}})()");
+        ScanDiagnostics.Log("WEB", iframeMeta ?? "(null)");
 
-        CoreWebView2Frame[] frames;
-        lock (_frameLock) frames = _childFrames.ToArray();
+        var frames = SnapshotLiveFrames();
         ScanDiagnostics.Log("WEB", "Tracked child frames: " + frames.Length);
         for (var i = 0; i < frames.Length; i++)
         {
-            try
-            {
-                var raw = await frames[i].ExecuteScriptAsync(WebProbeScript);
-                ScanDiagnostics.Log("WEB", "FRAME[" + i + "] " + UnwrapScriptResult(raw));
-            }
-            catch (Exception ex)
-            {
-                ScanDiagnostics.Log("WEB", "FRAME[" + i + "] error: " + ex.Message);
-            }
+            var probe = await SafeFrameScriptAsync(frames[i], WebProbeScript);
+            ScanDiagnostics.Log("WEB", "FRAME[" + i + "] " + (probe ?? "(null)"));
         }
     }
 
@@ -919,6 +924,50 @@ public partial class MainWindow : Window
         catch
         {
             return raw;
+        }
+    }
+
+    private CoreWebView2Frame[] SnapshotLiveFrames()
+    {
+        lock (_frameLock)
+            return _childFrames.ToArray();
+    }
+
+    private async Task<string?> SafeTopScriptAsync(string js)
+    {
+        if (WebView.CoreWebView2 == null) return null;
+        await _webScriptLock.WaitAsync();
+        try
+        {
+            if (WebView.CoreWebView2 == null) return null;
+            var raw = await WebView.CoreWebView2.ExecuteScriptAsync(js);
+            return UnwrapScriptResult(raw);
+        }
+        catch (Exception ex)
+        {
+            return "err:" + ex.Message;
+        }
+        finally
+        {
+            _webScriptLock.Release();
+        }
+    }
+
+    private async Task<string?> SafeFrameScriptAsync(CoreWebView2Frame frame, string js)
+    {
+        await _webScriptLock.WaitAsync();
+        try
+        {
+            var raw = await frame.ExecuteScriptAsync(js);
+            return UnwrapScriptResult(raw);
+        }
+        catch (Exception ex)
+        {
+            return "err:" + ex.Message;
+        }
+        finally
+        {
+            _webScriptLock.Release();
         }
     }
 

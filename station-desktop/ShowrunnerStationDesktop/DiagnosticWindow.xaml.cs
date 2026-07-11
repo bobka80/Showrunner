@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Windows;
 
 namespace Showrunner.Station.Desktop;
@@ -17,11 +19,21 @@ public partial class DiagnosticWindow : Window
         _gunSummary = gunSummary;
 
         var ver = typeof(DiagnosticWindow).Assembly.GetName().Version?.ToString(3) ?? "?";
-        FooterText.Text = "Desktop v" + ver + " · F12 to hide · Scan: " + ScanDiagnostics.LogFilePath
-            + " · Connect: " + ConnectLockLog.LogFilePath;
+        FooterText.Text = "Desktop v" + ver + " · F12 to hide · Log file: " + ScanDiagnostics.LogFilePath;
 
-        foreach (var line in ScanDiagnostics.Snapshot())
-            AppendLine(line);
+        Loaded += (_, _) =>
+        {
+            try
+            {
+                LogBox.Text = string.Join(Environment.NewLine, ScanDiagnostics.Snapshot());
+                if (AutoScrollBox.IsChecked == true)
+                    LogBox.ScrollToEnd();
+            }
+            catch (Exception ex)
+            {
+                LogBox.Text = "Failed to load log: " + ex.Message;
+            }
+        };
 
         ScanDiagnostics.LineAdded += OnLineAdded;
 
@@ -36,9 +48,18 @@ public partial class DiagnosticWindow : Window
 
     protected override void OnClosing(CancelEventArgs e)
     {
-        // X / Alt+F4 hides the panel — avoids destroy/recreate loops and stray BeginInvoke updates.
         e.Cancel = true;
         Hide();
+    }
+
+    protected override void OnPreviewKeyDown(System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Escape || e.Key == System.Windows.Input.Key.F12)
+        {
+            Hide();
+            e.Handled = true;
+        }
+        base.OnPreviewKeyDown(e);
     }
 
     private void OnLineAdded(string line)
@@ -106,6 +127,25 @@ public partial class DiagnosticWindow : Window
         catch (Exception ex)
         {
             ScanDiagnostics.Log("DIAG", "Copy failed: " + ex.Message);
+        }
+    }
+
+    private void OpenLogBtn_OnClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var path = ScanDiagnostics.LogFilePath;
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+            if (!File.Exists(path))
+                File.WriteAllText(path, "");
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+            ScanDiagnostics.Log("DIAG", "Opened log file");
+        }
+        catch (Exception ex)
+        {
+            ScanDiagnostics.Log("DIAG", "Open log failed: " + ex.Message);
         }
     }
 }
