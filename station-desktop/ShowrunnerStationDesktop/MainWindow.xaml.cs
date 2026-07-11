@@ -365,6 +365,9 @@ public partial class MainWindow : Window
                         }
                     }
                     break;
+                case "exitApp":
+                    Dispatcher.Invoke(() => Application.Current.Shutdown(0));
+                    break;
             }
         }
         catch
@@ -1309,6 +1312,7 @@ public partial class MainWindow : Window
               shellReady: function() { postGun('shellReady'); },
               loginNeeded: function() { postGun('loginNeeded'); },
               saveSession: function(t, e) { postGun('saveSession', [t, e]); },
+              exitApp: function() { postGun('exitApp'); },
               getSavedSession: function() {
                 try {
                   var h = chrome.webview.hostObjects.sync.androidStation;

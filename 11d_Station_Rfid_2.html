@@ -30,19 +30,16 @@ function stationRenderScanFeed_() {
     if (hit && hit.name) {
       if (hit.kind === 'crew') {
         return '<div class="station-scan-feed__row is-crew">'
-          + '<span class="station-scan-feed__identity">'
           + '<span class="name">' + esc(hit.name) + '</span>'
           + '<span class="unit">crew</span>'
-          + '</span>'
+          + '<span class="station-scan-feed__spacer"></span>'
           + '<span class="time">' + time + '</span></div>';
       }
       const unit = hit.unitNumber || hit.unitId || '';
       const statusHtml = stationScanFeedStatusHtml_(hit, esc);
       return '<div class="station-scan-feed__row">'
-        + '<span class="station-scan-feed__identity">'
         + '<span class="name">' + esc(hit.name) + '</span>'
-        + (unit ? '<span class="unit">#' + esc(unit) + '</span>' : '')
-        + '</span>'
+        + (unit ? '<span class="unit">#' + esc(unit) + '</span>' : '<span class="unit unit--empty"></span>')
         + statusHtml
         + '<span class="time">' + time + '</span></div>';
     }

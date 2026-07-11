@@ -34,6 +34,7 @@
     if (window.__srDockScanMounted) return;
     var headRight = document.getElementById('station-dock-head-right');
     var railBody = document.getElementById('station-dock-rail-body');
+    var railActions = document.getElementById('station-dock-rail-actions');
     var railFoot = document.getElementById('station-dock-rail-foot');
     if (!headRight || !railBody || !railFoot) return;
 
@@ -42,15 +43,26 @@
     var logoutBtn = document.getElementById('station-btn-logout-host');
     var scanBtn = document.getElementById('station-btn-scan-panel');
     var gunCog = document.getElementById('station-btn-settings-cog');
+    var exitBtn = document.getElementById('station-dock-exit-app');
+    var panelActions = document.getElementById('station-panel-actions');
+    var panelNote = document.getElementById('station-panel-note');
 
-    if (brand) headRight.appendChild(brand);
-    if (gunCog) headRight.appendChild(gunCog);
+    if (brand) {
+      if (exitBtn) headRight.insertBefore(brand, exitBtn);
+      else headRight.appendChild(brand);
+    }
+    if (gunCog) {
+      if (exitBtn) headRight.insertBefore(gunCog, exitBtn);
+      else headRight.appendChild(gunCog);
+    }
     if (scanBtn) scanBtn.style.display = 'none';
     if (panel) {
       panel.classList.add('is-open');
       panel.setAttribute('aria-hidden', 'false');
       railBody.appendChild(panel);
     }
+    if (panelActions && railActions) railActions.appendChild(panelActions);
+    if (panelNote && railActions) railActions.appendChild(panelNote);
     if (logoutBtn) railFoot.appendChild(logoutBtn);
 
     if (typeof window.stationDockApplyAllZoom_ === 'function') window.stationDockApplyAllZoom_();
@@ -58,27 +70,70 @@
     window.__srDockScanMounted = true;
   }
 
+  window.stationDockSyncPaHeader_ = function() {
+    if (!dockSkin_()) return;
+    var nav = document.getElementById('station-dock-head-left-nav');
+    var paOpen = document.body.classList.contains('station-dock-pa-open');
+    if (nav) nav.style.display = paOpen ? 'flex' : 'none';
+    var consoleBtn = document.getElementById('station-dock-pa-console');
+    var master = document.getElementById('btn-master-operation');
+    if (consoleBtn) {
+      if (!paOpen || !master) {
+        consoleBtn.style.display = 'none';
+      } else {
+        var masterVisible = master.style.display !== 'none';
+        consoleBtn.style.display = masterVisible ? 'inline-flex' : 'none';
+        consoleBtn.textContent = (master.textContent || 'CHECK-OUT').trim();
+      }
+    }
+  };
+
+  window.stationDockPaConsole_ = function() {
+    var master = document.getElementById('btn-master-operation');
+    if (master && master.style.display !== 'none') {
+      master.click();
+      return;
+    }
+    if (typeof window.startOperationUI === 'function') {
+      try { window.startOperationUI('CHECK-OUT', null); } catch (e) { /* ignore */ }
+    }
+  };
+
+  window.stationDockExitApp_ = function() {
+    if (!confirm('Exit Showrunner Station?')) return;
+    if (typeof stationInvokeGunNative_ === 'function') {
+      stationInvokeGunNative_('exitApp');
+      return;
+    }
+    try {
+      if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+        window.chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: 'exitApp', args: [] }));
+      }
+    } catch (e) { /* ignore */ }
+  };
+
   function stationDockSyncWorkspace_() {
     var host = (typeof stationReadHostSession_ === 'function') ? stationReadHostSession_() : null;
     var prompt = document.getElementById('station-dock-host-prompt');
     var home = document.getElementById('station-dock-home');
-    var backBtn = document.getElementById('station-dock-back-projects');
     var title = document.getElementById('station-dock-workspace-title');
     var paOpen = document.body.classList.contains('station-dock-pa-open');
 
-    if (paOpen) return;
+    if (paOpen) {
+      window.stationDockSyncPaHeader_();
+      return;
+    }
+    window.stationDockSyncPaHeader_();
 
     if (!host) {
       if (prompt) prompt.style.display = 'flex';
       if (home) home.style.display = 'none';
-      if (backBtn) backBtn.style.display = 'none';
       if (title) title.textContent = 'Projects';
       return;
     }
 
     if (prompt) prompt.style.display = 'none';
     if (home) home.style.display = 'flex';
-    if (backBtn) backBtn.style.display = 'none';
     if (title) title.textContent = 'Projects';
     stationDockLoadProjects_();
   }
@@ -202,12 +257,11 @@
     document.body.classList.add('station-dock-pa-open', 'mobile-pa-compact');
     var home = document.getElementById('station-dock-home');
     var prompt = document.getElementById('station-dock-host-prompt');
-    var backBtn = document.getElementById('station-dock-back-projects');
     var title = document.getElementById('station-dock-workspace-title');
     if (home) home.style.display = 'none';
     if (prompt) prompt.style.display = 'none';
-    if (backBtn) backBtn.style.display = 'inline-flex';
     if (title) title.textContent = proj.title || proj.name || 'Project';
+    window.stationDockSyncPaHeader_();
 
     if (typeof stationSetStatus_ === 'function') {
       stationSetStatus_('Opening ' + (proj.title || proj.name || 'project') + '…', '');
@@ -238,8 +292,10 @@
     setTimeout(function() {
       var ov = document.getElementById('project-assets-modal-overlay');
       var opened = ov && ov.style.display !== 'none';
-      if (opened) stationDockWatchPaExit_();
-      else {
+      if (opened) {
+        window.stationDockSyncPaHeader_();
+        stationDockWatchPaExit_();
+      } else {
         stationDockBackToProjects_();
         if (typeof stationSetStatus_ === 'function') {
           stationSetStatus_('Project didn’t open. Try again.', 'error');

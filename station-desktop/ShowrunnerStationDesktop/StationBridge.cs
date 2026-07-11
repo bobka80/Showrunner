@@ -88,4 +88,12 @@ public sealed class StationBridge
             return "";
         return JsonSerializer.Serialize(new { token, expiresAt = prefs.SessionExpires });
     }
+
+    public void exitApp()
+    {
+        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+        {
+            System.Windows.Application.Current.Shutdown(0);
+        });
+    }
 }

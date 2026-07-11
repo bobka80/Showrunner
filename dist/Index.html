@@ -6919,20 +6919,56 @@ html.station-dock-root #station-dock-shell {
   padding: 10px 16px;
   box-sizing: border-box;
 }
-.station-dock-head-left-actions {
-  margin-left: auto;
+.station-dock-head-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
   position: relative;
   flex-shrink: 0;
+}
+.station-dock-head-left-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.station-dock-nav-btn {
+  margin: 0;
+  white-space: nowrap;
 }
 .station-dock-unified-head__right {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
   padding: 8px 12px;
   box-sizing: border-box;
+}
+.station-dock-exit-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #a1a1aa;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.station-dock-exit-btn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
 }
 .station-dock-body {
   flex: 1;
@@ -7109,6 +7145,15 @@ html.station-dock-root #station-dock-shell {
   flex-direction: column;
   overflow: hidden;
 }
+.station-dock-rail__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #27272a;
+  background: #0d0d10;
+}
 .station-dock-rail__foot {
   flex-shrink: 0;
   padding: 10px 12px;
@@ -7149,16 +7194,64 @@ html.station-dock-root .station-scan-feed__list {
   flex: 1;
   overflow-y: auto;
 }
+html.station-dock-root .station-scan-feed__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 52px minmax(0, 0.9fr) auto;
+  gap: 2px 6px;
+  align-items: baseline;
+}
+html.station-dock-root .station-scan-feed__row .name {
+  grid-column: 1;
+  min-width: 0;
+}
+html.station-dock-root .station-scan-feed__row .unit {
+  grid-column: 2;
+  justify-self: start;
+}
+html.station-dock-root .station-scan-feed__row .unit--empty {
+  visibility: hidden;
+}
+html.station-dock-root .station-scan-feed__status {
+  grid-column: 3;
+  justify-self: end;
+  margin-left: 0;
+  max-width: none;
+}
+html.station-dock-root .station-scan-feed__spacer {
+  grid-column: 3;
+}
+html.station-dock-root .station-scan-feed__row .time {
+  grid-column: 4;
+  justify-self: end;
+}
+html.station-dock-root #station-panel-last {
+  display: none !important;
+}
+html.station-dock-root #station-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+html.station-dock-root #station-panel-actions .btn-outline,
+html.station-dock-root #station-panel-actions .btn-main,
+html.station-dock-root #station-panel-actions .btn-close {
+  margin: 0;
+}
+html.station-dock-root #station-panel-note {
+  width: 100%;
+  box-sizing: border-box;
+}
 html.station-dock-root .station-shell-brand {
   padding: 0;
-  margin-right: auto;
+  margin-right: 0;
   min-width: 0;
   font-family: monospace;
-  font-size: 11px;
+  font-size: 13px;
 }
 html.station-dock-root .station-shell-brand__device,
 html.station-dock-root .station-shell-brand__host {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   font-family: monospace;
   line-height: 1.2;
@@ -7171,7 +7264,7 @@ html.station-dock-root .station-shell-brand__line {
 }
 html.station-dock-root #station-dock-head-right .station-ctrl-cog {
   flex-shrink: 0;
-  margin-left: 4px;
+  margin-left: 2px;
 }
 html.station-dock-root #station-device-controls {
   display: none !important;
@@ -7204,6 +7297,9 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
   margin: 0 !important;
   border-radius: 0;
   zoom: var(--dock-left-zoom, 1);
+}
+html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal > div:first-child {
+  display: none !important;
 }
 </style>
 
@@ -7264,9 +7360,8 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
 <div id="station-dock-shell" aria-label="Desktop station">
   <header id="station-dock-unified-head" class="station-dock-unified-head">
     <div class="station-dock-unified-head__left">
-      <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
-      <button type="button" id="station-dock-back-projects" class="btn-outline btn-sm station-dock-back-btn" style="display:none;" onclick="stationDockBackToProjects_()">← Projects</button>
-      <div class="station-dock-head-left-actions">
+      <div class="station-dock-head-title-row">
+        <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
         <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn" onclick="stationDockToggleAppSettings_()" title="Display settings" aria-label="Display settings">&#9881; Display</button>
         <div id="station-dock-app-settings" class="station-dock-app-settings" style="display:none;" aria-hidden="true">
           <div class="station-dock-app-settings__title">Display zoom</div>
@@ -7291,8 +7386,14 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
           <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationDockToggleAppSettings_(false)">Done</button>
         </div>
       </div>
+      <div id="station-dock-head-left-nav" class="station-dock-head-left-nav" style="display:none;">
+        <button type="button" id="station-dock-pa-back" class="btn-outline btn-sm station-dock-nav-btn" onclick="stationDockBackToProjects_()">← Back</button>
+        <button type="button" id="station-dock-pa-console" class="btn-outline btn-sm station-dock-nav-btn" style="display:none;" onclick="stationDockPaConsole_()">CHECK-OUT</button>
+      </div>
     </div>
-    <div id="station-dock-head-right" class="station-dock-unified-head__right" aria-label="Station device"></div>
+    <div id="station-dock-head-right" class="station-dock-unified-head__right" aria-label="Station device">
+      <button type="button" id="station-dock-exit-app" class="station-dock-exit-btn" onclick="stationDockExitApp_()" title="Exit station app" aria-label="Exit station app">&#10005;</button>
+    </div>
   </header>
   <div class="station-dock-body">
     <main id="station-dock-workspace" class="station-dock-workspace" aria-label="Projects and equipment">
@@ -7309,6 +7410,7 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
     </main>
     <aside id="station-dock-scan-rail" class="station-dock-scan-rail" aria-label="Live scans">
       <div id="station-dock-rail-body" class="station-dock-rail__body"></div>
+      <div id="station-dock-rail-actions" class="station-dock-rail__actions"></div>
       <div id="station-dock-rail-foot" class="station-dock-rail__foot"></div>
     </aside>
   </div>

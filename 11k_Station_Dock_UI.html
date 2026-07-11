@@ -2,9 +2,8 @@
 <div id="station-dock-shell" aria-label="Desktop station">
   <header id="station-dock-unified-head" class="station-dock-unified-head">
     <div class="station-dock-unified-head__left">
-      <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
-      <button type="button" id="station-dock-back-projects" class="btn-outline btn-sm station-dock-back-btn" style="display:none;" onclick="stationDockBackToProjects_()">← Projects</button>
-      <div class="station-dock-head-left-actions">
+      <div class="station-dock-head-title-row">
+        <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
         <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn" onclick="stationDockToggleAppSettings_()" title="Display settings" aria-label="Display settings">&#9881; Display</button>
         <div id="station-dock-app-settings" class="station-dock-app-settings" style="display:none;" aria-hidden="true">
           <div class="station-dock-app-settings__title">Display zoom</div>
@@ -29,8 +28,14 @@
           <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationDockToggleAppSettings_(false)">Done</button>
         </div>
       </div>
+      <div id="station-dock-head-left-nav" class="station-dock-head-left-nav" style="display:none;">
+        <button type="button" id="station-dock-pa-back" class="btn-outline btn-sm station-dock-nav-btn" onclick="stationDockBackToProjects_()">← Back</button>
+        <button type="button" id="station-dock-pa-console" class="btn-outline btn-sm station-dock-nav-btn" style="display:none;" onclick="stationDockPaConsole_()">CHECK-OUT</button>
+      </div>
     </div>
-    <div id="station-dock-head-right" class="station-dock-unified-head__right" aria-label="Station device"></div>
+    <div id="station-dock-head-right" class="station-dock-unified-head__right" aria-label="Station device">
+      <button type="button" id="station-dock-exit-app" class="station-dock-exit-btn" onclick="stationDockExitApp_()" title="Exit station app" aria-label="Exit station app">&#10005;</button>
+    </div>
   </header>
   <div class="station-dock-body">
     <main id="station-dock-workspace" class="station-dock-workspace" aria-label="Projects and equipment">
@@ -47,6 +52,7 @@
     </main>
     <aside id="station-dock-scan-rail" class="station-dock-scan-rail" aria-label="Live scans">
       <div id="station-dock-rail-body" class="station-dock-rail__body"></div>
+      <div id="station-dock-rail-actions" class="station-dock-rail__actions"></div>
       <div id="station-dock-rail-foot" class="station-dock-rail__foot"></div>
     </aside>
   </div>

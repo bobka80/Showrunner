@@ -43,12 +43,14 @@
     var p = String(preset || '100');
     if (!PRESETS[p]) p = '100';
     try { localStorage.setItem(KEY_RIGHT, p); } catch (e) { /* ignore */ }
-    var rail = document.getElementById('station-dock-scan-rail');
     var z = scaleCss_(p);
+    var rail = document.getElementById('station-dock-scan-rail');
+    var headRight = document.getElementById('station-dock-head-right');
     if (rail) {
       rail.setAttribute('data-dock-scale', p);
       rail.style.zoom = z;
     }
+    if (headRight) headRight.style.zoom = z;
     var sel = document.getElementById('station-dock-zoom-right');
     if (sel) sel.value = p;
   };

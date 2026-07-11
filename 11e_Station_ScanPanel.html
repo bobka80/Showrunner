@@ -255,10 +255,18 @@ function stationPanelRenderActions_() {
   const sel = window.stationPanelSelection;
   const host = stationReadHostSession_();
   if (!host) {
+    if (document.documentElement.classList.contains('station-dock-root')) {
+      wrap.innerHTML = '';
+      return;
+    }
     wrap.innerHTML = '<div class="station-scan-panel__hint">Scan your crew badge to host before changing status.</div>';
     return;
   }
   if (!sel || sel.kind !== 'equipment') {
+    if (document.documentElement.classList.contains('station-dock-root')) {
+      wrap.innerHTML = '';
+      return;
+    }
     wrap.innerHTML = '<div class="station-scan-panel__hint">Scan a tagged piece of equipment.</div>';
     return;
   }

@@ -5,7 +5,7 @@
   },
   "projects": {
     "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj": {
-      "version": "0.1.46",
+      "version": "0.1.47",
       "restore": {
         "projectUniqueName": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
         "projectName": "ShowrunnerStationDesktop",
@@ -76,11 +76,6 @@
             }
           },
           "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.301/PortableRuntimeIdentifierGraph.json"
-        }
-      },
-      "runtimes": {
-        "win-x64": {
-          "#import": []
         }
       }
     }
