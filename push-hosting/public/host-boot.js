@@ -2959,8 +2959,7 @@
     hidePushPrompt();
   }
 
-  function clearDesktopStationHostSessions_() {
-    if (!isDesktopStationApp()) return;
+  function clearStationHostLocalStorage_() {
     try {
       var keys = [];
       for (var i = 0; i < localStorage.length; i++) {
@@ -2971,9 +2970,30 @@
     } catch (e) { /* ignore */ }
   }
 
+  function clearDesktopStationHostSessions_() {
+    if (!isDesktopStationApp()) return;
+    clearStationHostLocalStorage_();
+  }
+
+  /** Chainway cold boot: parent localStorage survives reboot — clear host, flag iframe. */
+  function markNativeStationShellBoot_() {
+    if (!isNativeStationApp()) return;
+    try {
+      var warm = sessionStorage.getItem('sr_station_shell_session') === '1';
+      sessionStorage.setItem('sr_station_shell_session', '1');
+      if (!warm) {
+        sessionStorage.setItem('sr_station_cold_boot', '1');
+        clearStationHostLocalStorage_();
+      } else {
+        sessionStorage.removeItem('sr_station_cold_boot');
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   async function initShell() {
     startShellBootGrace();
     clearDesktopStationHostSessions_();
+    markNativeStationShellBoot_();
     if (frame) {
       var skipNav = false;
       if (isStationShellApp() && readParentSession()) {

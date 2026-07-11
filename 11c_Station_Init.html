@@ -57,7 +57,19 @@ function initStationShell_() {
   if (stationIsDesktopKiosk_()) {
     try { stationWriteHostSession_(null); } catch (e) { /* ignore */ }
   } else {
-    try { stationRequestHostRestoreFromParent_(); } catch (e) { /* ignore */ }
+    // Cold device boot: parent cleared persisted host; do not restore stale badge from iframe storage.
+    // Warm iframe reload (same WebView session): restore from parent so gun-flap / renderer reload keeps host.
+    var coldBoot = false;
+    try {
+      if (window.parent && window.parent !== window) {
+        coldBoot = window.parent.sessionStorage.getItem('sr_station_cold_boot') === '1';
+        if (coldBoot) window.parent.sessionStorage.removeItem('sr_station_cold_boot');
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      if (coldBoot) stationWriteHostSession_(null);
+      else stationRequestHostRestoreFromParent_();
+    } catch (e) { /* ignore */ }
   }
 
   try {
@@ -127,16 +139,4 @@ function initStationShell_() {
     })
     .getStationShellBootstrap(ACTIVE_USER_NAME);
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-  if (window.IS_STATION_DEVICE) initStationShell_();
-});
-document.addEventListener('visibilitychange', function() {
-  if (!window.IS_STATION_DEVICE) return;
-  if (document.visibilityState === 'visible') stationAnnounceReady_();
-});
-window.addEventListener('pageshow', function(ev) {
-  if (!window.IS_STATION_DEVICE) return;
-  if (ev.persisted) stationAnnounceReady_();
-});
 </script>
