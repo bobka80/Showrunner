@@ -1,4 +1,3 @@
-Showrunner Station Desktop v0.1.2
+Showrunner Station Desktop v0.1.3
 
-- TSL trigger inventory + valid 10-29 dBm power
-- skip push on desktop
+- Deliver scans into GAS iframe via WebView2 host object + direct frame script

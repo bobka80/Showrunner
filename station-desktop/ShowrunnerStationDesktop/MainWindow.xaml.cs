@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Windows;
@@ -14,6 +15,8 @@ public partial class MainWindow : Window
         " ShowrunnerStationDesktop/" + (typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "0.1.0");
 
     private readonly TslRfidManager _rfid = new();
+    private readonly List<CoreWebView2Frame> _childFrames = new();
+    private readonly object _frameLock = new();
     private StationBridge? _bridge;
     private bool _splashHidden;
 
@@ -61,14 +64,32 @@ public partial class MainWindow : Window
             // there and the scan-poll loop never starts. Mirror Android's inject-into-every-frame.
             WebView.CoreWebView2.FrameCreated += (_, args) =>
             {
+                var child = args.Frame;
+                lock (_frameLock) _childFrames.Add(child);
+                child.Destroyed += (_, _) =>
+                {
+                    lock (_frameLock) _childFrames.Remove(child);
+                };
                 try
                 {
-                    args.Frame.AddHostObjectToScript("androidStation", _bridge, new[] { "*" });
+                    child.AddHostObjectToScript("androidStation", _bridge, new[] { "*" });
                 }
                 catch
                 {
                     // older runtime without frame host objects — top-frame path still works
                 }
+                child.NavigationCompleted += async (_, nav) =>
+                {
+                    if (!nav.IsSuccess) return;
+                    try
+                    {
+                        await child.ExecuteScriptAsync(BridgeShimScript);
+                    }
+                    catch
+                    {
+                        // ignore
+                    }
+                };
             };
 
             await WebView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(BridgeShimScript);
@@ -147,17 +168,37 @@ public partial class MainWindow : Window
     private void DeliverScanToPage(string epc, string tid)
     {
         if (WebView.CoreWebView2 == null) return;
-        var payload = JsonSerializer.Serialize(new { tag = epc, tid });
-        var js = $"(function(){{try{{var d={payload};" +
-                 "if(window.showrunnerStationDeliverScan)window.showrunnerStationDeliverScan(d.tag,d.tid);" +
-                 "}catch(e){{}}}})();";
+        var tagJs = JsonSerializer.Serialize(epc);
+        var tidJs = JsonSerializer.Serialize(tid);
+        var topJs =
+            $"(function(){{try{{var e={tagJs},t={tidJs};" +
+            "if(window.showrunnerStationDeliverScan)window.showrunnerStationDeliverScan(e,t);" +
+            "}catch(x){{}}}})();";
+        var childJs =
+            $"(function(){{try{{var e={tagJs},t={tidJs};" +
+            "if(typeof window.onStationRfidScan==='function')window.onStationRfidScan(e,t);" +
+            "}catch(x){{}}}})();";
         try
         {
-            _ = WebView.CoreWebView2.ExecuteScriptAsync(js);
+            _ = WebView.CoreWebView2.ExecuteScriptAsync(topJs);
         }
         catch
         {
             // ignore
+        }
+
+        CoreWebView2Frame[] frames;
+        lock (_frameLock) frames = _childFrames.ToArray();
+        foreach (var frame in frames)
+        {
+            try
+            {
+                _ = frame.ExecuteScriptAsync(childJs);
+            }
+            catch
+            {
+                // ignore
+            }
         }
     }
 

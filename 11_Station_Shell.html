@@ -2329,13 +2329,17 @@ window.onStationRfidScan = function(rawTag, rawTid) {
 function stationStartScanPoll_() {
   if (window.stationScanPollTimer) return;
   var b = stationGunBridge_();
-  // Desktop iframe relay: parent host-boot polls AndroidStation and postMessages scans.
-  if (!b || typeof b.pollScans !== 'function') { stationDebug_('poll: unavailable'); return; }
-  if (b.pollScans() === '[]' && !stationNativeBridge_()) {
-    stationDebug_('poll: parent relay');
+  if (!b || typeof b.pollScans !== 'function') {
+    if (!window.stationScanPollRetryTimer && window.IS_STATION_DEVICE) {
+      window.stationScanPollRetryTimer = setTimeout(function() {
+        window.stationScanPollRetryTimer = null;
+        stationStartScanPoll_();
+      }, 1500);
+    }
     return;
   }
-  stationDebug_('poll: on');
+  // Parent relay only when this iframe has no native bridge (legacy path).
+  if (b.pollScans() === '[]' && !stationNativeBridge_()) return;
   window.stationScanPollTimer = setInterval(function() {
     var raw;
     try { raw = b.pollScans(); } catch (e) { return; }
@@ -3434,6 +3438,27 @@ function stationNativeBridge_() {
     var b = window.AndroidStation;
     if (b && typeof b.getConfig === 'function' && typeof b.setScanMode === 'function') return b;
   } catch (e) { /* ignore */ }
+  // Desktop WebView2: host object is injected per-frame but the shim only runs on the top shell.
+  try {
+    var h = chrome && chrome.webview && chrome.webview.hostObjects &&
+      chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;
+    if (h && typeof h.getConfig === 'function' && typeof h.setScanMode === 'function') {
+      return {
+        getConfig: function() { return h.getConfig(); },
+        setPower: function(p) { h.setPower(p); },
+        setScanMode: function(m) { h.setScanMode(m); },
+        setBeep: function(b) { h.setBeep(b); },
+        setPollMs: function(ms) { h.setPollMs(ms); },
+        pollScans: function() { return h.pollScans(); },
+        reconnectGun: function() { h.reconnectGun(); },
+        sleepGun: function() { h.sleepGun(); },
+        shellReady: function() { try { h.shellReady(); } catch (e) { /* ignore */ } },
+        loginNeeded: function() { try { h.loginNeeded(); } catch (e) { /* ignore */ } },
+        saveSession: function(t, e) { h.saveSession(t, e); },
+        getSavedSession: function() { return h.getSavedSession(); }
+      };
+    }
+  } catch (e2) { /* ignore */ }
   return null;
 }
 

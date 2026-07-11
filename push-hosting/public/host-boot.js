@@ -28,15 +28,21 @@
   // The native app injects `AndroidStation` and calls `showrunnerStationDeliverScan`
   // in THIS (top) frame; Showrunner itself runs in the iframe, so we relay by postMessage.
   window.showrunnerStationDeliverScan = function(tag, tid) {
+    var msg = {
+      type: 'SHOWRUNNER_RFID_SCAN',
+      tag: String(tag == null ? '' : tag),
+      tid: tid ? String(tid) : ''
+    };
     try {
-      if (frame && frame.contentWindow) {
-        frame.contentWindow.postMessage({
-          type: 'SHOWRUNNER_RFID_SCAN',
-          tag: String(tag == null ? '' : tag),
-          tid: tid ? String(tid) : ''
-        }, '*');
-      }
+      if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
     } catch (e) { /* ignore */ }
+    // Belt-and-suspenders: post to every iframe (GAS may nest or redirect).
+    try {
+      var frames = document.querySelectorAll('iframe');
+      for (var i = 0; i < frames.length; i++) {
+        if (frames[i].contentWindow) frames[i].contentWindow.postMessage(msg, '*');
+      }
+    } catch (e2) { /* ignore */ }
   };
 
   // Desktop WebView2: AndroidStation is on this (top) frame; the GAS station shell is cross-origin
