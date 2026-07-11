@@ -2251,6 +2251,7 @@ function stationBeginHostLogin_(tag, tid) {
   }
 
   window.stationScanBusy = true;
+  window.stationScanBusyAt = Date.now();
   stationSetLastScan_(tag);
 
   // Race guard — "eject beats the server". processStationRfidScan takes ~1s. If the operator logs
@@ -2308,6 +2309,9 @@ function stationBeginHostLogin_(tag, tid) {
 
 /** Entry point for Chainway Android SDK bridge. */
 window.onStationRfidScan = function(rawTag, rawTid) {
+  if (window.stationScanBusy && (Date.now() - (window.stationScanBusyAt || 0)) > 8000) {
+    window.stationScanBusy = false;
+  }
   // Do not reset the idle-sleep timer on RFID reads — only stationArmGunSleepTimer_ on boot/save/reconnect.
   const scan = stationParseScanPayload_(rawTag, rawTid);
   const tag = scan.epc;

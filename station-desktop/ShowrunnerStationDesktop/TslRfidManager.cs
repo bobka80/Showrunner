@@ -46,8 +46,13 @@ public sealed class TslRfidManager : IDisposable
     private bool _disposed;
     private string _lastGunDeviceId = "";
     private string _lastDetectLog = "";
+    private long _lastTriggerMs;
+    private string _lastDeliverNorm = "";
+    private long _lastDeliverMs;
 
     private const int WatchdogMs = 2500;
+    private const int TriggerDebounceMs = 700;
+    private const int ScanDedupeMs = 800;
 
     public event Action<string>? StatusChanged;
     public event Action<string, string>? ScanReceived;
@@ -55,7 +60,6 @@ public sealed class TslRfidManager : IDisposable
     public TslRfidManager()
     {
         _switchResponder.SwitchStateChanged += OnSwitchStateChanged;
-        _inventory.TransponderReceived += OnInventoryTransponder;
         _inventory.FastIdentifier = TriState.Yes;
         _inventory.TagFocus = TriState.Yes;
     }
@@ -414,7 +418,6 @@ public sealed class TslRfidManager : IDisposable
         _watchdog = null;
         StopContinuous();
         _switchResponder.SwitchStateChanged -= OnSwitchStateChanged;
-        _inventory.TransponderReceived -= OnInventoryTransponder;
         try
         {
             if (_commander.IsConnected)
@@ -492,8 +495,8 @@ public sealed class TslRfidManager : IDisposable
             var sw = new SwitchActionCommand
             {
                 AsynchronousReportingEnabled = TriState.Yes,
-                // Explorer default: trigger runs inventory with last seeded parameters.
-                SinglePressAction = SwitchAction.Inventory,
+                // App owns inventory on trigger — avoids double-read (gun + app) and duplicate beeps.
+                SinglePressAction = SwitchAction.Off,
                 DoublePressAction = SwitchAction.Off,
             };
             _commander.ExecuteCommand(sw, sw.Responder);
@@ -526,6 +529,9 @@ public sealed class TslRfidManager : IDisposable
         }
         if (e.State == SwitchState.Single)
         {
+            var now = Environment.TickCount64;
+            if (now - _lastTriggerMs < TriggerDebounceMs) return;
+            _lastTriggerMs = now;
             PostStatus("Trigger");
             OnTriggerPressed();
         }
@@ -543,7 +549,6 @@ public sealed class TslRfidManager : IDisposable
                 StartContinuous();
             return;
         }
-        // Gun firmware also inventories on trigger — app-side read ensures the SDK callback fires.
         PerformSingleRead();
     }
 
@@ -555,8 +560,45 @@ public sealed class TslRfidManager : IDisposable
             try
             {
                 ConfigureChainInventory();
-                // Async inventory — same command instance as chain responder (TSL inventory sample pattern).
-                _commander.ExecuteCommand(_inventory, null);
+                string? epc = null;
+                string? tid = null;
+                void OnTag(object? s, TransponderDataEventArgs ev)
+                {
+                    var tag = NormalizeHex(ev.Transponder.Epc);
+                    if (string.IsNullOrEmpty(tag))
+                        tag = NormalizeHex(ev.Transponder.ReadData);
+                    if (string.IsNullOrEmpty(tag)) return;
+                    var chip = NormalizeHex(ev.Transponder.TransponderIdentifier);
+                    if (!string.IsNullOrEmpty(chip) && chip == tag)
+                        chip = "";
+                    if (string.IsNullOrEmpty(chip))
+                        chip = NormalizeHex(ev.Transponder.ReadData);
+                    if (!string.IsNullOrEmpty(chip) && chip == tag)
+                        chip = "";
+                    epc = tag;
+                    if (!string.IsNullOrEmpty(chip))
+                        tid = chip;
+                }
+
+                _inventory.TransponderReceived += OnTag;
+                try
+                {
+                    _commander.ExecuteCommand(_inventory, _inventory.Responder);
+                }
+                finally
+                {
+                    _inventory.TransponderReceived -= OnTag;
+                }
+
+                if (string.IsNullOrEmpty(epc))
+                {
+                    PostStatus("No tag in range");
+                    return;
+                }
+
+                if (string.IsNullOrEmpty(tid))
+                    tid = TryReadTidForEpc(epc);
+                DeliverScan(epc, tid ?? "");
             }
             catch (Exception ex)
             {
@@ -565,37 +607,15 @@ public sealed class TslRfidManager : IDisposable
         }
     }
 
-    private void OnInventoryTransponder(object? sender, TransponderDataEventArgs e)
-    {
-        var epc = NormalizeHex(e.Transponder.Epc);
-        if (string.IsNullOrEmpty(epc))
-            epc = NormalizeHex(e.Transponder.ReadData);
-        if (string.IsNullOrEmpty(epc)) return;
-
-        var tid = NormalizeHex(e.Transponder.TransponderIdentifier);
-        if (!string.IsNullOrEmpty(tid) && tid == epc)
-            tid = "";
-        if (string.IsNullOrEmpty(tid))
-            tid = NormalizeHex(e.Transponder.ReadData);
-        if (!string.IsNullOrEmpty(tid) && tid == epc)
-            tid = "";
-
-        DeliverScan(epc, tid);
-
-        if (!string.IsNullOrEmpty(tid)) return;
-
-        var epcCopy = epc;
-        Task.Run(() =>
-        {
-            Thread.Sleep(50);
-            var readTid = TryReadTidForEpc(epcCopy);
-            if (!string.IsNullOrEmpty(readTid) && !readTid.Equals(epcCopy, StringComparison.OrdinalIgnoreCase))
-                DeliverScan(epcCopy, readTid);
-        });
-    }
-
     private void DeliverScan(string epc, string tid)
     {
+        var norm = epc.Trim().ToUpperInvariant();
+        var now = Environment.TickCount64;
+        if (norm == _lastDeliverNorm && now - _lastDeliverMs < ScanDedupeMs && string.IsNullOrEmpty(tid))
+            return;
+        _lastDeliverNorm = norm;
+        _lastDeliverMs = now;
+
         EnqueueScan(epc, tid);
         ScanReceived?.Invoke(epc, tid);
         PostStatus("Read: " + epc + (string.IsNullOrEmpty(tid) ? " (no TID — hold badge still)" : " tid:" + tid));

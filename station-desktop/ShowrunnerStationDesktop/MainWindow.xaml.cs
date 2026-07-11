@@ -25,7 +25,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _rfid.StatusChanged += OnGunStatus;
         _rfid.ScanReceived += (epc, tid) =>
-            Dispatcher.BeginInvoke(() => DeliverScanToPage(epc, tid));
+            Dispatcher.BeginInvoke(() => DeliverScanToPage(epc, tid ?? ""));
         Loaded += async (_, _) => await InitWebViewAsync();
         Closed += (_, _) => _rfid.Dispose();
     }
@@ -231,7 +231,7 @@ public partial class MainWindow : Window
             if (low.Contains("fail") || low.Contains("error") || low.Contains("connect") ||
                 low.Contains("scanning") || low.Contains("waiting") ||
                 low.Contains("found tsl") || low.Contains("port(s)") || low.Contains("no tsl") ||
-                low.Contains("trigger"))
+                low.Contains("trigger") || low.StartsWith("read:") || low.Contains("no tag"))
                 ShowStatus(msg, persistent: false);
 
             if (low.Contains("gun connected") || low.Contains("gun asleep") || low.StartsWith("reconnecting"))

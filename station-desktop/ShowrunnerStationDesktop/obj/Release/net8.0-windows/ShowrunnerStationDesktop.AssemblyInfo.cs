@@ -12,11 +12,11 @@ using System.Reflection;
 
 [assembly: System.Reflection.AssemblyCompanyAttribute("ShowrunnerStationDesktop")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
-[assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.10.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.10+cd17fd9c6a9c8733b37a5122a1003d27786e0c5b")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.12.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.12+abc452842d619da174176457e18447d4ddd383bb")]
 [assembly: System.Reflection.AssemblyProductAttribute("ShowrunnerStationDesktop")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ShowrunnerStationDesktop")]
-[assembly: System.Reflection.AssemblyVersionAttribute("0.1.10.0")]
+[assembly: System.Reflection.AssemblyVersionAttribute("0.1.12.0")]
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")]
 
