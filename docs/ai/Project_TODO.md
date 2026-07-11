@@ -60,6 +60,22 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ---
 
+## Deferred — return when operational
+
+**Not blocking current milestones.** Known gaps, field-unproven fixes, and agreed-but-unbuilt warehouse/gate work. Resume only when the director confirms floor flows are operational and promotes an item.
+
+| Area | Status | File |
+|------|--------|------|
+| **Chainway gun sleep / reconnect / dead zone** | Field-unproven (build 53 disconnect beep + auto park) | [topics/deferred-when-operational.md](topics/deferred-when-operational.md) § A |
+| **Gate checkout model** | Agreed 2026-07-10 — cases + units hard-allocate; no case↔fixture pairing; not built | same § B |
+| **Equipment custody / cable case bind** | Optional later | same § C |
+| **Crew EPC+TID, kiosk, gate hardware** | When floor stable | same § D |
+| **Prep session, PA concurrency, pull sheets** | Platform track — do not absorb into RFID fixes | same § E |
+
+**Full checklist + rejected approaches:** [topics/deferred-when-operational.md](topics/deferred-when-operational.md)
+
+---
+
 ## Archive (reference only)
 
 | Plan | File |
