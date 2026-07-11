@@ -154,6 +154,7 @@ public partial class MainWindow : Window
                         {
                             lock (_frameLock) _gasFrame = child;
                             ScanDiagnostics.Log("WEB", "GAS frame tracked " + Trunc(href, 96));
+                            _ = SyncIframeSessionToParentAsync(child);
                         }
                     }
                     catch
@@ -240,8 +241,8 @@ public partial class MainWindow : Window
         "hasOnScan:typeof window.onStationRfidScan,hasFeed:typeof window.stationPushScanFeed_,bridge:!!window.__srDesktopBridge," +
         "shellReady:!!(window.onStationRfidScan&&window.onStationRfidScan.__srDesktopShim!==true&&window.onStationRfidScan.__srEarlyBoot!==true)};" +
         "info.recent=(window.stationRecentScans||[]).length;info.q=(window.__srScanQueue||[]).length;" +
-        "info.feedRows=(function(){var l=document.getElementById('station-scan-feed-list');return l&&l.children?l.children.length:0;})();" +
-        "info.hasFeedList=!!document.getElementById('station-scan-feed-list');info.onLogin=!!document.getElementById('login-form');" +
+        "info.feedRows=(function(){var s=document.getElementById('station-shell');var l=s?s.querySelector('#station-scan-feed-list'):document.getElementById('station-scan-feed-list');return l&&l.children?l.children.length:0;})();" +
+        "info.hasFeedList=!!(function(){var s=document.getElementById('station-shell');return s?s.querySelector('#station-scan-feed-list'):document.getElementById('station-scan-feed-list');})();info.onLogin=!!document.getElementById('login-form');" +
         "info.hasStationShell=!!document.getElementById('station-shell');" +
         "return JSON.stringify(info);}catch(e){return JSON.stringify({err:String(e.message||e)});}})()";
 
@@ -332,9 +333,8 @@ public partial class MainWindow : Window
                     break;
                 }
                 case "shellReady":
-                    _shellReady = true;
                     HideSplash();
-                    _ = DrainPendingScansOnGasFrameAsync();
+                    _ = ConfirmShellReadyAsync();
                     break;
                 case "loginNeeded":
                     _shellReady = false;
@@ -488,6 +488,13 @@ public partial class MainWindow : Window
     private async Task EnsureDesktopSessionBootAsync()
     {
         if (WebView.CoreWebView2 == null) return;
+        CoreWebView2Frame? gasFrame;
+        lock (_frameLock)
+            gasFrame = _gasFrame ?? (_childFrames.Count > 0 ? _childFrames[^1] : null);
+        if (gasFrame != null)
+            await SyncIframeSessionToParentAsync(gasFrame);
+        await SeedParentSessionFromDesktopPrefsAsync();
+
         const string js = """
             (function(){try{
               var f=document.getElementById('app-frame');
@@ -509,6 +516,8 @@ public partial class MainWindow : Window
             var raw = await WebView.CoreWebView2.ExecuteScriptAsync(js);
             var result = Trunc(UnwrapScriptResult(raw), 120);
             ScanDiagnostics.Log("WEB", "sessionboot check: " + result);
+            if (result.Contains("\"skip\":\"no-session\""))
+                ShowStatus("Station login required — enter gate PC name + passcode on screen", persistent: true);
         }
         catch
         {
@@ -518,8 +527,93 @@ public partial class MainWindow : Window
 
     private static string BuildInvokeScanJs(string epc, string tid) =>
         "(function(){try{var t=" + JsonSerializer.Serialize(epc) + ",i=" + JsonSerializer.Serialize(tid ?? "") + ";" +
-        "if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);return 'ok';}" +
-        "return 'no-handler';}catch(e){return 'err:'+String(e.message||e);}})()";
+        "if(typeof window.onStationRfidScan==='function'){window.onStationRfidScan(t,i);}" +
+        "var p=document.getElementById('station-scan-panel');" +
+        "if(p&&!p.classList.contains('is-open')&&typeof stationToggleScanPanel==='function'){try{stationToggleScanPanel();}catch(x){}}" +
+        "return typeof window.onStationRfidScan==='function'?'ok':'no-handler';" +
+        "}catch(e){return 'err:'+String(e.message||e);}})()";
+
+    private async Task ConfirmShellReadyAsync()
+    {
+        await Task.Delay(250);
+        if (await ProbeGasFrameShellReadyAsync())
+        {
+            _shellReady = true;
+            await DrainPendingScansOnGasFrameAsync();
+        }
+    }
+
+    private async Task<bool> ProbeGasFrameShellReadyAsync()
+    {
+        CoreWebView2Frame? frame;
+        lock (_frameLock)
+            frame = _gasFrame ?? (_childFrames.Count > 0 ? _childFrames[^1] : null);
+        if (frame == null) return false;
+        try
+        {
+            var raw = await frame.ExecuteScriptAsync(BuildFrameScanProbeJs());
+            var probe = UnwrapScriptResult(raw) ?? "";
+            return probe.Contains("\"shellReady\":true", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private async Task SyncIframeSessionToParentAsync(CoreWebView2Frame frame)
+    {
+        const string js = """
+            (function(){try{
+              var t=localStorage.getItem('sm_session_token')||'';
+              var exp=parseInt(localStorage.getItem('sm_session_expires')||'0',10);
+              if(!t||t.length<20||!exp||exp<=Date.now())return JSON.stringify({skip:'no-iframe-session'});
+              var crew=localStorage.getItem('sm_crew_name')||'';
+              var meta=document.querySelector('meta[name="user-name"]');
+              if(meta&&meta.content)crew=String(meta.content).trim()||crew;
+              if(window.AndroidStation&&typeof AndroidStation.saveSession==='function')
+                AndroidStation.saveSession(t,exp);
+              if(window.parent&&window.parent!==window)
+                window.parent.postMessage({type:'SHOWRUNNER_SESSION_TOKEN',token:t,crewName:crew,expiresAt:exp},'*');
+              return JSON.stringify({sync:true,crew:String(crew||'').substring(0,24)});
+            }catch(e){return JSON.stringify({err:String(e.message||e)});}})()
+            """;
+        try
+        {
+            var raw = await frame.ExecuteScriptAsync(js);
+            var result = Trunc(UnwrapScriptResult(raw), 80);
+            if (result.Contains("\"sync\":true"))
+                ScanDiagnostics.Log("WEB", "iframe session sync: " + result);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
+
+    private async Task SeedParentSessionFromDesktopPrefsAsync()
+    {
+        if (WebView.CoreWebView2 == null) return;
+        var prefs = DesktopPrefs.Load();
+        var token = (prefs.SessionToken ?? "").Trim();
+        if (token.Length < 20 || prefs.SessionExpires <= DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+            return;
+        var tokenJson = JsonSerializer.Serialize(token);
+        var exp = prefs.SessionExpires;
+        var js = "(function(){try{var t=" + tokenJson + ",exp=" + exp + ";" +
+                 "if(!t||exp<=Date.now())return;" +
+                 "localStorage.setItem('sm_session_token',t);" +
+                 "localStorage.setItem('sm_session_expires',String(exp));" +
+                 "}catch(e){}})();";
+        try
+        {
+            await WebView.CoreWebView2.ExecuteScriptAsync(js);
+        }
+        catch
+        {
+            // ignore
+        }
+    }
 
     private async Task DeliverScanToPageCoreAsync(string epc, string tid, string pass)
     {
@@ -819,7 +913,8 @@ public partial class MainWindow : Window
             if (f) f.style.display = 'none';
           }
           function __srEnsureFeedList_() {
-            var list = document.getElementById('station-scan-feed-list');
+            var shell = document.getElementById('station-shell');
+            var list = shell ? shell.querySelector('#station-scan-feed-list') : document.getElementById('station-scan-feed-list');
             if (list) {
               __srHideFloatFeed_();
               return list;
@@ -841,10 +936,10 @@ public partial class MainWindow : Window
               panel.id = 'sr-desktop-scan-feed';
               panel.setAttribute('aria-label', 'Live RFID scans');
               panel.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;max-height:140px;overflow:auto;z-index:2147483646;background:#18181b;border:1px solid #3f3f46;border-radius:8px;padding:8px;font:12px Inter,system-ui,sans-serif;color:#f4f4f5;';
-              panel.innerHTML = '<div style="font-weight:800;margin-bottom:6px;color:#10b981;">Live RFID scans</div><div id="station-scan-feed-list" class="station-scan-feed__list"></div>';
+              panel.innerHTML = '<div style="font-weight:800;margin-bottom:6px;color:#10b981;">Live RFID scans (login to use station UI)</div><div id="sr-desktop-scan-feed-list" class="station-scan-feed__list"></div>';
               (document.body || document.documentElement).appendChild(panel);
             }
-            return document.getElementById('station-scan-feed-list');
+            return document.getElementById('sr-desktop-scan-feed-list');
           }
           function __srShimPushFeed(tag, tid) {
             if (typeof window.stationPushScanFeed_ === 'function' && window.stationPushScanFeed_.__srShim !== true) {
@@ -860,7 +955,7 @@ public partial class MainWindow : Window
             if (typeof window.stationRenderScanFeed_ === 'function') {
               try { window.stationRenderScanFeed_(); __srHideFloatFeed_(); return; } catch (e) {}
             }
-            var list = document.getElementById('station-scan-feed-list');
+            var list = shell ? shell.querySelector('#station-scan-feed-list') : document.getElementById('station-scan-feed-list');
             if (list && document.getElementById('station-shell')) {
               __srHideFloatFeed_();
               var rows = window.stationRecentScans.map(function(s) {

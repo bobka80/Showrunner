@@ -102,11 +102,7 @@ function build() {
           }
         });
       }
-      try {
-        if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'SHOWRUNNER_STATION_READY' }, '*');
-        }
-      } catch (e) { /* ignore */ }
+      // Do not post SHOWRUNNER_STATION_READY here — only initStationShell_ / stationAnnounceReady_ may signal native splash.
     } catch (e) { /* ignore */ }
   })();
 

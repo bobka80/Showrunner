@@ -71,6 +71,11 @@
       if (!token || token.length < 20 || !crew) return;
       if (!shouldPersistSessionToken(crew)) return;
       try {
+        if (window.AndroidStation && typeof AndroidStation.saveSession === 'function') {
+          AndroidStation.saveSession(token, exp);
+        }
+      } catch (e) { /* ignore */ }
+      try {
         window.parent.postMessage({
           type: 'SHOWRUNNER_SESSION_TOKEN',
           token: token,

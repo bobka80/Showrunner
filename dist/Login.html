@@ -186,12 +186,18 @@
 
       function notifyParentSessionToken(token, crewName, expiresAt) {
         if (!token || window.parent === window) return;
+        var exp = expiresAt || (Date.now() + SESSION_MS);
+        try {
+          if (window.AndroidStation && typeof AndroidStation.saveSession === 'function') {
+            AndroidStation.saveSession(token, exp);
+          }
+        } catch (e) { /* ignore */ }
         try {
           window.parent.postMessage({
             type: 'SHOWRUNNER_SESSION_TOKEN',
             token: token,
             crewName: crewName || '',
-            expiresAt: expiresAt || (Date.now() + SESSION_MS)
+            expiresAt: exp
           }, '*');
         } catch (e) { /* ignore */ }
       }

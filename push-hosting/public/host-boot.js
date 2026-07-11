@@ -2563,6 +2563,7 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_READY') {
+      if (ev.data.full !== true) return;
       hideStationSplash();
       notifyNativeSplash('shellReady');
       try { localStorage.setItem('sr_station_iframe_ready', '1'); } catch (e) { /* ignore */ }

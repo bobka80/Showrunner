@@ -3847,7 +3847,7 @@ window.stationSaveGunParkDelayMinutes = function() {
 function stationAnnounceReady_() {
   try { stationCheckHostEjectDeadline_(); } catch (e) { /* ignore */ }
   try { stationCheckNoHostParkDeadline_(); } catch (e) { /* ignore */ }
-  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY' }); } catch (e) { /* ignore */ }
+  try { stationPostToHosting_({ type: 'SHOWRUNNER_STATION_READY', full: true }); } catch (e) { /* ignore */ }
 }
 
 function stationBindMessageListener_() {
