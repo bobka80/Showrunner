@@ -1,6 +1,6 @@
 <!-- @INDEX: STATION -> Dock bulletin / screensaver (desktop only) -->
 <div id="station-dock-screensaver" class="station-dock-screensaver" style="display:none;" aria-hidden="true">
-  <div class="station-dock-ss-left" aria-hidden="false">
+  <div class="station-dock-ss-bg" aria-hidden="true">
     <svg class="station-dock-ss-filters" aria-hidden="true" focusable="false">
       <defs>
         <filter id="station-dock-ss-sandy" x="-12%" y="-30%" width="124%" height="160%" color-interpolation-filters="sRGB">
@@ -12,20 +12,22 @@
         </filter>
       </defs>
     </svg>
-    <div class="station-dock-ss-bg" aria-hidden="true">
-      <div class="station-dock-ss-hero">
-        <svg class="station-dock-ss-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
-      </div>
-      <div id="station-dock-ss-bus-lanes" class="station-dock-ss-bus-lanes"></div>
+    <div class="station-dock-ss-hero">
+      <svg class="station-dock-ss-hero-a" viewBox="80 0 50 42" aria-hidden="true"><path fill="#eb1c24" d="M117.97.96v9.82c0,.05-.67.72-.72.72h-7.43l13.91,30.17h-31.65l3.84-9.1h13.91l-8.87-17.71-12.71,26.81h-10.07l13.91-30.17h-7.67V.96h33.57Z"/></svg>
     </div>
+    <div id="station-dock-ss-bus-lanes" class="station-dock-ss-bus-lanes"></div>
+  </div>
+  <div class="station-dock-ss-left" aria-hidden="false">
     <div class="station-dock-ss-clock-panel">
       <div id="station-dock-ss-clock" class="station-dock-ss-clock"></div>
     </div>
   </div>
   <aside class="station-dock-ss-right" aria-label="Weather bulletin">
-    <div id="station-dock-ss-event-title" class="station-dock-ss-event-title">Loading forecasts…</div>
-    <div class="station-dock-ss-credits-viewport">
-      <div id="station-dock-ss-credits-track" class="station-dock-ss-credits-track"></div>
+    <div class="station-dock-ss-bulletin-panel">
+      <div id="station-dock-ss-event-title" class="station-dock-ss-event-title">Loading forecasts…</div>
+      <div class="station-dock-ss-credits-viewport">
+        <div id="station-dock-ss-credits-track" class="station-dock-ss-credits-track"></div>
+      </div>
     </div>
   </aside>
   <button type="button" class="station-dock-ss-exit" onclick="stationDockCloseScreensaver_()" title="Exit screensaver (Esc)">Exit</button>
