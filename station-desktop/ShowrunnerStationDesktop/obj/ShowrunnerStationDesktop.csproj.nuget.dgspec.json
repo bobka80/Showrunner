@@ -10,7 +10,7 @@
         "projectUniqueName": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
         "projectName": "ShowrunnerStationDesktop",
         "projectPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
-        "packagesPath": "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget",
+        "packagesPath": "C:\\Users\\bobby\\.nuget\\packages\\",
         "outputPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [

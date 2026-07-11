@@ -2,7 +2,7 @@
 <script>
 /**
  * 11c_Station_Core.html — split from 11_Station_Shell.html
-
+ */
 window.stationShellBootstrap = null;
 window.stationHostSession = null;
 window.stationScanBusy = false;
@@ -172,7 +172,12 @@ function stationLookupCrewHostLocal_(epc, tid) {
   return { crew: null, tidMismatch: tidMismatch, tidMissing: tidMissing };
 }
 
-/** Same trim/lowercase contract the backend uses for tag matching. */
+/**
+ * Per-station settings namespace. Every station (one profile per device) keeps its OWN copy of the
+ * driver/gun settings, so two same-model guns on two different profiles never share values. The
+ * settings VIEW/MODEL is identical for all; only the stored bucket (and the active driver it talks
+ * to) differs. Keyed by the station profile name from the bootstrap, falling back to the device
+ * account name, then a safe default before the bootstrap arrives.
  */
 function stationSettingsNs_() {
   try {
@@ -632,6 +637,16 @@ function stationCacheProjectsPayload_(payload, projects) {
   } catch (e) { /* ignore */ }
 }
 
+function stationFormatTime24_(ts) {
+  var d = new Date(ts);
+  var h = d.getHours();
+  var m = d.getMinutes();
+  var s = d.getSeconds();
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  return pad(h) + ':' + pad(m) + ':' + pad(s);
+}
+
+var stationToastTimer_ = null;
 function stationToast_(msg, kind) {
   if (!msg) return;
   var el = document.getElementById('station-toast');

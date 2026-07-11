@@ -31,7 +31,7 @@ w('11h_Station_Project.html', parts([[1071, 1080]]),
 w('11f_Station_Vault.html', parts([[1082, 1137]]),
   '<!-- @INDEX: STATION -> Vault overlay markup -->\n');
 
-w('11c_Station_Core.html', parts([[1139, 1315], [1447, 1905], [1916, 2038], [2113, 2200], [3490, 3518], [3898, 4030]]),
+w('11c_Station_Core.html', parts([[1139, 1315], [1441, 1915], [1916, 2038], [2113, 2200], [3490, 3518], [3898, 4030]]),
   '<!-- @INDEX: STATION -> Core host session, RBAC, bootstrap init -->\n<script>\n',
   '</script>\n');
 

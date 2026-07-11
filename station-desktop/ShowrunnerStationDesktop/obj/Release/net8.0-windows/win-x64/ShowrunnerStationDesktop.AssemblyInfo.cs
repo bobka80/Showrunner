@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ShowrunnerStationDesktop")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("0.1.44.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.44+e78df26be0584d328b60a2c3bd9eed6f75ae56c6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("0.1.44+9384395d08cf277cc71ca034deb2d76b45ca7a98")]
 [assembly: System.Reflection.AssemblyProductAttribute("ShowrunnerStationDesktop")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ShowrunnerStationDesktop")]
 [assembly: System.Reflection.AssemblyVersionAttribute("0.1.44.0")]
