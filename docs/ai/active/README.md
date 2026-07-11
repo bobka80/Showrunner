@@ -10,6 +10,6 @@
 
 Full lifecycle: [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) Rule 11.
 
-**Major rewind (2026-07-11):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — Chainway sled + TSL desktop RFID baseline before 11-series UI split.
+**Major rewind (2026-07-11):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — GAS **530** baseline. **Station UI next:** [STATION_UI.md](../STATION_UI.md) · [station-ui-handoff.md](station-ui-handoff.md).
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md)

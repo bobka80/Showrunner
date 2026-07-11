@@ -1,0 +1,38 @@
+<!-- @INDEX: STATION -> Dock panel UI scale (magnification presets) -->
+<style>
+html.station-dock-root {
+  --station-ui-scale: 1;
+}
+html.station-dock-root[data-ui-scale="125"] { --station-ui-scale: 1.25; }
+html.station-dock-root[data-ui-scale="150"] { --station-ui-scale: 1.5; }
+html.station-dock-root[data-ui-scale="175"] { --station-ui-scale: 1.75; }
+</style>
+<script>
+(function stationDockScaleInit_() {
+  var KEY = 'sm_station_ui_scale';
+  var PRESETS = { '100': 1, '125': 1.25, '150': 1.5, '175': 1.75 };
+
+  window.stationUiScalePreset_ = function() {
+    try {
+      var v = localStorage.getItem(KEY);
+      return (v && PRESETS[v]) ? v : '100';
+    } catch (e) { return '100'; }
+  };
+
+  window.stationApplyUiScale_ = function(preset) {
+    var p = String(preset || '100');
+    if (!PRESETS[p]) p = '100';
+    try { localStorage.setItem(KEY, p); } catch (e) { /* ignore */ }
+    if (typeof window.stationActiveUiSkin_ === 'function' &&
+        window.stationActiveUiSkin_() === 'dock_panel') {
+      document.documentElement.setAttribute('data-ui-scale', p);
+    }
+  };
+
+  if (window.IS_STATION_DEVICE) {
+    document.addEventListener('DOMContentLoaded', function() {
+      window.stationApplyUiScale_(window.stationUiScalePreset_());
+    });
+  }
+})();
+</script>

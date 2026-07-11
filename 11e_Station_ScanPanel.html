@@ -1,0 +1,353 @@
+<!-- @INDEX: STATION -> Scan panel UI + status actions -->
+<script>
+function stationPanelPerm_(key) {
+  const boot = window.stationShellBootstrap;
+  if (boot && boot.permissions && boot.permissions[key] === true) return true;
+  // Legacy profiles: damaged permission column may be empty while broken is on.
+  if (key === 'station_vault_damaged' && boot && boot.permissions && boot.permissions.station_vault_broken === true) return true;
+  return false;
+}
+
+window.stationToggleScanPanel = function() {
+  if (window.stationScanPanelOpen) stationCloseScanPanel();
+  else stationOpenScanPanel();
+};
+
+function stationScanPanelOutsideClick_(e) {
+  var ctrls = document.getElementById('station-device-controls');
+  if (ctrls && ctrls.contains(e.target)) return;
+  stationCloseScanPanel();
+}
+
+function stationPositionScanPanel_() {
+  var header = document.querySelector('.station-shell-header');
+  var panel = document.getElementById('station-scan-panel');
+  if (!header || !panel) return;
+  var top = header.getBoundingClientRect().bottom;
+  panel.style.top = top + 'px';
+  panel.style.bottom = '0';
+}
+
+function stationScanPanelResize_() {
+  if (window.stationScanPanelOpen) stationPositionScanPanel_();
+}
+
+window.stationOpenScanPanel = function() {
+  window.stationScanPanelOpen = true;
+  const panel = document.getElementById('station-scan-panel');
+  const btn = document.getElementById('station-btn-scan-panel');
+  if (panel) {
+    panel.classList.add('is-open');
+    panel.setAttribute('aria-hidden', 'false');
+    stationPositionScanPanel_();
+  }
+  if (btn) btn.classList.add('is-panel-open');
+  stationSyncPanelReadModeUI_();
+  stationPanelRenderLast_();
+  window.addEventListener('resize', stationScanPanelResize_);
+  setTimeout(function() {
+    document.addEventListener('pointerdown', stationScanPanelOutsideClick_, true);
+  }, 0);
+};
+
+window.stationCloseScanPanel = function() {
+  window.stationScanPanelOpen = false;
+  window.stationPanelPendingStatus = null;
+  document.removeEventListener('pointerdown', stationScanPanelOutsideClick_, true);
+  window.removeEventListener('resize', stationScanPanelResize_);
+  const panel = document.getElementById('station-scan-panel');
+  const btn = document.getElementById('station-btn-scan-panel');
+  if (panel) {
+    panel.classList.remove('is-open');
+    panel.setAttribute('aria-hidden', 'true');
+    panel.style.top = '';
+    panel.style.bottom = '';
+  }
+  if (btn) btn.classList.remove('is-panel-open');
+  const noteEl = document.getElementById('station-panel-note');
+  if (noteEl) { noteEl.style.display = 'none'; noteEl.value = ''; }
+};
+
+function stationSyncPanelReadModeUI_() {
+  var mode = stationStoredSetting_(STATION_MODE_KEY) || 'single';
+  var singleBtn = document.getElementById('station-panel-mode-single');
+  var multiBtn = document.getElementById('station-panel-mode-multi');
+  var isMulti = (mode === 'multi');
+  var isContinuous = (mode === 'continuous');
+  if (singleBtn) singleBtn.classList.toggle('is-active', !isMulti && !isContinuous);
+  if (multiBtn) multiBtn.classList.toggle('is-active', isMulti);
+}
+
+window.stationSetPanelReadMode = function(mode) {
+  if (mode !== 'single' && mode !== 'multi') return;
+  stationSetStoredSetting_(STATION_MODE_KEY, mode);
+  var modeEl = document.getElementById('station-set-mode');
+  if (modeEl) modeEl.value = mode;
+  stationUpdateSpeedVisibility_();
+  stationApplyGunSetting_('scanMode', mode);
+  stationSyncPanelReadModeUI_();
+};
+
+function stationPanelReadPresets_() {
+  try {
+    const raw = localStorage.getItem(STATION_PRESET_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return (parsed && typeof parsed === 'object') ? parsed : {};
+  } catch (e) { return {}; }
+}
+
+function stationPanelWritePresets_(obj) {
+  try { localStorage.setItem(STATION_PRESET_STORAGE_KEY, JSON.stringify(obj || {})); } catch (e) { /* ignore */ }
+}
+
+function stationPanelApplyPreset_(slot) {
+  const presets = stationPanelReadPresets_();
+  const val = presets[slot];
+  if (val == null) {
+    stationSetStatus_('No saved preset for ' + slot + ' — hold the button to save.', 'error');
+    return;
+  }
+  const powerEl = document.getElementById('station-set-power');
+  if (powerEl) powerEl.value = val;
+  stationSavePower();
+  stationSetStatus_('Loaded ' + slot + ' preset (' + val + ' dBm).', 'ok');
+}
+
+function stationPanelSavePreset_(slot) {
+  const powerEl = document.getElementById('station-set-power');
+  if (!powerEl || !powerEl.value) return;
+  const presets = stationPanelReadPresets_();
+  presets[slot] = parseInt(powerEl.value, 10);
+  stationPanelWritePresets_(presets);
+  const btn = document.getElementById('station-preset-' + slot);
+  if (btn) {
+    btn.classList.add('station-preset-saved');
+    setTimeout(function() { btn.classList.remove('station-preset-saved'); }, 1200);
+  }
+  stationSetStatus_('Saved ' + slot + ' preset (' + powerEl.value + ' dBm).', 'ok');
+}
+
+function stationBindPresetButtons_() {
+  ['low', 'mid', 'high'].forEach(function(slot) {
+    const btn = document.getElementById('station-preset-' + slot);
+    if (!btn || btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+    let holdTimer = null;
+    let held = false;
+    function clearHold() {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+    }
+    btn.addEventListener('pointerdown', function() {
+      held = false;
+      clearHold();
+      holdTimer = setTimeout(function() {
+        held = true;
+        stationPanelSavePreset_(slot);
+      }, STATION_PRESET_HOLD_MS);
+    });
+    btn.addEventListener('pointerup', function() {
+      clearHold();
+      if (!held) stationPanelApplyPreset_(slot);
+    });
+    btn.addEventListener('pointerleave', clearHold);
+    btn.addEventListener('pointercancel', clearHold);
+  });
+}
+
+function stationPanelUpdateEquipEntry_(unitId, status, statusNote) {
+  if (!unitId) return;
+  const map = window.stationEquipMap || {};
+  Object.keys(map).forEach(function(epc) {
+    const e = map[epc];
+    if (e && String(e.unitId) === String(unitId)) {
+      e.status = status;
+      e.statusNote = statusNote || '';
+    }
+  });
+  try {
+    localStorage.setItem(STATION_EQUIP_MAP_KEY, JSON.stringify({ map: map, ts: Date.now() }));
+  } catch (e) { /* ignore */ }
+  const items = window.stationVaultItems || [];
+  items.forEach(function(it) {
+    if (String(it.id) === String(unitId)) {
+      it.status = status;
+      it.statusNote = statusNote || '';
+    }
+  });
+}
+
+function stationPanelHandleScan_(tag, tid) {
+  stationResetHostIdleTimer_();
+  const hit = stationResolveEpc_(tag);
+  if (hit && hit.kind === 'crew') {
+    window.stationPanelSelection = { kind: 'crew', tag: tag, name: hit.name };
+  } else {
+    const crewHit = stationLookupCrewHostLocal_(tag, tid || '');
+    if (crewHit.crew) {
+      window.stationPanelSelection = { kind: 'crew', tag: tag, name: crewHit.crew.name };
+    } else if (hit && hit.unitId) {
+      window.stationPanelSelection = {
+        kind: 'equipment',
+        tag: tag,
+        unitId: hit.unitId,
+        name: hit.name,
+        unitNumber: hit.unitNumber,
+        status: hit.status || 'Active',
+        statusNote: hit.statusNote || ''
+      };
+    } else {
+      window.stationPanelSelection = { kind: 'unknown', tag: tag };
+    }
+  }
+  stationPanelRenderLast_();
+}
+
+function stationPanelRenderLast_() {
+  const nameEl = document.getElementById('station-panel-last-name');
+  const metaEl = document.getElementById('station-panel-last-meta');
+  const statusEl = document.getElementById('station-panel-last-status');
+  const noteEl = document.getElementById('station-panel-note');
+  const sel = window.stationPanelSelection;
+  if (!nameEl) return;
+  if (!sel) {
+    nameEl.textContent = 'Scan equipment to select';
+    if (metaEl) metaEl.textContent = '';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) { noteEl.style.display = 'none'; noteEl.value = ''; }
+    stationPanelRenderActions_();
+    return;
+  }
+  if (sel.kind === 'crew') {
+    nameEl.textContent = sel.name || 'Crew badge';
+    if (metaEl) metaEl.textContent = 'Crew badge — status actions apply to equipment only';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) noteEl.style.display = 'none';
+    stationPanelRenderActions_();
+    return;
+  }
+  if (sel.kind === 'unknown') {
+    nameEl.textContent = 'Unknown tag';
+    if (metaEl) metaEl.textContent = sel.tag || '';
+    if (statusEl) statusEl.textContent = '';
+    if (noteEl) noteEl.style.display = 'none';
+    stationPanelRenderActions_();
+    return;
+  }
+  nameEl.textContent = sel.name || 'Equipment';
+  if (metaEl) metaEl.textContent = (sel.unitNumber ? ('Unit ' + sel.unitNumber + ' · ') : '') + (sel.tag || '');
+  const st = sel.status || 'Active';
+  const color = stationVaultStatusColor_(st);
+  if (statusEl) {
+    statusEl.innerHTML = '<span style="color:' + color + '; font-weight:800;">' + st.toUpperCase() + '</span>'
+      + (sel.statusNote ? (' — ' + sel.statusNote) : '');
+  }
+  if (noteEl && window.stationPanelPendingStatus !== 'Damaged') {
+    noteEl.style.display = 'none';
+    noteEl.value = sel.statusNote || '';
+  }
+  stationPanelRenderActions_();
+}
+
+function stationPanelRenderActions_() {
+  const wrap = document.getElementById('station-panel-actions');
+  if (!wrap) return;
+  const sel = window.stationPanelSelection;
+  const host = stationReadHostSession_();
+  if (!host) {
+    wrap.innerHTML = '<div class="station-scan-panel__hint">Scan your crew badge to host before changing status.</div>';
+    return;
+  }
+  if (!sel || sel.kind !== 'equipment') {
+    wrap.innerHTML = '<div class="station-scan-panel__hint">Scan a tagged piece of equipment.</div>';
+    return;
+  }
+  const st = String(sel.status || 'Active').toLowerCase();
+  const btns = [];
+  function add(label, status, style) {
+    btns.push('<button type="button" class="btn-outline btn-sm" style="margin:0;' + (style || '') + '" onclick="stationPanelAskStatus_(\'' + status + '\')">' + label + '</button>');
+  }
+  if (st === 'active' || st === '') {
+    if (stationPanelPerm_('station_vault_maintenance')) add('Maintenance', 'Maintenance', 'border-color:#f59e0b;color:#f59e0b;');
+    if (stationPanelPerm_('station_vault_damaged')) add('Damaged', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (stationPanelPerm_('station_vault_broken')) add('Broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+  } else if (st.indexOf('damaged') !== -1) {
+    if (stationPanelPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+    if (stationPanelPerm_('station_vault_damaged')) add('Edit problem', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (stationPanelPerm_('station_vault_broken')) add('Mark broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+    if (stationPanelPerm_('station_vault_maintenance')) add('Maintenance', 'Maintenance', 'border-color:#f59e0b;color:#f59e0b;');
+  } else if (st.indexOf('broken') !== -1 || st.indexOf('maintenance') !== -1) {
+    if (stationPanelPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+    if (st.indexOf('maintenance') !== -1 && stationPanelPerm_('station_vault_damaged')) add('Damaged', 'Damaged', 'border-color:#eab308;color:#eab308;');
+    if (st.indexOf('maintenance') !== -1 && stationPanelPerm_('station_vault_broken')) add('Broken', 'Broken', 'border-color:#ef4444;color:#ef4444;');
+  } else {
+    if (stationPanelPerm_('station_vault_repair')) add('Repaired', 'Repaired', 'border-color:#10b981;color:#10b981;');
+  }
+  if (window.stationPanelPendingStatus === 'Damaged') {
+    btns.push('<button type="button" class="btn-main btn-sm" style="margin:0; flex:1 1 100%;" onclick="stationPanelConfirmDamaged_()">Save damaged</button>');
+    btns.push('<button type="button" class="btn-close btn-sm" style="margin:0;" onclick="stationPanelCancelNote_()">Cancel</button>');
+  }
+  wrap.innerHTML = btns.join('');
+}
+
+window.stationPanelAskStatus_ = function(status) {
+  const sel = window.stationPanelSelection;
+  if (!sel || sel.kind !== 'equipment') return;
+  if (status === 'Damaged') {
+    window.stationPanelPendingStatus = 'Damaged';
+    const noteEl = document.getElementById('station-panel-note');
+    if (noteEl) {
+      noteEl.style.display = 'block';
+      noteEl.value = sel.statusNote || '';
+      noteEl.focus();
+    }
+    stationPanelRenderActions_();
+    return;
+  }
+  const noteEl = document.getElementById('station-panel-note');
+  const note = (noteEl && noteEl.value) ? noteEl.value.trim() : '';
+  stationPanelCommitStatus_(status, note);
+};
+
+window.stationPanelConfirmDamaged_ = function() {
+  const noteEl = document.getElementById('station-panel-note');
+  const note = noteEl ? noteEl.value.trim() : '';
+  if (!note) {
+    stationSetStatus_('Describe what is wrong before marking Damaged.', 'error');
+    if (noteEl) noteEl.focus();
+    return;
+  }
+  stationPanelCommitStatus_('Damaged', note);
+};
+
+window.stationPanelCancelNote_ = function() {
+  window.stationPanelPendingStatus = null;
+  const noteEl = document.getElementById('station-panel-note');
+  if (noteEl) noteEl.style.display = 'none';
+  stationPanelRenderActions_();
+};
+
+function stationPanelCommitStatus_(status, note) {
+  const host = stationReadHostSession_();
+  const sel = window.stationPanelSelection;
+  if (!host || !sel || !sel.unitId) return;
+  stationSetStatus_('Saving…', '');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      window.stationPanelPendingStatus = null;
+      if (!res || !res.success) {
+        stationSetStatus_((res && res.error) ? res.error : 'Could not update status.', 'error');
+        return;
+      }
+      sel.status = res.status;
+      sel.statusNote = res.statusNote || '';
+      stationPanelUpdateEquipEntry_(sel.unitId, res.status, res.statusNote);
+      stationPanelRenderLast_();
+      stationSetStatus_('Updated → ' + (res.label || res.status), 'ok');
+      stationRenderScanFeed_();
+    })
+    .withFailureHandler(function(err) {
+      stationSetStatus_('Error: ' + (err && err.message ? err.message : String(err)), 'error');
+    })
+    .setStationAssetStatus(ACTIVE_USER_NAME, host.name, sel.unitId, status, note || '');
+}
+</script>

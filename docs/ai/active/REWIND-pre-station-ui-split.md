@@ -3,7 +3,7 @@
 **Status:** **ACTIVE REWIND** — restore here before the **11-series shell split** and **dock panel UI** rework.  
 **Pinned:** 2026-07-11 · **GAS:** see `RELEASES.md` row tagged **REWIND POINT** · **Last updated:** 2026-07-11
 
-**Next work after this point:** [rfid-station-profiles.md](rfid-station-profiles.md) — mechanical split of `11_Station_Shell.html`, then **phone sled** vs **dock panel** UI. See session plan in chat / `STATION_UI.md` (when added).
+**Next work after this point:** [STATION_UI.md](../STATION_UI.md) (phone sled vs dock panel spec) · [station-ui-handoff.md](station-ui-handoff.md) (new-chat protocol) · [rfid-station-profiles.md](rfid-station-profiles.md) (RFID campaign).
 
 ---
 

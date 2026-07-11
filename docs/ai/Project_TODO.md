@@ -14,7 +14,16 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ---
 
-## Next up (director, 2026-07-05)
+## Next up (director, 2026-07-11)
+
+**Station UI rework** (after director **OK go**) — full spec: [STATION_UI.md](STATION_UI.md) · handoff: [active/station-ui-handoff.md](active/station-ui-handoff.md) · baseline: [active/REWIND-pre-station-ui-split.md](active/REWIND-pre-station-ui-split.md) (**GAS 530**).
+
+| Phase | Task | Status |
+|-------|------|--------|
+| **0** | REWIND + docs + rollback to v530 | [x] Done |
+| **A** | Mechanical split `11_Station_Shell.html` → `11b`–`11l` (zero logic change, parse-check, Chainway + TSL regression) | [ ] Not started |
+| **B** | Dock panel UI — right scan rail, bottom eject, sidebar, UI scale (`phone_sled` unchanged) | [ ] Blocked on Phase A |
+| **C** | Screensaver / bulletin (dock only); gate layout UI | [ ] Deferred |
 
 1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
 2. **Data access layer (DAL)** — Phase 0 discovery sweep → design lock → incremental router/repos **before** Firebase prep ledger or timeline fork. Campaign: [active/data-access-layer.md](active/data-access-layer.md). Say **OK go** to start Phase 0.
@@ -27,7 +36,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station profiles** | **REWIND pinned** — Chainway sled + TSL desktop RFID baseline working → [REWIND-pre-station-ui-split.md](active/REWIND-pre-station-ui-split.md). **Next:** 11-series shell split + dock/tablet UI | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. **Next:** Phase A shell split → Phase B dock UI — [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | **Planned — not executing**; phone app first; blocks Firebase prep/timeline fork until Phase 3 | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---
