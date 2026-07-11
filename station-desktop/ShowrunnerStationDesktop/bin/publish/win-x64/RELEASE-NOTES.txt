@@ -1,3 +1,3 @@
-Showrunner Station Desktop v0.1.5
+Showrunner Station Desktop v0.1.6
 
-- Fix connect regression: remove UI-thread deadlock, start watchdog before WebView
+- v0.1.6: fix gun sleep/disconnect postMessage parsing, triple scan delivery path, TID dedup

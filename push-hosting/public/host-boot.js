@@ -75,7 +75,7 @@
     } catch (e) { /* ignore */ }
     try {
       if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
-        window.chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method }));
+        window.chrome.webview.postMessage({ type: 'SR_STATION_GUN', method: method });
         return true;
       }
     } catch (e2) { /* ignore */ }
@@ -2597,12 +2597,14 @@
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_GUN_RECONNECT') {
       invokeStationGun_('reconnectGun');
-      setTimeout(relayStationConfigToIframe, 1500);
+      setTimeout(relayStationConfigToIframe, 800);
+      setTimeout(relayStationConfigToIframe, 2500);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_GUN_SLEEP') {
       invokeStationGun_('sleepGun');
-      setTimeout(relayStationConfigToIframe, 1200);
+      setTimeout(relayStationConfigToIframe, 800);
+      setTimeout(relayStationConfigToIframe, 2500);
       return;
     }
     if (hostMobileScanIsScanPageMsg_(ev)) {

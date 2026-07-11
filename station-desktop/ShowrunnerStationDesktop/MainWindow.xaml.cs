@@ -148,19 +148,16 @@ public partial class MainWindow : Window
     {
         try
         {
-            using var doc = JsonDocument.Parse(args.WebMessageAsJson);
-            var root = doc.RootElement;
-            if (root.GetProperty("type").GetString() != "SR_STATION_GUN") return;
-            var method = root.GetProperty("method").GetString();
+            if (!TryParseGunWebMessage(args, out var method)) return;
             switch (method)
             {
                 case "reconnectGun":
                     _rfid.ForceReconnect();
-                    RelayGunConfigToPage();
+                    ScheduleRelayGunConfig();
                     break;
                 case "sleepGun":
                     _rfid.SleepAndDisconnect();
-                    RelayGunConfigToPage();
+                    ScheduleRelayGunConfig();
                     break;
             }
         }
@@ -168,6 +165,41 @@ public partial class MainWindow : Window
         {
             // ignore malformed messages
         }
+    }
+
+    private static bool TryParseGunWebMessage(CoreWebView2WebMessageReceivedEventArgs args, out string? method)
+    {
+        method = null;
+        JsonElement root;
+        try
+        {
+            root = JsonDocument.Parse(args.WebMessageAsJson).RootElement;
+            if (root.ValueKind == JsonValueKind.String)
+                root = JsonDocument.Parse(root.GetString() ?? "{}").RootElement;
+        }
+        catch
+        {
+            var raw = args.TryGetWebMessageAsString();
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            try
+            {
+                root = JsonDocument.Parse(raw).RootElement;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        if (root.GetProperty("type").GetString() != "SR_STATION_GUN") return false;
+        method = root.GetProperty("method").GetString();
+        return !string.IsNullOrWhiteSpace(method);
+    }
+
+    private void ScheduleRelayGunConfig()
+    {
+        RelayGunConfigToPage();
+        Task.Delay(1200).ContinueWith(_ => Dispatcher.Invoke(RelayGunConfigToPage));
     }
 
     private void RelayGunConfigToPage()
@@ -224,17 +256,21 @@ public partial class MainWindow : Window
         if (WebView.CoreWebView2 == null) return;
         var tagJs = JsonSerializer.Serialize(epc);
         var tidJs = JsonSerializer.Serialize(tid);
+        var msgJs = JsonSerializer.Serialize(new { type = "SHOWRUNNER_RFID_SCAN", tag = epc, tid });
         var topJs =
             $"(function(){{try{{var e={tagJs},t={tidJs};" +
             "if(window.showrunnerStationDeliverScan)window.showrunnerStationDeliverScan(e,t);" +
             "}catch(x){{}}}})();";
         var childJs =
-            $"(function(){{try{{var e={tagJs},t={tidJs};" +
-            "if(typeof window.onStationRfidScan==='function')window.onStationRfidScan(e,t);" +
+            $"(function(){{try{{var m={msgJs};" +
+            "if(typeof window.onStationRfidScan==='function')window.onStationRfidScan(m.tag,m.tid||'');" +
             "}catch(x){{}}}})();";
         try
         {
             _ = WebView.CoreWebView2.ExecuteScriptAsync(topJs);
+            _ = WebView.CoreWebView2.ExecuteScriptAsync(
+                $"(function(m){{try{{var f=document.getElementById('app-frame');" +
+                "if(f&&f.contentWindow)f.contentWindow.postMessage(m,'*');}}catch(e){{}}}})({msgJs});");
         }
         catch
         {
@@ -311,7 +347,7 @@ public partial class MainWindow : Window
               try { h[method](); return; } catch (e) {}
             }
             try {
-              chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method }));
+              chrome.webview.postMessage({ type: 'SR_STATION_GUN', method: method });
             } catch (e2) {}
           }
           window.__srDesktopBridge = true;

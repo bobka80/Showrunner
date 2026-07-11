@@ -7,7 +7,7 @@
   "targets": {
     ".NETCoreApp,Version=v8.0": {},
     ".NETCoreApp,Version=v8.0/win-x64": {
-      "ShowrunnerStationDesktop/0.1.5": {
+      "ShowrunnerStationDesktop/0.1.6": {
         "dependencies": {
           "Microsoft.Web.WebView2": "1.0.2957.106",
           "System.Management": "8.0.0",
@@ -123,7 +123,7 @@
     }
   },
   "libraries": {
-    "ShowrunnerStationDesktop/0.1.5": {
+    "ShowrunnerStationDesktop/0.1.6": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

@@ -242,10 +242,9 @@ public sealed class TslRfidManager : IDisposable
             try
             {
                 StopContinuous();
+                AbortIfConnected();
                 if (_commander.IsConnected)
                 {
-                    AbortIfConnected();
-                    // TSL Commands sample: synchronous SleepCommand — disconnects after response.
                     var sleep = new SleepCommand();
                     _commander.ExecuteCommand(sleep, sleep.Responder);
                 }
@@ -513,6 +512,13 @@ public sealed class TslRfidManager : IDisposable
         var epc = NormalizeHex(e.Transponder.Epc);
         if (string.IsNullOrEmpty(epc)) return;
         var tid = NormalizeHex(e.Transponder.TransponderIdentifier);
+        // Fast ID must not duplicate EPC into the TID field — that fails host pair-match.
+        if (!string.IsNullOrEmpty(tid) && tid == epc)
+            tid = "";
+        if (string.IsNullOrEmpty(tid))
+            tid = NormalizeHex(e.Transponder.ReadData);
+        if (!string.IsNullOrEmpty(tid) && tid == epc)
+            tid = "";
         EnqueueScan(epc, tid);
         PostStatus("Read: " + epc + (string.IsNullOrEmpty(tid) ? "" : " tid:" + tid));
     }
