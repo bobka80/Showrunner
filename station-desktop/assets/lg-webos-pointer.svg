@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
+  <!-- LG webOS Magic Remote pointer  dark fill, white ring, tip upper-left -->
+  <path fill="#35383e" stroke="#ffffff" stroke-width="3.25" stroke-linejoin="round" stroke-linecap="round"
+    d="M 10.8 5.2
+       C 10.8 5.2 12.8 8.8 17.2 10.8
+       C 27.6 15.2 34.4 22.8 33.2 30.6
+       C 32.2 37.6 24.4 40.2 17.6 37.4
+       C 10.8 34.6 7.4 27.4 8 19.8
+       C 8.4 14.2 9.6 9.2 10.8 5.2 Z"/>
+</svg>
