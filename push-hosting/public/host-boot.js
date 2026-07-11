@@ -36,13 +36,21 @@
       tag: String(tag == null ? '' : tag),
       tid: tid ? String(tid) : ''
     };
+    // Post once to the GAS iframe only — posting to #app-frame AND every iframe duplicated
+    // every scan (2× onStationRfidScan), and the 1500ms dedup then ate real rescans.
     try {
-      if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
+      if (frame && frame.contentWindow) {
+        frame.contentWindow.postMessage(msg, '*');
+        return;
+      }
     } catch (e) { /* ignore */ }
     try {
       var frames = document.querySelectorAll('iframe');
       for (var i = 0; i < frames.length; i++) {
-        if (frames[i].contentWindow) frames[i].contentWindow.postMessage(msg, '*');
+        if (frames[i].contentWindow) {
+          frames[i].contentWindow.postMessage(msg, '*');
+          return;
+        }
       }
     } catch (e2) { /* ignore */ }
   }

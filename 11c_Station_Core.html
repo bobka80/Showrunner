@@ -78,6 +78,8 @@ window.stationHostActive_ = function() {
 
 /** How many recent scans to keep in the always-on top strip. */
 var STATION_SCAN_FEED_MAX = 8;
+/** Collapse poll+relay double-delivery only — not physical re-scans of the same tag. */
+var STATION_SCAN_DELIVERY_DEDUPE_MS = 350;
 
 /** Auto-eject the hosted crew member after this much inactivity (device stays logged in). */
 var STATION_HOST_IDLE_DEFAULT_MIN = 10;

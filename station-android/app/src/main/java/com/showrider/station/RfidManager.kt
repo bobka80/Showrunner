@@ -866,6 +866,8 @@ class RfidManager(
         pendingScans.add(PendingScan(epc, tid))
         while (pendingScans.size > 32) pendingScans.poll()
         onGunActivity()
+        // Relay immediately (v530 path). Host poll still drains the queue as fallback;
+        // client dedup (~350ms) collapses poll+relay duplicates — not physical re-scans.
         mainHandler.post { onTagScanned(epc, tid) }
     }
 
