@@ -72,20 +72,38 @@
     }, 300);
   }
 
-  function invokeStationGun_(method) {
+  function relayStationGunCommand_(method, args) {
+    args = args || [];
     try {
-      if (window.AndroidStation && typeof AndroidStation[method] === 'function') {
-        AndroidStation[method]();
+      if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+        window.chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: args }));
         return true;
       }
     } catch (e) { /* ignore */ }
     try {
-      if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
-        window.chrome.webview.postMessage({ type: 'SR_STATION_GUN', method: method });
+      if (window.AndroidStation) {
+        if (method === 'setPower' && typeof AndroidStation.setPower === 'function')
+          AndroidStation.setPower(parseInt(args[0], 10));
+        else if (method === 'setScanMode' && typeof AndroidStation.setScanMode === 'function')
+          AndroidStation.setScanMode(String(args[0]));
+        else if (method === 'setBeep' && typeof AndroidStation.setBeep === 'function')
+          AndroidStation.setBeep(args[0] === true || args[0] === 1 || args[0] === '1');
+        else if (method === 'setPollMs' && typeof AndroidStation.setPollMs === 'function')
+          AndroidStation.setPollMs(parseInt(args[0], 10));
+        else if (method === 'saveSession' && typeof AndroidStation.saveSession === 'function')
+          AndroidStation.saveSession(args[0], args[1]);
+        else if (typeof AndroidStation[method] === 'function') {
+          if (args.length) AndroidStation[method].apply(AndroidStation, args);
+          else AndroidStation[method]();
+        }
         return true;
       }
     } catch (e2) { /* ignore */ }
     return false;
+  }
+
+  function invokeStationGun_(method) {
+    return relayStationGunCommand_(method, []);
   }
 
   function relayStationConfigToIframe() {
@@ -1373,14 +1391,10 @@
   }
 
   function applyStationConfig(key, value) {
-    try {
-      if (window.AndroidStation) {
-        if (key === 'power' && typeof AndroidStation.setPower === 'function') AndroidStation.setPower(parseInt(value, 10));
-        else if (key === 'scanMode' && typeof AndroidStation.setScanMode === 'function') AndroidStation.setScanMode(String(value));
-        else if (key === 'beep' && typeof AndroidStation.setBeep === 'function') AndroidStation.setBeep(!!value);
-        else if (key === 'pollMs' && typeof AndroidStation.setPollMs === 'function') AndroidStation.setPollMs(parseInt(value, 10));
-      }
-    } catch (e) { /* ignore */ }
+    if (key === 'power') relayStationGunCommand_('setPower', [parseInt(value, 10)]);
+    else if (key === 'scanMode') relayStationGunCommand_('setScanMode', [String(value)]);
+    else if (key === 'beep') relayStationGunCommand_('setBeep', [!!value]);
+    else if (key === 'pollMs') relayStationGunCommand_('setPollMs', [parseInt(value, 10)]);
     relayStationConfigToIframe();
   }
 
@@ -2632,6 +2646,10 @@
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_GET') {
       relayStationConfigToIframe();
+      return;
+    }
+    if (ev.data.type === 'SR_STATION_GUN') {
+      relayStationGunCommand_(ev.data.method, ev.data.args || []);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_STATION_CONFIG_SET') {

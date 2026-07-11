@@ -1,22 +1,22 @@
 {
   "version": 2,
-  "dgSpecHash": "VXpUEAPzO8I=",
+  "dgSpecHash": "2ZkuHxvjuyM=",
   "success": true,
   "projectFilePath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\bobby\\.nuget\\packages\\microsoft.web.webview2\\1.0.2957.106\\microsoft.web.webview2.1.0.2957.106.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\runtime.linux-arm.runtime.native.system.io.ports\\8.0.0\\runtime.linux-arm.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\runtime.linux-arm64.runtime.native.system.io.ports\\8.0.0\\runtime.linux-arm64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\runtime.linux-x64.runtime.native.system.io.ports\\8.0.0\\runtime.linux-x64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\runtime.native.system.io.ports\\8.0.0\\runtime.native.system.io.ports.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\runtime.osx-arm64.runtime.native.system.io.ports\\8.0.0\\runtime.osx-arm64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\runtime.osx-x64.runtime.native.system.io.ports\\8.0.0\\runtime.osx-x64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\system.codedom\\8.0.0\\system.codedom.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\system.io.ports\\8.0.0\\system.io.ports.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\system.management\\8.0.0\\system.management.8.0.0.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\tsl.asciiprotocol\\6.3.4\\tsl.asciiprotocol.6.3.4.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\tsl.rfid.asciiprotocol.core\\6.3.4\\tsl.rfid.asciiprotocol.core.6.3.4.nupkg.sha512",
-    "C:\\Users\\bobby\\.nuget\\packages\\tsl.rfid.operations\\6.3.4\\tsl.rfid.operations.6.3.4.nupkg.sha512"
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\microsoft.web.webview2\\1.0.2957.106\\microsoft.web.webview2.1.0.2957.106.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\runtime.linux-arm.runtime.native.system.io.ports\\8.0.0\\runtime.linux-arm.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\runtime.linux-arm64.runtime.native.system.io.ports\\8.0.0\\runtime.linux-arm64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\runtime.linux-x64.runtime.native.system.io.ports\\8.0.0\\runtime.linux-x64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\runtime.native.system.io.ports\\8.0.0\\runtime.native.system.io.ports.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\runtime.osx-arm64.runtime.native.system.io.ports\\8.0.0\\runtime.osx-arm64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\runtime.osx-x64.runtime.native.system.io.ports\\8.0.0\\runtime.osx-x64.runtime.native.system.io.ports.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\system.codedom\\8.0.0\\system.codedom.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\system.io.ports\\8.0.0\\system.io.ports.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\system.management\\8.0.0\\system.management.8.0.0.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\tsl.asciiprotocol\\6.3.4\\tsl.asciiprotocol.6.3.4.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\tsl.rfid.asciiprotocol.core\\6.3.4\\tsl.rfid.asciiprotocol.core.6.3.4.nupkg.sha512",
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget\\tsl.rfid.operations\\6.3.4\\tsl.rfid.operations.6.3.4.nupkg.sha512"
   ],
   "logs": []
 }

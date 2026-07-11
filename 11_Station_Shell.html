@@ -3504,8 +3504,17 @@ function stationNativeBridge_() {
     var b = window.AndroidStation;
     if (b && typeof b.getConfig === 'function' && typeof b.setScanMode === 'function') return b;
   } catch (e) { /* ignore */ }
-  // Desktop without cache shim: do not touch sync hostObjects (blocks UI / COM).
-  if (window.__srDesktopBridge) return null;
+  // Desktop cache shim without chrome.webview in this frame — use hosting relay for settings.
+  if (window.__srDesktopBridge) {
+    var hasPost = false;
+    try { hasPost = !!(window.chrome && window.chrome.webview && window.chrome.webview.postMessage); } catch (e0) { /* ignore */ }
+    if (!hasPost) {
+      try {
+        hasPost = !!(window.top && window.top.chrome && window.top.chrome.webview && window.top.chrome.webview.postMessage);
+      } catch (e1) { /* ignore */ }
+    }
+    if (!hasPost) return null;
+  }
   try {
     var h = chrome && chrome.webview && chrome.webview.hostObjects &&
       chrome.webview.hostObjects.sync && chrome.webview.hostObjects.sync.androidStation;
@@ -3866,6 +3875,7 @@ function stationBindMessageListener_() {
       if (typeof window.onStationRfidScan === 'function') window.onStationRfidScan(d.tag, d.tid || '');
     } else if (d.type === 'SHOWRUNNER_STATION_CONFIG') {
       stationDebug_('relay config');
+      try { if (d.config) window.__srGunConfigJson = JSON.stringify(d.config); } catch (e) { /* ignore */ }
       stationApplyGunConfig_(d.config || null);
     } else if (d.type === 'SHOWRUNNER_STATION_GUN_STATUS' && d.message) {
       if (typeof window.stationOnGunStatus_ === 'function') window.stationOnGunStatus_(d.message);

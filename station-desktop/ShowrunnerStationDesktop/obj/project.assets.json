@@ -194,143 +194,6 @@
           }
         }
       }
-    },
-    "net8.0-windows7.0/win-x64": {
-      "Microsoft.Web.WebView2/1.0.2957.106": {
-        "type": "package",
-        "native": {
-          "runtimes/win-x64/native/WebView2Loader.dll": {}
-        },
-        "build": {
-          "buildTransitive/Microsoft.Web.WebView2.targets": {}
-        }
-      },
-      "runtime.linux-arm.runtime.native.System.IO.Ports/8.0.0": {
-        "type": "package"
-      },
-      "runtime.linux-arm64.runtime.native.System.IO.Ports/8.0.0": {
-        "type": "package"
-      },
-      "runtime.linux-x64.runtime.native.System.IO.Ports/8.0.0": {
-        "type": "package"
-      },
-      "runtime.native.System.IO.Ports/8.0.0": {
-        "type": "package",
-        "dependencies": {
-          "runtime.linux-arm.runtime.native.System.IO.Ports": "8.0.0",
-          "runtime.linux-arm64.runtime.native.System.IO.Ports": "8.0.0",
-          "runtime.linux-x64.runtime.native.System.IO.Ports": "8.0.0",
-          "runtime.osx-arm64.runtime.native.System.IO.Ports": "8.0.0",
-          "runtime.osx-x64.runtime.native.System.IO.Ports": "8.0.0"
-        }
-      },
-      "runtime.osx-arm64.runtime.native.System.IO.Ports/8.0.0": {
-        "type": "package"
-      },
-      "runtime.osx-x64.runtime.native.System.IO.Ports/8.0.0": {
-        "type": "package"
-      },
-      "System.CodeDom/8.0.0": {
-        "type": "package",
-        "compile": {
-          "lib/net8.0/System.CodeDom.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net8.0/System.CodeDom.dll": {
-            "related": ".xml"
-          }
-        },
-        "build": {
-          "buildTransitive/net6.0/_._": {}
-        }
-      },
-      "System.IO.Ports/8.0.0": {
-        "type": "package",
-        "dependencies": {
-          "runtime.native.System.IO.Ports": "8.0.0"
-        },
-        "compile": {
-          "lib/net8.0/System.IO.Ports.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "runtimes/win/lib/net8.0/System.IO.Ports.dll": {
-            "related": ".xml"
-          }
-        },
-        "build": {
-          "buildTransitive/net6.0/_._": {}
-        }
-      },
-      "System.Management/8.0.0": {
-        "type": "package",
-        "dependencies": {
-          "System.CodeDom": "8.0.0"
-        },
-        "compile": {
-          "lib/net8.0/System.Management.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "runtimes/win/lib/net8.0/System.Management.dll": {
-            "related": ".xml"
-          }
-        },
-        "build": {
-          "buildTransitive/net6.0/_._": {}
-        }
-      },
-      "Tsl.AsciiProtocol/6.3.4": {
-        "type": "package",
-        "dependencies": {
-          "System.IO.Ports": "8.0.0",
-          "Tsl.Rfid.AsciiProtocol.Core": "6.3.4",
-          "Tsl.Rfid.Operations": "6.3.4"
-        },
-        "compile": {
-          "lib/net8.0-windows7.0/TechnologySolutions.Rfid.AsciiProtocol.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/net8.0-windows7.0/TechnologySolutions.Rfid.AsciiProtocol.dll": {
-            "related": ".xml"
-          }
-        }
-      },
-      "Tsl.Rfid.AsciiProtocol.Core/6.3.4": {
-        "type": "package",
-        "compile": {
-          "lib/netstandard2.0/TechnologySolutions.Rfid.AsciiProtocol.Core.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/netstandard2.0/TechnologySolutions.Rfid.AsciiProtocol.Core.dll": {
-            "related": ".xml"
-          }
-        }
-      },
-      "Tsl.Rfid.Operations/6.3.4": {
-        "type": "package",
-        "dependencies": {
-          "Tsl.Rfid.AsciiProtocol.Core": "6.3.4"
-        },
-        "compile": {
-          "lib/netstandard2.0/TechnologySolutions.Rfid.Operations.dll": {
-            "related": ".xml"
-          }
-        },
-        "runtime": {
-          "lib/netstandard2.0/TechnologySolutions.Rfid.Operations.dll": {
-            "related": ".xml"
-          }
-        }
-      }
     }
   },
   "libraries": {
@@ -695,15 +558,15 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\bobby\\.nuget\\packages\\": {}
+    "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget": {}
   },
   "project": {
-    "version": "0.1.40",
+    "version": "0.1.41",
     "restore": {
       "projectUniqueName": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
       "projectName": "ShowrunnerStationDesktop",
       "projectPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\ShowrunnerStationDesktop.csproj",
-      "packagesPath": "C:\\Users\\bobby\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\bobby\\AppData\\Local\\Temp\\cursor-sandbox-cache\\f94e96e52647e98a416a656a6e583cb2\\nuget",
       "outputPath": "S:\\Gdrive\\3Showrider\\Code Env\\station-desktop\\ShowrunnerStationDesktop\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
@@ -769,11 +632,6 @@
           }
         },
         "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.301/PortableRuntimeIdentifierGraph.json"
-      }
-    },
-    "runtimes": {
-      "win-x64": {
-        "#import": []
       }
     }
   }

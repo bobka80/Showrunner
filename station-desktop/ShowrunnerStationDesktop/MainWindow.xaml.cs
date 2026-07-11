@@ -230,6 +230,7 @@ public partial class MainWindow : Window
                 if (WebView.CoreWebView2 == null) return;
                 var cfgMsg = JsonSerializer.Serialize(new { type = "SR_GUN_CONFIG", json = cfg });
                 WebView.CoreWebView2.PostWebMessageAsJson(cfgMsg);
+                PostJsonToChildFrames(cfgMsg, "WEB", "gun-config");
             }
             catch
             {
@@ -288,6 +289,7 @@ public partial class MainWindow : Window
         try
         {
             if (!TryParseGunWebMessage(args, out var method, out var payload)) return;
+            ScanDiagnostics.Log("WEB", "SR_STATION_GUN " + method);
             switch (method)
             {
                 case "reconnectGun":
@@ -1066,6 +1068,9 @@ public partial class MainWindow : Window
               if ((d.type === 'SHOWRUNNER_SESSION_TOKEN' || d.type === 'SHOWRUNNER_SESSION') && __srIsGasWrapperFrame_()) {
                 try { if (window.parent && window.parent !== window) window.parent.postMessage(d, '*'); } catch (e) {}
               }
+              if (d.type === 'SR_STATION_GUN' && __srIsGasWrapperFrame_()) {
+                try { if (window.top && window.top !== window) window.top.postMessage(d, '*'); } catch (e) {}
+              }
             }, true);
           }
           var __srIsWrapper = __srIsGasWrapperFrame_();
@@ -1252,9 +1257,25 @@ public partial class MainWindow : Window
               });
             } catch (e) {}
             function postGun(method, args) {
+              args = args || [];
+              var payload = { type: 'SR_STATION_GUN', method: method, args: args };
+              var raw = JSON.stringify(payload);
               try {
-                chrome.webview.postMessage(JSON.stringify({ type: 'SR_STATION_GUN', method: method, args: args || [] }));
+                if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+                  window.chrome.webview.postMessage(raw);
+                  return;
+                }
               } catch (e2) {}
+              try {
+                var topWin = window.top;
+                if (topWin && topWin !== window && topWin.chrome && topWin.chrome.webview && topWin.chrome.webview.postMessage) {
+                  topWin.chrome.webview.postMessage(raw);
+                  return;
+                }
+              } catch (e3) {}
+              try {
+                if (window.top && window.top !== window) window.top.postMessage(payload, '*');
+              } catch (e4) {}
             }
             window.AndroidStation = {
               getConfig: function() { return window.__srGunConfigJson || '{}'; },
