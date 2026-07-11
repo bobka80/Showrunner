@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (vision + full backlog):** [../topics/logistics-warehouse.md](../topics/logistics-warehouse.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md) §8/§11 · **Fragile bridge rules:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Two-layer shell bridge
 
-**Opened:** 2026-07-02 · **Production:** GAS **v525** · APK **v0.1.48 (build 50)** · Desktop EXE **ShowrunnerStationDesktop v0.1.40** · Hosting **web.app** (host-boot; bump `?v=` on change) · **Last swept:** 2026-07-11
+**Opened:** 2026-07-02 · **REWIND (major):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — restore before UI split · **Production:** GAS **see RELEASES.md REWIND row** · APK **v0.1.51 (build 53)** · Desktop **v0.1.44** · Hosting **host-boot ?v=499** · **Last swept:** 2026-07-11
 
 **Phone QR scan** — **closed** (colleague verified 2026-07-07). Shipped reference → [../topics/mobile-crew.md](../topics/mobile-crew.md) § Phone QR scan.
 
@@ -112,7 +112,8 @@ Setup and field ops: [station-desktop/README.md](../../../station-desktop/README
 - [x] **App versioning + changelog** — `build-station-apk.js` auto-bumps `versionCode`/`versionName`, requires release notes, records build timestamp + history; `/station-app` page shows version, upload time, "What's fixed", and previous builds. Doctrine Rule 6 + [station-android README](../../../station-android/README.md).
 - [x] **Per-device gun-driver fork (v495)** — `11a_Station_Gun_Drivers.html` registry + `stationGunCap_`; Chainway/TSL/gate isolated by `caps`; Chainway auto-sleep regression reverted (`appSleep:false`, trigger-wake restored). See § Gun driver fork.
 - [x] **TSL 1128 desktop thin shell** — `station-desktop/` (WebView2 + TSL ASCII, `PID_1128` auto-detect + watchdog, `.sl` app-sleep), `window.AndroidStation` bridge parity; build via `build-station-desktop.js`. See § Desktop TSL station.
-- [x] **TSL desktop — login + RFID in real station UI (v0.1.40, GAS 525, 2026-07-11)** — four-layer WebView routing, session to `window.top`, nested scan forward, session dedupe, diagnostic window fix. Equipment scans resolve to **name + unit** in Scan panel. Handoff: [tsl-desktop-handoff.md](tsl-desktop-handoff.md).
+- [x] **TSL desktop — login + RFID in real station UI (v0.1.40+, GAS 525+, 2026-07-11)** — four-layer WebView routing, session to `window.top`, nested scan forward, session dedupe, diagnostic window fix. Equipment scans resolve to **name + unit** in Scan panel. Handoff: [tsl-desktop-handoff.md](tsl-desktop-handoff.md).
+- [x] **REWIND POINT (major, 2026-07-11)** — Field baseline pinned before station shell split + dock/tablet UI rework. Chainway sled + TSL gate PC RFID/host flows working. See [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md).
 - [x] **Gun auto-sleep timer** — Session-settings dropdown (`sm_station_gunsleep_min`, default 5, Never=0); fires `sleepGun()` only for `appSleep:true` drivers (TSL).
 - [x] **Chainway park + HID trigger reconnect (build 50, 2026-07-10)** — no-host grace + park delay dropdowns; `sleepGun` restored; 3-state trigger; firmware sleep pinned 1 min.
 - [x] **Host badge lock while hosted (v501, 2026-07-10)** — scanning a different crew badge while someone is signed in is rejected; operator must **LOG OUT HOST** (or wait for idle eject) so `stationResetDeviceToPristine_` runs before the next badge-in. Restores the hosted-state machine in [logistics-warehouse.md](../topics/logistics-warehouse.md).

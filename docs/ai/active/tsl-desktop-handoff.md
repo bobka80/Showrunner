@@ -16,13 +16,16 @@
 
 ---
 
-## Versions (verified working 2026-07-11)
+## Versions (verified working 2026-07-11 — see REWIND doc for pins)
+
+**Major rewind before UI rework:** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md)
 
 | Layer | Version | Notes |
 |-------|---------|--------|
-| **Desktop EXE** | **0.1.40** | Session dedupe, diag window fix (no `Owner`), nested iframe forward |
-| **GAS** | **525** | `postSessionToParent` → `window.top`; early boot does not fake `SHOWRUNNER_STATION_READY` |
-| **Hosting** | `sm-showrunner-97405.web.app` | `host-boot.js` — `showrunnerStationDeliverScan`, `full:true` on real shell ready |
+| **Desktop EXE** | **0.1.44** | Cold start clears host; settings + sleep/reconnect relay (0.1.41–43) |
+| **GAS** | **RELEASES.md REWIND row** | Monolithic `11_Station_Shell.html` — last baseline before split |
+| **Hosting** | `host-boot.js?v=499` | `SR_STATION_GUN` relay; desktop host session clear on init |
+| **Chainway APK** | **0.1.51 (build 53)** | Sled phone — separate track; see REWIND doc |
 | **Profile layout** | `tsl_dock_desktop` | One station profile per gate PC device account |
 
 Build / deploy:

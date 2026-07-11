@@ -182,6 +182,31 @@ The project folder may sync via Google Drive. Use **one main PC** for Git commit
 
 ---
 
+## Four deployment surfaces (why version numbers differ)
+
+Showrunner is **one product** but **four independent release tracks**. The GAS integer (e.g. **529**) is **not** the same as hosting `host-boot.js?v=` (e.g. **499**), desktop **0.1.44**, or APK **build 53** — each has its own counter and deploy script.
+
+| # | Surface | What runs there | Version looks like | Deploy | Included in `milestone.js`? |
+|---|---------|-----------------|-------------------|--------|----------------------------|
+| **1** | **GAS (Apps Script)** | Backend `.js`, compiled `Index.html` + all UI modules (`11_Station_Shell.html`, LogicPayload, Login) | Integer **529**, **530**, … in `RELEASES.md` | `node milestone.js` | **Yes** — this is the milestone |
+| **2** | **Firebase hosting shell** | `web.app` parent page: `host-boot.js`, session boot, scan `postMessage` relay, PWA, `/station-app` APK page | Cache-bust **`?v=499`** on `index.html` (manual bump) | `node deploy-hosting.js` | **No** — separate deploy |
+| **3** | **Desktop station EXE** | Windows WebView2 + TSL COM driver (`station-desktop/`) | **0.1.44** in `.csproj` | `RUN-STATION.bat` / `build-station-desktop.js` | **No** |
+| **4** | **Station APK** | Android WebView + Chainway BLE (`station-android/`) | **0.1.51** / **versionCode 53** in `station-manifest.json` | `build-station-apk.js` → `deploy-hosting.js` | **No** (manifest rides hosting) |
+
+**How they stack in the field:**
+
+```
+Phone sled or desktop EXE (3 or 4)
+  → loads web.app (2 hosting)
+    → iframe loads script.google.com GAS app (1)
+```
+
+Changing GAS **does not** redeploy hosting, desktop, or APK. A station fix that touches **`host-boot.js` and `11_Station_Shell.html`** needs **`deploy-hosting.js` + `milestone.js`**. A native-only APK fix needs **`build-station-apk.js` + `deploy-hosting.js`** only.
+
+**Major rewind points** (before large reworks): [active/REWIND-pre-station-ui-split.md](active/REWIND-pre-station-ui-split.md) — pins all four tracks + rollback steps.
+
+---
+
 ## Two accounts (developer vs company host) — normal setup
 
 Many directors use **two different accounts**. That is expected and supported.

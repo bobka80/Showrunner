@@ -27,7 +27,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station profiles** | Active — **Chainway no-host park** + HID trigger reconnect (build 50); TSL desktop. Next: field-tune timers, kiosk auto-start, gate layout | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **RFID scanning & station profiles** | **REWIND pinned** — Chainway sled + TSL desktop RFID baseline working → [REWIND-pre-station-ui-split.md](active/REWIND-pre-station-ui-split.md). **Next:** 11-series shell split + dock/tablet UI | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | **Planned — not executing**; phone app first; blocks Firebase prep/timeline fork until Phase 3 | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---
