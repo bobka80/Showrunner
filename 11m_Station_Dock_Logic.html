@@ -13,6 +13,145 @@
     });
   }
 
+  var DOCK_WEATHER_SCROLL_SEC_PER_DAY = 14;
+  var dockWeatherHoverTimer_ = null;
+  var dockWeatherHoverActiveId_ = null;
+
+  function stationDockWeatherEmoji_(cond) {
+    if (typeof weatherCondEmoji === 'function') return weatherCondEmoji(cond);
+    return '☀️';
+  }
+
+  function stationDockWeatherCreditsHtml_(days) {
+    if (!days || !days.length) {
+      return '<div class="station-dock-ss-credit-line station-dock-ss-credit-line--muted">No forecast for project dates</div>';
+    }
+    return days.map(function(d) {
+      var dayName = d.dObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+      var alert = d.maxT > 35 || d.minT < 5 || d.wind > 40 || d.rainProb > 50;
+      return '<div class="station-dock-ss-credit-line' + (alert ? ' station-dock-ss-credit-line--alert' : '') + '">' +
+        '<div class="station-dock-ss-credit-head">' +
+        '<span class="station-dock-ss-credit-day">' + dayName + '</span>' +
+        '<span class="station-dock-ss-credit-emoji" aria-hidden="true">' + stationDockWeatherEmoji_(d.cond) + '</span>' +
+        '</div>' +
+        '<span class="station-dock-ss-credit-stats">' + Math.round(d.maxT) + '° / ' + Math.round(d.minT) + '° · ' +
+        Math.round(d.wind) + ' km/h · ' + d.rainProb + '% rain</span></div>';
+    }).join('');
+  }
+
+  function stationDockWeatherScrollRestart_(track, dayCount) {
+    if (!track) return;
+    var count = Math.max(1, dayCount || 1);
+    var sec = Math.max(90, count * DOCK_WEATHER_SCROLL_SEC_PER_DAY);
+    track.style.setProperty('--ss-scroll-duration', sec + 's');
+    track.style.animation = 'none';
+    void track.offsetHeight;
+    requestAnimationFrame(function() {
+      track.style.animation = 'station-dock-ss-credits-scroll var(--ss-scroll-duration, 168s) linear infinite';
+    });
+  }
+
+  function stationDockCancelWeatherHoverClose_() {
+    if (dockWeatherHoverTimer_) {
+      clearTimeout(dockWeatherHoverTimer_);
+      dockWeatherHoverTimer_ = null;
+    }
+  }
+
+  function stationDockPositionWeatherHover_(anchorEl) {
+    var pop = document.getElementById('station-dock-weather-hover');
+    if (!pop || !anchorEl) return;
+    var rect = anchorEl.getBoundingClientRect();
+    var popW = pop.offsetWidth || 280;
+    var left = rect.right + 6;
+    if (left + popW > window.innerWidth - 8) left = Math.max(8, rect.left - popW - 6);
+    pop.style.left = Math.round(left) + 'px';
+    pop.style.top = Math.round(rect.top + rect.height / 2) + 'px';
+    pop.style.transform = 'translateY(-50%)';
+  }
+
+  function stationDockCloseWeatherHover_(delayMs) {
+    stationDockCancelWeatherHoverClose_();
+    dockWeatherHoverTimer_ = setTimeout(function() {
+      dockWeatherHoverTimer_ = null;
+      dockWeatherHoverActiveId_ = null;
+      var pop = document.getElementById('station-dock-weather-hover');
+      if (!pop) return;
+      var track = pop.querySelector('.station-dock-weather-hover__track');
+      if (track) {
+        track.style.animation = 'none';
+        track.innerHTML = '';
+      }
+      pop.classList.remove('is-open');
+      pop.style.display = 'none';
+      pop.setAttribute('aria-hidden', 'true');
+    }, delayMs || 140);
+  }
+
+  function stationDockOpenWeatherHover_(hostEl, proj) {
+    var pop = document.getElementById('station-dock-weather-hover');
+    if (!pop || !hostEl || !proj) return;
+    stationDockCancelWeatherHoverClose_();
+    dockWeatherHoverActiveId_ = proj.id;
+    var track = pop.querySelector('.station-dock-weather-hover__track');
+    var title = pop.querySelector('.station-dock-weather-hover__title');
+    if (title) title.textContent = proj.title || proj.name || 'Forecast';
+    pop.style.display = 'flex';
+    pop.classList.add('is-open');
+    pop.setAttribute('aria-hidden', 'false');
+    stationDockPositionWeatherHover_(hostEl);
+    if (track) track.innerHTML = '<div class="station-dock-ss-credit-line station-dock-ss-credit-line--muted">Loading…</div>';
+    if (typeof fetchMobileWeatherDaysForProject !== 'function') {
+      if (track) track.innerHTML = stationDockWeatherCreditsHtml_([]);
+      return;
+    }
+    fetchMobileWeatherDaysForProject(proj).then(function(result) {
+      if (dockWeatherHoverActiveId_ !== proj.id) return;
+      var days = (result && result.days) ? result.days : [];
+      if (!track) return;
+      var block = stationDockWeatherCreditsHtml_(days);
+      track.innerHTML = days.length ? (block + block) : block;
+      stationDockWeatherScrollRestart_(track, days.length);
+    });
+  }
+
+  function stationDockBindWeatherHover_(hostEl, proj) {
+    if (!hostEl || hostEl.__srDockWeatherHover) return;
+    hostEl.__srDockWeatherHover = true;
+    hostEl.style.pointerEvents = 'auto';
+    hostEl.addEventListener('click', function(ev) { ev.stopPropagation(); });
+    hostEl.addEventListener('mousedown', function(ev) { ev.stopPropagation(); });
+    hostEl.addEventListener('mouseenter', function() {
+      stationDockOpenWeatherHover_(hostEl, proj);
+    });
+    hostEl.addEventListener('mouseleave', function() {
+      stationDockCloseWeatherHover_(160);
+    });
+  }
+
+  function stationDockInitWeatherHover_() {
+    var pop = document.getElementById('station-dock-weather-hover');
+    if (!pop || pop.__srDockHoverRoot) return;
+    pop.__srDockHoverRoot = true;
+    pop.addEventListener('mouseenter', stationDockCancelWeatherHoverClose_);
+    pop.addEventListener('mouseleave', function() { stationDockCloseWeatherHover_(160); });
+  }
+
+  function stationDockApplyWeatherBadges_(projects) {
+    if (typeof renderMobileWeatherSummaryBadge !== 'function') return;
+    var isOutdoor = typeof stationProjectIsOutdoor_ === 'function'
+      ? stationProjectIsOutdoor_
+      : (typeof projectIsOutdoorMobile === 'function' ? projectIsOutdoorMobile : function() { return false; });
+    (projects || []).forEach(function(p) {
+      if (!isOutdoor(p)) return;
+      var host = document.getElementById('dock-weather-' + p.id);
+      if (!host) return;
+      renderMobileWeatherSummaryBadge(host, p, { interactive: false });
+      host.style.pointerEvents = 'auto';
+      stationDockBindWeatherHover_(host, p);
+    });
+  }
+
   window.stationInitDockUi_ = function() {
     if (!dockSkin_()) return;
     document.documentElement.classList.add('station-dock-root');
@@ -22,6 +161,7 @@
     var dockShell = document.getElementById('station-dock-shell');
     if (dockShell) dockShell.style.display = 'flex';
     stationDockMountScanRail_();
+    stationDockInitWeatherHover_();
     stationDockSyncWorkspace_();
     if (typeof stationPreloadWarehouseProjects_ === 'function') stationPreloadWarehouseProjects_();
     if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
@@ -221,12 +361,13 @@
     listEl.scrollTop = 0;
     requestAnimationFrame(function() { listEl.scrollTop = 0; });
     if (statusEl) statusEl.style.display = 'none';
-    if (typeof stationApplyProjectListWeather_ === 'function') {
-      stationApplyProjectListWeather_(sorted, 'dock-weather-');
+    if (typeof stationDockApplyWeatherBadges_ === 'function') {
+      stationDockApplyWeatherBadges_(sorted);
     }
   };
 
   window.stationDockPickProject_ = function(pId) {
+    stationDockCloseWeatherHover_(0);
     if (typeof window.openMobileProjectAssets !== 'function') {
       if (typeof stationSetStatus_ === 'function') stationSetStatus_('Project view unavailable on this build.', 'error');
       return;

@@ -1,5 +1,5 @@
 /**
- * Dock pointer: both arcs convex (picked in SVG space, away from opposite circle).
+ * Dock pointer: bulb arc + tangent lines through tip (DXF-accurate).
  */
 const rL = 1.5;
 const cL = { x: 0, y: 0 };
@@ -20,6 +20,7 @@ const tip = {
 const FILL = '#7f1d1d';
 const STROKE = '#a1a1aa';
 const STROKE_W = 3.25;
+const VB = 48;
 
 function ang(c, p) {
   return Math.atan2(p.y - c.y, p.x - c.x);
@@ -29,8 +30,8 @@ function polar(c, r, a) {
 }
 function mapPt(p, minX, maxY, sc, pad) {
   return {
-    x: +(((p.x - minX) * sc + pad).toFixed(3)),
-    y: +(((maxY - p.y) * sc + pad).toFixed(3)),
+    x: (p.x - minX) * sc + pad,
+    y: (maxY - p.y) * sc + pad,
   };
 }
 function arcMidpoint(c, r, a1, a2, large, sweep) {
@@ -43,7 +44,6 @@ function arcMidpoint(c, r, a1, a2, large, sweep) {
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
-/** Exterior arc = midpoint farthest from the interior reference (opposite circle center). */
 function pickExteriorArc(c, r, from, to, awayFrom) {
   const a1 = ang(c, from);
   const a2 = ang(c, to);
@@ -57,11 +57,6 @@ function pickExteriorArc(c, r, from, to, awayFrom) {
   }
   return best;
 }
-function arcCmd(c, r, from, to, awayFrom) {
-  const pick = pickExteriorArc(c, r, from, to, awayFrom);
-  const rs = +r.toFixed(4);
-  return `A ${rs} ${rs} 0 ${pick.large} ${pick.sweep} ${to.x} ${to.y}`;
-}
 
 const outline = [pSmallR, pLargeR, pLargeL, pSmallL, tip];
 let minX = Infinity;
@@ -73,30 +68,39 @@ outline.forEach((p) => {
 const maxX = Math.max(...outline.map((p) => p.x));
 const minY = Math.min(...outline.map((p) => p.y));
 
-const VB = 48;
-const pad = 3;
+const strokePad = STROKE_W / 2 + 2;
+const pad = strokePad;
 const size = VB - pad * 2;
 const sc = size / Math.max(maxX - minX, maxY - minY);
 const m = (p) => mapPt(p, minX, maxY, sc, pad);
 
 const cLsvg = m(cL);
 const cSsvg = m(cS);
-const rLsvg = +(rL * sc).toFixed(4);
-const rSsvg = +(rS * sc).toFixed(4);
+const rLsvg = rL * sc;
 const P_SR = m(pSmallR);
 const P_LR = m(pLargeR);
 const P_LL = m(pLargeL);
 const P_SL = m(pSmallL);
 const T = m(tip);
 
+const largePick = pickExteriorArc(cLsvg, rLsvg, P_LR, P_LL, cSsvg);
+const largeArc = `A ${+rLsvg.toFixed(4)} ${+rLsvg.toFixed(4)} 0 ${largePick.large} ${largePick.sweep} ${P_LL.x.toFixed(3)} ${P_LL.y.toFixed(3)}`;
+
 const d = [
-  `M ${P_SR.x} ${P_SR.y}`,
-  `L ${P_LR.x} ${P_LR.y}`,
-  arcCmd(cLsvg, rLsvg, P_LR, P_LL, cSsvg),
-  `L ${P_SL.x} ${P_SL.y}`,
-  arcCmd(cSsvg, rSsvg, P_SL, P_SR, cLsvg),
+  `M ${P_SR.x.toFixed(3)} ${P_SR.y.toFixed(3)}`,
+  `L ${P_LR.x.toFixed(3)} ${P_LR.y.toFixed(3)}`,
+  largeArc,
+  `L ${P_SL.x.toFixed(3)} ${P_SL.y.toFixed(3)}`,
+  `L ${T.x.toFixed(3)} ${T.y.toFixed(3)}`,
+  `L ${P_SR.x.toFixed(3)} ${P_SR.y.toFixed(3)}`,
   'Z',
 ].join(' ');
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${VB}" height="${VB}" viewBox="0 0 ${VB} ${VB}"><path fill="${FILL}" stroke="${STROKE}" stroke-width="${STROKE_W}" stroke-linejoin="miter" stroke-linecap="butt" d="${d}"/></svg>`;
-console.log(JSON.stringify({ d, hotspot: T, css: `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round(T.x)} ${Math.round(T.y)}, auto`, svg }, null, 2));
+const hotspot = { x: +T.x.toFixed(3), y: +T.y.toFixed(3) };
+console.log(JSON.stringify({
+  d,
+  hotspot,
+  css: `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round(hotspot.x)} ${Math.round(hotspot.y)}, auto`,
+  svg,
+}, null, 2));

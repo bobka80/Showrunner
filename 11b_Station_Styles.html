@@ -927,7 +927,7 @@ html.station-dock-root,
 html.station-dock-root body {
   overflow: hidden;
   height: 100%;
-  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%237f1d1d%22%20stroke%3D%22%23a1a1aa%22%20stroke-width%3D%223.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%208.355%203.214%20L%2039.62%2026.45%20A%2020.2091%2020.2091%200%200%201%207.491%2045%20L%203%206.305%20A%203.3682%203.3682%200%200%201%208.355%203.214%20Z%22%2F%3E%3C%2Fsvg%3E") 5 3, auto;
+  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%237f1d1d%22%20stroke%3D%22%23a1a1aa%22%20stroke-width%3D%223.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%208.821%203.832%20L%2039.155%2026.377%20A%2019.6077%2019.6077%200%200%201%207.982%2044.375%20L%203.625%206.832%20L%205.237%203.625%20L%208.821%203.832%20Z%22%2F%3E%3C%2Fsvg%3E") 5 4, auto;
   cursor: var(--station-dock-cursor);
 }
 html.station-dock-root,
@@ -1201,6 +1201,53 @@ html.station-dock-root #station-dock-shell {
   color: #71717a;
   text-align: center;
   padding: 24px;
+}
+html.station-dock-root .station-dock-project-card .mob-event-weather-badge {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+html.station-dock-root .station-dock-project-card .mob-event-weather-badge .weather-widget-summary {
+  pointer-events: auto;
+}
+.station-dock-weather-hover {
+  position: fixed;
+  z-index: 52000;
+  display: none;
+  width: clamp(240px, 24vw, 340px);
+  max-height: min(420px, 52vh);
+  padding: 12px 10px 10px;
+  border-radius: 14px;
+  border: 1px solid #3f3f46;
+  background: rgba(10, 10, 12, 0.96);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+.station-dock-weather-hover.is-open {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.station-dock-weather-hover__title {
+  font-size: 12px;
+  font-weight: 800;
+  color: #a1a1aa;
+  text-align: center;
+  padding: 0 6px;
+  line-height: 1.2;
+  flex-shrink: 0;
+}
+.station-dock-weather-hover__viewport {
+  flex: 1;
+  min-height: 0;
+  max-height: min(360px, 46vh);
+}
+.station-dock-weather-hover__track {
+  padding-top: 4px;
+  padding-bottom: 48px;
+  gap: clamp(14px, 2vh, 22px);
 }
 .station-dock-scan-rail {
   flex: 1 1 0;
