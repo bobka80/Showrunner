@@ -6894,7 +6894,7 @@ html.station-dock-root,
 html.station-dock-root body {
   overflow: hidden;
   height: 100%;
-  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%2335383e%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%208.382%203%20L%2039.807%2026.355%20A%2020.3124%2020.3124%200%200%200%207.514%2045%20L%203%206.107%20A%203.3854%203.3854%200%200%200%208.382%203%20Z%22%2F%3E%3C%2Fsvg%3E") 5 3, auto;
+  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%2335383e%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%208.355%203.214%20L%2039.62%2026.45%20A%2020.2091%2020.2091%200%200%200%207.491%2045%20L%203%206.305%20A%203.3682%203.3682%200%200%201%208.355%203.214%20Z%22%2F%3E%3C%2Fsvg%3E") 5 3, auto;
   cursor: var(--station-dock-cursor);
 }
 html.station-dock-root,
@@ -7094,6 +7094,9 @@ html.station-dock-root #station-dock-shell {
   font-size: 13px;
 }
 .station-dock-host-prompt {
+  display: none !important;
+}
+.station-dock-host-prompt--legacy {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -7620,7 +7623,7 @@ body.station-dock-screensaver-active #station-dock-shell {
   animation: station-dock-ss-credits-scroll var(--ss-scroll-duration, 168s) linear infinite;
 }
 @keyframes station-dock-ss-credits-scroll {
-  0% { transform: translateY(100%); }
+  0% { transform: translateY(0); }
   100% { transform: translateY(-50%); }
 }
 .station-dock-ss-credit-line {
@@ -7785,12 +7788,9 @@ body.station-dock-screensaver-active #station-dock-shell {
   <div class="station-dock-body">
     <main id="station-dock-workspace" class="station-dock-workspace" aria-label="Projects and equipment">
       <div class="station-dock-workspace__content">
-        <div id="station-dock-host-prompt" class="station-dock-host-prompt">
-          <div class="station-dock-host-prompt__label">Waiting for host</div>
-          <div class="station-dock-host-prompt__hint">Scan your crew badge on the gun</div>
-        </div>
-        <div id="station-dock-home" class="station-dock-home" style="display:none;">
-          <div id="station-dock-project-status" class="station-dock-project-status">Loading projects…</div>
+        <div id="station-dock-host-prompt" class="station-dock-host-prompt" aria-hidden="true"></div>
+        <div id="station-dock-home" class="station-dock-home">
+          <div id="station-dock-project-status" class="station-dock-project-status" style="display:none;"></div>
           <div id="station-dock-project-list" class="station-dock-project-list"></div>
         </div>
       </div>

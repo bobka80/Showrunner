@@ -126,16 +126,13 @@
     }
     window.stationDockSyncPaHeader_();
 
+    if (prompt) prompt.style.display = 'none';
+    if (home) home.style.display = 'flex';
     if (!host) {
-      if (prompt) prompt.style.display = 'flex';
-      if (home) home.style.display = 'flex';
       if (title) title.textContent = 'Projects';
       stationDockLoadProjects_();
       return;
     }
-
-    if (prompt) prompt.style.display = 'none';
-    if (home) home.style.display = 'flex';
     if (title) title.textContent = 'Projects';
     stationDockLoadProjects_();
   }
@@ -149,11 +146,8 @@
       ? window.stationProjectsCache : null;
     if (cached) {
       stationDockRenderProjectList_(cached);
-    } else if (!listEl.children.length) {
-      if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'Loading projects…'; }
     } else if (statusEl) {
-      statusEl.style.display = 'block';
-      statusEl.textContent = 'Updating projects…';
+      statusEl.style.display = 'none';
     }
 
     if (typeof stationPreloadWarehouseProjects_ === 'function') stationPreloadWarehouseProjects_();
@@ -224,6 +218,8 @@
 
     if (!html) html = '<div class="station-dock-project-empty">No upcoming events.</div>';
     listEl.innerHTML = html;
+    listEl.scrollTop = 0;
+    requestAnimationFrame(function() { listEl.scrollTop = 0; });
     if (statusEl) statusEl.style.display = 'none';
     if (typeof stationApplyProjectListWeather_ === 'function') {
       stationApplyProjectListWeather_(sorted, 'dock-weather-');
@@ -339,7 +335,19 @@
     window.__srDockRenderWrapped = true;
     window.stationRenderShellState_ = function() {
       origRender.apply(this, arguments);
-      if (dockSkin_()) stationDockSyncWorkspace_();
+      if (!dockSkin_()) return;
+      var host = (typeof stationReadHostSession_ === 'function') ? stationReadHostSession_() : null;
+      if (!host) {
+        var stateLabel = document.getElementById('station-shell-state-label');
+        var prompt = document.getElementById('station-shell-prompt');
+        if (stateLabel) stateLabel.textContent = 'Ready';
+        if (prompt) {
+          prompt.style.display = 'none';
+          prompt.textContent = '';
+        }
+        if (typeof stationSetStatus_ === 'function') stationSetStatus_('Ready.', 'ok');
+      }
+      stationDockSyncWorkspace_();
     };
   }
 

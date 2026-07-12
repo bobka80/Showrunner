@@ -246,7 +246,9 @@
     track.style.setProperty('--ss-scroll-duration', sec + 's');
     track.style.animation = 'none';
     void track.offsetHeight;
-    track.style.animation = '';
+    requestAnimationFrame(function() {
+      track.style.animation = 'station-dock-ss-credits-scroll var(--ss-scroll-duration, 168s) linear infinite';
+    });
   }
 
   function ssSlotBody_() {
