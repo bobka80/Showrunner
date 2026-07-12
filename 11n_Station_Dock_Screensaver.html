@@ -353,14 +353,25 @@
     ssWeatherById = {};
 
     var pending = 1;
+    var finished = false;
     function finishPrefetch_() {
       pending--;
-      if (pending > 0) return;
+      if (pending > 0 || finished) return;
+      finished = true;
       ssBuildSlots_();
       if (done) done();
     }
 
+    setTimeout(function() {
+      if (finished) return;
+      finished = true;
+      ssBuildSlots_();
+      if (done) done();
+    }, 15000);
+
     ssFetchSofiaWeather_().then(function() {
+      finishPrefetch_();
+    }).catch(function() {
       finishPrefetch_();
     });
 
@@ -399,6 +410,10 @@
     if (typeof stationPreloadProjects_ === 'function' && host && host.name) {
       stationPreloadProjects_(host.name);
     }
+    if ((!window.stationProjectsCache || !window.stationProjectsCache.length) &&
+        typeof stationPreloadWarehouseProjects_ === 'function') {
+      stationPreloadWarehouseProjects_();
+    }
 
     ssBuildBuses_();
     ssUpdateClock_();
@@ -422,17 +437,10 @@
     ssPrefetchWeather_(function() {
       if (!ssActive) return;
       var body = ssSlotBody_();
-      if (body) body.classList.add('is-ss-hidden');
+      if (body) body.classList.remove('is-ss-hidden');
       ssSlotIndex = 0;
       ssRenderSlotAt_(0);
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          ssFadeSlotBody_(true, function() {
-            if (!ssActive) return;
-            ssStartRotate_();
-          });
-        });
-      });
+      ssStartRotate_();
     });
   };
 

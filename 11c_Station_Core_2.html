@@ -412,12 +412,21 @@ function stationWriteHostSession_(host) {
   // Warm the project list for THIS host in the background so pressing PROJECT opens instantly
   // (same list their personal profile sees). Clearing the host drops the cache + wipes the device.
   if (host && host.name) {
-    stationPreloadProjects_(host.name);
+    if (!document.documentElement.classList.contains('station-dock-root')) {
+      stationPreloadProjects_(host.name);
+    }
     if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
     stationClearNoHostParkDeadline_();
   } else {
-    window.stationProjectsCache = null; window.stationProjectsFor = null;
+    var dockRoot = document.documentElement.classList.contains('station-dock-root');
+    if (!dockRoot || window.stationProjectsFor !== '__warehouse__') {
+      window.stationProjectsCache = null;
+      window.stationProjectsFor = null;
+    }
     stationResetDeviceToPristine_();
+    if (dockRoot && typeof stationPreloadWarehouseProjects_ === 'function') {
+      stationPreloadWarehouseProjects_();
+    }
     stationArmNoHostParkDeadline_();
   }
 }
@@ -487,6 +496,42 @@ function stationPaintProjectLists_(projects) {
   if (panel && panel.classList.contains('is-open') && typeof stationRenderProjectList_ === 'function') {
     stationRenderProjectList_(projects);
   }
+}
+
+/** Warehouse dock project list — no host badge required to browse events. */
+function stationPreloadWarehouseProjects_() {
+  if (!document.documentElement.classList.contains('station-dock-root')) return;
+  if (window.__stationWarehouseFetchPending) return;
+
+  if (window.stationProjectsFor === '__warehouse__' && window.stationProjectsCache && window.stationProjectsCache.length) {
+    stationPaintProjectLists_(window.stationProjectsCache);
+    return;
+  }
+
+  var listEl = document.getElementById('station-dock-project-list');
+  var statusEl = document.getElementById('station-dock-project-status');
+  if (listEl && !listEl.children.length && statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Loading projects…';
+  }
+
+  window.__stationWarehouseFetchPending = true;
+  window.stationProjectsFor = '__warehouse__';
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      window.__stationWarehouseFetchPending = false;
+      if (window.stationProjectsFor !== '__warehouse__') return;
+      var projects = (payload && payload.projects) ? payload.projects : [];
+      window.stationProjectsCache = projects;
+      stationPaintProjectLists_(projects);
+    })
+    .withFailureHandler(function(err) {
+      window.__stationWarehouseFetchPending = false;
+      if (typeof stationDockShowProjectsError_ === 'function') {
+        stationDockShowProjectsError_(err && err.message ? err.message : String(err));
+      }
+    })
+    .getStationWarehouseProjects();
 }
 
 /** Background-fetch the host's projects (getRefreshPayload scoped to the person, not the device). */

@@ -339,6 +339,16 @@ function getStationHostProjects(crewName) {
   return { projects: filtered.projects };
 }
 
+/** Warehouse dock: all active events without host badge (no shift-calendar filter). */
+function getStationWarehouseProjects() {
+  IS_READ_ONLY_EXECUTION = true;
+  const projects = getExistingProjects().filter(function(p) {
+    const st = String(p.status || 'Draft').toUpperCase();
+    return st !== 'TRASHED' && st !== 'CANCELLED';
+  });
+  return { projects: projects };
+}
+
 /** Fast path for task drawer + notification list only (avoids full calendar payload). */
 function getTasksNotifsPayload(crewName) {
   IS_READ_ONLY_EXECUTION = true;

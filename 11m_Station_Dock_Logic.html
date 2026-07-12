@@ -23,6 +23,7 @@
     if (dockShell) dockShell.style.display = 'flex';
     stationDockMountScanRail_();
     stationDockSyncWorkspace_();
+    if (typeof stationPreloadWarehouseProjects_ === 'function') stationPreloadWarehouseProjects_();
     if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
   };
 
@@ -127,8 +128,9 @@
 
     if (!host) {
       if (prompt) prompt.style.display = 'flex';
-      if (home) home.style.display = 'none';
+      if (home) home.style.display = 'flex';
       if (title) title.textContent = 'Projects';
+      stationDockLoadProjects_();
       return;
     }
 
@@ -143,14 +145,7 @@
     var listEl = document.getElementById('station-dock-project-list');
     if (!listEl) return;
 
-    var host = (typeof stationReadHostSession_ === 'function') ? stationReadHostSession_() : null;
-    if (!host || !host.name) {
-      if (statusEl) statusEl.textContent = 'Scan your crew badge first.';
-      listEl.innerHTML = '';
-      return;
-    }
-
-    var cached = (window.stationProjectsFor === host.name && window.stationProjectsCache && window.stationProjectsCache.length)
+    var cached = (window.stationProjectsFor === '__warehouse__' && window.stationProjectsCache && window.stationProjectsCache.length)
       ? window.stationProjectsCache : null;
     if (cached) {
       stationDockRenderProjectList_(cached);
@@ -161,7 +156,7 @@
       statusEl.textContent = 'Updating projects…';
     }
 
-    if (typeof stationPreloadProjects_ === 'function') stationPreloadProjects_(host.name);
+    if (typeof stationPreloadWarehouseProjects_ === 'function') stationPreloadWarehouseProjects_();
   };
 
   window.stationDockShowProjectsError_ = function(msg) {
@@ -173,6 +168,7 @@
       statusEl.onclick = function() {
         window.stationProjectsCache = null;
         window.stationProjectsFor = null;
+        window.__stationWarehouseFetchPending = null;
         window.__stationProjectsFetchHost = null;
         stationDockLoadProjects_();
       };
