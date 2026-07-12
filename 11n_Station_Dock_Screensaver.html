@@ -163,7 +163,7 @@
   function ssUpdateClock_() {
     var el = document.getElementById('station-dock-ss-clock');
     if (!el) return;
-    var str = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    var str = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
     var prev = el.dataset.clockStr || '';
     var slots = el.querySelectorAll('.station-dock-ss-clock-slot');
     if (!prev || !slots.length) {
@@ -223,14 +223,16 @@
 
   function ssBuildCreditsHtml_(days) {
     if (!days || !days.length) {
-      return '<div class="station-dock-ss-credit-line station-dock-ss-credit-line--muted">No forecast for project dates</div>';
+      return '<div class="station-dock-ss-credit-line station-dock-ss-credit-line--muted">No forecast available</div>';
     }
     return days.map(function(d) {
       var dayName = d.dObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
       var alert = d.maxT > 35 || d.minT < 5 || d.wind > 40 || d.rainProb > 50;
       return '<div class="station-dock-ss-credit-line' + (alert ? ' station-dock-ss-credit-line--alert' : '') + '">' +
+        '<div class="station-dock-ss-credit-head">' +
         '<span class="station-dock-ss-credit-day">' + dayName + '</span>' +
-        '<span class="station-dock-ss-credit-cond">' + ssCondEmoji_(d.cond) + ' ' + ssCondLabel_(d.cond) + '</span>' +
+        '<span class="station-dock-ss-credit-emoji" aria-hidden="true">' + ssCondEmoji_(d.cond) + '</span>' +
+        '</div>' +
         '<span class="station-dock-ss-credit-stats">' + Math.round(d.maxT) + '° / ' + Math.round(d.minT) + '° · ' +
         Math.round(d.wind) + ' km/h · ' + d.rainProb + '% rain</span></div>';
     }).join('');
@@ -251,41 +253,24 @@
     return document.querySelector('.station-dock-ss-slot-body');
   }
 
-  function ssFadeSlotBody_(targetOpacity, done) {
+  function ssFadeSlotBody_(show, done) {
     var body = ssSlotBody_();
     if (!body) {
       if (done) done();
       return;
     }
-    body.style.transition = 'opacity ' + SS_SLOT_FADE_MS + 'ms ease';
-    if (Number(targetOpacity) === 0) {
-      body.style.opacity = '1';
-      void body.offsetHeight;
-      body.style.opacity = '0';
-    } else {
-      body.style.opacity = '0';
-      void body.offsetHeight;
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          body.style.opacity = '1';
-        });
-      });
-    }
+    if (show) body.classList.remove('is-ss-hidden');
+    else body.classList.add('is-ss-hidden');
     if (!done) return;
-    var finished = false;
-    function finish_() {
-      if (finished) return;
-      finished = true;
-      body.removeEventListener('transitionend', finish_);
-      done();
-    }
-    body.addEventListener('transitionend', finish_);
-    setTimeout(finish_, SS_SLOT_FADE_MS + 120);
+    setTimeout(done, SS_SLOT_FADE_MS);
   }
 
   function ssBuildSlots_() {
     ssSlots = [{ kind: 'sofia', title: SS_SOFIA.label + ' · 14-day outlook' }];
     ssEvents.forEach(function(p) {
+      var cached = ssWeatherById[p.id];
+      var days = (cached && cached.days) ? cached.days : [];
+      if (!days.length) return;
       var when = p.start ? new Date(p.start).toLocaleDateString() : '';
       ssSlots.push({
         kind: 'event',
@@ -293,7 +278,7 @@
         title: (p.title || p.name || 'Untitled') + (when ? (' · ' + when) : '')
       });
     });
-    ssSlotIndex = 0;
+    if (ssSlotIndex >= ssSlots.length) ssSlotIndex = 0;
   }
 
   function ssSofiaStubProject_() {
@@ -351,40 +336,46 @@
 
   function ssAdvanceSlot_() {
     if (!ssActive || ssSlots.length <= 1) return;
-    ssFadeSlotBody_(0, function() {
+    ssFadeSlotBody_(false, function() {
       if (!ssActive || ssSlots.length <= 1) return;
       ssRenderSlotAt_(ssSlotIndex + 1);
-      ssFadeSlotBody_(1, function() {
-        if (!ssActive || ssSlots.length <= 1) return;
-        ssRotateTimer = setTimeout(ssAdvanceSlot_, SS_ROTATE_MS);
+      requestAnimationFrame(function() {
+        ssFadeSlotBody_(true, function() {
+          if (!ssActive || ssSlots.length <= 1) return;
+          ssRotateTimer = setTimeout(ssAdvanceSlot_, SS_ROTATE_MS);
+        });
       });
     });
   }
 
   function ssPrefetchWeather_(done) {
     ssEvents = ssCollectOutdoorEvents_();
-    ssBuildSlots_();
+    ssWeatherById = {};
 
     var pending = 1;
+    function finishPrefetch_() {
+      pending--;
+      if (pending > 0) return;
+      ssBuildSlots_();
+      if (done) done();
+    }
+
+    ssFetchSofiaWeather_().then(function() {
+      finishPrefetch_();
+    });
+
     if (ssEvents.length && typeof fetchMobileWeatherDaysForProject === 'function') {
       pending += ssEvents.length;
       ssEvents.forEach(function(p) {
         fetchMobileWeatherDaysForProject(p).then(function(result) {
           ssWeatherById[p.id] = result || { days: [] };
-          pending--;
-          if (pending <= 0 && done) done();
+          finishPrefetch_();
         }).catch(function() {
           ssWeatherById[p.id] = { days: [] };
-          pending--;
-          if (pending <= 0 && done) done();
+          finishPrefetch_();
         });
       });
     }
-
-    ssFetchSofiaWeather_().then(function() {
-      pending--;
-      if (pending <= 0 && done) done();
-    });
   }
 
   function ssStartRotate_() {
@@ -412,6 +403,9 @@
     ssBuildBuses_();
     ssUpdateClock_();
     ssActive = true;
+    ssSofiaDays = null;
+    ssWeatherById = {};
+    ssSlotIndex = 0;
     document.body.classList.add('station-dock-screensaver-active');
     overlay.style.display = 'grid';
     overlay.setAttribute('aria-hidden', 'false');
@@ -428,14 +422,12 @@
     ssPrefetchWeather_(function() {
       if (!ssActive) return;
       var body = ssSlotBody_();
-      if (body) {
-        body.style.transition = 'opacity ' + SS_SLOT_FADE_MS + 'ms ease';
-        body.style.opacity = '0';
-      }
+      if (body) body.classList.add('is-ss-hidden');
+      ssSlotIndex = 0;
       ssRenderSlotAt_(0);
       requestAnimationFrame(function() {
         requestAnimationFrame(function() {
-          ssFadeSlotBody_(1, function() {
+          ssFadeSlotBody_(true, function() {
             if (!ssActive) return;
             ssStartRotate_();
           });
@@ -453,8 +445,7 @@
       ssStopTimers_();
       var body = ssSlotBody_();
       if (body) {
-        body.style.opacity = '';
-        body.style.transition = '';
+        body.classList.remove('is-ss-hidden');
       }
       overlay.classList.remove('is-visible', 'is-leaving', 'is-mounted');
       overlay.style.display = 'none';

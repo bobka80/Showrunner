@@ -927,7 +927,7 @@ html.station-dock-root,
 html.station-dock-root body {
   overflow: hidden;
   height: 100%;
-  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2244%22%20height%3D%2244%22%20viewBox%3D%220%200%2044%2044%22%3E%3Cpath%20fill%3D%22%2335383e%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222.5%22%20stroke-linejoin%3D%22round%22%20stroke-linecap%3D%22round%22%20d%3D%22M%207.219%204.128%20L%2026.016%2018.098%20A%2012.1499%2012.1499%200%200%200%206.7%2029.251%20L%204%205.987%20A%202.025%202.025%200%200%200%207.219%204.128%20Z%22%2F%3E%3C%2Fsvg%3E") 5 4, auto;
+  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%2335383e%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%222.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%206.756%203.15%20L%2028.686%2019.448%20A%2014.1749%2014.1749%200%200%200%206.15%2032.459%20L%203%205.318%20A%202.3625%202.3625%200%200%200%206.756%203.15%20Z%22%2F%3E%3C%2Fsvg%3E") 4 3, auto;
   cursor: var(--station-dock-cursor);
 }
 html.station-dock-root,
@@ -1615,6 +1615,9 @@ body.station-dock-screensaver-active #station-dock-shell {
   opacity: 1;
   transition: opacity 1s ease;
 }
+.station-dock-ss-slot-body.is-ss-hidden {
+  opacity: 0;
+}
 .station-dock-ss-event-title {
   position: relative;
   z-index: 1;
@@ -1654,40 +1657,47 @@ body.station-dock-screensaver-active #station-dock-shell {
   100% { transform: translateY(-50%); }
 }
 .station-dock-ss-credit-line {
-  text-align: center;
+  text-align: left;
   color: #f4f4f5;
-  font-size: clamp(17px, 2vw, 22px);
+  font-size: clamp(16px, 1.8vw, 20px);
   line-height: 1.3;
-  padding: clamp(20px, 3vh, 32px) clamp(10px, 1.2vw, 16px);
+  padding: clamp(20px, 3vh, 32px) clamp(12px, 1.4vw, 18px);
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-sizing: border-box;
   width: 100%;
 }
-.station-dock-ss-credit-line--muted { color: #71717a; font-style: italic; background: transparent; border-color: transparent; }
+.station-dock-ss-credit-line--muted { color: #71717a; font-style: italic; background: transparent; border-color: transparent; text-align: center; }
 .station-dock-ss-credit-line--alert { color: #fb923c; border-color: rgba(249, 115, 22, 0.35); }
-.station-dock-ss-credit-day {
-  display: block;
-  font-weight: 800;
-  font-size: clamp(16px, 1.8vw, 20px);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #a1a1aa;
-  margin-bottom: 10px;
+.station-dock-ss-credit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
 }
-.station-dock-ss-credit-cond {
-  display: block;
+.station-dock-ss-credit-day {
+  flex: 1;
+  min-width: 0;
   font-weight: 800;
-  font-size: clamp(28px, 3.6vw, 42px);
-  line-height: 1.15;
-  margin-bottom: 10px;
+  font-size: clamp(26px, 3.2vw, 38px);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #f4f4f5;
+}
+.station-dock-ss-credit-emoji {
+  flex-shrink: 0;
+  font-size: clamp(38px, 4.8vw, 56px);
+  line-height: 1;
 }
 .station-dock-ss-credit-stats {
   display: block;
   font-size: clamp(16px, 1.8vw, 22px);
   color: #cbd5e1;
   font-weight: 600;
+  text-align: left;
 }
 .station-dock-ss-exit {
   position: absolute;
