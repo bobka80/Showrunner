@@ -1,5 +1,5 @@
 /**
- * Dock pointer: outer bulge arcs (max distance from chord) + tangent lines.
+ * Dock pointer: outer bulb arc (max bulge) + tip arc (through tip point).
  */
 const rL = 1.5;
 const cL = { x: 0, y: 0 };
@@ -16,6 +16,10 @@ const tip = {
   x: cS.x + (rS * -3.8244210662233642) / axisLen,
   y: cS.y + (rS * 6.6240915962356075) / axisLen,
 };
+
+const FILL = '#991b1b';
+const STROKE = '#ffffff';
+const STROKE_W = 4.25;
 
 function ang(c, p) {
   return Math.atan2(p.y - c.y, p.x - c.x);
@@ -44,21 +48,41 @@ function bulgeFromChord(from, to, p) {
   const qy = from.y + t * dy;
   return Math.hypot(p.x - qx, p.y - qy);
 }
-function pickOuterArc(c, r, from, to) {
+function pointOnArc(c, pt, from, to, large, sweep) {
+  const a = ang(c, pt);
+  const a1 = ang(c, from);
+  const a2 = ang(c, to);
+  let da = a2 - a1;
+  if (sweep === 0 && da > 0) da -= Math.PI * 2;
+  if (sweep === 1 && da < 0) da += Math.PI * 2;
+  if (large) da = da > 0 ? da - Math.PI * 2 : da + Math.PI * 2;
+  let dap = a - a1;
+  if (sweep === 0 && dap > 0) dap -= Math.PI * 2;
+  if (sweep === 1 && dap < 0) dap += Math.PI * 2;
+  if (large) dap = dap > 0 ? dap - Math.PI * 2 : dap + Math.PI * 2;
+  return sweep ? dap >= 0 && dap <= da : dap <= 0 && dap >= da;
+}
+function pickArc(c, r, from, to, through) {
   const a1 = ang(c, from);
   const a2 = ang(c, to);
   let best = null;
   for (let large = 0; large <= 1; large++) {
     for (let sweep = 0; sweep <= 1; sweep++) {
+      const contains = through ? pointOnArc(c, through, from, to, large, sweep) : false;
       const mid = arcMidpoint(c, r, a1, a2, large, sweep);
       const bulge = bulgeFromChord(from, to, mid);
+      if (through) {
+        if (!contains) continue;
+        if (!best || bulge < best.bulge) best = { large, sweep, bulge };
+        continue;
+      }
       if (!best || bulge > best.bulge) best = { large, sweep, bulge };
     }
   }
   return best;
 }
-function arcCmd(c, r, from, to, minX, maxY, sc, pad) {
-  const pick = pickOuterArc(c, r, from, to);
+function arcCmd(c, r, from, to, minX, maxY, sc, pad, through) {
+  const pick = pickArc(c, r, from, to, through);
   const end = mapPt(to, minX, maxY, sc, pad);
   const rs = +(r * sc).toFixed(4);
   return `A ${rs} ${rs} 0 ${pick.large} ${pick.sweep} ${end.x} ${end.y}`;
@@ -88,11 +112,11 @@ const T = m(tip);
 const d = [
   `M ${P_SR.x} ${P_SR.y}`,
   `L ${P_LR.x} ${P_LR.y}`,
-  arcCmd(cL, rL, pLargeR, pLargeL, minX, maxY, sc, pad),
+  arcCmd(cL, rL, pLargeR, pLargeL, minX, maxY, sc, pad, null),
   `L ${P_SL.x} ${P_SL.y}`,
-  arcCmd(cS, rS, pSmallL, pSmallR, minX, maxY, sc, pad),
+  arcCmd(cS, rS, pSmallL, pSmallR, minX, maxY, sc, pad, tip),
   'Z',
 ].join(' ');
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${VB}" height="${VB}" viewBox="0 0 ${VB} ${VB}"><path fill="#35383e" stroke="#ffffff" stroke-width="2.25" stroke-linejoin="miter" stroke-linecap="butt" d="${d}"/></svg>`;
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${VB}" height="${VB}" viewBox="0 0 ${VB} ${VB}"><path fill="${FILL}" stroke="${STROKE}" stroke-width="${STROKE_W}" stroke-linejoin="miter" stroke-linecap="butt" d="${d}"/></svg>`;
 console.log(JSON.stringify({ d, hotspot: T, css: `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round(T.x)} ${Math.round(T.y)}, auto`, svg }, null, 2));
