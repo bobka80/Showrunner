@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 44 44">
-  <!-- From Sketch1.dxf: outer contour only (arc + tangent + arc + tangent), ~30° from vertical -->
-  <path fill="#35383e" stroke="#ffffff" stroke-width="3" stroke-linejoin="miter"
-    d="M 5.42 4 A 2.887 2.887 0 1 1 8.59 4.18 L 35.39 24.1 A 17.322 17.322 0 0 1 7.85 40 L 4 6.83 A 2.887 2.887 0 1 1 5.42 4 Z"/>
+  <!-- Sketch1.dxf outer contour: tangent lines + circle arcs only -->
+  <path fill="#35383e" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"
+    d="M 7.219 4.128 L 26.016 18.098 A 12.1499 12.1499 0 0 0 6.7 29.251 L 4 5.987 A 2.025 2.025 0 0 0 7.219 4.128 Z"/>
 </svg>
