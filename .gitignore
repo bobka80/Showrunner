@@ -23,3 +23,8 @@ Desktop.ini
 deploy-config.json
 push-hosting/.env.local
 push-hosting/firebase-public-config.json
+
+# Claude / Repomix pack output (regenerate with node create-repomix.js)
+claude-pack/repomix-output*
+claude-pack/instructions.md
+repomix.config.run.json

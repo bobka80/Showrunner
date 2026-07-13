@@ -23,6 +23,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 |----------|---------|
 | [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md) | Brainstorm vs build; how the director works with AI |
 | [CURSOR_WORKFLOW.md](CURSOR_WORKFLOW.md) | Cursor rules, subagents, Bugbot/security gates, session routine |
+| [CLAUDE_PACK.md](CLAUDE_PACK.md) | Repomix pack for Claude project knowledge (`node create-repomix.js`) |
 | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) | Pre-flight checklist before dangerous edits |
 | [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md) | Bulk vs unique, Matryoshka, Auto-Packing vs Auto-Containerization — **read before PA/warehouse** |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Deep traps, build pipeline, RBAC boot |

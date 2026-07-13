@@ -1,0 +1,34 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "output": {
+    "filePath": "claude-pack/repomix-output.md",
+    "style": "markdown",
+    "instructionFilePath": "claude-pack/instructions.md",
+    "removeEmptyLines": true,
+    "directoryStructure": true,
+    "fileSummary": true,
+    "topFilesLength": 5
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "_clasp_pull_check/**",
+      "station-android/CW referense/**",
+      "stage-desktop-info/**",
+      "station-desktop/**/bin/**",
+      "station-desktop/**/obj/**",
+      "claude-pack/repomix-output*",
+      "claude-pack/instructions.md",
+      "cursor-project-template/**",
+      "**/*.aar",
+      "**/*.apk",
+      "**/*.msi",
+      "**/*.jks",
+      "**/*.dylib",
+      "deploy-config.json",
+      "push-hosting/.env.local",
+      "push-hosting/firebase-public-config.json"
+    ]
+  }
+}

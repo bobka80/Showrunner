@@ -22,4 +22,5 @@ module.exports = new Set([
   'test.js',
   'test_db.js',
   'run_test.js',
+  'create-repomix.js',
 ]);

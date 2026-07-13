@@ -4,7 +4,7 @@
 
 This doc maps **Cursor IDE features** (rules, skills, subagents, review agents) onto the doctrine you already use. It does not replace `AI_DOCTRINE.md` — it is the stable reference for *how to run sessions in Cursor*.
 
-`Last swept:` 2026-07-06 · `Production:` GAS v449 (see root `RELEASES.md`)
+`Last swept:` 2026-07-13 · `Production:` see root `RELEASES.md`
 
 ---
 
@@ -109,8 +109,21 @@ From [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md):
 
 ---
 
+## Claude project pack (brainstorm on the go)
+
+Full reference: **[CLAUDE_PACK.md](CLAUDE_PACK.md)**.
+
+```bash
+node create-repomix.js
+```
+
+Upload `claude-pack/repomix-output.md` to Claude **project knowledge** — includes source + `docs/ai/` (~1M tokens curated). Regenerate after major pipeline or doc changes. Packing is local (no API cost).
+
+---
+
 ## Related
 
 - [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md) — brainstorm, bug template, handoff
 - [FRAGILE_ZONES.md](FRAGILE_ZONES.md) — pre-flight before dangerous edits
 - [FILE_MAP.md](FILE_MAP.md) — module index including hosting and mobile scan
+- [CLAUDE_PACK.md](CLAUDE_PACK.md) — Repomix pack for Claude project tab

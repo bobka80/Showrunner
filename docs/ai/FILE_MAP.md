@@ -26,6 +26,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits. Copies backend `.js` + `Login.html` to `dist/`; excludes Node tooling via **`gas-node-only.js`**.
 - **`gas-node-only.js`**: Canonical list of root `.js` files that must **never** ship to Apps Script (PC-only / `require`). Shared by `build.js` and `check-google-account.js`.
 - **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md`.
+- **`create-repomix.js`**: PC-only. Packs repo via Repomix (`npx repomix`) into `claude-pack/repomix-output.md` for Claude project knowledge. Curated ~1M tokens. `npm run create-repomix`. See [CLAUDE_PACK.md](CLAUDE_PACK.md).
 - **`check-google-account.js`**: Node-only (not deployed to GAS). Three checks: (1) clasp login, (2) email matches `google-account.json` + project reachable, (3) **no PC-only scripts on live GAS** (white-screen guard). Run: `node check-google-account.js` or `npm run check-google`.
 - **`gas-push-sync.js`**: Node-only. Replaces all Apps Script project files from `dist/` via API (deletes orphans). Used by `milestone.js` and `dev-push.js` instead of bare `clasp push`.
 - **`Security.js`**: Manages user authentication and extracts security profiles.

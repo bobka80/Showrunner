@@ -10,6 +10,7 @@
     "milestone": "node milestone.js",
     "rollback-works": "node rollback-works.js",
     "rollback-milestone": "node rollback-milestone.js",
-    "check-google": "node check-google-account.js"
+    "check-google": "node check-google-account.js",
+    "create-repomix": "node create-repomix.js"
   }
 }

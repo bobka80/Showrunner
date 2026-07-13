@@ -117,7 +117,7 @@ Example `desktop-prefs.json`:
 - **Login / auto pin** → station profile; scan crew badge to host.
 - **Equipment scan** → Scan panel shows **resolved equipment name + unit** (vault map), not raw tag hex.
 - **F12** — diagnostics panel (toggle); **Open log file** opens `scan-diag.log`.
-- **Escape** — quit when main window focused (kiosk ops).
+- **Escape** — closes bulletin / project view in the web UI; does not quit the shell (use header ✕).
 - **F11** — toggle window chrome (debug).
 
 Session token is saved in `desktop-prefs.json` and synced to the web.app parent for `sessionboot`.

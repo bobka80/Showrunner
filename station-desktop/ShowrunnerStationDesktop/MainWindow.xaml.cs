@@ -114,10 +114,7 @@ public partial class MainWindow : Window
             if (!defaultUa.Contains("ShowrunnerStationDesktop", StringComparison.OrdinalIgnoreCase))
                 WebView.CoreWebView2.Settings.UserAgent = defaultUa + UserAgentSuffix;
 
-            if (WebView.CoreWebView2Controller != null)
-            {
-                WebView.CoreWebView2Controller.AcceleratorKeyPressed += OnWebViewAcceleratorKeyPressed;
-            }
+            WebView.PreviewKeyDown += WebView_OnPreviewKeyDown;
 
             _bridge = new StationBridge(_rfid, HideSplash);
 
@@ -1045,10 +1042,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnWebViewAcceleratorKeyPressed(object? sender, CoreWebView2AcceleratorKeyPressedEventArgs e)
+    private void WebView_OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // Swallow Escape in the WebView so it cannot quit the shell or trigger browser chrome.
-        if (e.VirtualKey == 27)
+        if (e.Key == Key.Escape)
         {
             e.Handled = true;
         }
