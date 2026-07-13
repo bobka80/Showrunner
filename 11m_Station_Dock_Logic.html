@@ -10,6 +10,22 @@
     return (typeof window.stationActiveUiSkin_ === 'function' && window.stationActiveUiSkin_() === 'dock_panel');
   }
 
+  /** Dock PA CSS targets html.station-dock-pa-open — must not live only on body. */
+  function stationDockIsPaOpen_() {
+    return document.documentElement.classList.contains('station-dock-pa-open');
+  }
+
+  function stationDockSetPaOpen_(open) {
+    var html = document.documentElement;
+    if (open) {
+      html.classList.add('station-dock-pa-open');
+      document.body.classList.add('mobile-pa-compact');
+    } else {
+      html.classList.remove('station-dock-pa-open');
+      document.body.classList.remove('mobile-pa-compact');
+    }
+  }
+
   function esc_(v) {
     return String(v == null ? '' : v).replace(/[<&>"]/g, function(c) {
       return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&amp;'));
@@ -206,7 +222,7 @@
         ev.stopImmediatePropagation();
         return;
       }
-      if (document.body.classList.contains('station-dock-pa-open')) {
+      if (stationDockIsPaOpen_()) {
         ev.preventDefault();
         ev.stopImmediatePropagation();
         stationDockConfirmBackToProjects_();
@@ -235,7 +251,7 @@
 
   function stationDockProjectKeys_(ev) {
     if (!dockSkin_() || !ev || ev.defaultPrevented) return;
-    if (document.body.classList.contains('station-dock-pa-open')) return;
+    if (stationDockIsPaOpen_()) return;
     if (document.body.classList.contains('station-dock-screensaver-active')) return;
     var tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toUpperCase() : '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -324,7 +340,7 @@
   window.stationDockSyncPaHeader_ = function() {
     if (!dockSkin_()) return;
     var nav = document.getElementById('station-dock-head-left-nav');
-    var paOpen = document.body.classList.contains('station-dock-pa-open');
+    var paOpen = stationDockIsPaOpen_();
     if (nav) nav.style.display = paOpen ? 'flex' : 'none';
     var consoleBtn = document.getElementById('station-dock-pa-console');
     var master = document.getElementById('btn-master-operation');
@@ -368,7 +384,7 @@
     var prompt = document.getElementById('station-dock-host-prompt');
     var home = document.getElementById('station-dock-home');
     var title = document.getElementById('station-dock-workspace-title');
-    var paOpen = document.body.classList.contains('station-dock-pa-open');
+    var paOpen = stationDockIsPaOpen_();
 
     if (paOpen) {
       window.stationDockSyncPaHeader_();
@@ -511,7 +527,7 @@
       if (fid) fid.value = pId;
     }
 
-    document.body.classList.add('station-dock-pa-open', 'mobile-pa-compact');
+    stationDockSetPaOpen_(true);
     var home = document.getElementById('station-dock-home');
     var prompt = document.getElementById('station-dock-host-prompt');
     var title = document.getElementById('station-dock-workspace-title');
@@ -567,7 +583,7 @@
   };
 
   function stationDockBackToProjectsTeardown_() {
-    document.body.classList.remove('station-dock-pa-open', 'mobile-pa-compact');
+    stationDockSetPaOpen_(false);
     window.mobilePaCompactActive = false;
     stationDockShowPaHost_(false);
     var ov = document.getElementById('project-assets-modal-overlay');
