@@ -1417,6 +1417,11 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
   min-width: 0;
 }
 
+/* Prevent dock zoom from pushing PA wider than viewport. */
+html.station-dock-root.station-dock-pa-open {
+  --dock-left-zoom: 1 !important;
+}
+
 /* Ensure dock back nav is visible while PA is open. */
 html.station-dock-root.station-dock-pa-open #station-dock-head-left-nav {
   display: flex !important;

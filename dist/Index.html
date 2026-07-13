@@ -3745,6 +3745,10 @@ body.mobile-pa-compact #btn-pa-close-x {
     display: inline-flex !important;
 }
 
+body.mobile-pa-compact #btn-pa-back-station {
+    display: inline-flex !important;
+}
+
 body.mobile-pa-compact #pa-mobile-mode-bar {
     display: flex !important;
 }
@@ -7391,6 +7395,11 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
   min-width: 0;
 }
 
+/* Prevent dock zoom from pushing PA wider than viewport. */
+html.station-dock-root.station-dock-pa-open {
+  --dock-left-zoom: 1 !important;
+}
+
 /* Ensure dock back nav is visible while PA is open. */
 html.station-dock-root.station-dock-pa-open #station-dock-head-left-nav {
   display: flex !important;
@@ -8552,7 +8561,8 @@ body.station-dock-screensaver-active #station-dock-shell {
              <div id="pa-human-list" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; margin-top: 4px; background: #151518; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; gap: 6px; align-items: center; z-index: 50; padding: 10px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.8); box-sizing: border-box;"></div>
          </div>
          <button class="btn-close" id="btn-pa-cancel-desktop" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="cancelProjectAssetsModal()">CANCEL</button>
-         <button type="button" id="btn-pa-close-x" class="btn-close btn-sm" style="display:none; width:38px; height:38px; margin:0; padding:0 !important; font-size:18px; line-height:1; box-sizing:border-box;" onclick="cancelProjectAssetsModal()" title="Close">✕</button>
+        <button type="button" id="btn-pa-back-station" class="btn-outline btn-sm" style="display:none; margin:0; height: 38px; box-sizing: border-box;" onclick="if(window.requestMobilePaClose) window.requestMobilePaClose({ returnToHub: false }); else cancelProjectAssetsModal();" title="Back">← Back</button>
+        <button type="button" id="btn-pa-close-x" class="btn-close btn-sm" style="display:none; width:38px; height:38px; margin:0; padding:0 !important; font-size:18px; line-height:1; box-sizing:border-box;" onclick="cancelProjectAssetsModal()" title="Close">✕</button>
          <button id="btn-save-pa" class="btn-main" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="saveProjectAssets()">SAVE EQUIPMENT</button>
       </div>
     </div>

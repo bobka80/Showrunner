@@ -398,10 +398,12 @@ window.applyMobilePaChrome = function() {
     const saveM = document.getElementById('btn-save-pa-mobile');
     const searchM = document.getElementById('btn-mobile-pa-search');
     const closeX = document.getElementById('btn-pa-close-x');
+    const backBtn = document.getElementById('btn-pa-back-station');
     const ro = !!window.projectAssetsReadOnly;
     if (saveM) saveM.style.display = ro ? 'none' : 'inline-flex';
     if (searchM) searchM.style.display = ro ? 'none' : 'inline-flex';
     if (closeX) closeX.style.display = 'inline-flex';
+    if (backBtn) backBtn.style.display = (window.IS_STATION_DEVICE ? 'inline-flex' : 'none');
     stashMobilePaEl('mode-toggle-btn');
     stashMobilePaEl('pa-packing-filters');
     const modeBar = document.getElementById('pa-mobile-mode-bar');
@@ -417,6 +419,24 @@ window.applyMobilePaChrome = function() {
     applyMobilePaModeChrome();
     updateMobilePaUnsavedUI();
 };
+
+// Station / desktop: allow Escape to back out of Project Assets (with unsaved guard).
+if (!window.__srStationPaEscape && window.IS_STATION_DEVICE) {
+    window.__srStationPaEscape = true;
+    document.addEventListener('keydown', function(ev) {
+        if (!ev || ev.key !== 'Escape') return;
+        if (!window.mobilePaCompactActive) return;
+        const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toUpperCase() : '';
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        if (typeof window.requestMobilePaClose === 'function') {
+            window.requestMobilePaClose({ returnToHub: false });
+        } else if (typeof window.cancelProjectAssetsModal === 'function') {
+            window.cancelProjectAssetsModal();
+        }
+    }, true);
+}
 
 window.exitMobilePaCompactMode = function() {
     document.body.classList.remove('mobile-pa-compact');
