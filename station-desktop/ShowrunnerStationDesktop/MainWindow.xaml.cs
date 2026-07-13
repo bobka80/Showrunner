@@ -108,10 +108,16 @@ public partial class MainWindow : Window
             settings.IsStatusBarEnabled = false;
             settings.IsZoomControlEnabled = false;
             settings.IsWebMessageEnabled = true;
+            settings.AreBrowserAcceleratorKeysEnabled = false;
 
             var defaultUa = WebView.CoreWebView2.Settings.UserAgent;
             if (!defaultUa.Contains("ShowrunnerStationDesktop", StringComparison.OrdinalIgnoreCase))
                 WebView.CoreWebView2.Settings.UserAgent = defaultUa + UserAgentSuffix;
+
+            if (WebView.CoreWebView2Controller != null)
+            {
+                WebView.CoreWebView2Controller.AcceleratorKeyPressed += OnWebViewAcceleratorKeyPressed;
+            }
 
             _bridge = new StationBridge(_rfid, HideSplash);
 
@@ -1033,7 +1039,19 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        // Escape no longer quits the app — use the header ✕ button (with confirm).
+        if (e.Key == Key.Escape)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private void OnWebViewAcceleratorKeyPressed(object? sender, CoreWebView2AcceleratorKeyPressedEventArgs e)
+    {
+        // Swallow Escape in the WebView so it cannot quit the shell or trigger browser chrome.
+        if (e.VirtualKey == 27)
+        {
+            e.Handled = true;
+        }
     }
 
     // Cache-only bridge: pollScans/getConfig read JS memory updated by native PostWebMessage.

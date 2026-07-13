@@ -139,6 +139,61 @@
     });
   }
 
+  function stationDockInitPaHost_() {
+    var host = document.getElementById('station-dock-pa-host');
+    var ov = document.getElementById('project-assets-modal-overlay');
+    if (!host || !ov || ov.__srDockInHost) return;
+    host.appendChild(ov);
+    ov.__srDockInHost = true;
+  }
+
+  function stationDockShowPaHost_(show) {
+    var host = document.getElementById('station-dock-pa-host');
+    if (!host) return;
+    host.style.display = show ? 'flex' : 'none';
+    host.setAttribute('aria-hidden', show ? 'false' : 'true');
+  }
+
+  function stationDockWirePaClose_() {
+    var closeX = document.getElementById('btn-pa-close-x');
+    if (!closeX || closeX.__srDockClose) return;
+    closeX.__srDockClose = true;
+    closeX.onclick = function(ev) {
+      if (ev) ev.preventDefault();
+      stationDockBackToProjects_();
+    };
+  }
+
+  function stationDockInitEscapeGuard_() {
+    if (window.__srDockEscapeGuard) return;
+    window.__srDockEscapeGuard = true;
+    document.addEventListener('keydown', function(ev) {
+      if (!dockSkin_() || ev.key !== 'Escape') return;
+      if (document.body.classList.contains('station-dock-screensaver-active')) return;
+      if (document.getElementById('mobile-pa-choice-sheet') &&
+          document.getElementById('mobile-pa-choice-sheet').classList.contains('open')) return;
+      if (document.getElementById('mobile-pa-vault-sheet') &&
+          document.getElementById('mobile-pa-vault-sheet').classList.contains('open')) {
+        if (typeof window.closeMobilePaVaultSearch === 'function') window.closeMobilePaVaultSearch();
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        return;
+      }
+      if (document.body.classList.contains('station-dock-pa-open')) {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        stationDockBackToProjects_();
+        return;
+      }
+      var rail = document.getElementById('station-dock-weather-rail');
+      if (rail && rail.classList.contains('is-open')) {
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        stationDockCloseWeatherHover_(0);
+      }
+    }, true);
+  }
+
   window.stationInitDockUi_ = function() {
     if (!dockSkin_()) return;
     document.documentElement.classList.add('station-dock-root');
@@ -148,7 +203,9 @@
     var dockShell = document.getElementById('station-dock-shell');
     if (dockShell) dockShell.style.display = 'flex';
     stationDockMountScanRail_();
+    stationDockInitPaHost_();
     stationDockInitWeatherHover_();
+    stationDockInitEscapeGuard_();
     stationDockSyncWorkspace_();
     if (typeof stationPreloadWarehouseProjects_ === 'function') stationPreloadWarehouseProjects_();
     if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
@@ -254,7 +311,8 @@
     window.stationDockSyncPaHeader_();
 
     if (prompt) prompt.style.display = 'none';
-    if (home) home.style.display = 'flex';
+    if (!paOpen) stationDockShowPaHost_(false);
+    if (home) home.style.display = paOpen ? 'none' : 'flex';
     if (!host) {
       if (title) title.textContent = 'Projects';
       stationDockLoadProjects_();
@@ -390,6 +448,7 @@
     var title = document.getElementById('station-dock-workspace-title');
     if (home) home.style.display = 'none';
     if (prompt) prompt.style.display = 'none';
+    stationDockShowPaHost_(true);
     if (title) title.textContent = proj.title || proj.name || 'Project';
     window.stationDockSyncPaHeader_();
 
@@ -411,6 +470,10 @@
 
     try {
       window.openMobileProjectAssets(pId);
+      if (typeof window.closeMobilePaVaultSearch === 'function') window.closeMobilePaVaultSearch();
+      if (typeof window.switchPaView === 'function') window.switchPaView('logistics');
+      if (typeof window.applyMobilePaChrome === 'function') window.applyMobilePaChrome();
+      stationDockWirePaClose_();
     } catch (e) {
       stationDockBackToProjects_();
       if (typeof stationSetStatus_ === 'function') {
@@ -434,15 +497,27 @@
     }, 250);
   };
 
-  window.stationDockBackToProjects_ = function() {
+  function stationDockBackToProjectsTeardown_() {
     document.body.classList.remove('station-dock-pa-open', 'mobile-pa-compact');
     window.mobilePaCompactActive = false;
+    stationDockShowPaHost_(false);
     var ov = document.getElementById('project-assets-modal-overlay');
     if (ov) ov.style.display = 'none';
     if (typeof window.closeMobilePaChoiceSheet === 'function') {
       try { window.closeMobilePaChoiceSheet(); } catch (e) { /* ignore */ }
     }
+    if (typeof window.closeMobilePaVaultSearch === 'function') {
+      try { window.closeMobilePaVaultSearch(); } catch (e) { /* ignore */ }
+    }
     stationDockSyncWorkspace_();
+  }
+
+  window.stationDockBackToProjects_ = function() {
+    if (window.mobilePaCompactActive && typeof window.requestMobilePaClose === 'function') {
+      window.requestMobilePaClose({ onClosed: stationDockBackToProjectsTeardown_ });
+      return;
+    }
+    stationDockBackToProjectsTeardown_();
   };
 
   function stationDockWatchPaExit_() {

@@ -1393,16 +1393,18 @@ html.station-dock-root #station-settings {
 }
 html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay {
   display: flex !important;
+  position: absolute !important;
+  inset: 0 !important;
   left: 0 !important;
-  right: calc(100% - var(--dock-split)) !important;
-  top: var(--station-dock-head-h) !important;
+  right: 0 !important;
+  top: 0 !important;
   bottom: 0 !important;
-  width: auto !important;
-  height: auto !important;
+  width: 100% !important;
+  height: 100% !important;
   align-items: stretch;
   justify-content: stretch;
-  z-index: 51000 !important;
-  background: rgba(0, 0, 0, 0.35);
+  z-index: 5 !important;
+  background: #0a0a0c !important;
 }
 html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal {
   width: 100% !important;
@@ -1411,10 +1413,41 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
   max-height: none !important;
   margin: 0 !important;
   border-radius: 0;
+  border: none !important;
   zoom: var(--dock-left-zoom, 1);
 }
-html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal > div:first-child {
+html.station-dock-root.station-dock-pa-open #pa-left-panel,
+html.station-dock-root.station-dock-pa-open #pa-view-offer {
   display: none !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-right-panel {
+  width: 100% !important;
+  flex: 1 1 auto !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-split-pane {
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-mobile-mode-bar {
+  display: flex !important;
+}
+html.station-dock-root.station-dock-pa-open #btn-pa-close-x {
+  display: inline-flex !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-right-panel > div:first-child > div:first-child > span:first-child,
+html.station-dock-root.station-dock-pa-open #pa-right-panel > div:first-child > div:first-child > div[style*="width: 2px"] {
+  display: none !important;
+}
+.station-dock-pa-host {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+html.station-dock-root.station-dock-pa-open .station-dock-pa-host {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Dock bulletin / screensaver (desktop station) */
