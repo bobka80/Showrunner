@@ -7379,6 +7379,7 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay {
   justify-content: stretch;
   z-index: 5 !important;
   background: #0a0a0c !important;
+  overflow: hidden;
 }
 html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal {
   width: 100% !important;
@@ -7389,6 +7390,8 @@ html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal
   border-radius: 0;
   border: none !important;
   zoom: var(--dock-left-zoom, 1);
+  overflow: hidden;
+  min-width: 0;
 }
 html.station-dock-root.station-dock-pa-open #pa-left-panel,
 html.station-dock-root.station-dock-pa-open #pa-view-offer {

@@ -160,7 +160,31 @@
     closeX.__srDockClose = true;
     closeX.onclick = function(ev) {
       if (ev) ev.preventDefault();
-      stationDockBackToProjects_();
+      stationDockConfirmBackToProjects_();
+    };
+  }
+
+  function stationDockConfirmBackToProjects_() {
+    // Always ask for confirmation when leaving the PA view on desktop station.
+    // This prevents accidental exits (especially from keyboard Escape).
+    var warn = 'Leave this project and go back to Projects?';
+    try {
+      if (typeof window.calculatePaDeltas === 'function') {
+        var deltas = window.calculatePaDeltas() || [];
+        if (deltas.length) warn = 'You have unsaved equipment changes. Leave this project and discard them?';
+      }
+    } catch (e) { /* ignore */ }
+    if (!confirm(warn)) return;
+    stationDockBackToProjects_();
+  }
+
+  function stationDockWirePaBackBtn_() {
+    var backBtn = document.getElementById('station-dock-pa-back');
+    if (!backBtn || backBtn.__srDockBackConfirm) return;
+    backBtn.__srDockBackConfirm = true;
+    backBtn.onclick = function(ev) {
+      if (ev) ev.preventDefault();
+      stationDockConfirmBackToProjects_();
     };
   }
 
@@ -182,7 +206,7 @@
       if (document.body.classList.contains('station-dock-pa-open')) {
         ev.preventDefault();
         ev.stopImmediatePropagation();
-        stationDockBackToProjects_();
+        stationDockConfirmBackToProjects_();
         return;
       }
       var rail = document.getElementById('station-dock-weather-rail');
@@ -244,6 +268,7 @@
     stationDockInitPaHost_();
     stationDockInitWeatherHover_();
     stationDockInitEscapeGuard_();
+    stationDockWirePaBackBtn_();
     stationDockSyncWorkspace_();
     if (typeof stationPreloadWarehouseProjects_ === 'function') stationPreloadWarehouseProjects_();
     if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
