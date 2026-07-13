@@ -54,6 +54,25 @@ This document describes how the **Software Director** (project owner) collaborat
 |------|---------|------------|------------------------------|
 | **Summarize** | "summarize" | Restate upcoming work | Code, docs, deploy |
 | **Hygiene sweep** | "hygiene sweep" / "doc hygiene" | Sweep + report | Code, deploy, doc edits |
+| **Create repo mix** | "create repo mix" / "create repomix" | Run pack → give drag-drop paths | App code edits (unless you also say OK go) |
+
+---
+
+### Create repo mix (Claude / quote.ai project pack)
+
+**Triggers:** **"create repo mix"**, **"create repomix"**, **"repo mix"** (dictation may hear "repo mix" / "repomix" / "repo mix").
+
+**AI behavior:**
+1. Run **`node create-repomix.js`** immediately (no **OK go** required — this is tooling, not app code).
+2. Reply with the **full Windows paths** to drag into your **quote.ai / Claude project knowledge** tab:
+   - **Primary:** `claude-pack/repomix-output.md` (~1M tokens)
+   - **Optional:** `claude-pack/instructions.md`
+3. If upload fails on size, re-run with **`node create-repomix.js --split 2mb`** and list all part files.
+4. Plain-language: what the file contains, that packing is free (local), and when to regenerate (after major releases).
+
+**Director:** Open File Explorer → `claude-pack` folder in the repo → drag `repomix-output.md` into the project tab. You do not run terminal commands.
+
+See [CLAUDE_PACK.md](CLAUDE_PACK.md).
 
 ---
 

@@ -113,11 +113,19 @@ From [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md):
 
 Full reference: **[CLAUDE_PACK.md](CLAUDE_PACK.md)**.
 
+**Director says:** **create repo mix** (aliases: create repomix, repo mix)
+
+**Agent runs:** `node create-repomix.js` → reply with full paths:
+
+- `…/claude-pack/repomix-output.md` — **drag this** into quote.ai / Claude project knowledge
+- `…/claude-pack/instructions.md` — optional
+
 ```bash
-node create-repomix.js
+node create-repomix.js              # curated ~1M tokens
+node create-repomix.js --split 2mb  # if upload size limit
 ```
 
-Upload `claude-pack/repomix-output.md` to Claude **project knowledge** — includes source + `docs/ai/` (~1M tokens curated). Regenerate after major pipeline or doc changes. Packing is local (no API cost).
+Regenerate after major pipeline or doc changes. Packing is local (no API cost).
 
 ---
 

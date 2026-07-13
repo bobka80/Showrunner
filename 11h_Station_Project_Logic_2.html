@@ -70,17 +70,19 @@ function stationRenderProjectList_(projects) {
     return;
   }
   if (statusEl) statusEl.style.display = 'none';
+  window.__srStationProjectList = list;
+  window.__srStationProjectIdx = 0;
   const esc = function(v) {
     return String(v == null ? '' : v).replace(/[<&>"]/g, function(c) {
       return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&amp;'));
     });
   };
-  listEl.innerHTML = list.map(function(p) {
+  listEl.innerHTML = list.map(function(p, idx) {
     const when = [p.start, p.end].filter(Boolean).join(' → ');
     const weatherSlot = stationProjectIsOutdoor_(p)
       ? '<div id="stn-weather-' + esc(p.id) + '" class="mob-event-weather-badge"></div>'
       : '';
-    return '<button type="button" class="station-project-item" onclick="stationPickProject_(' + JSON.stringify(String(p.id)) + ')">'
+    return '<button type="button" class="station-project-item" data-sr-idx="' + idx + '" onclick="stationPickProject_(' + JSON.stringify(String(p.id)) + ')">'
       + '<div class="station-project-item__row">'
       + '<div class="station-project-item__main">'
       + '<div class="station-project-item__name">' + esc(p.title || p.name || 'Untitled') + '</div>'
@@ -90,6 +92,54 @@ function stationRenderProjectList_(projects) {
       + '</div></button>';
   }).join('');
   stationApplyProjectListWeather_(list, 'stn-weather-');
+  stationProjectPickerSelect_(0);
+}
+
+function stationProjectPickerSelect_(idx) {
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!listEl) return;
+  const items = Array.from(listEl.querySelectorAll('.station-project-item'));
+  if (!items.length) return;
+  const clamped = Math.max(0, Math.min(items.length - 1, idx));
+  window.__srStationProjectIdx = clamped;
+  items.forEach(function(el, i) {
+    el.classList.toggle('is-selected', i === clamped);
+  });
+  const active = items[clamped];
+  if (active && typeof active.scrollIntoView === 'function') {
+    active.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function stationProjectPickerHandleKeys_(ev) {
+  if (!ev || ev.defaultPrevented) return;
+  const panel = document.getElementById('station-project-picker');
+  if (!panel || !panel.classList.contains('is-open')) return;
+  const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toUpperCase() : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  const list = window.__srStationProjectList || [];
+  if (!list.length) return;
+
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const dir = ev.key === 'ArrowDown' ? 1 : -1;
+    stationProjectPickerSelect_((window.__srStationProjectIdx || 0) + dir);
+    return;
+  }
+
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const idx = window.__srStationProjectIdx || 0;
+    const proj = list[idx];
+    if (proj && proj.id != null) window.stationPickProject_(String(proj.id));
+  }
+}
+
+if (!window.__srStationProjectPickerKeys) {
+  window.__srStationProjectPickerKeys = true;
+  document.addEventListener('keydown', stationProjectPickerHandleKeys_, true);
 }
 
 window.stationPickProject_ = function(pId) {

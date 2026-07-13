@@ -36,6 +36,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [File_Splitting_Guide.md](File_Splitting_Guide.md) | Safe file splits |
 | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) | This works / milestone / rollback |
 | [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) | Google Drive — `STAGE_MASTERS_SYSTEM_ROOT`, `05_DATABASE`, Showrunner Sync |
+| [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) | DAL + Firebase design lock (2026-07-13) |
 | [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now **full protocol** (the root `../../MILESTONE_NOW.md` is the director's quick card that points here) |
 
 **Intentional pairs (same truth, different job):** `FRAGILE_ZONES` = checklist; `ARCHITECTURE` = explanation; `EQUIPMENT_MODEL` = how gear works on projects. Link, do not copy.

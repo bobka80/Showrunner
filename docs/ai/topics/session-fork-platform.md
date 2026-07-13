@@ -2,7 +2,9 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Status:** Backlog — shared architecture for branched session types below. **Do not implement fork until [active/data-access-layer.md](../active/data-access-layer.md) Phase 3B+** (router + session lifecycle).
+**Status:** Backlog — shared architecture for branched session types below. **Do not implement fork until [active/data-access-layer.md](../active/data-access-layer.md) Phase 4** (router + **Phase 3 delta saves** complete).
+
+**Design lock (2026-07-13):** [../active/dal-firebase-design-lock-2026-07-13.md](../active/dal-firebase-design-lock-2026-07-13.md) — reconciliation engine, failed-writes pocket, Logistics Hub atomic ops (no fork), PA/Timeline fork lifecycle.
 
 **Prerequisite campaign:** [../active/data-access-layer.md](../active/data-access-layer.md)
 
@@ -13,7 +15,7 @@
 | Warehouse preparation (PA, ledger, trucks, logistics hub) | [warehouse-prep-session.md](warehouse-prep-session.md) |
 | Timeline collaboration room | [timeline-collab-session.md](timeline-collab-session.md) |
 
-**Last swept:** 2026-06-30
+**Last swept:** 2026-07-13
 
 ---
 
@@ -46,7 +48,7 @@ SESSION CLOSED (fork left)
 
 ### Firebase (Firestore)
 
-- [ ] Project-scoped session path e.g. `sessions/{projectId}/{sessionType}/`
+- [ ] Project-scoped paths — **reconcile** `sessions/{projectId}/{sessionType}/` (this doc) vs `projects/{projectId}/assets|timeline/` ([design lock](../active/dal-firebase-design-lock-2026-07-13.md)) in DAL Phase 2
 - [ ] **Lean read model** — avoid “subscribe to 500 rows” per client (session summary doc + targeted subcollections)
 - [ ] Write on **meaning** only (scan, drag end, add row) — debounce pack/qty 300–500 ms
 - [ ] Unsubscribe listeners when user leaves room / closes modal
@@ -55,7 +57,12 @@ SESSION CLOSED (fork left)
 
 - [ ] **Open:** GAS validates → snapshot Sheets → bulk write Firebase → set session flag → FCM “session opened”
 - [ ] **During:** clients read/write Firebase only for session slice
-- [ ] **Close:** GAS validates buffer → bulk commit Sheets → clear session → delete or archive Firebase session → FCM “session closed”
+- [ ] **Close:** GAS validates buffer → bulk commit Sheets → **reconciliation engine** (cell-by-cell) → clear session → delete or archive Firebase session → FCM “session closed”
+- [ ] **Failed commit:** queue in `failed_writes/{projectId}/{timestamp}/{deltaId}` — retry backoff, manager alert — see [design lock §2](../active/dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
+
+### Logistics Hub (not a fork)
+
+- [ ] **Atomic per-operation** path — no session fork, immediate Sheets verify after each op — [design lock §2](../active/dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
 
 ### Presence & activity
 

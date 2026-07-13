@@ -8,17 +8,23 @@ A **Repomix** bundle of Showrunner source + `docs/ai/` for upload to a **Claude 
 
 ## Commands
 
+**Director trigger in Cursor:** say **create repo mix** — the agent runs the pack and tells you the drag-drop path.
+
 ```bash
 node create-repomix.js              # curated ~1M tokens (recommended)
 node create-repomix.js --split 2mb  # multiple parts if upload size limit
 node create-repomix.js --full         # includes vendor Javadoc (~11M tokens — usually too large)
 ```
 
-## Upload
+## Drag & drop location
 
-1. Run the command on your PC (repo must be current).
-2. Upload `repomix-output.md` (or `repomix-output_001.md`, …) to Claude project knowledge.
-3. Optionally upload `instructions.md` (navigation + current priorities).
+After the command finishes, upload from:
+
+**`S:\Gdrive\3Showrider\Code Env\claude-pack\repomix-output.md`**
+
+*(path is under your repo root → `claude-pack/` folder)*
+
+Optional: `claude-pack/instructions.md`
 
 ## Cost
 

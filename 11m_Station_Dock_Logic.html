@@ -194,6 +194,44 @@
     }, true);
   }
 
+  function stationDockProjectSelect_(idx) {
+    var listEl = document.getElementById('station-dock-project-list');
+    if (!listEl) return;
+    var cards = Array.prototype.slice.call(listEl.querySelectorAll('.station-dock-project-card'));
+    if (!cards.length) return;
+    var clamped = Math.max(0, Math.min(cards.length - 1, idx));
+    window.__srDockProjectIdx = clamped;
+    cards.forEach(function(el, i) { el.classList.toggle('is-selected', i === clamped); });
+    var active = cards[clamped];
+    if (active && active.scrollIntoView) active.scrollIntoView({ block: 'nearest' });
+  }
+
+  function stationDockProjectKeys_(ev) {
+    if (!dockSkin_() || !ev || ev.defaultPrevented) return;
+    if (document.body.classList.contains('station-dock-pa-open')) return;
+    if (document.body.classList.contains('station-dock-screensaver-active')) return;
+    var tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toUpperCase() : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    var list = window.stationProjectsCache || [];
+    if (!list.length) return;
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      ev.preventDefault(); ev.stopPropagation();
+      var dir = ev.key === 'ArrowDown' ? 1 : -1;
+      stationDockProjectSelect_((window.__srDockProjectIdx || 0) + dir);
+      return;
+    }
+    if (ev.key === 'Enter') {
+      ev.preventDefault(); ev.stopPropagation();
+      var idx = window.__srDockProjectIdx || 0;
+      var proj = list.slice().sort(function(a, b) {
+        var d1 = a.start ? new Date(a.start) : new Date(8640000000000000);
+        var d2 = b.start ? new Date(b.start) : new Date(8640000000000000);
+        return d1 - d2;
+      })[idx];
+      if (proj && proj.id != null) window.stationDockPickProject_(String(proj.id));
+    }
+  }
+
   window.stationInitDockUi_ = function() {
     if (!dockSkin_()) return;
     document.documentElement.classList.add('station-dock-root');
@@ -409,6 +447,9 @@
     if (typeof stationDockApplyWeatherBadges_ === 'function') {
       stationDockApplyWeatherBadges_(sorted);
     }
+    window.stationProjectsCache = sorted;
+    window.__srDockProjectIdx = 0;
+    stationDockProjectSelect_(0);
   };
 
   window.stationDockPickProject_ = function(pId) {
@@ -566,5 +607,10 @@
   document.addEventListener('DOMContentLoaded', function() {
     if (dockSkin_()) window.stationInitDockUi_();
   });
+
+  if (!window.__srDockProjectKeyGuard) {
+    window.__srDockProjectKeyGuard = true;
+    document.addEventListener('keydown', stationDockProjectKeys_, true);
+  }
 })();
 </script>

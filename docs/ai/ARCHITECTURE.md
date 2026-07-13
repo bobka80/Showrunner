@@ -107,3 +107,11 @@ When an AI agent changes frontend code, the live web app will **not** update unt
 **Index.html wiring rule:** Every production `.html` module must appear as `<?!= include('ModuleName'); ?>` in root `Index.html` or it will **not** ship in the build. Orphan files on disk are invisible to the live app.
 
 **Naming note:** In frontend JavaScript objects, nesting uses `containerUid` (camelCase). In Google Sheets / relational columns, the equivalent may appear as `container_uid` (snake_case). Do not treat these as different concepts.
+
+---
+
+## 12. Data layer (planned — DAL + Firebase)
+
+**Status:** Design locked 2026-07-13 — not coded yet. **Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Spec:** [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md).
+
+Target: repositories + router (Sheets vs Firebase session buffer), **delta-only saves before Firebase**, reconciliation + failed-writes pocket on commit, Cache Coordinator on top. Sheets remain official record between sessions. Session fork pattern: [topics/session-fork-platform.md](topics/session-fork-platform.md).

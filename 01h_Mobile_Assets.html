@@ -341,7 +341,16 @@ window.openMobileProjectAssets = function(projectId) {
         return;
     }
 
-    syncProjectEditorHiddenFields(p, pId);
+    // Station shell / compact entry may not have the full calendar editor context.
+    // Never throw here — the station project picker will treat it as a blank-screen failure.
+    if (typeof syncProjectEditorHiddenFields === 'function') {
+        try {
+            syncProjectEditorHiddenFields(p, pId);
+        } catch (e) { /* ignore */ }
+    } else {
+        const fid = document.getElementById('edit-folder-id');
+        if (fid) fid.value = pId;
+    }
     document.body.classList.add('mobile-pa-compact');
     window.mobilePaCompactActive = true;
     window.activePaTarget = null;

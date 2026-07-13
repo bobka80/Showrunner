@@ -141,15 +141,17 @@ function listOutputs() {
 }
 
 function printSummary(files) {
-  console.log('\n--- Claude pack ready ---');
+  console.log('\n=== DRAG & DROP → Claude / quote.ai project knowledge ===\n');
   for (const f of files) {
     const stat = fs.statSync(f);
     const mb = (stat.size / (1024 * 1024)).toFixed(2);
-    console.log(`  ${path.relative(ROOT, f)}  (${mb} MB)`);
+    console.log(`  PRIMARY: ${f}`);
+    console.log(`           (${mb} MB)\n`);
   }
-  console.log(`  ${path.relative(ROOT, INSTRUCTIONS_PATH)}  (upload with output if your UI allows)`);
-  console.log('\nUpload the repomix-output file(s) to your Claude project knowledge tab.');
-  console.log('Regenerate after major doc or pipeline changes: node create-repomix.js\n');
+  console.log(`  OPTIONAL: ${INSTRUCTIONS_PATH}`);
+  console.log('           (navigation + current priorities)\n');
+  console.log('Folder: ' + OUT_DIR);
+  console.log('\nSay "create repo mix" in Cursor anytime to regenerate.\n');
 }
 
 function main() {
