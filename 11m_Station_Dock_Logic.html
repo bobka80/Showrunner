@@ -4,6 +4,9 @@
   if (!window.IS_STATION_DEVICE) return;
 
   function dockSkin_() {
+    // Dock can be entered via multiple boot paths; prefer robust DOM-state checks.
+    if (document.documentElement.classList.contains('station-dock-root')) return true;
+    if (document.getElementById('station-dock-shell')) return true;
     return (typeof window.stationActiveUiSkin_ === 'function' && window.stationActiveUiSkin_() === 'dock_panel');
   }
 
