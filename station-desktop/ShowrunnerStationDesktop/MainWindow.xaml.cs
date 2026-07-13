@@ -1033,12 +1033,7 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-        // PreviewKeyDown so WebView focus cannot swallow Escape when the UI thread is busy.
-        if (e.Key == Key.Escape)
-        {
-            e.Handled = true;
-            Application.Current.Shutdown(0);
-        }
+        // Escape no longer quits the app — use the header ✕ button (with confirm).
     }
 
     // Cache-only bridge: pollScans/getConfig read JS memory updated by native PostWebMessage.

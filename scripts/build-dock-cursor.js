@@ -1,5 +1,6 @@
 /**
- * Dock pointer: bulb arc + tangent lines through tip (DXF-accurate).
+ * Dock pointer — DXF tangent points, short exterior bulb arc, tip via lines.
+ * Rollback: station-desktop/assets/lg-webos-pointer-v563-milestone.svg (GAS v563)
  */
 const rL = 1.5;
 const cL = { x: 0, y: 0 };
@@ -28,11 +29,8 @@ function ang(c, p) {
 function polar(c, r, a) {
   return { x: c.x + r * Math.cos(a), y: c.y + r * Math.sin(a) };
 }
-function mapPt(p, minX, maxY, sc, pad) {
-  return {
-    x: (p.x - minX) * sc + pad,
-    y: (maxY - p.y) * sc + pad,
-  };
+function onCircle(c, r, p) {
+  return polar(c, r, ang(c, p));
 }
 function arcMidpoint(c, r, a1, a2, large, sweep) {
   let da = a2 - a1;
@@ -44,21 +42,28 @@ function arcMidpoint(c, r, a1, a2, large, sweep) {
 function dist(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
-function pickExteriorArc(c, r, from, to, awayFrom) {
+/** Short arc only — exterior = midpoint farther from opposite circle center. */
+function pickShortExteriorArc(c, r, from, to, awayFrom) {
   const a1 = ang(c, from);
   const a2 = ang(c, to);
   let best = null;
-  for (let large = 0; large <= 1; large++) {
-    for (let sweep = 0; sweep <= 1; sweep++) {
-      const mid = arcMidpoint(c, r, a1, a2, large, sweep);
-      const d = dist(mid, awayFrom);
-      if (!best || d > best.d) best = { large, sweep, d };
-    }
+  for (let sweep = 0; sweep <= 1; sweep++) {
+    const mid = arcMidpoint(c, r, a1, a2, 0, sweep);
+    const d = dist(mid, awayFrom);
+    if (!best || d > best.d) best = { large: 0, sweep, d };
   }
   return best;
 }
+function fmt(n) {
+  return (+n).toFixed(3);
+}
 
-const outline = [pSmallR, pLargeR, pLargeL, pSmallL, tip];
+const eLargeR = onCircle(cL, rL, pLargeR);
+const eLargeL = onCircle(cL, rL, pLargeL);
+const eSmallR = onCircle(cS, rS, pSmallR);
+const eSmallL = onCircle(cS, rS, pSmallL);
+
+const outline = [eSmallR, eLargeR, eLargeL, eSmallL, tip];
 let minX = Infinity;
 let maxY = -Infinity;
 outline.forEach((p) => {
@@ -68,31 +73,34 @@ outline.forEach((p) => {
 const maxX = Math.max(...outline.map((p) => p.x));
 const minY = Math.min(...outline.map((p) => p.y));
 
-const strokePad = STROKE_W / 2 + 2;
+const strokePad = STROKE_W / 2 + 5;
 const pad = strokePad;
 const size = VB - pad * 2;
 const sc = size / Math.max(maxX - minX, maxY - minY);
-const m = (p) => mapPt(p, minX, maxY, sc, pad);
+const mapPt = (p) => ({
+  x: (p.x - minX) * sc + pad,
+  y: (maxY - p.y) * sc + pad,
+});
 
-const cLsvg = m(cL);
-const cSsvg = m(cS);
+const cLsvg = mapPt(cL);
+const cSsvg = mapPt(cS);
 const rLsvg = rL * sc;
-const P_SR = m(pSmallR);
-const P_LR = m(pLargeR);
-const P_LL = m(pLargeL);
-const P_SL = m(pSmallL);
-const T = m(tip);
+const P_SR = mapPt(eSmallR);
+const P_LR = mapPt(eLargeR);
+const P_LL = mapPt(eLargeL);
+const P_SL = mapPt(eSmallL);
+const T = mapPt(tip);
 
-const largePick = pickExteriorArc(cLsvg, rLsvg, P_LR, P_LL, cSsvg);
-const largeArc = `A ${+rLsvg.toFixed(4)} ${+rLsvg.toFixed(4)} 0 ${largePick.large} ${largePick.sweep} ${P_LL.x.toFixed(3)} ${P_LL.y.toFixed(3)}`;
+const largePick = pickShortExteriorArc(cLsvg, rLsvg, P_LR, P_LL, cSsvg);
+const largeArc = `A ${fmt(rLsvg)} ${fmt(rLsvg)} 0 0 ${largePick.sweep} ${fmt(P_LL.x)} ${fmt(P_LL.y)}`;
 
 const d = [
-  `M ${P_SR.x.toFixed(3)} ${P_SR.y.toFixed(3)}`,
-  `L ${P_LR.x.toFixed(3)} ${P_LR.y.toFixed(3)}`,
+  `M ${fmt(P_SR.x)} ${fmt(P_SR.y)}`,
+  `L ${fmt(P_LR.x)} ${fmt(P_LR.y)}`,
   largeArc,
-  `L ${P_SL.x.toFixed(3)} ${P_SL.y.toFixed(3)}`,
-  `L ${T.x.toFixed(3)} ${T.y.toFixed(3)}`,
-  `L ${P_SR.x.toFixed(3)} ${P_SR.y.toFixed(3)}`,
+  `L ${fmt(P_SL.x)} ${fmt(P_SL.y)}`,
+  `L ${fmt(T.x)} ${fmt(T.y)}`,
+  `L ${fmt(P_SR.x)} ${fmt(P_SR.y)}`,
   'Z',
 ].join(' ');
 
@@ -101,6 +109,7 @@ const hotspot = { x: +T.x.toFixed(3), y: +T.y.toFixed(3) };
 console.log(JSON.stringify({
   d,
   hotspot,
+  largePick,
   css: `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${Math.round(hotspot.x)} ${Math.round(hotspot.y)}, auto`,
   svg,
 }, null, 2));

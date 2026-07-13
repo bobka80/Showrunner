@@ -6894,7 +6894,7 @@ html.station-dock-root,
 html.station-dock-root body {
   overflow: hidden;
   height: 100%;
-  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%237f1d1d%22%20stroke%3D%22%23a1a1aa%22%20stroke-width%3D%223.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%208.821%203.832%20L%2039.155%2026.377%20A%2019.6077%2019.6077%200%200%201%207.982%2044.375%20L%203.625%206.832%20L%205.237%203.625%20L%208.821%203.832%20Z%22%2F%3E%3C%2Fsvg%3E") 5 4, auto;
+  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%237f1d1d%22%20stroke%3D%22%23a1a1aa%22%20stroke-width%3D%223.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%2011.056%206.802%20L%2036.924%2026.027%20A%2016.721%2016.721%200%200%201%2010.341%2041.375%20L%206.625%209.360%20L%208.000%206.625%20L%2011.056%206.802%20Z%22%2F%3E%3C%2Fsvg%3E") 8 7, auto;
   cursor: var(--station-dock-cursor);
 }
 html.station-dock-root,
@@ -7178,44 +7178,6 @@ html.station-dock-root .station-dock-project-card .mob-event-weather-badge {
 html.station-dock-root .station-dock-project-card .mob-event-weather-badge .weather-widget-summary {
   pointer-events: auto;
 }
-.station-dock-weather-hover {
-  position: fixed;
-  z-index: 52000;
-  display: none;
-  width: clamp(240px, 24vw, 340px);
-  max-height: min(420px, 52vh);
-  padding: 12px 10px 10px;
-  border-radius: 14px;
-  border: 1px solid #3f3f46;
-  background: rgba(10, 10, 12, 0.96);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
-  box-sizing: border-box;
-  pointer-events: auto;
-}
-.station-dock-weather-hover.is-open {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.station-dock-weather-hover__title {
-  font-size: 12px;
-  font-weight: 800;
-  color: #a1a1aa;
-  text-align: center;
-  padding: 0 6px;
-  line-height: 1.2;
-  flex-shrink: 0;
-}
-.station-dock-weather-hover__viewport {
-  flex: 1;
-  min-height: 0;
-  max-height: min(360px, 46vh);
-}
-.station-dock-weather-hover__track {
-  padding-top: 4px;
-  padding-bottom: 48px;
-  gap: clamp(14px, 2vh, 22px);
-}
 .station-dock-scan-rail {
   flex: 1 1 0;
   min-width: 0;
@@ -7223,6 +7185,40 @@ html.station-dock-root .station-dock-project-card .mob-event-weather-badge .weat
   flex-direction: column;
   background: #111114;
   box-sizing: border-box;
+  position: relative;
+}
+.station-dock-weather-rail {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #0a0a0c;
+  box-sizing: border-box;
+  padding: 14px 8px 10px 4px;
+}
+.station-dock-weather-rail.is-open {
+  display: flex;
+}
+.station-dock-weather-rail__panel {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 8px 10px;
+}
+.station-dock-weather-rail__viewport {
+  flex: 1;
+  min-height: 0;
+}
+.station-dock-weather-rail__track {
+  padding-top: 4px;
+  padding-bottom: 72px;
+}
+html.station-dock-root.station-dock-weather-preview-active .station-dock-rail__body,
+html.station-dock-root.station-dock-weather-preview-active .station-dock-rail__actions,
+html.station-dock-root.station-dock-weather-preview-active .station-dock-rail__foot {
+  visibility: hidden;
 }
 .station-dock-rail__body {
   flex: 1;
@@ -7846,13 +7842,17 @@ body.station-dock-screensaver-active #station-dock-shell {
       <div id="station-dock-rail-body" class="station-dock-rail__body"></div>
       <div id="station-dock-rail-actions" class="station-dock-rail__actions"></div>
       <div id="station-dock-rail-foot" class="station-dock-rail__foot"></div>
+      <div id="station-dock-weather-rail" class="station-dock-weather-rail" aria-hidden="true">
+        <div class="station-dock-ss-bulletin-panel station-dock-weather-rail__panel">
+          <div class="station-dock-ss-slot-body">
+            <div class="station-dock-weather-rail__title station-dock-ss-event-title"></div>
+            <div class="station-dock-ss-credits-viewport station-dock-weather-rail__viewport">
+              <div class="station-dock-weather-rail__track station-dock-ss-credits-track"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </aside>
-  </div>
-</div>
-<div id="station-dock-weather-hover" class="station-dock-weather-hover" style="display:none;" aria-hidden="true">
-  <div class="station-dock-weather-hover__title"></div>
-  <div class="station-dock-ss-credits-viewport station-dock-weather-hover__viewport">
-    <div class="station-dock-weather-hover__track station-dock-ss-credits-track"></div>
   </div>
 </div>
 
