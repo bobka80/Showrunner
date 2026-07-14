@@ -7065,6 +7065,14 @@ html.station-dock-root #station-dock-shell {
   color: #fff;
   border-color: #52525b;
 }
+.station-dock-app-settings-btn.station-dock-settings-cog {
+  padding: 6px 10px;
+  min-width: 36px;
+  justify-content: center;
+  gap: 0;
+  font-size: 16px;
+  line-height: 1;
+}
 .station-dock-app-settings {
   position: absolute;
   top: calc(100% + 6px);
@@ -7355,19 +7363,28 @@ html.station-dock-root .station-shell-brand__host {
 html.station-dock-root .station-shell-brand__line {
   gap: 8px;
 }
-html.station-dock-root #station-dock-head-right .station-ctrl-cog {
-  flex-shrink: 0;
-  margin-left: 2px;
+html.station-dock-root #station-dock-head-right .station-ctrl-cog,
+html.station-dock-root #station-btn-settings-cog {
+  display: none !important;
 }
 html.station-dock-root #station-device-controls {
   display: none !important;
 }
 html.station-dock-root #station-settings {
-  left: auto !important;
-  right: 0 !important;
+  position: fixed !important;
+  inset: auto !important;
+  left: 0 !important;
+  right: auto !important;
   top: var(--station-dock-head-h) !important;
-  width: calc(100% - var(--dock-split)) !important;
+  width: min(440px, calc(var(--dock-split) - 12px)) !important;
   max-width: none;
+  height: auto !important;
+  bottom: auto !important;
+  max-height: calc(100vh - var(--station-dock-head-h) - 8px);
+  border: 1px solid #27272a;
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
 }
 html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay {
   display: flex !important;
@@ -7848,33 +7865,11 @@ body.station-dock-screensaver-active #station-dock-shell {
     <div class="station-dock-unified-head__left">
       <div class="station-dock-head-title-row">
         <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
-        <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn" onclick="stationDockToggleAppSettings_()" title="Display settings" aria-label="Display settings">&#9881; Display</button>
+        <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn station-dock-settings-cog" onclick="stationDockToggleSettings_()" title="Settings" aria-label="Settings">&#9881;</button>
         <button type="button" id="station-dock-screensaver-btn" class="station-dock-app-settings-btn" onclick="stationDockOpenScreensaver_()" title="Bulletin screensaver" aria-label="Bulletin screensaver">&#9673; Bulletin</button>
-        <div id="station-dock-app-settings" class="station-dock-app-settings" style="display:none;" aria-hidden="true">
-          <div class="station-dock-app-settings__title">Display zoom</div>
-          <label class="station-dock-app-settings__field" for="station-dock-zoom-left">
-            <span>Left pane</span>
-            <select id="station-dock-zoom-left" onchange="stationDockApplyZoomLeft_(this.value)">
-              <option value="100">100%</option>
-              <option value="125">125%</option>
-              <option value="150">150%</option>
-              <option value="175">175%</option>
-            </select>
-          </label>
-          <label class="station-dock-app-settings__field" for="station-dock-zoom-right">
-            <span>Right pane (scans)</span>
-            <select id="station-dock-zoom-right" onchange="stationDockApplyZoomRight_(this.value)">
-              <option value="100">100%</option>
-              <option value="125">125%</option>
-              <option value="150">150%</option>
-              <option value="175">175%</option>
-            </select>
-          </label>
-          <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationDockToggleAppSettings_(false)">Done</button>
-        </div>
       </div>
       <div id="station-dock-head-left-nav" class="station-dock-head-left-nav" style="display:none;">
-        <button type="button" id="station-dock-pa-back" class="btn-outline btn-sm station-dock-nav-btn" onclick="stationDockBackToProjects_()">← Back</button>
+        <button type="button" id="station-dock-pa-back" class="btn-outline btn-sm station-dock-nav-btn" title="Back (Escape)">← Back (Esc)</button>
         <button type="button" id="station-dock-pa-console" class="btn-outline btn-sm station-dock-nav-btn" style="display:none;" onclick="stationDockPaConsole_()">CHECK-OUT</button>
       </div>
     </div>
@@ -7921,6 +7916,28 @@ body.station-dock-screensaver-active #station-dock-shell {
     <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseSettings()">Done</button>
   </div>
   <div class="station-settings-body">
+
+    <div id="station-settings-display-section" class="station-settings-section" style="display:none;">
+      <div class="station-settings-section__title">Display</div>
+      <div class="station-field">
+        <label class="station-field__label" for="station-dock-zoom-left">Left pane zoom</label>
+        <select id="station-dock-zoom-left" onchange="stationDockApplyZoomLeft_(this.value)">
+          <option value="100">100%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+          <option value="175">175%</option>
+        </select>
+      </div>
+      <div class="station-field">
+        <label class="station-field__label" for="station-dock-zoom-right">Right pane zoom (scans)</label>
+        <select id="station-dock-zoom-right" onchange="stationDockApplyZoomRight_(this.value)">
+          <option value="100">100%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+          <option value="175">175%</option>
+        </select>
+      </div>
+    </div>
 
     <div class="station-settings-section">
       <div class="station-settings-section__title">Session</div>
@@ -8561,7 +8578,7 @@ body.station-dock-screensaver-active #station-dock-shell {
              <div id="pa-human-list" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; margin-top: 4px; background: #151518; border: 1px solid #d8b4fe; border-radius: 6px; font-size: 11px; color: #a1a1aa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; gap: 6px; align-items: center; z-index: 50; padding: 10px 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.8); box-sizing: border-box;"></div>
          </div>
          <button class="btn-close" id="btn-pa-cancel-desktop" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="cancelProjectAssetsModal()">CANCEL</button>
-        <button type="button" id="btn-pa-back-station" class="btn-outline btn-sm" style="display:none; margin:0; height: 38px; box-sizing: border-box;" onclick="if(window.requestMobilePaClose) window.requestMobilePaClose({ returnToHub: false }); else cancelProjectAssetsModal();" title="Back">← Back</button>
+        <button type="button" id="btn-pa-back-station" class="btn-outline btn-sm" style="display:none; margin:0; height: 38px; box-sizing: border-box;" onclick="if(document.documentElement.classList.contains('station-dock-root')&&typeof stationDockConfirmBackToProjects_==='function'){stationDockConfirmBackToProjects_();}else if(window.requestMobilePaClose){window.requestMobilePaClose({returnToHub:false});}else{cancelProjectAssetsModal();}" title="Back (Escape)">← Back (Esc)</button>
         <button type="button" id="btn-pa-close-x" class="btn-close btn-sm" style="display:none; width:38px; height:38px; margin:0; padding:0 !important; font-size:18px; line-height:1; box-sizing:border-box;" onclick="cancelProjectAssetsModal()" title="Close">✕</button>
          <button id="btn-save-pa" class="btn-main" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="saveProjectAssets()">SAVE EQUIPMENT</button>
       </div>

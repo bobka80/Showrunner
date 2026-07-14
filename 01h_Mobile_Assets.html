@@ -430,6 +430,11 @@ if (!window.__srStationPaEscape && window.IS_STATION_DEVICE) {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
         ev.preventDefault();
         ev.stopImmediatePropagation();
+        if (document.documentElement.classList.contains('station-dock-root') &&
+            typeof window.stationDockConfirmBackToProjects_ === 'function') {
+            window.stationDockConfirmBackToProjects_();
+            return;
+        }
         if (typeof window.requestMobilePaClose === 'function') {
             window.requestMobilePaClose({ returnToHub: false });
         } else if (typeof window.cancelProjectAssetsModal === 'function') {

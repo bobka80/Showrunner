@@ -61,18 +61,8 @@
     window.stationDockApplyZoomRight_(window.stationDockZoomRightPreset_());
   };
 
-  window.stationDockToggleAppSettings_ = function(force) {
-    var panel = document.getElementById('station-dock-app-settings');
-    if (!panel) return;
-    var show = (force === true) ? true : (force === false) ? false : panel.style.display === 'none';
-    panel.style.display = show ? 'flex' : 'none';
-    panel.setAttribute('aria-hidden', show ? 'false' : 'true');
-    if (show) {
-      var l = document.getElementById('station-dock-zoom-left');
-      var r = document.getElementById('station-dock-zoom-right');
-      if (l) l.value = window.stationDockZoomLeftPreset_();
-      if (r) r.value = window.stationDockZoomRightPreset_();
-    }
+  window.stationDockToggleSettings_ = function() {
+    if (typeof window.stationOpenSettings === 'function') window.stationOpenSettings();
   };
 
   if (window.IS_STATION_DEVICE) {

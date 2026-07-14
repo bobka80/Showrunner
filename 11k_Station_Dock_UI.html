@@ -4,33 +4,11 @@
     <div class="station-dock-unified-head__left">
       <div class="station-dock-head-title-row">
         <div id="station-dock-workspace-title" class="station-dock-workspace__title">Projects</div>
-        <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn" onclick="stationDockToggleAppSettings_()" title="Display settings" aria-label="Display settings">&#9881; Display</button>
+        <button type="button" id="station-dock-app-settings-btn" class="station-dock-app-settings-btn station-dock-settings-cog" onclick="stationDockToggleSettings_()" title="Settings" aria-label="Settings">&#9881;</button>
         <button type="button" id="station-dock-screensaver-btn" class="station-dock-app-settings-btn" onclick="stationDockOpenScreensaver_()" title="Bulletin screensaver" aria-label="Bulletin screensaver">&#9673; Bulletin</button>
-        <div id="station-dock-app-settings" class="station-dock-app-settings" style="display:none;" aria-hidden="true">
-          <div class="station-dock-app-settings__title">Display zoom</div>
-          <label class="station-dock-app-settings__field" for="station-dock-zoom-left">
-            <span>Left pane</span>
-            <select id="station-dock-zoom-left" onchange="stationDockApplyZoomLeft_(this.value)">
-              <option value="100">100%</option>
-              <option value="125">125%</option>
-              <option value="150">150%</option>
-              <option value="175">175%</option>
-            </select>
-          </label>
-          <label class="station-dock-app-settings__field" for="station-dock-zoom-right">
-            <span>Right pane (scans)</span>
-            <select id="station-dock-zoom-right" onchange="stationDockApplyZoomRight_(this.value)">
-              <option value="100">100%</option>
-              <option value="125">125%</option>
-              <option value="150">150%</option>
-              <option value="175">175%</option>
-            </select>
-          </label>
-          <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationDockToggleAppSettings_(false)">Done</button>
-        </div>
       </div>
       <div id="station-dock-head-left-nav" class="station-dock-head-left-nav" style="display:none;">
-        <button type="button" id="station-dock-pa-back" class="btn-outline btn-sm station-dock-nav-btn" onclick="stationDockBackToProjects_()">← Back</button>
+        <button type="button" id="station-dock-pa-back" class="btn-outline btn-sm station-dock-nav-btn" title="Back (Escape)">← Back (Esc)</button>
         <button type="button" id="station-dock-pa-console" class="btn-outline btn-sm station-dock-nav-btn" style="display:none;" onclick="stationDockPaConsole_()">CHECK-OUT</button>
       </div>
     </div>

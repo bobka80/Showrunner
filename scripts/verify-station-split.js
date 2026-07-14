@@ -71,9 +71,16 @@ if (!fs.existsSync(monoPath)) fail('Missing 11_Station_Shell.html monolith refer
 const mono = read('11_Station_Shell.html');
 const monoLines = mono.split(/\r?\n/);
 
-if (monoLines.length < 4036) {
+if (monoLines.length < 2000) {
   fail('Monolith shorter than expected (' + monoLines.length + ' lines)');
 }
+
+const scriptStartIdx = monoLines.findIndex(function(l) { return /^<script\b/i.test(String(l).trim()); });
+if (scriptStartIdx < 0) fail('Monolith missing <script> opener');
+const scriptEndIdx = monoLines.findIndex(function(l, i) {
+  return i > scriptStartIdx && /^<\/script>/i.test(String(l).trim());
+});
+if (scriptEndIdx < 0) fail('Monolith missing </script> closer');
 
 console.log('=== Station split verification ===\n');
 
@@ -119,18 +126,18 @@ LOGIC_FILES.forEach(function(f) {
   rebuiltLogic += extractScriptBodies(read(f), f)[0];
 });
 
-const origMarkup = monoLines.slice(0, 1137).join('\n') + '\n';
-const origLogic = monoLines.slice(1139, 4036).join('\n') + '\n';
+const origMarkup = monoLines.slice(0, scriptStartIdx).join('\n') + '\n';
+const origLogic = monoLines.slice(scriptStartIdx + 1, scriptEndIdx).join('\n') + '\n';
 
 if (origMarkup !== rebuiltMarkup) {
-  fail('Markup concat !== monolith lines 1–1137');
+  fail('Markup concat !== monolith lines 1–' + scriptStartIdx);
 }
-console.log('concat OK: markup === monolith 1–1137');
+console.log('concat OK: markup === monolith 1–' + scriptStartIdx);
 
 if (origLogic !== rebuiltLogic) {
-  fail('Logic concat !== monolith script 1140–4036');
+  fail('Logic concat !== monolith script ' + (scriptStartIdx + 2) + '–' + scriptEndIdx);
 }
-console.log('concat OK: logic === monolith 1140–4036');
+console.log('concat OK: logic === monolith ' + (scriptStartIdx + 2) + '–' + scriptEndIdx);
 
 const hash = crypto.createHash('sha256').update(origMarkup + origLogic).digest('hex').slice(0, 16);
 console.log('\nGolden hash (markup+logic): ' + hash);

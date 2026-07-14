@@ -314,6 +314,23 @@ html.station-device-root #station-device-controls { display: flex; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.station-scan-feed__identity {
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 72%;
+  gap: 4px;
+}
+.station-scan-feed__identity .name {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: none;
+}
+.station-scan-feed__identity .unit {
+  flex: 0 0 auto;
+  margin-left: 0;
+}
 .station-scan-feed__row .unit {
   font-family: monospace;
   font-size: 11px;
@@ -325,8 +342,9 @@ html.station-device-root #station-device-controls { display: flex; }
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  flex-shrink: 0;
-  max-width: 42%;
+  flex: 0 0 auto;
+  margin-left: auto;
+  max-width: 28%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -348,8 +366,8 @@ html.station-device-root #station-device-controls { display: flex; }
 .station-scan-feed__row.is-crew .unit {
   color: #0ea5e9;
   text-transform: uppercase;
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   align-self: center;
 }
 /* Station project picker overlay */
@@ -388,6 +406,17 @@ html.station-device-root #station-device-controls { display: flex; }
   cursor: pointer;
 }
 .station-project-item:active { border-color: #f97316; }
+.station-project-item__row,
+.station-dock-project-card__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.station-project-item__main,
+.station-dock-project-card__main {
+  flex: 1;
+  min-width: 0;
+}
 .station-project-item__name {
   font-size: 15px;
   font-weight: 800;
@@ -722,13 +751,27 @@ html.station-device-root #station-device-controls { display: flex; }
 .station-scan-feed__row {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   font-family: monospace;
   font-size: 13px;
   color: #e4e4e7;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  box-sizing: border-box;
 }
-.station-scan-feed__row:first-child {
+.station-scan-feed__row.is-selected {
+  border-color: #f4f4f5;
+  background: rgba(24, 24, 27, 0.85);
+  color: #f4f4f5;
+  font-weight: 700;
+}
+.station-scan-feed__row.is-selected .time {
+  color: #71717a;
+}
+.station-scan-feed__row:first-child:not(.is-selected) {
   color: #10b981;
   font-weight: 700;
 }
@@ -872,6 +915,917 @@ html.station-device-root #station-device-controls { display: flex; }
   color: #10b981;
   min-height: 16px;
 }
+
+/* --- Dock panel (desktop station): 2/3 workspace + 1/3 scan rail, no sidebar --- */
+html.station-dock-root .dashboard,
+html.station-dock-root #mobile-dashboard,
+html.station-dock-root #sr-hosting-only-banner,
+html.station-dock-root #floating-bell-container {
+  display: none !important;
+}
+html.station-dock-root,
+html.station-dock-root body {
+  overflow: hidden;
+  height: 100%;
+  --station-dock-cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2248%22%20height%3D%2248%22%20viewBox%3D%220%200%2048%2048%22%3E%3Cpath%20fill%3D%22%237f1d1d%22%20stroke%3D%22%23a1a1aa%22%20stroke-width%3D%223.25%22%20stroke-linejoin%3D%22miter%22%20stroke-linecap%3D%22butt%22%20d%3D%22M%2011.056%206.802%20L%2036.924%2026.027%20A%2016.721%2016.721%200%200%201%2010.341%2041.375%20L%206.625%209.360%20L%208.000%206.625%20L%2011.056%206.802%20Z%22%2F%3E%3C%2Fsvg%3E") 8 7, auto;
+  cursor: var(--station-dock-cursor);
+}
+html.station-dock-root,
+html.station-dock-root * {
+  cursor: var(--station-dock-cursor) !important;
+}
+html.station-dock-root input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
+html.station-dock-root textarea {
+  cursor: text !important;
+}
+html.station-dock-root #station-shell {
+  display: none !important;
+}
+#station-dock-shell {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  flex-direction: column;
+  background: var(--bg-dark, #0a0a0c);
+  color: var(--text-main, #f4f4f5);
+  font-family: Inter, sans-serif;
+  --station-dock-head-h: 48px;
+  --dock-split: 66.666667%;
+  --dock-left-zoom: 1;
+  --dock-right-zoom: 1;
+}
+html.station-dock-root #station-dock-shell {
+  display: flex;
+}
+#station-dock-shell::before {
+  content: '';
+  position: absolute;
+  left: var(--dock-split);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #27272a;
+  pointer-events: none;
+  z-index: 3;
+}
+.station-dock-unified-head {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  min-height: var(--station-dock-head-h);
+  border-bottom: 1px solid #27272a;
+  background: #111114;
+  position: relative;
+  z-index: 4;
+}
+.station-dock-unified-head__left {
+  flex: 0 0 var(--dock-split);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  box-sizing: border-box;
+}
+.station-dock-head-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  position: relative;
+  flex-shrink: 0;
+}
+.station-dock-head-left-nav {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.station-dock-nav-btn {
+  margin: 0;
+  white-space: nowrap;
+}
+.station-dock-unified-head__right {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+.station-dock-exit-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #a1a1aa;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.station-dock-exit-btn:hover {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+.station-dock-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  position: relative;
+}
+.station-dock-workspace {
+  flex: 0 0 var(--dock-split);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  background: #0a0a0c;
+  box-sizing: border-box;
+}
+.station-dock-workspace__content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.station-dock-workspace__title {
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.station-dock-app-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  color: #a1a1aa;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.station-dock-app-settings-btn:hover {
+  color: #fff;
+  border-color: #52525b;
+}
+.station-dock-app-settings-btn.station-dock-settings-cog {
+  padding: 6px 10px;
+  min-width: 36px;
+  justify-content: center;
+  gap: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+.station-dock-app-settings {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 240px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid #3f3f46;
+  background: #18181b;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.station-dock-app-settings__title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f97316;
+}
+.station-dock-app-settings__field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #e4e4e7;
+}
+.station-dock-app-settings__field select {
+  min-width: 88px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: #0a0a0c;
+  color: #fff;
+  font-size: 13px;
+}
+.station-dock-host-prompt {
+  display: none !important;
+}
+.station-dock-host-prompt--legacy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+.station-dock-host-prompt__label {
+  font-size: 18px;
+  font-weight: 900;
+  color: #fff;
+}
+.station-dock-host-prompt__hint {
+  font-size: 14px;
+  color: #a1a1aa;
+}
+.station-dock-home {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.station-dock-project-status {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #a1a1aa;
+  text-align: center;
+  flex-shrink: 0;
+}
+.station-dock-project-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.station-dock-project-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin: 0;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1a1a1e;
+  color: #fff;
+  cursor: pointer;
+}
+.station-dock-project-card:hover {
+  background: #222228;
+}
+.station-dock-project-card__title {
+  font-size: 16px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+.station-dock-project-card__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #a1a1aa;
+}
+.station-dock-project-empty {
+  color: #71717a;
+  text-align: center;
+  padding: 24px;
+}
+html.station-dock-root .station-dock-project-card .mob-event-weather-badge {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+html.station-dock-root .station-dock-project-card .mob-event-weather-badge .weather-widget-summary {
+  pointer-events: auto;
+}
+.station-dock-scan-rail {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #111114;
+  box-sizing: border-box;
+  position: relative;
+}
+.station-dock-weather-rail {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: none;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #0a0a0c;
+  box-sizing: border-box;
+  padding: 14px 8px 10px 4px;
+}
+.station-dock-weather-rail.is-open {
+  display: flex;
+}
+.station-dock-weather-rail__panel {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 8px 10px;
+}
+.station-dock-weather-rail__viewport {
+  flex: 1;
+  min-height: 0;
+}
+.station-dock-weather-rail__track {
+  padding-top: 4px;
+  padding-bottom: 72px;
+}
+html.station-dock-root.station-dock-weather-preview-active .station-dock-rail__body,
+html.station-dock-root.station-dock-weather-preview-active .station-dock-rail__actions,
+html.station-dock-root.station-dock-weather-preview-active .station-dock-rail__foot {
+  visibility: hidden;
+}
+.station-dock-rail__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.station-dock-rail__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid #27272a;
+  background: #0d0d10;
+}
+.station-dock-rail__foot {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid #27272a;
+}
+html.station-dock-root #station-btn-logout-host {
+  display: none;
+  width: 100%;
+  margin: 0;
+}
+html.station-dock-root #station-btn-scan-panel {
+  display: none !important;
+}
+html.station-dock-root #station-scan-panel {
+  display: flex !important;
+  position: static !important;
+  flex: 1;
+  min-height: 0;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  box-shadow: none;
+  border: none;
+  border-radius: 0;
+  z-index: 1;
+}
+html.station-dock-root #station-scan-panel.is-open .station-scan-feed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-bottom: none;
+}
+html.station-dock-root .station-scan-feed__list {
+  max-height: none;
+  flex: 1;
+  overflow-y: auto;
+}
+html.station-dock-root .station-scan-feed__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) 52px minmax(0, 0.9fr) auto;
+  gap: 2px 6px;
+  align-items: baseline;
+}
+html.station-dock-root .station-scan-feed__row .name {
+  grid-column: 1;
+  min-width: 0;
+}
+html.station-dock-root .station-scan-feed__row .unit {
+  grid-column: 2;
+  justify-self: start;
+}
+html.station-dock-root .station-scan-feed__row .unit--empty {
+  visibility: hidden;
+}
+html.station-dock-root .station-scan-feed__status {
+  grid-column: 3;
+  justify-self: end;
+  margin-left: 0;
+  max-width: none;
+}
+html.station-dock-root .station-scan-feed__spacer {
+  grid-column: 3;
+}
+html.station-dock-root .station-scan-feed__row .time {
+  grid-column: 4;
+  justify-self: end;
+}
+html.station-dock-root #station-panel-last {
+  display: none !important;
+}
+html.station-dock-root #station-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+html.station-dock-root #station-panel-actions .btn-outline,
+html.station-dock-root #station-panel-actions .btn-main,
+html.station-dock-root #station-panel-actions .btn-close {
+  margin: 0;
+}
+html.station-dock-root #station-panel-note {
+  width: 100%;
+  box-sizing: border-box;
+}
+html.station-dock-root .station-shell-brand {
+  padding: 0;
+  margin-right: 0;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 13px;
+}
+html.station-dock-root .station-shell-brand__device,
+html.station-dock-root .station-shell-brand__host {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: monospace;
+  line-height: 1.2;
+}
+html.station-dock-root .station-shell-brand__host {
+  color: #10b981;
+}
+html.station-dock-root .station-shell-brand__line {
+  gap: 8px;
+}
+html.station-dock-root #station-dock-head-right .station-ctrl-cog,
+html.station-dock-root #station-btn-settings-cog {
+  display: none !important;
+}
+html.station-dock-root #station-device-controls {
+  display: none !important;
+}
+html.station-dock-root #station-settings {
+  position: fixed !important;
+  inset: auto !important;
+  left: 0 !important;
+  right: auto !important;
+  top: var(--station-dock-head-h) !important;
+  width: min(440px, calc(var(--dock-split) - 12px)) !important;
+  max-width: none;
+  height: auto !important;
+  bottom: auto !important;
+  max-height: calc(100vh - var(--station-dock-head-h) - 8px);
+  border: 1px solid #27272a;
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay {
+  display: flex !important;
+  /* Overlay is mounted inside .station-dock-pa-host (left workspace pane). */
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: 100% !important;
+  align-items: stretch;
+  justify-content: stretch;
+  z-index: 5 !important;
+  background: #0a0a0c !important;
+  overflow: hidden;
+}
+html.station-dock-root.station-dock-pa-open #project-assets-modal-overlay .modal {
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border-radius: 0;
+  border: none !important;
+  zoom: var(--dock-left-zoom, 1);
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Prevent dock zoom from pushing PA wider than viewport. */
+html.station-dock-root.station-dock-pa-open {
+  --dock-left-zoom: 1 !important;
+}
+
+/* Ensure dock back nav is visible while PA is open. */
+html.station-dock-root.station-dock-pa-open #station-dock-head-left-nav {
+  display: flex !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-left-panel,
+html.station-dock-root.station-dock-pa-open #pa-view-offer {
+  display: none !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-right-panel {
+  width: 100% !important;
+  flex: 1 1 auto !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-split-pane {
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-mobile-mode-bar {
+  display: flex !important;
+}
+html.station-dock-root.station-dock-pa-open #btn-pa-close-x {
+  display: inline-flex !important;
+}
+html.station-dock-root.station-dock-pa-open #pa-right-panel > div:first-child > div:first-child > span:first-child,
+html.station-dock-root.station-dock-pa-open #pa-right-panel > div:first-child > div:first-child > div[style*="width: 2px"] {
+  display: none !important;
+}
+.station-dock-pa-host {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+html.station-dock-root.station-dock-pa-open .station-dock-pa-host {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dock bulletin / screensaver (desktop station) */
+body.station-dock-screensaver-active { overflow: hidden; }
+body.station-dock-screensaver-active #station-dock-shell {
+  visibility: hidden;
+}
+.station-dock-screensaver {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 52000;
+  --dock-split: 66.666667%;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  overflow: hidden;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  background: #0a0a0c;
+}
+.station-dock-screensaver.is-mounted { display: grid; }
+.station-dock-screensaver.is-visible { opacity: 1; }
+.station-dock-screensaver.is-leaving { opacity: 0; }
+.station-dock-screensaver::after {
+  content: '';
+  position: absolute;
+  left: var(--dock-split);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(39, 39, 42, 0.55);
+  pointer-events: none;
+  z-index: 4;
+}
+.station-dock-ss-left {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  z-index: 2;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.station-dock-ss-filters {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.station-dock-ss-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.station-dock-ss-hero {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.station-dock-ss-hero-a {
+  height: calc(100% - 40px);
+  width: auto;
+  opacity: 0.07;
+  transform-origin: center center;
+  animation: station-dock-ss-hero-pulse 52s ease-in-out infinite alternate;
+}
+@keyframes station-dock-ss-hero-pulse {
+  0% { transform: scale(1); opacity: 0.06; }
+  100% { transform: scale(14); opacity: 0.10; }
+}
+.station-dock-ss-bus-lanes {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 1;
+}
+.station-dock-ss-bus {
+  position: absolute;
+  left: 0;
+  white-space: nowrap;
+  will-change: transform, opacity;
+  opacity: 0;
+}
+.station-dock-ss-bus svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.station-dock-ss-bus--blur svg {
+  filter: blur(var(--bus-blur, 2px)) url(#station-dock-ss-sandy);
+  -webkit-filter: blur(var(--bus-blur, 2px)) url(#station-dock-ss-sandy);
+}
+.station-dock-ss-bus--ltr {
+  animation-name: station-dock-ss-bus-ltr;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.station-dock-ss-bus--rtl {
+  animation-name: station-dock-ss-bus-rtl;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes station-dock-ss-bus-ltr {
+  0%   { transform: translateX(-110%); opacity: 0; }
+  7%   { opacity: var(--bus-o, 0.15); }
+  93%  { opacity: var(--bus-o, 0.15); }
+  100% { transform: translateX(110%); opacity: 0; }
+}
+@keyframes station-dock-ss-bus-rtl {
+  0%   { transform: translateX(110%); opacity: 0; }
+  7%   { opacity: var(--bus-o, 0.15); }
+  93%  { opacity: var(--bus-o, 0.15); }
+  100% { transform: translateX(-110%); opacity: 0; }
+}
+.station-dock-ss-clock-panel {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  --lock-fade-out: 50px;
+}
+.station-dock-ss-clock-panel::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: var(--lock-dim-w, 420px);
+  height: var(--lock-dim-h, 170px);
+  background: rgba(5, 5, 8, 0.72);
+  pointer-events: none;
+  z-index: -1;
+  border-radius: var(--lock-dim-radius, 0);
+  filter: blur(var(--lock-fade-out, 50px));
+  -webkit-filter: blur(var(--lock-fade-out, 50px));
+}
+.station-dock-ss-clock {
+  font-family: "Bahnschrift", "Segoe UI", sans-serif;
+  font-size: clamp(64px, 8vw, 120px);
+  font-weight: 700;
+  color: #8a939f;
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.station-dock-ss-clock-slot {
+  position: relative;
+  display: inline-block;
+  width: 0.58em;
+  height: 1em;
+  vertical-align: top;
+}
+.station-dock-ss-clock-sep,
+.station-dock-ss-clock-digit {
+  filter: blur(0.9px);
+  -webkit-filter: blur(0.9px);
+  text-shadow: 0 0 3px rgba(138, 147, 159, 0.42), 0 0 12px rgba(138, 147, 159, 0.14);
+}
+.station-dock-ss-clock-slot--accent .station-dock-ss-clock-digit {
+  color: #c25860;
+}
+.station-dock-ss-clock-digit {
+  display: block;
+  line-height: 1;
+  width: 100%;
+  text-align: center;
+}
+.station-dock-ss-clock-digit.is-leaving,
+.station-dock-ss-clock-digit.is-entering {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.station-dock-ss-clock-digit.is-leaving {
+  animation: station-dock-ss-digit-out 0.6s ease forwards;
+}
+.station-dock-ss-clock-digit.is-entering {
+  opacity: 0;
+  animation: station-dock-ss-digit-in 0.3s ease forwards;
+}
+@keyframes station-dock-ss-digit-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes station-dock-ss-digit-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.station-dock-ss-right {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 10px 14px 6px;
+  box-sizing: border-box;
+}
+.station-dock-ss-bulletin-panel {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 18px 10px 12px;
+  isolation: isolate;
+  --lock-fade-out: 48px;
+}
+.station-dock-ss-bulletin-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 5, 8, 0.72);
+  pointer-events: none;
+  z-index: -1;
+  border-radius: 20px;
+  filter: blur(var(--lock-fade-out, 48px));
+  -webkit-filter: blur(var(--lock-fade-out, 48px));
+}
+.station-dock-ss-slot-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  opacity: 1;
+  transition: opacity 1s ease;
+}
+.station-dock-ss-slot-body.is-ss-hidden {
+  opacity: 0;
+}
+.station-dock-ss-event-title {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  font-size: clamp(18px, 2vw, 24px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f4f4f5;
+  text-align: center;
+  padding: 0 4px 16px;
+  min-height: 2.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.station-dock-ss-credits-viewport {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 6%, #000 94%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 6%, #000 94%, transparent 100%);
+}
+.station-dock-ss-credits-track {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(20px, 2.8vh, 32px);
+  padding: 8px 2px 72px;
+  width: 100%;
+  box-sizing: border-box;
+  animation: station-dock-ss-credits-scroll var(--ss-scroll-duration, 168s) linear infinite;
+}
+@keyframes station-dock-ss-credits-scroll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+.station-dock-ss-credit-line {
+  text-align: left;
+  color: #f4f4f5;
+  font-size: clamp(16px, 1.8vw, 20px);
+  line-height: 1.3;
+  padding: clamp(20px, 3vh, 32px) clamp(12px, 1.4vw, 18px);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  width: 100%;
+}
+.station-dock-ss-credit-line--muted { color: #71717a; font-style: italic; background: transparent; border-color: transparent; text-align: center; }
+.station-dock-ss-credit-line--alert { color: #fb923c; border-color: rgba(249, 115, 22, 0.35); }
+.station-dock-ss-credit-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.station-dock-ss-credit-day {
+  flex: 1;
+  min-width: 0;
+  font-weight: 800;
+  font-size: clamp(26px, 3.2vw, 38px);
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #f4f4f5;
+}
+.station-dock-ss-credit-emoji {
+  flex-shrink: 0;
+  font-size: clamp(38px, 4.8vw, 56px);
+  line-height: 1;
+}
+.station-dock-ss-credit-stats {
+  display: block;
+  font-size: clamp(16px, 1.8vw, 22px);
+  color: #cbd5e1;
+  font-weight: 600;
+  text-align: left;
+}
+.station-dock-ss-exit {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #3f3f46;
+  background: rgba(10, 10, 12, 0.85);
+  color: #e4e4e7;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: var(--station-dock-cursor);
+}
+.station-dock-ss-exit:hover {
+  border-color: #f97316;
+  color: #f97316;
+}
 </style>
 
 <div id="station-shell" aria-label="Warehouse station">
@@ -930,6 +1884,28 @@ html.station-device-root #station-device-controls { display: flex; }
     <button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="stationCloseSettings()">Done</button>
   </div>
   <div class="station-settings-body">
+
+    <div id="station-settings-display-section" class="station-settings-section" style="display:none;">
+      <div class="station-settings-section__title">Display</div>
+      <div class="station-field">
+        <label class="station-field__label" for="station-dock-zoom-left">Left pane zoom</label>
+        <select id="station-dock-zoom-left" onchange="stationDockApplyZoomLeft_(this.value)">
+          <option value="100">100%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+          <option value="175">175%</option>
+        </select>
+      </div>
+      <div class="station-field">
+        <label class="station-field__label" for="station-dock-zoom-right">Right pane zoom (scans)</label>
+        <select id="station-dock-zoom-right" onchange="stationDockApplyZoomRight_(this.value)">
+          <option value="100">100%</option>
+          <option value="125">125%</option>
+          <option value="150">150%</option>
+          <option value="175">175%</option>
+        </select>
+      </div>
+    </div>
 
     <div class="station-settings-section">
       <div class="station-settings-section__title">Session</div>
@@ -1135,7 +2111,6 @@ html.station-device-root #station-device-controls { display: flex; }
     </div>
   </div>
 </div>
-
 <script>
 /**
  * 11_Station_Shell.html
@@ -1651,6 +2626,14 @@ function stationArmGunSleepTimer_() {
     var br = stationSleepCapableBridge_();
     if (!br) return;
     try {
+      var live = false;
+      if (typeof br.getConfig === 'function') {
+        try {
+          var cfg = JSON.parse(br.getConfig() || '{}');
+          live = !!(cfg && (cfg.connected || cfg.linkState === 'live'));
+        } catch (e) { /* ignore */ }
+      }
+      if (!live) return;
       br.sleepGun();
       stationToast_('Gun disconnecting (idle ' + mins + ' min) — LED off in ~1 min after link drop', '');
       setTimeout(function() { stationRequestGunConfig_(); }, 1200);
@@ -1842,11 +2825,21 @@ function stationWriteHostSession_(host) {
   // Warm the project list for THIS host in the background so pressing PROJECT opens instantly
   // (same list their personal profile sees). Clearing the host drops the cache + wipes the device.
   if (host && host.name) {
-    stationPreloadProjects_(host.name);
+    if (!document.documentElement.classList.contains('station-dock-root')) {
+      stationPreloadProjects_(host.name);
+    }
+    if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
     stationClearNoHostParkDeadline_();
   } else {
-    window.stationProjectsCache = null; window.stationProjectsFor = null;
+    var dockRoot = document.documentElement.classList.contains('station-dock-root');
+    if (!dockRoot || window.stationProjectsFor !== '__warehouse__') {
+      window.stationProjectsCache = null;
+      window.stationProjectsFor = null;
+    }
     stationResetDeviceToPristine_();
+    if (dockRoot && typeof stationPreloadWarehouseProjects_ === 'function') {
+      stationPreloadWarehouseProjects_();
+    }
     stationArmNoHostParkDeadline_();
   }
 }
@@ -1872,23 +2865,160 @@ function stationResetDeviceToPristine_() {
   try { if (typeof stationSetLastScan_ === 'function') stationSetLastScan_(''); } catch (e) {}
 }
 
+/** Session cache for instant dock project list paint on host re-login. */
+function stationHostProjectsCacheKey_(hostName) {
+  return 'sm_dock_host_projects_' + String(hostName || '').trim().toLowerCase().replace(/\s+/g, '_');
+}
+
+function stationPersistHostProjectsCache_(hostName, projects) {
+  try {
+    sessionStorage.setItem(stationHostProjectsCacheKey_(hostName), JSON.stringify({
+      ts: Date.now(),
+      projects: projects || []
+    }));
+  } catch (e) { /* ignore */ }
+}
+
+function stationReadHostProjectsCache_(hostName) {
+  try {
+    const raw = sessionStorage.getItem(stationHostProjectsCacheKey_(hostName));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return (obj && obj.projects && obj.projects.length) ? obj.projects : null;
+  } catch (e) { return null; }
+}
+
+function stationPreloadProjectsFull_(hostName) {
+  if (!hostName || window.__stationProjectsFullFetchHost === hostName) return;
+  window.__stationProjectsFullFetchHost = hostName;
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      window.__stationProjectsFullFetchHost = null;
+      const projects = (payload && payload.projects) ? payload.projects : [];
+      // Enrich phantom only — project list paint comes from getStationHostProjects so we never
+      // overwrite a good list with a stale/partial full payload (race caused single-event lists).
+      stationCacheProjectsPayload_(payload, projects);
+    })
+    .withFailureHandler(function() { window.__stationProjectsFullFetchHost = null; })
+    .getRefreshPayload(hostName);
+}
+
+function stationPaintProjectLists_(projects) {
+  if (typeof stationDockRenderProjectList_ === 'function') stationDockRenderProjectList_(projects);
+  const panel = document.getElementById('station-project-picker');
+  if (panel && panel.classList.contains('is-open') && typeof stationRenderProjectList_ === 'function') {
+    stationRenderProjectList_(projects);
+  }
+}
+
+/** Warehouse dock project list — no host badge required to browse events. */
+function stationPreloadWarehouseProjects_() {
+  if (!document.documentElement.classList.contains('station-dock-root')) return;
+  if (window.__stationWarehouseFetchPending) return;
+
+  if (window.stationProjectsFor === '__warehouse__' && window.stationProjectsCache && window.stationProjectsCache.length) {
+    stationPaintProjectLists_(window.stationProjectsCache);
+    return;
+  }
+
+  var listEl = document.getElementById('station-dock-project-list');
+  var statusEl = document.getElementById('station-dock-project-status');
+  if (listEl && !listEl.children.length && statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Loading projects…';
+  }
+
+  window.__stationWarehouseFetchPending = true;
+  window.stationProjectsFor = '__warehouse__';
+  google.script.run
+    .withSuccessHandler(function(payload) {
+      window.__stationWarehouseFetchPending = false;
+      if (window.stationProjectsFor !== '__warehouse__') return;
+      var projects = (payload && payload.projects) ? payload.projects : [];
+      window.stationProjectsCache = projects;
+      stationPaintProjectLists_(projects);
+    })
+    .withFailureHandler(function(err) {
+      window.__stationWarehouseFetchPending = false;
+      if (typeof stationDockShowProjectsError_ === 'function') {
+        stationDockShowProjectsError_(err && err.message ? err.message : String(err));
+      }
+    })
+    .getStationWarehouseProjects();
+}
+
 /** Background-fetch the host's projects (getRefreshPayload scoped to the person, not the device). */
 function stationPreloadProjects_(hostName) {
   if (!hostName) return;
-  if (window.stationProjectsFor === hostName && window.stationProjectsCache) return;
+
+  var painted = false;
+
+  if (window.stationProjectsFor === hostName && window.stationProjectsCache && window.stationProjectsCache.length) {
+    stationPaintProjectLists_(window.stationProjectsCache);
+    painted = true;
+  } else {
+    var instant = stationReadHostProjectsCache_(hostName);
+    if (instant && instant.length) {
+      window.stationProjectsFor = hostName;
+      window.stationProjectsCache = instant;
+      stationPaintProjectLists_(instant);
+      painted = true;
+    }
+  }
+
+  stationPreloadProjectsFull_(hostName);
+
+  if (window.__stationProjectsFetchHost === hostName) return;
+
+  window.__stationProjectsFetchHost = hostName;
   window.stationProjectsFor = hostName;
-  window.stationProjectsCache = null;
+  if (!painted) window.stationProjectsCache = null;
+
   google.script.run
     .withSuccessHandler(function(payload) {
+      window.__stationProjectsFetchHost = null;
+      if (window.stationProjectsFor !== hostName) return;
       const projects = (payload && payload.projects) ? payload.projects : [];
-      stationCacheProjectsPayload_(payload, projects);
       window.stationProjectsCache = projects;
-      // If the picker is already open and waiting, fill it now.
-      const panel = document.getElementById('station-project-picker');
-      if (panel && panel.classList.contains('is-open')) stationRenderProjectList_(projects);
+      stationPersistHostProjectsCache_(hostName, projects);
+      stationCacheProjectsPayload_(payload, projects);
+      stationPaintProjectLists_(projects);
     })
-    .withFailureHandler(function() { window.stationProjectsFor = null; })
-    .getRefreshPayload(hostName);
+    .withFailureHandler(function(err) {
+      window.__stationProjectsFetchHost = null;
+      if (!window.stationProjectsCache || !window.stationProjectsCache.length) {
+        window.stationProjectsFor = null;
+      }
+      if (typeof stationDockShowProjectsError_ === 'function') {
+        stationDockShowProjectsError_(err && err.message ? err.message : String(err));
+      }
+    })
+    .getStationHostProjects(hostName);
+}
+
+/** Preload vault registry so project assets modal can render on station (no calendar boot). */
+function stationPreloadVaultForPa_() {
+  if (typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length) return;
+  try {
+    const cached = localStorage.getItem('sm_vault_cache');
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.assets && parsed.assets.length) {
+        globalAssets = parsed.assets;
+        return;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  if (window.__stationVaultFetchPending) return;
+  window.__stationVaultFetchPending = true;
+  google.script.run
+    .withSuccessHandler(function(assets) {
+      window.__stationVaultFetchPending = false;
+      globalAssets = assets || [];
+      try { localStorage.setItem('sm_vault_cache', JSON.stringify({ assets: globalAssets })); } catch (e) { /* ignore */ }
+    })
+    .withFailureHandler(function() { window.__stationVaultFetchPending = false; })
+    .getAssetRegistry(typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '');
 }
 
 /** Persist the payload into sm_phantom_payload so the phone PA resolver (resolveMobileProject) works. */
@@ -2043,9 +3173,39 @@ function stationSetLastScan_(tag) {
   el.textContent = tag ? ('Last scan: ' + tag) : '';
 }
 
+function stationScanFeedEscAttr_(v) {
+  return String(v == null ? '' : v).replace(/[&<>"']/g, function(c) {
+    return c === '&' ? '&amp;' : (c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&#39;')));
+  });
+}
+
+function stationScanFeedSelectedNorm_() {
+  const sel = window.stationPanelSelection;
+  if (!sel || !sel.tag) return '';
+  return stationNormalizeEpc_(sel.tag);
+}
+
+function stationSelectFeedRow_(tag, tid) {
+  if (!tag || typeof stationPanelHandleScan_ !== 'function') return;
+  stationPanelHandleScan_(tag, tid || '');
+}
+
+function stationWireScanFeedClicks_() {
+  const list = document.getElementById('station-scan-feed-list');
+  if (!list || list.dataset.bound === '1') return;
+  list.dataset.bound = '1';
+  list.addEventListener('click', function(ev) {
+    const row = ev.target.closest ? ev.target.closest('.station-scan-feed__row') : null;
+    if (!row) return;
+    const tag = row.getAttribute('data-tag');
+    if (tag) stationSelectFeedRow_(tag, row.getAttribute('data-tid') || '');
+  });
+}
+
 function stationRenderScanFeed_() {
   const list = document.getElementById('station-scan-feed-list');
   if (!list) return;
+  stationWireScanFeedClicks_();
   const scans = window.stationRecentScans || [];
   if (!scans.length) {
     list.innerHTML = '<span class="station-scan-feed__empty">Waiting for scans…</span>';
@@ -2056,6 +3216,15 @@ function stationRenderScanFeed_() {
       return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : '&amp;');
     });
   };
+  const selNorm = stationScanFeedSelectedNorm_();
+  const rowAttrs = function(s, extraCls) {
+    const norm = s.norm || stationNormalizeEpc_(s.tag);
+    const selCls = (selNorm && norm === selNorm) ? ' is-selected' : '';
+    return ' class="station-scan-feed__row' + (extraCls || '') + selCls + '"'
+      + ' data-tag="' + stationScanFeedEscAttr_(s.tag) + '"'
+      + ' data-tid="' + stationScanFeedEscAttr_(s.tid || '') + '"'
+      + ' role="button" tabindex="0"';
+  };
   const rows = scans.map(function(s) {
     const time = stationFormatTime24_(s.ts);
     var hit = stationResolveEpc_(s.tag);
@@ -2065,25 +3234,28 @@ function stationRenderScanFeed_() {
     }
     if (hit && hit.name) {
       if (hit.kind === 'crew') {
-        return '<div class="station-scan-feed__row is-crew">'
+        return '<div' + rowAttrs(s, ' is-crew') + '>'
           + '<span class="name">' + esc(hit.name) + '</span>'
           + '<span class="unit">crew</span>'
+          + '<span class="station-scan-feed__spacer"></span>'
           + '<span class="time">' + time + '</span></div>';
       }
       const unit = hit.unitNumber || hit.unitId || '';
       const statusHtml = stationScanFeedStatusHtml_(hit, esc);
-      return '<div class="station-scan-feed__row">'
+      return '<div' + rowAttrs(s, '') + '>'
         + '<span class="name">' + esc(hit.name) + '</span>'
+        + (unit ? '<span class="unit">#' + esc(unit) + '</span>' : '<span class="unit unit--empty"></span>')
         + statusHtml
-        + (unit ? '<span class="unit">' + esc(unit) + '</span>' : '')
         + '<span class="time">' + time + '</span></div>';
     }
-    return '<div class="station-scan-feed__row is-unknown" title="' + esc(s.tag) + '">'
+    return '<div' + rowAttrs(s, ' is-unknown') + ' title="' + esc(s.tag) + '">'
       + '<span class="name">' + esc(s.tag) + '</span>'
       + '<span class="time">' + time + '</span></div>';
   });
   list.innerHTML = rows.join('');
 }
+
+window.stationSelectFeedRow_ = stationSelectFeedRow_;
 
 window.stationRenderScanFeed_ = stationRenderScanFeed_;
 
@@ -2243,8 +3415,11 @@ function stationHandleRfidScan_(rawTag, rawTid) {
       );
       return;
     }
-    // Not a crew badge → equipment scan during an open checkout / existing behavior.
-    stationForwardCheckoutScan_(tag);
+    // Not a crew badge → checkout when PA operation is open; else update dock scan rail selection.
+    if (stationForwardCheckoutScan_(tag)) return;
+    if (document.documentElement.classList.contains('station-dock-root') && typeof stationPanelHandleScan_ === 'function') {
+      stationPanelHandleScan_(tag, tid);
+    }
     return;
   }
 
@@ -2755,6 +3930,7 @@ function stationPanelHandleScan_(tag, tid) {
     }
   }
   stationPanelRenderLast_();
+  if (typeof stationRenderScanFeed_ === 'function') stationRenderScanFeed_();
 }
 
 function stationPanelRenderLast_() {
@@ -2809,10 +3985,18 @@ function stationPanelRenderActions_() {
   const sel = window.stationPanelSelection;
   const host = stationReadHostSession_();
   if (!host) {
+    if (document.documentElement.classList.contains('station-dock-root')) {
+      wrap.innerHTML = '';
+      return;
+    }
     wrap.innerHTML = '<div class="station-scan-panel__hint">Scan your crew badge to host before changing status.</div>';
     return;
   }
   if (!sel || sel.kind !== 'equipment') {
+    if (document.documentElement.classList.contains('station-dock-root')) {
+      wrap.innerHTML = '';
+      return;
+    }
     wrap.innerHTML = '<div class="station-scan-panel__hint">Scan a tagged piece of equipment.</div>';
     return;
   }
@@ -3389,6 +4573,22 @@ function stationOpenProjectPicker_() {
     .getRefreshPayload(host.name);
 }
 
+function stationProjectIsOutdoor_(p) {
+  if (typeof projectIsOutdoorMobile === 'function') return projectIsOutdoorMobile(p);
+  const rs = p && p.readinessState;
+  return !!(rs && (rs.isOutdoor || rs.outdoor));
+}
+
+function stationApplyProjectListWeather_(projects, idPrefix) {
+  if (typeof renderMobileWeatherSummaryBadge !== 'function') return;
+  (projects || []).forEach(function(p) {
+    if (!stationProjectIsOutdoor_(p)) return;
+    const host = document.getElementById(String(idPrefix || 'stn-weather-') + p.id);
+    if (host) renderMobileWeatherSummaryBadge(host, p, { interactive: false });
+  });
+}
+window.stationApplyProjectListWeather_ = stationApplyProjectListWeather_;
+
 function stationRenderProjectList_(projects) {
   const statusEl = document.getElementById('station-project-picker-status');
   const listEl = document.getElementById('station-project-picker-list');
@@ -3397,22 +4597,81 @@ function stationRenderProjectList_(projects) {
     return String(a.start || '').localeCompare(String(b.start || ''));
   });
   if (!list.length) {
+    listEl.innerHTML = '';
     if (statusEl) { statusEl.style.display = 'block'; statusEl.textContent = 'No projects assigned to you.'; }
     return;
   }
   if (statusEl) statusEl.style.display = 'none';
+  window.__srStationProjectList = list;
+  window.__srStationProjectIdx = 0;
   const esc = function(v) {
     return String(v == null ? '' : v).replace(/[<&>"]/g, function(c) {
       return c === '<' ? '&lt;' : (c === '>' ? '&gt;' : (c === '"' ? '&quot;' : '&amp;'));
     });
   };
-  listEl.innerHTML = list.map(function(p) {
+  listEl.innerHTML = list.map(function(p, idx) {
     const when = [p.start, p.end].filter(Boolean).join(' → ');
-    return '<button type="button" class="station-project-item" onclick="stationPickProject_(\'' + esc(p.id) + '\')">'
+    const weatherSlot = stationProjectIsOutdoor_(p)
+      ? '<div id="stn-weather-' + esc(p.id) + '" class="mob-event-weather-badge"></div>'
+      : '';
+    return '<button type="button" class="station-project-item" data-sr-idx="' + idx + '" onclick="stationPickProject_(' + JSON.stringify(String(p.id)) + ')">'
+      + '<div class="station-project-item__row">'
+      + '<div class="station-project-item__main">'
       + '<div class="station-project-item__name">' + esc(p.title || p.name || 'Untitled') + '</div>'
       + (when ? '<div class="station-project-item__meta">' + esc(when) + '</div>' : '')
-      + '</button>';
+      + '</div>'
+      + weatherSlot
+      + '</div></button>';
   }).join('');
+  stationApplyProjectListWeather_(list, 'stn-weather-');
+  stationProjectPickerSelect_(0);
+}
+
+function stationProjectPickerSelect_(idx) {
+  const listEl = document.getElementById('station-project-picker-list');
+  if (!listEl) return;
+  const items = Array.from(listEl.querySelectorAll('.station-project-item'));
+  if (!items.length) return;
+  const clamped = Math.max(0, Math.min(items.length - 1, idx));
+  window.__srStationProjectIdx = clamped;
+  items.forEach(function(el, i) {
+    el.classList.toggle('is-selected', i === clamped);
+  });
+  const active = items[clamped];
+  if (active && typeof active.scrollIntoView === 'function') {
+    active.scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function stationProjectPickerHandleKeys_(ev) {
+  if (!ev || ev.defaultPrevented) return;
+  const panel = document.getElementById('station-project-picker');
+  if (!panel || !panel.classList.contains('is-open')) return;
+  const tag = (document.activeElement && document.activeElement.tagName) ? document.activeElement.tagName.toUpperCase() : '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  const list = window.__srStationProjectList || [];
+  if (!list.length) return;
+
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const dir = ev.key === 'ArrowDown' ? 1 : -1;
+    stationProjectPickerSelect_((window.__srStationProjectIdx || 0) + dir);
+    return;
+  }
+
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const idx = window.__srStationProjectIdx || 0;
+    const proj = list[idx];
+    if (proj && proj.id != null) window.stationPickProject_(String(proj.id));
+  }
+}
+
+if (!window.__srStationProjectPickerKeys) {
+  window.__srStationProjectPickerKeys = true;
+  document.addEventListener('keydown', stationProjectPickerHandleKeys_, true);
 }
 
 window.stationPickProject_ = function(pId) {
@@ -3611,6 +4870,14 @@ window.stationOpenSettings = function() {
     return;
   }
   stationCloseScanPanel();
+  var isDock = document.documentElement.classList.contains('station-dock-root');
+  var dispSec = document.getElementById('station-settings-display-section');
+  if (dispSec) dispSec.style.display = isDock ? 'block' : 'none';
+  var titleEl = panel.querySelector('.station-settings-header__title');
+  if (titleEl) titleEl.textContent = isDock ? 'Settings' : 'Station setup';
+  if (isDock && typeof window.stationDockApplyAllZoom_ === 'function') {
+    window.stationDockApplyAllZoom_();
+  }
   panel.classList.add('is-open');
   var ctrls = document.getElementById('station-device-controls');
   if (ctrls) ctrls.style.display = 'none';
@@ -3944,9 +5211,14 @@ function initStationShell_() {
   // strand the initial screen. Everything after this is wrapped so boot failures surface on-screen
   // instead of leaving a blank kiosk.
   try {
-    document.documentElement.classList.add('station-device-root');
-    const shell = document.getElementById('station-shell');
-    if (shell) shell.style.display = 'flex';
+    if (typeof window.stationActiveUiSkin_ === 'function' && window.stationActiveUiSkin_() === 'dock_panel') {
+      document.documentElement.classList.add('station-dock-root');
+      if (typeof window.stationInitDockUi_ === 'function') window.stationInitDockUi_();
+    } else {
+      document.documentElement.classList.add('station-device-root');
+      const shell = document.getElementById('station-shell');
+      if (shell) shell.style.display = 'flex';
+    }
   } catch (e) { /* ignore */ }
   try { stationAnnounceReady_(); } catch (e) { /* ignore */ }
   if (stationIsDesktopKiosk_()) {
@@ -4047,3 +5319,6 @@ window.addEventListener('pageshow', function(ev) {
   if (ev.persisted) stationAnnounceReady_();
 });
 </script>
+</script>
+
+

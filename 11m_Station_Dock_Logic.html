@@ -184,18 +184,37 @@
   }
 
   function stationDockConfirmBackToProjects_() {
+    if (window.currentOperationType) {
+      if (typeof window.showMobilePaToast === 'function') {
+        window.showMobilePaToast('Operation active', 'Pause check-out before closing.');
+      }
+      return;
+    }
     // Always ask for confirmation when leaving the PA view on desktop station.
     // This prevents accidental exits (especially from keyboard Escape).
     var warn = 'Leave this project and go back to Projects?';
+    var discard = false;
     try {
       if (typeof window.calculatePaDeltas === 'function') {
         var deltas = window.calculatePaDeltas() || [];
-        if (deltas.length) warn = 'You have unsaved equipment changes. Leave this project and discard them?';
+        if (deltas.length) {
+          warn = 'You have unsaved equipment changes. Leave this project and discard them?';
+          discard = true;
+        }
       }
     } catch (e) { /* ignore */ }
     if (!confirm(warn)) return;
-    stationDockBackToProjects_();
+    if (window.mobilePaCompactActive && typeof window.finishMobilePaClose === 'function') {
+      window.finishMobilePaClose({
+        revertChanges: discard,
+        returnToHub: false,
+        onClosed: stationDockBackToProjectsTeardown_
+      });
+      return;
+    }
+    stationDockBackToProjectsTeardown_();
   }
+  window.stationDockConfirmBackToProjects_ = stationDockConfirmBackToProjects_;
 
   function stationDockWirePaBackBtn_() {
     var backBtn = document.getElementById('station-dock-pa-back');
@@ -275,6 +294,20 @@
     }
   }
 
+  function stationDockBindProjectListClicks_() {
+    var listEl = document.getElementById('station-dock-project-list');
+    if (!listEl || listEl.__srDockProjectClick) return;
+    listEl.__srDockProjectClick = true;
+    listEl.addEventListener('click', function(ev) {
+      var card = ev.target && ev.target.closest ? ev.target.closest('.station-dock-project-card') : null;
+      if (!card) return;
+      var pid = card.getAttribute('data-project-id');
+      if (!pid) return;
+      ev.preventDefault();
+      window.stationDockPickProject_(pid);
+    });
+  }
+
   window.stationInitDockUi_ = function() {
     if (!dockSkin_()) return;
     document.documentElement.classList.add('station-dock-root');
@@ -288,6 +321,7 @@
     stationDockInitWeatherHover_();
     stationDockInitEscapeGuard_();
     stationDockWirePaBackBtn_();
+    stationDockBindProjectListClicks_();
     stationDockSyncWorkspace_();
     if (typeof stationPreloadWarehouseProjects_ === 'function') stationPreloadWarehouseProjects_();
     if (typeof stationPreloadVaultForPa_ === 'function') stationPreloadVaultForPa_();
@@ -310,6 +344,7 @@
     var logoutBtn = document.getElementById('station-btn-logout-host');
     var scanBtn = document.getElementById('station-btn-scan-panel');
     var gunCog = document.getElementById('station-btn-settings-cog');
+    if (gunCog) gunCog.style.display = 'none';
     var exitBtn = document.getElementById('station-dock-exit-app');
     var panelActions = document.getElementById('station-panel-actions');
     var panelNote = document.getElementById('station-panel-note');
@@ -317,10 +352,6 @@
     if (brand) {
       if (exitBtn) headRight.insertBefore(brand, exitBtn);
       else headRight.appendChild(brand);
-    }
-    if (gunCog) {
-      if (exitBtn) headRight.insertBefore(gunCog, exitBtn);
-      else headRight.appendChild(gunCog);
     }
     if (scanBtn) scanBtn.style.display = 'none';
     if (panel) {
@@ -470,8 +501,7 @@
       var weatherSlot = isOutdoor
         ? '<div id="dock-weather-' + esc_(p.id) + '" class="mob-event-weather-badge"></div>'
         : '';
-      html += '<button type="button" class="station-dock-project-card" style="border-left:4px solid ' + statusColor + ';" '
-        + 'onclick="stationDockPickProject_(' + JSON.stringify(String(p.id)) + ')">'
+      html += '<button type="button" class="station-dock-project-card" data-project-id="' + esc_(String(p.id)) + '" style="border-left:4px solid ' + statusColor + ';">'
         + '<div class="station-dock-project-card__row">'
         + '<div class="station-dock-project-card__main">'
         + '<div class="station-dock-project-card__title">' + esc_(p.title || p.name || 'Untitled') + '</div>'
@@ -497,6 +527,9 @@
   };
 
   window.stationDockPickProject_ = function(pId) {
+    if (typeof window.stationCloseSettings === 'function') {
+      try { window.stationCloseSettings(); } catch (e) { /* ignore */ }
+    }
     stationDockCloseWeatherHover_(0);
     if (typeof window.openMobileProjectAssets !== 'function') {
       if (typeof stationSetStatus_ === 'function') stationSetStatus_('Project view unavailable on this build.', 'error');
@@ -583,6 +616,9 @@
   };
 
   function stationDockBackToProjectsTeardown_() {
+    if (typeof window.stationCloseSettings === 'function') {
+      try { window.stationCloseSettings(); } catch (e) { /* ignore */ }
+    }
     stationDockSetPaOpen_(false);
     window.mobilePaCompactActive = false;
     stationDockShowPaHost_(false);
