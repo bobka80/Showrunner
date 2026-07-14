@@ -81,6 +81,13 @@ function main() {
     }
   }
 
+  const { runPreShip } = require('./pre-ship/index.js');
+  try {
+    runPreShip({ layers: ['desktop'], label: 'build-station-desktop.js' });
+  } catch (e) {
+    fail('Pre-ship desktop layer failed: ' + (e.message || e));
+  }
+
   const scFlag = selfContained ? 'true' : 'false';
   const cmd =
     `dotnet publish "${csproj}" -c Release -r win-x64 ` +

@@ -217,6 +217,26 @@ async function verifyLive() {
 }
 
 async function main() {
+  const { runPreShip, getChangedFiles } = require('./pre-ship/index.js');
+  const { detectLayers } = require('./pre-ship/detect');
+  const changed = getChangedFiles();
+  const layers = ['hosting'];
+  if (detectLayers(changed).includes('gas')) {
+    console.log('\nNote: GAS files also changed — running GAS pre-ship before hosting deploy.\n');
+    layers.unshift('gas');
+  }
+  try {
+    runPreShip({
+      layers,
+      forDeploy: layers.includes('gas'),
+      label: 'deploy-hosting.js',
+      changedFiles: changed,
+    });
+  } catch (e) {
+    console.error(e.message || e);
+    process.exit(1);
+  }
+
   console.log('\n=== Firebase Hosting deploy ===\n');
   assertLocalApkReady();
   execSync('node generate-icons.js', { cwd: hostingDir, stdio: 'inherit' });

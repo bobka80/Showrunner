@@ -31,8 +31,9 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 **"Milestone now" (before new work):** AI runs **`milestone.js` first**, then continues with any other instructions in the same message (e.g. start a new feature). Full protocol: **[MILESTONE_NOW.md](MILESTONE_NOW.md)**.
 
 **What happens (automatic via `node milestone.js "note"`):**
+0. **`pre-ship` GAS layer** — build, parse, station verify (if needed), dist orphan scan, clasp account check (see [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md))
 1. Reads latest GAS version (e.g. 410) — next will be 411
-2. `node build.js` + **`gas-push-sync.js`** (full replace of GAS files from `dist/` — removes orphans; plain `clasp push` does not delete removed files)
+2. **`gas-push-sync.js`** (full replace of GAS files from `dist/` — removes orphans; plain `clasp push` does not delete removed files)
 3. `clasp version "<note>"` — frozen snapshot with your name on Google
 4. `clasp deploy` that new version (updates saved production URL if `deploy-config.json` exists; otherwise creates a new deployment and saves the ID)
 5. Git commit + row in root **`RELEASES.md`**
@@ -45,15 +46,29 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 ---
 
+## Pre-ship pipeline (before every ship)
+
+**Canonical doc:** [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md)
+
+Scoped integrity gates run **automatically** inside ship scripts. **Bugbot gate** decides when the AI must run Bugbot before ship (see [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) § Bugbot gate). Director may also run `node pre-ship.js` or `npm run pre-ship` to preview.
+
+| Ship | Layers |
+|------|--------|
+| `milestone.js` | gas (+ clasp) |
+| `deploy-hosting.js` | hosting (+ gas if GAS files dirty) |
+| `build-station-desktop.js` | desktop |
+| `build-station-apk.js` | apk |
+
+---
+
 ## Layer 0 — Dev iteration (build sessions)
 
 **Trigger:** **"OK go"** (fix/build session) or any completed implementation the director approved.
 
 **What happens (automatic — AI runs this; director does not):**
 1. AI edits source code
-2. `node build.js`
-3. **`node milestone.js "<note>"`** — production Apps Script version + deploy to web.app
-4. AI reports the new **GAS version number** (e.g. **v411**) in the handoff
+2. **`node milestone.js "<note>"`** — pre-ship + production Apps Script version + deploy to web.app
+3. AI reports the new **GAS version number** (e.g. **v411**) in the handoff
 
 **Director tests on:** `https://sm-showrunner-97405.web.app` (production), not developer mode, unless the task explicitly says otherwise.
 
@@ -67,7 +82,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 | When | AI must |
 |------|---------|
-| Completed implementation (code shipped) | `node build.js` → `node milestone.js "<note>"` (includes GitHub push) |
+| Completed implementation (code shipped) | `node milestone.js "<note>"` (pre-ship runs inside; includes GitHub push) |
 | Director says **Milestone** / **OK ship** / **Milestone now** | `milestone.js` (now may be first step if starting new work on tested prod) |
 | Director says **This works** | `works-save.js` (Git + GitHub push) |
 | Brainstorming / docs-only | No milestone |
@@ -79,7 +94,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 
 | Phrase | Layer | Script |
 |--------|-------|--------|
-| **OK go** (completed implementation) | Production milestone | `build.js` → `milestone.js` (automatic) |
+| **OK go** (completed implementation) | Production milestone | `milestone.js` (pre-ship inside; automatic) |
 | **Summarize** | Understanding only — no code until approved | Wait for **OK go** / **go** |
 | **Hygiene sweep** / **doc hygiene** | Docs audit — report only until approved | Sweep report → wait for **OK go** → apply doc fixes only (no feature code) |
 | **This works** | Git save + GitHub push | `works-save.js` |

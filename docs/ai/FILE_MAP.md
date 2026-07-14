@@ -28,6 +28,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md`.
 - **`create-repomix.js`**: PC-only. Packs repo via Repomix (`npx repomix`) into `claude-pack/repomix-output.md` for Claude project knowledge. Curated ~1M tokens. `npm run create-repomix`. See [CLAUDE_PACK.md](CLAUDE_PACK.md).
 - **`check-google-account.js`**: Node-only (not deployed to GAS). Three checks: (1) clasp login, (2) email matches `google-account.json` + project reachable, (3) **no PC-only scripts on live GAS** (white-screen guard). Run: `node check-google-account.js` or `npm run check-google`.
+- **`pre-ship.js`** + **`pre-ship/`**: Scoped pre-ship pipeline — auto-detects layers from git diff; hooked into `milestone.js`, `deploy-hosting.js`, `build-station-desktop.js`, `build-station-apk.js`. **Bugbot gate:** `pre-ship/bugbot-policy.js` decides skip/recommend/require; AI runs Bugbot when required. Docs: [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md). Run: `node pre-ship.js` or `npm run pre-ship`.
 - **`gas-push-sync.js`**: Node-only. Replaces all Apps Script project files from `dist/` via API (deletes orphans). Used by `milestone.js` and `dev-push.js` instead of bare `clasp push`.
 - **`Security.js`**: Manages user authentication and extracts security profiles.
 - **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.

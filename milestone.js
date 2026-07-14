@@ -120,6 +120,15 @@ function updateReleasesLog(gasVersion, deployId, text) {
 console.log('=== Production milestone (Apps Script layer) ===\n');
 console.log('Note:', note, '\n');
 
+const { runPreShip } = require('./pre-ship/index.js');
+
+try {
+  runPreShip({ layers: ['gas'], forDeploy: true, label: 'milestone.js' });
+} catch (e) {
+  console.error(e.message || e);
+  process.exit(1);
+}
+
 const before = getLatestGasVersion();
 if (before) {
   console.log(`Latest Apps Script version now: ${before.num} — "${before.desc}"`);
@@ -128,7 +137,7 @@ if (before) {
   console.log('Could not read existing versions; clasp will assign the next number.\n');
 }
 
-build();
+// build() already ran inside pre-ship GAS layer above.
 (async () => {
   try {
     await gasPushSync();

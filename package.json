@@ -11,6 +11,7 @@
     "rollback-works": "node rollback-works.js",
     "rollback-milestone": "node rollback-milestone.js",
     "check-google": "node check-google-account.js",
+    "pre-ship": "node pre-ship.js",
     "create-repomix": "node create-repomix.js"
   }
 }

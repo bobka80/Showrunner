@@ -9,6 +9,9 @@ node_modules/
 .cursor/*
 !.cursor/permissions.json
 
+# Pre-ship runtime report (local gate state)
+pre-ship/last-report.json
+
 # Local scratch (not production)
 scratch_*.js
 temp_*.js

@@ -28,7 +28,7 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 | Project Assets, packing, checkout, cables, containers, RFID/QR | [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) → [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) |
 | Formula / CLI / equipment list sync | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (Triangle of Truth) |
 | DAL, Firebase session fork, data router | [active/dal-firebase-design-lock-2026-07-13.md](docs/ai/active/dal-firebase-design-lock-2026-07-13.md) → [active/data-access-layer.md](docs/ai/active/data-access-layer.md) |
-| Deploy, mobile black screen, session | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (boot) → [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) |
+| Deploy, mobile black screen, session | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (boot) → [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) → [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md) |
 | Phone QR scan panel, shell camera, `host-boot.js` mobile paths | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Mobile QR handoff |
 | Station gun scans, `RfidManager`, `showrunnerStationDeliverScan` | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Station RFID delivery |
 | Cursor IDE session, rules, review gates | [CURSOR_WORKFLOW.md](docs/ai/CURSOR_WORKFLOW.md) |
@@ -124,6 +124,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 | [ENGINEERING_RULES.md](docs/ai/ENGINEERING_RULES.md) | 30-table model, audit |
 | [UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md) | Buttons, modals, hubs |
 | [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) | Two-layer versioning |
+| [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md) | Scoped pre-ship gates before every ship |
 | [MILESTONE_NOW.md](docs/ai/MILESTONE_NOW.md) | Milestone-now protocol |
 | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) | Dangerous areas |
 | [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) | Bulk vs unique, Matryoshka, two packing engines — **before PA/warehouse work** |
@@ -145,7 +146,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 4. **Deploy:** Edit source → `node build.js` → deploy. Never hand-edit `dist/` as source of truth.
 
 5. **Two-layer versioning:** [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md), **`RELEASES.md`**, **`WORKS_LOG.md`**.
-   - **After every completed implementation** (any build session after **"OK go"** / fix / feature): AI runs **`node build.js`** (if needed) then **`node milestone.js "<note>"`** — **automatically**. Do **not** tell the director to deploy. Production **GAS version** (e.g. v411) is required for **web.app** and mobile field testing.
+   - **After every completed implementation** (any build session after **"OK go"** / fix / feature): AI runs **`node milestone.js "<note>"`** — **automatically** (pre-ship GAS gates run inside). Do **not** tell the director to deploy. Production **GAS version** (e.g. v411) is required for **web.app** and mobile field testing.
    - **Always pass a descriptive `<note>`** to `milestone.js` (what shipped, not the word "Milestone") so `RELEASES.md` stays a usable changelog.
    - **"This works"** → `works-save.js` (extra Git checkpoint during long dev — optional, does not replace milestone)
    - **"Milestone" / "OK ship" / "Milestone now"** → `milestone.js` (same script; director may say these explicitly before or instead of other work)
@@ -156,6 +157,15 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
    - `versionCode` auto-increments and `versionName` bumps each build; the notes + build timestamp + rolling history land in `station-manifest.json` and render on the `/station-app` download page. The director reads app state **there**, not from chat — so notes must be plain and field-readable. Canonical process: [station-android/README.md](station-android/README.md) → *Versioning & changelog*.
 
 7. **Hosting-shell cache-buster:** WebViews (and browsers) hard-cache `push-hosting/public/host-boot.js`. **Any** edit to `host-boot.js` **must** bump the `?v=` query on its `<script>` tag in `push-hosting/public/index.html` in the same change, then `node deploy-hosting.js` — otherwise devices keep running the old shell (this caused scans/settings to silently no-op). Keep the `?v=` aligned to the shipped GAS version for traceability.
+
+8. **Pre-ship + Bugbot gate (mandatory for AI ships):** [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md)
+   - **Mechanical pre-ship** runs inside every ship script (`milestone.js`, `deploy-hosting.js`, `build-station-desktop.js`, `build-station-apk.js`).
+   - **Bugbot** is a **Cursor subagent** — not Node. Policy in `pre-ship/bugbot-policy.js` decides `skip` | `recommend` | `require`.
+   - **When `require`:** AI **must** launch Bugbot (`subagent_type: bugbot`, `Diff: branch changes`) **before** the ship script completes. Use `Custom Instructions` from `pre-ship/last-report.json` → `bugbot.customInstructions`. Fix **Critical/High** findings or get director override; then re-run ship with `PRE_SHIP_BUGBOT_OK=1`.
+   - **When `recommend`:** AI runs Bugbot if the diff is non-trivial; may ship without if mechanical GREEN and change is tiny — note in handoff.
+   - **When `skip`:** Do not spend tokens on Bugbot (docs-only, cosmetic desktop icon, etc.).
+   - **AI checks policy early:** `node pre-ship.js --dry-run` or `--bugbot-policy` before coding the ship command.
+   - **Never** bypass `BUGBOT REQUIRED` on fragile/multi-layer ships without director saying so explicitly.
 
 ---
 

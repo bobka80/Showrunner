@@ -54,20 +54,27 @@ One clear outcome per build session (e.g. scan panel camera, not camera + notifi
 
 ### 4. Ship
 
-- Source change → `node build.js` if needed → `node milestone.js "<descriptive note>"`
-- `push-hosting/public/**` → bump `host-boot.js?v=` if needed → `node deploy-hosting.js`
-- Report **GAS version** and plain-language **test steps on web.app**
+1. Mechanical **pre-ship** runs inside ship scripts (or preview: `node pre-ship.js --dry-run`).
+2. If **Bugbot gate = REQUIRE** → run Bugbot **before** ship completes (see [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) § Bugbot gate).
+3. `node milestone.js "<descriptive note>"` — after Bugbot cleared if required (`PRE_SHIP_BUGBOT_OK=1`).
+4. `push-hosting/public/**` → bump `host-boot.js?v=` if needed → `node deploy-hosting.js`
+5. Report **GAS version** and plain-language **test steps on web.app**
 
-### 5. Optional gates (larger changes)
+### 5. Bugbot + optional gates
 
-| When | Director says |
+| Pre-ship gate | AI must |
+|---------------|---------|
+| **require** | Launch Bugbot (`subagent_type: bugbot`, `Diff: branch changes`) — fix Critical/High — then `PRE_SHIP_BUGBOT_OK=1` + ship |
+| **recommend** | Run Bugbot when diff is non-trivial; OK to skip on tiny fixes — say so in handoff |
+| **skip** | No Bugbot — save tokens |
+
+| Also (manual director phrase) | When |
 |------|----------------|
-| 5+ files or risky mobile/hosting diff | **"Bugbot review on uncommitted changes"** (or branch diff) |
-| Auth, session, FCM, station bridge | **"Security review before ship"** |
+| Auth, session, FCM, station bridge (extra) | **"Security review before ship"** |
 | Stuck after two fix attempts | **"Use heavier reasoning"** |
 | PWA UI verification | **"Verify on web.app with the browser tool"** |
 
-Do **not** run Bugbot + security + explore on every small fix — cost and noise.
+Policy: `pre-ship/bugbot-policy.js` · report: `pre-ship/last-report.json`
 
 ### 6. Periodic hygiene
 

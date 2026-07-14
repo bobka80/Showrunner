@@ -58,7 +58,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | **Magic strings, flags** | [GLOSSARY.md](GLOSSARY.md) — stub only, link to model doc | `[BULK]`, formula flags |
 | **JSON / sheet shapes** | [SCHEMA.md](SCHEMA.md) | ProjectAsset fields |
 | **UI structure rules** | [UI_DOCTRINE.md](UI_DOCTRINE.md) | Buttons, modals |
-| **Deploy / rollback** | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) | milestone.js |
+| **Deploy / rollback** | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) · [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) | milestone.js · pre-ship.js |
 | **Incident learned the hard way** | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) incident log — **director approval only** | Black screen postmortem |
 
 **When expanding the system:** add stable reference docs to the table in this README and one task-routing line in [AI_DOCTRINE.md](../../AI_DOCTRINE.md). Add topic backlogs under `topics/` only for **work remaining**.

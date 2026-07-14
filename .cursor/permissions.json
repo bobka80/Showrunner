@@ -1,6 +1,7 @@
 {
   "terminalAllowlist": [
     "node check-google-account.js",
+    "node pre-ship.js",
     "node build.js",
     "node milestone.js",
     "node dev-push.js",

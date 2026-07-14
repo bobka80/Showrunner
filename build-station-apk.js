@@ -186,6 +186,13 @@ function main() {
 
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
 
+  const { runPreShip } = require('./pre-ship/index.js');
+  try {
+    runPreShip({ layers: ['apk'], label: 'build-station-apk.js' });
+  } catch (e) {
+    fail('Pre-ship APK layer failed: ' + (e.message || e));
+  }
+
   // Bump version BEFORE building so the APK embeds the new version.
   const current = readVersionFromGradle();
   let newName = current.versionName;
