@@ -8,12 +8,13 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>ShowrunnerStationDesktop</AssemblyName>
     <RootNamespace>Showrunner.Station.Desktop</RootNamespace>
-    <Version>0.1.50</Version>
+    <Version>0.1.51</Version>
     <ApplicationIcon>app.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
   <ItemGroup>
+    <Resource Include="app.ico" />
     <Content Include="app.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

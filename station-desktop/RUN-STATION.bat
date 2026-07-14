@@ -27,6 +27,12 @@ if "%DO_BUILD%"=="1" (
     goto :fail
   )
   echo [Showrunner Station] Building latest desktop shell...
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\generate-app-icon.ps1"
+  if errorlevel 1 (
+    echo.
+    echo ERROR: Could not generate app.ico — desktop shortcut icon will be blank.
+    goto :fail
+  )
   dotnet publish "%CSPROJ%" -c Release -r win-x64 --self-contained false -p:PublishSingleFile=false -o "%PUBLISH%" -nologo -v minimal
   if errorlevel 1 (
     echo.

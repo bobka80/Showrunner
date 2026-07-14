@@ -68,6 +68,19 @@ function main() {
   log('Mode: ' + (selfContained ? 'self-contained' : 'framework-dependent (.NET 8 runtime required)'));
   log('Notes: ' + notes.join(' · '));
 
+  const iconScript = path.join(root, 'station-desktop', 'scripts', 'generate-app-icon.ps1');
+  if (process.platform === 'win32' && fs.existsSync(iconScript)) {
+    log('\nGenerating app.ico from mobile apple-touch-icon.png…');
+    try {
+      execSync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${iconScript}"`,
+        { stdio: 'inherit' }
+      );
+    } catch (e) {
+      fail('app.ico generation failed. Fix generate-app-icon.ps1 and retry.');
+    }
+  }
+
   const scFlag = selfContained ? 'true' : 'false';
   const cmd =
     `dotnet publish "${csproj}" -c Release -r win-x64 ` +
