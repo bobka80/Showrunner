@@ -7,11 +7,13 @@ window.dalPaSessionWatchProjectId = '';
 window.dalPaIgnoreListenerUntil = 0;
 window.dalPaRemotePending = false;
 window.dalPaLastRemoteSig = '';
+window.dalPaFirestoreListenProjectId = '';
+window.dalMetaAuthority = false;
 
 window.dalFsDocToPaAsset_ = function(docId, d) {
   if (!d || docId === '_meta') return null;
   var formula = d.formula || '';
-  var asset = {
+  return {
     uid: d.uid || docId,
     assetId: String(d.asset_uid || ''),
     qty: d.assigned_quantity || 1,
@@ -33,7 +35,6 @@ window.dalFsDocToPaAsset_ = function(docId, d) {
     inboundRotated: d.inbound_rotated === true || d.inbound_rotated === 'true',
     inboundStaged: d.inbound_staged === true || d.inbound_staged === 'true'
   };
-  return asset;
 };
 
 window.dalProcessPaFormulas_ = function(arr) {
@@ -81,12 +82,16 @@ window.dalUpdateRemotePendingBanner_ = function() {
 
 window.dalApplyFirestorePaSnapshot_ = function(docs) {
   if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) return;
+  if (!window.dalPrepUiOpen) return;
+
   var assets = [];
   docs.forEach(function(entry) {
     var a = window.dalFsDocToPaAsset_(entry.id, entry.data);
     if (a) assets.push(a);
   });
-  var sig = assets.map(function(a) { return (a.uid || '') + ':' + (a.qty || 0) + ':' + (a.location || '') + ':' + (a.formula || ''); }).sort().join('|');
+  var sig = assets.map(function(a) {
+    return (a.uid || '') + ':' + (a.qty || 0) + ':' + (a.location || '') + ':' + (a.formula || '') + ':' + (a.assetId || '');
+  }).sort().join('|');
   if (sig === window.dalPaLastRemoteSig) return;
   window.dalPaLastRemoteSig = sig;
 
@@ -95,33 +100,13 @@ window.dalApplyFirestorePaSnapshot_ = function(docs) {
     window.dalUpdateRemotePendingBanner_();
     return;
   }
+
   window.dalPaRemotePending = false;
-  window.dalProcessPaFormulas_(assets);
-
-  var serverAssets = assets;
-  var usedServerUids = new Set();
-  if (typeof currentProjectAssets !== 'undefined') {
-    currentProjectAssets.forEach(function(localPa) {
-      if (localPa.uid) usedServerUids.add(localPa.uid);
-    });
-    currentProjectAssets.forEach(function(localPa) {
-      if (!localPa.uid) {
-        var match = serverAssets.find(function(srv) {
-          return !usedServerUids.has(srv.uid) &&
-            String(srv.assetId) === String(localPa.assetId) &&
-            String(srv.location || 'General') === String(localPa.location || 'General') &&
-            String(srv.formula || 'Standalone') === String(localPa.formula || 'Standalone');
-        });
-        if (match) {
-          localPa.uid = match.uid;
-          usedServerUids.add(match.uid);
-        }
-      }
-    });
-  }
-
+  var serverAssets = JSON.parse(JSON.stringify(assets));
+  window.dalProcessPaFormulas_(serverAssets);
   currentProjectAssets = JSON.parse(JSON.stringify(serverAssets));
   window.originalProjectAssets = JSON.parse(JSON.stringify(serverAssets));
+
   var overlay = document.getElementById('project-assets-modal-overlay');
   var paOpen = overlay && overlay.style.display !== 'none';
   if (paOpen && typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
@@ -198,8 +183,6 @@ window.dalEnsureFirestoreClientAuth_ = function(cb) {
     .getDalFirebaseClientAuth(actor);
 };
 
-window.dalPaFirestoreListenProjectId = '';
-
 window.stopDalPaFirestoreListener = function() {
   if (window.dalPaFirestoreUnsub) {
     try { window.dalPaFirestoreUnsub(); } catch (e) { /* ignore */ }
@@ -221,6 +204,7 @@ window.stopDalPaSessionWatcher = function() {
     window.dalPaSessionPollTimer = null;
   }
   window.dalPaSessionWatchProjectId = '';
+  window.dalMetaAuthority = false;
 };
 
 window.startDalPaSessionWatcher = function(projectId) {
@@ -229,43 +213,50 @@ window.startDalPaSessionWatcher = function(projectId) {
 
   window.stopDalPaSessionWatcher();
   window.dalPaSessionWatchProjectId = String(projectId);
+  window.dalMetaAuthority = false;
 
+  // Sheets poll only while Firestore meta watcher is not authoritative
   window.dalPaSessionPollTimer = setInterval(function() {
     var overlay = document.getElementById('project-assets-modal-overlay');
     if (!overlay || overlay.style.display === 'none') return;
-    if (typeof refreshDalSessionBanner === 'function') refreshDalSessionBanner();
-  }, 12000);
+    if (window.dalMetaAuthority || window.dalPrepClosing) return;
+    if (typeof refreshDalSessionBanner === 'function') refreshDalSessionBanner(true);
+  }, 15000);
+
+  // Initial Sheets read only until meta connects
+  if (typeof refreshDalSessionBanner === 'function') refreshDalSessionBanner(true);
 
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     if (err) {
-      console.warn('DAL session watcher auth failed:', err);
+      console.warn('DAL session watcher auth failed — Sheets poll fallback active:', err);
       return;
     }
     var metaRef = client.db.collection('projects').doc(String(projectId)).collection('assets').doc('_meta');
     window.dalPaSessionMetaUnsub = metaRef.onSnapshot(function(snap) {
+      if (window.dalPrepClosing) return;
+      window.dalMetaAuthority = true;
+
       var data = snap.exists ? (snap.data() || {}) : null;
-      var isPrepOpen = !!(data && data.sessionType === 'prep');
-      var wasPrep = window.dalSessionState && window.dalSessionState.sessionType === 'prep' &&
-        String(window.dalSessionState.status || '').toLowerCase() === 'open';
+      var isPrepOpen = !!(data && String(data.sessionType || '') === 'prep');
+      var wasPrep = !!window.dalPrepUiOpen;
 
       window.dalSessionState = window.dalSessionState || {};
       if (isPrepOpen) {
         window.dalSessionState.status = 'open';
         window.dalSessionState.sessionType = 'prep';
         window.dalSessionState.sessionUid = data.sessionUid || '';
-      } else if (!snap.exists && wasPrep) {
+      } else {
         window.dalSessionState.status = 'normal';
         window.dalSessionState.sessionType = '';
         window.dalSessionState.sessionUid = '';
-        try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       }
 
       if (typeof dalApplyDalPrepUiState_ === 'function') {
-        var prepJustOpened = isPrepOpen && !wasPrep;
-        dalApplyDalPrepUiState_(isPrepOpen, projectId, prepJustOpened);
+        dalApplyDalPrepUiState_(isPrepOpen, projectId, isPrepOpen && !wasPrep);
       }
     }, function(watchErr) {
-      console.warn('DAL session meta listener error:', watchErr);
+      console.warn('DAL session meta listener error — Sheets poll fallback:', watchErr);
+      window.dalMetaAuthority = false;
     });
   });
 };
@@ -278,8 +269,10 @@ window.startDalPaFirestoreListener = function(projectId) {
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     if (err) {
       console.warn('DAL Firestore listener auth failed:', err);
+      window.dalPaFirestoreListenProjectId = '';
       return;
     }
+    if (window.dalPaFirestoreListenProjectId !== String(projectId)) return;
     var col = client.db.collection('projects').doc(String(projectId)).collection('assets');
     window.dalPaFirestoreUnsub = col.onSnapshot(function(snap) {
       var docs = [];
@@ -287,14 +280,14 @@ window.startDalPaFirestoreListener = function(projectId) {
         docs.push({ id: doc.id, data: doc.data() || {} });
       });
       window.dalApplyFirestorePaSnapshot_(docs);
-    }, function(err) {
-      console.warn('DAL Firestore listener error:', err);
+    }, function(listenErr) {
+      console.warn('DAL Firestore listener error:', listenErr);
     });
   });
 };
 
 window.dalMarkPaLocalSave_ = function() {
-  window.dalPaIgnoreListenerUntil = Date.now() + 2000;
-  window.dalPaLastRemoteSig = '';
+  // Brief ignore so our own save echo doesn't fight the renderer; then accept remote
+  window.dalPaIgnoreListenerUntil = Date.now() + 1200;
 };
 </script>

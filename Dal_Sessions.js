@@ -155,6 +155,7 @@ function closeDalSession(projectId, actor) {
     var curStatus = String(row.data[row.map['Dal_Session_Status']] || '').toLowerCase();
     if (curStatus !== 'open') throw new Error('No open session on this project.');
 
+    // Mark committing on Sheets first so polls never report "open" while Firestore drains.
     dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, { Dal_Session_Status: 'committing' });
 
     if (sessionType === DAL_SESSION_TYPE.PREP) {
@@ -163,6 +164,7 @@ function closeDalSession(projectId, actor) {
       throw new Error('Close not implemented for session type: ' + sessionType);
     }
 
+    // Clear Sheets session flags after commit — UI live-truth is Firestore _meta (deleted in commit).
     dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
       Dal_Session_Type: '',
       Dal_Session_Status: '',

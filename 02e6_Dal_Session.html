@@ -1,6 +1,13 @@
 <!-- DAL Phase 4 — prep session UI inside Project Assets (L.O. / view_logistics) -->
 <script>
 window.dalSessionState = { status: 'normal', sessionType: '' };
+window.dalPrepUiOpen = false;
+window.dalPrepSheetsPollGen = 0;
+window.dalPrepClosing = false;
+
+window.dalIsPrepOpenFromInfo_ = function(info) {
+  return !!(info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'prep');
+};
 
 window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, invalidateCache) {
   projectId = projectId || (document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '');
@@ -8,13 +15,19 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, invalidateCache
   var startBtn = document.getElementById('dal-prep-start-btn');
   var endBtn = document.getElementById('dal-prep-end-btn');
   var canShow = window.dalCanShowPrepButtons();
+  isPrepOpen = !!isPrepOpen;
 
   if (!canShow) {
     if (banner) banner.style.display = 'none';
     if (startBtn) startBtn.style.display = 'none';
     if (endBtn) endBtn.style.display = 'none';
+    if (window.dalPrepUiOpen && typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
+    window.dalPrepUiOpen = false;
     return;
   }
+
+  var changed = window.dalPrepUiOpen !== isPrepOpen;
+  window.dalPrepUiOpen = isPrepOpen;
 
   if (banner) {
     if (isPrepOpen) {
@@ -29,11 +42,11 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, invalidateCache
   if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
 
   if (isPrepOpen && projectId) {
-    if (invalidateCache) {
+    if (invalidateCache || changed) {
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
     }
     if (typeof startDalPaFirestoreListener === 'function') startDalPaFirestoreListener(projectId);
-  } else if (typeof stopDalPaFirestoreListener === 'function') {
+  } else if (changed && typeof stopDalPaFirestoreListener === 'function') {
     stopDalPaFirestoreListener();
   }
 };
@@ -45,34 +58,36 @@ window.dalCanShowPrepButtons = function() {
   return !!(projectId && projectId !== 'NEW');
 };
 
-window.refreshDalSessionBanner = function() {
+/**
+ * Sheets poll — secondary only. Never flash-hide UI before reply.
+ * While Firestore _meta watcher is authoritative, do not override it.
+ */
+window.refreshDalSessionBanner = function(force) {
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
-  var banner = document.getElementById('dal-session-banner');
-  var startBtn = document.getElementById('dal-prep-start-btn');
-  var endBtn = document.getElementById('dal-prep-end-btn');
   var canShow = window.dalCanShowPrepButtons();
 
   if (!canShow) {
-    if (banner) banner.style.display = 'none';
-    if (startBtn) startBtn.style.display = 'none';
-    if (endBtn) endBtn.style.display = 'none';
+    window.dalApplyDalPrepUiState_(false, projectId);
     return;
   }
 
-  if (startBtn) startBtn.style.display = 'inline-flex';
-  if (endBtn) endBtn.style.display = 'none';
-  if (banner) banner.style.display = 'none';
+  if (!force && window.dalMetaAuthority && !window.dalPrepClosing) return;
 
+  var gen = ++window.dalPrepSheetsPollGen;
   google.script.run
     .withFailureHandler(function() {
-      if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher();
-      if (startBtn && window.dalCanShowPrepButtons()) startBtn.style.display = 'inline-flex';
-      if (endBtn) endBtn.style.display = 'none';
+      if (gen !== window.dalPrepSheetsPollGen) return;
+      if (!window.dalMetaAuthority) {
+        var startBtn = document.getElementById('dal-prep-start-btn');
+        if (startBtn && window.dalCanShowPrepButtons()) startBtn.style.display = 'inline-flex';
+      }
     })
     .withSuccessHandler(function(info) {
+      if (gen !== window.dalPrepSheetsPollGen) return;
+      if (window.dalPrepClosing) return;
+      if (window.dalMetaAuthority && !force) return;
       window.dalSessionState = info || {};
-      var isPrepOpen = info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'prep';
-      window.dalApplyDalPrepUiState_(isPrepOpen, projectId);
+      window.dalApplyDalPrepUiState_(window.dalIsPrepOpenFromInfo_(info), projectId);
     })
     .getDalSessionInfo(projectId);
 };
@@ -93,6 +108,7 @@ window.openDalPrepSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
   if (!projectId || projectId === 'NEW') return alert('Save the project first.');
   if (!confirm('Start preparation? Equipment saves fork to Firebase until End Prep.')) return;
+  window.dalPrepClosing = false;
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
   google.script.run
@@ -103,7 +119,8 @@ window.openDalPrepSession = function() {
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
-      window.refreshDalSessionBanner();
+      window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId };
+      window.dalApplyDalPrepUiState_(true, projectId, true);
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
       alert('Preparation started.');
     })
@@ -113,18 +130,23 @@ window.openDalPrepSession = function() {
 window.closeDalPrepSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
   if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
+  window.dalPrepClosing = true;
+  window.dalPrepSheetsPollGen++;
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
   google.script.run
     .withFailureHandler(function(err) {
+      window.dalPrepClosing = false;
       if (overlay) overlay.style.cursor = '';
       alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
     })
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
+      window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId };
+      window.dalApplyDalPrepUiState_(false, projectId);
       if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher();
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
-      window.refreshDalSessionBanner();
+      window.dalPrepClosing = false;
       alert('Preparation ended — committed to Sheets.');
     })
     .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));

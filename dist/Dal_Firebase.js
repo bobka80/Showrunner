@@ -137,6 +137,8 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
 function dalCommitPaFromFirestore_(projectId) {
   var hdr = dalGetProjectAssetsHeaderAndMap_();
   var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+  // Drop _meta first so live UI closes before the slower row drain finishes.
+  firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
   dalDeleteRowsByColumn_(hdr.sheet, 'project_uid', projectId);
   var rows = projectRows.map(function (r) { return r.data; });
   dalAppendRows_(hdr.sheet, rows);
