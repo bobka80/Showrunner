@@ -20,11 +20,8 @@
            <button id="logistics-hub-btn-layers" class="btn-outline req-view_logistics pe-mgr-only" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openLogisticsHubModal()">LOGISTICS HUB</button>
            <button class="btn-outline pe-mgr-only" style="margin:0;" onclick="openDriveFolder()">FOLDER</button>
            <button id="print-eq-btn" class="btn-outline pe-mgr-only" style="margin:0;" onclick="triggerPrint()">PDF</button>
-           <button id="dal-prep-start-btn" class="btn-outline btn-sm pe-manager-only" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="openDalPrepSession()">START PREP</button>
-           <button id="dal-prep-end-btn" class="btn-outline btn-sm pe-manager-only" style="margin:0; display:none; border-color:#ef4444; color:#ef4444;" onclick="closeDalPrepSession()">END PREP</button>
         </div>
     </div>
-    <div id="dal-session-banner" style="display:none; background:#78350f; color:#fde68a; padding:8px 12px; border-radius:6px; margin-bottom:8px; font-weight:700; text-align:center;"></div>
     <input type="hidden" id="edit-folder-id">
     <input type="hidden" id="edit-proj-version">
     <input type="hidden" id="edit-old-date">
@@ -546,7 +543,6 @@ function openUnscheduledModal(pId, title, fullTitle) {
     bootMiniCalendar(todayStr, pId);
     if (typeof startPresencePing === 'function') startPresencePing(pId);
     if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
-    if (typeof window.refreshDalSessionBanner === 'function') window.refreshDalSessionBanner();
 }
 
 window.cancelProjectEditor = function() {

@@ -101,6 +101,12 @@ window.canUseAssetCheckout = function() {
   return canEditAssets();
 };
 
+window.canOpenDalPrep = function() {
+  if (typeof USER_ACCESS !== 'undefined' && USER_ACCESS === 'ROOT') return true;
+  if (typeof accessTierAtLeast === 'function' && accessTierAtLeast('MANAGER')) return true;
+  return typeof userHasPerm === 'function' && userHasPerm('view_logistics');
+};
+
 /**
  * Actor to send with asset-operation / project-assets writes. On a station device the web app runs
  * as the low-tier DEVICE account, so passing ACTIVE_USER_NAME makes the backend deny edits. While a
@@ -380,8 +386,6 @@ window.applyProjectEditorMode = function(projectId) {
     const d = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
     bootMiniCalendar(d, pid);
   }
-
-  if (typeof window.refreshDalSessionBanner === 'function') window.refreshDalSessionBanner();
 };
 
 window.globalMonthShifts = window.globalMonthShifts || [];

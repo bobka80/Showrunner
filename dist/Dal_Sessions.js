@@ -101,11 +101,11 @@ function dalWriteSessionIndexFields_(indexSheet, rowNum, map, fields) {
 }
 
 /**
- * Open a DAL session (manager only). Prep: snapshot PA → Firestore.
+ * Open a DAL session (L.O. / logistics crew). Prep: snapshot PA → Firestore.
  */
 function openDalSession(projectId, sessionType, actor) {
   return executeWithRetry(function () {
-    assertActorCanManageProject(actor);
+    assertActorCanManageDalPrepSession(actor);
     if (!dalFirestoreIsConfigured_()) {
       throw new Error('Firebase service account not configured — cannot open prep session.');
     }
@@ -146,7 +146,7 @@ function openDalSession(projectId, sessionType, actor) {
  */
 function closeDalSession(projectId, actor) {
   return executeWithRetry(function () {
-    assertActorCanManageProject(actor);
+    assertActorCanManageDalPrepSession(actor);
     var sheets = verifyDatabaseSchema();
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) throw new Error('Project not found.');

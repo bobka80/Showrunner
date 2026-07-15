@@ -8429,11 +8429,8 @@ body.station-dock-screensaver-active #station-dock-shell {
            <button id="logistics-hub-btn-layers" class="btn-outline req-view_logistics pe-mgr-only" style="margin:0; border-color:#10b981; color:#10b981;" onclick="openLogisticsHubModal()">LOGISTICS HUB</button>
            <button class="btn-outline pe-mgr-only" style="margin:0;" onclick="openDriveFolder()">FOLDER</button>
            <button id="print-eq-btn" class="btn-outline pe-mgr-only" style="margin:0;" onclick="triggerPrint()">PDF</button>
-           <button id="dal-prep-start-btn" class="btn-outline btn-sm pe-manager-only" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="openDalPrepSession()">START PREP</button>
-           <button id="dal-prep-end-btn" class="btn-outline btn-sm pe-manager-only" style="margin:0; display:none; border-color:#ef4444; color:#ef4444;" onclick="closeDalPrepSession()">END PREP</button>
         </div>
     </div>
-    <div id="dal-session-banner" style="display:none; background:#78350f; color:#fde68a; padding:8px 12px; border-radius:6px; margin-bottom:8px; font-weight:700; text-align:center;"></div>
     <input type="hidden" id="edit-folder-id">
     <input type="hidden" id="edit-proj-version">
     <input type="hidden" id="edit-old-date">
@@ -8571,6 +8568,8 @@ body.station-dock-screensaver-active #station-dock-shell {
              <button id="pa-view-offer-btn" class="btn-outline btn-sm pa-view-btn" onclick="switchPaView('offer')" style="height: 38px; box-sizing: border-box;">OFFER</button>
           </div>
           <div id="pa-header-divider-checkout" style="width: 2px; height: 20px; background: #333; margin: 0 5px; flex-shrink: 0;"></div>
+          <button id="dal-prep-start-btn" class="btn-outline btn-sm req-view_logistics" style="border-color:#f59e0b; color:#f59e0b; margin:0; flex-shrink:0; display:none; height: 38px; box-sizing: border-box;" onclick="openDalPrepSession()">START PREP</button>
+          <button id="dal-prep-end-btn" class="btn-outline btn-sm req-view_logistics" style="border-color:#ef4444; color:#ef4444; margin:0; flex-shrink:0; display:none; height: 38px; box-sizing: border-box;" onclick="closeDalPrepSession()">END PREP</button>
           <button id="btn-master-operation" class="btn-outline btn-sm" style="border-color:#f59e0b; color:#f59e0b; margin:0; flex-shrink:0; display:none; height: 38px; box-sizing: border-box;" onclick="startOperationUI('CHECK-OUT', event)">START CHECK-OUT</button>
           <button id="btn-print-lists" class="btn-outline btn-sm" style="border-color:#3b82f6; color:#3b82f6; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box;" onclick="openPrintModal()">🖨️ PRINT</button>
           <button id="btn-mobile-pa-search" class="btn-outline btn-sm" style="display:none; border-color:#10b981; color:#10b981; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box;" onclick="openMobilePaVaultSearch()">🔍 SEARCH</button>
@@ -8598,6 +8597,7 @@ body.station-dock-screensaver-active #station-dock-shell {
          <button id="btn-save-pa" class="btn-main" style="width:auto; margin:0; height: 38px; box-sizing: border-box;" onclick="saveProjectAssets()">SAVE EQUIPMENT</button>
       </div>
     </div>
+    <div id="dal-session-banner" style="display:none; background:#78350f; color:#fde68a; padding:6px 25px; font-weight:700; font-size:11px; letter-spacing:0.04em; flex-shrink:0; text-align:center;"></div>
 
     <div id="pa-mobile-mode-bar" style="display:none; padding:8px 10px; background:#111; border-bottom:1px solid #333; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0;"></div>
     <div id="mobile-pa-unsaved-bar" style="display:none; padding:8px 12px; background:#422006; border-bottom:1px solid #f59e0b; color:#fcd34d; font-size:11px; font-weight:800; letter-spacing:0.04em; flex-shrink:0; align-items:center; justify-content:space-between; gap:10px;">
@@ -8688,7 +8688,7 @@ body.station-dock-screensaver-active #station-dock-shell {
 
 
 
-<!-- DAL Phase 4 Slice B — prep session UI (manager only) -->
+<!-- DAL Phase 4 — prep session UI inside Project Assets (L.O. / view_logistics) -->
 
 
 

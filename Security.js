@@ -780,6 +780,14 @@ function assertActorCanManageProject(actor) {
   }
 }
 
+/** L.O. crew (view_logistics) + managers/root — not manager-only. */
+function assertActorCanManageDalPrepSession(actor) {
+  if (verifyBackendPrivilege(actor, 'ROOT')) return;
+  if (verifyBackendPrivilege(actor, 'MANAGER')) return;
+  if (effectiveBackendPermission(actor, 'view_logistics')) return;
+  throw new Error('🛑 PERMISSION DENIED: Live logistics access required to start or end prep.');
+}
+
 function actorIsCrossRentOnlyCreator(actor) {
   if (!actor) return false;
   return verifyBackendPermission(actor, 'event_create_crossrent')

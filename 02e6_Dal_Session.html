@@ -1,9 +1,10 @@
-<!-- DAL Phase 4 Slice B — prep session UI (manager only) -->
+<!-- DAL Phase 4 — prep session UI inside Project Assets (L.O. / view_logistics) -->
 <script>
 window.dalSessionState = { status: 'normal', sessionType: '' };
 
 window.dalCanShowPrepButtons = function() {
-  if (typeof canManageProjectLifecycle === 'function' && !canManageProjectLifecycle()) return false;
+  if (typeof canOpenDalPrep === 'function' && !canOpenDalPrep()) return false;
+  if (window.projectAssetsReadOnly) return false;
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
   return !!(projectId && projectId !== 'NEW');
 };
@@ -22,7 +23,6 @@ window.refreshDalSessionBanner = function() {
     return;
   }
 
-  // Show START PREP immediately for managers on saved projects; refine after server round-trip.
   if (startBtn) startBtn.style.display = 'inline-flex';
   if (endBtn) endBtn.style.display = 'none';
   if (banner) banner.style.display = 'none';
@@ -38,7 +38,7 @@ window.refreshDalSessionBanner = function() {
       if (banner) {
         if (isPrepOpen) {
           banner.style.display = 'block';
-          banner.textContent = '🔒 IN PREPARATION — Project Assets live on Firebase fork (Sheets commit on End Prep)';
+          banner.textContent = '🔒 IN PREPARATION — saves go to Firebase until End Prep';
         } else {
           banner.style.display = 'none';
         }
@@ -52,7 +52,7 @@ window.refreshDalSessionBanner = function() {
 window.openDalPrepSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
   if (!projectId || projectId === 'NEW') return alert('Save the project first.');
-  if (!confirm('Start warehouse preparation? Project Assets will fork to Firebase until you End Prep.')) return;
+  if (!confirm('Start preparation? Equipment saves fork to Firebase until End Prep.')) return;
   document.body.style.cursor = 'wait';
   google.script.run
     .withFailureHandler(function(err) {
@@ -63,14 +63,14 @@ window.openDalPrepSession = function() {
       document.body.style.cursor = 'default';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
-      alert('Preparation session opened. Equipment saves now route through the Firebase fork.');
+      alert('Preparation started.');
     })
-    .openDalSession(projectId, 'prep', typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+    .openDalSession(projectId, 'prep', typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));
 };
 
 window.closeDalPrepSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
-  if (!confirm('End preparation and commit Project Assets back to Google Sheets?')) return;
+  if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
   document.body.style.cursor = 'wait';
   google.script.run
     .withFailureHandler(function(err) {
@@ -81,8 +81,8 @@ window.closeDalPrepSession = function() {
       document.body.style.cursor = 'default';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
-      alert('Preparation ended — Project Assets committed to Sheets.');
+      alert('Preparation ended — committed to Sheets.');
     })
-    .closeDalSession(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+    .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));
 };
 </script>
