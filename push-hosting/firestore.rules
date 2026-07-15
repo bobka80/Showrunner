@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Phase 4 Slice C — authenticated Showrunner crew read PA prep fork; writes via GAS only.
+    match /projects/{projectId}/assets/{docId} {
+      allow read: if request.auth != null && request.auth.token.showrunner == true;
+      allow write: if false;
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice B shipped** (prep session + PA Firestore fork). **Production:** GAS **v582+**. **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice C shipped** (client Firestore listeners during prep). **Production:** GAS **v587+**. **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -343,7 +343,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Slice B** — `FirebaseAdapter` live PA read/write via GAS Firestore REST during prep
 - [x] **Slice B** — Hard block direct Sheet PA read/write while prep session open
 - [x] **Slice B** — Manager UI: START PREP / END PREP + banner (`02e6_Dal_Session.html`)
-- [ ] **Slice C** — Client Firestore SDK listeners (real-time multi-user without reload)
+- [x] **Slice C** — Client Firestore SDK listeners (real-time multi-user during prep; saves still via GAS)
 - [ ] **Slice C** — Timeline collab session (`timelineCollab`)
 - [ ] End session → reconciliation engine (Phase 5)
 - [ ] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)

@@ -1,0 +1,202 @@
+<!-- DAL Phase 4 Slice C — client Firestore listeners during prep (read sync; saves still via GAS) -->
+<script>
+window.dalPaFirestoreUnsub = null;
+window.dalPaIgnoreListenerUntil = 0;
+window.dalPaRemotePending = false;
+
+window.dalFsDocToPaAsset_ = function(docId, d) {
+  if (!d || docId === '_meta') return null;
+  var formula = d.formula || '';
+  var asset = {
+    uid: d.uid || docId,
+    assetId: String(d.asset_uid || ''),
+    qty: d.assigned_quantity || 1,
+    location: d.location || '',
+    formula: formula,
+    creator: d.creator || 'System',
+    containerUid: d.container_uid || '',
+    scanStatus: d.scan_status || 'Assigned',
+    outboundTruckUid: d.outbound_truck_uid || '',
+    outboundX: d.outbound_x !== undefined && d.outbound_x !== '' ? Number(d.outbound_x) : null,
+    outboundY: d.outbound_y !== undefined && d.outbound_y !== '' ? Number(d.outbound_y) : null,
+    outboundZ: d.outbound_z !== undefined && d.outbound_z !== '' ? Number(d.outbound_z) : null,
+    outboundRotated: d.outbound_rotated === true || d.outbound_rotated === 'true',
+    outboundStaged: d.outbound_staged === true || d.outbound_staged === 'true',
+    inboundTruckUid: d.inbound_truck_uid || '',
+    inboundX: d.inbound_x !== undefined && d.inbound_x !== '' ? Number(d.inbound_x) : null,
+    inboundY: d.inbound_y !== undefined && d.inbound_y !== '' ? Number(d.inbound_y) : null,
+    inboundZ: d.inbound_z !== undefined && d.inbound_z !== '' ? Number(d.inbound_z) : null,
+    inboundRotated: d.inbound_rotated === true || d.inbound_rotated === 'true',
+    inboundStaged: d.inbound_staged === true || d.inbound_staged === 'true'
+  };
+  return asset;
+};
+
+window.dalProcessPaFormulas_ = function(arr) {
+  if (!arr) return;
+  var exploded = [];
+  for (var i = arr.length - 1; i >= 0; i--) {
+    var pa = arr[i];
+    var vaultAsset = typeof globalAssets !== 'undefined' ? globalAssets.find(function(a) { return a.id === pa.assetId; }) : null;
+    if (vaultAsset && vaultAsset.type !== 'Bulk' && vaultAsset.isConsumable !== true && vaultAsset.isConsumable !== 'true') {
+      var parsedQty = parseInt(pa.qty, 10);
+      if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
+        arr.splice(i, 1);
+        for (var k = 0; k < parsedQty; k++) {
+          var newPa = Object.assign({}, pa, { qty: 1 });
+          delete newPa.uid;
+          exploded.push(newPa);
+        }
+      }
+    }
+  }
+  if (exploded.length > 0) arr.push.apply(arr, exploded);
+  arr.forEach(function(pa) {
+    if (pa.formula === 'Manual') pa.formula = 'Standalone';
+    if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
+    if (pa.formula && pa.formula.indexOf('[SHORT] ') === 0) {
+      pa.isShortage = true;
+      pa.formula = pa.formula.substring(8);
+    }
+    if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; }
+    else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
+    else if (pa.formula && pa.formula.indexOf('[GEN_AUTO] ') === 0) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
+    else if (pa.formula && pa.formula.indexOf('[AUTO] ') === 0) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
+  });
+};
+
+window.dalUpdateRemotePendingBanner_ = function() {
+  var banner = document.getElementById('dal-session-banner');
+  if (!banner || banner.style.display === 'none') return;
+  if (window.dalPaRemotePending) {
+    banner.textContent = '🔒 IN PREPARATION — remote updates available (save or reload to sync)';
+  } else {
+    banner.textContent = '🔒 IN PREPARATION — live sync active';
+  }
+};
+
+window.dalApplyFirestorePaSnapshot_ = function(docs) {
+  if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) return;
+  if (typeof calculatePaDeltas === 'function' && calculatePaDeltas().length > 0) {
+    window.dalPaRemotePending = true;
+    window.dalUpdateRemotePendingBanner_();
+    return;
+  }
+  window.dalPaRemotePending = false;
+  var assets = [];
+  docs.forEach(function(entry) {
+    var a = window.dalFsDocToPaAsset_(entry.id, entry.data);
+    if (a) assets.push(a);
+  });
+  window.dalProcessPaFormulas_(assets);
+  currentProjectAssets = assets;
+  window.originalProjectAssets = JSON.parse(JSON.stringify(assets));
+  if (window.activePresenceModule === 'assets' && typeof renderProjectAssetsUI === 'function') {
+    renderProjectAssetsUI();
+  }
+  if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+  window.dalUpdateRemotePendingBanner_();
+};
+
+window.dalEnsureFirebaseSdk_ = function(done) {
+  if (window.firebase && window.firebase.firestore && window.firebase.auth) {
+    done(null);
+    return;
+  }
+  var urls = [
+    'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+    'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'
+  ];
+  var idx = 0;
+  function loadNext() {
+    if (idx >= urls.length) {
+      done(window.firebase ? null : new Error('Firebase SDK failed to load'));
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = urls[idx++];
+    s.onload = loadNext;
+    s.onerror = function() { done(new Error('Failed to load ' + s.src)); };
+    document.head.appendChild(s);
+  }
+  loadNext();
+};
+
+window.dalEnsureFirestoreClientAuth_ = function(cb) {
+  if (window.dalFirestoreClient && window.dalFirestoreClient.ready) {
+    cb(null, window.dalFirestoreClient);
+    return;
+  }
+  var actor = typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '');
+  google.script.run
+    .withFailureHandler(function(err) { cb(err); })
+    .withSuccessHandler(function(res) {
+      window.dalEnsureFirebaseSdk_(function(sdkErr) {
+        if (sdkErr) { cb(sdkErr); return; }
+        try {
+          if (!window.dalFirestoreClient || window.dalFirestoreClient.appName !== res.config.projectId) {
+            if (window.dalFirestoreClient && window.dalFirestoreClient.app) {
+              try { window.dalFirestoreClient.app.delete(); } catch (e) { /* ignore */ }
+            }
+            var app = firebase.apps.length ? firebase.app() : firebase.initializeApp({
+              apiKey: res.config.apiKey,
+              authDomain: res.config.authDomain,
+              projectId: res.config.projectId,
+              storageBucket: res.config.storageBucket,
+              messagingSenderId: res.config.messagingSenderId,
+              appId: res.config.appId
+            });
+            window.dalFirestoreClient = {
+              app: app,
+              appName: res.config.projectId,
+              auth: firebase.auth(app),
+              db: firebase.firestore(app),
+              ready: false
+            };
+          }
+          window.dalFirestoreClient.auth.signInWithCustomToken(res.customToken)
+            .then(function() {
+              window.dalFirestoreClient.ready = true;
+              cb(null, window.dalFirestoreClient);
+            })
+            .catch(function(e) { cb(e); });
+        } catch (e) { cb(e); }
+      });
+    })
+    .getDalFirebaseClientAuth(actor);
+};
+
+window.stopDalPaFirestoreListener = function() {
+  if (window.dalPaFirestoreUnsub) {
+    try { window.dalPaFirestoreUnsub(); } catch (e) { /* ignore */ }
+    window.dalPaFirestoreUnsub = null;
+  }
+  window.dalPaRemotePending = false;
+};
+
+window.startDalPaFirestoreListener = function(projectId) {
+  if (!projectId) return;
+  window.stopDalPaFirestoreListener();
+  window.dalEnsureFirestoreClientAuth_(function(err, client) {
+    if (err) {
+      console.warn('DAL Firestore listener auth failed:', err);
+      return;
+    }
+    var col = client.db.collection('projects').doc(String(projectId)).collection('assets');
+    window.dalPaFirestoreUnsub = col.onSnapshot(function(snap) {
+      var docs = [];
+      snap.forEach(function(doc) {
+        docs.push({ id: doc.id, data: doc.data() || {} });
+      });
+      window.dalApplyFirestorePaSnapshot_(docs);
+    }, function(err) {
+      console.warn('DAL Firestore listener error:', err);
+    });
+  });
+};
+
+window.dalMarkPaLocalSave_ = function() {
+  window.dalPaIgnoreListenerUntil = Date.now() + 3500;
+};
+</script>

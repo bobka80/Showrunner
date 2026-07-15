@@ -29,6 +29,7 @@ window.refreshDalSessionBanner = function() {
 
   google.script.run
     .withFailureHandler(function() {
+      if (typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
       if (startBtn && window.dalCanShowPrepButtons()) startBtn.style.display = 'inline-flex';
       if (endBtn) endBtn.style.display = 'none';
     })
@@ -38,9 +39,11 @@ window.refreshDalSessionBanner = function() {
       if (banner) {
         if (isPrepOpen) {
           banner.style.display = 'block';
-          banner.textContent = '🔒 IN PREPARATION — saves go to Firebase until End Prep';
+          banner.textContent = '🔒 IN PREPARATION — live sync active';
+          if (typeof startDalPaFirestoreListener === 'function') startDalPaFirestoreListener(projectId);
         } else {
           banner.style.display = 'none';
+          if (typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
         }
       }
       if (startBtn) startBtn.style.display = isPrepOpen ? 'none' : 'inline-flex';
@@ -76,6 +79,7 @@ window.openDalPrepSession = function() {
       if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
+      if (typeof startDalPaFirestoreListener === 'function') startDalPaFirestoreListener(projectId);
       alert('Preparation started.');
     })
     .openDalSession(projectId, 'prep', typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));
@@ -93,6 +97,7 @@ window.closeDalPrepSession = function() {
     })
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
+      if (typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
       alert('Preparation ended — committed to Sheets.');

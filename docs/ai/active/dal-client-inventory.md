@@ -2,7 +2,7 @@
 
 **Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [dal-pre-ship-gates.md](dal-pre-ship-gates.md)
 
-**Generated:** 2026-07-15 · **Root HTML modules scanned:** 90
+**Generated:** 2026-07-15 · **Root HTML modules scanned:** 91
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 
@@ -41,6 +41,7 @@
 | `closeDalSession` | `02e6_Dal_Session.html` |
 | `getDalSessionInfo` | `02e6_Dal_Session.html` |
 | `openDalSession` | `02e6_Dal_Session.html` |
+| `getDalFirebaseClientAuth` | `02e7_Dal_Firestore_Client.html` |
 | `deleteProjectFull` | `02_Project_Editor_Core.html` |
 | `generateProjectFolders` | `02_Project_Editor_Core.html` |
 | `printEquipmentList` | `02_Project_Editor_Core.html` |
@@ -193,6 +194,7 @@
 | 02e4_Logic_Containers.html | 0 | 0 |
 | 02e5_Logic_Sync.html | 2 | 0 |
 | 02e6_Dal_Session.html | 3 | 0 |
+| 02e7_Dal_Firestore_Client.html | 1 | 0 |
 | 02g_Project_Reports.html | 0 | 2 |
 | 03a_Timeline_Boot.html | 3 | 0 |
 | 03b_Timeline_Shifts.html | 0 | 0 |

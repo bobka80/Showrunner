@@ -376,6 +376,8 @@ function saveProjectAssets(doneCb) {
             setTimeout(() => { btnMobile.innerText = origMobileText; btnMobile.disabled = false; }, 2000);
         }
         window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+        if (typeof dalMarkPaLocalSave_ === 'function') dalMarkPaLocalSave_();
+        window.dalPaRemotePending = false;
         
         if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
         if (typeof updateMobilePaUnsavedUI === 'function') updateMobilePaUnsavedUI();

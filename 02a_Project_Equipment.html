@@ -214,6 +214,7 @@ window.cancelProjectAssetsModal = function() {
         currentProjectAssets = JSON.parse(JSON.stringify(window.originalProjectAssets));
     }
     window.activePresenceModule = 'main';
+    if (typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
     document.getElementById('project-assets-modal-overlay').style.display = 'none';
 };
 
