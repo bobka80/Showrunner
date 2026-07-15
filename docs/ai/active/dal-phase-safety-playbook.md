@@ -124,9 +124,9 @@ For the files in scope:
 - Changing sheet schemas
 - Introducing Firebase code
 
-**Preflight note:** (fill when phase starts)
+**Preflight note (2026-07-15, Slice A):** Phase 1 inventory complete in [data-access-layer.md § Phase 1 preflight](data-access-layer.md#phase-1-preflight--inventory-2026-07-15). Hot-path searches: `clearContents(` in `Logistics_Assets.js:88`, `Logistics_Timeline.js:67`, `Operations.js:210`; client callers unchanged in Slice A. No `SpreadsheetApp` in feature HTML. Slice A adds `Dal_Repos.js` only — existing public GAS functions remain entry points.
 
-**Postflight test plan:** (fill when phase ends)
+**Postflight test plan (Slice A):** `node build.js` succeeds; login smoke on web.app unchanged; no client `google.script.run` renames; pre-ship DAL gates **not** triggered (no hot-path file edits).
 
 ---
 

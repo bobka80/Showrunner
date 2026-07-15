@@ -101,13 +101,72 @@ Storage
 - [x] **GAS spreadsheet gateways** — [§5](dal-phase0-discovery-2026-07-13.md#5-spreadsheet-access-model-no-dal-today) (`verifyDatabaseSchema`, `verifyVaultSchema`, `getSheetData`)
 - [x] **Client inventory** — [dal-client-inventory.md](dal-client-inventory.md) (generated; `node scripts/dal-client-inventory.js`)
 - [x] **Client cache inventory** — same file (`localStorage` keys section)
-- [ ] **PA save pipeline map** — client delta → `saveProjectAssetsDelta` / related → sheets touched → order of merge, `processFormulas()`, optimistic healing — **do not reimplement inside DAL**
-- [ ] **Ledger pipeline map** — scan → optimistic UI → `opsQueue` → `batchProcessOperations` → `Operations_Ledger` + `Projects_Index` session fields
-- [ ] **Schema cross-check** — code headers vs [SCHEMA.md](../SCHEMA.md) vs `verifyVaultSchema` / `verifyDatabaseSchema`
-- [ ] **Doc/code inconsistency report** — prioritized list (doc says X, code does Y); fixes tracked separately from DAL code
-- [ ] **Fragile boundary list** — which functions are **mandatory write boundaries** for repos first (Ledger, ProjectAssets, Timeline saves) — see [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md) §6
+- [x] **PA save pipeline map** — § Phase 1 preflight below
+- [x] **Ledger pipeline map** — § Phase 1 preflight below
+- [x] **Schema cross-check** — § Phase 1 preflight below
+- [x] **Doc/code inconsistency report** — § Phase 1 preflight below
+- [x] **Fragile boundary list** — § Phase 1 preflight below (canonical detail: [dal-phase0-discovery-2026-07-13.md §6](dal-phase0-discovery-2026-07-13.md#6-mandatory-write-boundaries-repos-first))
 
-*Phase 0 core sweep complete 2026-07-13 → [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md). Client inventory + pre-ship gates complete 2026-07-15 → [dal-pre-ship-gates.md](dal-pre-ship-gates.md). Remaining bullets = Phase 1 inventory.*
+*Phase 0 core sweep complete 2026-07-13 → [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md). Client inventory + pre-ship gates complete 2026-07-15 → [dal-pre-ship-gates.md](dal-pre-ship-gates.md). Phase 1 preflight complete 2026-07-15 — Slice A awaits director **OK go**.*
+
+---
+
+## Phase 1 preflight — inventory (2026-07-15)
+
+### PA save pipeline map
+
+| Step | Location | What happens |
+|------|----------|--------------|
+| 1. Delta calc | `02e5_Logic_Sync.html` — `calculatePaDeltas()` | Diff `originalProjectAssets` vs `currentProjectAssets` by composite key (`assetId`, `location`, `formula`, `containerUid`) → `{ assetId, location, rawFormula, containerUid, deltaQty, isBulk, creator }` |
+| 2. Auto-save | `autoSaveAndExecute()` | If deltas → `google.script.run.saveProjectAssetsDelta`; on success → `getProjectAssets` re-fetch |
+| 3. Manual save | `saveProjectAssets()` | Same delta path |
+| 4. Other callers | `02c_Project_Operations.html`, `02_Project_Editor_Logistics.html` | Ops/checkout + logistics wizard also call `saveProjectAssetsDelta` |
+| 5. Server persist | `Logistics_Assets.js` — `saveProjectAssetsDelta` | `verifyDatabaseSchema()` → read full `Project_Assets` → apply deltas in memory → **`clearContents()` + `setValues()` whole tab** → `flushCache()` + audit |
+| 6. Post-save client | `autoSaveAndExecute` success handler | **`processFormulas()`** (qty=1 burst for physical) on server + local arrays; **optimistic healing** injects server `uid`s without overwriting unsaved local edits; merge → `originalProjectAssets` snapshot |
+
+**DAL rule:** Repos wrap step 5 only. Steps 1–4 and 6 stay in client engines — **do not move `processFormulas()` or healing into DAL.**
+
+### Ledger pipeline map
+
+| Step | Location | What happens |
+|------|----------|--------------|
+| 1. Start session | `02c_Project_Operations.html` — `startOperationUI` | `startEventOperation` → `Projects_Index.Active_Operation` + `Active_Session_UID` (partial cell writes) |
+| 2. Scan / undo UI | `handleRfidScan`, manual scan, undo | Optimistic `scannedQty` on `currentProjectAssets`; push `{ action, assetId, scanQty/undoQty }` to **`opsQueue`** |
+| 3. Debounced commit | `resetOpsTimer` → `commitOpsBatch` (1.5s) | Drain queue → `batchProcessOperations(projectId, batch, actor)` |
+| 4. RFID direct | `Operations.js` — `processRfidScan` | Vault resolve → delegates to `batchProcessOperations` with single-item batch |
+| 5. Server persist | `batchProcessOperations` | Read `Projects_Index` session fields → read full `Operations_Ledger` + `Project_Assets` + vault → mutate session rows in memory → **`opsLedger.clearContents()` + `setValues()` whole tab** |
+| 6. Finalize | `stopOperationUI` | `finalizeEventOperation` → clears index operation fields |
+
+**DAL rule:** `LedgerRepo` wraps steps 1, 4–6 server boundaries. Client `opsQueue` stays until a later slice.
+
+### Schema cross-check
+
+| Sheet (ENGINE) | `Logistics_Schema.js` headers | `SCHEMA.md` | Match |
+|----------------|------------------------------|-------------|-------|
+| `Project_Assets` | uid, project_uid, asset_uid, assigned_quantity, location, formula, creator, container_uid, scan_status, outbound_*, inbound_* | Listed in ENGINE set; column detail in code | **OK** — schema builder is source of truth for columns |
+| `Operations_Ledger` | uid, session_uid, project_uid, operation_type, asset_uid, asset_code, asset_name, department, rfid_tag, timestamp, actor | Listed in ENGINE set | **OK** |
+| `Shift_Assignments` | uid, project_uid, Phase_Mode, user_uid, Role, Start, Duration, … | Listed as `Shift_Assignments` | **OK** |
+| `Phase_Blocks` | uid, project_uid, Phase_Mode, Phase_Name, Start, Duration, Note | Listed as `Phase_Blocks` | **OK** |
+| `Dept_Overrides` | project_uid, Phase_Mode, user_uid, Dept_Name | Listed as `Dept_Overrides` | **OK** |
+
+No column-name drift found between `verifyDatabaseSchema` bootstrap and live save/read code on hot paths.
+
+### Doc/code inconsistency report (prioritized)
+
+| Priority | Doc says | Code does | Action |
+|----------|----------|-----------|--------|
+| P1 | Design lock §9 / Phase 3 gate: PA + timeline full rewrite | **Confirmed** in `Logistics_Assets.js`, `Logistics_Timeline.js` | Phase 3 — not Slice A |
+| P2 | `FRAGILE_ZONES` § Warehouse ledger: "Append to Operations_Ledger" | `batchProcessOperations` **rewrites entire tab** per batch | Update FRAGILE_ZONES when Phase 3 ledger work starts |
+| P3 | Timeline collision = row-level safety | 2s `Last_Updated` on `Projects_Index` only | Phase 3 + visible conflict UX per design lock §3 |
+
+### Fragile boundary list (repos first)
+
+| Priority | Repo | Mandatory GAS write/read boundaries | Fragile zones |
+|----------|------|-------------------------------------|---------------|
+| P0 | `ProjectAssetsRepo` | `saveProjectAssetsDelta`, `getProjectAssets` (+ later: `saveProjectAssetsAPI`, `saveTruckArrangementAPI`) | Formula explosion, UID/healing, Auto-Containerization — **wrap persist only** |
+| P0 | `TimelineRepo` | `saveTimelineData`, `getTimelineData` | Collision timestamp — wrap persist only |
+| P0 | `LedgerRepo` | `batchProcessOperations`, `startEventOperation`, `finalizeEventOperation`, `processRfidScan` | Warehouse ledger — no assignment mutation outside ledger path |
+| P1 | `ProjectRepo` | `saveProjectData`, project delete/restore | Defer to Phase 2+ |
 
 ---
 
