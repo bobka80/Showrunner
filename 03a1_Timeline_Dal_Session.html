@@ -42,6 +42,11 @@ function dalTimelineErrMsg_(err) {
   if (msg.indexOf('Database Lockout') === 0) {
     msg = msg.replace(/^Database Lockout after \d+ attempts:\s*/, '');
   }
+  if (msg.indexOf('Error: ') === 0) msg = msg.slice(7);
+  // Prep ↔ timeline share one session slot — do not attach the timeout hint.
+  if (/Preparation is still active|Timeline collab is still active|session is already open/i.test(msg)) {
+    return msg;
+  }
   if (/timed out|Timeout|timeout/i.test(msg)) {
     return msg + '\n\nWait a few seconds and click START COLLAB again — a stuck open clears automatically after ~90s.';
   }

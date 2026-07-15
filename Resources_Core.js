@@ -710,8 +710,19 @@ function executeWithRetry(operation, maxRetries = 5) {
       if (e.message && (
         e.message.includes("Firestore") && (e.message.includes("(403)") || e.message.includes("(401)") || e.message.includes("(400)")) ||
         e.message.includes("Firebase service account") ||
-        e.message.includes("Firebase not configured")
-      )) throw e; // Config / permission / client errors — do not retry
+        e.message.includes("Firebase not configured") ||
+        // DAL session lifecycle — business rules, not lock contention
+        e.message.includes("Preparation is still active") ||
+        e.message.includes("Timeline collab is still active") ||
+        e.message.includes("session is already") ||
+        e.message.includes("No open session") ||
+        e.message.includes("Session open raced") ||
+        e.message.includes("Session is not opening") ||
+        e.message.includes("Project not found") ||
+        e.message.includes("Unknown session type") ||
+        e.message.includes("not authorized") ||
+        e.message.includes("Permission")
+      )) throw e; // Config / permission / business errors — do not retry
       attempt++;
       if (attempt >= maxRetries) {
           let errType = bypassLock ? "Read Timeout" : "Lockout";

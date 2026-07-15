@@ -201,10 +201,22 @@ function beginDalSession(projectId, sessionType, actor) {
     }
 
     if (curStatus === 'open' || curStatus === 'committing' || curStatus === 'opening') {
+      // One Projects_Index session slot per project — prep and timelineCollab cannot overlap.
+      if (curType === DAL_SESSION_TYPE.PREP && sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
+        throw new Error(
+          'Preparation is still active on this project. Open Project Assets → END PREP, then start timeline collab.'
+        );
+      }
+      if (curType === DAL_SESSION_TYPE.TIMELINE_COLLAB && sessionType === DAL_SESSION_TYPE.PREP) {
+        throw new Error(
+          'Timeline collab is still active. Open the timeline → END COLLAB, then start prep.'
+        );
+      }
       throw new Error(
         'A session is already ' + curStatus + ' on this project' +
         (curType ? ' (' + curType + ')' : '') +
-        '. End that session first, or wait ~90s if a prior START COLLAB timed out.'
+        '. End that session first' +
+        (curStatus === 'opening' ? ', or wait ~90s if a prior start timed out.' : '.')
       );
     }
 
