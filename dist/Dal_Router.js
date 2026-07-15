@@ -1,9 +1,10 @@
 /**
  * SM Showrunner (smuruner) - Clean 8 Architecture
- * Dal_Router.js - DAL router (Phase 2 — Sheets only)
+ * Dal_Router.js - DAL router (Phase 4 Slice A)
  *
- * Selects storage adapter per domain + session status. Phase 4 adds FirebaseAdapter
- * for session-open on projectAssets / timeline; Phase 2 always returns SheetsAdapter.
+ * Selects storage adapter per domain + session status. Session-open routes PA/timeline
+ * to FirebaseAdapter (Slice A still delegates to Sheets until Firestore wiring ships).
+ * Ledger stays on Sheets (design lock §2 — atomic checkout path).
  */
 
 // @INDEX: DAL -> Router (Phase 2)
@@ -25,7 +26,7 @@ var DAL_SESSION = {
  * Central routing switch — canonical entry for adapter selection.
  * @param {string} domain - DAL_DOMAIN value
  * @param {string} sessionStatus - DAL_SESSION value
- * @returns {object} Active adapter (SheetsAdapter through Phase 3)
+ * @returns {object} Active adapter (SheetsAdapter or FirebaseAdapter)
  */
 function projectDataRouter(domain, sessionStatus) {
   var status = sessionStatus || DAL_SESSION.NORMAL;
@@ -36,18 +37,17 @@ function projectDataRouter(domain, sessionStatus) {
     status = DAL_SESSION.NORMAL;
   }
 
-  // Phase 2–3: all states → Sheets (zero behavior change).
-  // Phase 4: session-open + projectAssets|timeline → FirebaseAdapter.
-  // Ledger stays Sheets (atomic per-op — design lock §2).
-  return getSheetsAdapter();
-}
+  // Ledger: always Sheets (checkout / atomic ops — design lock §2).
+  if (domain === DAL_DOMAIN.LEDGER) {
+    return getSheetsAdapter();
+  }
 
-/**
- * Resolve session status for a project/domain. Phase 4 reads session registry.
- * @param {string} projectId
- * @param {string} domain
- * @returns {string} DAL_SESSION value
- */
-function resolveDalSessionStatus_(projectId, domain) {
-  return DAL_SESSION.NORMAL;
+  // Phase 4: session-open or committing → Firebase for PA + timeline only.
+  if (status === DAL_SESSION.SESSION_OPEN || status === DAL_SESSION.COMMITTING) {
+    if (domain === DAL_DOMAIN.PROJECT_ASSETS || domain === DAL_DOMAIN.TIMELINE) {
+      return getFirebaseAdapter();
+    }
+  }
+
+  return getSheetsAdapter();
 }

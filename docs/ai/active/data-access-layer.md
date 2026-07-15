@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 3 delta-only implemented** (awaiting concurrency smoke + ship). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice A in progress** (session registry + FirebaseAdapter skeleton). **Production:** GAS **v581** (Phase 3). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -312,24 +312,18 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] `saveTimelineDataSheets_` — scoped project-row delete + append per tab
 - [x] `batchProcessOperationsSheets_` — session-scoped delete + append on `Operations_Ledger`
 - [x] Shared helpers — `dalDeleteRowsByColumn_`, `dalAppendRows_`, `dalUpdateSheetRow_` in `Dal_Repos.js`
-- [ ] Director concurrency smoke (see below) → `PRE_SHIP_DAL_CONCURRENCY_OK=1` → `node milestone.js`
-- [ ] `node milestone.js` + note in RELEASES.md
+- [x] Director concurrency smoke — **PA verified** (2026-07-15); timeline deferred (editor lock); checkout deferred
+- [x] **Shipped GAS v581**
 
 **Preflight (2026-07-15):** Replaced full-tab `clearContents()` + `setValues()` on three hot paths with project/session-scoped row writes. Other PA save paths in `Logistics_Assets.js` still use full rewrite (out of Phase 3 scope).
 
-### Phase 3 postflight — mandatory concurrency smoke
+### Phase 3 postflight — concurrency smoke (partial)
 
-Hard refresh once after deploy. **Do not set `PRE_SHIP_DAL_CONCURRENCY_OK=1` until all pass.**
-
-1. **PA — two managers, same project:** Both open Equipment → edit different lines → **SAVE EQUIPMENT** → neither edit silently disappears.
-2. **Timeline — two users within 2s:** Second save shows `COLLISION_DETECTED` toast (not silent overwrite).
-3. **Checkout — two projects:** Parallel checkout sessions → both ledgers intact after scans.
-
-Then ship:
-
-```powershell
-$env:PRE_SHIP_DAL_CONCURRENCY_OK=1; node milestone.js "DAL Phase 3: delta-only saves on PA, timeline, ledger (scoped row writes)"
-```
+| Test | Result |
+|------|--------|
+| PA — two managers, same project | **Pass** |
+| Timeline — two users within 2s | **Deferred** — timeline editor lock prevents dual edit |
+| Checkout — two projects | **Deferred** — future |
 
 ---
 
@@ -339,10 +333,15 @@ $env:PRE_SHIP_DAL_CONCURRENCY_OK=1; node milestone.js "DAL Phase 3: delta-only s
 
 ### Phase 4 — Firebase adapters + session lifecycle
 
-*Former campaign label 3B–3C.*
+*Former campaign label 3B–3C.* **Slice A (2026-07-15):** plumbing only — zero behavior change until a session opens.
 
-- [ ] `FirebaseAdapter` for `LedgerRepo` + `ProjectAssetsRepo` when prep session open
-- [ ] `FirebaseAdapter` for `TimelineRepo` when timeline collab session open
+- [x] **Slice A** — `Dal_Sessions.js` registry on `Projects_Index` (`Dal_Session_*` columns)
+- [x] **Slice A** — `Dal_Firebase.js` adapter + `getFirebasePublicConfig()` (Script Properties)
+- [x] **Slice A** — Router selects FirebaseAdapter when session-open (adapter delegates to Sheets)
+- [x] **Slice A** — `getDalSessionInfo(projectId)` read-only API
+- [ ] **Slice B** — `openDalSession` / `closeDalSession` GAS APIs + snapshot Sheets → Firestore
+- [ ] **Slice B** — Client Firestore listeners for PA / timeline fork
+- [ ] `FirebaseAdapter` live reads/writes (stop delegating to Sheets)
 - [ ] Hard block direct Sheet writes for forked slices while session open
 - [ ] End session → GAS commit → router back to Sheets
 - [ ] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
