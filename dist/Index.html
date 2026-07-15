@@ -3770,9 +3770,8 @@ body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > 
     align-items: center;
 }
 
-body.mobile-pa-compact #btn-print-lists { order: 1; }
-body.mobile-pa-compact #btn-mobile-pa-search { order: 2; }
-body.mobile-pa-compact #btn-save-pa-mobile { order: 3; }
+body.mobile-pa-compact #btn-mobile-pa-search { order: 1; }
+body.mobile-pa-compact #btn-save-pa-mobile { order: 2; }
 
 body.mobile-pa-compact #project-assets-modal-overlay .modal > div:first-child > div:last-child {
     margin-right: 0 !important;
@@ -8560,16 +8559,14 @@ body.station-dock-screensaver-active #station-dock-shell {
   <div class="modal" style="width: 100% !important; max-width: 100% !important; height: 100% !important; max-height: 100% !important; border-radius: 0; border: 4px solid transparent; box-sizing: border-box; display: flex; flex-direction: column; padding: 0; background: var(--bg-dark);">
     <!-- Header -->
     <div style="height: 70px; background: var(--bg-sidebar); border-bottom: 1px solid #333; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; flex-shrink: 0; position: relative; z-index: 100; overflow: visible;">
-      <div style="display:flex; align-items:center; gap: 15px;">
-          <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing: 1px;" id="pa-modal-title">PROJECT EQUIPMENT LIST</div>
-          <div style="width: 2px; height: 20px; background: #333; margin: 0 10px;"></div>
-          <div id="pa-view-toggles" style="display:flex; gap:6px;">
+      <div id="pa-header-left" style="display:flex; align-items:center; gap: 12px; min-width: 0;">
+          <div style="color:#fff; font-weight:900; font-size:16px; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: min(42vw, 520px);" id="pa-modal-title"></div>
+          <button id="btn-master-operation" class="btn-outline btn-sm" style="border-color:#f59e0b; color:#f59e0b; margin:0; flex-shrink:0; display:none; height: 38px; box-sizing: border-box;" onclick="startOperationUI('CHECK-OUT', event)">START CHECK-OUT</button>
+          <div id="pa-header-divider-views" style="width: 2px; height: 20px; background: #333; flex-shrink: 0;"></div>
+          <div id="pa-view-toggles" style="display:flex; gap:6px; flex-shrink: 0;">
              <button id="pa-view-logistics-btn" class="btn-outline btn-sm pa-view-btn active" onclick="switchPaView('logistics')" style="height: 38px; box-sizing: border-box;">LOGISTICS</button>
              <button id="pa-view-offer-btn" class="btn-outline btn-sm pa-view-btn" onclick="switchPaView('offer')" style="height: 38px; box-sizing: border-box;">OFFER</button>
           </div>
-          <div style="width: 2px; height: 20px; background: #333; margin: 0 5px;"></div>
-          <button id="btn-master-operation" class="btn-outline btn-sm" style="border-color:#f59e0b; color:#f59e0b; margin:0; flex-shrink:0; display:none; height: 38px; box-sizing: border-box;" onclick="startOperationUI('CHECK-OUT', event)">START CHECK-OUT</button>
-          <button id="btn-print-lists" class="btn-outline btn-sm" style="border-color:#3b82f6; color:#3b82f6; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box;" onclick="openPrintModal()">🖨️ PRINT</button>
           <button id="btn-mobile-pa-search" class="btn-outline btn-sm" style="display:none; border-color:#10b981; color:#10b981; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box;" onclick="openMobilePaVaultSearch()">🔍 SEARCH</button>
           <button id="btn-save-pa-mobile" class="btn-main btn-sm" style="display:none; margin:0; flex-shrink:0; height: 38px; box-sizing: border-box; padding: 0 14px !important;" onclick="saveProjectAssets()">SAVE</button>
       </div>
