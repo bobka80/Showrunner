@@ -2,21 +2,34 @@
 <script>
 window.dalSessionState = { status: 'normal', sessionType: '' };
 
+window.dalCanShowPrepButtons = function() {
+  if (typeof canManageProjectLifecycle === 'function' && !canManageProjectLifecycle()) return false;
+  var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+  return !!(projectId && projectId !== 'NEW');
+};
+
 window.refreshDalSessionBanner = function() {
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
   var banner = document.getElementById('dal-session-banner');
   var startBtn = document.getElementById('dal-prep-start-btn');
   var endBtn = document.getElementById('dal-prep-end-btn');
-  if (!projectId || projectId === 'NEW') {
+  var canShow = window.dalCanShowPrepButtons();
+
+  if (!canShow) {
     if (banner) banner.style.display = 'none';
     if (startBtn) startBtn.style.display = 'none';
     if (endBtn) endBtn.style.display = 'none';
     return;
   }
+
+  // Show START PREP immediately for managers on saved projects; refine after server round-trip.
+  if (startBtn) startBtn.style.display = 'inline-flex';
+  if (endBtn) endBtn.style.display = 'none';
+  if (banner) banner.style.display = 'none';
+
   google.script.run
     .withFailureHandler(function() {
-      if (banner) banner.style.display = 'none';
-      if (startBtn) startBtn.style.display = 'none';
+      if (startBtn && window.dalCanShowPrepButtons()) startBtn.style.display = 'inline-flex';
       if (endBtn) endBtn.style.display = 'none';
     })
     .withSuccessHandler(function(info) {

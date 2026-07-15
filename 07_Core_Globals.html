@@ -380,6 +380,8 @@ window.applyProjectEditorMode = function(projectId) {
     const d = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
     bootMiniCalendar(d, pid);
   }
+
+  if (typeof window.refreshDalSessionBanner === 'function') window.refreshDalSessionBanner();
 };
 
 window.globalMonthShifts = window.globalMonthShifts || [];
