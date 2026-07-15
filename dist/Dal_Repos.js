@@ -127,3 +127,50 @@ function createLedgerRepo_() {
     }
   };
 }
+
+// ==========================================
+// --- PHASE 3 SHEET WRITE HELPERS (scoped rows — no clearContents) ---
+// ==========================================
+
+function dalHeaderMapFromRows_(headerRow) {
+  var map = {};
+  if (!headerRow) return map;
+  headerRow.forEach(function (h, i) { map[h.toString().trim()] = i; });
+  return map;
+}
+
+/**
+ * Delete rows where column === matchValue (bottom-first). Returns header map + deleted row copies.
+ */
+function dalDeleteRowsByColumn_(sheet, columnName, matchValue) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length === 0) return { map: {}, cols: 0, deletedRows: [] };
+  var map = dalHeaderMapFromRows_(data[0]);
+  var colIdx = map[columnName];
+  if (colIdx === undefined) return { map: map, cols: data[0].length, deletedRows: [] };
+  var deletedRows = [];
+  var rowNums = [];
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][colIdx]) === String(matchValue)) {
+      deletedRows.push(data[i]);
+      rowNums.push(i + 1);
+    }
+  }
+  rowNums.sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+  return { map: map, cols: data[0].length, deletedRows: deletedRows };
+}
+
+function dalAppendRows_(sheet, rows) {
+  if (!rows || rows.length === 0) return;
+  var startRow = Math.max(sheet.getLastRow(), 1) + 1;
+  if (sheet.getLastRow() === 0) startRow = 1;
+  sheet.getRange(startRow, 1, rows.length, rows[0].length).setValues(rows);
+}
+
+function dalUpdateSheetRow_(sheet, sheetRow, rowData) {
+  sheet.getRange(sheetRow, 1, 1, rowData.length).setValues([rowData]);
+}
+
+function dalDeleteSheetRows_(sheet, rowNums) {
+  rowNums.slice().sort(function (a, b) { return b - a; }).forEach(function (r) { sheet.deleteRows(r, 1); });
+}

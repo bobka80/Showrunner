@@ -62,21 +62,6 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
     assertActorCanEditTimeline(actor);
     const sheets = verifyDatabaseSchema();
 
-    const processSheet = (sheet) => {
-      let data = sheet.getDataRange().getValues();
-      let map = {};
-      if(data.length > 0) data[0].forEach((h, i) => map[h.toString().trim()] = i);
-      let keptRows = [data[0]];
-      let deletedRows = [];
-      for (let i = 1; i < data.length; i++) {
-                if (data[i][map['project_uid']] !== folderId) keptRows.push(data[i]);
-                else deletedRows.push(data[i]);
-      }
-      sheet.clearContents();
-      if (keptRows.length > 0) sheet.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
-      return { map: map, cols: data[0].length, keptCount: keptRows.length, deletedRows: deletedRows };
-    };
-
     let newTimestamp = new Date().toISOString();
 
     // Concurrency Check for Timeline
@@ -100,10 +85,10 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
         }
     }
 
-    // 1. Wipe Old State for this specific Project and Phase
-    let sInfo = processSheet(sheets.shifts);
-    let bInfo = processSheet(sheets.blocks);
-    let oInfo = processSheet(sheets.overrides);
+    // 1. Remove old state for this project only (scoped rows — no clearContents)
+    let sInfo = dalDeleteRowsByColumn_(sheets.shifts, 'project_uid', folderId);
+    let bInfo = dalDeleteRowsByColumn_(sheets.blocks, 'project_uid', folderId);
+    let oInfo = dalDeleteRowsByColumn_(sheets.overrides, 'project_uid', folderId);
     let sMap = sInfo.map; let bMap = bInfo.map; let oMap = oInfo.map;
 
     // 2. Inject New Shifts
@@ -123,7 +108,7 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
         if(sMap['paid_amount'] !== undefined) r[sMap['paid_amount']] = s.paid_amount || '';
         return r;
       });
-      sheets.shifts.getRange(sInfo.keptCount + 1, 1, shiftRows.length, sInfo.cols).setValues(shiftRows);
+      dalAppendRows_(sheets.shifts, shiftRows);
     }
 
     // 3. Inject New Phases
@@ -139,7 +124,7 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
         if(bMap['Note'] !== undefined) r[bMap['Note']] = p.note || "";
         return r;
       });
-      sheets.blocks.getRange(bInfo.keptCount + 1, 1, phaseRows.length, bInfo.cols).setValues(phaseRows);
+      dalAppendRows_(sheets.blocks, phaseRows);
     }
 
     // 4. Inject New Overrides
@@ -152,12 +137,12 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
         if(oMap['Dept_Name'] !== undefined) r[oMap['Dept_Name']] = overrides[email];
         return r;
       });
-      sheets.overrides.getRange(oInfo.keptCount + 1, 1, overrideRows.length, oInfo.cols).setValues(overrideRows);
+      dalAppendRows_(sheets.overrides, overrideRows);
     }
     
     // 5. Inject New Sub-Events if provided
     if (subEvents !== null) {
-      let tInfo = processSheet(sheets.timelines);
+      let tInfo = dalDeleteRowsByColumn_(sheets.timelines, 'project_uid', folderId);
       let tMap = tInfo.map;
       if (subEvents.length > 0) {
         let tlRows = subEvents.map(t => {
@@ -171,7 +156,7 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
           if(tMap['Note'] !== undefined) r[tMap['Note']] = t.Note || "";
           return r;
         });
-        sheets.timelines.getRange(tInfo.keptCount + 1, 1, tlRows.length, tInfo.cols).setValues(tlRows);
+        dalAppendRows_(sheets.timelines, tlRows);
       }
     }
 

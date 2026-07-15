@@ -148,10 +148,8 @@ function batchProcessOperationsSheets_(projectId, batch, actor = "System UI") {
         if (ledgerData.length > 0) ledgerData[0].forEach((h, i) => lMap[h.toString().trim()] = i);
         
         let sessionRows = [];
-        let keptRows = [ledgerData[0]];
         for (let i = 1; i < ledgerData.length; i++) {
             if (ledgerData[i][lMap['session_uid']] === sessionUid) sessionRows.push(ledgerData[i]);
-            else keptRows.push(ledgerData[i]);
         }
         
         let paData = sheets.projectAssets.getDataRange().getValues();
@@ -218,11 +216,8 @@ function batchProcessOperationsSheets_(projectId, batch, actor = "System UI") {
             }
         });
         
-        let finalLedger = keptRows.concat(sessionRows);
-        sheets.opsLedger.clearContents();
-        if (finalLedger.length > 0) {
-            sheets.opsLedger.getRange(1, 1, finalLedger.length, finalLedger[0].length).setValues(finalLedger);
-        }
+        dalDeleteRowsByColumn_(sheets.opsLedger, 'session_uid', sessionUid);
+        dalAppendRows_(sheets.opsLedger, sessionRows);
         
         flushCache();
         

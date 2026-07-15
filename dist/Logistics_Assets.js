@@ -16,16 +16,15 @@ function saveProjectAssetsDeltaSheets_(projectId, deltas, actor = "System UI") {
     return executeWithRetry(() => {
         assertActorCanEditProjectAssets(actor);
         const sheets = verifyDatabaseSchema();
-        let data = sheets.projectAssets.getDataRange().getValues();
-        let map = {}; if(data.length > 0) data[0].forEach((h,i)=>map[h.toString().trim()]=i);
+        const sheet = sheets.projectAssets;
+        let data = sheet.getDataRange().getValues();
+        if (data.length === 0) throw new Error("Project_Assets sheet has no header row.");
+        let map = dalHeaderMapFromRows_(data[0]);
         
-        let keptRows = [data[0]];
         let projectRows = [];
-        for(let i=1; i<data.length; i++) { 
-            if(String(data[i][map['project_uid']]) !== String(projectId)) {
-                keptRows.push(data[i]); 
-            } else {
-                projectRows.push({ data: data[i] });
+        for (let i = 1; i < data.length; i++) {
+            if (String(data[i][map['project_uid']]) === String(projectId)) {
+                projectRows.push({ data: data[i].slice(), sheetRow: i + 1 });
             }
         }
         
@@ -86,11 +85,23 @@ function saveProjectAssetsDeltaSheets_(projectId, deltas, actor = "System UI") {
             }
         });
         
-        projectRows = projectRows.filter(r => (parseInt(r.data[map['assigned_quantity']], 10) || 0) > 0);
-        projectRows.forEach(r => keptRows.push(r.data));
+        let rowsToUpdate = [];
+        let rowsToDelete = [];
+        let rowsToAppend = [];
+        projectRows.forEach(r => {
+            let qty = parseInt(r.data[map['assigned_quantity']], 10) || 0;
+            if (qty <= 0) {
+                if (r.sheetRow) rowsToDelete.push(r.sheetRow);
+            } else if (r.sheetRow) {
+                rowsToUpdate.push(r);
+            } else {
+                rowsToAppend.push(r.data);
+            }
+        });
         
-        sheets.projectAssets.clearContents();
-        if(keptRows.length > 0) sheets.projectAssets.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
+        rowsToUpdate.forEach(r => dalUpdateSheetRow_(sheet, r.sheetRow, r.data));
+        dalDeleteSheetRows_(sheet, rowsToDelete);
+        dalAppendRows_(sheet, rowsToAppend);
         
         flushCache();
         writeToAuditLog(actor, "UPDATE", "PROJECT_ASSETS", projectId, projectId, `Applied ${deltas.length} delta change(s) to event assets.`);

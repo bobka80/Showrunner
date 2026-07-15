@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 2 router shipped** (v580+). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 3 delta-only implemented** (awaiting concurrency smoke + ship). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -308,10 +308,28 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 
 **Design lock Phase 3.** No Firebase until this ships and is verified with concurrent-user smoke tests.
 
-- [ ] `saveProjectAssetsDelta` — replace `clearContents()` + `setValues()` with true delta/range writes
-- [ ] `saveTimelineData` — same for Shifts/Phases/Overrides
-- [ ] Director smoke test: two managers editing same project PA — no silent overwrite
+- [x] `saveProjectAssetsDeltaSheets_` — scoped row update/delete/append (no `clearContents`)
+- [x] `saveTimelineDataSheets_` — scoped project-row delete + append per tab
+- [x] `batchProcessOperationsSheets_` — session-scoped delete + append on `Operations_Ledger`
+- [x] Shared helpers — `dalDeleteRowsByColumn_`, `dalAppendRows_`, `dalUpdateSheetRow_` in `Dal_Repos.js`
+- [ ] Director concurrency smoke (see below) → `PRE_SHIP_DAL_CONCURRENCY_OK=1` → `node milestone.js`
 - [ ] `node milestone.js` + note in RELEASES.md
+
+**Preflight (2026-07-15):** Replaced full-tab `clearContents()` + `setValues()` on three hot paths with project/session-scoped row writes. Other PA save paths in `Logistics_Assets.js` still use full rewrite (out of Phase 3 scope).
+
+### Phase 3 postflight — mandatory concurrency smoke
+
+Hard refresh once after deploy. **Do not set `PRE_SHIP_DAL_CONCURRENCY_OK=1` until all pass.**
+
+1. **PA — two managers, same project:** Both open Equipment → edit different lines → **SAVE EQUIPMENT** → neither edit silently disappears.
+2. **Timeline — two users within 2s:** Second save shows `COLLISION_DETECTED` toast (not silent overwrite).
+3. **Checkout — two projects:** Parallel checkout sessions → both ledgers intact after scans.
+
+Then ship:
+
+```powershell
+$env:PRE_SHIP_DAL_CONCURRENCY_OK=1; node milestone.js "DAL Phase 3: delta-only saves on PA, timeline, ledger (scoped row writes)"
+```
 
 ---
 
