@@ -70,6 +70,7 @@ Is: **collaborative room** with shared live state.
 ### Phase A — Room + live shifts on fork
 - [x] Enter/leave timeline room APIs (`openDalSession` / `closeDalSession` type `timelineCollab`)
 - [x] Snapshot timeline → Firebase on START COLLAB
+- [x] Hotfix: open/close must not hold ScriptLock across Firestore (starved presence → stuck 🔒 + START COLLAB timeout)
 - [ ] Multi-user shift drag with drag-end writes
 - [x] Manual END COLLAB commit (last-leave auto-commit later)
 

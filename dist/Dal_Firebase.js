@@ -141,9 +141,12 @@ function dalCommitPaFromFirestore_(projectId) {
   var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
   // Drop _meta first so live UI closes before the slower row drain finishes.
   firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
-  dalDeleteRowsByColumn_(hdr.sheet, 'project_uid', projectId);
-  var rows = projectRows.map(function (r) { return r.data; });
-  dalAppendRows_(hdr.sheet, rows);
+  // Sheet write under its own short lock — caller must not hold ScriptLock across Firestore UrlFetch.
+  executeWithRetry(function () {
+    dalDeleteRowsByColumn_(hdr.sheet, 'project_uid', projectId);
+    var rows = projectRows.map(function (r) { return r.data; });
+    dalAppendRows_(hdr.sheet, rows);
+  });
   firestoreDeleteCollection_(dalFirestorePaCollection_(projectId));
 }
 
@@ -183,14 +186,9 @@ function dalReadTimelineStateFromFirestore_(projectId) {
 }
 
 function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode) {
-  __dalTimelineSheetsDirect_ = true;
-  var state;
-  try {
-    state = getTimelineDataSheets_(projectId, mode || 'main');
-  } finally {
-    __dalTimelineSheetsDirect_ = false;
-  }
-  dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor);
+  // Status is "opening" — Sheets path allowed. getTimelineDataSheets_ takes its own short lock.
+  var state = getTimelineDataSheets_(projectId, mode || 'main');
+  // Meta first so UI can see the fork sooner; state doc carries the payload.
   firestoreSetTimelineSessionMeta_(projectId, {
     sessionUid: sessionUid,
     sessionType: DAL_SESSION_TYPE.TIMELINE_COLLAB,
@@ -199,6 +197,7 @@ function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode) {
     domain: 'timeline',
     mode: mode || 'main'
   });
+  dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor);
 }
 
 function dalCommitTimelineFromFirestore_(projectId, actor) {
@@ -208,23 +207,18 @@ function dalCommitTimelineFromFirestore_(projectId, actor) {
     firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
     return;
   }
-  // Commit through Sheets path without nested ScriptLock (caller already holds DAL session lock).
-  __dalTimelineSheetsDirect_ = true;
-  try {
-    saveTimelineDataSheets_(
-      projectId,
-      snap.mode || 'main',
-      snap.shifts || [],
-      null,
-      snap.phases || [],
-      snap.overrides || {},
-      null,
-      actor || 'System UI',
-      null
-    );
-  } finally {
-    __dalTimelineSheetsDirect_ = false;
-  }
+  // Status is "committing" — Sheets path allowed. saveTimelineDataSheets_ takes its own short lock.
+  saveTimelineDataSheets_(
+    projectId,
+    snap.mode || 'main',
+    snap.shifts || [],
+    null,
+    snap.phases || [],
+    snap.overrides || {},
+    null,
+    actor || 'System UI',
+    null
+  );
   firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
 }
 

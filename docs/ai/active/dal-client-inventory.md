@@ -45,7 +45,7 @@
 | `deleteProjectFull` | `02_Project_Editor_Core.html` |
 | `generateProjectFolders` | `02_Project_Editor_Core.html` |
 | `printEquipmentList` | `02_Project_Editor_Core.html` |
-| `reportProjectPresence` | `02_Project_Editor_Core.html` |
+| `reportProjectPresence` | `02_Project_Editor_Core.html`, `03a1_Timeline_Dal_Session.html`, `03a_Timeline_Boot.html` |
 | `restoreProjectWithConflictCheck` | `02_Project_Editor_Core.html` |
 | `saveEventFromUI` | `02_Project_Editor_Core.html` |
 | `setProjectStatus` | `02_Project_Editor_Core.html` |
@@ -196,8 +196,8 @@
 | 02e6_Dal_Session.html | 3 | 0 |
 | 02e7_Dal_Firestore_Client.html | 2 | 0 |
 | 02g_Project_Reports.html | 0 | 2 |
-| 03a_Timeline_Boot.html | 3 | 0 |
-| 03a1_Timeline_Dal_Session.html | 3 | 0 |
+| 03a_Timeline_Boot.html | 4 | 0 |
+| 03a1_Timeline_Dal_Session.html | 4 | 0 |
 | 03b_Timeline_Shifts.html | 0 | 0 |
 | 03c_Timeline_Phases.html | 0 | 0 |
 | 03d_Timeline_Crew.html | 0 | 0 |

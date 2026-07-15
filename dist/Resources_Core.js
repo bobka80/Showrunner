@@ -733,8 +733,9 @@ function reportProjectPresence(projectId, userName, action, activeModule) {
     let key = 'PRESENCE_' + projectId;
     let lock = LockService.getScriptLock();
     
-    // Try to lock RAM for 2 seconds to prevent read/write overlap
-    if (lock.tryLock(2000)) {
+    // Presence must not lose to DAL Firestore holds — open/close no longer hold ScriptLock across UrlFetch.
+    // Still wait longer than before so a brief sheet write does not leave the door stuck on the timeline.
+    if (lock.tryLock(8000)) {
         try {
             let activeStr = cache.get(key);
             let activeUsers = activeStr ? JSON.parse(activeStr) : {};

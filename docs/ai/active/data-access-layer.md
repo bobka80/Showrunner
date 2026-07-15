@@ -345,6 +345,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Slice B** — Manager UI: START PREP / END PREP + banner (`02e6_Dal_Session.html`)
 - [x] **Slice C** — Client Firestore SDK listeners (real-time multi-user during prep; saves still via GAS)
 - [x] **Slice C** — Timeline collab session Phase A (`timelineCollab` open/close + Firestore fork via GAS; START/END COLLAB UI)
+- [x] **Hotfix** — `openDalSession` / `closeDalSession` release ScriptLock during Firestore UrlFetch (was starving presence → stuck 🔒 door + client timeout on START COLLAB)
 - [ ] End session → reconciliation engine (Phase 5)
 - [ ] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
 

@@ -356,7 +356,14 @@ function cancelShifts() {
   document.getElementById('shift-layer').style.display = 'none';
   
   window.activePresenceModule = 'main'; // Unlock the door
-  if (typeof startPresencePing === 'function' && targetFolderId) startPresencePing(targetFolderId);
+  window.isTimelineOccupiedBy = null;
+  var leavePid = targetFolderId || (document.getElementById('edit-folder-id') && document.getElementById('edit-folder-id').value);
+  var leaveUser = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown';
+  // Explicit leave clears a stuck "timeline" module if prior pings lost the ScriptLock.
+  if (leavePid) {
+    try { google.script.run.reportProjectPresence(leavePid, leaveUser, 'leave'); } catch (eLeave) {}
+    if (typeof startPresencePing === 'function') startPresencePing(leavePid);
+  }
   
   if (cameFromRoster) {
     document.getElementById('month-roster-layer').style.display = 'flex';
