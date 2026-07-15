@@ -21,14 +21,18 @@ window.refreshTimelineDalBanner = function() {
   google.script.run
     .withFailureHandler(function() { /* keep current */ })
     .withSuccessHandler(function(info) {
-      var isOpen = info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'timelineCollab';
+      var st = info ? String(info.status).toLowerCase() : '';
+      var isTl = info && info.sessionType === 'timelineCollab';
+      var isOpen = isTl && st === 'open';
+      var isOpening = isTl && st === 'opening';
       window.dalTimelineSessionOpen = !!isOpen;
       if (banner) {
-        banner.style.display = isOpen ? 'block' : 'none';
+        banner.style.display = (isOpen || isOpening) ? 'block' : 'none';
         if (isOpen) banner.textContent = '👥 TIMELINE COLLAB — saves go to Firebase until End Collab';
+        else if (isOpening) banner.textContent = '⏳ TIMELINE COLLAB opening… — End Collab aborts a stuck start';
       }
-      if (startBtn) startBtn.style.display = (isOpen || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly)) ? 'none' : 'inline-flex';
-      if (endBtn) endBtn.style.display = isOpen ? 'inline-flex' : 'none';
+      if (startBtn) startBtn.style.display = (isOpen || isOpening || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly)) ? 'none' : 'inline-flex';
+      if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
     })
     .getDalSessionInfo(projectId);
 };
