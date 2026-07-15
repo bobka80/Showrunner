@@ -7,6 +7,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 
 const DAL_HOT_PATTERNS = [
+  /^Dal_[A-Za-z0-9_]+\.js$/i,
   /^Logistics_[A-Za-z0-9_]+\.js$/i,
   /^Operations\.js$/i,
   /^Resources_Core\.js$/i,

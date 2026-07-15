@@ -1,9 +1,8 @@
 /**
  * SM Showrunner (smuruner) - Clean 8 Architecture
- * Dal_Repos.js - Data access layer: repository seams + SheetsAdapter (Phase 1)
+ * Dal_Repos.js - Data access layer: repository seams + SheetsAdapter (Phase 1–2)
  *
- * Zero behavior change: public GAS APIs delegate to repos; SheetsAdapter calls
- * *Sheets_* impl functions in Logistics_* / Operations.js (Slice B).
+ * Public GAS APIs → repos → projectDataRouter → SheetsAdapter → *Sheets_* impls.
  *
  * IMPORTANT (GAS): Adapter/repo method names must NOT mirror global server API
  * names (saveProjectAssetsDelta, getProjectAssets, …) — those names are reserved
@@ -18,7 +17,7 @@ var __dalTimelineRepoSingleton = null;
 var __dalLedgerRepoSingleton = null;
 
 // ==========================================
-// --- ADAPTER REGISTRY (Sheets only — Phase 1) ---
+// --- ADAPTER REGISTRY ---
 // ==========================================
 
 function getSheetsAdapter() {
@@ -30,27 +29,31 @@ function getSheetsAdapter() {
 
 function getProjectAssetsRepo() {
   if (!__dalProjectAssetsRepoSingleton) {
-    __dalProjectAssetsRepoSingleton = createProjectAssetsRepo_(getSheetsAdapter());
+    __dalProjectAssetsRepoSingleton = createProjectAssetsRepo_();
   }
   return __dalProjectAssetsRepoSingleton;
 }
 
 function getTimelineRepo() {
   if (!__dalTimelineRepoSingleton) {
-    __dalTimelineRepoSingleton = createTimelineRepo_(getSheetsAdapter());
+    __dalTimelineRepoSingleton = createTimelineRepo_();
   }
   return __dalTimelineRepoSingleton;
 }
 
 function getLedgerRepo() {
   if (!__dalLedgerRepoSingleton) {
-    __dalLedgerRepoSingleton = createLedgerRepo_(getSheetsAdapter());
+    __dalLedgerRepoSingleton = createLedgerRepo_();
   }
   return __dalLedgerRepoSingleton;
 }
 
+function dalAdapterFor_(projectId, domain) {
+  return projectDataRouter(domain, resolveDalSessionStatus_(projectId, domain));
+}
+
 // ==========================================
-// --- SHEETS ADAPTER (delegates to existing save/read paths) ---
+// --- SHEETS ADAPTER (delegates to *Sheets_* impls) ---
 // ==========================================
 
 function createSheetsAdapter_() {
@@ -86,41 +89,41 @@ function createSheetsAdapter_() {
 // --- DOMAIN REPOSITORIES ---
 // ==========================================
 
-function createProjectAssetsRepo_(adapter) {
+function createProjectAssetsRepo_() {
   return {
     saveDelta: function (projectId, deltas, actor) {
-      return adapter.persistProjectAssetsDelta(projectId, deltas, actor);
+      return dalAdapterFor_(projectId, DAL_DOMAIN.PROJECT_ASSETS).persistProjectAssetsDelta(projectId, deltas, actor);
     },
     getForProject: function (projectId, startDateStr, endDateStr) {
-      return adapter.fetchProjectAssets(projectId, startDateStr, endDateStr);
+      return dalAdapterFor_(projectId, DAL_DOMAIN.PROJECT_ASSETS).fetchProjectAssets(projectId, startDateStr, endDateStr);
     }
   };
 }
 
-function createTimelineRepo_(adapter) {
+function createTimelineRepo_() {
   return {
     save: function (folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents) {
-      return adapter.persistTimelineData(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents);
+      return dalAdapterFor_(folderId, DAL_DOMAIN.TIMELINE).persistTimelineData(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents);
     },
     getForProject: function (folderId, mode) {
-      return adapter.fetchTimelineData(folderId, mode);
+      return dalAdapterFor_(folderId, DAL_DOMAIN.TIMELINE).fetchTimelineData(folderId, mode);
     }
   };
 }
 
-function createLedgerRepo_(adapter) {
+function createLedgerRepo_() {
   return {
     batchProcess: function (projectId, batch, actor) {
-      return adapter.persistOperationsBatch(projectId, batch, actor);
+      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).persistOperationsBatch(projectId, batch, actor);
     },
     startOperation: function (projectId, operationType, actor) {
-      return adapter.startOperationSession(projectId, operationType, actor);
+      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).startOperationSession(projectId, operationType, actor);
     },
     finalizeOperation: function (projectId, actor) {
-      return adapter.finalizeOperationSession(projectId, actor);
+      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).finalizeOperationSession(projectId, actor);
     },
     processRfidScan: function (projectId, rfidTag, actor) {
-      return adapter.processRfidScanOp(projectId, rfidTag, actor);
+      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).processRfidScanOp(projectId, rfidTag, actor);
     }
   };
 }

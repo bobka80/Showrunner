@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 1 Slice B shipped** (public APIs → repos → Sheets impl). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 2 router shipped** (v580+). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -216,18 +216,91 @@ Phase 6  Cache Coordinator (per-view policies, tag invalidation)
 - [x] `ProjectAssetsRepo` skeleton wraps `saveProjectAssetsDelta` boundary
 - [x] `TimelineRepo` skeleton wraps `saveTimelineData` boundary
 - [x] Slice B — public GAS APIs delegate to repos; `*Sheets_*` impls called by adapter only (2026-07-15)
-- [ ] Ban **new** direct sheet access in touched files — enforced by `scripts/dal-persistence-lint.js` on pre-ship (see [dal-pre-ship-gates.md](dal-pre-ship-gates.md))
+- [x] Persistence lint on pre-ship — `scripts/dal-persistence-lint.js` (ongoing; no new client sheet access)
 
 ### Phase 2 — Router + inventory tables
 
-- [ ] **Touchpoint table** — domain → primary GAS files → primary sheets → client callers → fragile zone link
-- [ ] **Write boundary diagram** — what repos wrap first vs migrate later
-- [ ] **“Not on fork” list** — vault master, crew roster, financials, config (Sheets-only until explicitly moved)
-- [ ] **Router state machine** — `normal` | `session-open` | `committing` | `closed`
-- [ ] Centralized `projectDataRouter(domain, sessionStatus)` — **Sheets only** for now
-- [ ] **Firebase path layout** — reconcile `projects/{id}/…` vs `sessions/{id}/{type}/` (design lock vs [session-fork-platform.md](../topics/session-fork-platform.md))
-- [ ] **Test matrix** — manual checks after each migration slice
+- [x] **`Dal_Router.js`** — `projectDataRouter(domain, sessionStatus)` + `DAL_DOMAIN` / `DAL_SESSION` (2026-07-15)
+- [x] Repos resolve adapter via router on each call (Sheets-only — zero behavior change)
+- [x] **Touchpoint table** — § Phase 2 inventory below
+- [x] **Write boundary diagram** — § Phase 2 inventory below
+- [x] **“Not on fork” list** — § Phase 2 inventory below
+- [x] **Router state machine** — `normal` | `session-open` | `committing` | `closed` (Phase 2: all → Sheets)
+- [x] **Firebase path layout** — canonical `/projects/{projectId}/assets|timeline/` (design lock); `sessions/…` legacy doc only — see § Firebase paths
+- [x] **Test matrix** — § Phase 2 postflight below
 - [x] **Design lock** — [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) (2026-07-13)
+
+---
+
+## Phase 2 — inventory (2026-07-15)
+
+### Router state machine (Phase 2 behavior)
+
+```text
+normal         → SheetsAdapter  (all domains — today)
+session-open   → SheetsAdapter  (Phase 4: Firebase for projectAssets + timeline only)
+committing     → SheetsAdapter  (Phase 4–5: GAS bulk commit + reconciliation)
+closed         → SheetsAdapter
+ledger domain  → SheetsAdapter always (atomic per-op — design lock §2; no session fork)
+```
+
+Code: `Dal_Router.js` — `projectDataRouter()`, `resolveDalSessionStatus_()` (returns `normal` until Phase 4 session registry).
+
+### Touchpoint table (P0 repos — wired)
+
+| Domain | Repo | Public GAS API | Sheets | Primary client callers | Fragile zone |
+|--------|------|----------------|--------|------------------------|--------------|
+| Project Assets | `ProjectAssetsRepo` | `saveProjectAssetsDelta`, `getProjectAssets` | `Project_Assets` | `02e5_Logic_Sync.html`, `02c_Project_Operations.html`, `02_Project_Editor_Logistics.html`, `02a_Project_Equipment.html`, `01h_Mobile_Assets.html` | Formula explosion, UID/healing — [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md) |
+| Timeline | `TimelineRepo` | `saveTimelineData`, `getTimelineData` | `Shift_Assignments`, `Phase_Blocks`, `Dept_Overrides`, `Project_Timelines` | `03a_Timeline_Boot.html`, `02_Project_Editor_Logistics.html` | Collision timestamp (2s index) |
+| Ledger / checkout | `LedgerRepo` | `batchProcessOperations`, `startEventOperation`, `finalizeEventOperation`, `processRfidScan` | `Operations_Ledger`, `Projects_Index` (session fields) | `02c_Project_Operations.html` | Warehouse ledger — [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) |
+
+Full client inventory: [dal-client-inventory.md](dal-client-inventory.md).
+
+### Write boundary diagram
+
+```text
+Client google.script.run
+    → public GAS fn (saveProjectAssetsDelta, …)
+        → get*Repo()
+            → projectDataRouter(domain, sessionStatus)   [Dal_Router.js]
+                → SheetsAdapter                          [Dal_Repos.js — Phase 2: always]
+                    → *Sheets_* impl                     [Logistics_* / Operations.js]
+                        → verifyDatabaseSchema + sheet I/O
+```
+
+**P1 (not repo-wired yet):** `saveProjectAssetsAPI`, `saveTruckArrangementAPI`, `generateLogisticsPayloadAPI`, `saveEventFromUI`, `deleteProjectFull`, vault/admin CRUD.
+
+### “Not on fork” list (Sheets-only until explicit move)
+
+| Domain | GAS / sheets | Notes |
+|--------|--------------|-------|
+| Vault master | `Resources_Vault.js`, VAULT tabs | Admin CRUD; station vault reads |
+| Crew roster / IAM | `Resources_*`, VAULT directory | Not session-fork hot path |
+| Financials | `Projects_Index` planned columns | [topics/financials.md](../topics/financials.md) |
+| System config / visuals | `Resources_Core.js`, settings tabs | Stable reference |
+| Calendar boot / refresh | `getBootPayload`, `getRefreshPayload` | Not behind repos yet |
+| Logistics Hub atomic ops | `LedgerRepo` | Stays Sheets even after prep session (design lock §2) |
+
+### Firebase paths (reconciled for Phase 4+)
+
+**Canonical (implement in Phase 4):** [design lock §2](dal-firebase-design-lock-2026-07-13.md)
+
+- `/projects/{projectId}/assets/`
+- `/projects/{projectId}/timeline/`
+
+**Legacy doc only:** [session-fork-platform.md](../topics/session-fork-platform.md) used `sessions/{projectId}/{sessionType}/` — do **not** implement both. Update session-fork doc stub when Phase 4 starts.
+
+### Phase 2 postflight — test matrix (baseline)
+
+Same as Phase 1 — no new UX. Hard refresh once after deploy.
+
+1. Login — app loads.
+2. PA — edit → **SAVE EQUIPMENT** → persists after reload.
+3. Design → Packing with unsaved edits — saves then switches mode.
+4. Check-out — start session, scan/queue, ledger commits (~1.5s).
+5. Timeline — save shifts.
+
+**Not in scope:** auto-save on every PA edit; delta-only server saves (Phase 3).
 
 ---
 
