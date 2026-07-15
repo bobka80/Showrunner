@@ -13,6 +13,8 @@ function dalMintFirebaseCustomToken_(firebaseUid, extraClaims) {
     throw new Error('Firebase service account missing — set FIREBASE_SERVICE_ACCOUNT_JSON in Script Properties.');
   }
   var now = Math.floor(Date.now() / 1000);
+  // Custom claims MUST be nested under "claims" — top-level keys are ignored by Firebase Auth
+  // and then request.auth.token.showrunner fails Firestore security rules.
   var claim = {
     iss: sa.client_email,
     sub: sa.client_email,
@@ -21,10 +23,8 @@ function dalMintFirebaseCustomToken_(firebaseUid, extraClaims) {
     exp: now + 3600,
     uid: String(firebaseUid || 'showrunner_anon')
   };
-  if (extraClaims) {
-    Object.keys(extraClaims).forEach(function (k) {
-      claim[k] = extraClaims[k];
-    });
+  if (extraClaims && typeof extraClaims === 'object') {
+    claim.claims = extraClaims;
   }
   var header = { alg: 'RS256', typ: 'JWT' };
   var enc = function (obj) {

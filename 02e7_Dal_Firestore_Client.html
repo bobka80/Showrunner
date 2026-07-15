@@ -9,6 +9,7 @@ window.dalPaRemotePending = false;
 window.dalPaLastRemoteSig = '';
 window.dalPaFirestoreListenProjectId = '';
 window.dalMetaAuthority = false;
+window.dalPaLiveSyncFailed = false;
 
 window.dalFsDocToPaAsset_ = function(docId, d) {
   if (!d || docId === '_meta') return null;
@@ -73,14 +74,18 @@ window.dalProcessPaFormulas_ = function(arr) {
 window.dalUpdateRemotePendingBanner_ = function() {
   var banner = document.getElementById('dal-session-banner');
   if (!banner || banner.style.display === 'none') return;
-  if (window.dalPaRemotePending) {
+  if (window.dalPaLiveSyncFailed) {
+    banner.textContent = '🔒 IN PREPARATION — live sync offline (saves still go to Firebase via server)';
+  } else if (window.dalPaRemotePending) {
     banner.textContent = '🔒 IN PREPARATION — remote updates available (save or reload to sync)';
-  } else {
+  } else if (window.dalPaFirestoreUnsub) {
     banner.textContent = '🔒 IN PREPARATION — live sync active';
+  } else {
+    banner.textContent = '🔒 IN PREPARATION — connecting live sync…';
   }
 };
 
-window.dalApplyFirestorePaSnapshot_ = function(docs) {
+window.dalApplyFirestorePaSnapshot_ = function(docs, fromCache) {
   if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) return;
   if (!window.dalPrepUiOpen) return;
 
@@ -89,6 +94,10 @@ window.dalApplyFirestorePaSnapshot_ = function(docs) {
     var a = window.dalFsDocToPaAsset_(entry.id, entry.data);
     if (a) assets.push(a);
   });
+
+  // Empty local-cache snapshot can arrive before the server answer — never wipe the UI with it.
+  if ((!docs || docs.length === 0) && fromCache) return;
+
   var sig = assets.map(function(a) {
     return (a.uid || '') + ':' + (a.qty || 0) + ':' + (a.location || '') + ':' + (a.formula || '') + ':' + (a.assetId || '');
   }).sort().join('|');
@@ -102,6 +111,7 @@ window.dalApplyFirestorePaSnapshot_ = function(docs) {
   }
 
   window.dalPaRemotePending = false;
+  window.dalPaLiveSyncFailed = false;
   var serverAssets = JSON.parse(JSON.stringify(assets));
   window.dalProcessPaFormulas_(serverAssets);
   currentProjectAssets = JSON.parse(JSON.stringify(serverAssets));
@@ -229,12 +239,19 @@ window.startDalPaSessionWatcher = function(projectId) {
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     if (err) {
       console.warn('DAL session watcher auth failed — Sheets poll fallback active:', err);
+      window.dalPaLiveSyncFailed = true;
+      window.dalUpdateRemotePendingBanner_();
       return;
     }
     var metaRef = client.db.collection('projects').doc(String(projectId)).collection('assets').doc('_meta');
     window.dalPaSessionMetaUnsub = metaRef.onSnapshot(function(snap) {
       if (window.dalPrepClosing) return;
+
+      // Empty local-cache "missing" must not kill a prep session that Sheets/UI already treat as open.
+      if (!snap.exists && snap.metadata && snap.metadata.fromCache) return;
+
       window.dalMetaAuthority = true;
+      window.dalPaLiveSyncFailed = false;
 
       var data = snap.exists ? (snap.data() || {}) : null;
       var isPrepOpen = !!(data && String(data.sessionType || '') === 'prep');
@@ -257,6 +274,8 @@ window.startDalPaSessionWatcher = function(projectId) {
     }, function(watchErr) {
       console.warn('DAL session meta listener error — Sheets poll fallback:', watchErr);
       window.dalMetaAuthority = false;
+      window.dalPaLiveSyncFailed = true;
+      window.dalUpdateRemotePendingBanner_();
     });
   });
 };
@@ -270,6 +289,8 @@ window.startDalPaFirestoreListener = function(projectId) {
     if (err) {
       console.warn('DAL Firestore listener auth failed:', err);
       window.dalPaFirestoreListenProjectId = '';
+      window.dalPaLiveSyncFailed = true;
+      window.dalUpdateRemotePendingBanner_();
       return;
     }
     if (window.dalPaFirestoreListenProjectId !== String(projectId)) return;
@@ -279,9 +300,16 @@ window.startDalPaFirestoreListener = function(projectId) {
       snap.forEach(function(doc) {
         docs.push({ id: doc.id, data: doc.data() || {} });
       });
-      window.dalApplyFirestorePaSnapshot_(docs);
+      var fromCache = !!(snap.metadata && snap.metadata.fromCache);
+      window.dalApplyFirestorePaSnapshot_(docs, fromCache);
+      if (!fromCache) {
+        window.dalPaLiveSyncFailed = false;
+        window.dalUpdateRemotePendingBanner_();
+      }
     }, function(listenErr) {
       console.warn('DAL Firestore listener error:', listenErr);
+      window.dalPaLiveSyncFailed = true;
+      window.dalUpdateRemotePendingBanner_();
     });
   });
 };
