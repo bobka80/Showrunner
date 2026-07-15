@@ -8,9 +8,9 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 
 const HOT_FUNCTIONS = [
-  { file: 'Logistics_Assets.js', fn: 'saveProjectAssetsDelta' },
-  { file: 'Logistics_Timeline.js', fn: 'saveTimelineData' },
-  { file: 'Operations.js', fn: 'batchProcessOperations' },
+  { file: 'Logistics_Assets.js', fn: 'saveProjectAssetsDelta', impl: 'saveProjectAssetsDeltaSheets_' },
+  { file: 'Logistics_Timeline.js', fn: 'saveTimelineData', impl: 'saveTimelineDataSheets_' },
+  { file: 'Operations.js', fn: 'batchProcessOperations', impl: 'batchProcessOperationsSheets_' },
 ];
 
 function extractFunctionBlock(src, fnName) {
@@ -30,14 +30,18 @@ function extractFunctionBlock(src, fnName) {
 
 function deltaOnlyStatus() {
   const out = [];
-  HOT_FUNCTIONS.forEach(({ file, fn }) => {
+  HOT_FUNCTIONS.forEach(({ file, fn, impl }) => {
     const fp = path.join(ROOT, file);
     if (!fs.existsSync(fp)) return;
     const src = fs.readFileSync(fp, 'utf8');
-    const block = extractFunctionBlock(src, fn);
+    let block = extractFunctionBlock(src, fn);
     if (!block) {
       out.push({ file, fn, status: 'missing' });
       return;
+    }
+    if (!/\.clearContents\s*\(/.test(block) && impl) {
+      const implBlock = extractFunctionBlock(src, impl);
+      if (implBlock) block = implBlock;
     }
     const hasClear = /\.clearContents\s*\(/.test(block);
     out.push({ file, fn, status: hasClear ? 'full-rewrite' : 'delta-only' });

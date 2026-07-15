@@ -2,8 +2,8 @@
  * SM Showrunner (smuruner) - Clean 8 Architecture
  * Dal_Repos.js - Data access layer: repository seams + SheetsAdapter (Phase 1)
  *
- * Zero behavior change: adapter delegates to existing Logistics_* / Operations.js
- * functions. Public GAS entry points remain unchanged until Slice B rewiring.
+ * Zero behavior change: public GAS APIs delegate to repos; SheetsAdapter calls
+ * *Sheets_* impl functions in Logistics_* / Operations.js (Slice B).
  *
  * IMPORTANT (GAS): Adapter/repo method names must NOT mirror global server API
  * names (saveProjectAssetsDelta, getProjectAssets, …) — those names are reserved
@@ -56,28 +56,28 @@ function getLedgerRepo() {
 function createSheetsAdapter_() {
   return {
     persistProjectAssetsDelta: function (projectId, deltas, actor) {
-      return saveProjectAssetsDelta(projectId, deltas, actor);
+      return saveProjectAssetsDeltaSheets_(projectId, deltas, actor);
     },
     fetchProjectAssets: function (projectId, startDateStr, endDateStr) {
-      return getProjectAssets(projectId, startDateStr, endDateStr);
+      return getProjectAssetsSheets_(projectId, startDateStr, endDateStr);
     },
     persistTimelineData: function (folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents) {
-      return saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents);
+      return saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents);
     },
     fetchTimelineData: function (folderId, mode) {
-      return getTimelineData(folderId, mode);
+      return getTimelineDataSheets_(folderId, mode);
     },
     persistOperationsBatch: function (projectId, batch, actor) {
-      return batchProcessOperations(projectId, batch, actor);
+      return batchProcessOperationsSheets_(projectId, batch, actor);
     },
     startOperationSession: function (projectId, operationType, actor) {
-      return startEventOperation(projectId, operationType, actor);
+      return startEventOperationSheets_(projectId, operationType, actor);
     },
     finalizeOperationSession: function (projectId, actor) {
-      return finalizeEventOperation(projectId, actor);
+      return finalizeEventOperationSheets_(projectId, actor);
     },
     processRfidScanOp: function (projectId, rfidTag, actor) {
-      return processRfidScan(projectId, rfidTag, actor);
+      return processRfidScanSheets_(projectId, rfidTag, actor);
     }
   };
 }

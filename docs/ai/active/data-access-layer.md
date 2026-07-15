@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Design locked 2026-07-13** · Phase 0 + pre-ship gates complete. **Phase 1 Slice A shipped** (repos + SheetsAdapter skeleton). **Rollback baseline:** GAS **v576** — see § Major rollback point.
+**Opened:** 2026-07-05 · **Status:** **Phase 1 Slice B shipped** (public APIs → repos → Sheets impl). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -215,7 +215,7 @@ Phase 6  Cache Coordinator (per-view policies, tag invalidation)
 - [x] `LedgerRepo` skeleton wraps checkout path surface (adapter delegates; public GAS functions not rewired yet)
 - [x] `ProjectAssetsRepo` skeleton wraps `saveProjectAssetsDelta` boundary
 - [x] `TimelineRepo` skeleton wraps `saveTimelineData` boundary
-- [ ] Slice B — old public GAS functions delegate to repos (no second write path)
+- [x] Slice B — public GAS APIs delegate to repos; `*Sheets_*` impls called by adapter only (2026-07-15)
 - [ ] Ban **new** direct sheet access in touched files — enforced by `scripts/dal-persistence-lint.js` on pre-ship (see [dal-pre-ship-gates.md](dal-pre-ship-gates.md))
 
 ### Phase 2 — Router + inventory tables

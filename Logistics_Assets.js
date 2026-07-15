@@ -9,6 +9,10 @@
 // @INDEX: PA_ENGINE -> Project Assets Logistics
 
 function saveProjectAssetsDelta(projectId, deltas, actor = "System UI") {
+    return getProjectAssetsRepo().saveDelta(projectId, deltas, actor);
+}
+
+function saveProjectAssetsDeltaSheets_(projectId, deltas, actor = "System UI") {
     return executeWithRetry(() => {
         assertActorCanEditProjectAssets(actor);
         const sheets = verifyDatabaseSchema();
@@ -95,6 +99,10 @@ function saveProjectAssetsDelta(projectId, deltas, actor = "System UI") {
 }
 
 function getProjectAssets(projectId, startDateStr, endDateStr) {
+    return getProjectAssetsRepo().getForProject(projectId, startDateStr, endDateStr);
+}
+
+function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
     return executeWithRetry(() => {
         const sheets = verifyDatabaseSchema(true);
         const data = getSheetData(sheets.projectAssets);

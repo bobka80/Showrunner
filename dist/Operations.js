@@ -8,6 +8,10 @@
 // ==========================================
 // @INDEX: OPS_BACKEND -> Start Session
 function startEventOperation(projectId, operationType, actor = "System UI") {
+    return getLedgerRepo().startOperation(projectId, operationType, actor);
+}
+
+function startEventOperationSheets_(projectId, operationType, actor = "System UI") {
     return executeWithRetry(() => {
         assertActorCanPerformAssetOperations(actor);
         const sheets = verifyDatabaseSchema();
@@ -66,6 +70,10 @@ function startEventOperation(projectId, operationType, actor = "System UI") {
 // ==========================================
 // @INDEX: OPS_BACKEND -> RFID Processor
 function processRfidScan(projectId, rfidTag, actor = "System UI") {
+    return getLedgerRepo().processRfidScan(projectId, rfidTag, actor);
+}
+
+function processRfidScanSheets_(projectId, rfidTag, actor = "System UI") {
     return executeWithRetry(() => {
         assertActorCanPerformAssetOperations(actor);
         const vaultSheets = verifyVaultSchema(true);
@@ -111,6 +119,10 @@ function processRfidScan(projectId, rfidTag, actor = "System UI") {
 // ==========================================
 // @INDEX: OPS_BACKEND -> Ledger Committer
 function batchProcessOperations(projectId, batch, actor = "System UI") {
+    return getLedgerRepo().batchProcess(projectId, batch, actor);
+}
+
+function batchProcessOperationsSheets_(projectId, batch, actor = "System UI") {
     return executeWithRetry(() => {
         assertActorCanPerformAssetOperations(actor);
         const sheets = verifyDatabaseSchema();
@@ -230,6 +242,10 @@ function batchProcessOperations(projectId, batch, actor = "System UI") {
 // --- FINALIZE OPERATION & PDF GENERATION ---
 // ==========================================
 function finalizeEventOperation(projectId, actor = "System UI") {
+    return getLedgerRepo().finalizeOperation(projectId, actor);
+}
+
+function finalizeEventOperationSheets_(projectId, actor = "System UI") {
     return executeWithRetry(() => {
         assertActorCanPerformAssetOperations(actor);
         const sheets = verifyDatabaseSchema();

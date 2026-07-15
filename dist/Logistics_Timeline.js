@@ -9,6 +9,10 @@
 // @INDEX: CRUD_ENGINE -> Project Timeline Data
 
 function getTimelineData(folderId, mode) {
+  return getTimelineRepo().getForProject(folderId, mode);
+}
+
+function getTimelineDataSheets_(folderId, mode) {
   return executeWithRetry(() => {
     let roster = getCrewSettings(); // Pulls from VAULT
     
@@ -50,6 +54,10 @@ function getTimelineData(folderId, mode) {
 }
 
 function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor = "System UI", subEvents = null) {
+  return getTimelineRepo().save(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents);
+}
+
+function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor = "System UI", subEvents = null) {
   return executeWithRetry(() => {
     assertActorCanEditTimeline(actor);
     const sheets = verifyDatabaseSchema();
