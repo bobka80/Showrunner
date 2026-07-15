@@ -2,6 +2,42 @@
 <script>
 window.dalSessionState = { status: 'normal', sessionType: '' };
 
+window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, invalidateCache) {
+  projectId = projectId || (document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '');
+  var banner = document.getElementById('dal-session-banner');
+  var startBtn = document.getElementById('dal-prep-start-btn');
+  var endBtn = document.getElementById('dal-prep-end-btn');
+  var canShow = window.dalCanShowPrepButtons();
+
+  if (!canShow) {
+    if (banner) banner.style.display = 'none';
+    if (startBtn) startBtn.style.display = 'none';
+    if (endBtn) endBtn.style.display = 'none';
+    return;
+  }
+
+  if (banner) {
+    if (isPrepOpen) {
+      banner.style.display = 'block';
+      if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
+      else banner.textContent = '🔒 IN PREPARATION — live sync active';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+  if (startBtn) startBtn.style.display = isPrepOpen ? 'none' : 'inline-flex';
+  if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
+
+  if (isPrepOpen && projectId) {
+    if (invalidateCache) {
+      try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+    }
+    if (typeof startDalPaFirestoreListener === 'function') startDalPaFirestoreListener(projectId);
+  } else if (typeof stopDalPaFirestoreListener === 'function') {
+    stopDalPaFirestoreListener();
+  }
+};
+
 window.dalCanShowPrepButtons = function() {
   if (typeof canOpenDalPrep === 'function' && !canOpenDalPrep()) return false;
   if (window.projectAssetsReadOnly) return false;
@@ -29,25 +65,14 @@ window.refreshDalSessionBanner = function() {
 
   google.script.run
     .withFailureHandler(function() {
-      if (typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
+      if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher();
       if (startBtn && window.dalCanShowPrepButtons()) startBtn.style.display = 'inline-flex';
       if (endBtn) endBtn.style.display = 'none';
     })
     .withSuccessHandler(function(info) {
       window.dalSessionState = info || {};
       var isPrepOpen = info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'prep';
-      if (banner) {
-        if (isPrepOpen) {
-          banner.style.display = 'block';
-          banner.textContent = '🔒 IN PREPARATION — live sync active';
-          if (typeof startDalPaFirestoreListener === 'function') startDalPaFirestoreListener(projectId);
-        } else {
-          banner.style.display = 'none';
-          if (typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
-        }
-      }
-      if (startBtn) startBtn.style.display = isPrepOpen ? 'none' : 'inline-flex';
-      if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
+      window.dalApplyDalPrepUiState_(isPrepOpen, projectId);
     })
     .getDalSessionInfo(projectId);
 };
@@ -79,7 +104,7 @@ window.openDalPrepSession = function() {
       if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
-      if (typeof startDalPaFirestoreListener === 'function') startDalPaFirestoreListener(projectId);
+      if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
       alert('Preparation started.');
     })
     .openDalSession(projectId, 'prep', typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));
@@ -97,7 +122,7 @@ window.closeDalPrepSession = function() {
     })
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
-      if (typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
+      if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher();
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
       alert('Preparation ended — committed to Sheets.');
