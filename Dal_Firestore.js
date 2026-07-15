@@ -144,8 +144,13 @@ function firestoreDocIdFromName_(name) {
   return parts[parts.length - 1];
 }
 
+function firestoreCollectionParent_(collectionPath) {
+  return String(collectionPath || '').replace(/\/+$/, '') + '/';
+}
+
 function firestoreListCollection_(collectionPath) {
-  var result = firestoreFetch_('get', collectionPath);
+  var path = String(collectionPath || '').replace(/\/+$/, '');
+  var result = firestoreFetch_('get', path);
   if (!result || !result.documents) return [];
   return result.documents.map(function (doc) {
     var plain = firestoreDecodeFields_(doc.fields);
@@ -157,7 +162,7 @@ function firestoreListCollection_(collectionPath) {
 function firestoreWriteDocument_(docPath, obj) {
   var parts = docPath.split('/');
   var docId = parts.pop();
-  var parentPath = parts.join('/');
+  var parentPath = firestoreCollectionParent_(parts.join('/'));
   var got = firestoreFetch_('get', docPath);
   var fields = firestoreEncodeFields_(obj);
   if (got && got.fields) {

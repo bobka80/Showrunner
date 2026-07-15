@@ -10,7 +10,7 @@
 
 var __dalFirebaseAdapterSingleton = null;
 
-var DAL_FIRESTORE_PA_ROWS = 'assets/rows';
+var DAL_FIRESTORE_PA_COLLECTION = 'assets';
 
 function getFirebaseAdapter() {
   if (!__dalFirebaseAdapterSingleton) {
@@ -20,12 +20,14 @@ function getFirebaseAdapter() {
 }
 
 function dalFirestorePaCollection_(projectId) {
-  return 'projects/' + projectId + '/' + DAL_FIRESTORE_PA_ROWS;
+  return 'projects/' + projectId + '/' + DAL_FIRESTORE_PA_COLLECTION;
 }
 
 function dalLoadPaProjectRowsFromFirestore_(projectId, header, map) {
   var docs = firestoreListCollection_(dalFirestorePaCollection_(projectId));
-  return docs.map(function (doc) {
+  return docs.filter(function (doc) {
+    return doc._docId !== '_meta';
+  }).map(function (doc) {
     var row = dalPaRowObjectToSheetArray_(doc, header, map);
     var docId = doc._docId || String(doc.uid || '');
     return { data: row, docId: docId };
@@ -139,7 +141,6 @@ function dalCommitPaFromFirestore_(projectId) {
   var rows = projectRows.map(function (r) { return r.data; });
   dalAppendRows_(hdr.sheet, rows);
   firestoreDeleteCollection_(dalFirestorePaCollection_(projectId));
-  firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
 }
 
 function createFirebaseAdapter_() {
