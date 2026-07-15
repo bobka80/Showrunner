@@ -193,10 +193,7 @@ window.evalDalPrepButtons = function() {
         if (endBtn) endBtn.style.display = 'none';
         return;
     }
-    // Session watcher owns live prep state; Sheets poll only until meta is authoritative.
-    if (typeof window.refreshDalSessionBanner === 'function') {
-      window.refreshDalSessionBanner(!window.dalMetaAuthority);
-    }
+    if (typeof window.refreshDalSessionBanner === 'function') window.refreshDalSessionBanner();
 };
 
 window.cancelProjectAssetsModal = function() {

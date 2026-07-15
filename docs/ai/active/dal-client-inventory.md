@@ -25,7 +25,7 @@
 | `saveTaskData` | `01b_Calendar_Tasks.html` |
 | `getAssetRegistry` | `01d_Calendar_Mobile.html`, `02_Project_Editor_Logistics.html`, `02a_Project_Equipment.html`, `06b1_Admin_Assets_Core.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html` |
 | `provisionNewAsset` | `01d_Calendar_Mobile.html`, `06b2_Admin_Assets_Form.html`, `06f_Admin_Audit.html` |
-| `getProjectAssets` | `01h_Mobile_Assets.html`, `02_Project_Editor_Logistics.html`, `02a_Project_Equipment.html`, `02e5_Logic_Sync.html` |
+| `getProjectAssets` | `01h_Mobile_Assets.html`, `02_Project_Editor_Logistics.html`, `02a_Project_Equipment.html`, `02e5_Logic_Sync.html`, `02e7_Dal_Firestore_Client.html` |
 | `updateProjectReadiness` | `01h_Mobile_Assets.html`, `02_Project_Editor_Logistics.html`, `02d_Equipment_Render.html`, `03a_Timeline_Boot.html` |
 | `getDesktopLockPrefix` | `01i_Desktop_Lock.html` |
 | `verifyDesktopLockUnlock` | `01i_Desktop_Lock.html` |
@@ -194,7 +194,7 @@
 | 02e4_Logic_Containers.html | 0 | 0 |
 | 02e5_Logic_Sync.html | 2 | 0 |
 | 02e6_Dal_Session.html | 3 | 0 |
-| 02e7_Dal_Firestore_Client.html | 1 | 0 |
+| 02e7_Dal_Firestore_Client.html | 2 | 0 |
 | 02g_Project_Reports.html | 0 | 2 |
 | 03a_Timeline_Boot.html | 3 | 0 |
 | 03b_Timeline_Shifts.html | 0 | 0 |

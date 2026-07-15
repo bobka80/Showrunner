@@ -2,6 +2,7 @@
 <script>
 window.dalSessionState = { status: 'normal', sessionType: '' };
 window.dalPrepUiOpen = false;
+window.dalPrepLatched = false; // once true, Sheets/async cannot turn prep OFF
 window.dalPrepSheetsPollGen = 0;
 window.dalPrepClosing = false;
 
@@ -9,7 +10,8 @@ window.dalIsPrepOpenFromInfo_ = function(info) {
   return !!(info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'prep');
 };
 
-window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, invalidateCache) {
+window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
+  opts = opts || {};
   projectId = projectId || (document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '');
   var banner = document.getElementById('dal-session-banner');
   var startBtn = document.getElementById('dal-prep-start-btn');
@@ -17,37 +19,41 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, invalidateCache
   var canShow = window.dalCanShowPrepButtons();
   isPrepOpen = !!isPrepOpen;
 
+  // Latch: once prep is known-open, ignore spurious "closed" (Sheets lag / cache / auth blips)
+  // unless this call explicitly allows close (END PREP or server-confirmed meta gone).
+  if (!isPrepOpen && window.dalPrepLatched && !opts.allowClose) {
+    isPrepOpen = true;
+  }
+
   if (!canShow) {
     if (banner) banner.style.display = 'none';
     if (startBtn) startBtn.style.display = 'none';
     if (endBtn) endBtn.style.display = 'none';
-    if (window.dalPrepUiOpen && typeof stopDalPaFirestoreListener === 'function') stopDalPaFirestoreListener();
-    window.dalPrepUiOpen = false;
     return;
   }
+
+  if (isPrepOpen) window.dalPrepLatched = true;
+  else window.dalPrepLatched = false;
 
   var changed = window.dalPrepUiOpen !== isPrepOpen;
   window.dalPrepUiOpen = isPrepOpen;
 
   if (banner) {
-    if (isPrepOpen) {
-      banner.style.display = 'block';
-      if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
-      else banner.textContent = '🔒 IN PREPARATION — live sync active';
-    } else {
-      banner.style.display = 'none';
+    banner.style.display = isPrepOpen ? 'block' : 'none';
+    if (isPrepOpen && typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+      window.dalUpdateRemotePendingBanner_();
     }
   }
   if (startBtn) startBtn.style.display = isPrepOpen ? 'none' : 'inline-flex';
   if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
 
   if (isPrepOpen && projectId) {
-    if (invalidateCache || changed) {
+    if (opts.invalidateCache || changed) {
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
     }
-    if (typeof startDalPaFirestoreListener === 'function') startDalPaFirestoreListener(projectId);
-  } else if (changed && typeof stopDalPaFirestoreListener === 'function') {
-    stopDalPaFirestoreListener();
+    if (typeof startDalPaLiveSync_ === 'function') startDalPaLiveSync_(projectId);
+  } else if (changed && typeof stopDalPaLiveSync_ === 'function') {
+    stopDalPaLiveSync_();
   }
 };
 
@@ -59,35 +65,33 @@ window.dalCanShowPrepButtons = function() {
 };
 
 /**
- * Sheets poll — secondary only. Never flash-hide UI before reply.
- * While Firestore _meta watcher is authoritative, do not override it.
+ * Sheets session check — open can latch ON; never turns OFF once latched.
  */
-window.refreshDalSessionBanner = function(force) {
+window.refreshDalSessionBanner = function() {
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
-  var canShow = window.dalCanShowPrepButtons();
-
-  if (!canShow) {
-    window.dalApplyDalPrepUiState_(false, projectId);
+  if (!window.dalCanShowPrepButtons()) {
+    if (!window.dalPrepLatched) window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
     return;
   }
 
-  if (!force && window.dalMetaAuthority && !window.dalPrepClosing) return;
+  // Already latched open — do not re-poll Sheets for banner state (avoids toggle under GAS load).
+  if (window.dalPrepLatched || window.dalPrepUiOpen) {
+    window.dalApplyDalPrepUiState_(true, projectId);
+    return;
+  }
 
   var gen = ++window.dalPrepSheetsPollGen;
   google.script.run
-    .withFailureHandler(function() {
-      if (gen !== window.dalPrepSheetsPollGen) return;
-      if (!window.dalMetaAuthority) {
-        var startBtn = document.getElementById('dal-prep-start-btn');
-        if (startBtn && window.dalCanShowPrepButtons()) startBtn.style.display = 'inline-flex';
-      }
-    })
+    .withFailureHandler(function() { /* keep current UI */ })
     .withSuccessHandler(function(info) {
       if (gen !== window.dalPrepSheetsPollGen) return;
       if (window.dalPrepClosing) return;
-      if (window.dalMetaAuthority && !force) return;
       window.dalSessionState = info || {};
-      window.dalApplyDalPrepUiState_(window.dalIsPrepOpenFromInfo_(info), projectId);
+      if (window.dalIsPrepOpenFromInfo_(info)) {
+        window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
+      } else if (!window.dalPrepLatched) {
+        window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
+      }
     })
     .getDalSessionInfo(projectId);
 };
@@ -120,7 +124,7 @@ window.openDalPrepSession = function() {
       if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId };
-      window.dalApplyDalPrepUiState_(true, projectId, true);
+      window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
       alert('Preparation started.');
     })
@@ -143,7 +147,7 @@ window.closeDalPrepSession = function() {
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
       window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId };
-      window.dalApplyDalPrepUiState_(false, projectId);
+      window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher();
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.dalPrepClosing = false;
