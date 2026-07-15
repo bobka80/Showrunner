@@ -39,19 +39,47 @@ function dalTimelineErrMsg_(err) {
     msg = msg.replace(/^Database Lockout after \d+ attempts:\s*/, '');
   }
   if (/timed out|Timeout|timeout/i.test(msg)) {
-    return msg + '\n\nIf the other user still sees a lock on OPEN TIMELINE, leave the timeline (CANCEL) once — that clears the door.';
+    return msg + '\n\nWait a few seconds and click START COLLAB again — a stuck open clears automatically after ~90s.';
   }
   return msg;
 }
 
-function dalTimelineRepingPresence_() {
-  // Still inside the timeline editor after a failed/timeout open — refresh presence, do not leave.
-  window.activePresenceModule = 'timeline';
-  var pid = (typeof targetFolderId !== 'undefined' && targetFolderId)
-    || (document.getElementById('edit-folder-id') && document.getElementById('edit-folder-id').value);
-  var user = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown';
-  if (!pid) return;
-  try { google.script.run.reportProjectPresence(pid, user, 'ping', 'timeline'); } catch (ePing) {}
+function dalTimelineCollabStarted_(joined) {
+  window.dalTimelineSessionOpen = true;
+  window.refreshTimelineDalBanner();
+  alert(joined
+    ? 'Joined timeline collaboration — SAVE SHIFTS writes to the Firebase fork.'
+    : 'Timeline collaboration started — SAVE SHIFTS now writes to the Firebase fork.');
+}
+
+function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (layer) layer.style.cursor = '';
+      // finish may still succeed after client timeout — poll once
+      google.script.run
+        .withFailureHandler(function() {
+          alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
+        })
+        .withSuccessHandler(function(info) {
+          var status = info ? String(info.status).toLowerCase() : '';
+          if (status === 'open' && info.sessionType === 'timelineCollab') {
+            dalTimelineCollabStarted_(true);
+            return;
+          }
+          if (status === 'opening') {
+            alert('Timeline collab is still opening. Wait ~10 seconds, then click START COLLAB again.');
+            return;
+          }
+          alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
+        })
+        .getDalSessionInfo(projectId);
+    })
+    .withSuccessHandler(function(res) {
+      if (layer) layer.style.cursor = '';
+      dalTimelineCollabStarted_(!!(res && res.joined));
+    })
+    .finishDalSession(projectId, sessionUid, actor);
 }
 
 window.openDalTimelineCollabSession = function() {
@@ -61,39 +89,39 @@ window.openDalTimelineCollabSession = function() {
   var layer = document.getElementById('shift-layer');
   if (layer) layer.style.cursor = 'wait';
   var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+
+  // Split begin/finish so each google.script.run stays under the ~30s client limit.
   google.script.run
     .withFailureHandler(function(err) {
       if (layer) layer.style.cursor = '';
-      // Client timeout often races a successful server open — re-check before alarming.
+      // Already-open often surfaces as failure only if begin threw — re-check join.
       google.script.run
         .withFailureHandler(function() {
-          dalTimelineRepingPresence_();
           alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
         })
         .withSuccessHandler(function(info) {
-          var status = info ? String(info.status).toLowerCase() : '';
-          if (status === 'open' && info.sessionType === 'timelineCollab') {
-            window.dalTimelineSessionOpen = true;
-            window.refreshTimelineDalBanner();
-            alert('Timeline collaboration started (server finished after the client wait). SAVE SHIFTS now writes to the Firebase fork.');
+          if (info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'timelineCollab') {
+            dalTimelineCollabStarted_(true);
             return;
           }
-          if (status === 'opening') {
-            alert('Timeline collab is still opening on the server. Wait a few seconds, then click START COLLAB again (or refresh the banner).');
-            return;
-          }
-          dalTimelineRepingPresence_();
           alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
         })
         .getDalSessionInfo(projectId);
     })
-    .withSuccessHandler(function() {
-      if (layer) layer.style.cursor = '';
-      window.dalTimelineSessionOpen = true;
-      window.refreshTimelineDalBanner();
-      alert('Timeline collaboration started — SAVE SHIFTS now writes to the Firebase fork.');
+    .withSuccessHandler(function(begin) {
+      if (begin && begin.joined) {
+        if (layer) layer.style.cursor = '';
+        dalTimelineCollabStarted_(true);
+        return;
+      }
+      if (!begin || !begin.sessionUid) {
+        if (layer) layer.style.cursor = '';
+        alert('Start timeline collab failed:\n\nNo session reserved.');
+        return;
+      }
+      dalTimelineFinishOpen_(projectId, begin.sessionUid, actor, layer);
     })
-    .openDalSession(projectId, 'timelineCollab', actor);
+    .beginDalSession(projectId, 'timelineCollab', actor);
 };
 
 window.closeDalTimelineCollabSession = function() {

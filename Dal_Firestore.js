@@ -160,16 +160,9 @@ function firestoreListCollection_(collectionPath) {
 }
 
 function firestoreWriteDocument_(docPath, obj) {
-  var parts = docPath.split('/');
-  var docId = parts.pop();
-  var parentPath = firestoreCollectionParent_(parts.join('/'));
-  var got = firestoreFetch_('get', docPath);
+  // Single PATCH upserts — skip GET (each UrlFetch burns GAS time / client timeout budget).
   var fields = firestoreEncodeFields_(obj);
-  if (got && got.fields) {
-    firestoreFetch_('patch', docPath, { fields: fields });
-  } else {
-    firestoreFetch_('post', parentPath + '?documentId=' + encodeURIComponent(docId), { fields: fields });
-  }
+  firestoreFetch_('patch', docPath, { fields: fields });
 }
 
 function firestoreDeleteDocument_(docPath) {
