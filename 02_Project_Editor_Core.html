@@ -141,27 +141,8 @@ window.isProjectDirty = false;
 let presenceTimer = null;
 let activePresenceProject = null;
 window.activePresenceModule = 'main'; // Tracks if user is in 'main', 'timeline', etc.
-window.isTimelineOccupiedBy = null;   // Tracks who currently holds the lock
-
-function showLoudToQuietWarning(userName) {
-    let safeName = userName ? String(userName).replace(/</g, "&lt;").replace(/>/g, "&gt;") : "UNKNOWN USER";
-    let overlay = document.createElement('div');
-    overlay.id = 'loud-warning-overlay';
-    overlay.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px); z-index:999999; display:flex; justify-content:center; align-items:center; transition: all 1s ease-in-out;';
-    overlay.innerHTML = `<div style="text-align:center; padding: 40px; border: 2px solid #ef4444; background: #1a1a1e; border-radius: 12px; box-shadow: 0 20px 50px rgba(239,68,68,0.3); transform: scale(1); transition: transform 1s ease-in-out;" id="loud-warning-box">
-        <div style="font-size: 40px; margin-bottom: 10px;">⚠️</div>
-        <h1 style="color: #ef4444; margin: 0 0 10px 0; font-size: 24px; text-transform: uppercase;">${safeName} IS EDITING</h1>
-        <p style="color: #fff; font-size: 14px; font-weight: bold;">You have been placed in Read-Only mode.</p>
-    </div>`;
-    document.body.appendChild(overlay);
-
-    setTimeout(() => {
-        let box = document.getElementById('loud-warning-box');
-        if (box) box.style.transform = 'scale(0.8)';
-        overlay.style.opacity = '0';
-        setTimeout(() => { if (document.body.contains(overlay)) document.body.removeChild(overlay); }, 1000);
-    }, 3000);
-}
+window.isTimelineOccupiedBy = null;   // Legacy: first other user in timeline (informational only — no door lock)
+window.timelineOccupants = [];        // Other users currently in timeline module
 
 function startPresencePing(projectId) {
     stopPresencePing();
@@ -170,7 +151,7 @@ function startPresencePing(projectId) {
     
     let tlBtn = document.getElementById('master-timeline-btn');
     if (tlBtn) {
-        tlBtn.innerText = `⏳ CHECKING LOCK...`;
+        tlBtn.innerText = `⏳ CHECKING...`;
         tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#a1a1aa"; tlBtn.style.color = "#a1a1aa";
         tlBtn.disabled = true;
     }
@@ -189,22 +170,29 @@ function startPresencePing(projectId) {
         })
         .withSuccessHandler(othersObj => {
             window.isTimelineOccupiedBy = null;
-            let othersNames = Object.keys(othersObj);
-            
-            if (othersNames.length > 0) {
-                for (let name in othersObj) {
-                    if (othersObj[name].module === 'timeline') window.isTimelineOccupiedBy = name;
+            window.timelineOccupants = [];
+            othersObj = othersObj || {};
+            for (let name in othersObj) {
+                if (othersObj[name] && othersObj[name].module === 'timeline') {
+                    window.timelineOccupants.push(name);
+                    if (!window.isTimelineOccupiedBy) window.isTimelineOccupiedBy = name;
                 }
             }
-            
+
             if (tlBtn) {
                 tlBtn.disabled = false;
-                if (window.isTimelineOccupiedBy) {
-                    tlBtn.innerText = `🔒 ${window.isTimelineOccupiedBy.toUpperCase()} EDITING`;
-                    tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#ef4444"; tlBtn.style.color = "#ef4444";
+                // Presence is informational only — never blocks opening (timeline collab).
+                if (window.timelineOccupants.length > 0) {
+                    let n = window.timelineOccupants.length;
+                    tlBtn.innerText = n === 1
+                        ? `👥 ${window.timelineOccupants[0].toUpperCase()} IN TIMELINE`
+                        : `👥 ${n} IN TIMELINE`;
+                    tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#3b82f6"; tlBtn.style.color = "#3b82f6";
+                    tlBtn.title = 'Open timeline — others already inside: ' + window.timelineOccupants.join(', ');
                 } else {
                     tlBtn.innerText = `OPEN TIMELINE`;
                     tlBtn.className = "btn-outline btn-outline-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
+                    tlBtn.title = '';
                 }
             }
         }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule);

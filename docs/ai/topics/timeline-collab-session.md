@@ -26,7 +26,7 @@ Is: **collaborative room** with shared live state.
 ## Mode & UX
 
 - [ ] Open timeline → **join timeline room** (if project saved — keep existing `NEW` project guard)
-- [ ] Button: `👥 N IN TIMELINE` instead of `🔒 NAME EDITING` when room active
+- [x] Button: `👥 N IN TIMELINE` instead of `🔒 NAME EDITING` when room active (door lock removed — open always allowed)
 - [ ] Roster panel: names in room
 - [ ] Activity: “Bobby moved shift X”, “Maria added phase Y”
 - [ ] Write timeline changes on **drag end** only — not per mousemove

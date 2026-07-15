@@ -393,15 +393,12 @@ function launchMasterTimeline() {
 
     // 2. If it is an official, saved project, hide the modal safely
     document.getElementById('edit-modal-overlay').style.display = 'none';
-    
-    if (window.isTimelineOccupiedBy && !forceReadOnly) {
-        showLoudToQuietWarning(window.isTimelineOccupiedBy);
-        if(typeof openShiftLayout === 'function') openShiftLayout('main', true);
-    } else {
-        window.activePresenceModule = forceReadOnly ? 'main' : 'timeline';
-        if (!forceReadOnly && typeof startPresencePing === 'function') startPresencePing(folderId);
-        if(typeof openShiftLayout === 'function') openShiftLayout('main', forceReadOnly);
-    }
+
+    // Timeline collab: no single-editor door — both users may enter editable at once.
+    // (forceReadOnly remains for mobile / RBAC read-only only.)
+    window.activePresenceModule = forceReadOnly ? 'main' : 'timeline';
+    if (!forceReadOnly && typeof startPresencePing === 'function') startPresencePing(folderId);
+    if (typeof openShiftLayout === 'function') openShiftLayout('main', forceReadOnly);
 }
 
 // ==========================================
