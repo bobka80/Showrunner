@@ -4,7 +4,7 @@
 
 **Opened:** 2026-07-05 · **Status:** **Design locked 2026-07-13** · Phase 0 + pre-ship gates complete. **Phase 1 Slice A shipped** (repos + SheetsAdapter skeleton). **Rollback baseline:** GAS **v576** — see § Major rollback point.
 
-**Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"** (or *"Rollback production to last milestone before DAL"*). Git tag on branch: same commit as RELEASES.md row #1 after v576 ship. Phase 1+ ships are v577+.
+**Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
 **Design lock (canonical spec):** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) — architecture, session lifecycles, reconciliation, cache API, execution order, Phase 0 checklist.
 
