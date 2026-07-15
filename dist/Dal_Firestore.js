@@ -90,6 +90,12 @@ function firestoreFetch_(method, urlPath, body) {
     return text ? JSON.parse(text) : {};
   }
   if (code === 404) return null;
+  if (code === 403 && text.indexOf('has not been used') !== -1) {
+    throw new Error(
+      'Cloud Firestore API is disabled for project ' + getFirestoreProjectId_() +
+      '. Enable it in Google Cloud Console (APIs & Services → Cloud Firestore API), then retry.'
+    );
+  }
   throw new Error('Firestore ' + method + ' failed (' + code + '): ' + text.slice(0, 300));
 }
 

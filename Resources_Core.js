@@ -707,6 +707,11 @@ function executeWithRetry(operation, maxRetries = 5) {
       return result;
     } catch (e) {
           if (e.message && e.message.includes("COLLISION_DETECTED")) throw e; // Instantly abort on collision
+      if (e.message && (
+        e.message.includes("Firestore") && (e.message.includes("(403)") || e.message.includes("(401)")) ||
+        e.message.includes("Firebase service account") ||
+        e.message.includes("Firebase not configured")
+      )) throw e; // Config / permission errors — do not retry
       attempt++;
       if (attempt >= maxRetries) {
           let errType = bypassLock ? "Read Timeout" : "Lockout";

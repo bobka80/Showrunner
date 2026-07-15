@@ -49,18 +49,31 @@ window.refreshDalSessionBanner = function() {
     .getDalSessionInfo(projectId);
 };
 
+function dalPrepErrMsg_(err) {
+  var msg = (err && err.message) ? String(err.message) : String(err || 'Unknown error');
+  if (msg.indexOf('Database Lockout') === 0) {
+    msg = msg.replace(/^Database Lockout after \d+ attempts:\s*/, '');
+  }
+  if (msg.indexOf('Cloud Firestore API is disabled') !== -1) return msg;
+  if (msg.indexOf('Firestore') !== -1 && msg.indexOf('403') !== -1) {
+    return 'Cloud Firestore API is not enabled for this Firebase project. Enable it in Google Cloud Console, then retry START PREP.';
+  }
+  return msg;
+}
+
 window.openDalPrepSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
   if (!projectId || projectId === 'NEW') return alert('Save the project first.');
   if (!confirm('Start preparation? Equipment saves fork to Firebase until End Prep.')) return;
-  document.body.style.cursor = 'wait';
+  var overlay = document.getElementById('project-assets-modal-overlay');
+  if (overlay) overlay.style.cursor = 'wait';
   google.script.run
     .withFailureHandler(function(err) {
-      document.body.style.cursor = 'default';
-      alert('Start prep failed: ' + err.message);
+      if (overlay) overlay.style.cursor = '';
+      alert('Start prep failed:\n\n' + dalPrepErrMsg_(err));
     })
     .withSuccessHandler(function() {
-      document.body.style.cursor = 'default';
+      if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
       alert('Preparation started.');
@@ -71,14 +84,15 @@ window.openDalPrepSession = function() {
 window.closeDalPrepSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
   if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
-  document.body.style.cursor = 'wait';
+  var overlay = document.getElementById('project-assets-modal-overlay');
+  if (overlay) overlay.style.cursor = 'wait';
   google.script.run
     .withFailureHandler(function(err) {
-      document.body.style.cursor = 'default';
-      alert('End prep failed: ' + err.message);
+      if (overlay) overlay.style.cursor = '';
+      alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
     })
     .withSuccessHandler(function() {
-      document.body.style.cursor = 'default';
+      if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.refreshDalSessionBanner();
       alert('Preparation ended — committed to Sheets.');
