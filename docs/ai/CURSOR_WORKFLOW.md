@@ -4,7 +4,7 @@
 
 This doc maps **Cursor IDE features** (rules, skills, subagents, review agents) onto the doctrine you already use. It does not replace `AI_DOCTRINE.md` — it is the stable reference for *how to run sessions in Cursor*.
 
-`Last swept:` 2026-07-13 · `Production:` see root `RELEASES.md`
+`Last swept:` 2026-07-15 · `Production:` GAS v575 per `RELEASES.md`
 
 ---
 
@@ -67,6 +67,8 @@ One clear outcome per build session (e.g. scan panel camera, not camera + notifi
 | **require** | Launch Bugbot (`subagent_type: bugbot`, `Diff: branch changes`) — fix Critical/High — then `PRE_SHIP_BUGBOT_OK=1` + ship |
 | **recommend** | Run Bugbot when diff is non-trivial; OK to skip on tiny fixes — say so in handoff |
 | **skip** | No Bugbot — save tokens |
+
+**DAL gates** (when Logistics / PA / timeline hot paths change): persistence lint, client inventory freshness, Phase 3 concurrency ack on delta-only deploy. **Handbook:** [active/dal-pre-ship-gates.md](active/dal-pre-ship-gates.md). After client `google.script.run` changes: `node scripts/dal-client-inventory.js`. Phase 3 deploy: `PRE_SHIP_DAL_CONCURRENCY_OK=1`.
 
 | Also (manual director phrase) | When |
 |------|----------------|

@@ -18,6 +18,9 @@ const FRAGILE_PATTERNS = [
   /^01j_Mobile_Scan\.html$/i,
   /^02b_Project_Syntax\.html$/i,
   /^02e5_Logic_Sync\.html$/i,
+  /^Logistics_Assets\.js$/i,
+  /^Logistics_Timeline\.js$/i,
+  /^Operations\.js$/i,
   /^11m_Station_Dock_Logic\.html$/i,
   /^11c_Station_Init\.html$/i,
   /station-desktop\/ShowrunnerStationDesktop\/MainWindow\.xaml\.cs$/i,
@@ -85,6 +88,9 @@ function buildCustomInstructions(layers, changedFiles) {
   }
   if (changedFiles.some((f) => norm(f).includes('01h_Mobile_Assets'))) {
     hints.push('Project Assets: left-pane containment, Back button, Escape confirm on desktop dock.');
+  }
+  if (changedFiles.some((f) => /^Logistics_|^Operations\.js$/i.test(norm(f).split('/').pop()))) {
+    hints.push('DAL hot path: verify save boundaries, no new clearContents in client HTML, Phase 3 concurrency if delta-only.');
   }
   hints.push('Read docs/ai/FRAGILE_ZONES.md zones touched by this diff.');
   return hints.join(' ');

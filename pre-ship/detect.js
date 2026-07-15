@@ -78,4 +78,5 @@ module.exports = {
   detectLayers,
   stationTouched,
   isStationFile,
+  dalTouched: require('./dal').dalTouched,
 };

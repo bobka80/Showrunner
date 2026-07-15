@@ -1,6 +1,6 @@
 # DAL campaign — Phase Safety Playbook (read before Phase 1+)
 
-**Campaign:** [data-access-layer.md](data-access-layer.md) · **Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) · **Phase 0 report:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
+**Campaign:** [data-access-layer.md](data-access-layer.md) · **Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) · **Phase 0 report:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md) · **Pre-ship gates:** [dal-pre-ship-gates.md](dal-pre-ship-gates.md)
 
 This document is written so a **fresh chat** (no context from prior sessions) can safely execute DAL phases without breaking fragile systems.
 
@@ -46,6 +46,16 @@ These are not “security theater” — they are the minimum guardrails for a l
 
 - Re-run a quick scan for **new `SpreadsheetApp` calls** in feature code (they should move toward repo boundaries, not spread).
 - Confirm no new `clearContents()` / whole-tab rewrites were added outside the known boundaries.
+- **Pre-ship (automated):** when DAL hot paths change — see **[dal-pre-ship-gates.md](dal-pre-ship-gates.md)** (canonical handbook; do not duplicate gate details here).
+
+---
+
+## Pre-ship vs DAL safety (summary)
+
+Gaps closed 2026-07-15 — full detail in [dal-pre-ship-gates.md](dal-pre-ship-gates.md):
+
+- Client inventory + persistence lint + Phase 3 deploy gate → **automated**
+- Reconciliation / failed-writes → **Phase 5** (deferred)
 
 ---
 
@@ -58,9 +68,10 @@ Read, in order:
 1. `docs/ai/active/data-access-layer.md`
 2. `docs/ai/active/dal-firebase-design-lock-2026-07-13.md`
 3. `docs/ai/active/dal-phase0-discovery-2026-07-13.md`
-4. `docs/ai/FRAGILE_ZONES.md` (relevant zones)
-5. `docs/ai/ARCHITECTURE.md` (deploy pipeline + optimistic healing)
-6. `docs/ai/FILE_MAP.md` (where functions live)
+4. `docs/ai/active/dal-pre-ship-gates.md` (if touching hot paths or shipping DAL work)
+5. `docs/ai/FRAGILE_ZONES.md` (relevant zones)
+6. `docs/ai/ARCHITECTURE.md` (deploy pipeline + optimistic healing)
+7. `docs/ai/FILE_MAP.md` (where functions live)
 
 Then write a **scope lock** for the phase (files + functions).
 

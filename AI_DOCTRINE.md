@@ -2,7 +2,7 @@
 
 Welcome to the ShowRider / SM Showrunner AI Knowledge Base. Before performing any code adjustments or bug hunting, **read this file**, then open the **drawer** for your task (see [docs/ai/README.md](docs/ai/README.md)).
 
-This doctrine applies to **any AI agent** in this repository (Cursor, Claude, etc.). Start at root **[AGENTS.md](AGENTS.md)** if your tool loads that automatically.
+This doctrine applies to **any AI agent** in this repository (Cursor, Claude, etc.). Start at root **[AGENTS.md](AGENTS.md)** if your tool loads that automatically — it summarizes ship, **pre-ship**, and the **Bugbot gate**; full rules are **Rule 8** below and [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md).
 
 ---
 
@@ -27,7 +27,7 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 |----------------------|------------------------|
 | Project Assets, packing, checkout, cables, containers, RFID/QR | [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) → [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) |
 | Formula / CLI / equipment list sync | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (Triangle of Truth) |
-| DAL, Firebase session fork, data router | [active/dal-firebase-design-lock-2026-07-13.md](docs/ai/active/dal-firebase-design-lock-2026-07-13.md) → [active/data-access-layer.md](docs/ai/active/data-access-layer.md) |
+| DAL, Firebase session fork, data router | [active/dal-firebase-design-lock-2026-07-13.md](docs/ai/active/dal-firebase-design-lock-2026-07-13.md) → [active/data-access-layer.md](docs/ai/active/data-access-layer.md) → [active/dal-pre-ship-gates.md](docs/ai/active/dal-pre-ship-gates.md) (mechanical gates) |
 | Deploy, mobile black screen, session | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (boot) → [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) → [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md) |
 | Phone QR scan panel, shell camera, `host-boot.js` mobile paths | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Mobile QR handoff |
 | Station gun scans, `RfidManager`, `showrunnerStationDeliverScan` | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Station RFID delivery |
@@ -164,6 +164,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
    - **When `require`:** AI **must** launch Bugbot (`subagent_type: bugbot`, `Diff: branch changes`) **before** the ship script completes. Use `Custom Instructions` from `pre-ship/last-report.json` → `bugbot.customInstructions`. Fix **Critical/High** findings or get director override; then re-run ship with `PRE_SHIP_BUGBOT_OK=1`.
    - **When `recommend`:** AI runs Bugbot if the diff is non-trivial; may ship without if mechanical GREEN and change is tiny — note in handoff.
    - **When `skip`:** Do not spend tokens on Bugbot (docs-only, cosmetic desktop icon, etc.).
+   - **DAL hot paths** (Logistics, PA save, timeline, Operations): mechanical **DAL gates** also run inside gas pre-ship — see [dal-pre-ship-gates.md](docs/ai/active/dal-pre-ship-gates.md). Regenerate client inventory after `google.script.run` changes; Phase 3 delta-only deploy needs `PRE_SHIP_DAL_CONCURRENCY_OK=1`.
    - **AI checks policy early:** `node pre-ship.js --dry-run` or `--bugbot-policy` before coding the ship command.
    - **Never** bypass `BUGBOT REQUIRED` on fragile/multi-layer ships without director saying so explicitly.
 

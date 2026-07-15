@@ -159,7 +159,7 @@ Repos should wrap **`verifyDatabaseSchema` / `verifyVaultSchema` + range operati
 | Ledger / ops | `batchProcessOperations`, `processRfidScan`, `startEventOperation`, `finalizeEventOperation` | `02c_Project_Operations.html` |
 | Projects | `saveProjectData`, `getExistingProjects`, … | Calendar / project editor modules |
 
-*Full client inventory deferred to Phase 1 appendix — mechanical grep of `google.script.run` across `*.html`.*
+*Full client inventory (2026-07-15):* [dal-client-inventory.md](dal-client-inventory.md) — regenerate with `node scripts/dal-client-inventory.js`. Pre-ship: [dal-pre-ship-gates.md](dal-pre-ship-gates.md).
 
 ---
 
@@ -180,8 +180,8 @@ Repos should wrap **`verifyDatabaseSchema` / `verifyVaultSchema` + range operati
 - [x] `saveTimelineData` trace
 - [x] `Operations.js` ledger trace
 - [x] Spreadsheet access gateways catalogued
-- [ ] Full client `google.script.run` inventory (Phase 1)
-- [ ] Full client `localStorage` key inventory (Phase 1)
+- [x] Full client `google.script.run` inventory — [dal-client-inventory.md](dal-client-inventory.md) (2026-07-15)
+- [x] Full client `localStorage` key inventory — same file
 - [ ] Schema cross-check vs `SCHEMA.md` (Phase 1)
 
 ---

@@ -68,3 +68,12 @@ Director vocabulary for **which station UI** we mean — not the native app bina
 - Shared station **logic** (host session, RFID, vault, project) is one codebase; the terms above refer to **UI layout / chrome**, not separate products.
 
 See [STATION_UI.md](STATION_UI.md) · [active/rfid-station-profiles.md](active/rfid-station-profiles.md).
+
+## Pre-ship gate environment variables
+
+Set in PowerShell before `node milestone.js` (or in the shell session). Full detail: [dal-pre-ship-gates.md](active/dal-pre-ship-gates.md) · [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md).
+
+| Variable | When to set |
+|----------|-------------|
+| `PRE_SHIP_BUGBOT_OK=1` | Bugbot gate was **require** and review passed (all ships) |
+| `PRE_SHIP_DAL_CONCURRENCY_OK=1` | Phase 3 **delta-only** saves shipping on deploy; director completed concurrency smoke |

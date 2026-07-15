@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const NODE_ONLY = require('../gas-node-only');
+const { dalTouched, runDalGates } = require('./dal');
 
 const ROOT = path.join(__dirname, '..');
 
@@ -53,6 +54,13 @@ function runGasLayer({ forDeploy, changedFiles, stationTouched }) {
     runNode('scripts/verify-station-split.js', 'station module split gates');
   } else {
     console.log('  → skip verify-station-split (no station files in this change set)');
+  }
+
+  if (dalTouched(changedFiles)) {
+    const dal = runDalGates({ forDeploy });
+    steps.push(...dal.steps);
+  } else {
+    console.log('  → skip DAL gates (no DAL hot-path files in this change set)');
   }
 
   steps.push('dist-orphan-scan');
