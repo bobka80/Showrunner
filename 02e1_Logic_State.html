@@ -150,6 +150,35 @@ window.togglePaMode = function(forcedMode) {
     executeTogglePaMode(targetMode);
 };
 
+function applyPaHeaderChrome_() {
+    var paViewToggles = document.getElementById('pa-view-toggles');
+    var divTitle = document.getElementById('pa-header-divider-title');
+    var divCheckout = document.getElementById('pa-header-divider-checkout');
+    var btnMasterOp = document.getElementById('btn-master-operation');
+    var btnPrint = document.getElementById('btn-print-lists');
+    var isPackLike = (window.currentPaMode === 'packing' || window.currentPaMode === 'operation');
+
+    if (isPackLike) {
+        if (paViewToggles) paViewToggles.style.setProperty('display', 'none', 'important');
+        if (divTitle) divTitle.style.setProperty('display', 'none', 'important');
+        if (divCheckout) divCheckout.style.setProperty('display', 'none', 'important');
+        if (btnPrint) btnPrint.style.setProperty('display', 'none', 'important');
+        if (btnMasterOp && !window.projectAssetsReadOnly) {
+            if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
+            else btnMasterOp.style.setProperty('display', 'inline-flex', 'important');
+        } else if (btnMasterOp) {
+            btnMasterOp.style.setProperty('display', 'none', 'important');
+        }
+    } else {
+        if (paViewToggles) paViewToggles.style.setProperty('display', 'flex', 'important');
+        if (divTitle) divTitle.style.setProperty('display', 'block', 'important');
+        if (divCheckout) divCheckout.style.setProperty('display', 'block', 'important');
+        if (btnPrint) btnPrint.style.setProperty('display', 'inline-flex', 'important');
+        if (btnMasterOp) btnMasterOp.style.setProperty('display', 'none', 'important');
+    }
+    if (typeof window.refreshPaModalTitle_ === 'function') window.refreshPaModalTitle_();
+}
+
 function executeTogglePaMode(targetMode) {
     let toggleContainersBtn = document.getElementById('toggle-auto-containers-btn');
     let setContainersState = function(state) {
@@ -195,8 +224,6 @@ function executeTogglePaMode(targetMode) {
     let loadinPlanBtn = document.getElementById('btn-loadin-plan');
     let paModal = document.querySelector('#project-assets-modal-overlay .modal');
     let btnMasterOp = document.getElementById('btn-master-operation');
-    let paViewToggles = document.getElementById('pa-view-toggles');
-    let paViewDivider = document.getElementById('pa-header-divider-views');
     
     if (window.currentPaMode === 'design') {
         if (toggleBtn) {
@@ -214,16 +241,8 @@ function executeTogglePaMode(targetMode) {
         if (autoAddCasesBtn) autoAddCasesBtn.style.setProperty('display', 'none', 'important');
         if (loadinPlanBtn) loadinPlanBtn.style.setProperty('display', 'none', 'important');
             if (paModal) paModal.style.borderColor = 'transparent';
-        if (paViewToggles) paViewToggles.style.setProperty('display', 'none', 'important');
-        if (paViewDivider) paViewDivider.style.setProperty('display', 'none', 'important');
         if (window.lastDesignContainerState !== undefined) {
             setContainersState(window.lastDesignContainerState);
-        }
-        if (btnMasterOp && !window.projectAssetsReadOnly) {
-            if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
-            else btnMasterOp.style.setProperty('display', 'inline-flex', 'important');
-        } else if (btnMasterOp) {
-            btnMasterOp.style.setProperty('display', 'none', 'important');
         }
         window.activeContainerTarget = null;
     } else if (window.currentPaMode === 'packing') {
@@ -245,14 +264,6 @@ function executeTogglePaMode(targetMode) {
                 paModal.style.setProperty('border', '4px solid #f59e0b', 'important');
         }
         setContainersState(true);
-        if (paViewToggles) paViewToggles.style.setProperty('display', 'flex', 'important');
-        if (paViewDivider) paViewDivider.style.setProperty('display', 'block', 'important');
-        if (btnMasterOp && !window.projectAssetsReadOnly) {
-            if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
-            else btnMasterOp.style.setProperty('display', 'inline-flex', 'important');
-        } else if (btnMasterOp) {
-            btnMasterOp.style.setProperty('display', 'none', 'important');
-        }
         window.activePaTarget = null;
     } else if (window.currentPaMode === 'operation') {
         if (toggleBtn) {
@@ -274,16 +285,9 @@ function executeTogglePaMode(targetMode) {
                 paModal.style.boxShadow = 'none';
         }
         setContainersState(true);
-        if (paViewToggles) paViewToggles.style.setProperty('display', 'flex', 'important');
-        if (paViewDivider) paViewDivider.style.setProperty('display', 'block', 'important');
-        if (btnMasterOp && !window.projectAssetsReadOnly) {
-            if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
-            else btnMasterOp.style.setProperty('display', 'inline-flex', 'important');
-        } else if (btnMasterOp) {
-            btnMasterOp.style.setProperty('display', 'none', 'important');
-        }
         window.activePaTarget = null;
     }
+    applyPaHeaderChrome_();
     if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
     if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
     if (typeof applyMobilePaChrome === 'function') applyMobilePaChrome();
