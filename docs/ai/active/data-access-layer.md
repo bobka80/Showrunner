@@ -2,7 +2,9 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Design locked 2026-07-13** · Phase 0 discovery + **pre-ship gates** complete (2026-07-15). **Next:** Phase 1 repos + SheetsAdapter on director **OK go**.
+**Opened:** 2026-07-05 · **Status:** **Design locked 2026-07-13** · Phase 0 + pre-ship gates complete. **Phase 1 Slice A shipped** (repos + SheetsAdapter skeleton). **Rollback baseline:** GAS **v576** — see § Major rollback point.
+
+**Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"** (or *"Rollback production to last milestone before DAL"*). Git tag on branch: same commit as RELEASES.md row #1 after v576 ship. Phase 1+ ships are v577+.
 
 **Design lock (canonical spec):** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) — architecture, session lifecycles, reconciliation, cache API, execution order, Phase 0 checklist.
 
@@ -208,11 +210,12 @@ Phase 6  Cache Coordinator (per-view policies, tag invalidation)
 
 ### Phase 1 — Repo interfaces + SheetsAdapter (zero behavior change)
 
-- [ ] New GAS module(s) for repos + `SheetsAdapter` (exact filename TBD)
-- [ ] `SheetsAdapter` delegates to current `Operations.js` / save paths — **zero user-visible change**
-- [ ] `LedgerRepo` wraps checkout append path; old public functions delegate to repo
-- [ ] `ProjectAssetsRepo` wraps `saveProjectAssetsDelta` boundary
-- [ ] `TimelineRepo` wraps `saveTimelineData` boundary
+- [x] New GAS module — `Dal_Repos.js` (Slice A, 2026-07-15)
+- [x] `SheetsAdapter` delegates to current `Operations.js` / save paths — **zero user-visible change**
+- [x] `LedgerRepo` skeleton wraps checkout path surface (adapter delegates; public GAS functions not rewired yet)
+- [x] `ProjectAssetsRepo` skeleton wraps `saveProjectAssetsDelta` boundary
+- [x] `TimelineRepo` skeleton wraps `saveTimelineData` boundary
+- [ ] Slice B — old public GAS functions delegate to repos (no second write path)
 - [ ] Ban **new** direct sheet access in touched files — enforced by `scripts/dal-persistence-lint.js` on pre-ship (see [dal-pre-ship-gates.md](dal-pre-ship-gates.md))
 
 ### Phase 2 — Router + inventory tables

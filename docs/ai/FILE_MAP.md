@@ -87,6 +87,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Logistics_Schema.js`**: Relational engine schemas.
 - **`Logistics_Tasks.js`**: Task routing logic.
 - **`Logistics_Timeline.js`**: Project timeline backend CRUD.
+- **`Dal_Repos.js`**: DAL Phase 1 — `SheetsAdapter` + `ProjectAssetsRepo` / `TimelineRepo` / `LedgerRepo` seams (delegates to existing Logistics/Operations save paths; zero behavior change until Slice B rewiring).
 
 ## 6. The 03 & 04 Series: Timelines & Crew
 - **`03a_Timeline_Boot.html`** to **`03e_Timeline_UX.html`**: The shift and phase drag-and-drop timeline builder.
