@@ -1,9 +1,13 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Phase 4 Slice C — any Firebase-Auth signed-in Showrunner client may read prep PA fork.
+    // Phase 4 — signed-in Showrunner client may read prep PA + timeline forks.
     // GAS service account writes bypass these rules. Client writes stay denied.
     match /projects/{projectId}/assets/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+    match /projects/{projectId}/timeline/{docId} {
       allow read: if request.auth != null;
       allow write: if false;
     }

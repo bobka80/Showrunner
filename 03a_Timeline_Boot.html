@@ -163,6 +163,7 @@ function openShiftLayout(mode, isReadOnly = false) {
   const finishedWrap = document.getElementById('tt-crew-finished-wrap');
   const editCrewBtn = document.querySelector('.tt-bottom-actions button[onclick="openCrewManager()"]');
   const shiftLayer = document.getElementById('shift-layer');
+  if (typeof refreshTimelineDalBanner === 'function') refreshTimelineDalBanner();
   
   let finishedCb = document.getElementById('tt-crew-finished-cb');
   if (finishedCb && !isReadOnly) {

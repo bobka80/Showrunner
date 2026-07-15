@@ -12,8 +12,18 @@ function getTimelineData(folderId, mode) {
   return getTimelineRepo().getForProject(folderId, mode);
 }
 
+function dalAssertSheetsTimelineNotForked_(folderId) {
+  if (resolveDalSessionStatus_(folderId, DAL_DOMAIN.TIMELINE) === DAL_SESSION.SESSION_OPEN) {
+    throw new Error('TIMELINE_SESSION_ACTIVE: Timeline is on the Firebase fork — direct Sheets access blocked.');
+  }
+}
+
+/** When true, timeline Sheets helpers skip nested executeWithRetry (DAL open/close already holds the lock). */
+var __dalTimelineSheetsDirect_ = false;
+
 function getTimelineDataSheets_(folderId, mode) {
-  return executeWithRetry(() => {
+  var run = function () {
+    if (!__dalTimelineSheetsDirect_) dalAssertSheetsTimelineNotForked_(folderId);
     let roster = getCrewSettings(); // Pulls from VAULT
     
 
@@ -50,7 +60,9 @@ function getTimelineDataSheets_(folderId, mode) {
     }
     
     return state;
-  });
+  };
+  if (__dalTimelineSheetsDirect_) return run();
+  return executeWithRetry(run);
 }
 
 function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor = "System UI", subEvents = null) {
@@ -58,8 +70,9 @@ function saveTimelineData(folderId, mode, shifts, crewUids, phases, overrides, c
 }
 
 function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor = "System UI", subEvents = null) {
-  return executeWithRetry(() => {
+  var run = function () {
     assertActorCanEditTimeline(actor);
+    if (!__dalTimelineSheetsDirect_) dalAssertSheetsTimelineNotForked_(folderId);
     const sheets = verifyDatabaseSchema();
 
     let newTimestamp = new Date().toISOString();
@@ -268,7 +281,9 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
     SpreadsheetApp.flush();
     writeToAuditLog(actor, "UPDATE", "TIMELINE", folderId, folderId, deltaPayload);
     return JSON.stringify({ status: "Saved", timestamp: newTimestamp });
-  });
+  };
+  if (__dalTimelineSheetsDirect_) return run();
+  return executeWithRetry(run);
 }
 
 function loadCalendar() {

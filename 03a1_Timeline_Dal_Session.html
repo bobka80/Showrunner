@@ -1,0 +1,76 @@
+<!-- DAL Phase 4 Slice C — Timeline collab session UI (open/close + banner; live multi-drag later) -->
+<script>
+window.dalTimelineSessionOpen = false;
+
+window.refreshTimelineDalBanner = function() {
+  var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+  var banner = document.getElementById('dal-timeline-session-banner');
+  var startBtn = document.getElementById('dal-timeline-start-btn');
+  var endBtn = document.getElementById('dal-timeline-end-btn');
+  if (!projectId || projectId === 'NEW') {
+    if (banner) banner.style.display = 'none';
+    if (startBtn) startBtn.style.display = 'none';
+    if (endBtn) endBtn.style.display = 'none';
+    return;
+  }
+  if (typeof canDrawPhases === 'function' && !canDrawPhases()) {
+    if (startBtn) startBtn.style.display = 'none';
+    if (endBtn) endBtn.style.display = 'none';
+  }
+
+  google.script.run
+    .withFailureHandler(function() { /* keep current */ })
+    .withSuccessHandler(function(info) {
+      var isOpen = info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'timelineCollab';
+      window.dalTimelineSessionOpen = !!isOpen;
+      if (banner) {
+        banner.style.display = isOpen ? 'block' : 'none';
+        if (isOpen) banner.textContent = '👥 TIMELINE COLLAB — saves go to Firebase until End Collab';
+      }
+      if (startBtn) startBtn.style.display = (isOpen || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly)) ? 'none' : 'inline-flex';
+      if (endBtn) endBtn.style.display = isOpen ? 'inline-flex' : 'none';
+    })
+    .getDalSessionInfo(projectId);
+};
+
+window.openDalTimelineCollabSession = function() {
+  var projectId = document.getElementById('edit-folder-id').value;
+  if (!projectId || projectId === 'NEW') return alert('Save the project first.');
+  if (!confirm('Start timeline collaboration? Timeline saves fork to Firebase until End Collab.')) return;
+  var layer = document.getElementById('shift-layer');
+  if (layer) layer.style.cursor = 'wait';
+  var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (layer) layer.style.cursor = '';
+      alert('Start timeline collab failed:\n\n' + ((err && err.message) || err));
+    })
+    .withSuccessHandler(function() {
+      if (layer) layer.style.cursor = '';
+      window.dalTimelineSessionOpen = true;
+      window.refreshTimelineDalBanner();
+      alert('Timeline collaboration started — SAVE SHIFTS now writes to the Firebase fork.');
+    })
+    .openDalSession(projectId, 'timelineCollab', actor);
+};
+
+window.closeDalTimelineCollabSession = function() {
+  var projectId = document.getElementById('edit-folder-id').value;
+  if (!confirm('End timeline collaboration and commit shifts/phases back to Google Sheets?')) return;
+  var layer = document.getElementById('shift-layer');
+  if (layer) layer.style.cursor = 'wait';
+  var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (layer) layer.style.cursor = '';
+      alert('End timeline collab failed:\n\n' + ((err && err.message) || err));
+    })
+    .withSuccessHandler(function() {
+      if (layer) layer.style.cursor = '';
+      window.dalTimelineSessionOpen = false;
+      window.refreshTimelineDalBanner();
+      alert('Timeline collaboration ended — committed to Sheets.');
+    })
+    .closeDalSession(projectId, actor);
+};
+</script>

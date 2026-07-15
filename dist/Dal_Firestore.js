@@ -196,3 +196,13 @@ function firestoreGetSessionMeta_(projectId) {
   if (!doc || !doc.fields) return null;
   return firestoreDecodeFields_(doc.fields);
 }
+
+function firestoreSetTimelineSessionMeta_(projectId, meta) {
+  firestoreWriteDocument_('projects/' + projectId + '/timeline/_meta', meta);
+}
+
+function firestoreGetTimelineSessionMeta_(projectId) {
+  var doc = firestoreFetch_('get', 'projects/' + projectId + '/timeline/_meta');
+  if (!doc || !doc.fields) return null;
+  return firestoreDecodeFields_(doc.fields);
+}

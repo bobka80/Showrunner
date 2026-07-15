@@ -34,6 +34,7 @@
 </div>
 
 <div id="shift-layer" style="display: none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; background: var(--bg-dark); z-index: 2000; flex-direction: column;">
+  <div id="dal-timeline-session-banner" style="display:none; background:#1e3a5f; color:#93c5fd; padding:6px 25px; font-weight:700; font-size:11px; letter-spacing:0.04em; flex-shrink:0; text-align:center;"></div>
   <div class="tt-workspace" style="flex: 1; display: flex; overflow: hidden;">
     <div class="tt-sidebar" style="display: none;">
       <div id="dept-override-panel"></div>
@@ -58,6 +59,8 @@
   </div> 
   <div class="tt-bottom-actions">
       <button onclick="openCrewManager()" class="btn-blue" style="margin: 0; width: auto;">EDIT CREW</button>
+      <button id="dal-timeline-start-btn" class="btn-outline" style="margin: 0; width: auto; border-color:#3b82f6; color:#3b82f6; display:none;" onclick="openDalTimelineCollabSession()">START COLLAB</button>
+      <button id="dal-timeline-end-btn" class="btn-outline" style="margin: 0; width: auto; border-color:#ef4444; color:#ef4444; display:none;" onclick="closeDalTimelineCollabSession()">END COLLAB</button>
       <div style="flex: 1;"></div>
       <label id="tt-crew-finished-wrap" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
           <input type="checkbox" id="tt-crew-finished-cb" style="width:16px; height:16px; margin:0; accent-color:#10b981;" onchange="window.isTimelineDirty = true;"> CREW FINISHED

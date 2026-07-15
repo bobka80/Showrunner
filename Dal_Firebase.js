@@ -1,9 +1,10 @@
 /**
  * SM Showrunner (smuruner) - Clean 8 Architecture
- * Dal_Firebase.js - FirebaseAdapter (Phase 4 Slice B — PA prep fork via GAS Firestore REST)
+ * Dal_Firebase.js - FirebaseAdapter (Phase 4 — PA prep + timeline collab fork via GAS Firestore REST)
  *
- * During prep session: PA reads/writes Firestore. Timeline + ledger still delegate to Sheets.
- * Client Firestore SDK listeners ship in a later slice — saves still work via google.script.run.
+ * Prep session: PA reads/writes Firestore.
+ * Timeline collab session: timeline reads/writes Firestore.
+ * Ledger always Sheets. Saves during session still go through google.script.run.
  */
 
 // @INDEX: DAL -> Firebase adapter (Phase 4)
@@ -11,6 +12,7 @@
 var __dalFirebaseAdapterSingleton = null;
 
 var DAL_FIRESTORE_PA_COLLECTION = 'assets';
+var DAL_FIRESTORE_TIMELINE_COLLECTION = 'timeline';
 
 function getFirebaseAdapter() {
   if (!__dalFirebaseAdapterSingleton) {
@@ -145,6 +147,143 @@ function dalCommitPaFromFirestore_(projectId) {
   firestoreDeleteCollection_(dalFirestorePaCollection_(projectId));
 }
 
+function dalFirestoreTimelineCollection_(projectId) {
+  return 'projects/' + projectId + '/' + DAL_FIRESTORE_TIMELINE_COLLECTION;
+}
+
+function dalWriteTimelineStateToFirestore_(projectId, mode, shifts, phases, overrides, actor) {
+  firestoreWriteDocument_(dalFirestoreTimelineCollection_(projectId) + '/state', {
+    mode: mode || 'main',
+    shiftsJson: JSON.stringify(shifts || []),
+    phasesJson: JSON.stringify(phases || []),
+    overridesJson: JSON.stringify(overrides || {}),
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor || 'System'
+  });
+}
+
+function dalReadTimelineStateFromFirestore_(projectId) {
+  var doc = firestoreFetch_('get', dalFirestoreTimelineCollection_(projectId) + '/state');
+  if (!doc || !doc.fields) return null;
+  var plain = firestoreDecodeFields_(doc.fields);
+  var shifts = [];
+  var phases = [];
+  var overrides = {};
+  try { shifts = JSON.parse(plain.shiftsJson || '[]'); } catch (e1) { shifts = []; }
+  try { phases = JSON.parse(plain.phasesJson || '[]'); } catch (e2) { phases = []; }
+  try { overrides = JSON.parse(plain.overridesJson || '{}'); } catch (e3) { overrides = {}; }
+  return {
+    mode: plain.mode || 'main',
+    shifts: shifts,
+    phases: phases,
+    overrides: overrides,
+    updatedAt: plain.updatedAt || '',
+    updatedBy: plain.updatedBy || ''
+  };
+}
+
+function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode) {
+  __dalTimelineSheetsDirect_ = true;
+  var state;
+  try {
+    state = getTimelineDataSheets_(projectId, mode || 'main');
+  } finally {
+    __dalTimelineSheetsDirect_ = false;
+  }
+  dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor);
+  firestoreSetTimelineSessionMeta_(projectId, {
+    sessionUid: sessionUid,
+    sessionType: DAL_SESSION_TYPE.TIMELINE_COLLAB,
+    openedAt: new Date().toISOString(),
+    openedBy: actor,
+    domain: 'timeline',
+    mode: mode || 'main'
+  });
+}
+
+function dalCommitTimelineFromFirestore_(projectId, actor) {
+  var snap = dalReadTimelineStateFromFirestore_(projectId);
+  firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta');
+  if (!snap) {
+    firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
+    return;
+  }
+  // Commit through Sheets path without nested ScriptLock (caller already holds DAL session lock).
+  __dalTimelineSheetsDirect_ = true;
+  try {
+    saveTimelineDataSheets_(
+      projectId,
+      snap.mode || 'main',
+      snap.shifts || [],
+      null,
+      snap.phases || [],
+      snap.overrides || {},
+      null,
+      actor || 'System UI',
+      null
+    );
+  } finally {
+    __dalTimelineSheetsDirect_ = false;
+  }
+  firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
+}
+
+function getTimelineDataFirestore_(folderId, mode) {
+  return executeWithRetry(function () {
+    var roster = getCrewSettings();
+    var snap = dalReadTimelineStateFromFirestore_(folderId);
+    if (!snap) {
+      // Fail open to Sheets snapshot only if fork empty mid-session (should not happen).
+      return getTimelineDataSheets_(folderId, mode);
+    }
+    var shifts = snap.shifts || [];
+    var assigned = [];
+    shifts.forEach(function (s) {
+      var u = s.user_uid || s.email;
+      if (u && assigned.indexOf(u) === -1) assigned.push(u);
+    });
+    return {
+      roster: roster,
+      assigned: assigned,
+      shifts: shifts,
+      phases: snap.phases || [],
+      overrides: snap.overrides || {}
+    };
+  }, 3, true);
+}
+
+function saveTimelineDataFirestore_(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents) {
+  return executeWithRetry(function () {
+    assertActorCanEditTimeline(actor);
+    if (!dalFirestoreIsConfigured_()) {
+      throw new Error('Firebase not configured — cannot save during timeline collab session.');
+    }
+    dalWriteTimelineStateToFirestore_(folderId, mode, shifts, phases, overrides, actor);
+    // Sub-events stay Sheets for Phase A (not on fork yet — logistics editor path).
+    if (subEvents !== null) {
+      var sheets = verifyDatabaseSchema();
+      var tInfo = dalDeleteRowsByColumn_(sheets.timelines, 'project_uid', folderId);
+      var tMap = tInfo.map;
+      if (subEvents.length > 0) {
+        var tlRows = subEvents.map(function (t) {
+          var r = new Array(tInfo.cols).fill('');
+          if (tMap['uid'] !== undefined) r[tMap['uid']] = Utilities.getUuid();
+          if (tMap['project_uid'] !== undefined) r[tMap['project_uid']] = folderId;
+          if (tMap['Sub_Event_Type'] !== undefined) r[tMap['Sub_Event_Type']] = t.Sub_Event_Type || 'MAIN';
+          if (tMap['Event_Date'] !== undefined) r[tMap['Event_Date']] = t.Event_Date || '';
+          if (tMap['Start_Time'] !== undefined) r[tMap['Start_Time']] = t.Start_Time ? ("'" + t.Start_Time) : '';
+          if (tMap['End_Time'] !== undefined) r[tMap['End_Time']] = t.End_Time ? ("'" + t.End_Time) : '';
+          if (tMap['Note'] !== undefined) r[tMap['Note']] = t.Note || '';
+          return r;
+        });
+        dalAppendRows_(sheets.timelines, tlRows);
+      }
+    }
+    writeToAuditLog(actor, 'UPDATE', 'TIMELINE_FIRESTORE', folderId, folderId, 'Saved timeline on collab fork.');
+    return { success: true, fork: true };
+  });
+}
+
 function createFirebaseAdapter_() {
   var sheets = getSheetsAdapter();
   return {
@@ -161,9 +300,15 @@ function createFirebaseAdapter_() {
       return sheets.fetchProjectAssets(projectId, startDateStr, endDateStr);
     },
     persistTimelineData: function (folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents) {
+      if (resolveDalSessionStatus_(folderId, DAL_DOMAIN.TIMELINE) === DAL_SESSION.SESSION_OPEN) {
+        return saveTimelineDataFirestore_(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents);
+      }
       return sheets.persistTimelineData(folderId, mode, shifts, crewUids, phases, overrides, clientTimestamp, actor, subEvents);
     },
     fetchTimelineData: function (folderId, mode) {
+      if (resolveDalSessionStatus_(folderId, DAL_DOMAIN.TIMELINE) === DAL_SESSION.SESSION_OPEN) {
+        return getTimelineDataFirestore_(folderId, mode);
+      }
       return sheets.fetchTimelineData(folderId, mode);
     },
     persistOperationsBatch: function (projectId, batch, actor) {

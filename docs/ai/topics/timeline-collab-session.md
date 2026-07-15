@@ -6,7 +6,7 @@
 
 **Replaces/enhances:** current timeline **single-editor** presence lock (`reportProjectPresence`, `🔒 NAME EDITING` in `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`).
 
-**Status:** Backlog — **blocked on DAL campaign** ([../active/data-access-layer.md](../active/data-access-layer.md)).
+**Status:** Phase A in progress — DAL open/close + Firestore fork shipped (GAS path). Live multi-user drag / room roster still open. See [../active/data-access-layer.md](../active/data-access-layer.md).
 
 ---
 
@@ -68,10 +68,10 @@ Is: **collaborative room** with shared live state.
 ## Phased delivery
 
 ### Phase A — Room + live shifts on fork
-- [ ] Enter/leave timeline room APIs
-- [ ] Snapshot timeline → Firebase on first enter (or on first edit)
+- [x] Enter/leave timeline room APIs (`openDalSession` / `closeDalSession` type `timelineCollab`)
+- [x] Snapshot timeline → Firebase on START COLLAB
 - [ ] Multi-user shift drag with drag-end writes
-- [ ] Commit when last participant leaves
+- [x] Manual END COLLAB commit (last-leave auto-commit later)
 
 ### Phase B — Phases + sub-events on fork
 - [ ] Extend buffer to phase row + sub-event data
