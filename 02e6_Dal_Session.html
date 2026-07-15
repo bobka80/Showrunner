@@ -1,0 +1,75 @@
+<!-- DAL Phase 4 Slice B — prep session UI (manager only) -->
+<script>
+window.dalSessionState = { status: 'normal', sessionType: '' };
+
+window.refreshDalSessionBanner = function() {
+  var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+  var banner = document.getElementById('dal-session-banner');
+  var startBtn = document.getElementById('dal-prep-start-btn');
+  var endBtn = document.getElementById('dal-prep-end-btn');
+  if (!projectId || projectId === 'NEW') {
+    if (banner) banner.style.display = 'none';
+    if (startBtn) startBtn.style.display = 'none';
+    if (endBtn) endBtn.style.display = 'none';
+    return;
+  }
+  google.script.run
+    .withFailureHandler(function() {
+      if (banner) banner.style.display = 'none';
+      if (startBtn) startBtn.style.display = 'none';
+      if (endBtn) endBtn.style.display = 'none';
+    })
+    .withSuccessHandler(function(info) {
+      window.dalSessionState = info || {};
+      var isPrepOpen = info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'prep';
+      if (banner) {
+        if (isPrepOpen) {
+          banner.style.display = 'block';
+          banner.textContent = '🔒 IN PREPARATION — Project Assets live on Firebase fork (Sheets commit on End Prep)';
+        } else {
+          banner.style.display = 'none';
+        }
+      }
+      if (startBtn) startBtn.style.display = isPrepOpen ? 'none' : 'inline-flex';
+      if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
+    })
+    .getDalSessionInfo(projectId);
+};
+
+window.openDalPrepSession = function() {
+  var projectId = document.getElementById('edit-folder-id').value;
+  if (!projectId || projectId === 'NEW') return alert('Save the project first.');
+  if (!confirm('Start warehouse preparation? Project Assets will fork to Firebase until you End Prep.')) return;
+  document.body.style.cursor = 'wait';
+  google.script.run
+    .withFailureHandler(function(err) {
+      document.body.style.cursor = 'default';
+      alert('Start prep failed: ' + err.message);
+    })
+    .withSuccessHandler(function() {
+      document.body.style.cursor = 'default';
+      try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+      window.refreshDalSessionBanner();
+      alert('Preparation session opened. Equipment saves now route through the Firebase fork.');
+    })
+    .openDalSession(projectId, 'prep', typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+};
+
+window.closeDalPrepSession = function() {
+  var projectId = document.getElementById('edit-folder-id').value;
+  if (!confirm('End preparation and commit Project Assets back to Google Sheets?')) return;
+  document.body.style.cursor = 'wait';
+  google.script.run
+    .withFailureHandler(function(err) {
+      document.body.style.cursor = 'default';
+      alert('End prep failed: ' + err.message);
+    })
+    .withSuccessHandler(function() {
+      document.body.style.cursor = 'default';
+      try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+      window.refreshDalSessionBanner();
+      alert('Preparation ended — Project Assets committed to Sheets.');
+    })
+    .closeDalSession(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+};
+</script>

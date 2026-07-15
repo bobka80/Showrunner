@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice A in progress** (session registry + FirebaseAdapter skeleton). **Production:** GAS **v581** (Phase 3). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice B shipped** (prep session + PA Firestore fork). **Production:** GAS **v582+**. **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -339,11 +339,13 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Slice A** — `Dal_Firebase.js` adapter + `getFirebasePublicConfig()` (Script Properties)
 - [x] **Slice A** — Router selects FirebaseAdapter when session-open (adapter delegates to Sheets)
 - [x] **Slice A** — `getDalSessionInfo(projectId)` read-only API
-- [ ] **Slice B** — `openDalSession` / `closeDalSession` GAS APIs + snapshot Sheets → Firestore
-- [ ] **Slice B** — Client Firestore listeners for PA / timeline fork
-- [ ] `FirebaseAdapter` live reads/writes (stop delegating to Sheets)
-- [ ] Hard block direct Sheet writes for forked slices while session open
-- [ ] End session → GAS commit → router back to Sheets
+- [x] **Slice B** — `openDalSession` / `closeDalSession` (prep) + Firestore snapshot/commit for PA
+- [x] **Slice B** — `FirebaseAdapter` live PA read/write via GAS Firestore REST during prep
+- [x] **Slice B** — Hard block direct Sheet PA read/write while prep session open
+- [x] **Slice B** — Manager UI: START PREP / END PREP + banner (`02e6_Dal_Session.html`)
+- [ ] **Slice C** — Client Firestore SDK listeners (real-time multi-user without reload)
+- [ ] **Slice C** — Timeline collab session (`timelineCollab`)
+- [ ] End session → reconciliation engine (Phase 5)
 - [ ] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
 
 ### Phase 5 — Reconciliation + failed-writes pocket

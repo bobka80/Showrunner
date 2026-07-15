@@ -26,7 +26,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | **C** | Screensaver / bulletin (dock only); gate layout UI | [ ] Deferred |
 
 1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
-2. **Data access layer (DAL)** — **Phase 4 Slice A** (session registry + FirebaseAdapter skeleton). Production **v581**. Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
+2. **Data access layer (DAL)** — **Phase 4 Slice B** (prep session + PA Firestore fork). Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
 3. **After DAL Phase 4+:** warehouse prep session (Firebase PA + ledger), expanded ledger, timeline collab — all via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)).
 4. **Parallel when ready:** Google Chat update → [topics/workspace-migration.md](topics/workspace-migration.md).
 
@@ -37,7 +37,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Campaign | Status | File |
 |----------|--------|------|
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. **Next:** Phase A shell split → Phase B dock UI — [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | **Phase 4 Slice A** — session registry + Firebase seam · prod **v581** · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
+| **Data access layer (DAL + router)** | **Phase 4 Slice B** — prep fork live · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
 
 ---
 

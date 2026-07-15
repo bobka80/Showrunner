@@ -12,97 +12,133 @@ function saveProjectAssetsDelta(projectId, deltas, actor = "System UI") {
     return getProjectAssetsRepo().saveDelta(projectId, deltas, actor);
 }
 
+function dalAssertSheetsPaNotForked_(projectId) {
+    if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN) {
+        throw new Error('PREP_SESSION_ACTIVE: Project Assets are on the Firebase fork — direct Sheets access blocked.');
+    }
+}
+
+function dalGetProjectAssetsHeaderAndMap_() {
+    const sheets = verifyDatabaseSchema(true);
+    const sheet = sheets.projectAssets;
+    const data = sheet.getDataRange().getValues();
+    if (data.length === 0) throw new Error("Project_Assets sheet has no header row.");
+    const header = data[0];
+    return { sheet: sheet, header: header, map: dalHeaderMapFromRows_(header), colCount: header.length };
+}
+
+function dalLoadPaProjectRowsFromSheet_(sheet, map, projectId) {
+    const data = sheet.getDataRange().getValues();
+    const projectRows = [];
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][map['project_uid']]) === String(projectId)) {
+            projectRows.push({ data: data[i].slice(), sheetRow: i + 1 });
+        }
+    }
+    return projectRows;
+}
+
+function dalApplyPaDeltas_(projectRows, deltas, map, colCount, projectId) {
+    deltas.forEach(d => {
+        if (d.isBulk) {
+            let match = projectRows.find(r =>
+                String(r.data[map['asset_uid']]) === String(d.assetId) &&
+                String(r.data[map['location']] || "General") === String(d.location || "General") &&
+                String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
+                String(r.data[map['container_uid']] || "") === String(d.containerUid || "")
+            );
+            if (match) {
+                let currentQty = parseInt(match.data[map['assigned_quantity']], 10) || 0;
+                match.data[map['assigned_quantity']] = currentQty + d.deltaQty;
+            } else if (d.deltaQty > 0) {
+                let r = new Array(colCount).fill("");
+                if (map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
+                if (map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
+                if (map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
+                if (map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = d.deltaQty;
+                if (map['location'] !== undefined) r[map['location']] = d.location || "General";
+                if (map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
+                if (map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
+                if (map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
+                if (map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
+                projectRows.push({ data: r });
+            }
+        } else {
+            if (d.deltaQty > 0) {
+                for (let k = 0; k < d.deltaQty; k++) {
+                    let r = new Array(colCount).fill("");
+                    if (map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
+                    if (map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
+                    if (map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
+                    if (map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = 1;
+                    if (map['location'] !== undefined) r[map['location']] = d.location || "General";
+                    if (map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
+                    if (map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
+                    if (map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
+                    if (map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
+                    projectRows.push({ data: r });
+                }
+            } else if (d.deltaQty < 0) {
+                let removeCount = Math.abs(d.deltaQty);
+                for (let i = projectRows.length - 1; i >= 0 && removeCount > 0; i--) {
+                    let r = projectRows[i];
+                    if (String(r.data[map['asset_uid']]) === String(d.assetId) &&
+                        String(r.data[map['location']] || "General") === String(d.location || "General") &&
+                        String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
+                        String(r.data[map['container_uid']] || "") === String(d.containerUid || "")) {
+                        r.data[map['assigned_quantity']] = 0;
+                        removeCount--;
+                    }
+                }
+            }
+        }
+    });
+
+    const rowsToUpdate = [];
+    const rowsToDelete = [];
+    const rowsToAppend = [];
+    projectRows.forEach(r => {
+        const qty = parseInt(r.data[map['assigned_quantity']], 10) || 0;
+        if (qty <= 0) {
+            if (r.sheetRow) rowsToDelete.push(r.sheetRow);
+            else if (r.docId) rowsToDelete.push(r.docId);
+        } else if (r.sheetRow || r.docId) {
+            rowsToUpdate.push(r);
+        } else {
+            rowsToAppend.push(r.data);
+        }
+    });
+    return { rowsToUpdate, rowsToDelete, rowsToAppend };
+}
+
+function dalPaRowObjectToSheetArray_(obj, header, map) {
+    const r = new Array(header.length).fill("");
+    Object.keys(map).forEach(function (key) {
+        if (obj[key] !== undefined && obj[key] !== null) r[map[key]] = obj[key];
+    });
+    return r;
+}
+
+function dalPaSheetRowToObject_(row, map) {
+    const obj = {};
+    Object.keys(map).forEach(function (key) {
+        obj[key] = row[map[key]];
+    });
+    return obj;
+}
+
 function saveProjectAssetsDeltaSheets_(projectId, deltas, actor = "System UI") {
     return executeWithRetry(() => {
         assertActorCanEditProjectAssets(actor);
-        const sheets = verifyDatabaseSchema();
-        const sheet = sheets.projectAssets;
-        let data = sheet.getDataRange().getValues();
-        if (data.length === 0) throw new Error("Project_Assets sheet has no header row.");
-        let map = dalHeaderMapFromRows_(data[0]);
-        
-        let projectRows = [];
-        for (let i = 1; i < data.length; i++) {
-            if (String(data[i][map['project_uid']]) === String(projectId)) {
-                projectRows.push({ data: data[i].slice(), sheetRow: i + 1 });
-            }
-        }
-        
-        deltas.forEach(d => {
-            if (d.isBulk) {
-                let match = projectRows.find(r => 
-                    String(r.data[map['asset_uid']]) === String(d.assetId) &&
-                    String(r.data[map['location']] || "General") === String(d.location || "General") &&
-                    String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
-                    String(r.data[map['container_uid']] || "") === String(d.containerUid || "")
-                );
-                
-                if (match) {
-                    let currentQty = parseInt(match.data[map['assigned_quantity']], 10) || 0;
-                    match.data[map['assigned_quantity']] = currentQty + d.deltaQty;
-                } else if (d.deltaQty > 0) {
-                    let r = new Array(data[0].length).fill("");
-                    if(map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
-                    if(map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
-                    if(map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
-                    if(map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = d.deltaQty;
-                    if(map['location'] !== undefined) r[map['location']] = d.location || "General";
-                    if(map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
-                    if(map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
-                    if(map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
-                    if(map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
-                    projectRows.push({ data: r });
-                }
-            } else {
-                if (d.deltaQty > 0) {
-                    for (let k = 0; k < d.deltaQty; k++) {
-                        let r = new Array(data[0].length).fill("");
-                        if(map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
-                        if(map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
-                        if(map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
-                        if(map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = 1;
-                        if(map['location'] !== undefined) r[map['location']] = d.location || "General";
-                        if(map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
-                        if(map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
-                        if(map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
-                        if(map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
-                        projectRows.push({ data: r });
-                    }
-                } else if (d.deltaQty < 0) {
-                    let removeCount = Math.abs(d.deltaQty);
-                    for (let i = projectRows.length - 1; i >= 0 && removeCount > 0; i--) {
-                        let r = projectRows[i];
-                        if (String(r.data[map['asset_uid']]) === String(d.assetId) &&
-                            String(r.data[map['location']] || "General") === String(d.location || "General") &&
-                            String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
-                            String(r.data[map['container_uid']] || "") === String(d.containerUid || "")) 
-                        {
-                            r.data[map['assigned_quantity']] = 0;
-                            removeCount--;
-                        }
-                    }
-                }
-            }
-        });
-        
-        let rowsToUpdate = [];
-        let rowsToDelete = [];
-        let rowsToAppend = [];
-        projectRows.forEach(r => {
-            let qty = parseInt(r.data[map['assigned_quantity']], 10) || 0;
-            if (qty <= 0) {
-                if (r.sheetRow) rowsToDelete.push(r.sheetRow);
-            } else if (r.sheetRow) {
-                rowsToUpdate.push(r);
-            } else {
-                rowsToAppend.push(r.data);
-            }
-        });
-        
-        rowsToUpdate.forEach(r => dalUpdateSheetRow_(sheet, r.sheetRow, r.data));
-        dalDeleteSheetRows_(sheet, rowsToDelete);
-        dalAppendRows_(sheet, rowsToAppend);
-        
+        dalAssertSheetsPaNotForked_(projectId);
+        const hdr = dalGetProjectAssetsHeaderAndMap_();
+        let projectRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId);
+        const classified = dalApplyPaDeltas_(projectRows, deltas, hdr.map, hdr.colCount, projectId);
+
+        classified.rowsToUpdate.forEach(r => dalUpdateSheetRow_(hdr.sheet, r.sheetRow, r.data));
+        dalDeleteSheetRows_(hdr.sheet, classified.rowsToDelete);
+        dalAppendRows_(hdr.sheet, classified.rowsToAppend);
+
         flushCache();
         writeToAuditLog(actor, "UPDATE", "PROJECT_ASSETS", projectId, projectId, `Applied ${deltas.length} delta change(s) to event assets.`);
         return "Saved Delta";
@@ -113,8 +149,56 @@ function getProjectAssets(projectId, startDateStr, endDateStr) {
     return getProjectAssetsRepo().getForProject(projectId, startDateStr, endDateStr);
 }
 
+function getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets) {
+    let overlappingMap = {};
+    if (startDateStr && endDateStr) {
+        const indexData = getSheetData(sheets.index);
+        const iMap = indexData.hMap;
+        const timelineData = getSheetData(sheets.timelines);
+        const tMap = timelineData.hMap;
+
+        let projectDates = {};
+        for (let i = 1; i < timelineData.length; i++) {
+            let pid = timelineData[i][tMap['project_uid']];
+            let dStr = timelineData[i][tMap['Event_Date']];
+            let eDateStr = "";
+            if (dStr instanceof Date) eDateStr = `${dStr.getFullYear()}-${String(dStr.getMonth() + 1).padStart(2, '0')}-${String(dStr.getDate()).padStart(2, '0')}`;
+            else if (dStr) { let match = String(dStr).match(/^(\d{4})-(\d{2})-(\d{2})/); if (match) eDateStr = match[0]; }
+
+            if (eDateStr) {
+                if (!projectDates[pid]) projectDates[pid] = { start: eDateStr, end: eDateStr };
+                else {
+                    if (eDateStr < projectDates[pid].start) projectDates[pid].start = eDateStr;
+                    if (eDateStr > projectDates[pid].end) projectDates[pid].end = eDateStr;
+                }
+            }
+        }
+
+        let overlappingPids = new Set();
+        for (let i = 1; i < indexData.length; i++) {
+            let pid = String(indexData[i][iMap['uid']]);
+            if (pid === String(projectId)) continue;
+            let status = String(indexData[i][iMap['Status']] || 'Draft').toUpperCase();
+            if (status === 'CANCELLED' || status === 'TRASHED') continue;
+
+            let pDates = projectDates[pid];
+            if (pDates && pDates.start <= endDateStr && pDates.end >= startDateStr) {
+                overlappingPids.add(pid);
+            }
+        }
+
+        otherAssets.forEach(pa => {
+            if (overlappingPids.has(pa.pid)) {
+                overlappingMap[pa.aId] = (overlappingMap[pa.aId] || 0) + pa.qty;
+            }
+        });
+    }
+    return { current: assets, overlapping: overlappingMap };
+}
+
 function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
     return executeWithRetry(() => {
+        dalAssertSheetsPaNotForked_(projectId);
         const sheets = verifyDatabaseSchema(true);
         const data = getSheetData(sheets.projectAssets);
         const map = data.hMap;
@@ -156,52 +240,8 @@ function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
                 });
             }
         }
-        
-        let overlappingMap = {};
-        if (startDateStr && endDateStr) {
-            const indexData = getSheetData(sheets.index);
-            const iMap = indexData.hMap;
-            const timelineData = getSheetData(sheets.timelines);
-            const tMap = timelineData.hMap;
-            
-            let projectDates = {};
-            for (let i=1; i<timelineData.length; i++) {
-                let pid = timelineData[i][tMap['project_uid']];
-                let dStr = timelineData[i][tMap['Event_Date']];
-                let eDateStr = "";
-                if (dStr instanceof Date) eDateStr = `${dStr.getFullYear()}-${String(dStr.getMonth() + 1).padStart(2, '0')}-${String(dStr.getDate()).padStart(2, '0')}`;
-                else if (dStr) { let match = String(dStr).match(/^(\d{4})-(\d{2})-(\d{2})/); if (match) eDateStr = match[0]; }
-                
-                if (eDateStr) {
-                    if (!projectDates[pid]) projectDates[pid] = { start: eDateStr, end: eDateStr };
-                    else {
-                        if (eDateStr < projectDates[pid].start) projectDates[pid].start = eDateStr;
-                        if (eDateStr > projectDates[pid].end) projectDates[pid].end = eDateStr;
-                    }
-                }
-            }
-            
-            let overlappingPids = new Set();
-            for (let i=1; i<indexData.length; i++) {
-                let pid = String(indexData[i][iMap['uid']]);
-                if (pid === String(projectId)) continue;
-                let status = String(indexData[i][iMap['Status']] || 'Draft').toUpperCase();
-                if (status === 'CANCELLED' || status === 'TRASHED') continue;
-                
-                let pDates = projectDates[pid];
-                if (pDates && pDates.start <= endDateStr && pDates.end >= startDateStr) {
-                    overlappingPids.add(pid);
-                }
-            }
-            
-            otherAssets.forEach(pa => {
-                if (overlappingPids.has(pa.pid)) {
-                    overlappingMap[pa.aId] = (overlappingMap[pa.aId] || 0) + pa.qty;
-                }
-            });
-        }
-        
-        return { current: assets, overlapping: overlappingMap };
+
+        return getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets);
     });
 }
 

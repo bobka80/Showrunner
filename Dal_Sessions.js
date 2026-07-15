@@ -1,9 +1,8 @@
 /**
  * SM Showrunner (smuruner) - Clean 8 Architecture
- * Dal_Sessions.js - DAL session registry (Phase 4 Slice A)
+ * Dal_Sessions.js - DAL session registry + lifecycle (Phase 4 Slice B)
  *
- * Authoritative session flags live on Projects_Index. Firebase mirror comes in a later slice.
- * No session can open via UI yet — registry is read-only plumbing for the router.
+ * Authoritative session flags on Projects_Index. PA prep fork uses Firestore via Dal_Firestore.js.
  */
 
 // @INDEX: DAL -> Session registry (Phase 4)
@@ -91,4 +90,89 @@ function resolveDalSessionStatus_(projectId, domain) {
   } catch (e) {
     return DAL_SESSION.NORMAL;
   }
+}
+
+function dalWriteSessionIndexFields_(indexSheet, rowNum, map, fields) {
+  Object.keys(fields).forEach(function (col) {
+    if (map[col] !== undefined) {
+      indexSheet.getRange(rowNum, map[col] + 1).setValue(fields[col]);
+    }
+  });
+}
+
+/**
+ * Open a DAL session (manager only). Prep: snapshot PA → Firestore.
+ */
+function openDalSession(projectId, sessionType, actor) {
+  return executeWithRetry(function () {
+    assertActorCanManageProject(actor);
+    if (!dalFirestoreIsConfigured_()) {
+      throw new Error('Firebase service account not configured — cannot open prep session.');
+    }
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) throw new Error('Project not found.');
+
+    var curStatus = String(row.data[row.map['Dal_Session_Status']] || '').toLowerCase();
+    if (curStatus === 'open') throw new Error('A session is already open on this project.');
+
+    var sessionUid = Utilities.getUuid();
+    var now = new Date().toISOString();
+
+    if (sessionType === DAL_SESSION_TYPE.PREP) {
+      dalSnapshotPaToFirestore_(projectId, sessionUid, actor);
+    } else if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
+      throw new Error('Timeline collaboration session is not implemented yet.');
+    } else {
+      throw new Error('Unknown session type: ' + sessionType);
+    }
+
+    dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
+      Dal_Session_Type: sessionType,
+      Dal_Session_Status: 'open',
+      Dal_Session_UID: sessionUid,
+      Dal_Session_Opened_At: now,
+      Dal_Session_Opened_By: actor
+    });
+
+    flushCache();
+    writeToAuditLog(actor, 'OPEN', 'DAL_SESSION', projectId, sessionUid, 'Opened ' + sessionType + ' session.');
+    return { success: true, sessionUid: sessionUid, sessionType: sessionType, status: 'open' };
+  });
+}
+
+/**
+ * Close DAL session — commit Firestore → Sheets, clear fork.
+ */
+function closeDalSession(projectId, actor) {
+  return executeWithRetry(function () {
+    assertActorCanManageProject(actor);
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) throw new Error('Project not found.');
+
+    var sessionType = String(row.data[row.map['Dal_Session_Type']] || '');
+    var curStatus = String(row.data[row.map['Dal_Session_Status']] || '').toLowerCase();
+    if (curStatus !== 'open') throw new Error('No open session on this project.');
+
+    dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, { Dal_Session_Status: 'committing' });
+
+    if (sessionType === DAL_SESSION_TYPE.PREP) {
+      dalCommitPaFromFirestore_(projectId);
+    } else {
+      throw new Error('Close not implemented for session type: ' + sessionType);
+    }
+
+    dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
+      Dal_Session_Type: '',
+      Dal_Session_Status: '',
+      Dal_Session_UID: '',
+      Dal_Session_Opened_At: '',
+      Dal_Session_Opened_By: ''
+    });
+
+    flushCache();
+    writeToAuditLog(actor, 'CLOSE', 'DAL_SESSION', projectId, projectId, 'Closed ' + sessionType + ' session — committed to Sheets.');
+    return { success: true, sessionType: sessionType, status: 'closed' };
+  });
 }
