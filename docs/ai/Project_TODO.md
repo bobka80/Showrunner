@@ -26,8 +26,8 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | **C** | Screensaver / bulletin (dock only); gate layout UI | [ ] Deferred |
 
 1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
-2. **Data access layer (DAL)** — Phase 4 Slice C+ (prep + timeline forks); **next registry work:** Slice D dual-domain (prep∥timeline). Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md)
-3. **After DAL Phase 4 Slice D + Phase 5+:** fuller warehouse prep UX, timeline live multi-drag — all via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)).
+2. **Data access layer (DAL)** — Phase 4 Slice D shipped (prep∥timeline concurrent); next: Phase 5 reconciliation. Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md)
+3. **After DAL campaign:** fuller warehouse prep UX, timeline drag-end autosave — via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)). **Optional later:** timeline auto-room + idle commit — [timeline-collab-session.md § Optional update](topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) (milestone-before-try / revert-if-disliked).
 4. **Parallel when ready:** Google Chat update → [topics/workspace-migration.md](topics/workspace-migration.md).
 
 ---
@@ -37,7 +37,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Campaign | Status | File |
 |----------|--------|------|
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. **Next:** Phase A shell split → Phase B dock UI — [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | **Phase 4** — prep + timeline forks live; **Slice D documented** (dual-domain, before Phase 5) · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
+| **Data access layer (DAL + router)** | **Phase 4** — Slice D shipped (prep∥timeline); next Phase 5 · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
 
 ---
 
@@ -61,8 +61,8 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
 | Session fork platform | Backlog — Firebase buffer + router | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
 | Unified data cache engine **+ data access layer (backend abstraction)** | **Design locked** — cache Phase 6 after DAL repos — [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) · [active/data-access-layer.md](active/data-access-layer.md) | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
-| Warehouse prep session | Partial — PA fork live; dual-domain vs timeline → Slice D | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) |
-| Timeline collab session | Partial — Phase A fork live; dual-domain vs prep → Slice D | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
+| Warehouse prep session | Partial — PA fork live; dual-domain vs timeline **resolved** (Slice D) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) |
+| Timeline collab session | Partial — Phase A + live sync + Slice D; **optional post-campaign:** auto-room + idle commit | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
 
 **Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → **DAL campaign** (Phase 0 sweep → repos/router → **Phase 3 delta-only gate** → Firebase → reconciliation → cache) — [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) → **warehouse prep** → **timeline collab** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. Do **not** start Firebase prep/timeline fork before DAL Phase 3 (delta saves) + Phase 4 shell.

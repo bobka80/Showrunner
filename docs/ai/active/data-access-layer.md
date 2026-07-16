@@ -392,7 +392,8 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - **2026-07-05:** Campaign file created from director brainstorm. Execution **deferred** — finish phone app work first.
 - **2026-07-15:** Pre-ship DAL gates shipped — [dal-pre-ship-gates.md](dal-pre-ship-gates.md). Phase 1 repos still await **OK go**.
 - **2026-07-13:** Director design lock imported → [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md). Phase 3 (delta-only) explicit gate before Firebase.
-- **2026-07-15:** **Slice D documented** (not coded) — dual-domain concurrent prep + timeline — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md). Gate before Phase 5.
+- **2026-07-15:** **Slice D documented** — dual-domain concurrent prep + timeline — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md). **Shipped v603.**
+- **2026-07-16:** Post-campaign **optional** timeline UX (auto room on enter + idle commit) documented in [../topics/timeline-collab-session.md](../topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) — do **not** build during this campaign; milestone-before-try / revert-if-disliked.
 
 ## What DAL must NOT do
 

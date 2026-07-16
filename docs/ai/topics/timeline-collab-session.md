@@ -10,6 +10,8 @@
 
 **Known gap (until drag-end autosave):** saves during collab still require SAVE SHIFTS (not drag-end yet).
 
+**Post-campaign optional (do not build during DAL campaign):** [§ Optional update — auto room + idle commit](#optional-update--auto-room--idle-commit) — after whole DAL/fork campaign finishes; milestone first; try on floor; revert if disliked.
+
 ---
 
 ## Director intent
@@ -22,6 +24,57 @@
 
 Not: one editor + others read-only (today).  
 Is: **collaborative room** with shared live state.
+
+---
+
+## Optional update — auto room + idle commit
+
+**When:** **After** the current DAL / fork campaign is complete (Phases through reconciliation/cache as director closes them). **Not** in-flight campaign work.
+
+**Why document now:** Reconstruct this UX later without re-brainstorming. Locked product shape from director (2026-07-16).
+
+**Ship protocol (mandatory for this optional slice):**
+
+1. Finish campaign first.
+2. **`node milestone.js`** with a clear note — that version is the **try/revert baseline**.
+3. Implement this optional update and ship a **new** milestone.
+4. Floor smoke — if liked, keep; if not, **rollback production to the baseline milestone**.
+
+### Product shape
+
+| Rule | Intent |
+|------|--------|
+| **First user into timeline opens co-op** | Fork starts with person 1 — room is hot **before** person 2 arrives. No separate START COLLAB ritual. |
+| **Second user joins live** | Opens timeline → joins existing Firebase fork → sees live grid immediately. |
+| **Seamless warm-up** | User may edit while snapshot/fork is still opening; when Firebase is ready, **cross-check** local pending work vs snapshot and **delta** immediately so entry feels continuous. |
+| **Always fork while in timeline** | Timeline open = working on the fork (not Sheets mid-session). |
+| **Idle timeout → Sheets + clear room** | After inactivity (no meaningful edits + dead presence heartbeats — e.g. hibernated laptop), **commit fork → Sheets** and **push everyone out** of timeline room mode. Mediates ghost sessions. |
+
+### Idle timeout details (locked intent)
+
+- **Happy path:** last person leaves timeline → commit (unchanged).
+- **Safety net:** room abandoned (all heartbeats dead / no room-level activity for N minutes) → same commit path → clear room.
+- **Room-level activity:** one idle ghost must not close the room while another user is still editing.
+- **Grace:** short “Stay in room” warning before kick; one action resets the timer.
+- **On timeout:** **commit**, never silent discard.
+- **Re-entry:** opening timeline again re-opens the room (first-user-opens model).
+- **Timing (starting point, not code yet):** heartbeat ~30–60s; idle threshold ~15–30 min — tune after try.
+
+### Explicitly out of this optional update
+
+- Prep session UX (START/END PREP stays manager-driven unless a separate topic says otherwise).
+- Logistics Hub atomic ops.
+- Changing Sheets as official record between sessions.
+
+### Checklist (when building — leave unchecked until then)
+
+- [ ] Auto-open `timelineCollab` on timeline enter (saved project only)
+- [ ] Join existing open fork for second+ users (no re-snapshot if live)
+- [ ] Local pending buffer + merge/delta when fork becomes `open`
+- [ ] Remove primary START COLLAB ceremony (manager force-close may remain)
+- [ ] Last leave + idle timeout both commit → Sheets and clear room UI
+- [ ] Presence heartbeat + room-level idle detection
+- [ ] Pre-build: dedicated baseline milestone; post-try: keep or rollback
 
 ---
 
@@ -85,13 +138,16 @@ Is: **collaborative room** with shared live state.
 ### Phase C — Polish
 - [ ] Grace period, force-close, session history export to `SM_Showrunner_LOGS` optional
 
+### After campaign — optional UX (see section above)
+- [ ] Auto room on enter + join live + warm-up delta + idle commit/kick — **post-campaign only**; milestone-before-try / revert-if-disliked
+
 ---
 
 ## Comparison to prep session
 
 | | Prep session | Timeline session |
 |--|--------------|------------------|
-| **Ends when** | Manager **End preparation** | **Last person leaves** timeline |
+| **Ends when** | Manager **End preparation** | **Last person leaves** timeline (optional later: idle timeout = synthetic last leave) |
 | **Who** | Whole floor on project | Whoever opened timeline |
 | **Data** | PA + ledger + trucks | Shifts / phases |
 

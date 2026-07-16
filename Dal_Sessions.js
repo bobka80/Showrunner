@@ -163,48 +163,93 @@ function dalFindSessionTypeForUid_(row, sessionUid) {
   return '';
 }
 
+function dalDomainInfoPayload_(domain) {
+  var openedAt = domain && domain.openedAt;
+  if (openedAt && Object.prototype.toString.call(openedAt) === '[object Date]') {
+    openedAt = openedAt.toISOString();
+  } else if (openedAt === null || openedAt === undefined) {
+    openedAt = '';
+  } else {
+    openedAt = String(openedAt);
+  }
+  return {
+    status: domain ? String(domain.status || '') : '',
+    sessionUid: domain ? String(domain.sessionUid || '') : '',
+    openedAt: openedAt,
+    openedBy: domain ? String(domain.openedBy || '') : '',
+    sessionType: domain ? String(domain.sessionType || '') : ''
+  };
+}
+
+/**
+ * Legacy flat fields: only when exactly one domain is active.
+ * When both prep + timeline are open, flat fields stay empty so clients cannot
+ * mistake prep for timeline (Slice D dual-domain).
+ */
 function dalLegacyFlatFromDomains_(prep, timeline) {
-  var pick = null;
-  if (prep && prep.status) pick = prep;
-  else if (timeline && timeline.status) pick = timeline;
+  var prepOn = !!(prep && prep.status);
+  var tlOn = !!(timeline && timeline.status);
+  if (prepOn && tlOn) {
+    return { status: '', sessionType: '', sessionUid: '', openedAt: '', openedBy: '' };
+  }
+  var pick = prepOn ? prep : (tlOn ? timeline : null);
   if (!pick) {
     return { status: '', sessionType: '', sessionUid: '', openedAt: '', openedBy: '' };
   }
+  var flat = dalDomainInfoPayload_(pick);
   return {
-    status: pick.status,
-    sessionType: pick.sessionType,
-    sessionUid: pick.sessionUid,
-    openedAt: pick.openedAt,
-    openedBy: pick.openedBy
+    status: flat.status,
+    sessionType: flat.sessionType,
+    sessionUid: flat.sessionUid,
+    openedAt: flat.openedAt,
+    openedBy: flat.openedBy
   };
 }
 
 /**
  * Read session records for a project (google.script.run safe — read only).
- * Returns independent prep + timeline domains; legacy flat fields mirror the first active domain only.
+ * Always includes flat prepStatus / timelineStatus fields (nested objects alone are unreliable for dual-domain UI).
  */
 function getDalSessionInfo(projectId) {
   return executeWithRetry(function () {
     var sheets = verifyDatabaseSchema(true);
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) {
-      var empty = { status: '', sessionUid: '', openedAt: '', openedBy: '', sessionType: '' };
       return {
         projectId: projectId,
-        prep: Object.assign({}, empty, { sessionType: DAL_SESSION_TYPE.PREP }),
-        timeline: Object.assign({}, empty, { sessionType: DAL_SESSION_TYPE.TIMELINE_COLLAB })
+        prepStatus: '',
+        prepUid: '',
+        prepOpenedAt: '',
+        prepOpenedBy: '',
+        timelineStatus: '',
+        timelineUid: '',
+        timelineOpenedAt: '',
+        timelineOpenedBy: '',
+        status: '',
+        sessionType: '',
+        sessionUid: '',
+        openedAt: '',
+        openedBy: ''
       };
     }
 
     dalMigrateLegacySessionToDomain_(sheets.index, row);
 
-    var prep = dalReadDomainSession_(row, DAL_SESSION_TYPE.PREP);
-    var timeline = dalReadDomainSession_(row, DAL_SESSION_TYPE.TIMELINE_COLLAB);
+    var prep = dalDomainInfoPayload_(dalReadDomainSession_(row, DAL_SESSION_TYPE.PREP));
+    var timeline = dalDomainInfoPayload_(dalReadDomainSession_(row, DAL_SESSION_TYPE.TIMELINE_COLLAB));
     var legacy = dalLegacyFlatFromDomains_(prep, timeline);
     return {
       projectId: projectId,
       prep: prep,
       timeline: timeline,
+      prepStatus: prep.status,
+      prepUid: prep.sessionUid,
+      prepOpenedAt: prep.openedAt,
+      prepOpenedBy: prep.openedBy,
+      timelineStatus: timeline.status,
+      timelineUid: timeline.sessionUid,
+      timelineOpenedAt: timeline.openedAt,
+      timelineOpenedBy: timeline.openedBy,
       status: legacy.status,
       sessionType: legacy.sessionType,
       sessionUid: legacy.sessionUid,

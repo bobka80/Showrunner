@@ -7,9 +7,14 @@ window.dalPrepSheetsPollGen = 0;
 window.dalPrepClosing = false;
 
 window.dalIsPrepOpenFromInfo_ = function(info) {
-  var prep = info && info.prep;
-  if (prep) return String(prep.status).toLowerCase() === 'open';
-  return !!(info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'prep');
+  if (!info) return false;
+  if (info.prepStatus !== undefined && info.prepStatus !== null) {
+    return String(info.prepStatus).toLowerCase() === 'open';
+  }
+  if (info.prep && typeof info.prep === 'object') {
+    return String(info.prep.status || '').toLowerCase() === 'open';
+  }
+  return !!(String(info.status || '').toLowerCase() === 'open' && info.sessionType === 'prep');
 };
 
 window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {

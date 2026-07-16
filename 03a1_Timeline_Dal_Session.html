@@ -3,8 +3,36 @@
 window.dalTimelineSessionOpen = false;
 
 window.dalTimelineInfoFromSession_ = function(info) {
-  if (info && info.timeline) return info.timeline;
-  if (info && info.sessionType === 'timelineCollab') return info;
+  if (!info) return { status: '', sessionType: 'timelineCollab', sessionUid: '' };
+  // Prefer flat dual-domain fields (reliable when prep + timeline both open).
+  if (info.timelineStatus !== undefined && info.timelineStatus !== null) {
+    return {
+      status: String(info.timelineStatus || ''),
+      sessionUid: String(info.timelineUid || ''),
+      openedAt: info.timelineOpenedAt || '',
+      openedBy: info.timelineOpenedBy || '',
+      sessionType: 'timelineCollab'
+    };
+  }
+  if (info.timeline && typeof info.timeline === 'object') {
+    return {
+      status: String(info.timeline.status || ''),
+      sessionUid: String(info.timeline.sessionUid || ''),
+      openedAt: info.timeline.openedAt || '',
+      openedBy: info.timeline.openedBy || '',
+      sessionType: 'timelineCollab'
+    };
+  }
+  // Single-domain legacy only when flat session is timelineCollab (not prep).
+  if (String(info.sessionType || '') === 'timelineCollab') {
+    return {
+      status: String(info.status || ''),
+      sessionUid: String(info.sessionUid || ''),
+      openedAt: info.openedAt || '',
+      openedBy: info.openedBy || '',
+      sessionType: 'timelineCollab'
+    };
+  }
   return { status: '', sessionType: 'timelineCollab', sessionUid: '' };
 };
 

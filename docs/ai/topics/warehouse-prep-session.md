@@ -8,9 +8,9 @@
 
 **Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. **Blocked items** remain on [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Last swept:** 2026-07-15
+**Last swept:** 2026-07-16
 
-**Known gap (until DAL Phase 4 Slice D):** prep open **blocks** timeline collab (singleton session slot). Product intent = both open at once — [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md).
+**Dual-domain vs timeline:** **Resolved** (Slice D / GAS v603) — prep + timeline collab may both be open. Spec: [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md).
 
 **Design lock note:** Logistics Hub / ledger = **atomic ops, not a prep fork** ([design lock §2](../active/dal-firebase-design-lock-2026-07-13.md)). Older bullet below about ledger/hub on the Firebase fork is aspirational floor UX; router today keeps `LEDGER` on Sheets.
 
