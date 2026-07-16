@@ -79,9 +79,12 @@ function loadAssetRegistry() {
     let isCachedRendered = false;
     
     try {
-        let cachedRaw = localStorage.getItem('sm_vault_cache');
-        if (cachedRaw) {
-            let cachedObj = JSON.parse(cachedRaw);
+        let cachedObj = (typeof dalCacheGetVault_ === 'function') ? dalCacheGetVault_() : null;
+        if (!cachedObj) {
+            let cachedRaw = localStorage.getItem('sm_vault_cache');
+            if (cachedRaw) cachedObj = JSON.parse(cachedRaw);
+        }
+        if (cachedObj) {
             globalAssets = cachedObj.assets || [];
             window.auditFlags = cachedObj.auditFlags || [];
             window.reviewedAssetIds = new Set(cachedObj.reviewedAssetIds || []);
@@ -104,7 +107,11 @@ function loadAssetRegistry() {
             globalAssets = Array.isArray(results[0]) ? results[0] : [];
             window.auditFlags = Array.isArray(results[1]) ? results[1] : [];
             window.reviewedAssetIds = new Set(Array.isArray(results[2]) ? results[2] : []);
-            try { localStorage.setItem('sm_vault_cache', JSON.stringify({ assets: globalAssets, auditFlags: window.auditFlags, reviewedAssetIds: Array.from(window.reviewedAssetIds) })); } catch(e) {}
+            try {
+                var vaultPayload = { assets: globalAssets, auditFlags: window.auditFlags, reviewedAssetIds: Array.from(window.reviewedAssetIds) };
+                if (typeof dalCacheSetVault_ === 'function') dalCacheSetVault_(vaultPayload);
+                else localStorage.setItem('sm_vault_cache', JSON.stringify(vaultPayload));
+            } catch(e) {}
             if (window.isInlineAuditMode && window.auditFlags.length > 0) currentAssetFilter = 'ALL';
                 renderAssetRegistry();
         }).catch(err => {
@@ -115,9 +122,12 @@ function loadAssetRegistry() {
     if (typeof globalWhRoots === 'undefined' || !globalWhRoots || globalWhRoots.length === 0) {
         let cachedWhRendered = false;
         try {
-            let cachedWh = localStorage.getItem('sm_wh_cache');
-            if (cachedWh) {
-                let parsed = JSON.parse(cachedWh);
+            let parsed = (typeof dalCacheGetWarehouse_ === 'function') ? dalCacheGetWarehouse_() : null;
+            if (!parsed) {
+                let cachedWh = localStorage.getItem('sm_wh_cache');
+                if (cachedWh) parsed = JSON.parse(cachedWh);
+            }
+            if (parsed) {
                 globalWhRoots = parsed.roots || [];
                 globalWhZones = parsed.zones || [];
                 globalWhAreas = parsed.areas || [];
@@ -135,7 +145,11 @@ function loadAssetRegistry() {
                     globalWhRoots = res.roots || [];
                     globalWhZones = res.zones || [];
                     globalWhAreas = res.areas || [];
-                    try { localStorage.setItem('sm_wh_cache', JSON.stringify({roots: globalWhRoots, zones: globalWhZones, areas: globalWhAreas})); } catch(e) {}
+                    try {
+                        var whPayload = {roots: globalWhRoots, zones: globalWhZones, areas: globalWhAreas};
+                        if (typeof dalCacheSetWarehouse_ === 'function') dalCacheSetWarehouse_(whPayload);
+                        else localStorage.setItem('sm_wh_cache', JSON.stringify(whPayload));
+                    } catch(e) {}
                     fetchAssets();
                 }).getWarehouseData();
         }

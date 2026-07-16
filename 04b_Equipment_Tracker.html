@@ -94,7 +94,8 @@ window.forceTrackerSync = function() {
     const canvas = document.getElementById('tracker-canvas-inner');
     if (canvas) canvas.innerHTML = '<div style="padding: 40px; text-align: center; color: #f59e0b; font-weight: bold; font-style: italic;">Deep Syncing Logistics & Shifts...</div>';
     
-    localStorage.removeItem('sm_tracker_cache');
+    if (typeof dalCacheInvalidateTracker_ === 'function') dalCacheInvalidateTracker_();
+    else try { localStorage.removeItem('sm_tracker_cache'); } catch (e) {}
     
     google.script.run
         .withSuccessHandler(data => {
@@ -203,18 +204,18 @@ function fetchTrackerData() {
     }
     
     let watchlistKey = JSON.stringify(trackerWatchlist);
-    let cacheKey = 'sm_tracker_cache';
     let isCachedRendered = false;
 
     try {
-        let cachedRaw = localStorage.getItem(cacheKey);
-        if (cachedRaw) {
-            let cachedObj = JSON.parse(cachedRaw);
-            if (cachedObj.startStr === startStr && cachedObj.endStr === endStr && cachedObj.watchlistKey === watchlistKey) {
-                trackerData = cachedObj.data;
-                renderTrackerGrid();
-                isCachedRendered = true;
-            }
+        let cachedObj = (typeof dalCacheGetTracker_ === 'function') ? dalCacheGetTracker_() : null;
+        if (!cachedObj) {
+            let cachedRaw = localStorage.getItem('sm_tracker_cache');
+            if (cachedRaw) cachedObj = JSON.parse(cachedRaw);
+        }
+        if (cachedObj && cachedObj.startStr === startStr && cachedObj.endStr === endStr && cachedObj.watchlistKey === watchlistKey) {
+            trackerData = cachedObj.data;
+            renderTrackerGrid();
+            isCachedRendered = true;
         }
     } catch(e) {}
 
@@ -225,7 +226,11 @@ function fetchTrackerData() {
     google.script.run.withSuccessHandler(data => {
         trackerData = data;
         renderTrackerGrid();
-        try { localStorage.setItem(cacheKey, JSON.stringify({ startStr: startStr, endStr: endStr, watchlistKey: watchlistKey, data: data })); } catch(e) {}
+        try {
+            var trackerPayload = { startStr: startStr, endStr: endStr, watchlistKey: watchlistKey, data: data };
+            if (typeof dalCacheSetTracker_ === 'function') dalCacheSetTracker_(trackerPayload);
+            else localStorage.setItem('sm_tracker_cache', JSON.stringify(trackerPayload));
+        } catch(e) {}
     }).withFailureHandler(err => {
         canvas.innerHTML = `<div style="padding: 40px; text-align: center; color: #ef4444; font-weight: bold;">Sync Error: ${err.message || err}</div>`;
         console.error("Tracker Sync Error:", err);

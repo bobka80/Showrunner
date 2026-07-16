@@ -669,7 +669,11 @@ function saveAsset() {
                     }
 
                     // INSTANT CACHE LOCK: Protect optimistic changes from being overwritten by immediate local reads
-                    try { localStorage.setItem('sm_vault_cache', JSON.stringify({ assets: globalAssets, auditFlags: window.auditFlags || [], reviewedAssetIds: Array.from(window.reviewedAssetIds || []) })); } catch(e) {}
+                    try {
+                        var vaultPayload = { assets: globalAssets, auditFlags: window.auditFlags || [], reviewedAssetIds: Array.from(window.reviewedAssetIds || []) };
+                        if (typeof dalCacheSetVault_ === 'function') dalCacheSetVault_(vaultPayload);
+                        else localStorage.setItem('sm_vault_cache', JSON.stringify(vaultPayload));
+                    } catch(e) {}
 
                         if (res.isExpansion || isContainerObj) {
                             if(typeof loadAssetRegistry === 'function') loadAssetRegistry();

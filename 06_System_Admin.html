@@ -98,7 +98,10 @@ function saveClient() {
                 if (res.uid) payload.uid = res.uid;
                 globalClients.push(payload); 
             }
-            try { localStorage.setItem('sm_clients_cache', JSON.stringify(globalClients)); } catch(e) {}
+            try {
+                if (typeof dalCacheSetClients_ === 'function') dalCacheSetClients_(globalClients);
+                else localStorage.setItem('sm_clients_cache', JSON.stringify(globalClients));
+            } catch(e) {}
             updateClientDropdowns();
             
             let projClientSel = document.getElementById('edit-proj-client');
@@ -126,7 +129,10 @@ function deleteClient() {
         if (res.success) {
             document.getElementById('client-modal-overlay').style.display = 'none';
             globalClients = globalClients.filter(c => c.uid !== uid && c.id !== uid && c.name !== uid);
-            try { localStorage.setItem('sm_clients_cache', JSON.stringify(globalClients)); } catch(e) {}
+            try {
+                if (typeof dalCacheSetClients_ === 'function') dalCacheSetClients_(globalClients);
+                else localStorage.setItem('sm_clients_cache', JSON.stringify(globalClients));
+            } catch(e) {}
             updateClientDropdowns();
         } else {
             alert(res.message || res.error);
@@ -212,9 +218,12 @@ function switchResourceTab(tabId) {
         if (!globalWhRoots || globalWhRoots.length === 0) {
             needsFetch = true;
             try {
-                let cachedRaw = localStorage.getItem('sm_wh_cache');
-                if (cachedRaw) {
-                    let cachedObj = JSON.parse(cachedRaw);
+                let cachedObj = (typeof dalCacheGetWarehouse_ === 'function') ? dalCacheGetWarehouse_() : null;
+                if (!cachedObj) {
+                    let cachedRaw = localStorage.getItem('sm_wh_cache');
+                    if (cachedRaw) cachedObj = JSON.parse(cachedRaw);
+                }
+                if (cachedObj) {
                     globalWhRoots = cachedObj.roots || [];
                     globalWhZones = cachedObj.zones || [];
                     globalWhAreas = cachedObj.areas || [];
@@ -234,7 +243,11 @@ function switchResourceTab(tabId) {
                 globalWhRoots = res.roots || [];
                 globalWhZones = res.zones || [];
                 globalWhAreas = res.areas || [];
-                try { localStorage.setItem('sm_wh_cache', JSON.stringify({roots: globalWhRoots, zones: globalWhZones, areas: globalWhAreas})); } catch(e) {}
+                try {
+                    var whPayload = {roots: globalWhRoots, zones: globalWhZones, areas: globalWhAreas};
+                    if (typeof dalCacheSetWarehouse_ === 'function') dalCacheSetWarehouse_(whPayload);
+                    else localStorage.setItem('sm_wh_cache', JSON.stringify(whPayload));
+                } catch(e) {}
                 initWarehouseDrawer();
             }).getWarehouseData();
         } else {

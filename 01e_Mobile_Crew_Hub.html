@@ -55,7 +55,7 @@ window.isMobileViewport = function() {
 window.resolveMobileProject = function(pId) {
     let p = null;
     try {
-        const phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+        const phantom = (typeof dalCacheGetPhantom_ === 'function') ? (dalCacheGetPhantom_() || {}) : JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
         if (phantom && phantom.projects) p = phantom.projects.find(function(x) { return x.id === pId; });
     } catch (e) { /* ignore */ }
     if (!p && typeof calendar !== 'undefined' && calendar) {

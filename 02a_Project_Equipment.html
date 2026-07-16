@@ -307,8 +307,12 @@ function openProjectAssetsModal() {
     
     if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
         try {
-            let vaultCache = localStorage.getItem('sm_vault_cache');
-            if (vaultCache) globalAssets = JSON.parse(vaultCache).assets || [];
+            let vaultObj = (typeof dalCacheGetVault_ === 'function') ? dalCacheGetVault_() : null;
+            if (!vaultObj) {
+                let vaultCache = localStorage.getItem('sm_vault_cache');
+                if (vaultCache) vaultObj = JSON.parse(vaultCache);
+            }
+            if (vaultObj) globalAssets = vaultObj.assets || [];
         } catch(e) {}
     }
     

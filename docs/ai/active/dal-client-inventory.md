@@ -156,6 +156,7 @@
 | `sm_offer_lang` | `02d_Equipment_Render.html`, `02g_Project_Reports.html` |
 | `sm_company_name` | `02g_Project_Reports.html` |
 | `sm_logistics_def_` | `02_Project_Editor_Logistics.html` |
+| `sm_tracker_cache` | `04b_Equipment_Tracker.html` |
 | `sm_wh_cache` | `06_System_Admin.html`, `06b1_Admin_Assets_Core.html` |
 | `sm_user_theme` | `07_Core_Globals.html` |
 | `sr_fcm_reg_key` | `10a_Notifications_Boot.html`, `Index.html` |
@@ -207,7 +208,7 @@
 | 03e_Timeline_UX.html | 0 | 0 |
 | 03f_Timeline_Mobile.html | 0 | 0 |
 | 04_Month_Roster.html | 2 | 0 |
-| 04b_Equipment_Tracker.html | 2 | 0 |
+| 04b_Equipment_Tracker.html | 2 | 1 |
 | 05_Warehouse_Engine.html | 6 | 0 |
 | 05a_Truck_Arrangement.html | 1 | 0 |
 | 05b_Loadin_Plan.html | 0 | 0 |

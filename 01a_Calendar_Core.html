@@ -448,9 +448,12 @@ document.addEventListener('DOMContentLoaded', function() {
   // SURGICAL FIX: PHANTOM BOOT (INSTANT LOAD)
   // ==========================================
   try {
-      let phantom = localStorage.getItem('sm_phantom_payload');
-      if (phantom) {
-          let p = JSON.parse(phantom);
+      let p = (typeof dalCacheGetPhantom_ === 'function') ? dalCacheGetPhantom_() : null;
+      if (!p) {
+          let phantom = localStorage.getItem('sm_phantom_payload');
+          if (phantom) p = JSON.parse(phantom);
+      }
+      if (p) {
           if (p.settings) {
               if (p.settings.departments) SYSTEM_DEPARTMENTS = p.settings.departments;
               if (p.settings.meals) SYSTEM_MEALS = p.settings.meals;
@@ -629,7 +632,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Save state for next Phantom Boot
         try {
             let cachePayload = Object.assign({}, payload);
-            localStorage.setItem('sm_phantom_payload', JSON.stringify(cachePayload));
+            if (typeof dalCacheSetPhantom_ === 'function') dalCacheSetPhantom_(cachePayload);
+            else localStorage.setItem('sm_phantom_payload', JSON.stringify(cachePayload));
         } catch(e) {}
         if (payload.fcmRegKey && window.parent && window.parent !== window) {
             try {
@@ -651,9 +655,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
   // Async fetch clients for dropdowns & cache
   try {
-      let cachedClients = localStorage.getItem('sm_clients_cache');
+      let cachedClients = (typeof dalCacheGetClients_ === 'function') ? dalCacheGetClients_() : null;
+      if (!cachedClients) {
+          let raw = localStorage.getItem('sm_clients_cache');
+          if (raw) cachedClients = JSON.parse(raw);
+      }
       if (cachedClients) {
-          globalClients = JSON.parse(cachedClients) || [];
+          globalClients = cachedClients || [];
           if (typeof updateClientDropdowns === 'function') updateClientDropdowns();
       }
   } catch(e) {}
@@ -661,22 +669,32 @@ document.addEventListener('DOMContentLoaded', function() {
   google.script.run.withSuccessHandler(clients => {
       if (typeof updateClientDropdowns === 'function') {
           globalClients = clients || [];
-          try { localStorage.setItem('sm_clients_cache', JSON.stringify(globalClients)); } catch(e) {}
+          try {
+              if (typeof dalCacheSetClients_ === 'function') dalCacheSetClients_(globalClients);
+              else localStorage.setItem('sm_clients_cache', JSON.stringify(globalClients));
+          } catch(e) {}
           updateClientDropdowns();
       }
   }).getClientsVault();
       
   // Async fetch vehicles for dynamic timeline trucks & cache
   try {
-      let cachedVehicles = localStorage.getItem('sm_fleet_cache');
+      let cachedVehicles = (typeof dalCacheGetFleet_ === 'function') ? dalCacheGetFleet_() : null;
+      if (!cachedVehicles) {
+          let rawV = localStorage.getItem('sm_fleet_cache');
+          if (rawV) cachedVehicles = JSON.parse(rawV);
+      }
       if (cachedVehicles) {
-          globalVehicles = JSON.parse(cachedVehicles) || [];
+          globalVehicles = cachedVehicles || [];
       }
   } catch(e) {}
 
   google.script.run.withSuccessHandler(veh => {
       globalVehicles = veh || [];
-      try { localStorage.setItem('sm_fleet_cache', JSON.stringify(globalVehicles)); } catch(e) {}
+      try {
+          if (typeof dalCacheSetFleet_ === 'function') dalCacheSetFleet_(globalVehicles);
+          else localStorage.setItem('sm_fleet_cache', JSON.stringify(globalVehicles));
+      } catch(e) {}
   }).getVehiclesVault();
 });
 
@@ -700,9 +718,10 @@ function refreshData() {
         
         // Update Phantom Cache with fresh contour data
         try {
-            let phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+            let phantom = (typeof dalCacheGetPhantom_ === 'function') ? (dalCacheGetPhantom_() || {}) : JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
             phantom.projects = payload.projects; phantom.monthData = payload.monthData; phantom.tasks = payload.tasks; phantom.notifs = payload.notifs;
-            localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+            if (typeof dalCacheSetPhantom_ === 'function') dalCacheSetPhantom_(phantom);
+            else localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
         } catch(e) {}
     }).getRefreshPayload(ACTIVE_USER_NAME);
 }
@@ -991,7 +1010,7 @@ function renderDesktopEventList(projectsData) {
     let projects = projectsData;
     if (!projects) {
         try { 
-            let phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}'); 
+            let phantom = (typeof dalCacheGetPhantom_ === 'function') ? (dalCacheGetPhantom_() || {}) : JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}'); 
             projects = phantom.projects || [];
         } catch(e) {}
     }

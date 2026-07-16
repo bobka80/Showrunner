@@ -14,9 +14,13 @@ function loadVehicles() {
     if (!globalVehicles || globalVehicles.length === 0) {
         needsFetch = true;
         try {
-            let cachedRaw = localStorage.getItem('sm_fleet_cache');
-            if (cachedRaw) {
-                globalVehicles = JSON.parse(cachedRaw) || [];
+            let cached = (typeof dalCacheGetFleet_ === 'function') ? dalCacheGetFleet_() : null;
+            if (!cached) {
+                let cachedRaw = localStorage.getItem('sm_fleet_cache');
+                if (cachedRaw) cached = JSON.parse(cachedRaw);
+            }
+            if (cached) {
+                globalVehicles = cached || [];
                 if (globalVehicles.length > 0) {
                     renderVehicles();
                     if (typeof populateTruckSelector === 'function') populateTruckSelector();
@@ -32,7 +36,10 @@ function loadVehicles() {
         }
         google.script.run.withSuccessHandler(res => {
             globalVehicles = res || [];
-            try { localStorage.setItem('sm_fleet_cache', JSON.stringify(globalVehicles)); } catch(e) {}
+            try {
+                if (typeof dalCacheSetFleet_ === 'function') dalCacheSetFleet_(globalVehicles);
+                else localStorage.setItem('sm_fleet_cache', JSON.stringify(globalVehicles));
+            } catch(e) {}
             renderVehicles();
             if (typeof populateTruckSelector === 'function') populateTruckSelector();
         }).getVehiclesVault();

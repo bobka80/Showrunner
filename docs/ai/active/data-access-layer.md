@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 6A shipped** (CacheCoordinator + domain-scoped invalidation). **Production:** GAS **v609+**. **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 6B shipped** (calendar/vault/tracker CacheCoordinator + tag-aware `getSheetData`). **Production:** GAS **v609+** (ship bumps). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -381,8 +381,8 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Phase 6A** — Client `CacheCoordinator` (`07d_Cache_Coordinator.html`) — `check`, `set`, `invalidate`, `registerPolicy`
 - [x] **Phase 6A** — Migrate PA `sm_pa_cache_*` behind coordinator helpers (legacy bridge kept)
 - [x] **Phase 6A** — Server `dalInvalidateCacheTags_` — close prep/timeline uses `project:{id}:pa` / `:timeline` (not global flush)
-- [ ] **Phase 6B** — Migrate calendar / vault / tracker keys behind policies
-- [ ] **Phase 6B** — Re-enable / harden GAS `getSheetData` cache for cold reads (tag-aware)
+- [x] **Phase 6B** — Migrate calendar / vault / tracker / fleet / clients / warehouse keys behind policies (legacy `sm_*` bridge kept)
+- [x] **Phase 6B** — Re-enable GAS `getSheetData` cache; fix `getCacheVersion` V2 key; tag-aware CacheService purge; debug bypass `DAL_SHEET_CACHE_DISABLED=1`
 
 ### Later — Migrate remaining domains (as needed)
 

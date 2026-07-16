@@ -123,7 +123,8 @@ function routeConflict(type, entityId, projectId) {
             document.getElementById('edit-proj-name').value = ev.title;
         } else {
             try {
-                let p = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}').projects?.find(x => x.id === projectId);
+                let phantom = (typeof dalCacheGetPhantom_ === 'function') ? (dalCacheGetPhantom_() || {}) : JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+                let p = phantom.projects?.find(x => x.id === projectId);
                 if (p) document.getElementById('edit-proj-name').value = p.title;
             } catch(e) {}
         }

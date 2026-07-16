@@ -4,7 +4,7 @@
 
 **Related:** [session-fork-platform.md](session-fork-platform.md) · [project-assets-concurrency.md](project-assets-concurrency.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
 
-**Status:** **Phase 6A live** — client `CacheCoordinator` + domain tags; PA cache migrated. Further key migration / GAS sheet cache re-enable = Phase 6B. See [active/data-access-layer.md](../active/data-access-layer.md).
+**Status:** **Phase 6B live** — client CacheCoordinator covers PA + calendar/vault/tracker/fleet/clients/warehouse; GAS `getSheetData` cache re-enabled with tag-aware purge. See [active/data-access-layer.md](../active/data-access-layer.md).
 
 **Last swept:** 2026-07-16
 
@@ -36,8 +36,8 @@ The cache engine sits **on top of** the data access layer: the DAL says *where t
 
 | Layer | Today | Gap |
 |-------|-------|-----|
-| **GAS** | `flushCache()`, `getCacheVersion()`, `vaultAssetCache`, `cachedVaultSheets` | `getSheetData()` sheet cache **disabled** (live-only reads) |
-| **Client** | `sm_phantom_payload`, `sm_pa_cache_*`, `sm_tracker_cache`, session/theme keys | No shared invalidation; each module owns keys |
+| **GAS** | `flushCache()`, `getCacheVersion()`, `vaultAssetCache`, `cachedVaultSheets`, `dalInvalidateCacheTags_` | `getSheetData()` **re-enabled** (CacheService + in-memory); bypass via `DAL_SHEET_CACHE_DISABLED=1` |
+| **Client** | `CacheCoordinator` + legacy `sm_*` bridges | Tag invalidation; new code should use `dalCache*` helpers |
 
 **Goal:** replace sprawl with `get` / `set` / `invalidate(tags)` + registered policies.
 
@@ -125,15 +125,16 @@ Each policy defines:
 
 ### Phase A — Shell + cold reads (no session fork required)
 
-- [ ] Client `CacheCoordinator` module — `get(key, policy)`, `set`, `invalidate(tags)`, `subscribe` optional
-- [ ] Key namespace registry — document allowed prefixes; ban raw `localStorage` in new code
-- [ ] Migrate existing keys behind coordinator:
-  - [ ] `sm_phantom_payload` → `calendar:phantom`
-  - [ ] `sm_pa_cache_{projectId}` → `project:{id}:pa`
-  - [ ] `sm_tracker_cache` → `tracker:{range}`
-- [ ] **Re-enable** GAS `getSheetData()` cache for cold vault/directory/config reads — fix why it was disabled; keep bypass flag for debug
-- [ ] Wire `flushCache()` → coordinator invalidation tags on server (`vault`, `directory`, `config`)
-- [ ] Stale-while-revalidate on calendar boot (already partial via phantom — formalize policy)
+- [x] Client `CacheCoordinator` module — `check`/`set`/`invalidate`/`registerPolicy` (`07d_Cache_Coordinator.html`)
+- [x] Key namespace registry — logical keys + legacy bridges; prefer `dalCache*` helpers in new code
+- [x] Migrate existing keys behind coordinator:
+  - [x] `sm_phantom_payload` → `calendar:phantom`
+  - [x] `sm_pa_cache_{projectId}` → `pa:{id}` / tag `project:{id}:pa`
+  - [x] `sm_tracker_cache` → `tracker` (range stored inside payload)
+  - [x] `sm_vault_cache` / `sm_wh_cache` / `sm_fleet_cache` / `sm_clients_cache`
+- [x] **Re-enable** GAS `getSheetData()` cache for cold reads — fixed V2 version key; bypass `DAL_SHEET_CACHE_DISABLED=1`
+- [x] Wire selective `dalInvalidateCacheTags_` → CacheService key purge by sheet map (`vault`, `directory`, PA/timeline)
+- [x] Stale-while-revalidate on calendar boot (phantom policy `calendar-warm`)
 
 ### Phase B — Hot paths + revisions
 

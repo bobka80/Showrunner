@@ -587,13 +587,14 @@ function stationPreloadProjects_(hostName) {
 function stationPreloadVaultForPa_() {
   if (typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length) return;
   try {
-    const cached = localStorage.getItem('sm_vault_cache');
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (parsed && parsed.assets && parsed.assets.length) {
-        globalAssets = parsed.assets;
-        return;
-      }
+    let parsed = (typeof dalCacheGetVault_ === 'function') ? dalCacheGetVault_() : null;
+    if (!parsed) {
+      const cached = localStorage.getItem('sm_vault_cache');
+      if (cached) parsed = JSON.parse(cached);
+    }
+    if (parsed && parsed.assets && parsed.assets.length) {
+      globalAssets = parsed.assets;
+      return;
     }
   } catch (e) { /* ignore */ }
   if (window.__stationVaultFetchPending) return;
@@ -602,7 +603,11 @@ function stationPreloadVaultForPa_() {
     .withSuccessHandler(function(assets) {
       window.__stationVaultFetchPending = false;
       globalAssets = assets || [];
-      try { localStorage.setItem('sm_vault_cache', JSON.stringify({ assets: globalAssets })); } catch (e) { /* ignore */ }
+      try {
+        var vaultPayload = { assets: globalAssets };
+        if (typeof dalCacheSetVault_ === 'function') dalCacheSetVault_(vaultPayload);
+        else localStorage.setItem('sm_vault_cache', JSON.stringify(vaultPayload));
+      } catch (e) { /* ignore */ }
     })
     .withFailureHandler(function() { window.__stationVaultFetchPending = false; })
     .getAssetRegistry(typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '');
@@ -611,12 +616,13 @@ function stationPreloadVaultForPa_() {
 /** Persist the payload into sm_phantom_payload so the phone PA resolver (resolveMobileProject) works. */
 function stationCacheProjectsPayload_(payload, projects) {
   try {
-    const phantom = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+    const phantom = (typeof dalCacheGetPhantom_ === 'function') ? (dalCacheGetPhantom_() || {}) : JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
     phantom.projects = projects;
     if (payload && payload.monthData) phantom.monthData = payload.monthData;
     if (payload && payload.tasks) phantom.tasks = payload.tasks;
     if (payload && payload.notifs) phantom.notifs = payload.notifs;
-    localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
+    if (typeof dalCacheSetPhantom_ === 'function') dalCacheSetPhantom_(phantom);
+    else localStorage.setItem('sm_phantom_payload', JSON.stringify(phantom));
   } catch (e) { /* ignore */ }
 }
 

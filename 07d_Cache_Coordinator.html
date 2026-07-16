@@ -1,8 +1,19 @@
-<!-- DAL Phase 6A — Cache Coordinator (client). Public API: check / set / invalidate / registerPolicy -->
+<!-- DAL Phase 6 — Cache Coordinator (client). Public API: check / set / invalidate / registerPolicy -->
 <script>
 (function () {
   var STORAGE_PREFIX = 'sm_cc_';
   var LEGACY_PA_PREFIX = 'sm_pa_cache_';
+
+  /** Logical key → legacy localStorage key (migration bridge). */
+  var LEGACY_MAP = {
+    'pa:': null, // handled via LEGACY_PA_PREFIX + projectId
+    'calendar:phantom': 'sm_phantom_payload',
+    'clients': 'sm_clients_cache',
+    'fleet': 'sm_fleet_cache',
+    'vault:assets': 'sm_vault_cache',
+    'warehouse': 'sm_wh_cache',
+    'tracker': 'sm_tracker_cache'
+  };
 
   var policies = {};
   var memory = {};
@@ -15,6 +26,13 @@
 
   function storageKey_(key) {
     return STORAGE_PREFIX + String(key || '');
+  }
+
+  function legacyKeyFor_(key) {
+    key = String(key || '');
+    if (LEGACY_MAP[key]) return LEGACY_MAP[key];
+    if (key.indexOf('pa:') === 0) return LEGACY_PA_PREFIX + key.slice(3);
+    return null;
   }
 
   function ttlMs_(policy) {
@@ -51,10 +69,9 @@
   function dropKey_(key) {
     delete memory[key];
     try { localStorage.removeItem(storageKey_(key)); } catch (e1) { /* ignore */ }
-    // Legacy PA key bridge
-    if (String(key).indexOf('pa:') === 0) {
-      var pid = String(key).slice(3);
-      try { localStorage.removeItem(LEGACY_PA_PREFIX + pid); } catch (e2) { /* ignore */ }
+    var leg = legacyKeyFor_(key);
+    if (leg) {
+      try { localStorage.removeItem(leg); } catch (e2) { /* ignore */ }
     }
     var tags = keyToTags[key] || [];
     tags.forEach(function (t) {
@@ -98,10 +115,11 @@
       }
     } catch (eRead) { /* miss */ }
 
-    // Legacy PA bridge read
-    if (String(key).indexOf('pa:') === 0) {
+    // Legacy bridge read
+    var leg = legacyKeyFor_(key);
+    if (leg) {
       try {
-        var legacy = localStorage.getItem(LEGACY_PA_PREFIX + String(key).slice(3));
+        var legacy = localStorage.getItem(leg);
         if (legacy) {
           var legacyObj = JSON.parse(legacy);
           return { hit: true, data: legacyObj, source: 'legacy', stale: true };
@@ -124,16 +142,17 @@
     } catch (eSet) {
       // Quota — keep memory only
     }
-    // Mirror legacy PA key for older readers during migration
-    if (String(key).indexOf('pa:') === 0) {
+    // Mirror legacy key for older readers during migration
+    var leg = legacyKeyFor_(key);
+    if (leg) {
       try {
-        localStorage.setItem(LEGACY_PA_PREFIX + String(key).slice(3), JSON.stringify(data));
+        localStorage.setItem(leg, JSON.stringify(data));
       } catch (eLegSet) { /* ignore */ }
     }
     return true;
   }
 
-  /** Invalidate by tag (surgical). Tag '*' clears everything tracked + known legacy PA keys for open project helpers. */
+  /** Invalidate by tag (surgical). Tag '*' clears everything tracked + known legacy keys. */
   function invalidate(tag) {
     tag = String(tag || '');
     if (!tag) return 0;
@@ -146,6 +165,11 @@
       memory = {};
       keyToTags = {};
       tagToKeys = {};
+      Object.keys(LEGACY_MAP).forEach(function (k) {
+        if (LEGACY_MAP[k]) {
+          try { localStorage.removeItem(LEGACY_MAP[k]); } catch (eG) { /* ignore */ }
+        }
+      });
       return removed;
     }
     var keys = (tagToKeys[tag] || []).slice();
@@ -159,18 +183,44 @@
       try { localStorage.removeItem(LEGACY_PA_PREFIX + m[1]); } catch (e3) { /* ignore */ }
       dropKey_('pa:' + m[1]);
     }
+    // Named domain tags — drop logical keys even if never registered in this session
+    if (tag === 'vault') {
+      dropKey_('vault:assets');
+      dropKey_('warehouse');
+      removed++;
+    }
+    if (tag === 'calendar') {
+      dropKey_('calendar:phantom');
+      removed++;
+    }
+    if (tag === 'clients') {
+      dropKey_('clients');
+      removed++;
+    }
+    if (tag === 'fleet') {
+      dropKey_('fleet');
+      removed++;
+    }
+    if (tag === 'tracker') {
+      dropKey_('tracker');
+      removed++;
+    }
     return removed;
   }
 
   function tagPa(projectId) { return 'project:' + String(projectId || '') + ':pa'; }
   function tagTimeline(projectId) { return 'project:' + String(projectId || '') + ':timeline'; }
 
-  // Built-in policies (design lock §4)
+  // Built-in policies (design lock §4 / data-cache-engine)
   registerPolicy('default', { freshness: 'warm', ttlMs: 5 * 60 * 1000 });
   registerPolicy('pa-hot', { freshness: 'hot', ttlMs: 15 * 1000, staleWhileRevalidate: true });
   registerPolicy('timeline-hot', { freshness: 'hot', ttlMs: 15 * 1000, staleWhileRevalidate: true });
   registerPolicy('vault-cold', { freshness: 'cold', ttlMs: 30 * 60 * 1000 });
+  registerPolicy('warehouse-cold', { freshness: 'cold', ttlMs: 30 * 60 * 1000 });
+  registerPolicy('fleet-cold', { freshness: 'cold', ttlMs: 30 * 60 * 1000 });
+  registerPolicy('clients-cold', { freshness: 'cold', ttlMs: 30 * 60 * 1000 });
   registerPolicy('calendar-warm', { freshness: 'warm', ttlMs: 5 * 60 * 1000, staleWhileRevalidate: true });
+  registerPolicy('tracker-warm', { freshness: 'warm', ttlMs: 5 * 60 * 1000, staleWhileRevalidate: true });
   registerPolicy('logistics-none', { freshness: 'none', ttlMs: 0 });
 
   window.CacheCoordinator = {
@@ -182,7 +232,7 @@
     tagTimeline: tagTimeline
   };
 
-  /** Helpers used by PA modules during migration. */
+  /** Helpers used by modules during migration. */
   window.dalCacheGetPa_ = function (projectId) {
     var r = check('pa:' + projectId, 'pa-hot');
     return r.hit ? r.data : null;
@@ -195,6 +245,60 @@
   };
   window.dalCacheInvalidateTimeline_ = function (projectId) {
     return invalidate(tagTimeline(projectId));
+  };
+
+  window.dalCacheGetPhantom_ = function () {
+    var r = check('calendar:phantom', 'calendar-warm');
+    return r.hit ? r.data : null;
+  };
+  window.dalCacheSetPhantom_ = function (data) {
+    return set('calendar:phantom', data, 'calendar-warm', ['calendar']);
+  };
+
+  window.dalCacheGetClients_ = function () {
+    var r = check('clients', 'clients-cold');
+    return r.hit ? r.data : null;
+  };
+  window.dalCacheSetClients_ = function (data) {
+    return set('clients', data, 'clients-cold', ['clients', 'directory']);
+  };
+
+  window.dalCacheGetFleet_ = function () {
+    var r = check('fleet', 'fleet-cold');
+    return r.hit ? r.data : null;
+  };
+  window.dalCacheSetFleet_ = function (data) {
+    return set('fleet', data, 'fleet-cold', ['fleet']);
+  };
+
+  window.dalCacheGetVault_ = function () {
+    var r = check('vault:assets', 'vault-cold');
+    return r.hit ? r.data : null;
+  };
+  window.dalCacheSetVault_ = function (data) {
+    return set('vault:assets', data, 'vault-cold', ['vault']);
+  };
+  window.dalCacheInvalidateVault_ = function () {
+    return invalidate('vault');
+  };
+
+  window.dalCacheGetWarehouse_ = function () {
+    var r = check('warehouse', 'warehouse-cold');
+    return r.hit ? r.data : null;
+  };
+  window.dalCacheSetWarehouse_ = function (data) {
+    return set('warehouse', data, 'warehouse-cold', ['vault', 'warehouse']);
+  };
+
+  window.dalCacheGetTracker_ = function () {
+    var r = check('tracker', 'tracker-warm');
+    return r.hit ? r.data : null;
+  };
+  window.dalCacheSetTracker_ = function (data) {
+    return set('tracker', data, 'tracker-warm', ['tracker', 'calendar']);
+  };
+  window.dalCacheInvalidateTracker_ = function () {
+    return invalidate('tracker');
   };
 })();
 </script>

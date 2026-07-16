@@ -152,7 +152,7 @@ window.stationPickProject_ = function(pId) {
   let proj = (window.stationProjectsCache || []).find(function(p) { return String(p.id) === String(pId); });
   if (!proj) {
     try {
-      const ph = JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
+      const ph = (typeof dalCacheGetPhantom_ === 'function') ? (dalCacheGetPhantom_() || {}) : JSON.parse(localStorage.getItem('sm_phantom_payload') || '{}');
       if (ph && ph.projects) proj = ph.projects.find(function(p) { return String(p.id) === String(pId); });
     } catch (e) { /* ignore */ }
   }
