@@ -331,10 +331,15 @@ function openProjectAssetsModal() {
         let cacheKey = 'sm_pa_cache_' + projectId;
         let isCachedRendered = false;
         try {
-            let cachedRaw = localStorage.getItem(cacheKey);
-            if (cachedRaw) {
-                let cachedObj = JSON.parse(cachedRaw);
-                if (cachedObj.sDate === sDate && cachedObj.eDate === eDate) {
+            let cachedObj = null;
+            if (typeof window.dalCacheGetPa_ === 'function') {
+                cachedObj = window.dalCacheGetPa_(projectId);
+            }
+            if (!cachedObj) {
+                let cachedRaw = localStorage.getItem(cacheKey);
+                if (cachedRaw) cachedObj = JSON.parse(cachedRaw);
+            }
+            if (cachedObj && cachedObj.sDate === sDate && cachedObj.eDate === eDate) {
                     currentProjectAssets = cachedObj.current || [];
                     window.overlappingAllocations = cachedObj.overlapping || {};
                     window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
@@ -347,7 +352,6 @@ function openProjectAssetsModal() {
                         if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
                     } catch(err) {}
                     isCachedRendered = true;
-                }
             }
         } catch(e) {}
 
@@ -364,7 +368,11 @@ function openProjectAssetsModal() {
             window.overlappingAllocations = res.overlapping || {};
             window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets)); // Store pristine DB state
             
-            try { localStorage.setItem(cacheKey, JSON.stringify({ sDate: sDate, eDate: eDate, current: res.current, overlapping: res.overlapping })); } catch(e) {}
+            try {
+                var paCachePayload = { sDate: sDate, eDate: eDate, current: res.current, overlapping: res.overlapping };
+                if (typeof window.dalCacheSetPa_ === 'function') window.dalCacheSetPa_(projectId, paCachePayload);
+                else localStorage.setItem(cacheKey, JSON.stringify(paCachePayload));
+            } catch(e) {}
             
             const processFormulas = (arr) => {
                 let exploded = [];

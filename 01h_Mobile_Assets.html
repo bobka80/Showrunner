@@ -199,14 +199,16 @@ window.ensureMobilePaCache = function(projectId, cb) {
         return;
     }
     try {
-        const cached = localStorage.getItem('sm_pa_cache_' + projectId);
-        if (cached) {
-            const parsed = JSON.parse(cached);
-            if (parsed && parsed.current && parsed.current.length) {
-                currentProjectAssets = parsed.current;
-                if (cb) cb();
-                return;
-            }
+        var parsed = null;
+        if (typeof window.dalCacheGetPa_ === 'function') parsed = window.dalCacheGetPa_(projectId);
+        if (!parsed) {
+            const cached = localStorage.getItem('sm_pa_cache_' + projectId);
+            if (cached) parsed = JSON.parse(cached);
+        }
+        if (parsed && parsed.current && parsed.current.length) {
+            currentProjectAssets = parsed.current;
+            if (cb) cb();
+            return;
         }
     } catch (e) { /* ignore */ }
     if (cb) cb();
@@ -263,19 +265,22 @@ window.mobileCrewOpenAreas = function() {
 };
 
 window.refreshMobileProjectAssetsCache = function(projectId, cb) {
-    try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) { /* ignore */ }
+    if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
+    else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) { /* ignore */ }
     const sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
     const eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
     google.script.run
         .withSuccessHandler(function(res) {
             currentProjectAssets = (res && res.current) ? res.current : [];
             try {
-                localStorage.setItem('sm_pa_cache_' + projectId, JSON.stringify({
+                var payload = {
                     sDate: sDate,
                     eDate: eDate,
                     current: res.current,
                     overlapping: res.overlapping || {}
-                }));
+                };
+                if (typeof window.dalCacheSetPa_ === 'function') window.dalCacheSetPa_(projectId, payload);
+                else localStorage.setItem('sm_pa_cache_' + projectId, JSON.stringify(payload));
             } catch (e) { /* ignore */ }
             if (cb) cb();
         })

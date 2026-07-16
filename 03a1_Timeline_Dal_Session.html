@@ -208,6 +208,7 @@ window.closeDalTimelineCollabSession = function() {
       window.dalTimelineSessionOpen = false;
       window.dalTlWasSessionOpen = false;
       if (typeof window.stopDalTimelineStateSync_ === 'function') window.stopDalTimelineStateSync_();
+      if (typeof window.dalCacheInvalidateTimeline_ === 'function') window.dalCacheInvalidateTimeline_(projectId);
       window.refreshTimelineDalBanner();
       alert('Timeline collaboration ended — committed to Sheets.');
     })

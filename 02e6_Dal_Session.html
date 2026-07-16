@@ -124,7 +124,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
       window.dalPrepClosedPollStreak = 0;
     }
     if (opts.invalidateCache || changed) {
-      try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+      if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
+      else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
     }
     if (typeof startDalPaLiveSync_ === 'function') startDalPaLiveSync_(projectId);
     window.startDalPrepSessionPoll_(projectId);
@@ -200,6 +201,7 @@ window.openDalPrepSession = function() {
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+      if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
       window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
       window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
@@ -230,7 +232,8 @@ window.closeDalPrepSession = function() {
       if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
       // Re-open watcher/poll so this browser can see a later remote START PREP without leaving PA.
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
-      try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+      if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
+      else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.dalPrepClosing = false;
       alert('Preparation ended — committed to Sheets.');
     })

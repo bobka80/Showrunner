@@ -103,6 +103,18 @@ function dalClearDomainSession_(indexSheet, rowNum, map, sessionType) {
   });
 }
 
+/** Domain-scoped cache bump — must not flush the other live fork's readers. */
+function dalFlushDomainCache_(projectId, sessionType) {
+  var tag = (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB)
+    ? dalCacheTagTimeline_(projectId)
+    : dalCacheTagPa_(projectId);
+  if (typeof dalInvalidateCacheTags_ === 'function') {
+    dalInvalidateCacheTags_([tag]);
+  } else {
+    flushCache();
+  }
+}
+
 function dalDomainOpenedAtMs_(row, sessionType) {
   var cols = dalDomainSessionCols_(sessionType);
   if (!row || !row.map || row.map[cols.openedAt] === undefined) return 0;
@@ -300,7 +312,7 @@ function dalClearDomainSessionIfUid_(projectId, sessionType, sessionUid) {
   var d = dalReadDomainSession_(row, sessionType);
   if (sessionUid && d.sessionUid !== String(sessionUid)) return;
   dalClearDomainSession_(sheets.index, row.rowNum, row.map, sessionType);
-  flushCache();
+  dalFlushDomainCache_(projectId, sessionType);
 }
 
 function dalReclaimStaleDomainSession_(indexSheet, row, sessionType) {
@@ -374,7 +386,7 @@ function beginDalSession(projectId, sessionType, actor) {
       openedAt: now,
       openedBy: actor
     });
-    flushCache();
+    dalFlushDomainCache_(projectId, sessionType);
     return {
       success: true,
       joined: false,
@@ -448,7 +460,7 @@ function finishDalSession(projectId, sessionUid, actor) {
     var cur = dalReadDomainSession_(row, resolvedType);
     if (cur.sessionUid !== String(sessionUid)) throw new Error('Session open raced — retry.');
     dalWriteDomainSession_(sheets.index, row.rowNum, row.map, resolvedType, { status: 'open' });
-    flushCache();
+    dalFlushDomainCache_(projectId, resolvedType);
     writeToAuditLog(actor, 'OPEN', 'DAL_SESSION', projectId, sessionUid, 'Opened ' + resolvedType + ' session.');
     return { success: true, joined: false, sessionUid: sessionUid, sessionType: resolvedType, status: 'open' };
   });
@@ -485,7 +497,7 @@ function closeDalSession(projectId, actor, sessionType) {
       if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) assertActorCanEditTimeline(actor);
       else assertActorCanManageDalPrepSession(actor);
       dalClearDomainSession_(sheets.index, row.rowNum, row.map, sessionType);
-      flushCache();
+      dalFlushDomainCache_(projectId, sessionType);
       return { abortOpening: true, type: sessionType };
     }
 
@@ -498,7 +510,7 @@ function closeDalSession(projectId, actor, sessionType) {
     }
 
     dalWriteDomainSession_(sheets.index, row.rowNum, row.map, sessionType, { status: 'committing' });
-    flushCache();
+    dalFlushDomainCache_(projectId, sessionType);
     return { abortOpening: false, type: sessionType, sessionUid: cur.sessionUid };
   });
 
@@ -534,7 +546,7 @@ function closeDalSession(projectId, actor, sessionType) {
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) throw new Error('Project not found.');
     dalClearDomainSession_(sheets.index, row.rowNum, row.map, closingType);
-    flushCache();
+    dalFlushDomainCache_(projectId, closingType);
     writeToAuditLog(actor, 'CLOSE', 'DAL_SESSION', projectId, projectId, 'Closed ' + closingType + ' session — committed to Sheets.');
     return { success: true, sessionType: closingType, status: 'closed' };
   });

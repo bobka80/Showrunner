@@ -4,7 +4,9 @@
 
 **Related:** [session-fork-platform.md](session-fork-platform.md) · [project-assets-concurrency.md](project-assets-concurrency.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
 
-**Status:** Backlog — consolidate fragmented caches; tune per-screen UX without rewriting modules. **Execution blocked until [active/data-access-layer.md](../active/data-access-layer.md) Phase 6** (design lock) / campaign Phase 6.
+**Status:** **Phase 6A live** — client `CacheCoordinator` + domain tags; PA cache migrated. Further key migration / GAS sheet cache re-enable = Phase 6B. See [active/data-access-layer.md](../active/data-access-layer.md).
+
+**Last swept:** 2026-07-16
 
 **Design lock — Cache Coordinator public API:** [../active/dal-firebase-design-lock-2026-07-13.md §4](../active/dal-firebase-design-lock-2026-07-13.md#4-caching-strategy-cache-coordinator) — `check`, `set`, `invalidate`, `registerPolicy`; UI → coordinator → repos (never UI → repos directly).
 

@@ -1,0 +1,200 @@
+<!-- DAL Phase 6A — Cache Coordinator (client). Public API: check / set / invalidate / registerPolicy -->
+<script>
+(function () {
+  var STORAGE_PREFIX = 'sm_cc_';
+  var LEGACY_PA_PREFIX = 'sm_pa_cache_';
+
+  var policies = {};
+  var memory = {};
+  /** @type {Object.<string, string[]>} */
+  var keyToTags = {};
+  /** @type {Object.<string, string[]>} */
+  var tagToKeys = {};
+
+  function nowMs() { return Date.now(); }
+
+  function storageKey_(key) {
+    return STORAGE_PREFIX + String(key || '');
+  }
+
+  function ttlMs_(policy) {
+    if (!policy) return 5 * 60 * 1000;
+    if (typeof policy.ttlMs === 'number') return policy.ttlMs;
+    var hot = String(policy.freshness || policy.tier || '').toLowerCase();
+    if (hot === 'hot') return 15 * 1000;
+    if (hot === 'warm') return 5 * 60 * 1000;
+    if (hot === 'cold') return 30 * 60 * 1000;
+    if (hot === 'none' || hot === 'network') return 0;
+    return 5 * 60 * 1000;
+  }
+
+  function isExpired_(entry, policy) {
+    if (!entry) return true;
+    var ttl = ttlMs_(policy);
+    if (ttl <= 0) return true;
+    return (nowMs() - (entry.savedAt || 0)) > ttl;
+  }
+
+  function rememberTags_(key, tags) {
+    var list = (tags || []).map(String).filter(Boolean);
+    var prev = keyToTags[key] || [];
+    prev.forEach(function (t) {
+      tagToKeys[t] = (tagToKeys[t] || []).filter(function (k) { return k !== key; });
+    });
+    keyToTags[key] = list;
+    list.forEach(function (t) {
+      if (!tagToKeys[t]) tagToKeys[t] = [];
+      if (tagToKeys[t].indexOf(key) === -1) tagToKeys[t].push(key);
+    });
+  }
+
+  function dropKey_(key) {
+    delete memory[key];
+    try { localStorage.removeItem(storageKey_(key)); } catch (e1) { /* ignore */ }
+    // Legacy PA key bridge
+    if (String(key).indexOf('pa:') === 0) {
+      var pid = String(key).slice(3);
+      try { localStorage.removeItem(LEGACY_PA_PREFIX + pid); } catch (e2) { /* ignore */ }
+    }
+    var tags = keyToTags[key] || [];
+    tags.forEach(function (t) {
+      tagToKeys[t] = (tagToKeys[t] || []).filter(function (k) { return k !== key; });
+    });
+    delete keyToTags[key];
+  }
+
+  function registerPolicy(name, rules) {
+    if (!name) return;
+    policies[String(name)] = rules || {};
+  }
+
+  /**
+   * @returns {{ hit: boolean, data?: *, source?: string, stale?: boolean }}
+   */
+  function check(key, policyName) {
+    key = String(key || '');
+    if (!key) return { hit: false };
+    var policy = policies[policyName] || policies.default || {};
+    var mem = memory[key];
+    if (mem && !isExpired_(mem, policy)) {
+      return { hit: true, data: mem.data, source: 'memory', stale: false };
+    }
+    if (mem && policy.staleWhileRevalidate) {
+      return { hit: true, data: mem.data, source: 'memory', stale: true };
+    }
+    try {
+      var raw = localStorage.getItem(storageKey_(key));
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && parsed.data !== undefined) {
+          memory[key] = { data: parsed.data, savedAt: parsed.savedAt || 0 };
+          if (!isExpired_(memory[key], policy)) {
+            return { hit: true, data: parsed.data, source: 'local', stale: false };
+          }
+          if (policy.staleWhileRevalidate) {
+            return { hit: true, data: parsed.data, source: 'local', stale: true };
+          }
+        }
+      }
+    } catch (eRead) { /* miss */ }
+
+    // Legacy PA bridge read
+    if (String(key).indexOf('pa:') === 0) {
+      try {
+        var legacy = localStorage.getItem(LEGACY_PA_PREFIX + String(key).slice(3));
+        if (legacy) {
+          var legacyObj = JSON.parse(legacy);
+          return { hit: true, data: legacyObj, source: 'legacy', stale: true };
+        }
+      } catch (eLeg) { /* miss */ }
+    }
+    return { hit: false };
+  }
+
+  function set(key, data, policyName, tags) {
+    key = String(key || '');
+    if (!key) return false;
+    var policy = policies[policyName] || policies.default || {};
+    if (ttlMs_(policy) <= 0 && !policy.forceStore) return false;
+    var entry = { data: data, savedAt: nowMs(), policy: policyName || 'default' };
+    memory[key] = entry;
+    rememberTags_(key, tags || policy.tags || []);
+    try {
+      localStorage.setItem(storageKey_(key), JSON.stringify(entry));
+    } catch (eSet) {
+      // Quota — keep memory only
+    }
+    // Mirror legacy PA key for older readers during migration
+    if (String(key).indexOf('pa:') === 0) {
+      try {
+        localStorage.setItem(LEGACY_PA_PREFIX + String(key).slice(3), JSON.stringify(data));
+      } catch (eLegSet) { /* ignore */ }
+    }
+    return true;
+  }
+
+  /** Invalidate by tag (surgical). Tag '*' clears everything tracked + known legacy PA keys for open project helpers. */
+  function invalidate(tag) {
+    tag = String(tag || '');
+    if (!tag) return 0;
+    var removed = 0;
+    if (tag === '*' || tag === 'global') {
+      Object.keys(keyToTags).forEach(function (k) {
+        dropKey_(k);
+        removed++;
+      });
+      memory = {};
+      keyToTags = {};
+      tagToKeys = {};
+      return removed;
+    }
+    var keys = (tagToKeys[tag] || []).slice();
+    keys.forEach(function (k) {
+      dropKey_(k);
+      removed++;
+    });
+    // Domain tag also clears legacy PA key: project:{id}:pa
+    var m = /^project:([^:]+):pa$/.exec(tag);
+    if (m) {
+      try { localStorage.removeItem(LEGACY_PA_PREFIX + m[1]); } catch (e3) { /* ignore */ }
+      dropKey_('pa:' + m[1]);
+    }
+    return removed;
+  }
+
+  function tagPa(projectId) { return 'project:' + String(projectId || '') + ':pa'; }
+  function tagTimeline(projectId) { return 'project:' + String(projectId || '') + ':timeline'; }
+
+  // Built-in policies (design lock §4)
+  registerPolicy('default', { freshness: 'warm', ttlMs: 5 * 60 * 1000 });
+  registerPolicy('pa-hot', { freshness: 'hot', ttlMs: 15 * 1000, staleWhileRevalidate: true });
+  registerPolicy('timeline-hot', { freshness: 'hot', ttlMs: 15 * 1000, staleWhileRevalidate: true });
+  registerPolicy('vault-cold', { freshness: 'cold', ttlMs: 30 * 60 * 1000 });
+  registerPolicy('calendar-warm', { freshness: 'warm', ttlMs: 5 * 60 * 1000, staleWhileRevalidate: true });
+  registerPolicy('logistics-none', { freshness: 'none', ttlMs: 0 });
+
+  window.CacheCoordinator = {
+    check: check,
+    set: set,
+    invalidate: invalidate,
+    registerPolicy: registerPolicy,
+    tagPa: tagPa,
+    tagTimeline: tagTimeline
+  };
+
+  /** Helpers used by PA modules during migration. */
+  window.dalCacheGetPa_ = function (projectId) {
+    var r = check('pa:' + projectId, 'pa-hot');
+    return r.hit ? r.data : null;
+  };
+  window.dalCacheSetPa_ = function (projectId, data) {
+    return set('pa:' + projectId, data, 'pa-hot', [tagPa(projectId)]);
+  };
+  window.dalCacheInvalidatePa_ = function (projectId) {
+    return invalidate(tagPa(projectId));
+  };
+  window.dalCacheInvalidateTimeline_ = function (projectId) {
+    return invalidate(tagTimeline(projectId));
+  };
+})();
+</script>
