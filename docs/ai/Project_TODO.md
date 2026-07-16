@@ -26,7 +26,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | **C** | Screensaver / bulletin (dock only); gate layout UI | [ ] Deferred |
 
 1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
-2. **Data access layer (DAL)** — Phase 6B shipped (remaining keys + sheet cache); next: Logistics Hub atomic path / optional 5C. Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
+2. **Data access layer (DAL)** — Hub atomic + 5C shipped; campaign near-complete (remaining: as-needed domain repos). Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
 3. **After DAL campaign:** fuller warehouse prep UX, timeline drag-end autosave — via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)). **Optional later:** timeline auto-room + idle commit — [timeline-collab-session.md § Optional update](topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) (milestone-before-try / revert-if-disliked).
 4. **Parallel when ready:** Google Chat update → [topics/workspace-migration.md](topics/workspace-migration.md).
 
@@ -37,7 +37,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Campaign | Status | File |
 |----------|--------|------|
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. **Next:** Phase A shell split → Phase B dock UI — [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | **Phase 6B** — calendar/vault/tracker cache + `getSheetData`; next Logistics Hub · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
+| **Data access layer (DAL + router)** | **Hub atomic + 5C** — ledger journal/verify; campaign wrap-up · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
 
 ---
 
@@ -61,7 +61,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Google Workspace migration | Done — in-place host upgrade verified | [topics/workspace-migration.md](topics/workspace-migration.md) |
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
 | Session fork platform | Backlog — Firebase buffer + router | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
-| Unified data cache engine **+ data access layer (backend abstraction)** | **Phase 6B live** — coordinator + sheet cache — [active/data-access-layer.md](active/data-access-layer.md) | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
+| Unified data cache engine **+ data access layer (backend abstraction)** | **Phase 6B + Hub atomic live** — [active/data-access-layer.md](active/data-access-layer.md) | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
 | Warehouse prep session | Partial — PA fork live; dual-domain vs timeline **resolved** (Slice D) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) |
 | Timeline collab session | Partial — Phase A + live sync + Slice D; **optional post-campaign:** auto-room + idle commit | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |

@@ -93,6 +93,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Dal_Firestore.js`**: DAL Phase 4 — Firestore REST (GAS service account) for prep + timeline forks.
 - **`Dal_Firebase.js`**: DAL Phase 4 — FirebaseAdapter; snapshot/commit; wires Phase 5A reconcile after commit.
 - **`Dal_Cache.js`**: DAL Phase 6A — `dalInvalidateCacheTags_(tags)`; domain tags `project:{id}:pa` / `project:{id}:timeline` (selective, not global `flushCache`).
+- **`Dal_Ledger.js`**: DAL Logistics Hub atomic path (design lock §2) — Firebase op journal → Sheets apply → live read-back verify; Phase 5C ledger pocket/retry. No session fork.
 - **`07d_Cache_Coordinator.html`**: DAL Phase 6A — client `CacheCoordinator` (`check` / `set` / `invalidate` / `registerPolicy`); PA helpers `dalCacheGetPa_` / `dalCacheSetPa_` / `dalCacheInvalidatePa_`.
 
 ## 6. The 03 & 04 Series: Timelines & Crew

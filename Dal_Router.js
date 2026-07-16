@@ -4,7 +4,9 @@
  *
  * Selects storage adapter per domain + session status. Session-open routes PA/timeline
  * to FirebaseAdapter (Slice A still delegates to Sheets until Firestore wiring ships).
- * Ledger stays on Sheets (design lock §2 — atomic checkout path).
+ * Ledger: durable Sheets via atomic hub path in LedgerRepo (design lock §2 —
+ * journal → Sheets → verify; no session fork). Router still returns SheetsAdapter
+ * if anything calls dalAdapterFor_(…, LEDGER) directly.
  */
 
 // @INDEX: DAL -> Router (Phase 2)
@@ -37,7 +39,7 @@ function projectDataRouter(domain, sessionStatus) {
     status = DAL_SESSION.NORMAL;
   }
 
-  // Ledger: always Sheets (checkout / atomic ops — design lock §2).
+  // Ledger: Sheets durable store (atomic journal lives in Dal_Ledger.js / LedgerRepo).
   if (domain === DAL_DOMAIN.LEDGER) {
     return getSheetsAdapter();
   }

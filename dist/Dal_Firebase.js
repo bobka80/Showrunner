@@ -4,7 +4,7 @@
  *
  * Prep session: PA reads/writes Firestore.
  * Timeline collab session: timeline reads/writes Firestore.
- * Ledger always Sheets. Saves during session still go through google.script.run.
+ * Ledger: durable Sheets; atomic journal + verify via Dal_Ledger.js (not a fork).
  */
 
 // @INDEX: DAL -> Firebase adapter (Phase 4)
@@ -344,16 +344,16 @@ function createFirebaseAdapter_() {
       return sheets.fetchTimelineData(folderId, mode);
     },
     persistOperationsBatch: function (projectId, batch, actor) {
-      return sheets.persistOperationsBatch(projectId, batch, actor);
+      return batchProcessOperationsAtomic_(projectId, batch, actor);
     },
     startOperationSession: function (projectId, operationType, actor) {
-      return sheets.startOperationSession(projectId, operationType, actor);
+      return startEventOperationAtomic_(projectId, operationType, actor);
     },
     finalizeOperationSession: function (projectId, actor) {
-      return sheets.finalizeOperationSession(projectId, actor);
+      return finalizeEventOperationAtomic_(projectId, actor);
     },
     processRfidScanOp: function (projectId, rfidTag, actor) {
-      return sheets.processRfidScanOp(projectId, rfidTag, actor);
+      return processRfidScanSheets_(projectId, rfidTag, actor);
     }
   };
 }

@@ -113,17 +113,19 @@ function createTimelineRepo_() {
 
 function createLedgerRepo_() {
   return {
+    // Design lock §2 — atomic hub path (journal → Sheets → verify). No session fork.
     batchProcess: function (projectId, batch, actor) {
-      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).persistOperationsBatch(projectId, batch, actor);
+      return batchProcessOperationsAtomic_(projectId, batch, actor);
     },
     startOperation: function (projectId, operationType, actor) {
-      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).startOperationSession(projectId, operationType, actor);
+      return startEventOperationAtomic_(projectId, operationType, actor);
     },
     finalizeOperation: function (projectId, actor) {
-      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).finalizeOperationSession(projectId, actor);
+      return finalizeEventOperationAtomic_(projectId, actor);
     },
     processRfidScan: function (projectId, rfidTag, actor) {
-      return dalAdapterFor_(projectId, DAL_DOMAIN.LEDGER).processRfidScanOp(projectId, rfidTag, actor);
+      // RFID resolves vault then batchProcess → atomic path.
+      return processRfidScanSheets_(projectId, rfidTag, actor);
     }
   };
 }

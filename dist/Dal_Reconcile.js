@@ -18,6 +18,7 @@ var DAL_FW_MAX_PER_SWEEP_ = 8;
 function dalReconcileDomainLabel_(domain) {
   if (domain === 'assets' || domain === DAL_SESSION_TYPE.PREP) return 'assets';
   if (domain === 'timeline' || domain === DAL_SESSION_TYPE.TIMELINE_COLLAB) return 'timeline';
+  if (domain === 'ledger' || domain === DAL_DOMAIN.LEDGER) return 'ledger';
   return String(domain || 'unknown');
 }
 
@@ -386,6 +387,8 @@ function dalFwProcessQueueItem_(queueDoc) {
       result = dalFwRetryPaOnly_(projectId, payload, actor);
     } else if (domain === 'timeline') {
       result = dalFwRetryTimelineOnly_(projectId, payload, actor);
+    } else if (domain === 'ledger') {
+      result = dalFwRetryLedgerOnly_(projectId, payload, actor);
     } else {
       throw new Error('Unknown domain: ' + domain);
     }

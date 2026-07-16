@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 6B shipped** (calendar/vault/tracker CacheCoordinator + tag-aware `getSheetData`). **Production:** GAS **v609+** (ship bumps). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Logistics Hub atomic + Phase 5C shipped** (ledger journal → Sheets → verify). **Production:** GAS **v610+** (ship bumps). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -357,7 +357,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
   - [x] Smoke: both open → each domain routes only its fork; end either → other stays live (director verified 2026-07-16)
 - [x] **Phase 5A** — Post-commit reconcile + failed_writes pocket (prep + timeline); manager alert on mismatch — `Dal_Reconcile.js`
 - [x] **Phase 5B** — Retry / purge sweep for failed_writes (`runDalFailedWritesRetrySweep`)
-- [ ] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
+- [x] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain) — `Dal_Ledger.js` journal → Sheets → verify (checkout start/batch/finalize)
 
 **Known gap until Slice D:** ~~one `Dal_Session_*` slot~~ **Resolved v603** — prep and timeline use independent column families. Legacy singleton migrates on first read.
 
@@ -370,7 +370,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Phase 5B** — Retry sweep `runDalFailedWritesRetrySweep` (backoff 30s→60s→5m→30m), 7-day purge, manager alert on retry ≥3; trigger every 5 min via `ensureDalFailedWritesRetryTrigger_`
 - [x] Closing domain A never reconciles or deletes domain B’s fork (scoped by domain path + session columns)
 - [x] Per-project isolation — never global reconciliation
-- [ ] **Phase 5C (optional)** — Logistics Hub atomic per-op reconcile (design lock §2)
+- [x] **Phase 5C** — Logistics Hub atomic per-op reconcile (design lock §2) — ledger domain in failed_writes + retry sweep
 
 ### Phase 6 — Cache coordinator
 

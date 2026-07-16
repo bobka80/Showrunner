@@ -56,7 +56,7 @@ function startEventOperationSheets_(projectId, operationType, actor = "System UI
                 let sessionUid = Utilities.getUuid();
                 sheets.index.getRange(i + 1, iMap['Active_Session_UID'] + 1).setValue(sessionUid);
                 
-                flushCache();
+                dalLedgerInvalidateAfterOp_(projectId);
                 writeToAuditLog(actor, "UPDATE", "OPERATIONS", projectId, projectId, `Started ${operationType} operation.`);
                 return { success: true, message: `Operation ${operationType} started.` };
             }
@@ -219,7 +219,7 @@ function batchProcessOperationsSheets_(projectId, batch, actor = "System UI") {
         dalDeleteRowsByColumn_(sheets.opsLedger, 'session_uid', sessionUid);
         dalAppendRows_(sheets.opsLedger, sessionRows);
         
-        flushCache();
+        dalLedgerInvalidateAfterOp_(projectId);
         
         let scannedMap = {};
         let totalScanned = 0;
@@ -292,7 +292,7 @@ function finalizeEventOperationSheets_(projectId, actor = "System UI") {
         
         // TODO: Update the actual Asset Locations in the Vault to show they are on the Truck/Event.
         
-        flushCache();
+        dalLedgerInvalidateAfterOp_(projectId);
         writeToAuditLog(actor, "UPDATE", "OPERATIONS", projectId, projectId, `Finalized ${operationType}. Processed ${scannedItems.length} items.`);
         
         return { success: true, message: `Protocol Generated. ${scannedItems.length} items processed.`, newStatus: newStatus };
