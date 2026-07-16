@@ -92,7 +92,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Dal_Sessions.js`**: DAL Phase 4 — dual-domain session registry (`Dal_Prep_Session_*` / `Dal_Timeline_Session_*`); `getDalSessionInfo` returns `prepStatus` / `timelineStatus`.
 - **`Dal_Firestore.js`**: DAL Phase 4 — Firestore REST (GAS service account) for prep + timeline forks.
 - **`Dal_Firebase.js`**: DAL Phase 4 — FirebaseAdapter; snapshot/commit; wires Phase 5A reconcile after commit.
-- **`Dal_Reconcile.js`**: DAL Phase 5A — post-commit signature compare; `failed_writes/{projectId}/{domain}/{sessionUid}/{deltaId}` pocket; manager alert (audit + FCM).
+- **`Dal_Reconcile.js`**: DAL Phase 5 — post-commit reconcile; `failed_writes/{projectId}/items/…` pocket; `dal_fw_queue` + `runDalFailedWritesRetrySweep` (5‑min backoff retry / 7‑day purge); `setupDalFailedWritesRetryTrigger()`.
 
 ## 6. The 03 & 04 Series: Timelines & Crew
 - **`03a_Timeline_Boot.html`** to **`03e_Timeline_UX.html`**: The shift and phase drag-and-drop timeline builder.

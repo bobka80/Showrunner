@@ -26,7 +26,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | **C** | Screensaver / bulletin (dock only); gate layout UI | [ ] Deferred |
 
 1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
-2. **Data access layer (DAL)** — Phase 5A shipped (reconcile + failed_writes); next: Phase 5B retry / Phase 6 cache. Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
+2. **Data access layer (DAL)** — Phase 5B shipped (failed_writes retry/purge); next: Phase 6 cache. Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
 3. **After DAL campaign:** fuller warehouse prep UX, timeline drag-end autosave — via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)). **Optional later:** timeline auto-room + idle commit — [timeline-collab-session.md § Optional update](topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) (milestone-before-try / revert-if-disliked).
 4. **Parallel when ready:** Google Chat update → [topics/workspace-migration.md](topics/workspace-migration.md).
 
@@ -37,7 +37,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Campaign | Status | File |
 |----------|--------|------|
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. **Next:** Phase A shell split → Phase B dock UI — [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | **Phase 5A** — reconcile + failed_writes pocket; next 5B retry / Phase 6 · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
+| **Data access layer (DAL + router)** | **Phase 5B** — reconcile + retry/purge; next Phase 6 cache · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
 
 ---
 
