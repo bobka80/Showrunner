@@ -499,7 +499,7 @@ function closeDalSession(projectId, actor, sessionType) {
 
     dalWriteDomainSession_(sheets.index, row.rowNum, row.map, sessionType, { status: 'committing' });
     flushCache();
-    return { abortOpening: false, type: sessionType };
+    return { abortOpening: false, type: sessionType, sessionUid: cur.sessionUid };
   });
 
   if (gate && gate.abortOpening) {
@@ -515,12 +515,13 @@ function closeDalSession(projectId, actor, sessionType) {
   }
 
   var closingType = gate.type;
+  var closingUid = gate.sessionUid || '';
 
   try {
     if (closingType === DAL_SESSION_TYPE.PREP) {
-      dalCommitPaFromFirestore_(projectId);
+      dalCommitPaFromFirestore_(projectId, closingUid, actor);
     } else if (closingType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
-      dalCommitTimelineFromFirestore_(projectId, actor);
+      dalCommitTimelineFromFirestore_(projectId, actor, closingUid);
     } else {
       throw new Error('Close not implemented for session type: ' + closingType);
     }

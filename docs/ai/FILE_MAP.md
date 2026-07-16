@@ -89,8 +89,10 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Logistics_Timeline.js`**: Project timeline backend CRUD.
 - **`Dal_Repos.js`**: DAL Phase 1–3 — `SheetsAdapter` + domain repos + scoped row write helpers.
 - **`Dal_Router.js`**: DAL Phase 4 — `projectDataRouter(domain, sessionStatus)`; Firebase when session-open.
-- **`Dal_Sessions.js`**: DAL Phase 4 — session registry on `Projects_Index` (`Dal_Session_*` columns); `getDalSessionInfo`.
-- **`Dal_Firestore.js`**: DAL Phase 4 — Firestore REST (GAS service account) for prep fork snapshot/commit.
+- **`Dal_Sessions.js`**: DAL Phase 4 — dual-domain session registry (`Dal_Prep_Session_*` / `Dal_Timeline_Session_*`); `getDalSessionInfo` returns `prepStatus` / `timelineStatus`.
+- **`Dal_Firestore.js`**: DAL Phase 4 — Firestore REST (GAS service account) for prep + timeline forks.
+- **`Dal_Firebase.js`**: DAL Phase 4 — FirebaseAdapter; snapshot/commit; wires Phase 5A reconcile after commit.
+- **`Dal_Reconcile.js`**: DAL Phase 5A — post-commit signature compare; `failed_writes/{projectId}/{domain}/{sessionUid}/{deltaId}` pocket; manager alert (audit + FCM).
 
 ## 6. The 03 & 04 Series: Timelines & Crew
 - **`03a_Timeline_Boot.html`** to **`03e_Timeline_UX.html`**: The shift and phase drag-and-drop timeline builder.

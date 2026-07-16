@@ -136,9 +136,12 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
   });
 }
 
-function dalCommitPaFromFirestore_(projectId) {
+function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   var hdr = dalGetProjectAssetsHeaderAndMap_();
   var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+  var intendedObjects = (projectRows || []).map(function (r) {
+    return dalPaSheetRowToObject_(r.data, hdr.map);
+  });
   // Drop _meta first so live UI closes before the slower row drain finishes.
   firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
   // Sheet write under its own short lock — caller must not hold ScriptLock across Firestore UrlFetch.
@@ -146,7 +149,24 @@ function dalCommitPaFromFirestore_(projectId) {
     dalDeleteRowsByColumn_(hdr.sheet, 'project_uid', projectId);
     var rows = projectRows.map(function (r) { return r.data; });
     dalAppendRows_(hdr.sheet, rows);
+    flushCache();
   });
+  // Phase 5A — reconcile before wiping the fork collection (pocket needs intended rows).
+  try {
+    dalReconcilePaCommit_(projectId, sessionUid, intendedObjects, actor);
+  } catch (reconErr) {
+    try {
+      dalPocketFailedWrite_({
+        projectId: projectId,
+        domain: 'assets',
+        sessionUid: sessionUid,
+        actor: actor,
+        mismatchNote: 'Reconcile threw: ' + (reconErr.message || reconErr),
+        payload: { rows: intendedObjects }
+      });
+      dalAlertFailedWrite_(projectId, 'assets', actor, 'Reconcile threw: ' + (reconErr.message || reconErr));
+    } catch (pocketErr) { /* already failing */ }
+  }
   firestoreDeleteCollection_(dalFirestorePaCollection_(projectId));
 }
 
@@ -200,7 +220,7 @@ function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode) {
   dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor);
 }
 
-function dalCommitTimelineFromFirestore_(projectId, actor) {
+function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
   var snap = dalReadTimelineStateFromFirestore_(projectId);
   firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta');
   if (!snap) {
@@ -219,6 +239,24 @@ function dalCommitTimelineFromFirestore_(projectId, actor) {
     actor || 'System UI',
     null
   );
+  try {
+    flushCache();
+  } catch (eFlush) { /* continue */ }
+  try {
+    dalReconcileTimelineCommit_(projectId, sessionUid, snap, actor);
+  } catch (reconErr) {
+    try {
+      dalPocketFailedWrite_({
+        projectId: projectId,
+        domain: 'timeline',
+        sessionUid: sessionUid,
+        actor: actor,
+        mismatchNote: 'Reconcile threw: ' + (reconErr.message || reconErr),
+        payload: snap
+      });
+      dalAlertFailedWrite_(projectId, 'timeline', actor, 'Reconcile threw: ' + (reconErr.message || reconErr));
+    } catch (pocketErr) { /* already failing */ }
+  }
   firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
 }
 

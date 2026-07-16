@@ -34,6 +34,7 @@ When the director reports a bug in these areas, state the risk in plain language
 | **Station APK + hosting deploy** | `build-station-apk.js`, `deploy-hosting.js`, `push-hosting/prepare-hosting.js`, `station-manifest.json` | Add stdin prompts without `isTTY` guard (wedges shell); leave HTTP fetches undrained (hangs deploy); ship a lower `versionCode`; trust "deploy ran" without live verify | `--non-interactive` firebase + heartbeat/timeout; drain redirects + `process.exit(0)`; downgrade guard; post-deploy live-manifest verify; see § Station APK + Firebase hosting deploy pipeline |
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
 | **Warehouse ledger** | `Operations.js` | Mutate assignments directly during RFID chaos | Append to `Operations_Ledger` |
+| **DAL prep / timeline session UI (dual-domain)** | `Dal_Sessions.js`, `02e6_Dal_Session.html`, `02e7_Dal_Firestore_Client.html`, `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html` | Trust legacy flat `sessionType` when both domains open; clear prep latch on first “closed” poll; poll only for END not START; put `*/` inside `Dal_Sessions.js` block comments | Read `prepStatus` / `timelineStatus`; poll both START+END with grace; see § DAL prep/timeline session UI |
 
 ---
 
@@ -444,6 +445,52 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 ---
 
+## DAL prep / timeline session UI (dual-domain) (Critical)
+
+**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Slice D:** [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) · **Design lock:** [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md)
+
+**Plain language:** Prep and timeline collab can both be open on one project (independent forks). The **banners and START/END buttons** are UI state synced across browsers. Getting that sync wrong looks like “collab died” or “prep never started on the other PC” even when the server fork is fine.
+
+**Primary files:**
+
+| File | Role |
+|------|------|
+| `Dal_Sessions.js` | Dual-domain registry on `Projects_Index`; `getDalSessionInfo`; begin/finish/close |
+| `02e6_Dal_Session.html` | Prep START/END UI, latch, Sheets poll |
+| `02e7_Dal_Firestore_Client.html` | Prep Firestore `_meta` + live PA sync |
+| `03a1_Timeline_Dal_Session.html` / `03a2_Timeline_Dal_Live.html` | Timeline collab START/END + session watcher |
+
+### Never do
+
+1. **Trust legacy flat `sessionType` / `status` when both domains may be open.** Those fields preferred prep and made timeline collab look closed (banner gone, START COLLAB stuck) while the timeline fork was still live (**v604**). Always read **`prepStatus` / `timelineStatus`** (or nested `prep` / `timeline`). When both domains are active, flat legacy fields are intentionally empty.
+2. **Clear the prep latch on the first “closed” Sheets poll.** Prep UI latches open (`dalPrepLatched`) so flaky reads cannot flicker. Remote END PREP must use `allowClose: true` (Firestore `_meta` gone **or** confirmed Sheets poll). A close-only poll with no grace **wiped remote START PREP** when Sheets lagged Firebase (**v605 → v606**).
+3. **Poll only for END, not START.** While Project Assets is open, the prep poll must detect **remote START and remote END**. Stopping the poll when not latched breaks “other PC started prep.”
+4. **Put `*/` inside a `Dal_Sessions.js` block comment** (e.g. `prep*/timeline*`). It terminates the comment early → GAS syntax error → white screen / failed push (same class as **v577** `persist*/fetch*` in `Dal_Repos.js`).
+5. **Hold ScriptLock across Firestore UrlFetch** on open/close — starves presence and times out START COLLAB (fixed earlier in Phase 4 hotfixes).
+
+### Safe rules (locked)
+
+| Concern | Rule |
+|---------|------|
+| Dual-domain reads | Client: `prepStatus` / `timelineStatus`. Server close: always pass `'prep'` or `'timelineCollab'`. |
+| Prep remote sync | Fast path: Firestore `projects/{id}/assets/_meta`. Safety: Sheets poll while PA open — **both** open and close. After a fresh open: **~8s grace** + **two consecutive closed polls** before `allowClose`. |
+| Timeline remote sync | Session watcher polls `getDalSessionInfo` → `dalTimelineInfoFromSession_` (domain fields only). |
+| Sheet vs UI | Banner sync is **not** Sheet truth. Fork may be correct while UI is wrong — fix clients, do not “re-open” blindly. |
+
+### Smoke (after any session-UI / `Dal_Sessions` change)
+
+Hard-refresh **two browsers**:
+
+1. Timeline collab both sides → START COLLAB → banners stick.  
+2. Leave timeline on A (no END COLLAB) → START PREP on A → B’s **collab banner must stay**.  
+3. Both in Project Assets → START PREP on A → B shows prep within a few seconds.  
+4. END PREP on A → B clears within a few seconds.  
+5. Optional: both domains open → END COLLAB / END PREP independently — other domain stays live.
+
+**AI rule:** Before editing these files, state the dual-domain + latch risk in plain language. Prefer small ships with the smoke above over “one more poll tweak” without both START and END covered.
+
+---
+
 ## Auto-Containerization vs Auto-Packing
 
 Two **completely separate** engines. Never merge their logic. **Full model:** [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md).
@@ -486,6 +533,17 @@ LESSON (never do X again):
 ```
 
 ### Entries
+
+#### 2026-07-16 — Dual-domain session UI + prep latch sync (fixed v604–v606)
+
+```
+DATE: 2026-07-16
+SYMPTOM: (1) Prep open on A cleared timeline collab banner on B; START COLLAB popup then snapped back to START. (2) END PREP on A left prep banner on B. (3) Fix for (2) then blocked remote START PREP on B.
+CAUSE: (1) Legacy flat sessionType preferred prep when both domains open. (2) Prep latch only cleared via Firestore _meta — poll missing. (3) Close-only poll + no grace wiped a fresh open when Sheets lagged Firebase.
+FRAGILE ZONE: DAL prep / timeline session UI (dual-domain)
+FILES TOUCHED: Dal_Sessions.js, 02e6_Dal_Session.html, 02e7_Dal_Firestore_Client.html, 03a1_Timeline_Dal_Session.html, 03a2_Timeline_Dal_Live.html, FRAGILE_ZONES.md
+LESSON: Always read prepStatus/timelineStatus. Prep poll must cover START and END; grace + two closed polls before allowClose. Never put */ inside Dal_Sessions block comments.
+```
 
 #### 2026-06-27 — Session expired loop + black screen after mobile milestones (fixed v328)
 

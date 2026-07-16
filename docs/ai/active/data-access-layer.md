@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice D shipped** (dual-domain prep∥timeline). **Production:** GAS **v603+**. **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 5A shipped** (reconcile + failed_writes pocket). **Production:** GAS **v607+**. **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -354,8 +354,9 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
   - [x] Independent prep + timeline lifecycle columns on `Projects_Index` (migrate off singleton `Dal_Session_*`)
   - [x] Domain-specific begin/finish/close / stale reclaim / `getDalSessionInfo`
   - [x] Close prep must not touch timeline fork; close timeline must not touch prep fork
-  - [ ] Smoke: both open → each domain routes only its fork; end either → other stays live
-- [ ] End session → reconciliation engine (Phase 5)
+  - [x] Smoke: both open → each domain routes only its fork; end either → other stays live (director verified 2026-07-16)
+- [x] **Phase 5A** — Post-commit reconcile + failed_writes pocket (prep + timeline); manager alert on mismatch — `Dal_Reconcile.js`
+- [ ] End session → full reconciliation engine (Phase 5B — retry backoff / purge)
 - [ ] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
 
 **Known gap until Slice D:** ~~one `Dal_Session_*` slot~~ **Resolved v603** — prep and timeline use independent column families. Legacy singleton migrates on first read.
@@ -364,10 +365,11 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 
 **Prerequisite:** Phase 4 **Slice D** (dual-domain registry) — otherwise close/reconcile keyed only by project can corrupt the other live fork.
 
-- [ ] Post-commit cell-by-cell reconciliation (Firebase vs Sheets) **per domain**
-- [ ] `failed_writes/{projectId}/…` — every record includes **`domain` + `sessionUid`**; retry backoff, 7-day retention, manager alert on failure
-- [ ] Closing domain A never reconciles or deletes domain B’s fork
-- [ ] Per-project isolation — never global reconciliation
+- [x] **Phase 5A** — Post-commit signature compare (Firebase intended vs Sheets read-back) for **prep** and **timeline**
+- [x] **Phase 5A** — `failed_writes/{projectId}/{domain}/{sessionUid}/{deltaId}` pocket + audit + FCM to logistics managers on mismatch
+- [ ] **Phase 5B** — Retry backoff (30s, 60s, 5m, 30m…), 7-day purge, manager alert on retry failure
+- [x] Closing domain A never reconciles or deletes domain B’s fork (scoped by domain path + session columns)
+- [x] Per-project isolation — never global reconciliation
 
 ### Phase 6 — Cache coordinator
 
