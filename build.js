@@ -225,7 +225,12 @@ function getFrontendLogicChunk(index) {
   const files = fs.readdirSync(__dirname);
   let filesCopied = 0;
   files.forEach(file => {
-    if (NODE_ONLY.has(file) || file.startsWith('scratch_') || file.startsWith('temp_')) return;
+    if (
+      NODE_ONLY.has(file) ||
+      file.startsWith('scratch_') ||
+      file.startsWith('temp_') ||
+      file.startsWith('_tmp')
+    ) return;
     if (fs.statSync(path.join(__dirname, file)).isDirectory()) return;
 
     if (file.endsWith('.js') || file === 'appsscript.json' || file === 'Login.html') {
@@ -237,6 +242,16 @@ function getFrontendLogicChunk(index) {
   NODE_ONLY.forEach(file => {
     const stale = path.join(DIST_DIR, file);
     if (fs.existsSync(stale)) fs.unlinkSync(stale);
+  });
+  fs.readdirSync(DIST_DIR).forEach(file => {
+    if (
+      file.startsWith('scratch_') ||
+      file.startsWith('temp_') ||
+      file.startsWith('_tmp')
+    ) {
+      const stale = path.join(DIST_DIR, file);
+      if (fs.statSync(stale).isFile()) fs.unlinkSync(stale);
+    }
   });
 
   console.log(`Copied ${filesCopied} backend script files to dist/`);
