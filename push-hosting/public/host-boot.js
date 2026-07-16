@@ -2546,9 +2546,18 @@
   var dalFsAuthReady_ = false;
 
   function dalFsPostToIframe_(msg) {
+    // Outer GAS frame + every iframe we can see (nesting). Inner Index also forwards down.
     try {
       if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
     } catch (e) { /* ignore */ }
+    try {
+      var frames = document.querySelectorAll('iframe');
+      for (var i = 0; i < frames.length; i++) {
+        try {
+          if (frames[i].contentWindow) frames[i].contentWindow.postMessage(msg, '*');
+        } catch (e1) { /* ignore */ }
+      }
+    } catch (e2) { /* ignore */ }
   }
 
   function dalFsDocRef_(path) {

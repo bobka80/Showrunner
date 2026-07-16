@@ -134,6 +134,18 @@
       SHOWRUNNER_MOBILE_SCAN_WAKE: 1,
       SHOWRUNNER_MOBILE_SCAN_REOPEN: 1
     };
+    var dalFsUpTypes = {
+      SHOWRUNNER_DAL_FS_AUTH: 1,
+      SHOWRUNNER_DAL_FS_LISTEN: 1,
+      SHOWRUNNER_DAL_FS_UNLISTEN: 1,
+      SHOWRUNNER_DAL_FS_PATCH_WRITE: 1
+    };
+    var dalFsDownTypes = {
+      SHOWRUNNER_DAL_FS_AUTH_RESULT: 1,
+      SHOWRUNNER_DAL_FS_SNAP: 1,
+      SHOWRUNNER_DAL_FS_SNAP_ERROR: 1,
+      SHOWRUNNER_DAL_FS_WRITE_RESULT: 1
+    };
     function forwardToInnerFrames(data) {
       try {
         var frames = document.querySelectorAll('iframe');
@@ -142,8 +154,30 @@
         }
       } catch (e) { /* ignore */ }
     }
+    function forwardDalFsToHost(data) {
+      try { if (window.top && window.top !== window) window.top.postMessage(data, '*'); } catch (e0) { /* ignore */ }
+      try {
+        if (window.parent && window.parent !== window && window.parent !== window.top) {
+          window.parent.postMessage(data, '*');
+        }
+      } catch (e1) { /* ignore */ }
+    }
     window.addEventListener('message', function(ev) {
-      if (!ev.data || !ev.data.type || !shellTypes[ev.data.type]) return;
+      if (!ev.data || !ev.data.type) return;
+      var t = ev.data.type;
+      // Nested GAS frame: relay live-Firestore requests up to web.app host-boot.
+      if (dalFsUpTypes[t]) {
+        try {
+          if (ev.source !== window.top) forwardDalFsToHost(ev.data);
+        } catch (eUp) { /* ignore */ }
+        return;
+      }
+      // Host replies: this document's 02e7 listener handles them; also push into nested iframes.
+      if (dalFsDownTypes[t]) {
+        forwardToInnerFrames(ev.data);
+        return;
+      }
+      if (!shellTypes[t]) return;
       var fromShell = false;
       try {
         fromShell = (ev.source === window.parent) || (ev.origin && ev.origin.indexOf('web.app') !== -1);

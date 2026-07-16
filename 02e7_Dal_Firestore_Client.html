@@ -204,7 +204,13 @@ window.dalFsBindHostMessages_ = function() {
 };
 
 window.dalFsPostToHost_ = function(msg) {
-  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+  // GAS nests iframes — parent is often NOT web.app. Always hit top (host-boot).
+  try { if (window.top) window.top.postMessage(msg, '*'); } catch (e0) { /* ignore */ }
+  try {
+    if (window.parent && window.parent !== window && window.parent !== window.top) {
+      window.parent.postMessage(msg, '*');
+    }
+  } catch (e1) { /* ignore */ }
 };
 
 /**
@@ -278,7 +284,7 @@ window.dalEnsureFirestoreClientAuth_ = function(cb) {
         delete window.dalFsPending_[requestId];
         try { console.warn('Host DAL auth timed out — trying iframe Auth'); } catch (e1) { /* ignore */ }
         finishWithIframeAuth_();
-      }, 8000);
+      }, 12000);
       window.dalFsPending_[requestId] = {
         cb: function(err, client) {
           if (settled) return;
