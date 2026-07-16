@@ -390,6 +390,7 @@ window.dalMarkPaLocalSave_ = function() {
 /**
  * True live collab: while prep fork is open, flush PA deltas to Firebase after local edits.
  * Debounced; no-ops when no deltas. SAVE button remains for non-prep and manual flush.
+ * Flush is also called from the end of renderProjectAssetsUI (reliable — do not rely on wrap).
  */
 window.dalFlushPaIfPrepOpen_ = function() {
   if (!window.dalPrepUiOpen) return;
@@ -407,6 +408,7 @@ window.dalFlushPaIfPrepOpen_ = function() {
   clearTimeout(window.dalPaFlushTimer);
   window.dalPaFlushTimer = setTimeout(function() {
     if (!window.dalPrepUiOpen) return;
+    if (window.dalPaApplyingRemote) return;
     if (typeof calculatePaDeltas !== 'function' || calculatePaDeltas().length === 0) return;
     window.dalPaFlushInFlight = true;
     window.dalPaFlushAgain = false;
@@ -414,26 +416,28 @@ window.dalFlushPaIfPrepOpen_ = function() {
       window.dalPaFlushInFlight = false;
       return;
     }
-    saveProjectAssets(function() {
+    saveProjectAssets(function(ok) {
       window.dalPaFlushInFlight = false;
+      if (!ok) {
+        try { console.warn('DAL PA live flush failed or had no changes'); } catch (e1) { /* ignore */ }
+        var banner = document.getElementById('dal-session-banner');
+        if (banner && window.dalPrepUiOpen) {
+          banner.textContent = '🔒 IN PREPARATION — live sync retry…';
+        }
+      } else if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+        window.dalUpdateRemotePendingBanner_();
+      }
       if (window.dalPaFlushAgain) {
         window.dalPaFlushAgain = false;
         window.dalFlushPaIfPrepOpen_();
       }
     }, true);
-  }, 450);
+  }, 200);
 };
 
-/** Wrap PA render so discrete edits that re-render also flush during prep. */
+/** Kept for prep-open call sites; real flush is wired inside renderProjectAssetsUI. */
 window.dalInstallPaLiveFlushHook_ = function() {
-  if (window.__dalPaFlushHookInstalled) return;
-  if (typeof renderProjectAssetsUI !== 'function') return;
   window.__dalPaFlushHookInstalled = true;
-  var orig = renderProjectAssetsUI;
-  window.renderProjectAssetsUI = function() {
-    orig.apply(this, arguments);
-    if (typeof dalFlushPaIfPrepOpen_ === 'function') dalFlushPaIfPrepOpen_();
-  };
 };
 
 window.dalPaApplyingRemote = false;
