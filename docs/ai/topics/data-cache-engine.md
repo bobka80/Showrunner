@@ -73,6 +73,8 @@ Stores (layered — not one bucket)
 
 **Intent (director, 2026-07-03):** every feature talks to **domain repositories** (`AssetsRepo.getForProject(id)`, `CrewRepo.setRfid(...)`, `LedgerRepo.append(...)`), never directly to `SpreadsheetApp` / raw sheets / Firebase. Behind the repository interface sits one active **adapter**: `SheetsAdapter` today; tomorrow `PostgresAdapter`, `SqlAdapter`, or `FirebasePaidAdapter`. Swap the adapter in **one registration point** → the whole app reroutes.
 
+**Campaign close bar (2026-07-16):** the live DAL campaign does **not** migrate every domain before close. Inventory of what stays outside repos until as-needed: [active/data-access-layer.md § Out of this campaign](../active/data-access-layer.md#out-of-this-campaign--not-routed-through-dal).
+
 ```text
 Feature code (GAS + client)
     ↓  (domain methods only)

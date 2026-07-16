@@ -174,15 +174,41 @@ function dalFirestoreTimelineCollection_(projectId) {
   return 'projects/' + projectId + '/' + DAL_FIRESTORE_TIMELINE_COLLECTION;
 }
 
-function dalWriteTimelineStateToFirestore_(projectId, mode, shifts, phases, overrides, actor) {
+function dalWriteTimelineStateToFirestore_(projectId, mode, shifts, phases, overrides, actor, replaceAll) {
+  var outShifts = shifts || [];
+  var outPhases = phases || [];
+  var outOverrides = overrides || {};
+  // Live saves: upsert onto fork so a stale full payload cannot drop concurrent adds.
+  // Snapshots / commits pass replaceAll=true for an authoritative rewrite.
+  if (!replaceAll) {
+    var remote = null;
+    try { remote = dalReadTimelineStateFromFirestore_(projectId); } catch (eRead) { remote = null; }
+    if (remote) {
+      outShifts = dalFirebasePatchTimelineEntities_(remote.shifts || [], shifts || []);
+      outPhases = dalFirebasePatchTimelineEntities_(remote.phases || [], phases || []);
+      outOverrides = Object.assign({}, remote.overrides || {}, overrides || {});
+    }
+  }
   firestoreWriteDocument_(dalFirestoreTimelineCollection_(projectId) + '/state', {
     mode: mode || 'main',
-    shiftsJson: JSON.stringify(shifts || []),
-    phasesJson: JSON.stringify(phases || []),
-    overridesJson: JSON.stringify(overrides || {}),
+    shiftsJson: JSON.stringify(outShifts),
+    phasesJson: JSON.stringify(outPhases),
+    overridesJson: JSON.stringify(outOverrides),
     updatedAt: new Date().toISOString(),
     updatedBy: actor || 'System'
   });
+}
+
+/** Upsert incoming by id onto remote; keep remote-only ids (never silent-drop concurrent adds). */
+function dalFirebasePatchTimelineEntities_(remoteList, incomingList) {
+  var map = {};
+  (remoteList || []).forEach(function (e) {
+    if (e && e.id) map[String(e.id)] = e;
+  });
+  (incomingList || []).forEach(function (e) {
+    if (e && e.id) map[String(e.id)] = e;
+  });
+  return Object.keys(map).map(function (k) { return map[k]; });
 }
 
 function dalReadTimelineStateFromFirestore_(projectId) {
@@ -217,7 +243,7 @@ function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode) {
     domain: 'timeline',
     mode: mode || 'main'
   });
-  dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor);
+  dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor, true);
 }
 
 function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {

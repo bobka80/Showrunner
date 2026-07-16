@@ -93,6 +93,7 @@ function openDeptOverride(uid, name) {
 function applyDeptOverride() {
   if(!activeDeptOverrideUid) return;
   localDeptOverrides[activeDeptOverrideUid] = document.getElementById('dept-override-select').value;
+  if (typeof window.dalTlNoteOverrideTouch_ === 'function') window.dalTlNoteOverrideTouch_(activeDeptOverrideUid);
   document.getElementById('dept-override-panel').style.display = 'none';
   rebuildTimelineGrid();
   window.isTimelineDirty = true;
@@ -235,11 +236,17 @@ document.addEventListener('keydown', function(e) {
         
         let changed = false;
         if (selectedIds && selectedIds.size > 0) {
+            selectedIds.forEach(function(sid) {
+              if (typeof window.dalTlNoteShiftDelete_ === 'function') window.dalTlNoteShiftDelete_(sid);
+            });
             shifts = shifts.filter(s => !selectedIds.has(s.id));
             selectedIds.clear();
             changed = true;
         }
         if (selectedPhaseIds && selectedPhaseIds.size > 0) {
+            selectedPhaseIds.forEach(function(pid) {
+              if (typeof window.dalTlNotePhaseDelete_ === 'function') window.dalTlNotePhaseDelete_(pid);
+            });
             activePhases = activePhases.filter(p => !selectedPhaseIds.has(p.id));
             selectedPhaseIds.clear();
             changed = true;

@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Direct client Firebase writes** for live PA/timeline forks (GAS only for open/close/commit). Timeline collab: 3-way merge + transactional writes. **Production:** GAS **v615+** (merge hotfix shipping). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Direct client Firebase writes** for live PA/timeline forks. Timeline collab: touch/patch merge. **Production:** GAS **v616+** (patch hotfix shipping). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -350,6 +350,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Timeline live sync** — while both users are in timeline: session open/close + fork state sync (`03a2_Timeline_Dal_Live.html`; Firestore listener with GAS poll fallback); SAVE stays in room during collab
 - [x] **Hotfix** — timeline collab thrash: live writes use **full** mode state (not crew-checkbox filter); skip/stash apply during drag; stronger echo/LWW guards (`03a2` + collab path in `saveAndCloseShifts`)
 - [x] **Hotfix** — timeline collab lost-updates: **3-way merge** (base/local/remote) + Firestore **transaction** on write; merge-on-apply while dirty; unique shift/phase ids; banner `live sync (merge)`
+- [x] **Hotfix** — timeline collab stale overwrite + lag: **touch/patch merge** (only touched entities overwrite remote); 40ms flush; light redraw; server upsert on GAS fork save; banner `live sync (patch)`
 - [x] **Hotfix** — `openDalSession` / `closeDalSession` release ScriptLock during Firestore UrlFetch (was starving presence → stuck 🔒 door + client timeout on START COLLAB)
 - [x] **Hotfix** — timeline START COLLAB: `beginDalSession` + `finishDalSession` (join if open, reclaim stale opening ~90s, faster Firestore upsert)
 - [x] **Slice D — Dual-domain sessions** — prep + timelineCollab **concurrent** on one project (design lock: per project + per domain). Spec: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
@@ -388,6 +389,8 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 
 ### Later — Migrate remaining domains (as needed)
 
+**Not a close-out gate for this campaign.** Full inventory of what stays outside repo routing until a later pass: **[§ Out of this campaign — not routed through DAL](#out-of-this-campaign--not-routed-through-dal)**.
+
 - [ ] Vault/Assets, Crew, Directory, Config — one repo at a time when touched or when timeouts force move
 - [ ] Future SQL/Postgres adapter only after interface proven on Sheets + Firebase
 
@@ -400,6 +403,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - **2026-07-13:** Director design lock imported → [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md). Phase 3 (delta-only) explicit gate before Firebase.
 - **2026-07-15:** **Slice D documented** — dual-domain concurrent prep + timeline — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md). **Shipped v603.**
 - **2026-07-16:** Post-campaign **optional** timeline UX (auto room on enter + idle commit) documented in [../topics/timeline-collab-session.md](../topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) — do **not** build during this campaign; milestone-before-try / revert-if-disliked.
+- **2026-07-16:** Director clarified close bar — **not** “absolutely every DB path through DAL.” Documented out-of-campaign inventory below.
 
 ## What DAL must NOT do
 
@@ -410,6 +414,61 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 
 ---
 
+## Out of this campaign — not routed through DAL
+
+**Locked intent (2026-07-16):** Closing this campaign does **not** require every Sheets/Firebase read/write to go through a repository. Long-term target remains “everything through the DAL”; the list below is explicitly **deferred / as-needed after campaign close**.
+
+**In campaign (for contrast — already repo-routed or DAL infrastructure):**
+
+| In scope | Path |
+|----------|------|
+| Project Assets | `ProjectAssetsRepo` ← `saveProjectAssetsDelta` / `getProjectAssets` |
+| Timeline | `TimelineRepo` ← `saveTimelineData` / `getTimelineData` |
+| Ledger / checkout / RFID ops | `LedgerRepo` ← start / batch / finalize / `processRfidScan` |
+| Session registry + open/close/commit | `Dal_Sessions.js`, reconcile, failed-writes |
+| Cache coordinator policies for migrated keys | Phase 6A/6B — sits **on** the data story; not a second write path |
+
+**Nuance (still “DAL story,” not a free side door):** while prep/timeline fork is open, the **browser may write Firestore directly** on the fork paths; GAS still owns snapshot/commit. That is intentional live-collab design, not “skip the layer.”
+
+### Domains / surfaces **not** intended to be repo-wired before campaign close
+
+| Area | Typical GAS / modules | Examples (not exhaustive) | Why deferred |
+|------|----------------------|---------------------------|--------------|
+| **Projects index / event CRUD** | `Logistics_Projects.js` | `saveEventFromUI`, `saveProjectData`, `deleteProjectFull`, `setProjectStatus`, `updateProjectReadiness`, `setProjectDifficultyMultiplier`, `restoreProjectWithConflictCheck`, `generateProjectFolders` | P1 `ProjectRepo` — not fork hot path |
+| **PA-adjacent helpers still outside repo** | `Logistics_Assets.js` / logistics APIs | `saveTruckArrangementAPI`, `generateLogisticsPayloadAPI`, legacy `saveProjectAssetsAPI` if still called | Wrap when next touched; core PA delta is already in |
+| **Calendar boot / refresh** | boot/refresh payloads | `getBootPayload`, `getRefreshPayload`, `getGlobalMonthData` | Read aggregates; cache policies exist, repos do not |
+| **Vault master (assets)** | `Resources_Vault.js` | `getAssetRegistry`, `getVaultAsset`, `saveVaultAsset`, `deleteVaultAsset`, `batchUpdateAssets`, `provisionNewAsset` | Admin + reference; post-campaign as-needed |
+| **Clients / fleet vault** | `Resources_Vault.js` / admin | `getClientsVault`, `provisionNewClient`, `deleteClientVault`, `getVehiclesVault`, `saveVehicleVault`, `deleteVehicleVault` | Same |
+| **Crew / IAM / directory** | `Resources_*`, `Security.js` | `getSecureIamDirectory`, `provisionNewUser`, `saveDirectoryUpdate`, `deleteUserFromVault`, `saveRoleConfig`, `deleteRoleConfig` | Not session-fork |
+| **Warehouse map admin** | `Resources_Warehouse.js` | `getWarehouseData`, `saveWarehouseRoot/Zone/Area`, `saveWarehouseDraft`, `deleteWarehouseEntity` | Admin geometry |
+| **Tasks & in-app notifications** | `Logistics_Tasks.js` | `getTasksAndNotifs` / `getTasksNotifsPayload`, `saveTaskData`, `deleteTaskData`, notification CRUD | Separate product surface |
+| **Push / FCM registry** | `Notifications_*.js` | VAPID/FCM token save, device admin, test push | Infra + devices, not ENGINE fork data |
+| **Financials** | financials hub APIs | `getFinancialsData`, `getFinancialSettings`, `saveFinancialSettings`, `approveShiftPayments` | [topics/financials.md](../topics/financials.md) |
+| **Conflicts** | `Conflicts.js` | `getActiveConflicts`, `acknowledgeConflict` | Can route later if needed |
+| **Month roster / leave** | roster APIs | `saveLeave`, `deleteLeave` | Crew calendar side |
+| **Equipment tracker aggregates** | tracker APIs | `getUnifiedTrackerData` | Read/report path |
+| **System config / visuals / tags** | `Resources_System.js` / admin visuals | `getModuleVisualSettings`, `saveModuleVisualSettings`, `saveSystemSettings`, `saveSystemTags`, `getManagerConfig`, `saveManagerConfig` | Stable reference |
+| **Audit admin** | `Resources_Audit.js` | `getAuditFlags`, `saveAuditGroups`, `getReviewedAssets`, `setAssetReviewedStatus`, `getEntityAuditHistory` | Admin |
+| **Database backup / restore / lock** | `Resources_Database.js` | backup/restore/repair, `beginDatabaseBackupLock`, nightly backup | Ops tooling — keep out of feature repos |
+| **Schema bootstrap / migrations** | `Logistics_Schema.js`, `Resources_Migrations.js` | `verifyDatabaseSchema`, vault/engine migrate | **Adapter internals forever** — not UI repos |
+| **Audit log writer** | `Resources_Audit.js` | `writeToAuditLog` | Called from many paths; infrastructure |
+| **Station shell / gun / mobile scan** | `Station_Security.js`, station HTML | station bootstrap, vault list, RFID map, `processStationRfidScan`, `setStationAssetStatus`, mobile scan bootstrap/status | Station campaign surface; warehouse ledger checkout already uses `LedgerRepo` where wired |
+| **Presence / desktop lock / session auth** | presence + login | `reportProjectPresence`, desktop lock verify, `apiLogoutSession`, passcode change | Not persistence domain repos |
+| **Drive / integrations / archive jobs** | `Integrations.js`, automation admin | Drive directory, checklist actions, yearly/monthly archive, retro Drive sync | Side systems |
+| **Print / email one-shots** | project editor | `printEquipmentList`, `triggerManualCrewEmail` | Output, not DAL storage routing |
+
+### Cache note
+
+Phase 6 migrated **some** client cache keys behind `CacheCoordinator`. That does **not** mean those domains’ **server** reads/writes are repo-routed. Calendar/vault/tracker/fleet/clients/warehouse may use coordinator policies while GAS still hits Sheets outside `get*Repo()`.
+
+### Rule after campaign close
+
+1. **Do not** open new direct `SpreadsheetApp` / raw sheet write paths in feature code — new work goes through a repo (create one if missing).
+2. **Do** migrate a deferred row above when that domain is next edited for real, or when timeouts/scale force a move.
+3. Optional later: expand this table into stable `docs/ai/DATA_ACCESS.md` when the campaign archives.
+
+---
+
 ## When this campaign closes
 
-Move this file to [../archive/](../archive/), update [Project_TODO.md](../Project_TODO.md) **Active campaigns** row, and leave long-term reference in [data-cache-engine.md](../topics/data-cache-engine.md) (+ optional stable `docs/ai/DATA_ACCESS.md` once Phase 1 ships).
+Move this file to [../archive/](../archive/), update [Project_TODO.md](../Project_TODO.md) **Active campaigns** row, and leave long-term reference in [data-cache-engine.md](../topics/data-cache-engine.md) (+ optional stable `docs/ai/DATA_ACCESS.md` once Phase 1 ships). Carry the **[§ Out of this campaign](#out-of-this-campaign--not-routed-through-dal)** list into that stable doc so “what still bypasses repos” stays visible.

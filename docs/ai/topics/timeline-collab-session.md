@@ -8,7 +8,7 @@
 
 **Status:** Phase A + **true live edit sync** with **direct client → Firestore** writes while fork open (GAS fallback if client auth fails). Drag-end flush without SAVE. **Hotfix:** full-state writes + **3-way merge / transactional writes** so concurrent editors cannot wipe each other. Optional auto-room / idle commit still post-campaign. See [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed** — full-state fork writes + apply guards. ~~forgotten / disappearing concurrent edits~~ **Fixed** — 3-way merge + transactions.
+**Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed**. ~~forgotten / disappearing concurrent edits~~ **Fixed** — touch/patch merge (editing crew B cannot rewrite crew A’s untouched strip).
 
 **Post-campaign optional (do not build during DAL campaign):** [§ Optional update — auto room + idle commit](#optional-update--auto-room--idle-commit) — after whole DAL/fork campaign finishes; milestone first; try on floor; revert if disliked.
 

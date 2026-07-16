@@ -26,7 +26,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | **C** | Screensaver / bulletin (dock only); gate layout UI | [ ] Deferred |
 
 1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
-2. **Data access layer (DAL)** — Hub atomic + 5C shipped; campaign near-complete (remaining: as-needed domain repos). Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
+2. **Data access layer (DAL)** — Hub atomic + 5C shipped; campaign near-complete. Close does **not** require every domain through repos — [§ Out of this campaign](active/data-access-layer.md#out-of-this-campaign--not-routed-through-dal). Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
 3. **After DAL campaign:** fuller warehouse prep UX, timeline drag-end autosave — via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)). **Optional later:** timeline auto-room + idle commit — [timeline-collab-session.md § Optional update](topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) (milestone-before-try / revert-if-disliked).
 4. **Parallel when ready:** Google Chat update → [topics/workspace-migration.md](topics/workspace-migration.md).
 
@@ -37,7 +37,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Campaign | Status | File |
 |----------|--------|------|
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. **Next:** Phase A shell split → Phase B dock UI — [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | **Hub atomic + 5C** — ledger journal/verify; campaign wrap-up · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
+| **Data access layer (DAL + router)** | Near-complete — out-of-campaign DB paths listed in campaign § · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) · [design lock](active/dal-firebase-design-lock-2026-07-13.md) |
 
 ---
 

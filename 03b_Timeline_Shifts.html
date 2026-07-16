@@ -20,6 +20,7 @@ function addShift(uid, e) {
     }
     const sid = (typeof window.dalTlNewId_ === 'function') ? window.dalTlNewId_('s_') : ('s_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
     shifts.push({ id: sid, user_uid: uid, email: uid, start: startHr, duration: 2.5, role: tName, color: '#e5e7eb', textCol: '#18181b', hasArrow: false });
+    if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(sid);
   } else {
     let dur = lastEditedDurationMain;
     let person = activeRoster.find(c => c.uid === uid);
@@ -30,6 +31,7 @@ function addShift(uid, e) {
     
     const sid = (typeof window.dalTlNewId_ === 'function') ? window.dalTlNewId_('s_') : ('s_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
     shifts.push({ id: sid, user_uid: uid, email: uid, start: startHr, duration: dur, role: dRole, color: bgHex, textCol: txtCol, hasArrow: false });
+    if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(sid);
   }
   drawShifts();
   window.isTimelineDirty = true;
@@ -40,9 +42,13 @@ function removeShift(id, e) {
   if (currentIsReadOnly) return;
   e.stopPropagation();
   if (selectedIds.has(id)) {
+    selectedIds.forEach(function(sid) {
+      if (typeof window.dalTlNoteShiftDelete_ === 'function') window.dalTlNoteShiftDelete_(sid);
+    });
     shifts = shifts.filter(s => !selectedIds.has(s.id));
     selectedIds.clear();
   } else {
+    if (typeof window.dalTlNoteShiftDelete_ === 'function') window.dalTlNoteShiftDelete_(id);
     shifts = shifts.filter(s => s.id !== id);
   }
   drawShifts();
@@ -330,6 +336,11 @@ function endDrag() {
   document.removeEventListener('touchmove', onDrag); 
   document.removeEventListener('touchend', endDrag);
   drawShifts();
+  if (typeof selectedIds !== 'undefined' && selectedIds && selectedIds.size) {
+    selectedIds.forEach(function(sid) {
+      if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(sid);
+    });
+  }
   window.isTimelineDirty = true;
   if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
@@ -372,10 +383,16 @@ function setRole(roleName, bgHex, textHex) {
 
   if (selectedIds.has(activeRoleTarget) && selectedIds.size > 1) {
     shifts.forEach(s => {
-      if (selectedIds.has(s.id) && isTruck(s.email) === isTargetTruck) { s.role = roleName; s.color = bgHex; s.textCol = textHex; }
+      if (selectedIds.has(s.id) && isTruck(s.email) === isTargetTruck) {
+        s.role = roleName; s.color = bgHex; s.textCol = textHex;
+        if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(s.id);
+      }
     });
   } else {
-    if(targetShift) { targetShift.role = roleName; targetShift.color = bgHex; targetShift.textCol = textHex; }
+    if(targetShift) {
+      targetShift.role = roleName; targetShift.color = bgHex; targetShift.textCol = textHex;
+      if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(targetShift.id);
+    }
   }
   document.getElementById('role-picker').style.display = 'none';
   drawShifts();
