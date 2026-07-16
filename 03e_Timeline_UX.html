@@ -96,6 +96,7 @@ function applyDeptOverride() {
   document.getElementById('dept-override-panel').style.display = 'none';
   rebuildTimelineGrid();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 function toggleAllTimelineDepts(expand) {
@@ -161,6 +162,7 @@ function openNoteModal(id, type, e) {
         if (type === 'shift') { let s = shifts.find(x => x.id === id); if (s) s.note = noteTxt; drawShifts(); } 
         else { let p = activePhases.find(x => x.id === id); if (p) p.note = noteTxt; renderPhases(); }
         window.isTimelineDirty = true;
+        if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
     };
     
     input.addEventListener('keydown', ev => {
@@ -217,6 +219,7 @@ function toggleIndicatorState(id, newState) {
   }
   drawShifts();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 // ==========================================
@@ -247,6 +250,7 @@ document.addEventListener('keydown', function(e) {
             drawShifts();
             renderPhases();
             window.isTimelineDirty = true;
+            if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
         }
     }
 });

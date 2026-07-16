@@ -6,9 +6,9 @@
 
 **Replaces/enhances:** current timeline **single-editor** presence lock (`reportProjectPresence`, `🔒 NAME EDITING` in `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`).
 
-**Status:** Phase A + **live sync** shipped — open/close fork + session/state sync while both users are in timeline. **Slice D shipped** — prep + timeline collab concurrent. Drag-end writes / room roster still open. See [../active/data-access-layer.md](../active/data-access-layer.md).
+**Status:** Phase A + **true live edit sync** — while prep/timeline fork open, discrete edits flush to Firebase; remotes redraw via listeners. Drag-end autosave on timeline; PA flush-on-edit during prep. Optional auto-room / idle commit still post-campaign. See [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Known gap (until drag-end autosave):** saves during collab still require SAVE SHIFTS (not drag-end yet).
+**Known gap (until this ship):** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end / discrete edits; SAVE remains optional manual flush.
 
 **Post-campaign optional (do not build during DAL campaign):** [§ Optional update — auto room + idle commit](#optional-update--auto-room--idle-commit) — after whole DAL/fork campaign finishes; milestone first; try on floor; revert if disliked.
 
@@ -84,7 +84,8 @@ Is: **collaborative room** with shared live state.
 - [x] Button: `👥 N IN TIMELINE` instead of `🔒 NAME EDITING` when room active (door lock removed — open always allowed)
 - [ ] Roster panel: names in room
 - [ ] Activity: “Bobby moved shift X”, “Maria added phase Y”
-- [ ] Write timeline changes on **drag end** only — not per mousemove
+- [x] Write timeline changes on **drag end** only — not per mousemove (flush to Firebase while collab open)
+- [x] Multi-user shift drag with drag-end writes (no SAVE button required during collab; SAVE still optional)
 - [ ] **Last leave** triggers commit (with optional **60s grace** if someone disconnects briefly — TBD)
 - [ ] Optional: manager **Force close session** if grace fails
 - [ ] FCM: “timeline session active on Project X”
@@ -127,9 +128,9 @@ Is: **collaborative room** with shared live state.
 - [x] Snapshot timeline → Firebase on START COLLAB
 - [x] Hotfix: open/close must not hold ScriptLock across Firestore (starved presence → stuck 🔒 + START COLLAB timeout)
 - [x] Button: `👥 N IN TIMELINE` instead of door lock (single-editor presence lock removed)
-- [x] **Live sync** — session open/close visible to others in timeline; state sync (Firestore listener + GAS poll fallback); SAVE stays in room during collab
+- [x] **Live sync** — session open/close + **edit flush** to Firebase on drag-end / discrete edits; remotes apply via listener (SAVE optional during collab)
 - [x] **Depends on DAL Slice D** — timeline collab while prep is open (dual-domain registry)
-- [ ] Multi-user shift drag with drag-end writes (no SAVE button required)
+- [x] Multi-user shift drag with drag-end writes (no SAVE button required)
 - [x] Manual END COLLAB commit (last-leave auto-commit later)
 
 ### Phase B — Phases + sub-events on fork

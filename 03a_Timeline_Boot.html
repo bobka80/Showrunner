@@ -565,25 +565,32 @@ function saveAndCloseShifts() {
   if (projBtn) { projBtn.innerText = "SYNCING SHIFTS..."; projBtn.disabled = true; }
   const saveBtn = document.getElementById('tt-save-btn');
   const saveBtnOrig = saveBtn ? saveBtn.innerText : 'SAVE SHIFTS';
-  if (stayInCollab && saveBtn) {
+  const quietFlush = !!window.__dalTlQuietFlush;
+  if (stayInCollab && saveBtn && !quietFlush) {
     saveBtn.innerText = 'SAVING…';
     saveBtn.disabled = true;
   }
   
   // Asynchronously push readiness status 
-  google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState), ACTIVE_USER_NAME);
+  if (!quietFlush) {
+    google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState), ACTIVE_USER_NAME);
+  }
   
   google.script.run
       .withFailureHandler(err => {
-          if (err.message.includes("COLLISION_DETECTED")) alert("SAVE FAILED: Modified by another user. Please refresh.");
-          else alert("Save Failed: " + err.message);
+          if (!quietFlush) {
+            if (err.message.includes("COLLISION_DETECTED")) alert("SAVE FAILED: Modified by another user. Please refresh.");
+            else alert("Save Failed: " + err.message);
+          }
           if (projBtn) { projBtn.innerText = origProjBtnText; projBtn.disabled = false; }
-          if (stayInCollab && saveBtn) { saveBtn.innerText = saveBtnOrig; saveBtn.disabled = false; }
-          if (typeof refreshData === 'function') refreshData();
+          if (stayInCollab && saveBtn && !quietFlush) { saveBtn.innerText = saveBtnOrig; saveBtn.disabled = false; }
+          if (!quietFlush && typeof refreshData === 'function') refreshData();
+          // Keep dirty so another flush can retry
+          if (stayInCollab) window.isTimelineDirty = true;
       })
       .withSuccessHandler(res => {
          if (projBtn) { projBtn.innerText = origProjBtnText; projBtn.disabled = false; }
-         if (stayInCollab && saveBtn) { saveBtn.innerText = saveBtnOrig; saveBtn.disabled = false; }
+         if (stayInCollab && saveBtn && !quietFlush) { saveBtn.innerText = saveBtnOrig; saveBtn.disabled = false; }
          
          let finalRes = { status: res };
          try { if (typeof res === 'string' && res.startsWith('{')) finalRes = JSON.parse(res); } catch(e){}

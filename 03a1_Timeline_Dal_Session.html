@@ -100,8 +100,8 @@ function dalTimelineCollabStarted_(joined) {
     window.startDalTimelineStateSync_(projectId);
   }
   alert(joined
-    ? 'Joined timeline collaboration — SAVE SHIFTS writes to the Firebase fork (stay in timeline to keep syncing).'
-    : 'Timeline collaboration started — SAVE SHIFTS writes to the Firebase fork (stay in timeline to keep syncing).');
+    ? 'Joined timeline collaboration — edits sync live to Firebase (SAVE optional).'
+    : 'Timeline collaboration started — edits sync live to Firebase (SAVE optional).');
 }
 
 function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {

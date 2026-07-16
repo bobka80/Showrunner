@@ -104,21 +104,26 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
 
   if (typeof calculatePaDeltas === 'function' && calculatePaDeltas().length > 0) {
     window.dalPaRemotePending = true;
-    window.dalPaLastRemoteSig = sig; // remember remote version even if deferred
+    // Do not advance lastSig — after local flush, next snapshot must still apply.
     window.dalUpdateRemotePendingBanner_();
     return;
   }
 
   window.dalPaLastRemoteSig = sig;
   window.dalPaRemotePending = false;
-  currentProjectAssets = JSON.parse(JSON.stringify(serverAssets));
-  window.originalProjectAssets = JSON.parse(JSON.stringify(serverAssets));
+  window.dalPaApplyingRemote = true;
+  try {
+    currentProjectAssets = JSON.parse(JSON.stringify(serverAssets));
+    window.originalProjectAssets = JSON.parse(JSON.stringify(serverAssets));
 
-  var overlay = document.getElementById('project-assets-modal-overlay');
-  if (overlay && overlay.style.display !== 'none' && typeof renderProjectAssetsUI === 'function') {
-    renderProjectAssetsUI();
+    var overlay = document.getElementById('project-assets-modal-overlay');
+    if (overlay && overlay.style.display !== 'none' && typeof renderProjectAssetsUI === 'function') {
+      renderProjectAssetsUI();
+    }
+    if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+  } finally {
+    window.dalPaApplyingRemote = false;
   }
-  if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
   window.dalUpdateRemotePendingBanner_();
 };
 
@@ -288,6 +293,7 @@ window.startDalPaFirestoreListener = function(projectId) {
 
 window.startDalPaLiveSync_ = function(projectId) {
   if (!projectId || !window.dalPrepUiOpen) return;
+  if (typeof window.dalInstallPaLiveFlushHook_ === 'function') window.dalInstallPaLiveFlushHook_();
   // Prefer Firestore; auth/domain failure auto-falls back to GAS poll.
   if (window.dalPaLiveSyncMode === 'firestore' && window.dalPaFirestoreUnsub) return;
   if (window.dalPaLiveSyncMode === 'gas' && window.dalPaGasSyncTimer) return;
@@ -380,4 +386,55 @@ window.startDalPaSessionWatcher = function(projectId) {
 window.dalMarkPaLocalSave_ = function() {
   window.dalPaIgnoreListenerUntil = Date.now() + 1500;
 };
+
+/**
+ * True live collab: while prep fork is open, flush PA deltas to Firebase after local edits.
+ * Debounced; no-ops when no deltas. SAVE button remains for non-prep and manual flush.
+ */
+window.dalFlushPaIfPrepOpen_ = function() {
+  if (!window.dalPrepUiOpen) return;
+  if (window.dalPaApplyingRemote) return;
+  if (window.isBackgroundSyncing) return;
+  if (window.dalPaFlushInFlight) {
+    window.dalPaFlushAgain = true;
+    return;
+  }
+  if (window.projectAssetsReadOnly) return;
+  if (window.currentOperationType) return;
+  if (typeof calculatePaDeltas !== 'function') return;
+  if (calculatePaDeltas().length === 0) return;
+
+  clearTimeout(window.dalPaFlushTimer);
+  window.dalPaFlushTimer = setTimeout(function() {
+    if (!window.dalPrepUiOpen) return;
+    if (typeof calculatePaDeltas !== 'function' || calculatePaDeltas().length === 0) return;
+    window.dalPaFlushInFlight = true;
+    window.dalPaFlushAgain = false;
+    if (typeof saveProjectAssets !== 'function') {
+      window.dalPaFlushInFlight = false;
+      return;
+    }
+    saveProjectAssets(function() {
+      window.dalPaFlushInFlight = false;
+      if (window.dalPaFlushAgain) {
+        window.dalPaFlushAgain = false;
+        window.dalFlushPaIfPrepOpen_();
+      }
+    }, true);
+  }, 450);
+};
+
+/** Wrap PA render so discrete edits that re-render also flush during prep. */
+window.dalInstallPaLiveFlushHook_ = function() {
+  if (window.__dalPaFlushHookInstalled) return;
+  if (typeof renderProjectAssetsUI !== 'function') return;
+  window.__dalPaFlushHookInstalled = true;
+  var orig = renderProjectAssetsUI;
+  window.renderProjectAssetsUI = function() {
+    orig.apply(this, arguments);
+    if (typeof dalFlushPaIfPrepOpen_ === 'function') dalFlushPaIfPrepOpen_();
+  };
+};
+
+window.dalPaApplyingRemote = false;
 </script>

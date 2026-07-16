@@ -16,6 +16,7 @@ function addPhaseFromClick(e) {
    activePhases.push({ id: 'p_'+Date.now(), type: 'Build-Up', start: startHr, duration: 4 });
    renderPhases();
    window.isTimelineDirty = true;
+   if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 function renderPhases() {
@@ -193,6 +194,7 @@ function endPhaseDrag() {
   document.removeEventListener('touchend', endPhaseDrag);
   renderPhases();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 // ==========================================
@@ -222,6 +224,7 @@ function setPhaseType(typeName) {
   document.getElementById('phase-picker').style.display = 'none';
   renderPhases();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 // ==========================================
@@ -361,5 +364,6 @@ function endSubEventDrag() {
   document.removeEventListener('mouseup', endSubEventDrag);
   renderSubEvents();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 </script>

@@ -300,12 +300,14 @@ window.autoSaveAndExecute = function(callback, optimistic = true, failureCallbac
     }
 };
 
-function saveProjectAssets(doneCb) {
+function saveProjectAssets(doneCb, quiet) {
     if (window.projectAssetsReadOnly) {
-        if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
-            window.showMobilePaToast('Read-only', 'Cannot save equipment in this view.');
-        } else {
-            return alert('🛑 Read-only view — you cannot edit project assets.');
+        if (!quiet) {
+          if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
+              window.showMobilePaToast('Read-only', 'Cannot save equipment in this view.');
+          } else {
+              return alert('🛑 Read-only view — you cannot edit project assets.');
+          }
         }
         if (doneCb) doneCb(false);
         return;
@@ -315,10 +317,12 @@ function saveProjectAssets(doneCb) {
         return;
     }
     if (window.currentOperationType) {
-        if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
-            window.showMobilePaToast('Operation active', 'Pause check-out before saving.');
-        } else {
-            alert("⚠️ Please PAUSE the active operation before saving the equipment list.");
+        if (!quiet) {
+          if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
+              window.showMobilePaToast('Operation active', 'Pause check-out before saving.');
+          } else {
+              alert("⚠️ Please PAUSE the active operation before saving the equipment list.");
+          }
         }
         if (doneCb) doneCb(false);
         return;
@@ -333,47 +337,56 @@ function saveProjectAssets(doneCb) {
     let origMobileText = btnMobile ? btnMobile.innerText : "SAVE";
 
     if (deltas.length === 0) {
-        if (btn) {
-            btn.innerText = "NO CHANGES";
-            setTimeout(() => { btn.innerText = origText; }, 1500);
-        }
-        if (btnMobile) {
-            btnMobile.innerText = "NO CHANGES";
-            setTimeout(() => { btnMobile.innerText = origMobileText; }, 1500);
+        if (!quiet) {
+          if (btn) {
+              btn.innerText = "NO CHANGES";
+              setTimeout(() => { btn.innerText = origText; }, 1500);
+          }
+          if (btnMobile) {
+              btnMobile.innerText = "NO CHANGES";
+              setTimeout(() => { btnMobile.innerText = origMobileText; }, 1500);
+          }
         }
         if (doneCb) doneCb(false);
         return;
     }
 
-    if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
-    if (btnMobile) { btnMobile.innerText = "SAVING..."; btnMobile.disabled = true; }
+    if (!quiet) {
+      if (btn) { btn.innerText = "SAVING..."; btn.disabled = true; }
+      if (btnMobile) { btnMobile.innerText = "SAVING..."; btnMobile.disabled = true; }
+    }
     
     let safetyTimer = setTimeout(() => {
-        if (btn) { btn.innerText = origText; btn.disabled = false; }
-        alert("Network Timeout: Asset save took too long.");
+        if (!quiet && btn) { btn.innerText = origText; btn.disabled = false; }
+        if (!quiet) alert("Network Timeout: Asset save took too long.");
+        if (doneCb) doneCb(false);
     }, 30000);
     
     google.script.run
     .withFailureHandler(err => {
         clearTimeout(safetyTimer);
-        if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
-            window.showMobilePaToast('Save failed', err.message);
-        } else {
-            alert("Equipment Save Failed: " + err.message);
+        if (!quiet) {
+          if (typeof window.showMobilePaToast === 'function' && window.mobilePaCompactActive) {
+              window.showMobilePaToast('Save failed', err.message);
+          } else {
+              alert("Equipment Save Failed: " + err.message);
+          }
+          if (btn) { btn.innerText = origText; btn.disabled = false; }
+          if (btnMobile) { btnMobile.innerText = origMobileText; btnMobile.disabled = false; }
         }
-        if (btn) { btn.innerText = origText; btn.disabled = false; }
-        if (btnMobile) { btnMobile.innerText = origMobileText; btnMobile.disabled = false; }
         if (doneCb) doneCb(false);
     })
     .withSuccessHandler(res => {
         clearTimeout(safetyTimer);
-        if (btn) { 
-            btn.innerText = "SAVED ✓"; 
-            setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
-        }
-        if (btnMobile) {
-            btnMobile.innerText = "SAVED ✓";
-            setTimeout(() => { btnMobile.innerText = origMobileText; btnMobile.disabled = false; }, 2000);
+        if (!quiet) {
+          if (btn) { 
+              btn.innerText = "SAVED ✓"; 
+              setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
+          }
+          if (btnMobile) {
+              btnMobile.innerText = "SAVED ✓";
+              setTimeout(() => { btnMobile.innerText = origMobileText; btnMobile.disabled = false; }, 2000);
+          }
         }
         window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
         if (typeof dalMarkPaLocalSave_ === 'function') dalMarkPaLocalSave_();

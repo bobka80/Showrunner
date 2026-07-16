@@ -31,6 +31,7 @@ function addShift(uid, e) {
   }
   drawShifts();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 function removeShift(id, e) {
@@ -44,6 +45,7 @@ function removeShift(id, e) {
   }
   drawShifts();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 function drawShifts() {
@@ -324,6 +326,7 @@ function endDrag() {
   document.removeEventListener('touchend', endDrag);
   drawShifts();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 
 // ==========================================
@@ -372,5 +375,6 @@ function setRole(roleName, bgHex, textHex) {
   document.getElementById('role-picker').style.display = 'none';
   drawShifts();
   window.isTimelineDirty = true;
+  if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
 }
 </script>

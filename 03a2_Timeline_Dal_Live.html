@@ -31,17 +31,52 @@ window.dalMarkTimelineLocalSave_ = function() {
   window.dalTlIgnoreListenerUntil = Date.now() + 2000;
 };
 
+/**
+ * True live collab: while timeline fork is open, flush full state to Firebase after edits.
+ * Debounced; uses stay-in-room save path. SAVE SHIFTS remains for manual flush / non-collab.
+ */
+window.dalFlushTimelineIfCollabOpen_ = function() {
+  if (!window.dalTimelineSessionOpen) return;
+  if (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly) return;
+  if (!window.isTimelineDirty) return;
+  if (window.dalTlFlushInFlight) {
+    window.dalTlFlushAgain = true;
+    return;
+  }
+  clearTimeout(window.dalTlFlushTimer);
+  window.dalTlFlushTimer = setTimeout(function() {
+    if (!window.dalTimelineSessionOpen || !window.isTimelineDirty) return;
+    if (typeof saveAndCloseShifts !== 'function') return;
+    window.dalTlFlushInFlight = true;
+    window.dalTlFlushAgain = false;
+    window.__dalTlQuietFlush = true;
+    try {
+      saveAndCloseShifts();
+    } finally {
+      // save is async — clear in-flight when ignore window starts / on next tick after call
+      setTimeout(function() {
+        window.dalTlFlushInFlight = false;
+        window.__dalTlQuietFlush = false;
+        if (window.dalTlFlushAgain) {
+          window.dalTlFlushAgain = false;
+          window.dalFlushTimelineIfCollabOpen_();
+        }
+      }, 800);
+    }
+  }, 400);
+};
+
 window.dalUpdateTimelineLiveBanner_ = function() {
   var banner = document.getElementById('dal-timeline-session-banner');
   if (!banner || !window.dalTimelineSessionOpen) return;
   if (window.dalTlRemotePending) {
-    banner.textContent = '👥 TIMELINE COLLAB — remote updates waiting (save or discard local edits to sync)';
+    banner.textContent = '👥 TIMELINE COLLAB — syncing…';
   } else if (window.dalTlLiveSyncMode === 'firestore') {
     banner.textContent = '👥 TIMELINE COLLAB — live sync active';
   } else if (window.dalTlLiveSyncMode === 'gas') {
     banner.textContent = '👥 TIMELINE COLLAB — live sync (server)';
   } else {
-    banner.textContent = '👥 TIMELINE COLLAB — saves go to Firebase until End Collab';
+    banner.textContent = '👥 TIMELINE COLLAB — live edits sync to Firebase';
   }
 };
 
@@ -69,7 +104,7 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
 
   if (window.isTimelineDirty) {
     window.dalTlRemotePending = true;
-    window.dalTlLastStateSig = sig;
+    // Do not advance lastSig — after local flush, next snapshot must still apply.
     window.dalUpdateTimelineLiveBanner_();
     return;
   }
