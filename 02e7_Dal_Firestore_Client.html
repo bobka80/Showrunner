@@ -84,7 +84,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
   if (window.dalPaRemotePending) {
     banner.textContent = '🔒 IN PREPARATION — remote updates available (save or reload to sync)';
   } else if (window.dalPaLiveSyncMode === 'firestore') {
-    banner.textContent = '🔒 IN PREPARATION — live sync active';
+    banner.textContent = '🔒 IN PREPARATION — live sync (direct)';
   } else if (window.dalPaLiveSyncMode === 'gas') {
     banner.textContent = '🔒 IN PREPARATION — live sync (server)';
   } else {
@@ -384,13 +384,136 @@ window.startDalPaSessionWatcher = function(projectId) {
 };
 
 window.dalMarkPaLocalSave_ = function() {
-  window.dalPaIgnoreListenerUntil = Date.now() + 1500;
+  window.dalPaIgnoreListenerUntil = Date.now() + 800;
+};
+
+window.dalNewUid_ = function() {
+  try {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+  } catch (e1) { /* ignore */ }
+  return 'pa_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+};
+
+window.dalPaEncodeFormulaForFs_ = function(pa) {
+  var pForm = pa.formula || 'Standalone';
+  if (pa.isShortage) pForm = '[SHORT] ' + pForm;
+  if (pa.isGenericAuto && pa.formula !== 'Standalone') pForm = '[GEN_AUTO] ' + pForm;
+  else if (pa.isGenericAuto) pForm = 'Gen-Auto-Container';
+  else if (pa.isAuto && pa.formula !== 'Standalone') pForm = '[AUTO] ' + pForm;
+  else if (pa.isAuto) pForm = 'Auto-Container';
+  return pForm;
+};
+
+/** Client asset → Firestore fork document (sheet-column field names). */
+window.dalPaAssetToFsDoc_ = function(pa, projectId) {
+  if (!pa.uid) pa.uid = window.dalNewUid_();
+  var doc = {
+    uid: String(pa.uid),
+    project_uid: String(projectId || ''),
+    asset_uid: String(pa.assetId || ''),
+    assigned_quantity: pa.qty != null ? pa.qty : 1,
+    location: pa.location || 'General',
+    formula: window.dalPaEncodeFormulaForFs_(pa),
+    creator: pa.creator || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'),
+    container_uid: pa.containerUid || '',
+    scan_status: pa.scanStatus || 'Assigned'
+  };
+  if (pa.outboundTruckUid) doc.outbound_truck_uid = pa.outboundTruckUid;
+  if (pa.outboundX != null) doc.outbound_x = pa.outboundX;
+  if (pa.outboundY != null) doc.outbound_y = pa.outboundY;
+  if (pa.outboundZ != null) doc.outbound_z = pa.outboundZ;
+  if (pa.outboundRotated) doc.outbound_rotated = true;
+  if (pa.outboundStaged) doc.outbound_staged = true;
+  if (pa.inboundTruckUid) doc.inbound_truck_uid = pa.inboundTruckUid;
+  if (pa.inboundX != null) doc.inbound_x = pa.inboundX;
+  if (pa.inboundY != null) doc.inbound_y = pa.inboundY;
+  if (pa.inboundZ != null) doc.inbound_z = pa.inboundZ;
+  if (pa.inboundRotated) doc.inbound_rotated = true;
+  if (pa.inboundStaged) doc.inbound_staged = true;
+  return doc;
 };
 
 /**
- * True live collab: while prep fork is open, flush PA deltas to Firebase after local edits.
- * Debounced; no-ops when no deltas. SAVE button remains for non-prep and manual flush.
- * Flush is also called from the end of renderProjectAssetsUI (reliable — do not rely on wrap).
+ * Direct browser → Firestore PA fork write (no GAS round-trip).
+ * Falls back to caller if auth/client unavailable.
+ */
+window.dalWritePaForkToFirestore_ = function(projectId, done) {
+  done = done || function() {};
+  if (!projectId || !window.dalPrepUiOpen) {
+    done(new Error('prep_not_open'));
+    return;
+  }
+  window.dalEnsureFirestoreClientAuth_(function(err, client) {
+    if (err || !client || !client.db) {
+      done(err || new Error('firestore_client_unavailable'));
+      return;
+    }
+    try {
+      var col = client.db.collection('projects').doc(String(projectId)).collection('assets');
+      var current = Array.isArray(currentProjectAssets) ? currentProjectAssets : [];
+      var currentByUid = {};
+      var i;
+      for (i = 0; i < current.length; i++) {
+        var pa = current[i];
+        if (!pa) continue;
+        if (!pa.uid) pa.uid = window.dalNewUid_();
+        currentByUid[String(pa.uid)] = pa;
+      }
+      var prev = Array.isArray(window.originalProjectAssets) ? window.originalProjectAssets : [];
+      var toDelete = [];
+      for (i = 0; i < prev.length; i++) {
+        var oldUid = prev[i] && prev[i].uid ? String(prev[i].uid) : '';
+        if (oldUid && !currentByUid[oldUid]) toDelete.push(oldUid);
+      }
+
+      var writes = Object.keys(currentByUid).map(function(uid) {
+        return { uid: uid, doc: window.dalPaAssetToFsDoc_(currentByUid[uid], projectId) };
+      });
+
+      // Firestore batches max 500 ops
+      var ops = [];
+      writes.forEach(function(w) {
+        ops.push({ type: 'set', ref: col.doc(w.uid), data: w.doc });
+      });
+      toDelete.forEach(function(uid) {
+        if (uid === '_meta') return;
+        ops.push({ type: 'delete', ref: col.doc(uid) });
+      });
+
+      function commitChunk(start) {
+        if (start >= ops.length) {
+          done(null);
+          return;
+        }
+        var batch = client.db.batch();
+        var end = Math.min(start + 450, ops.length);
+        var j;
+        for (j = start; j < end; j++) {
+          if (ops[j].type === 'delete') batch.delete(ops[j].ref);
+          else batch.set(ops[j].ref, ops[j].data, { merge: true });
+        }
+        batch.commit().then(function() {
+          commitChunk(end);
+        }).catch(function(eWrite) {
+          done(eWrite);
+        });
+      }
+
+      if (ops.length === 0) {
+        done(null);
+        return;
+      }
+      window.dalMarkPaLocalSave_();
+      commitChunk(0);
+    } catch (e2) {
+      done(e2);
+    }
+  });
+};
+
+/**
+ * True live collab: while prep fork is open, flush PA to Firebase after local edits.
+ * Prefers direct client Firestore write; falls back to GAS if client auth unavailable.
  */
 window.dalFlushPaIfPrepOpen_ = function() {
   if (!window.dalPrepUiOpen) return;
@@ -412,30 +535,55 @@ window.dalFlushPaIfPrepOpen_ = function() {
     if (typeof calculatePaDeltas !== 'function' || calculatePaDeltas().length === 0) return;
     window.dalPaFlushInFlight = true;
     window.dalPaFlushAgain = false;
-    if (typeof saveProjectAssets !== 'function') {
+
+    var projectId = document.getElementById('edit-folder-id')
+      ? document.getElementById('edit-folder-id').value
+      : '';
+    var finish = function(ok) {
       window.dalPaFlushInFlight = false;
-      return;
-    }
-    saveProjectAssets(function(ok) {
-      window.dalPaFlushInFlight = false;
-      if (!ok) {
-        try { console.warn('DAL PA live flush failed or had no changes'); } catch (e1) { /* ignore */ }
+      if (ok) {
+        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+        window.dalPaRemotePending = false;
+        if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
+        if (typeof updateMobilePaUnsavedUI === 'function') updateMobilePaUnsavedUI();
+      } else {
+        try { console.warn('DAL PA live flush failed — will retry or use SAVE'); } catch (e1) { /* ignore */ }
         var banner = document.getElementById('dal-session-banner');
-        if (banner && window.dalPrepUiOpen) {
-          banner.textContent = '🔒 IN PREPARATION — live sync retry…';
-        }
-      } else if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
-        window.dalUpdateRemotePendingBanner_();
+        if (banner && window.dalPrepUiOpen) banner.textContent = '🔒 IN PREPARATION — live sync retry…';
       }
       if (window.dalPaFlushAgain) {
         window.dalPaFlushAgain = false;
         window.dalFlushPaIfPrepOpen_();
       }
-    }, true);
-  }, 200);
+    };
+
+    // Fast path: direct client → Firestore
+    if (projectId && window.dalPaLiveSyncMode === 'firestore') {
+      window.dalWritePaForkToFirestore_(projectId, function(writeErr) {
+        if (!writeErr) {
+          finish(true);
+          return;
+        }
+        try { console.warn('Direct PA Firestore write failed, falling back to GAS:', writeErr); } catch (e2) { /* ignore */ }
+        // Fall through to GAS
+        if (typeof saveProjectAssets !== 'function') {
+          finish(false);
+          return;
+        }
+        saveProjectAssets(function(ok) { finish(!!ok); }, true);
+      });
+      return;
+    }
+
+    if (typeof saveProjectAssets !== 'function') {
+      finish(false);
+      return;
+    }
+    saveProjectAssets(function(ok) { finish(!!ok); }, true);
+  }, 150);
 };
 
-/** Kept for prep-open call sites; real flush is wired inside renderProjectAssetsUI. */
+/** Kept for prep-open call sites; flush is wired inside renderProjectAssetsUI. */
 window.dalInstallPaLiveFlushHook_ = function() {
   window.__dalPaFlushHookInstalled = true;
 };

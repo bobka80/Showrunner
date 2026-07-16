@@ -28,12 +28,75 @@ window.dalTimelineStateSig_ = function(shifts, phases, overrides) {
 };
 
 window.dalMarkTimelineLocalSave_ = function() {
-  window.dalTlIgnoreListenerUntil = Date.now() + 2000;
+  window.dalTlIgnoreListenerUntil = Date.now() + 800;
+};
+
+/**
+ * Direct browser → Firestore timeline fork write (no GAS round-trip).
+ */
+window.dalWriteTimelineForkToFirestore_ = function(done) {
+  done = done || function() {};
+  if (!window.dalTimelineSessionOpen) {
+    done(new Error('timeline_collab_not_open'));
+    return;
+  }
+  if (typeof window.dalEnsureFirestoreClientAuth_ !== 'function') {
+    done(new Error('firestore_auth_helper_missing'));
+    return;
+  }
+  var projectId = document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value
+    : '';
+  if (!projectId) {
+    done(new Error('missing_project'));
+    return;
+  }
+
+  window.dalEnsureFirestoreClientAuth_(function(err, client) {
+    if (err || !client || !client.db) {
+      done(err || new Error('firestore_client_unavailable'));
+      return;
+    }
+    try {
+      var crewUids = Array.from(document.querySelectorAll('.internal-cb:checked')).map(function(cb) {
+        return cb.value;
+      });
+      var localShifts = (typeof shifts !== 'undefined' ? shifts : []).filter(function(s) {
+        var u = s.user_uid || s.email;
+        return crewUids.indexOf(u) !== -1 || (typeof isTruck === 'function' && isTruck(u));
+      });
+      var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
+      var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+      var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
+      var payload = {
+        mode: mode,
+        shiftsJson: JSON.stringify(localShifts || []),
+        phasesJson: JSON.stringify(typeof activePhases !== 'undefined' ? activePhases : []),
+        overridesJson: JSON.stringify(typeof localDeptOverrides !== 'undefined' ? localDeptOverrides : {}),
+        updatedAt: new Date().toISOString(),
+        updatedBy: actor
+      };
+      window.dalMarkTimelineLocalSave_();
+      ref.set(payload).then(function() {
+        window.dalTlLastStateSig = window.dalTimelineStateSig_
+          ? window.dalTimelineStateSig_(localShifts, activePhases, localDeptOverrides)
+          : '';
+        window.isTimelineDirty = false;
+        window.dalTlRemotePending = false;
+        if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
+        done(null);
+      }).catch(function(eWrite) {
+        done(eWrite);
+      });
+    } catch (e2) {
+      done(e2);
+    }
+  });
 };
 
 /**
  * True live collab: while timeline fork is open, flush full state to Firebase after edits.
- * Debounced; uses stay-in-room save path. SAVE SHIFTS remains for manual flush / non-collab.
+ * Prefers direct client Firestore write; falls back to GAS quiet save.
  */
 window.dalFlushTimelineIfCollabOpen_ = function() {
   if (!window.dalTimelineSessionOpen) return;
@@ -46,24 +109,52 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
   clearTimeout(window.dalTlFlushTimer);
   window.dalTlFlushTimer = setTimeout(function() {
     if (!window.dalTimelineSessionOpen || !window.isTimelineDirty) return;
-    if (typeof saveAndCloseShifts !== 'function') return;
     window.dalTlFlushInFlight = true;
     window.dalTlFlushAgain = false;
-    window.__dalTlQuietFlush = true;
-    try {
-      saveAndCloseShifts();
-    } finally {
-      // save is async — clear in-flight when ignore window starts / on next tick after call
-      setTimeout(function() {
-        window.dalTlFlushInFlight = false;
-        window.__dalTlQuietFlush = false;
-        if (window.dalTlFlushAgain) {
-          window.dalTlFlushAgain = false;
-          window.dalFlushTimelineIfCollabOpen_();
+
+    var finish = function() {
+      window.dalTlFlushInFlight = false;
+      if (window.dalTlFlushAgain) {
+        window.dalTlFlushAgain = false;
+        window.dalFlushTimelineIfCollabOpen_();
+      }
+    };
+
+    // Fast path: direct client → Firestore
+    if (window.dalTlLiveSyncMode === 'firestore') {
+      window.dalWriteTimelineForkToFirestore_(function(writeErr) {
+        if (!writeErr) {
+          finish();
+          return;
         }
-      }, 800);
+        try { console.warn('Direct timeline Firestore write failed, falling back to GAS:', writeErr); } catch (e1) { /* ignore */ }
+        if (typeof saveAndCloseShifts !== 'function') {
+          finish();
+          return;
+        }
+        window.__dalTlQuietFlush = true;
+        try { saveAndCloseShifts(); } finally {
+          setTimeout(function() {
+            window.__dalTlQuietFlush = false;
+            finish();
+          }, 600);
+        }
+      });
+      return;
     }
-  }, 400);
+
+    if (typeof saveAndCloseShifts !== 'function') {
+      finish();
+      return;
+    }
+    window.__dalTlQuietFlush = true;
+    try { saveAndCloseShifts(); } finally {
+      setTimeout(function() {
+        window.__dalTlQuietFlush = false;
+        finish();
+      }, 600);
+    }
+  }, 150);
 };
 
 window.dalUpdateTimelineLiveBanner_ = function() {
@@ -72,7 +163,7 @@ window.dalUpdateTimelineLiveBanner_ = function() {
   if (window.dalTlRemotePending) {
     banner.textContent = '👥 TIMELINE COLLAB — syncing…';
   } else if (window.dalTlLiveSyncMode === 'firestore') {
-    banner.textContent = '👥 TIMELINE COLLAB — live sync active';
+    banner.textContent = '👥 TIMELINE COLLAB — live sync (direct)';
   } else if (window.dalTlLiveSyncMode === 'gas') {
     banner.textContent = '👥 TIMELINE COLLAB — live sync (server)';
   } else {

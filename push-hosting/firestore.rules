@@ -1,15 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Phase 4 — signed-in Showrunner client may read prep PA + timeline forks.
-    // GAS service account writes bypass these rules. Client writes stay denied.
+    // Signed-in Showrunner clients may read/write live fork data during prep / timeline collab.
+    // Session registry meta (_meta) stays GAS-only so open/close cannot be spoofed from the browser.
+    // GAS service account writes bypass these rules.
+    function isShowrunnerClient() {
+      return request.auth != null && request.auth.token.showrunner == true;
+    }
+
     match /projects/{projectId}/assets/{docId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow write: if isShowrunnerClient() && docId != '_meta';
     }
     match /projects/{projectId}/timeline/{docId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow write: if isShowrunnerClient() && docId != '_meta';
     }
   }
 }

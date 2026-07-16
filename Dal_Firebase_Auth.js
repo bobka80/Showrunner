@@ -1,8 +1,9 @@
 /**
- * Dal_Firebase_Auth.js — Firebase Auth custom tokens for client Firestore SDK (Phase 4 Slice C)
+ * Dal_Firebase_Auth.js — Firebase Auth custom tokens for client Firestore SDK
  *
  * Mint short-lived custom tokens via service account (same credential as FCM / Firestore REST).
- * Client signs in before Firestore listeners; writes still go through GAS in Slice C.
+ * Client signs in for live fork listeners + direct writes during prep / timeline collab.
+ * Session open/close and Sheets commit still go through GAS.
  */
 
 // @INDEX: DAL -> Firebase client auth
