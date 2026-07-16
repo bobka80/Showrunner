@@ -152,48 +152,180 @@ window.dalEnsureFirebaseSdk_ = function(done) {
   loadNext();
 };
 
+/** True when running inside hosting shell (web.app) — preferred for live Firestore. */
+window.dalHostFsAvailable_ = function() {
+  try { return !!(window.parent && window.parent !== window); } catch (e) { return false; }
+};
+
+window.dalFsReqSeq_ = 1;
+window.dalFsPending_ = {};
+window.dalFsListenHandlers_ = {};
+window.dalFsHostAuthReady_ = false;
+window.dalFsMsgBound_ = false;
+
+window.dalFsBindHostMessages_ = function() {
+  if (window.dalFsMsgBound_) return;
+  window.dalFsMsgBound_ = true;
+  window.addEventListener('message', function(ev) {
+    var d = ev.data;
+    if (!d || !d.type) return;
+    if (d.type === 'SHOWRUNNER_DAL_FS_AUTH_RESULT') {
+      var pend = window.dalFsPending_[d.requestId];
+      if (!pend) return;
+      delete window.dalFsPending_[d.requestId];
+      if (d.ok) {
+        window.dalFsHostAuthReady_ = true;
+        window.dalFirestoreClient = { viaHost: true, ready: true };
+        pend.cb(null, window.dalFirestoreClient);
+      } else {
+        window.dalFsHostAuthReady_ = false;
+        pend.cb(new Error(d.error || 'Host Firebase auth failed'));
+      }
+      return;
+    }
+    if (d.type === 'SHOWRUNNER_DAL_FS_SNAP') {
+      var h = window.dalFsListenHandlers_[d.requestId];
+      if (h && h.onSnap) h.onSnap(d);
+      return;
+    }
+    if (d.type === 'SHOWRUNNER_DAL_FS_SNAP_ERROR') {
+      var he = window.dalFsListenHandlers_[d.requestId];
+      if (he && he.onErr) he.onErr(new Error(d.error || 'Host listen failed'));
+      return;
+    }
+    if (d.type === 'SHOWRUNNER_DAL_FS_WRITE_RESULT') {
+      var pw = window.dalFsPending_[d.requestId];
+      if (!pw) return;
+      delete window.dalFsPending_[d.requestId];
+      if (d.ok) pw.cb(null, d.result);
+      else pw.cb(new Error(d.error || 'Host write failed'));
+    }
+  });
+};
+
+window.dalFsPostToHost_ = function(msg) {
+  try { window.parent.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+};
+
+/**
+ * Prefer host-shell Firebase Auth (first-party web.app). Falls back to in-iframe Auth.
+ */
 window.dalEnsureFirestoreClientAuth_ = function(cb) {
   if (window.dalFirestoreClient && window.dalFirestoreClient.ready) {
     cb(null, window.dalFirestoreClient);
     return;
   }
+  window.dalFsBindHostMessages_();
   var actor = typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : '');
-  google.script.run
-    .withFailureHandler(function(err) { cb(err); })
-    .withSuccessHandler(function(res) {
-      window.dalEnsureFirebaseSdk_(function(sdkErr) {
-        if (sdkErr) { cb(sdkErr); return; }
-        try {
-          if (!window.dalFirestoreClient || window.dalFirestoreClient.appName !== res.config.projectId) {
-            if (window.dalFirestoreClient && window.dalFirestoreClient.app) {
-              try { window.dalFirestoreClient.app.delete(); } catch (e) { /* ignore */ }
+
+  var finishWithIframeAuth_ = function() {
+    google.script.run
+      .withFailureHandler(function(err) { cb(err); })
+      .withSuccessHandler(function(res) {
+        window.dalEnsureFirebaseSdk_(function(sdkErr) {
+          if (sdkErr) { cb(sdkErr); return; }
+          try {
+            if (!window.dalFirestoreClient || window.dalFirestoreClient.appName !== res.config.projectId) {
+              if (window.dalFirestoreClient && window.dalFirestoreClient.app) {
+                try { window.dalFirestoreClient.app.delete(); } catch (e) { /* ignore */ }
+              }
+              var app = firebase.apps.length ? firebase.app() : firebase.initializeApp({
+                apiKey: res.config.apiKey,
+                authDomain: res.config.authDomain,
+                projectId: res.config.projectId,
+                storageBucket: res.config.storageBucket,
+                messagingSenderId: res.config.messagingSenderId,
+                appId: res.config.appId
+              });
+              window.dalFirestoreClient = {
+                app: app,
+                appName: res.config.projectId,
+                auth: firebase.auth(app),
+                db: firebase.firestore(app),
+                ready: false,
+                viaHost: false
+              };
             }
-            var app = firebase.apps.length ? firebase.app() : firebase.initializeApp({
-              apiKey: res.config.apiKey,
-              authDomain: res.config.authDomain,
-              projectId: res.config.projectId,
-              storageBucket: res.config.storageBucket,
-              messagingSenderId: res.config.messagingSenderId,
-              appId: res.config.appId
-            });
-            window.dalFirestoreClient = {
-              app: app,
-              appName: res.config.projectId,
-              auth: firebase.auth(app),
-              db: firebase.firestore(app),
-              ready: false
-            };
+            window.dalFirestoreClient.auth.signInWithCustomToken(res.customToken)
+              .then(function() {
+                window.dalFirestoreClient.ready = true;
+                cb(null, window.dalFirestoreClient);
+              })
+              .catch(function(e) { cb(e); });
+          } catch (e) { cb(e); }
+        });
+      })
+      .getDalFirebaseClientAuth(actor);
+  };
+
+  if (!window.dalHostFsAvailable_()) {
+    finishWithIframeAuth_();
+    return;
+  }
+
+  google.script.run
+    .withFailureHandler(function(err) {
+      // Token mint failed — try iframe path anyway.
+      try { console.warn('Host DAL auth token mint failed, trying iframe:', err); } catch (e0) { /* ignore */ }
+      finishWithIframeAuth_();
+    })
+    .withSuccessHandler(function(res) {
+      var requestId = 'A' + (window.dalFsReqSeq_++);
+      var settled = false;
+      var timer = setTimeout(function() {
+        if (settled) return;
+        settled = true;
+        delete window.dalFsPending_[requestId];
+        try { console.warn('Host DAL auth timed out — trying iframe Auth'); } catch (e1) { /* ignore */ }
+        finishWithIframeAuth_();
+      }, 8000);
+      window.dalFsPending_[requestId] = {
+        cb: function(err, client) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (err) {
+            try { console.warn('Host DAL auth failed, trying iframe:', err && err.message ? err.message : err); } catch (e2) { /* ignore */ }
+            finishWithIframeAuth_();
+            return;
           }
-          window.dalFirestoreClient.auth.signInWithCustomToken(res.customToken)
-            .then(function() {
-              window.dalFirestoreClient.ready = true;
-              cb(null, window.dalFirestoreClient);
-            })
-            .catch(function(e) { cb(e); });
-        } catch (e) { cb(e); }
+          cb(null, client);
+        }
+      };
+      window.dalFsPostToHost_({
+        type: 'SHOWRUNNER_DAL_FS_AUTH',
+        requestId: requestId,
+        config: res.config,
+        customToken: res.customToken
       });
     })
     .getDalFirebaseClientAuth(actor);
+};
+
+window.dalHostFsListenDoc_ = function(path, onSnap, onErr) {
+  window.dalFsBindHostMessages_();
+  var requestId = 'L' + (window.dalFsReqSeq_++);
+  window.dalFsListenHandlers_[requestId] = { onSnap: onSnap, onErr: onErr };
+  window.dalFsPostToHost_({ type: 'SHOWRUNNER_DAL_FS_LISTEN', requestId: requestId, path: path });
+  return function() {
+    delete window.dalFsListenHandlers_[requestId];
+    window.dalFsPostToHost_({ type: 'SHOWRUNNER_DAL_FS_UNLISTEN', requestId: requestId });
+  };
+};
+
+window.dalHostFsPatchWrite_ = function(path, localState, mutations, meta, done) {
+  done = done || function() {};
+  window.dalFsBindHostMessages_();
+  var requestId = 'W' + (window.dalFsReqSeq_++);
+  window.dalFsPending_[requestId] = { cb: done };
+  window.dalFsPostToHost_({
+    type: 'SHOWRUNNER_DAL_FS_PATCH_WRITE',
+    requestId: requestId,
+    path: path,
+    localState: localState,
+    mutations: mutations,
+    meta: meta || {}
+  });
 };
 
 window.stopDalPaFirestoreListener = function() {

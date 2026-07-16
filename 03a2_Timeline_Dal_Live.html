@@ -384,8 +384,51 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
   var clientId = window.dalTlClientId;
 
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
-    if (err || !client || !client.db) {
+    if (err || !client) {
       done(err || new Error('firestore_client_unavailable'));
+      return;
+    }
+    var path = 'projects/' + String(projectId) + '/timeline/state';
+
+    // Host-shell path (preferred on web.app) — Auth + transaction run in parent.
+    if (client.viaHost && typeof window.dalHostFsPatchWrite_ === 'function') {
+      window.dalHostFsPatchWrite_(path, localState, mutations, {
+        mode: mode,
+        actor: actor,
+        clientId: clientId
+      }, function(writeErr, result) {
+        if (writeErr) {
+          done(writeErr);
+          return;
+        }
+        var merged = (result && result.merged) || localState;
+        var updatedAt = (result && result.updatedAt) || new Date().toISOString();
+        var outSig = window.dalTimelineStateSig_(merged.shifts, merged.phases, merged.overrides);
+        window.dalTlLastStateSig = outSig;
+        window.dalTlLastRemoteUpdatedAt = updatedAt;
+        window.dalTlSetSyncBase_(merged);
+        window.dalMarkTimelineLocalSave_();
+        Object.keys(mutations.touchedShifts).forEach(function(id) { delete window.dalTlTouchedShifts_[id]; });
+        Object.keys(mutations.deletedShifts).forEach(function(id) { delete window.dalTlDeletedShifts_[id]; });
+        Object.keys(mutations.touchedPhases).forEach(function(id) { delete window.dalTlTouchedPhases_[id]; });
+        Object.keys(mutations.deletedPhases).forEach(function(id) { delete window.dalTlDeletedPhases_[id]; });
+        Object.keys(mutations.touchedOverrides).forEach(function(id) { delete window.dalTlTouchedOverrides_[id]; });
+        Object.keys(mutations.deletedOverrides).forEach(function(id) { delete window.dalTlDeletedOverrides_[id]; });
+        window.isTimelineDirty = window.dalTlHasPendingMutations_();
+        window.dalTlPendingRemote = null;
+        window.dalTlRemotePending = false;
+        var localSig = window.dalTimelineStateSig_(localState.shifts, localState.phases, localState.overrides);
+        if (localSig !== outSig) {
+          window.dalTlInstallMergedLocal_(merged, { forceRebuild: false });
+        }
+        if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
+        done(null, merged);
+      });
+      return;
+    }
+
+    if (!client.db) {
+      done(new Error('firestore_client_unavailable'));
       return;
     }
     var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
@@ -415,7 +458,6 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
       window.dalTlLastRemoteUpdatedAt = result.updatedAt;
       window.dalTlSetSyncBase_(merged);
       window.dalMarkTimelineLocalSave_();
-      // Clear only mutations that were part of this flush snapshot.
       Object.keys(mutations.touchedShifts).forEach(function(id) { delete window.dalTlTouchedShifts_[id]; });
       Object.keys(mutations.deletedShifts).forEach(function(id) { delete window.dalTlDeletedShifts_[id]; });
       Object.keys(mutations.touchedPhases).forEach(function(id) { delete window.dalTlTouchedPhases_[id]; });
@@ -542,7 +584,9 @@ window.dalUpdateTimelineLiveBanner_ = function() {
   if (window.dalTlRemotePending) {
     banner.textContent = '👥 TIMELINE COLLAB — syncing…';
   } else if (window.dalTlLiveSyncMode === 'firestore') {
-    banner.textContent = '👥 TIMELINE COLLAB — live sync (patch)';
+    banner.textContent = (window.dalFirestoreClient && window.dalFirestoreClient.viaHost)
+      ? '👥 TIMELINE COLLAB — live sync (patch)'
+      : '👥 TIMELINE COLLAB — live sync (patch)';
   } else if (window.dalTlLiveSyncMode === 'gas') {
     banner.textContent = '👥 TIMELINE COLLAB — live sync (server patch)';
   } else {
@@ -720,7 +764,7 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
     return;
   }
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
-    if (err) {
+    if (err || !client) {
       console.warn('Timeline Firestore auth failed — using server sync:', err && err.message ? err.message : err);
       window.startDalTimelineGasStateSync_(projectId);
       return;
@@ -731,18 +775,44 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
     window.dalTlLiveSyncMode = 'firestore';
     window.dalUpdateTimelineLiveBanner_();
 
+    var path = 'projects/' + String(projectId) + '/timeline/state';
+    var onSnapPayload = function(meta, d) {
+      if (!window.dalTimelineSessionOpen) return;
+      if (!d) return;
+      var parsed = window.dalTlParseStateDoc_(d);
+      window.dalApplyRemoteTimelineState_(parsed.shifts, parsed.phases, parsed.overrides, {
+        hasPendingWrites: !!(meta && meta.hasPendingWrites),
+        updatedAt: parsed.updatedAt || '',
+        updatedBy: parsed.updatedBy || '',
+        clientId: parsed.clientId || ''
+      });
+    };
+
+    if (client.viaHost && typeof window.dalHostFsListenDoc_ === 'function') {
+      window.dalTlStateUnsub = window.dalHostFsListenDoc_(path, function(msg) {
+        if (!msg || !msg.exists) return;
+        if (msg.fromCache && !msg.data) return;
+        onSnapPayload({ hasPendingWrites: !!msg.hasPendingWrites }, msg.data);
+      }, function(listenErr) {
+        console.warn('Timeline host Firestore listener error — falling back to server sync:', listenErr);
+        window.stopDalTimelineStateSync_();
+        window.startDalTimelineGasStateSync_(projectId);
+      });
+      return;
+    }
+
+    if (!client.db) {
+      window.startDalTimelineGasStateSync_(projectId);
+      return;
+    }
     var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
     window.dalTlStateUnsub = ref.onSnapshot(function(snap) {
       if (!window.dalTimelineSessionOpen) return;
       if (!snap.exists) return;
       if (snap.metadata && snap.metadata.fromCache && !snap.data()) return;
-      var parsed = window.dalTlParseStateDoc_(snap.data());
-      window.dalApplyRemoteTimelineState_(parsed.shifts, parsed.phases, parsed.overrides, {
-        hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites),
-        updatedAt: parsed.updatedAt || '',
-        updatedBy: parsed.updatedBy || '',
-        clientId: parsed.clientId || ''
-      });
+      onSnapPayload({
+        hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites)
+      }, snap.data());
     }, function(listenErr) {
       console.warn('Timeline Firestore listener error — falling back to server sync:', listenErr);
       window.stopDalTimelineStateSync_();

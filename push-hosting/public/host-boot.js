@@ -2540,8 +2540,264 @@
     });
   }
 
+  // ——— DAL live Firestore on host (first-party web.app) ———
+  // GAS iframe Auth often fails → "server patch". Auth + listen + write run here instead.
+  var dalFsListeners_ = {};
+  var dalFsAuthReady_ = false;
+
+  function dalFsPostToIframe_(msg) {
+    try {
+      if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
+    } catch (e) { /* ignore */ }
+  }
+
+  function dalFsDocRef_(path) {
+    var parts = String(path || '').split('/').filter(Boolean);
+    if (parts.length < 2 || parts.length % 2 !== 0) {
+      throw new Error('Invalid Firestore path: ' + path);
+    }
+    var ref = firebase.firestore();
+    for (var i = 0; i < parts.length; i += 2) {
+      ref = ref.collection(parts[i]).doc(parts[i + 1]);
+    }
+    return ref;
+  }
+
+  function dalFsRound_(n) {
+    var x = Number(n);
+    if (!isFinite(x)) return 0;
+    return Math.round(x * 100) / 100;
+  }
+
+  function dalFsEntityChanged_(a, b, fields) {
+    if (!a || !b) return true;
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i];
+      if (f === 'start' || f === 'duration') {
+        if (dalFsRound_(a[f]) !== dalFsRound_(b[f])) return true;
+      } else if (f === 'hasArrow') {
+        if (!!a[f] !== !!b[f]) return true;
+      } else if (String(a[f] || '') !== String(b[f] || '')) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function dalFsPatchList_(remoteList, localList, touchedMap, deletedMap, fields) {
+    var remoteMap = {};
+    var localMap = {};
+    (remoteList || []).forEach(function(e) { if (e && e.id) remoteMap[e.id] = e; });
+    (localList || []).forEach(function(e) { if (e && e.id) localMap[e.id] = e; });
+    var out = {};
+    Object.keys(remoteMap).forEach(function(id) { out[id] = remoteMap[id]; });
+    var touched = touchedMap || {};
+    var deleted = deletedMap || {};
+    var tKeys = Object.keys(touched);
+    var dKeys = Object.keys(deleted);
+    if (tKeys.length || dKeys.length) {
+      dKeys.forEach(function(id) { delete out[id]; });
+      tKeys.forEach(function(id) {
+        if (localMap[id]) out[id] = localMap[id];
+        else delete out[id];
+      });
+    } else {
+      Object.keys(localMap).forEach(function(id) {
+        if (!remoteMap[id] || dalFsEntityChanged_(localMap[id], remoteMap[id], fields)) {
+          out[id] = localMap[id];
+        }
+      });
+    }
+    return Object.keys(out).map(function(k) { return out[k]; });
+  }
+
+  function dalFsParseState_(d) {
+    d = d || {};
+    var shifts = [];
+    var phases = [];
+    var overrides = {};
+    try { shifts = JSON.parse(d.shiftsJson || '[]'); } catch (e1) { shifts = []; }
+    try { phases = JSON.parse(d.phasesJson || '[]'); } catch (e2) { phases = []; }
+    try { overrides = JSON.parse(d.overridesJson || '{}'); } catch (e3) { overrides = {}; }
+    return {
+      shifts: shifts,
+      phases: phases,
+      overrides: overrides,
+      updatedAt: d.updatedAt || '',
+      updatedBy: d.updatedBy || '',
+      clientId: d.clientId || '',
+      mode: d.mode || ''
+    };
+  }
+
+  function dalFsHandleAuth_(data) {
+    var requestId = data.requestId || '';
+    function reply(ok, errMsg) {
+      dalFsPostToIframe_({
+        type: 'SHOWRUNNER_DAL_FS_AUTH_RESULT',
+        requestId: requestId,
+        ok: !!ok,
+        error: errMsg || ''
+      });
+    }
+    try {
+      if (typeof firebase === 'undefined') {
+        reply(false, 'Firebase SDK missing on host');
+        return;
+      }
+      if (!firebase.apps.length) {
+        var cfg = data.config || firebaseConfig || {};
+        if (!cfg.apiKey) {
+          reply(false, 'Firebase config missing on host');
+          return;
+        }
+        firebase.initializeApp({
+          apiKey: cfg.apiKey,
+          authDomain: cfg.authDomain,
+          projectId: cfg.projectId,
+          storageBucket: cfg.storageBucket,
+          messagingSenderId: cfg.messagingSenderId,
+          appId: cfg.appId
+        });
+      }
+      if (!data.customToken) {
+        reply(false, 'Missing custom token');
+        return;
+      }
+      firebase.auth().signInWithCustomToken(data.customToken).then(function() {
+        dalFsAuthReady_ = true;
+        reply(true);
+      }).catch(function(err) {
+        dalFsAuthReady_ = false;
+        reply(false, err && err.message ? err.message : String(err));
+      });
+    } catch (e) {
+      dalFsAuthReady_ = false;
+      reply(false, e && e.message ? e.message : String(e));
+    }
+  }
+
+  function dalFsHandleListen_(data) {
+    var requestId = data.requestId || '';
+    var path = data.path || '';
+    try {
+      if (dalFsListeners_[requestId]) {
+        try { dalFsListeners_[requestId](); } catch (e0) { /* ignore */ }
+        delete dalFsListeners_[requestId];
+      }
+      var ref = dalFsDocRef_(path);
+      dalFsListeners_[requestId] = ref.onSnapshot(function(snap) {
+        dalFsPostToIframe_({
+          type: 'SHOWRUNNER_DAL_FS_SNAP',
+          requestId: requestId,
+          exists: snap.exists,
+          hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites),
+          fromCache: !!(snap.metadata && snap.metadata.fromCache),
+          data: snap.exists ? (snap.data() || {}) : null
+        });
+      }, function(err) {
+        dalFsPostToIframe_({
+          type: 'SHOWRUNNER_DAL_FS_SNAP_ERROR',
+          requestId: requestId,
+          error: err && err.message ? err.message : String(err)
+        });
+      });
+    } catch (e) {
+      dalFsPostToIframe_({
+        type: 'SHOWRUNNER_DAL_FS_SNAP_ERROR',
+        requestId: requestId,
+        error: e && e.message ? e.message : String(e)
+      });
+    }
+  }
+
+  function dalFsHandleUnlisten_(data) {
+    var requestId = data.requestId || '';
+    if (dalFsListeners_[requestId]) {
+      try { dalFsListeners_[requestId](); } catch (e) { /* ignore */ }
+      delete dalFsListeners_[requestId];
+    }
+  }
+
+  function dalFsHandlePatchWrite_(data) {
+    var requestId = data.requestId || '';
+    var path = data.path || '';
+    var localState = data.localState || { shifts: [], phases: [], overrides: {} };
+    var mutations = data.mutations || {};
+    var meta = data.meta || {};
+    function reply(ok, result, errMsg) {
+      dalFsPostToIframe_({
+        type: 'SHOWRUNNER_DAL_FS_WRITE_RESULT',
+        requestId: requestId,
+        ok: !!ok,
+        result: result || null,
+        error: errMsg || ''
+      });
+    }
+    try {
+      var ref = dalFsDocRef_(path);
+      firebase.firestore().runTransaction(function(tx) {
+        return tx.get(ref).then(function(doc) {
+          var remote = doc.exists ? dalFsParseState_(doc.data()) : { shifts: [], phases: [], overrides: {} };
+          var shiftFields = ['user_uid', 'email', 'role', 'start', 'duration', 'hasArrow', 'note'];
+          var phaseFields = ['type', 'start', 'duration', 'note'];
+          var mergedShifts = dalFsPatchList_(remote.shifts, localState.shifts, mutations.touchedShifts, mutations.deletedShifts, shiftFields);
+          var mergedPhases = dalFsPatchList_(remote.phases, localState.phases, mutations.touchedPhases, mutations.deletedPhases, phaseFields);
+          var mergedOverrides = Object.assign({}, remote.overrides || {});
+          var touchedOv = mutations.touchedOverrides || {};
+          var deletedOv = mutations.deletedOverrides || {};
+          Object.keys(deletedOv).forEach(function(k) { delete mergedOverrides[k]; });
+          Object.keys(touchedOv).forEach(function(k) {
+            if (localState.overrides && Object.prototype.hasOwnProperty.call(localState.overrides, k)) {
+              mergedOverrides[k] = localState.overrides[k];
+            } else {
+              delete mergedOverrides[k];
+            }
+          });
+          var updatedAt = new Date().toISOString();
+          var payload = {
+            mode: meta.mode || remote.mode || 'main',
+            shiftsJson: JSON.stringify(mergedShifts),
+            phasesJson: JSON.stringify(mergedPhases),
+            overridesJson: JSON.stringify(mergedOverrides),
+            updatedAt: updatedAt,
+            updatedBy: meta.actor || 'System',
+            clientId: meta.clientId || ''
+          };
+          tx.set(ref, payload);
+          return {
+            merged: { shifts: mergedShifts, phases: mergedPhases, overrides: mergedOverrides },
+            updatedAt: updatedAt
+          };
+        });
+      }).then(function(result) {
+        reply(true, result);
+      }).catch(function(err) {
+        reply(false, null, err && err.message ? err.message : String(err));
+      });
+    } catch (e) {
+      reply(false, null, e && e.message ? e.message : String(e));
+    }
+  }
+
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_AUTH') {
+      dalFsHandleAuth_(ev.data);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_LISTEN') {
+      dalFsHandleListen_(ev.data);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_UNLISTEN') {
+      dalFsHandleUnlisten_(ev.data);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_PATCH_WRITE') {
+      dalFsHandlePatchWrite_(ev.data);
+      return;
+    }
     if (ev.data.type === 'SHOWRUNNER_SESSION_TOKEN') {
       saveParentSession(ev.data.token, ev.data.crewName, ev.data.expiresAt);
       if (ev.data.crewName) lastCrewName = ev.data.crewName;

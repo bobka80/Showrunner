@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Direct client Firebase writes** for live PA/timeline forks. Timeline collab: touch/patch merge. **Production:** GAS **v616+** (patch hotfix shipping). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Direct client Firebase writes** for live PA/timeline forks. Timeline collab: touch/patch merge. **Production:** GAS **v617**. **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -351,6 +351,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Hotfix** — timeline collab thrash: live writes use **full** mode state (not crew-checkbox filter); skip/stash apply during drag; stronger echo/LWW guards (`03a2` + collab path in `saveAndCloseShifts`)
 - [x] **Hotfix** — timeline collab lost-updates: **3-way merge** (base/local/remote) + Firestore **transaction** on write; merge-on-apply while dirty; unique shift/phase ids; banner `live sync (merge)`
 - [x] **Hotfix** — timeline collab stale overwrite + lag: **touch/patch merge** (only touched entities overwrite remote); 40ms flush; light redraw; server upsert on GAS fork save; banner `live sync (patch)`
+- [x] **Hotfix** — force direct live sync on host: Firebase Auth/listen/write via **host-boot** (`SHOWRUNNER_DAL_FS_*`) so web.app users get `patch` not `server patch` after reload
 - [x] **Hotfix** — `openDalSession` / `closeDalSession` release ScriptLock during Firestore UrlFetch (was starving presence → stuck 🔒 door + client timeout on START COLLAB)
 - [x] **Hotfix** — timeline START COLLAB: `beginDalSession` + `finishDalSession` (join if open, reclaim stale opening ~90s, faster Firestore upsert)
 - [x] **Slice D — Dual-domain sessions** — prep + timelineCollab **concurrent** on one project (design lock: per project + per domain). Spec: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
