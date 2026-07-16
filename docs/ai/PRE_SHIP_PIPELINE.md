@@ -31,7 +31,7 @@ Auto-detects layers from `git diff` (staged + unstaged vs `HEAD`).
 
 | Layer | When it runs | What it checks |
 |-------|----------------|----------------|
-| **gas** | Root `*.html` / `*.js` (except Node-only), `dist/`, `Index.html`, `appsscript.json` | `build.js`, payload parse, station split verify (if `11_*` touched), **DAL gates** (if Logistics/PA/timeline hot paths touched), `dist/` orphan scan; with `--deploy`: `check-google-account.js` |
+| **gas** | Root `*.html` / `*.js` (except Node-only), `dist/`, `Index.html`, `appsscript.json` | `build.js`, **GAS ship safety** (no `scratch_` / `temp_` / `_tmp` / PC-only in root or `dist/`), payload parse, station split verify (if `11_*` touched), **DAL gates** (if Logistics/PA/timeline hot paths touched); with `--deploy`: `check-google-account.js` (remote orphan guard) |
 | **hosting** | `push-hosting/**` | `host-boot.js` parse; if `host-boot.js` changed → `index.html` `host-boot.js?v=` must be **bumped** |
 | **desktop** | `station-desktop/**` | `app.ico` present; `dotnet build` Release |
 | **apk** | `station-android/**` | APK tree present (full build still via `build-station-apk.js`) |
@@ -76,6 +76,8 @@ $env:PRE_SHIP_DAL_CONCURRENCY_OK=1; node milestone.js "…"
 | `DAL persistence lint FAILED` (client) | Remove `SpreadsheetApp` / `clearContents` from HTML — use `google.script.run` → server only |
 | `DAL persistence lint FAILED` (server) | New `clearContents` in non-allowlisted file — refactor or get director approval to extend allowlist in `dal-persistence-lint.js` |
 | `DAL Phase 3 gate BLOCKED` | Director runs concurrency smoke → `PRE_SHIP_DAL_CONCURRENCY_OK=1` + `node milestone.js` |
+| `debug/scratch .js files — delete before ship` | Delete `_tmp*.js`, `temp_*.js`, `scratch_*.js` from repo root — never ship to GAS |
+| `dist/ contains files that must not ship` | `node build.js` — `gas-ship-exclude.js` blocks PC-only + scratch copies |
 
 ---
 

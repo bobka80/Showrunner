@@ -8,11 +8,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const build = require('./build');
 
-const NODE_ONLY = new Set([
-  'build.js', 'watch.js', 'dev-push.js',
-  'works-save.js', 'milestone.js', 'rollback-works.js', 'rollback-milestone.js',
-  'test.js', 'test_db.js', 'run_test.js'
-]);
+const { isExcludedFromGasCopy } = require('./gas-ship-exclude');
 
 function shouldIgnore(filePath) {
   const normalized = filePath.replace(/\\/g, '/');
@@ -22,7 +18,7 @@ function shouldIgnore(filePath) {
   if (normalized.startsWith('.VSCodeCounter/')) return true;
   if (normalized.startsWith('.cursor/')) return true;
   if (!/\.(html|js|json)$/i.test(normalized)) return true;
-  if (NODE_ONLY.has(path.basename(normalized))) return true;
+  if (isExcludedFromGasCopy(path.basename(normalized))) return true;
   return false;
 }
 

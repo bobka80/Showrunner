@@ -3,6 +3,7 @@
  */
 const path = require('path');
 const NODE_ONLY = require('../gas-node-only');
+const { isExcludedFromGasCopy } = require('../gas-ship-exclude');
 
 const LAYERS = ['gas', 'hosting', 'desktop', 'apk'];
 
@@ -31,7 +32,18 @@ function isRootGasJs(file) {
   const n = norm(file);
   if (n.includes('/')) return false;
   if (!/\.js$/i.test(n)) return false;
-  return !NODE_ONLY.has(basename(n));
+  return !isExcludedFromGasCopy(basename(n));
+}
+
+function isGasPipelineFile(file) {
+  const n = norm(file);
+  return (
+    n === 'build.js' ||
+    n === 'check-google-account.js' ||
+    n === 'gas-ship-exclude.js' ||
+    n === 'gas-node-only.js' ||
+    n.startsWith('pre-ship/')
+  );
 }
 
 function classifyFile(file) {
@@ -50,6 +62,7 @@ function classifyFile(file) {
     n.startsWith('dist/') ||
     n === 'Index.html' ||
     n === 'appsscript.json' ||
+    isGasPipelineFile(n) ||
     isRootGasHtml(n) ||
     isRootGasJs(n)
   ) {

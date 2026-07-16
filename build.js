@@ -220,17 +220,12 @@ function getFrontendLogicChunk(index) {
   fs.writeFileSync(path.join(DIST_DIR, 'LogicPayload_Master.js'), masterLogic);
   console.log(`Compiled LogicPayload_Master.js`);
 
-  // 6. Copy backend .js files, appsscript.json, and Login.html (never Node tooling)
-  const NODE_ONLY = require('./gas-node-only');
+  // 6. Copy backend .js files, appsscript.json, and Login.html (never Node tooling / scratch)
+  const { isExcludedFromGasCopy, findForbiddenGasDistJs } = require('./gas-ship-exclude');
   const files = fs.readdirSync(__dirname);
   let filesCopied = 0;
   files.forEach(file => {
-    if (
-      NODE_ONLY.has(file) ||
-      file.startsWith('scratch_') ||
-      file.startsWith('temp_') ||
-      file.startsWith('_tmp')
-    ) return;
+    if (isExcludedFromGasCopy(file)) return;
     if (fs.statSync(path.join(__dirname, file)).isDirectory()) return;
 
     if (file.endsWith('.js') || file === 'appsscript.json' || file === 'Login.html') {
@@ -238,20 +233,10 @@ function getFrontendLogicChunk(index) {
       filesCopied++;
     }
   });
-  // Remove Node tooling left over from older builds
-  NODE_ONLY.forEach(file => {
+  // Remove PC-only / scratch files left over from older builds
+  findForbiddenGasDistJs(DIST_DIR).forEach((file) => {
     const stale = path.join(DIST_DIR, file);
     if (fs.existsSync(stale)) fs.unlinkSync(stale);
-  });
-  fs.readdirSync(DIST_DIR).forEach(file => {
-    if (
-      file.startsWith('scratch_') ||
-      file.startsWith('temp_') ||
-      file.startsWith('_tmp')
-    ) {
-      const stale = path.join(DIST_DIR, file);
-      if (fs.statSync(stale).isFile()) fs.unlinkSync(stale);
-    }
   });
 
   console.log(`Copied ${filesCopied} backend script files to dist/`);

@@ -24,4 +24,5 @@ module.exports = new Set([
   'run_test.js',
   'create-repomix.js',
   'pre-ship.js',
+  'gas-ship-exclude.js',
 ]);

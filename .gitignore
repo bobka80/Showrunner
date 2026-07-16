@@ -15,6 +15,7 @@ pre-ship/last-report.json
 # Local scratch (not production)
 scratch_*.js
 temp_*.js
+_tmp*.js
 filename
 
 # OS

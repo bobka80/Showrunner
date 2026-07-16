@@ -11,6 +11,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const NODE_ONLY = require('./gas-node-only');
+const { isForbiddenRemoteGasName } = require('./gas-ship-exclude');
 const { getRemoteGasFileNames } = require('./gas-push-sync');
 
 const ROOT = __dirname;
@@ -91,9 +92,9 @@ function parseLatestVersion(output) {
   return latest;
 }
 
-function nodeOnlyLeakedOnGas(remoteFiles) {
+function forbiddenLeakedOnGas(remoteFiles) {
   return remoteFiles.filter(
-    (f) => f.type === 'SERVER_JS' && NODE_ONLY_BASENAMES.has(f.name)
+    (f) => f.type === 'SERVER_JS' && isForbiddenRemoteGasName(f.name)
   );
 }
 
@@ -158,18 +159,20 @@ async function main() {
     }
 
     lines.push('');
-    lines.push('Check 3 — PC-only scripts must not be on Apps Script:');
+    lines.push('Check 3 — PC-only / scratch scripts must not be on Apps Script:');
     try {
       const remoteFiles = await getRemoteGasFileNames();
-      const leaked = nodeOnlyLeakedOnGas(remoteFiles);
+      const leaked = forbiddenLeakedOnGas(remoteFiles);
       if (leaked.length) {
         ok = false;
         const names = leaked.map((f) => `${f.name}.js`).join(', ');
-        issues.push(`PC-only Node file(s) on live Apps Script: ${names} — causes white screen (require is not defined).`);
+        issues.push(
+          `Forbidden file(s) on live Apps Script: ${names} — causes white screen (require is not defined).`
+        );
         lines.push(`  NOT OK — found: ${names}`);
-        lines.push('  Fix: node build.js && node milestone.js "Remove Node-only orphans from GAS"');
+        lines.push('  Fix: remove source file, node build.js, then node milestone.js');
       } else {
-        lines.push('  OK — no PC-only Node scripts on the remote project');
+        lines.push('  OK — no PC-only or scratch/debug scripts on the remote project');
       }
     } catch (e) {
       ok = false;

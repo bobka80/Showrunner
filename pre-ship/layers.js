@@ -5,7 +5,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const NODE_ONLY = require('../gas-node-only');
+const { findTempDebugJsInDir, findForbiddenGasDistJs } = require('../gas-ship-exclude');
 const { dalTouched, runDalGates } = require('./dal');
 
 const ROOT = path.join(__dirname, '..');
@@ -22,15 +22,25 @@ function fail(msg) {
   throw err;
 }
 
-function scanDistForNodeOnlyOrphans() {
+function scanGasShipSafety({ afterBuild }) {
   const dist = path.join(ROOT, 'dist');
+
+  const rootScratch = findTempDebugJsInDir(ROOT);
+  if (rootScratch.length) {
+    fail(
+      `Repo root has debug/scratch .js files — delete before ship: ${rootScratch.join(', ')}`
+    );
+  }
+
+  if (!afterBuild) return;
+
   if (!fs.existsSync(dist)) fail('dist/ missing — build did not produce output');
-  const leaked = [];
-  NODE_ONLY.forEach((file) => {
-    if (fs.existsSync(path.join(dist, file))) leaked.push(file);
-  });
+  const leaked = findForbiddenGasDistJs(dist);
   if (leaked.length) {
-    fail(`dist/ contains PC-only Node files: ${leaked.join(', ')} — white-screen risk on GAS`);
+    fail(
+      `dist/ contains files that must not ship to Apps Script: ${leaked.join(', ')} ` +
+        '(require is not defined on GAS). Run node build.js and remove the source file.'
+    );
   }
 }
 
@@ -42,6 +52,10 @@ function readHostBootCacheVersion(indexHtml) {
 function runGasLayer({ forDeploy, changedFiles, stationTouched }) {
   console.log('\n── GAS layer (Apps Script / PWA iframe payload) ──');
   const steps = [];
+
+  steps.push('gas-ship-safety-root');
+  scanGasShipSafety({ afterBuild: false });
+  console.log('  → root scratch/debug scan OK');
 
   steps.push('build');
   require(path.join(ROOT, 'build.js'));
@@ -63,9 +77,9 @@ function runGasLayer({ forDeploy, changedFiles, stationTouched }) {
     console.log('  → skip DAL gates (no DAL hot-path files in this change set)');
   }
 
-  steps.push('dist-orphan-scan');
-  scanDistForNodeOnlyOrphans();
-  console.log('  → dist/ orphan scan OK');
+  steps.push('gas-ship-safety-dist');
+  scanGasShipSafety({ afterBuild: true });
+  console.log('  → dist/ GAS ship safety scan OK');
 
   if (forDeploy) {
     steps.push('check-google-account');
