@@ -9,30 +9,112 @@ window.dalTlLastStateSig = '';
 window.dalTlRemotePending = false;
 window.dalTlLiveSyncMode = ''; // 'firestore' | 'gas' | ''
 window.dalTlWasSessionOpen = false;
+window.dalTlLastRemoteUpdatedAt = '';
+window.dalTlApplyingRemote = false;
+window.dalTlPendingRemote = null;
 
 window.dalTimelineLayerOpen_ = function() {
   var layer = document.getElementById('shift-layer');
   return !!(layer && layer.style.display !== 'none' && layer.style.display !== '');
 };
 
+window.dalTlRound_ = function(n) {
+  var x = Number(n);
+  if (!isFinite(x)) return 0;
+  return Math.round(x * 100) / 100;
+};
+
 window.dalTimelineStateSig_ = function(shifts, phases, overrides) {
   var s = (shifts || []).map(function(x) {
-    return [x.id || '', x.user_uid || x.email || '', x.role || '', x.start, x.duration, x.hasArrow ? 1 : 0, x.note || ''].join(':');
+    return [
+      x.id || '',
+      x.user_uid || x.email || '',
+      x.role || '',
+      window.dalTlRound_(x.start),
+      window.dalTlRound_(x.duration),
+      x.hasArrow ? 1 : 0,
+      x.note || ''
+    ].join(':');
   }).sort().join('|');
   var p = (phases || []).map(function(x) {
-    return [x.id || '', x.type || '', x.start, x.duration, x.note || ''].join(':');
+    return [
+      x.id || '',
+      x.type || '',
+      window.dalTlRound_(x.start),
+      window.dalTlRound_(x.duration),
+      x.note || ''
+    ].join(':');
   }).sort().join('|');
   var oKeys = Object.keys(overrides || {}).sort();
   var o = oKeys.map(function(k) { return k + '=' + (overrides[k] || ''); }).join('|');
   return s + '##' + p + '##' + o;
 };
 
+/** Strip drag temps / colors so fork JSON stays stable across clients. */
+window.dalTlSanitizeShiftsForFork_ = function(list) {
+  return (list || []).map(function(s) {
+    return {
+      id: s.id,
+      user_uid: s.user_uid || s.email || '',
+      email: s.user_uid || s.email || '',
+      role: s.role || '',
+      start: window.dalTlRound_(s.start),
+      duration: window.dalTlRound_(s.duration),
+      hasArrow: !!s.hasArrow,
+      note: s.note || ''
+    };
+  });
+};
+
+window.dalTlSanitizePhasesForFork_ = function(list) {
+  return (list || []).map(function(p) {
+    return {
+      id: p.id,
+      type: p.type || '',
+      start: window.dalTlRound_(p.start),
+      duration: window.dalTlRound_(p.duration),
+      note: p.note || ''
+    };
+  });
+};
+
+window.dalTlIsLocalDragging_ = function() {
+  return !!(
+    (typeof dragMode !== 'undefined' && dragMode) ||
+    (typeof dragPhaseMode !== 'undefined' && dragPhaseMode) ||
+    (typeof dragSubEventMode !== 'undefined' && dragSubEventMode)
+  );
+};
+
 window.dalMarkTimelineLocalSave_ = function() {
-  window.dalTlIgnoreListenerUntil = Date.now() + 800;
+  window.dalTlIgnoreListenerUntil = Date.now() + 2500;
+};
+
+window.dalStashPendingRemoteTimeline_ = function(shiftsIn, phasesIn, overridesIn, meta) {
+  window.dalTlPendingRemote = {
+    shifts: shiftsIn,
+    phases: phasesIn,
+    overrides: overridesIn,
+    meta: meta || {}
+  };
+  window.dalTlRemotePending = true;
+  window.dalUpdateTimelineLiveBanner_();
+};
+
+/** Apply a remote snapshot that was held during drag / local dirty flush. */
+window.dalDrainPendingRemoteTimeline_ = function() {
+  var pending = window.dalTlPendingRemote;
+  if (!pending) return;
+  if (window.dalTlIsLocalDragging_() || window.isTimelineDirty || window.dalTlFlushInFlight || window.dalTlApplyingRemote) {
+    return;
+  }
+  window.dalTlPendingRemote = null;
+  window.dalApplyRemoteTimelineState_(pending.shifts, pending.phases, pending.overrides, pending.meta);
 };
 
 /**
  * Direct browser → Firestore timeline fork write (no GAS round-trip).
+ * Writes FULL mode state (not checkbox-filtered) so clients share one source of truth.
  */
 window.dalWriteTimelineForkToFirestore_ = function(done) {
   done = done || function() {};
@@ -58,34 +140,34 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
       return;
     }
     try {
-      var crewUids = Array.from(document.querySelectorAll('.internal-cb:checked')).map(function(cb) {
-        return cb.value;
-      });
-      var localShifts = (typeof shifts !== 'undefined' ? shifts : []).filter(function(s) {
-        var u = s.user_uid || s.email;
-        return crewUids.indexOf(u) !== -1 || (typeof isTruck === 'function' && isTruck(u));
-      });
+      // Full fork state — never filter by checked crew (that caused position thrash).
+      var localShifts = window.dalTlSanitizeShiftsForFork_(typeof shifts !== 'undefined' ? shifts : []);
+      var localPhases = window.dalTlSanitizePhasesForFork_(typeof activePhases !== 'undefined' ? activePhases : []);
+      var localOverrides = JSON.parse(JSON.stringify(typeof localDeptOverrides !== 'undefined' ? localDeptOverrides : {}));
       var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
       var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+      var updatedAt = new Date().toISOString();
       var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
       var payload = {
         mode: mode,
-        shiftsJson: JSON.stringify(localShifts || []),
-        phasesJson: JSON.stringify(typeof activePhases !== 'undefined' ? activePhases : []),
-        overridesJson: JSON.stringify(typeof localDeptOverrides !== 'undefined' ? localDeptOverrides : {}),
-        updatedAt: new Date().toISOString(),
+        shiftsJson: JSON.stringify(localShifts),
+        phasesJson: JSON.stringify(localPhases),
+        overridesJson: JSON.stringify(localOverrides),
+        updatedAt: updatedAt,
         updatedBy: actor
       };
+      var outSig = window.dalTimelineStateSig_(localShifts, localPhases, localOverrides);
+      window.dalTlLastStateSig = outSig;
+      window.dalTlLastRemoteUpdatedAt = updatedAt;
       window.dalMarkTimelineLocalSave_();
+      window.isTimelineDirty = false;
       ref.set(payload).then(function() {
-        window.dalTlLastStateSig = window.dalTimelineStateSig_
-          ? window.dalTimelineStateSig_(localShifts, activePhases, localDeptOverrides)
-          : '';
-        window.isTimelineDirty = false;
         window.dalTlRemotePending = false;
         if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
         done(null);
       }).catch(function(eWrite) {
+        // Keep dirty so a later flush can retry.
+        window.isTimelineDirty = true;
         done(eWrite);
       });
     } catch (e2) {
@@ -101,6 +183,7 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
 window.dalFlushTimelineIfCollabOpen_ = function() {
   if (!window.dalTimelineSessionOpen) return;
   if (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly) return;
+  if (window.dalTlApplyingRemote) return;
   if (!window.isTimelineDirty) return;
   if (window.dalTlFlushInFlight) {
     window.dalTlFlushAgain = true;
@@ -109,6 +192,11 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
   clearTimeout(window.dalTlFlushTimer);
   window.dalTlFlushTimer = setTimeout(function() {
     if (!window.dalTimelineSessionOpen || !window.isTimelineDirty) return;
+    // Drag may still be clearing — reschedule instead of dropping the flush.
+    if (window.dalTlIsLocalDragging_()) {
+      window.dalFlushTimelineIfCollabOpen_();
+      return;
+    }
     window.dalTlFlushInFlight = true;
     window.dalTlFlushAgain = false;
 
@@ -117,7 +205,9 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
       if (window.dalTlFlushAgain) {
         window.dalTlFlushAgain = false;
         window.dalFlushTimelineIfCollabOpen_();
+        return;
       }
+      window.dalDrainPendingRemoteTimeline_();
     };
 
     // Fast path: direct client → Firestore
@@ -154,7 +244,7 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
         finish();
       }, 600);
     }
-  }, 150);
+  }, 250);
 };
 
 window.dalUpdateTimelineLiveBanner_ = function() {
@@ -183,43 +273,67 @@ window.dalColorTimelineShifts_ = function(list) {
   });
 };
 
-window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remoteOverrides) {
+window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remoteOverrides, meta) {
   if (!window.dalTimelineLayerOpen_()) return;
-  if (Date.now() < (window.dalTlIgnoreListenerUntil || 0)) return;
+  if (window.dalTlApplyingRemote) return;
 
-  var shiftsIn = Array.isArray(remoteShifts) ? remoteShifts : [];
-  var phasesIn = Array.isArray(remotePhases) ? remotePhases : [];
+  meta = meta || {};
+  // Skip own in-flight writes (local cache echo).
+  if (meta.hasPendingWrites) return;
+
+  var remoteUpdatedAt = String(meta.updatedAt || '');
+  if (remoteUpdatedAt && window.dalTlLastRemoteUpdatedAt && remoteUpdatedAt < window.dalTlLastRemoteUpdatedAt) {
+    return; // older snapshot — ignore
+  }
+
+  var shiftsIn = window.dalTlSanitizeShiftsForFork_(Array.isArray(remoteShifts) ? remoteShifts : []);
+  var phasesIn = window.dalTlSanitizePhasesForFork_(Array.isArray(remotePhases) ? remotePhases : []);
   var overridesIn = remoteOverrides && typeof remoteOverrides === 'object' ? remoteOverrides : {};
   var sig = window.dalTimelineStateSig_(shiftsIn, phasesIn, overridesIn);
-  if (sig === window.dalTlLastStateSig) return;
-
-  if (window.isTimelineDirty) {
-    window.dalTlRemotePending = true;
-    // Do not advance lastSig — after local flush, next snapshot must still apply.
-    window.dalUpdateTimelineLiveBanner_();
+  if (sig === window.dalTlLastStateSig) {
+    if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
+    window.dalTlPendingRemote = null;
+    window.dalTlRemotePending = false;
     return;
   }
 
-  window.dalTlLastStateSig = sig;
-  window.dalTlRemotePending = false;
+  if (Date.now() < (window.dalTlIgnoreListenerUntil || 0)) {
+    window.dalStashPendingRemoteTimeline_(shiftsIn, phasesIn, overridesIn, meta);
+    return;
+  }
+  if (window.dalTlIsLocalDragging_() || window.isTimelineDirty || window.dalTlFlushInFlight) {
+    window.dalStashPendingRemoteTimeline_(shiftsIn, phasesIn, overridesIn, meta);
+    return;
+  }
 
-  shifts = JSON.parse(JSON.stringify(shiftsIn));
-  window.dalColorTimelineShifts_(shifts);
-  activePhases = JSON.parse(JSON.stringify(phasesIn));
-  localDeptOverrides = JSON.parse(JSON.stringify(overridesIn));
+  window.dalTlApplyingRemote = true;
+  try {
+    window.dalTlLastStateSig = sig;
+    if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
+    window.dalTlPendingRemote = null;
+    window.dalTlRemotePending = false;
 
-  var assigned = [];
-  shifts.forEach(function(s) {
-    var u = s.user_uid || s.email;
-    if (u && assigned.indexOf(u) === -1) assigned.push(u);
-  });
-  globalAssignedArr = assigned;
-  document.querySelectorAll('.internal-cb').forEach(function(cb) {
-    cb.checked = assigned.indexOf(cb.value) !== -1;
-  });
+    shifts = JSON.parse(JSON.stringify(shiftsIn));
+    window.dalColorTimelineShifts_(shifts);
+    activePhases = JSON.parse(JSON.stringify(phasesIn));
+    localDeptOverrides = JSON.parse(JSON.stringify(overridesIn));
 
-  if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
-  window.dalUpdateTimelineLiveBanner_();
+    var assigned = [];
+    shifts.forEach(function(s) {
+      var u = s.user_uid || s.email;
+      if (u && assigned.indexOf(u) === -1) assigned.push(u);
+    });
+    globalAssignedArr = assigned;
+    // Ensure rows with shifts are visible; do not wipe extra checked empty rows mid-edit.
+    document.querySelectorAll('.internal-cb').forEach(function(cb) {
+      if (assigned.indexOf(cb.value) !== -1) cb.checked = true;
+    });
+
+    if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+    window.dalUpdateTimelineLiveBanner_();
+  } finally {
+    window.dalTlApplyingRemote = false;
+  }
 };
 
 window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
@@ -276,7 +390,7 @@ window.startDalTimelineGasStateSync_ = function(projectId) {
       .withFailureHandler(function() { /* keep last */ })
       .withSuccessHandler(function(data) {
         if (!data || !window.dalTimelineSessionOpen) return;
-        window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides);
+        window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides, {});
       })
       .getTimelineData(projectId, mode);
   };
@@ -314,7 +428,11 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
       try { remoteShifts = JSON.parse(d.shiftsJson || '[]'); } catch (e1) { remoteShifts = []; }
       try { remotePhases = JSON.parse(d.phasesJson || '[]'); } catch (e2) { remotePhases = []; }
       try { remoteOverrides = JSON.parse(d.overridesJson || '{}'); } catch (e3) { remoteOverrides = {}; }
-      window.dalApplyRemoteTimelineState_(remoteShifts, remotePhases, remoteOverrides);
+      window.dalApplyRemoteTimelineState_(remoteShifts, remotePhases, remoteOverrides, {
+        hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites),
+        updatedAt: d.updatedAt || '',
+        updatedBy: d.updatedBy || ''
+      });
     }, function(listenErr) {
       console.warn('Timeline Firestore listener error — falling back to server sync:', listenErr);
       window.stopDalTimelineStateSync_();
@@ -339,6 +457,8 @@ window.stopDalTimelineSessionWatcher = function() {
   window.dalTlWatchProjectId = '';
   window.dalTlWasSessionOpen = false;
   window.dalTlLastStateSig = '';
+  window.dalTlLastRemoteUpdatedAt = '';
+  window.dalTlPendingRemote = null;
 };
 
 window.dalHandleTimelineSessionInfo_ = function(info) {
@@ -360,7 +480,7 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
         .withSuccessHandler(function(data) {
           if (!data || window.isTimelineDirty) return;
           window.dalTlLastStateSig = '';
-          window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides);
+          window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides, {});
         })
         .getTimelineData(projectId, mode);
     }

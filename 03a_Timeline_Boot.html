@@ -460,12 +460,27 @@ function saveAndCloseShifts() {
   if (currentIsReadOnly) return;
   if (typeof canDrawPhases === 'function' && !canDrawPhases()) return;
   if (window.guardDatabaseBackupLock && window.guardDatabaseBackupLock('timeline save')) return;
-  const crewUids = Array.from(document.querySelectorAll('.internal-cb:checked')).map(cb => cb.value);
-  let localShiftsToSave = shifts.filter(s => crewUids.includes(s.user_uid || s.email) || isTruck(s.user_uid || s.email));
-  
-  let projVersion = document.getElementById('edit-proj-version') ? document.getElementById('edit-proj-version').value : '';
   // During timeline collab, stay in the room so both users keep syncing.
   const stayInCollab = !!window.dalTimelineSessionOpen;
+  // Collab fork must write FULL mode state — checkbox is view-only (filtering caused thrash).
+  let crewUids;
+  let localShiftsToSave;
+  if (stayInCollab) {
+    localShiftsToSave = (typeof window.dalTlSanitizeShiftsForFork_ === 'function')
+      ? window.dalTlSanitizeShiftsForFork_(shifts)
+      : shifts.slice();
+    const assigned = [];
+    localShiftsToSave.forEach(s => {
+      const u = s.user_uid || s.email;
+      if (u && assigned.indexOf(u) === -1) assigned.push(u);
+    });
+    crewUids = assigned;
+  } else {
+    crewUids = Array.from(document.querySelectorAll('.internal-cb:checked')).map(cb => cb.value);
+    localShiftsToSave = shifts.filter(s => crewUids.includes(s.user_uid || s.email) || isTruck(s.user_uid || s.email));
+  }
+  
+  let projVersion = document.getElementById('edit-proj-version') ? document.getElementById('edit-proj-version').value : '';
   
   if (!stayInCollab) {
     document.getElementById('shift-layer').style.display = 'none';

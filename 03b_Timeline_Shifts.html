@@ -319,7 +319,10 @@ function endDrag() {
       let s = shifts.find(x => x.id === sampleId);
       if (s) lastEditedDurationMain = s.duration;
   }
-  setTimeout(() => { dragMode = null; }, 50);
+  setTimeout(() => {
+    dragMode = null;
+    if (typeof window.dalDrainPendingRemoteTimeline_ === 'function') window.dalDrainPendingRemoteTimeline_();
+  }, 50);
   document.removeEventListener('mousemove', onDrag); 
   document.removeEventListener('mouseup', endDrag); 
   document.removeEventListener('touchmove', onDrag); 

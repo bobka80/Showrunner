@@ -187,7 +187,10 @@ function onPhaseDrag(e) {
 }
 
 function endPhaseDrag() { 
-  setTimeout(() => { dragPhaseMode = null; }, 50); 
+  setTimeout(() => {
+    dragPhaseMode = null;
+    if (typeof window.dalDrainPendingRemoteTimeline_ === 'function') window.dalDrainPendingRemoteTimeline_();
+  }, 50); 
   document.removeEventListener('mousemove', onPhaseDrag); 
   document.removeEventListener('mouseup', endPhaseDrag); 
   document.removeEventListener('touchmove', onPhaseDrag); 
@@ -359,7 +362,10 @@ function onSubEventDrag(e) {
 }
 
 function endSubEventDrag() {
-  setTimeout(() => { dragSubEventMode = null; }, 50);
+  setTimeout(() => {
+    dragSubEventMode = null;
+    if (typeof window.dalDrainPendingRemoteTimeline_ === 'function') window.dalDrainPendingRemoteTimeline_();
+  }, 50);
   document.removeEventListener('mousemove', onSubEventDrag);
   document.removeEventListener('mouseup', endSubEventDrag);
   renderSubEvents();
