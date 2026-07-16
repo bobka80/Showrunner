@@ -12,6 +12,8 @@ window.dalTlWasSessionOpen = false;
 window.dalTlLastRemoteUpdatedAt = '';
 window.dalTlApplyingRemote = false;
 window.dalTlPendingRemote = null;
+window.dalTlSyncBase_ = null; // last successfully synced state (for 3-way merge)
+window.dalTlClientId = 'tl_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
 
 window.dalTimelineLayerOpen_ = function() {
   var layer = document.getElementById('shift-layer');
@@ -22,6 +24,11 @@ window.dalTlRound_ = function(n) {
   var x = Number(n);
   if (!isFinite(x)) return 0;
   return Math.round(x * 100) / 100;
+};
+
+/** Unique entity ids — Date.now() alone collides across users. */
+window.dalTlNewId_ = function(prefix) {
+  return String(prefix || 'x') + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
 };
 
 window.dalTimelineStateSig_ = function(shifts, phases, overrides) {
@@ -78,6 +85,11 @@ window.dalTlSanitizePhasesForFork_ = function(list) {
   });
 };
 
+window.dalTlCloneOverrides_ = function(obj) {
+  try { return JSON.parse(JSON.stringify(obj && typeof obj === 'object' ? obj : {})); }
+  catch (e) { return {}; }
+};
+
 window.dalTlIsLocalDragging_ = function() {
   return !!(
     (typeof dragMode !== 'undefined' && dragMode) ||
@@ -86,11 +98,136 @@ window.dalTlIsLocalDragging_ = function() {
   );
 };
 
+window.dalTlCaptureLocalState_ = function() {
+  return {
+    shifts: window.dalTlSanitizeShiftsForFork_(typeof shifts !== 'undefined' ? shifts : []),
+    phases: window.dalTlSanitizePhasesForFork_(typeof activePhases !== 'undefined' ? activePhases : []),
+    overrides: window.dalTlCloneOverrides_(typeof localDeptOverrides !== 'undefined' ? localDeptOverrides : {})
+  };
+};
+
+window.dalTlSetSyncBase_ = function(state) {
+  window.dalTlSyncBase_ = {
+    shifts: window.dalTlSanitizeShiftsForFork_(state && state.shifts),
+    phases: window.dalTlSanitizePhasesForFork_(state && state.phases),
+    overrides: window.dalTlCloneOverrides_(state && state.overrides)
+  };
+};
+
+window.dalTlEnsureSyncBase_ = function() {
+  if (!window.dalTlSyncBase_) window.dalTlSetSyncBase_(window.dalTlCaptureLocalState_());
+};
+
+window.dalTlEntityChanged_ = function(a, b, fields) {
+  if (!a || !b) return true;
+  for (var i = 0; i < fields.length; i++) {
+    var f = fields[i];
+    if (f === 'start' || f === 'duration') {
+      if (window.dalTlRound_(a[f]) !== window.dalTlRound_(b[f])) return true;
+    } else if (f === 'hasArrow') {
+      if (!!a[f] !== !!b[f]) return true;
+    } else if (String(a[f] || '') !== String(b[f] || '')) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * 3-way entity merge (base / local / remote) by id.
+ * - Remote-only adds survive local writes
+ * - Local-only adds survive remote applies
+ * - Same-id both edited → local wins (this client is flushing or holding dirty)
+ * - Local delete (in base, not local) wins over remote-unchanged
+ */
+window.dalTlMergeEntityLists_ = function(baseList, localList, remoteList, fields) {
+  var baseMap = {};
+  var localMap = {};
+  var remoteMap = {};
+  (baseList || []).forEach(function(e) { if (e && e.id) baseMap[e.id] = e; });
+  (localList || []).forEach(function(e) { if (e && e.id) localMap[e.id] = e; });
+  (remoteList || []).forEach(function(e) { if (e && e.id) remoteMap[e.id] = e; });
+  var ids = {};
+  Object.keys(baseMap).forEach(function(id) { ids[id] = 1; });
+  Object.keys(localMap).forEach(function(id) { ids[id] = 1; });
+  Object.keys(remoteMap).forEach(function(id) { ids[id] = 1; });
+
+  var out = [];
+  Object.keys(ids).forEach(function(id) {
+    var b = baseMap[id];
+    var l = localMap[id];
+    var r = remoteMap[id];
+    if (l && r) {
+      var localChanged = !b || window.dalTlEntityChanged_(l, b, fields);
+      var remoteChanged = !b || window.dalTlEntityChanged_(r, b, fields);
+      if (localChanged) out.push(l);
+      else if (remoteChanged) out.push(r);
+      else out.push(r);
+    } else if (l && !r) {
+      if (!b) out.push(l); // local add
+      else if (window.dalTlEntityChanged_(l, b, fields)) out.push(l); // edited after remote delete
+      // else: remote deleted, local unchanged → drop
+    } else if (!l && r) {
+      if (!b) out.push(r); // remote add
+      // else: local deleted → drop (honor delete)
+    }
+  });
+  return out;
+};
+
+window.dalTlMergeOverrides_ = function(baseObj, localObj, remoteObj) {
+  var base = baseObj || {};
+  var local = localObj || {};
+  var remote = remoteObj || {};
+  var keys = {};
+  Object.keys(base).forEach(function(k) { keys[k] = 1; });
+  Object.keys(local).forEach(function(k) { keys[k] = 1; });
+  Object.keys(remote).forEach(function(k) { keys[k] = 1; });
+  var out = {};
+  Object.keys(keys).forEach(function(k) {
+    var b = base[k];
+    var l = Object.prototype.hasOwnProperty.call(local, k) ? local[k] : undefined;
+    var r = Object.prototype.hasOwnProperty.call(remote, k) ? remote[k] : undefined;
+    var hasL = Object.prototype.hasOwnProperty.call(local, k);
+    var hasR = Object.prototype.hasOwnProperty.call(remote, k);
+    var hasB = Object.prototype.hasOwnProperty.call(base, k);
+    if (hasL && hasR) {
+      if (!hasB || String(l) !== String(b)) out[k] = l;
+      else out[k] = r;
+    } else if (hasL && !hasR) {
+      if (!hasB || String(l) !== String(b)) out[k] = l;
+    } else if (!hasL && hasR) {
+      if (!hasB) out[k] = r;
+      // else local deleted key — drop
+    }
+  });
+  return out;
+};
+
+window.dalTlMergeTimelineState_ = function(baseState, localState, remoteState) {
+  var base = baseState || { shifts: [], phases: [], overrides: {} };
+  var local = localState || { shifts: [], phases: [], overrides: {} };
+  var remote = remoteState || { shifts: [], phases: [], overrides: {} };
+  var shiftFields = ['user_uid', 'email', 'role', 'start', 'duration', 'hasArrow', 'note'];
+  var phaseFields = ['type', 'start', 'duration', 'note'];
+  return {
+    shifts: window.dalTlMergeEntityLists_(base.shifts, local.shifts, remote.shifts, shiftFields),
+    phases: window.dalTlMergeEntityLists_(base.phases, local.phases, remote.phases, phaseFields),
+    overrides: window.dalTlMergeOverrides_(base.overrides, local.overrides, remote.overrides)
+  };
+};
+
 window.dalMarkTimelineLocalSave_ = function() {
-  window.dalTlIgnoreListenerUntil = Date.now() + 2500;
+  window.dalTlIgnoreListenerUntil = Date.now() + 800;
 };
 
 window.dalStashPendingRemoteTimeline_ = function(shiftsIn, phasesIn, overridesIn, meta) {
+  // Keep newest pending by updatedAt when possible.
+  var incomingAt = String((meta && meta.updatedAt) || '');
+  var existingAt = window.dalTlPendingRemote && window.dalTlPendingRemote.meta
+    ? String(window.dalTlPendingRemote.meta.updatedAt || '')
+    : '';
+  if (existingAt && incomingAt && incomingAt < existingAt) return;
   window.dalTlPendingRemote = {
     shifts: shiftsIn,
     phases: phasesIn,
@@ -105,16 +242,55 @@ window.dalStashPendingRemoteTimeline_ = function(shiftsIn, phasesIn, overridesIn
 window.dalDrainPendingRemoteTimeline_ = function() {
   var pending = window.dalTlPendingRemote;
   if (!pending) return;
-  if (window.dalTlIsLocalDragging_() || window.isTimelineDirty || window.dalTlFlushInFlight || window.dalTlApplyingRemote) {
+  if (window.dalTlIsLocalDragging_() || window.dalTlFlushInFlight || window.dalTlApplyingRemote) {
     return;
   }
   window.dalTlPendingRemote = null;
   window.dalApplyRemoteTimelineState_(pending.shifts, pending.phases, pending.overrides, pending.meta);
 };
 
+window.dalTlParseStateDoc_ = function(d) {
+  d = d || {};
+  var remoteShifts = [];
+  var remotePhases = [];
+  var remoteOverrides = {};
+  try { remoteShifts = JSON.parse(d.shiftsJson || '[]'); } catch (e1) { remoteShifts = []; }
+  try { remotePhases = JSON.parse(d.phasesJson || '[]'); } catch (e2) { remotePhases = []; }
+  try { remoteOverrides = JSON.parse(d.overridesJson || '{}'); } catch (e3) { remoteOverrides = {}; }
+  return {
+    shifts: window.dalTlSanitizeShiftsForFork_(remoteShifts),
+    phases: window.dalTlSanitizePhasesForFork_(remotePhases),
+    overrides: window.dalTlCloneOverrides_(remoteOverrides),
+    updatedAt: d.updatedAt || '',
+    updatedBy: d.updatedBy || '',
+    clientId: d.clientId || '',
+    mode: d.mode || ''
+  };
+};
+
+window.dalTlInstallMergedLocal_ = function(merged, opts) {
+  opts = opts || {};
+  shifts = JSON.parse(JSON.stringify(merged.shifts || []));
+  window.dalColorTimelineShifts_(shifts);
+  activePhases = JSON.parse(JSON.stringify(merged.phases || []));
+  localDeptOverrides = window.dalTlCloneOverrides_(merged.overrides);
+
+  var assigned = [];
+  shifts.forEach(function(s) {
+    var u = s.user_uid || s.email;
+    if (u && assigned.indexOf(u) === -1) assigned.push(u);
+  });
+  globalAssignedArr = assigned;
+  document.querySelectorAll('.internal-cb').forEach(function(cb) {
+    if (assigned.indexOf(cb.value) !== -1) cb.checked = true;
+  });
+
+  if (opts.rebuild !== false && typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+};
+
 /**
- * Direct browser → Firestore timeline fork write (no GAS round-trip).
- * Writes FULL mode state (not checkbox-filtered) so clients share one source of truth.
+ * Direct browser → Firestore timeline fork write.
+ * Uses a transaction + 3-way merge so concurrent editors cannot wipe each other.
  */
 window.dalWriteTimelineForkToFirestore_ = function(done) {
   done = done || function() {};
@@ -134,51 +310,124 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
     return;
   }
 
+  window.dalTlEnsureSyncBase_();
+  var localState = window.dalTlCaptureLocalState_();
+  var baseState = {
+    shifts: (window.dalTlSyncBase_ && window.dalTlSyncBase_.shifts) || [],
+    phases: (window.dalTlSyncBase_ && window.dalTlSyncBase_.phases) || [],
+    overrides: (window.dalTlSyncBase_ && window.dalTlSyncBase_.overrides) || {}
+  };
+  var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
+  var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+  var clientId = window.dalTlClientId;
+
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     if (err || !client || !client.db) {
       done(err || new Error('firestore_client_unavailable'));
       return;
     }
-    try {
-      // Full fork state — never filter by checked crew (that caused position thrash).
-      var localShifts = window.dalTlSanitizeShiftsForFork_(typeof shifts !== 'undefined' ? shifts : []);
-      var localPhases = window.dalTlSanitizePhasesForFork_(typeof activePhases !== 'undefined' ? activePhases : []);
-      var localOverrides = JSON.parse(JSON.stringify(typeof localDeptOverrides !== 'undefined' ? localDeptOverrides : {}));
-      var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
-      var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
-      var updatedAt = new Date().toISOString();
-      var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
-      var payload = {
-        mode: mode,
-        shiftsJson: JSON.stringify(localShifts),
-        phasesJson: JSON.stringify(localPhases),
-        overridesJson: JSON.stringify(localOverrides),
-        updatedAt: updatedAt,
-        updatedBy: actor
-      };
-      var outSig = window.dalTimelineStateSig_(localShifts, localPhases, localOverrides);
+    var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
+
+    client.db.runTransaction(function(tx) {
+      return tx.get(ref).then(function(doc) {
+        var remoteState = { shifts: [], phases: [], overrides: {} };
+        if (doc.exists) {
+          remoteState = window.dalTlParseStateDoc_(doc.data());
+        }
+        var merged = window.dalTlMergeTimelineState_(baseState, localState, remoteState);
+        var updatedAt = new Date().toISOString();
+        var payload = {
+          mode: mode,
+          shiftsJson: JSON.stringify(merged.shifts),
+          phasesJson: JSON.stringify(merged.phases),
+          overridesJson: JSON.stringify(merged.overrides),
+          updatedAt: updatedAt,
+          updatedBy: actor,
+          clientId: clientId
+        };
+        tx.set(ref, payload);
+        return { merged: merged, updatedAt: updatedAt, payload: payload };
+      });
+    }).then(function(result) {
+      var merged = result.merged;
+      var outSig = window.dalTimelineStateSig_(merged.shifts, merged.phases, merged.overrides);
       window.dalTlLastStateSig = outSig;
-      window.dalTlLastRemoteUpdatedAt = updatedAt;
+      window.dalTlLastRemoteUpdatedAt = result.updatedAt;
+      window.dalTlSetSyncBase_(merged);
       window.dalMarkTimelineLocalSave_();
       window.isTimelineDirty = false;
-      ref.set(payload).then(function() {
-        window.dalTlRemotePending = false;
-        if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
-        done(null);
-      }).catch(function(eWrite) {
-        // Keep dirty so a later flush can retry.
-        window.isTimelineDirty = true;
-        done(eWrite);
-      });
-    } catch (e2) {
-      done(e2);
-    }
+      window.dalTlPendingRemote = null;
+      window.dalTlRemotePending = false;
+
+      // Adopt remote-only entities that the merge kept (other users' adds).
+      var localSig = window.dalTimelineStateSig_(localState.shifts, localState.phases, localState.overrides);
+      if (localSig !== outSig) {
+        window.dalTlInstallMergedLocal_(merged, { rebuild: true });
+      }
+
+      if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
+      done(null, merged);
+    }).catch(function(eWrite) {
+      window.isTimelineDirty = true;
+      done(eWrite);
+    });
   });
 };
 
 /**
- * True live collab: while timeline fork is open, flush full state to Firebase after edits.
- * Prefers direct client Firestore write; falls back to GAS quiet save.
+ * GAS fallback: pull remote fork, 3-way merge into local, then quiet save.
+ */
+window.dalMergeThenGasTimelineSave_ = function(done) {
+  done = done || function() {};
+  var projectId = document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value
+    : '';
+  var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
+  if (!projectId || typeof saveAndCloseShifts !== 'function') {
+    done(new Error('gas_merge_unavailable'));
+    return;
+  }
+  window.dalTlEnsureSyncBase_();
+  var localState = window.dalTlCaptureLocalState_();
+  var baseState = window.dalTlSyncBase_;
+
+  google.script.run
+    .withFailureHandler(function(err) {
+      // Last resort: save local only (may lose concurrent remote — better than dropping local).
+      try { console.warn('Timeline merge pull failed; saving local only:', err); } catch (e0) { /* ignore */ }
+      window.__dalTlQuietFlush = true;
+      try { saveAndCloseShifts(); } finally {
+        setTimeout(function() {
+          window.__dalTlQuietFlush = false;
+          done(err || null);
+        }, 600);
+      }
+    })
+    .withSuccessHandler(function(data) {
+      var remoteState = {
+        shifts: window.dalTlSanitizeShiftsForFork_(data && data.shifts),
+        phases: window.dalTlSanitizePhasesForFork_(data && data.phases),
+        overrides: window.dalTlCloneOverrides_(data && data.overrides)
+      };
+      var merged = window.dalTlMergeTimelineState_(baseState, localState, remoteState);
+      window.dalTlInstallMergedLocal_(merged, { rebuild: true });
+      window.dalTlSetSyncBase_(merged);
+      window.__dalTlQuietFlush = true;
+      try { saveAndCloseShifts(); } finally {
+        setTimeout(function() {
+          window.__dalTlQuietFlush = false;
+          window.isTimelineDirty = false;
+          window.dalTlLastStateSig = window.dalTimelineStateSig_(merged.shifts, merged.phases, merged.overrides);
+          done(null);
+        }, 600);
+      }
+    })
+    .getTimelineData(projectId, mode);
+};
+
+/**
+ * True live collab: while timeline fork is open, flush after edits.
+ * Prefers transactional client Firestore write; falls back to merge+GAS.
  */
 window.dalFlushTimelineIfCollabOpen_ = function() {
   if (!window.dalTimelineSessionOpen) return;
@@ -192,7 +441,6 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
   clearTimeout(window.dalTlFlushTimer);
   window.dalTlFlushTimer = setTimeout(function() {
     if (!window.dalTimelineSessionOpen || !window.isTimelineDirty) return;
-    // Drag may still be clearing — reschedule instead of dropping the flush.
     if (window.dalTlIsLocalDragging_()) {
       window.dalFlushTimelineIfCollabOpen_();
       return;
@@ -202,7 +450,7 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
 
     var finish = function() {
       window.dalTlFlushInFlight = false;
-      if (window.dalTlFlushAgain) {
+      if (window.dalTlFlushAgain || window.isTimelineDirty) {
         window.dalTlFlushAgain = false;
         window.dalFlushTimelineIfCollabOpen_();
         return;
@@ -210,41 +458,20 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
       window.dalDrainPendingRemoteTimeline_();
     };
 
-    // Fast path: direct client → Firestore
     if (window.dalTlLiveSyncMode === 'firestore') {
       window.dalWriteTimelineForkToFirestore_(function(writeErr) {
         if (!writeErr) {
           finish();
           return;
         }
-        try { console.warn('Direct timeline Firestore write failed, falling back to GAS:', writeErr); } catch (e1) { /* ignore */ }
-        if (typeof saveAndCloseShifts !== 'function') {
-          finish();
-          return;
-        }
-        window.__dalTlQuietFlush = true;
-        try { saveAndCloseShifts(); } finally {
-          setTimeout(function() {
-            window.__dalTlQuietFlush = false;
-            finish();
-          }, 600);
-        }
+        try { console.warn('Direct timeline Firestore write failed, falling back to GAS merge:', writeErr); } catch (e1) { /* ignore */ }
+        window.dalMergeThenGasTimelineSave_(function() { finish(); });
       });
       return;
     }
 
-    if (typeof saveAndCloseShifts !== 'function') {
-      finish();
-      return;
-    }
-    window.__dalTlQuietFlush = true;
-    try { saveAndCloseShifts(); } finally {
-      setTimeout(function() {
-        window.__dalTlQuietFlush = false;
-        finish();
-      }, 600);
-    }
-  }, 250);
+    window.dalMergeThenGasTimelineSave_(function() { finish(); });
+  }, 280);
 };
 
 window.dalUpdateTimelineLiveBanner_ = function() {
@@ -253,9 +480,9 @@ window.dalUpdateTimelineLiveBanner_ = function() {
   if (window.dalTlRemotePending) {
     banner.textContent = '👥 TIMELINE COLLAB — syncing…';
   } else if (window.dalTlLiveSyncMode === 'firestore') {
-    banner.textContent = '👥 TIMELINE COLLAB — live sync (direct)';
+    banner.textContent = '👥 TIMELINE COLLAB — live sync (merge)';
   } else if (window.dalTlLiveSyncMode === 'gas') {
-    banner.textContent = '👥 TIMELINE COLLAB — live sync (server)';
+    banner.textContent = '👥 TIMELINE COLLAB — live sync (server merge)';
   } else {
     banner.textContent = '👥 TIMELINE COLLAB — live edits sync to Firebase';
   }
@@ -278,30 +505,72 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
   if (window.dalTlApplyingRemote) return;
 
   meta = meta || {};
-  // Skip own in-flight writes (local cache echo).
+  // Skip own in-flight writes (local cache echo) — confirmed write already updated base.
   if (meta.hasPendingWrites) return;
 
   var remoteUpdatedAt = String(meta.updatedAt || '');
-  if (remoteUpdatedAt && window.dalTlLastRemoteUpdatedAt && remoteUpdatedAt < window.dalTlLastRemoteUpdatedAt) {
-    return; // older snapshot — ignore
-  }
-
   var shiftsIn = window.dalTlSanitizeShiftsForFork_(Array.isArray(remoteShifts) ? remoteShifts : []);
   var phasesIn = window.dalTlSanitizePhasesForFork_(Array.isArray(remotePhases) ? remotePhases : []);
   var overridesIn = remoteOverrides && typeof remoteOverrides === 'object' ? remoteOverrides : {};
+  var remoteState = { shifts: shiftsIn, phases: phasesIn, overrides: overridesIn };
   var sig = window.dalTimelineStateSig_(shiftsIn, phasesIn, overridesIn);
+
+  // Own write echo: refresh base/sig only — do not rebuild (prevents flicker / disappear).
+  if (meta.clientId && meta.clientId === window.dalTlClientId) {
+    window.dalTlLastStateSig = sig;
+    if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
+    window.dalTlSetSyncBase_(remoteState);
+    window.dalTlPendingRemote = null;
+    window.dalTlRemotePending = false;
+    window.dalUpdateTimelineLiveBanner_();
+    return;
+  }
+
+  if (remoteUpdatedAt && window.dalTlLastRemoteUpdatedAt && remoteUpdatedAt < window.dalTlLastRemoteUpdatedAt) {
+    return;
+  }
+
   if (sig === window.dalTlLastStateSig) {
     if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
+    window.dalTlSetSyncBase_(remoteState);
     window.dalTlPendingRemote = null;
     window.dalTlRemotePending = false;
     return;
   }
 
-  if (Date.now() < (window.dalTlIgnoreListenerUntil || 0)) {
+  if (window.dalTlIsLocalDragging_()) {
     window.dalStashPendingRemoteTimeline_(shiftsIn, phasesIn, overridesIn, meta);
     return;
   }
-  if (window.dalTlIsLocalDragging_() || window.isTimelineDirty || window.dalTlFlushInFlight) {
+
+  // While local edits pending or flushing: MERGE remote in — never drop either side.
+  if (window.isTimelineDirty || window.dalTlFlushInFlight) {
+    window.dalTlEnsureSyncBase_();
+    var localState = window.dalTlCaptureLocalState_();
+    var mergedDirty = window.dalTlMergeTimelineState_(window.dalTlSyncBase_, localState, remoteState);
+    var mergedSig = window.dalTimelineStateSig_(mergedDirty.shifts, mergedDirty.phases, mergedDirty.overrides);
+    if (mergedSig !== window.dalTimelineStateSig_(localState.shifts, localState.phases, localState.overrides)) {
+      window.dalTlApplyingRemote = true;
+      try {
+        window.dalTlInstallMergedLocal_(mergedDirty, { rebuild: true });
+        // Keep dirty — local-only changes still need a flush; base stays pre-local until write succeeds.
+        window.isTimelineDirty = true;
+        if (remoteUpdatedAt && (!window.dalTlLastRemoteUpdatedAt || remoteUpdatedAt > window.dalTlLastRemoteUpdatedAt)) {
+          // Do not advance lastSig to remote-only; advance updatedAt floor carefully.
+        }
+        window.dalTlRemotePending = true;
+        window.dalUpdateTimelineLiveBanner_();
+        window.dalFlushTimelineIfCollabOpen_();
+      } finally {
+        window.dalTlApplyingRemote = false;
+      }
+    } else {
+      window.dalStashPendingRemoteTimeline_(shiftsIn, phasesIn, overridesIn, meta);
+    }
+    return;
+  }
+
+  if (Date.now() < (window.dalTlIgnoreListenerUntil || 0)) {
     window.dalStashPendingRemoteTimeline_(shiftsIn, phasesIn, overridesIn, meta);
     return;
   }
@@ -312,24 +581,8 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
     if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
     window.dalTlPendingRemote = null;
     window.dalTlRemotePending = false;
-
-    shifts = JSON.parse(JSON.stringify(shiftsIn));
-    window.dalColorTimelineShifts_(shifts);
-    activePhases = JSON.parse(JSON.stringify(phasesIn));
-    localDeptOverrides = JSON.parse(JSON.stringify(overridesIn));
-
-    var assigned = [];
-    shifts.forEach(function(s) {
-      var u = s.user_uid || s.email;
-      if (u && assigned.indexOf(u) === -1) assigned.push(u);
-    });
-    globalAssignedArr = assigned;
-    // Ensure rows with shifts are visible; do not wipe extra checked empty rows mid-edit.
-    document.querySelectorAll('.internal-cb').forEach(function(cb) {
-      if (assigned.indexOf(cb.value) !== -1) cb.checked = true;
-    });
-
-    if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+    window.dalTlSetSyncBase_(remoteState);
+    window.dalTlInstallMergedLocal_(remoteState, { rebuild: true });
     window.dalUpdateTimelineLiveBanner_();
   } finally {
     window.dalTlApplyingRemote = false;
@@ -355,9 +608,11 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
   if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
 
   if (isOpen) {
+    window.dalTlEnsureSyncBase_();
     window.startDalTimelineStateSync_(projectId);
   } else {
     window.stopDalTimelineStateSync_();
+    window.dalTlSyncBase_ = null;
   }
 };
 
@@ -384,7 +639,6 @@ window.startDalTimelineGasStateSync_ = function(projectId) {
 
   var pull = function() {
     if (!window.dalTimelineLayerOpen_() || !window.dalTimelineSessionOpen) return;
-    if (Date.now() < (window.dalTlIgnoreListenerUntil || 0)) return;
     var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
     google.script.run
       .withFailureHandler(function() { /* keep last */ })
@@ -421,17 +675,12 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
       if (!window.dalTimelineSessionOpen) return;
       if (!snap.exists) return;
       if (snap.metadata && snap.metadata.fromCache && !snap.data()) return;
-      var d = snap.data() || {};
-      var remoteShifts = [];
-      var remotePhases = [];
-      var remoteOverrides = {};
-      try { remoteShifts = JSON.parse(d.shiftsJson || '[]'); } catch (e1) { remoteShifts = []; }
-      try { remotePhases = JSON.parse(d.phasesJson || '[]'); } catch (e2) { remotePhases = []; }
-      try { remoteOverrides = JSON.parse(d.overridesJson || '{}'); } catch (e3) { remoteOverrides = {}; }
-      window.dalApplyRemoteTimelineState_(remoteShifts, remotePhases, remoteOverrides, {
+      var parsed = window.dalTlParseStateDoc_(snap.data());
+      window.dalApplyRemoteTimelineState_(parsed.shifts, parsed.phases, parsed.overrides, {
         hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites),
-        updatedAt: d.updatedAt || '',
-        updatedBy: d.updatedBy || ''
+        updatedAt: parsed.updatedAt || '',
+        updatedBy: parsed.updatedBy || '',
+        clientId: parsed.clientId || ''
       });
     }, function(listenErr) {
       console.warn('Timeline Firestore listener error — falling back to server sync:', listenErr);
@@ -459,6 +708,7 @@ window.stopDalTimelineSessionWatcher = function() {
   window.dalTlLastStateSig = '';
   window.dalTlLastRemoteUpdatedAt = '';
   window.dalTlPendingRemote = null;
+  window.dalTlSyncBase_ = null;
 };
 
 window.dalHandleTimelineSessionInfo_ = function(info) {
@@ -470,7 +720,6 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
 
   window.dalApplyTimelineSessionUi_(isOpen, isOpening);
 
-  // Session just closed by someone else — reload Sheets-backed timeline if local is clean.
   if (wasOpen && !isOpen && !isOpening && window.dalTimelineLayerOpen_() && !window.isTimelineDirty) {
     var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
     var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
@@ -480,6 +729,7 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
         .withSuccessHandler(function(data) {
           if (!data || window.isTimelineDirty) return;
           window.dalTlLastStateSig = '';
+          window.dalTlSyncBase_ = null;
           window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides, {});
         })
         .getTimelineData(projectId, mode);
@@ -492,7 +742,6 @@ window.startDalTimelineSessionWatcher = function(projectId) {
   if (!projectId || projectId === 'NEW') return;
   if (!window.dalTimelineLayerOpen_()) return;
   if (window.dalTlWatchProjectId === String(projectId) && window.dalTlSessionPollTimer) {
-    // Already watching — still refresh once.
     google.script.run
       .withFailureHandler(function() {})
       .withSuccessHandler(window.dalHandleTimelineSessionInfo_)

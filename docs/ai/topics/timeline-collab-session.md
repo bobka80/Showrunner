@@ -6,9 +6,9 @@
 
 **Replaces/enhances:** current timeline **single-editor** presence lock (`reportProjectPresence`, `🔒 NAME EDITING` in `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`).
 
-**Status:** Phase A + **true live edit sync** with **direct client → Firestore** writes while fork open (GAS fallback if client auth fails). Drag-end / PA mutate flush without SAVE. **Hotfix:** collab writes full mode state (checkbox is view-only) so clients stop thrashing positions. Optional auto-room / idle commit still post-campaign. See [../active/data-access-layer.md](../active/data-access-layer.md).
+**Status:** Phase A + **true live edit sync** with **direct client → Firestore** writes while fork open (GAS fallback if client auth fails). Drag-end flush without SAVE. **Hotfix:** full-state writes + **3-way merge / transactional writes** so concurrent editors cannot wipe each other. Optional auto-room / idle commit still post-campaign. See [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed** — full-state fork writes + apply guards.
+**Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed** — full-state fork writes + apply guards. ~~forgotten / disappearing concurrent edits~~ **Fixed** — 3-way merge + transactions.
 
 **Post-campaign optional (do not build during DAL campaign):** [§ Optional update — auto room + idle commit](#optional-update--auto-room--idle-commit) — after whole DAL/fork campaign finishes; milestone first; try on floor; revert if disliked.
 

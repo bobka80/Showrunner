@@ -13,7 +13,8 @@ function addPhaseFromClick(e) {
    const clickX = e.clientX - rect.left;
    const startHr = Math.round(clickX / SNAP_PX) * (SNAP_PX / PX_PER_HR);
    
-   activePhases.push({ id: 'p_'+Date.now(), type: 'Build-Up', start: startHr, duration: 4 });
+   const pid = (typeof window.dalTlNewId_ === 'function') ? window.dalTlNewId_('p_') : ('p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+   activePhases.push({ id: pid, type: 'Build-Up', start: startHr, duration: 4 });
    renderPhases();
    window.isTimelineDirty = true;
    if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();

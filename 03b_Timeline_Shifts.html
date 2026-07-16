@@ -18,7 +18,8 @@ function addShift(uid, e) {
         let v = globalVehicles.find(x => x.id === uid);
         if (v) tName = v.name;
     }
-    shifts.push({ id: 's_'+Date.now(), user_uid: uid, email: uid, start: startHr, duration: 2.5, role: tName, color: '#e5e7eb', textCol: '#18181b', hasArrow: false });
+    const sid = (typeof window.dalTlNewId_ === 'function') ? window.dalTlNewId_('s_') : ('s_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+    shifts.push({ id: sid, user_uid: uid, email: uid, start: startHr, duration: 2.5, role: tName, color: '#e5e7eb', textCol: '#18181b', hasArrow: false });
   } else {
     let dur = lastEditedDurationMain;
     let person = activeRoster.find(c => c.uid === uid);
@@ -27,7 +28,8 @@ function addShift(uid, e) {
     let bgHex = ROLE_COLORS[dRole] ? ROLE_COLORS[dRole].bg : '#86efac';
     let txtCol = ROLE_COLORS[dRole] ? ROLE_COLORS[dRole].text : '#064e3b';
     
-    shifts.push({ id: 's_'+Date.now(), user_uid: uid, email: uid, start: startHr, duration: dur, role: dRole, color: bgHex, textCol: txtCol, hasArrow: false });
+    const sid = (typeof window.dalTlNewId_ === 'function') ? window.dalTlNewId_('s_') : ('s_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+    shifts.push({ id: sid, user_uid: uid, email: uid, start: startHr, duration: dur, role: dRole, color: bgHex, textCol: txtCol, hasArrow: false });
   }
   drawShifts();
   window.isTimelineDirty = true;

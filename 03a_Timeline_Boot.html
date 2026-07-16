@@ -462,6 +462,24 @@ function saveAndCloseShifts() {
   if (window.guardDatabaseBackupLock && window.guardDatabaseBackupLock('timeline save')) return;
   // During timeline collab, stay in the room so both users keep syncing.
   const stayInCollab = !!window.dalTimelineSessionOpen;
+
+  // Manual SAVE during collab: use transactional merge write (never blind overwrite).
+  if (stayInCollab && !window.__dalTlQuietFlush && window.dalTlLiveSyncMode === 'firestore'
+      && typeof window.dalWriteTimelineForkToFirestore_ === 'function') {
+    window.isTimelineDirty = true;
+    const saveBtn = document.getElementById('tt-save-btn');
+    const saveBtnOrig = saveBtn ? saveBtn.innerText : 'SAVE SHIFTS';
+    if (saveBtn) { saveBtn.innerText = 'SAVING…'; saveBtn.disabled = true; }
+    window.dalWriteTimelineForkToFirestore_(function(err) {
+      if (saveBtn) { saveBtn.innerText = saveBtnOrig; saveBtn.disabled = false; }
+      if (err) {
+        try { alert('Collab save failed: ' + (err.message || err)); } catch (e0) { /* ignore */ }
+        window.isTimelineDirty = true;
+      }
+    });
+    return;
+  }
+
   // Collab fork must write FULL mode state — checkbox is view-only (filtering caused thrash).
   let crewUids;
   let localShiftsToSave;
