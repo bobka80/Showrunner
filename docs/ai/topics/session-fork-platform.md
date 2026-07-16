@@ -15,7 +15,11 @@
 | Warehouse preparation (PA, ledger, trucks, logistics hub) | [warehouse-prep-session.md](warehouse-prep-session.md) |
 | Timeline collaboration room | [timeline-collab-session.md](timeline-collab-session.md) |
 
-**Last swept:** 2026-07-13
+**Last swept:** 2026-07-15
+
+**Firestore paths (canonical):** `projects/{projectId}/assets/` and `projects/{projectId}/timeline/` per [design lock](../active/dal-firebase-design-lock-2026-07-13.md). The older `sessions/{projectId}/{sessionType}/` sketch is historical only.
+
+**Dual-domain (Phase 4 Slice D):** prep + timeline must be allowed **concurrent** on one project — [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md). Until that ships, `Dal_Sessions.js` has one slot and mutually excludes them.
 
 ---
 
@@ -41,14 +45,16 @@ SESSION CLOSED (fork left)
 
 ### Router & session record
 
-- [ ] `projectDataRouter` / per-slice routers (PA, timeline) — `normal` vs `session` backend
-- [ ] Session metadata: `projectId`, `sessionType`, `openedAt`, `openedBy`, `status` (open | committing | closed)
-- [ ] Store session flag on `Projects_Index` (authoritative for “is fork active?”) + Firebase mirror for live UI
-- [ ] Hard block: while session open, **no direct** `saveProjectAssetsDelta` / `saveTimelineData` to Sheets from client
+- [x] `projectDataRouter` / per-slice routers (PA, timeline) — `normal` vs `session` backend (Phase 4)
+- [x] Session metadata: `projectId`, `sessionType`, `openedAt`, `openedBy`, `status` (open | committing | closed) — **singleton row today**
+- [x] Store session flag on `Projects_Index` (authoritative for “is fork active?”) + Firebase `_meta` for live UI
+- [x] Hard block: while session open, **no direct** PA / timeline Sheets path for that domain (from adapter asserts)
+- [ ] **Slice D:** independent prep + timeline lifecycle on `Projects_Index` — concurrent open — [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md)
+- [ ] Hard block remains **per domain** after Slice D (prep open must not block timeline Sheets when timeline is normal, and vice versa)
 
 ### Firebase (Firestore)
 
-- [ ] Project-scoped paths — **reconcile** `sessions/{projectId}/{sessionType}/` (this doc) vs `projects/{projectId}/assets|timeline/` ([design lock](../active/dal-firebase-design-lock-2026-07-13.md)) in DAL Phase 2
+- [x] Project-scoped paths — canonical `projects/{projectId}/assets|timeline/` ([design lock](../active/dal-firebase-design-lock-2026-07-13.md))
 - [ ] **Lean read model** — avoid “subscribe to 500 rows” per client (session summary doc + targeted subcollections)
 - [ ] Write on **meaning** only (scan, drag end, add row) — debounce pack/qty 300–500 ms
 - [ ] Unsubscribe listeners when user leaves room / closes modal

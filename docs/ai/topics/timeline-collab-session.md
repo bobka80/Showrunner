@@ -6,7 +6,9 @@
 
 **Replaces/enhances:** current timeline **single-editor** presence lock (`reportProjectPresence`, `🔒 NAME EDITING` in `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`).
 
-**Status:** Phase A in progress — DAL open/close + Firestore fork shipped (GAS path). Live multi-user drag / room roster still open. See [../active/data-access-layer.md](../active/data-access-layer.md).
+**Status:** Phase A + **live sync** shipped — open/close fork + session/state sync while both users are in timeline. Drag-end writes / room roster still open. See [../active/data-access-layer.md](../active/data-access-layer.md).
+
+**Known gap (until DAL Phase 4 Slice D):** a project with **prep open** cannot start timeline collab (one `Dal_Session_*` slot). Product intent = both open at once — [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md). Workaround: END PREP → START COLLAB.
 
 ---
 
@@ -71,7 +73,10 @@ Is: **collaborative room** with shared live state.
 - [x] Enter/leave timeline room APIs (`openDalSession` / `closeDalSession` type `timelineCollab`)
 - [x] Snapshot timeline → Firebase on START COLLAB
 - [x] Hotfix: open/close must not hold ScriptLock across Firestore (starved presence → stuck 🔒 + START COLLAB timeout)
-- [ ] Multi-user shift drag with drag-end writes
+- [x] Button: `👥 N IN TIMELINE` instead of door lock (single-editor presence lock removed)
+- [x] **Live sync** — session open/close visible to others in timeline; state sync (Firestore listener + GAS poll fallback); SAVE stays in room during collab
+- [ ] **Depends on DAL Slice D** — timeline collab while prep is open (dual-domain registry)
+- [ ] Multi-user shift drag with drag-end writes (no SAVE button required)
 - [x] Manual END COLLAB commit (last-leave auto-commit later)
 
 ### Phase B — Phases + sub-events on fork

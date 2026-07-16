@@ -6,9 +6,13 @@
 
 **Related:** [project-assets-concurrency.md](project-assets-concurrency.md) · [logistics-warehouse.md](logistics-warehouse.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Status:** Backlog — **blocked on DAL campaign** ([../active/data-access-layer.md](../active/data-access-layer.md)). Firebase PA + ledger fork ships through repos/router, not ad hoc `Operations.js` branches.
+**Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. **Blocked items** remain on [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Last swept:** 2026-06-30
+**Last swept:** 2026-07-15
+
+**Known gap (until DAL Phase 4 Slice D):** prep open **blocks** timeline collab (singleton session slot). Product intent = both open at once — [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md).
+
+**Design lock note:** Logistics Hub / ledger = **atomic ops, not a prep fork** ([design lock §2](../active/dal-firebase-design-lock-2026-07-13.md)). Older bullet below about ledger/hub on the Firebase fork is aspirational floor UX; router today keeps `LEDGER` on Sheets.
 
 ---
 
@@ -17,7 +21,7 @@
 - **“Start preparation”** ≠ start packing only — includes **design mode** (add departments / lines).
 - While prep is active: **project-wide mode** — everyone sees **IN PREPARATION**; rules differ (like timeline lock, but **shared** busy mode, not one editor).
 - **No casual exit** — crew cannot turn off prep; only manager **End preparation** after checkout/check-in commit.
-- **Fork right:** Project Assets, expanded ledger, trucks, logistics hub actions route to **Firebase** — **no direct Sheets** for those slices until session closes.
+- **Fork right (PA):** Project Assets route to **Firebase** while prep open — **no direct Sheets** for PA until session closes. (Hub/ledger: see design lock — not forked via `Dal_Session_*`.)
 
 ---
 

@@ -1,0 +1,273 @@
+<!-- DAL Phase 4 — Timeline collab live sync (session + state; Firestore with GAS poll fallback) -->
+<script>
+window.dalTlSessionPollTimer = null;
+window.dalTlStatePollTimer = null;
+window.dalTlStateUnsub = null;
+window.dalTlWatchProjectId = '';
+window.dalTlIgnoreListenerUntil = 0;
+window.dalTlLastStateSig = '';
+window.dalTlRemotePending = false;
+window.dalTlLiveSyncMode = ''; // 'firestore' | 'gas' | ''
+window.dalTlWasSessionOpen = false;
+
+window.dalTimelineLayerOpen_ = function() {
+  var layer = document.getElementById('shift-layer');
+  return !!(layer && layer.style.display !== 'none' && layer.style.display !== '');
+};
+
+window.dalTimelineStateSig_ = function(shifts, phases, overrides) {
+  var s = (shifts || []).map(function(x) {
+    return [x.id || '', x.user_uid || x.email || '', x.role || '', x.start, x.duration, x.hasArrow ? 1 : 0, x.note || ''].join(':');
+  }).sort().join('|');
+  var p = (phases || []).map(function(x) {
+    return [x.id || '', x.type || '', x.start, x.duration, x.note || ''].join(':');
+  }).sort().join('|');
+  var oKeys = Object.keys(overrides || {}).sort();
+  var o = oKeys.map(function(k) { return k + '=' + (overrides[k] || ''); }).join('|');
+  return s + '##' + p + '##' + o;
+};
+
+window.dalMarkTimelineLocalSave_ = function() {
+  window.dalTlIgnoreListenerUntil = Date.now() + 2000;
+};
+
+window.dalUpdateTimelineLiveBanner_ = function() {
+  var banner = document.getElementById('dal-timeline-session-banner');
+  if (!banner || !window.dalTimelineSessionOpen) return;
+  if (window.dalTlRemotePending) {
+    banner.textContent = '👥 TIMELINE COLLAB — remote updates waiting (save or discard local edits to sync)';
+  } else if (window.dalTlLiveSyncMode === 'firestore') {
+    banner.textContent = '👥 TIMELINE COLLAB — live sync active';
+  } else if (window.dalTlLiveSyncMode === 'gas') {
+    banner.textContent = '👥 TIMELINE COLLAB — live sync (server)';
+  } else {
+    banner.textContent = '👥 TIMELINE COLLAB — saves go to Firebase until End Collab';
+  }
+};
+
+window.dalColorTimelineShifts_ = function(list) {
+  (list || []).forEach(function(s) {
+    if (typeof isTruck === 'function' && isTruck(s.user_uid || s.email)) {
+      s.color = '#e5e7eb';
+      s.textCol = '#18181b';
+    } else if (typeof ROLE_COLORS !== 'undefined' && ROLE_COLORS && ROLE_COLORS[s.role]) {
+      s.color = ROLE_COLORS[s.role].bg;
+      s.textCol = ROLE_COLORS[s.role].text;
+    }
+  });
+};
+
+window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remoteOverrides) {
+  if (!window.dalTimelineLayerOpen_()) return;
+  if (Date.now() < (window.dalTlIgnoreListenerUntil || 0)) return;
+
+  var shiftsIn = Array.isArray(remoteShifts) ? remoteShifts : [];
+  var phasesIn = Array.isArray(remotePhases) ? remotePhases : [];
+  var overridesIn = remoteOverrides && typeof remoteOverrides === 'object' ? remoteOverrides : {};
+  var sig = window.dalTimelineStateSig_(shiftsIn, phasesIn, overridesIn);
+  if (sig === window.dalTlLastStateSig) return;
+
+  if (window.isTimelineDirty) {
+    window.dalTlRemotePending = true;
+    window.dalTlLastStateSig = sig;
+    window.dalUpdateTimelineLiveBanner_();
+    return;
+  }
+
+  window.dalTlLastStateSig = sig;
+  window.dalTlRemotePending = false;
+
+  shifts = JSON.parse(JSON.stringify(shiftsIn));
+  window.dalColorTimelineShifts_(shifts);
+  activePhases = JSON.parse(JSON.stringify(phasesIn));
+  localDeptOverrides = JSON.parse(JSON.stringify(overridesIn));
+
+  var assigned = [];
+  shifts.forEach(function(s) {
+    var u = s.user_uid || s.email;
+    if (u && assigned.indexOf(u) === -1) assigned.push(u);
+  });
+  globalAssignedArr = assigned;
+  document.querySelectorAll('.internal-cb').forEach(function(cb) {
+    cb.checked = assigned.indexOf(cb.value) !== -1;
+  });
+
+  if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+  window.dalUpdateTimelineLiveBanner_();
+};
+
+window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
+  var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+  var banner = document.getElementById('dal-timeline-session-banner');
+  var startBtn = document.getElementById('dal-timeline-start-btn');
+  var endBtn = document.getElementById('dal-timeline-end-btn');
+  window.dalTimelineSessionOpen = !!isOpen;
+
+  if (banner) {
+    banner.style.display = (isOpen || isOpening) ? 'block' : 'none';
+    if (isOpening) banner.textContent = '⏳ TIMELINE COLLAB opening… — End Collab aborts a stuck start';
+    else if (isOpen) window.dalUpdateTimelineLiveBanner_();
+  }
+  if (startBtn) {
+    startBtn.style.display = (isOpen || isOpening || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly))
+      ? 'none' : 'inline-flex';
+  }
+  if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
+
+  if (isOpen) {
+    window.startDalTimelineStateSync_(projectId);
+  } else {
+    window.stopDalTimelineStateSync_();
+  }
+};
+
+window.stopDalTimelineStateSync_ = function() {
+  if (window.dalTlStateUnsub) {
+    try { window.dalTlStateUnsub(); } catch (e1) { /* ignore */ }
+    window.dalTlStateUnsub = null;
+  }
+  if (window.dalTlStatePollTimer) {
+    clearInterval(window.dalTlStatePollTimer);
+    window.dalTlStatePollTimer = null;
+  }
+  window.dalTlLiveSyncMode = '';
+  window.dalTlRemotePending = false;
+};
+
+window.startDalTimelineGasStateSync_ = function(projectId) {
+  if (!projectId || !window.dalTimelineSessionOpen) return;
+  if (window.dalTlStatePollTimer && window.dalTlLiveSyncMode === 'gas') return;
+
+  window.stopDalTimelineStateSync_();
+  window.dalTlLiveSyncMode = 'gas';
+  window.dalUpdateTimelineLiveBanner_();
+
+  var pull = function() {
+    if (!window.dalTimelineLayerOpen_() || !window.dalTimelineSessionOpen) return;
+    if (Date.now() < (window.dalTlIgnoreListenerUntil || 0)) return;
+    var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
+    google.script.run
+      .withFailureHandler(function() { /* keep last */ })
+      .withSuccessHandler(function(data) {
+        if (!data || !window.dalTimelineSessionOpen) return;
+        window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides);
+      })
+      .getTimelineData(projectId, mode);
+  };
+  pull();
+  window.dalTlStatePollTimer = setInterval(pull, 2500);
+};
+
+window.startDalTimelineFirestoreStateSync_ = function(projectId) {
+  if (!projectId || !window.dalTimelineSessionOpen) return;
+  if (typeof window.dalEnsureFirestoreClientAuth_ !== 'function') {
+    window.startDalTimelineGasStateSync_(projectId);
+    return;
+  }
+  window.dalEnsureFirestoreClientAuth_(function(err, client) {
+    if (err) {
+      console.warn('Timeline Firestore auth failed — using server sync:', err && err.message ? err.message : err);
+      window.startDalTimelineGasStateSync_(projectId);
+      return;
+    }
+    if (!window.dalTimelineSessionOpen || !window.dalTimelineLayerOpen_()) return;
+
+    window.stopDalTimelineStateSync_();
+    window.dalTlLiveSyncMode = 'firestore';
+    window.dalUpdateTimelineLiveBanner_();
+
+    var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
+    window.dalTlStateUnsub = ref.onSnapshot(function(snap) {
+      if (!window.dalTimelineSessionOpen) return;
+      if (!snap.exists) return;
+      if (snap.metadata && snap.metadata.fromCache && !snap.data()) return;
+      var d = snap.data() || {};
+      var remoteShifts = [];
+      var remotePhases = [];
+      var remoteOverrides = {};
+      try { remoteShifts = JSON.parse(d.shiftsJson || '[]'); } catch (e1) { remoteShifts = []; }
+      try { remotePhases = JSON.parse(d.phasesJson || '[]'); } catch (e2) { remotePhases = []; }
+      try { remoteOverrides = JSON.parse(d.overridesJson || '{}'); } catch (e3) { remoteOverrides = {}; }
+      window.dalApplyRemoteTimelineState_(remoteShifts, remotePhases, remoteOverrides);
+    }, function(listenErr) {
+      console.warn('Timeline Firestore listener error — falling back to server sync:', listenErr);
+      window.stopDalTimelineStateSync_();
+      window.startDalTimelineGasStateSync_(projectId);
+    });
+  });
+};
+
+window.startDalTimelineStateSync_ = function(projectId) {
+  if (!projectId || !window.dalTimelineSessionOpen) return;
+  if (window.dalTlLiveSyncMode === 'firestore' && window.dalTlStateUnsub) return;
+  if (window.dalTlLiveSyncMode === 'gas' && window.dalTlStatePollTimer) return;
+  window.startDalTimelineFirestoreStateSync_(projectId);
+};
+
+window.stopDalTimelineSessionWatcher = function() {
+  if (window.dalTlSessionPollTimer) {
+    clearInterval(window.dalTlSessionPollTimer);
+    window.dalTlSessionPollTimer = null;
+  }
+  window.stopDalTimelineStateSync_();
+  window.dalTlWatchProjectId = '';
+  window.dalTlWasSessionOpen = false;
+  window.dalTlLastStateSig = '';
+};
+
+window.dalHandleTimelineSessionInfo_ = function(info) {
+  var st = info ? String(info.status).toLowerCase() : '';
+  var isTl = info && info.sessionType === 'timelineCollab';
+  var isOpen = !!(isTl && st === 'open');
+  var isOpening = !!(isTl && st === 'opening');
+  var wasOpen = !!window.dalTlWasSessionOpen;
+
+  window.dalApplyTimelineSessionUi_(isOpen, isOpening);
+
+  // Session just closed by someone else — reload Sheets-backed timeline if local is clean.
+  if (wasOpen && !isOpen && !isOpening && window.dalTimelineLayerOpen_() && !window.isTimelineDirty) {
+    var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+    var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
+    if (projectId) {
+      google.script.run
+        .withFailureHandler(function() { /* keep view */ })
+        .withSuccessHandler(function(data) {
+          if (!data || window.isTimelineDirty) return;
+          window.dalTlLastStateSig = '';
+          window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides);
+        })
+        .getTimelineData(projectId, mode);
+    }
+  }
+  window.dalTlWasSessionOpen = isOpen;
+};
+
+window.startDalTimelineSessionWatcher = function(projectId) {
+  if (!projectId || projectId === 'NEW') return;
+  if (!window.dalTimelineLayerOpen_()) return;
+  if (window.dalTlWatchProjectId === String(projectId) && window.dalTlSessionPollTimer) {
+    // Already watching — still refresh once.
+    google.script.run
+      .withFailureHandler(function() {})
+      .withSuccessHandler(window.dalHandleTimelineSessionInfo_)
+      .getDalSessionInfo(projectId);
+    return;
+  }
+
+  window.stopDalTimelineSessionWatcher();
+  window.dalTlWatchProjectId = String(projectId);
+
+  var tick = function() {
+    if (!window.dalTimelineLayerOpen_()) {
+      window.stopDalTimelineSessionWatcher();
+      return;
+    }
+    google.script.run
+      .withFailureHandler(function() { /* keep last */ })
+      .withSuccessHandler(window.dalHandleTimelineSessionInfo_)
+      .getDalSessionInfo(projectId);
+  };
+  tick();
+  window.dalTlSessionPollTimer = setInterval(tick, 2500);
+};
+</script>

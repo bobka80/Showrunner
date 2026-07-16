@@ -37,6 +37,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) | This works / milestone / rollback |
 | [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) | Google Drive — `STAGE_MASTERS_SYSTEM_ROOT`, `05_DATABASE`, Showrunner Sync |
 | [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) | DAL + Firebase design lock (2026-07-13) |
+| [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) | Phase 4 Slice D — prep∥timeline concurrent sessions (before Phase 5) |
 | [active/dal-pre-ship-gates.md](active/dal-pre-ship-gates.md) | DAL mechanical gates (inventory, persistence lint, Phase 3 deploy ack) — **read before DAL hot-path ships** |
 | [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) | Scoped pre-ship + Bugbot gate (all layers) |
 | [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now **full protocol** (the root `../../MILESTONE_NOW.md` is the director's quick card that points here) |

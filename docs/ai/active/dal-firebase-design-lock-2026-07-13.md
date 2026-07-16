@@ -2,11 +2,11 @@
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Status:** **Design locked** — pending **Phase 0** discovery + codebase audit (say **OK go** to start Phase 0)
+**Status:** **Design locked** — Phase 0–4 (through Slice C) executed in campaign; **Slice D** (dual-domain sessions) documented next — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md). Track live checklists in [data-access-layer.md](data-access-layer.md).
 
 **Scope:** Replace current full-sheet-rewrite pattern with Firebase-first session forks, per-view caching, and reconciliation.
 
-> **Firestore paths:** This doc uses `/projects/{projectId}/assets/` and `/projects/{projectId}/timeline/`. [session-fork-platform.md](../topics/session-fork-platform.md) uses `sessions/{projectId}/{sessionType}/`. **Reconcile to one canonical layout in Phase 2 design lock** — do not implement both.
+> **Firestore paths (canonical):** `/projects/{projectId}/assets/` and `/projects/{projectId}/timeline/`. Older `sessions/{projectId}/{sessionType}/` sketch in [session-fork-platform.md](../topics/session-fork-platform.md) is historical only.
 
 ---
 
@@ -100,6 +100,7 @@ Sits **between UI and repos** — never inside adapters, never inside Firebase/S
 4. Conflict resolution must stay visible to users (notification), never a silent destructive overwrite.
 5. Cache Coordinator must remain an isolated module — safe to heavily modify later without breaking DAL/repos/adapters.
 6. Every fork is scoped to one project + one domain. No cross-project data ever shares a fork.
+7. **Concurrent domains on one project are allowed and required** — prep (`assets`) and timeline (`timeline`) may both be open at once. Session registry, close, reconciliation, and cache flush are **per domain**. A singleton “one session per project” slot is a Phase 4 Slice A–C shortcut and is **not** the locked end state — see [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md) (**Phase 4 Slice D**, before Phase 5).
 
 ---
 
@@ -121,8 +122,9 @@ Before writing any DAL code, answer these by reading the actual GAS source (not 
 - **Phase 2:** Centralized router (`projectDataRouter(domain, sessionStatus)`), hard-wired to Sheets only for now. Replace scattered direct `SpreadsheetApp` calls in features with repo calls.
 - **Phase 3:** Fix full-rewrite → delta-only writes in `saveProjectAssetsDelta` / `saveTimelineData` (this is the single highest-priority blocker — with 10-12 concurrent users, full rewrites silently overwrite each other today).
 - **Phase 4:** FirebaseAdapter + session open/close lifecycle (snapshot on open, commit on close) — only once router + repos exist.
-- **Phase 5:** Reconciliation engine (Firebase vs Sheets comparison post-sync) + failed-writes pocket.
-- **Phase 6:** Cache Coordinator with per-view policies and tag-based invalidation.
+  - **Phase 4 Slice D (required before Phase 5):** dual-domain session registry so prep + timeline can be open concurrently — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
+- **Phase 5:** Reconciliation engine (Firebase vs Sheets comparison post-sync) + failed-writes pocket — keys include **domain + sessionUid**.
+- **Phase 6:** Cache Coordinator with per-view policies and **domain-scoped** tag-based invalidation.
 
 ---
 

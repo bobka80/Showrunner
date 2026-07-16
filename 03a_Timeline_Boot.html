@@ -338,6 +338,9 @@ function openShiftLayout(mode, isReadOnly = false) {
           }
           
           rebuildTimelineGrid();
+          if (typeof window.startDalTimelineSessionWatcher === 'function') {
+            window.startDalTimelineSessionWatcher(targetFolderId);
+          }
           
       } catch (err) {
           document.getElementById('tt-rows-container').innerHTML = `<div style="color:#ef4444; padding:20px; font-weight:bold;">Client Error: ${err.message}</div>`;
@@ -354,6 +357,7 @@ function cancelShifts() {
   }
   window.isTimelineDirty = false;
   document.getElementById('shift-layer').style.display = 'none';
+  if (typeof window.stopDalTimelineSessionWatcher === 'function') window.stopDalTimelineSessionWatcher();
   
   window.activePresenceModule = 'main'; // Unlock the door
   window.isTimelineOccupiedBy = null;
@@ -460,13 +464,20 @@ function saveAndCloseShifts() {
   let localShiftsToSave = shifts.filter(s => crewUids.includes(s.user_uid || s.email) || isTruck(s.user_uid || s.email));
   
   let projVersion = document.getElementById('edit-proj-version') ? document.getElementById('edit-proj-version').value : '';
+  // During timeline collab, stay in the room so both users keep syncing.
+  const stayInCollab = !!window.dalTimelineSessionOpen;
   
-  document.getElementById('shift-layer').style.display = 'none';
-  window.activePresenceModule = 'main'; // Unlock the door
-  if (typeof startPresencePing === 'function' && targetFolderId) startPresencePing(targetFolderId);
+  if (!stayInCollab) {
+    document.getElementById('shift-layer').style.display = 'none';
+    if (typeof window.stopDalTimelineSessionWatcher === 'function') window.stopDalTimelineSessionWatcher();
+    window.activePresenceModule = 'main'; // Unlock the door
+    if (typeof startPresencePing === 'function' && targetFolderId) startPresencePing(targetFolderId);
+  } else if (typeof window.dalMarkTimelineLocalSave_ === 'function') {
+    window.dalMarkTimelineLocalSave_();
+  }
   
   let returnToRoster = cameFromRoster;
-  cameFromRoster = false;
+  if (!stayInCollab) cameFromRoster = false;
 
   window.isTimelineDirty = false;
 
@@ -536,20 +547,28 @@ function saveAndCloseShifts() {
           });
       });
       
-      if (returnToRoster && typeof renderMonthGrid === 'function') {
+      if (!stayInCollab && returnToRoster && typeof renderMonthGrid === 'function') {
           renderMonthGrid();
       }
   }
 
-  if (returnToRoster) {
-    document.getElementById('month-roster-layer').style.display = 'flex';
-  } else {
-    document.getElementById('edit-modal-overlay').style.display = 'flex';
+  if (!stayInCollab) {
+    if (returnToRoster) {
+      document.getElementById('month-roster-layer').style.display = 'flex';
+    } else {
+      document.getElementById('edit-modal-overlay').style.display = 'flex';
+    }
   }
 
   let projBtn = document.getElementById('update-btn');
   let origProjBtnText = projBtn ? projBtn.innerText : "SAVE & SYNC CALENDAR";
   if (projBtn) { projBtn.innerText = "SYNCING SHIFTS..."; projBtn.disabled = true; }
+  const saveBtn = document.getElementById('tt-save-btn');
+  const saveBtnOrig = saveBtn ? saveBtn.innerText : 'SAVE SHIFTS';
+  if (stayInCollab && saveBtn) {
+    saveBtn.innerText = 'SAVING…';
+    saveBtn.disabled = true;
+  }
   
   // Asynchronously push readiness status 
   google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState), ACTIVE_USER_NAME);
@@ -559,10 +578,12 @@ function saveAndCloseShifts() {
           if (err.message.includes("COLLISION_DETECTED")) alert("SAVE FAILED: Modified by another user. Please refresh.");
           else alert("Save Failed: " + err.message);
           if (projBtn) { projBtn.innerText = origProjBtnText; projBtn.disabled = false; }
+          if (stayInCollab && saveBtn) { saveBtn.innerText = saveBtnOrig; saveBtn.disabled = false; }
           if (typeof refreshData === 'function') refreshData();
       })
       .withSuccessHandler(res => {
          if (projBtn) { projBtn.innerText = origProjBtnText; projBtn.disabled = false; }
+         if (stayInCollab && saveBtn) { saveBtn.innerText = saveBtnOrig; saveBtn.disabled = false; }
          
          let finalRes = { status: res };
          try { if (typeof res === 'string' && res.startsWith('{')) finalRes = JSON.parse(res); } catch(e){}
@@ -570,7 +591,15 @@ function saveAndCloseShifts() {
              document.getElementById('edit-proj-version').value = finalRes.timestamp;
          }
          
-         if (typeof refreshData === 'function') refreshData(); 
+         if (stayInCollab) {
+           window.dalTlLastStateSig = window.dalTimelineStateSig_
+             ? window.dalTimelineStateSig_(localShiftsToSave, activePhases, localDeptOverrides)
+             : '';
+           window.dalTlRemotePending = false;
+           if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
+         } else if (typeof refreshData === 'function') {
+           refreshData();
+         }
       }).saveTimelineData(targetFolderId, currentShiftMode, localShiftsToSave, crewUids, activePhases, localDeptOverrides, projVersion, ACTIVE_USER_NAME, timelines); 
 }
 </script>

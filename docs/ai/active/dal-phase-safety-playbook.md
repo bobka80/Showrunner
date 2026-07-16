@@ -158,17 +158,28 @@ For the files in scope:
 
 **Security note:** This is the phase where secrets and permissions mistakes can happen. Keep Firebase config public-only and document paths + rules.
 
+**Slice D — Dual-domain sessions (prep + timeline concurrent):**
+
+- Spec: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
+- **Do not start Phase 5** until Slice D is shipped (or director explicitly waives with accepted cross-domain close risk).
+- **Must not:** close one domain’s session columns/Firestore path when ending the other; restore full-tab Sheet writes; fold Logistics Hub into the session registry as a fork.
+- **Must:** independent `Projects_Index` lifecycle per domain; smoke both open → end either → other stays live.
+
 ---
 
 ### Phase 5 — Reconciliation + failed-writes pocket
 
 **Goal:** Make commit-out trustworthy and loud on failure (manager alert).
 
+**Hard requirement after Slice D:** every reconcile / failed-write / retry / alert is keyed by `projectId` + **`domain`** + `sessionUid`. Never project-global session clear while another domain fork is open.
+
 ---
 
 ### Phase 6 — CacheCoordinator
 
 **Goal:** One isolated public API (`check`, `set`, `invalidate`, `registerPolicy`) and tag-based invalidation. Cache rides the router backend.
+
+**Hard requirement after Slice D:** domain-scoped tags (`project:{id}:pa` vs `project:{id}:timeline`); closing one domain never flushes the other live fork.
 
 ---
 

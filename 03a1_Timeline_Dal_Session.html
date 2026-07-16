@@ -21,6 +21,10 @@ window.refreshTimelineDalBanner = function() {
   google.script.run
     .withFailureHandler(function() { /* keep current */ })
     .withSuccessHandler(function(info) {
+      if (typeof window.dalHandleTimelineSessionInfo_ === 'function') {
+        window.dalHandleTimelineSessionInfo_(info);
+        return;
+      }
       var st = info ? String(info.status).toLowerCase() : '';
       var isTl = info && info.sessionType === 'timelineCollab';
       var isOpen = isTl && st === 'open';
@@ -55,10 +59,19 @@ function dalTimelineErrMsg_(err) {
 
 function dalTimelineCollabStarted_(joined) {
   window.dalTimelineSessionOpen = true;
-  window.refreshTimelineDalBanner();
+  window.dalTlWasSessionOpen = true;
+  if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+    window.dalApplyTimelineSessionUi_(true, false);
+  } else {
+    window.refreshTimelineDalBanner();
+  }
+  var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+  if (projectId && typeof window.startDalTimelineStateSync_ === 'function') {
+    window.startDalTimelineStateSync_(projectId);
+  }
   alert(joined
-    ? 'Joined timeline collaboration — SAVE SHIFTS writes to the Firebase fork.'
-    : 'Timeline collaboration started — SAVE SHIFTS now writes to the Firebase fork.');
+    ? 'Joined timeline collaboration — SAVE SHIFTS writes to the Firebase fork (stay in timeline to keep syncing).'
+    : 'Timeline collaboration started — SAVE SHIFTS writes to the Firebase fork (stay in timeline to keep syncing).');
 }
 
 function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
@@ -161,6 +174,8 @@ window.closeDalTimelineCollabSession = function() {
     .withSuccessHandler(function() {
       if (layer) layer.style.cursor = '';
       window.dalTimelineSessionOpen = false;
+      window.dalTlWasSessionOpen = false;
+      if (typeof window.stopDalTimelineStateSync_ === 'function') window.stopDalTimelineStateSync_();
       window.refreshTimelineDalBanner();
       alert('Timeline collaboration ended — committed to Sheets.');
     })
