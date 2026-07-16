@@ -1,8 +1,8 @@
 /**
  * SM Showrunner (smuruner) - Clean 8 Architecture
- * Dal_Sessions.js - DAL session registry + lifecycle (Phase 4 Slice B)
+ * Dal_Sessions.js - DAL session registry + lifecycle (Phase 4 Slice B + Slice D dual-domain)
  *
- * Authoritative session flags on Projects_Index. PA prep fork uses Firestore via Dal_Firestore.js.
+ * Authoritative session flags on Projects_Index. Prep and timelineCollab use independent column families.
  */
 
 // @INDEX: DAL -> Session registry (Phase 4)
@@ -17,8 +17,32 @@ var DAL_SESSION_INDEX_COLS = [
   'Dal_Session_Status',
   'Dal_Session_UID',
   'Dal_Session_Opened_At',
-  'Dal_Session_Opened_By'
+  'Dal_Session_Opened_By',
+  'Dal_Prep_Session_Status',
+  'Dal_Prep_Session_UID',
+  'Dal_Prep_Session_Opened_At',
+  'Dal_Prep_Session_Opened_By',
+  'Dal_Timeline_Session_Status',
+  'Dal_Timeline_Session_UID',
+  'Dal_Timeline_Session_Opened_At',
+  'Dal_Timeline_Session_Opened_By'
 ];
+
+function dalSessionFamilyPrefix_(sessionType) {
+  if (sessionType === DAL_SESSION_TYPE.PREP) return 'Dal_Prep_Session';
+  if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) return 'Dal_Timeline_Session';
+  throw new Error('Unknown session type: ' + sessionType);
+}
+
+function dalDomainSessionCols_(sessionType) {
+  var p = dalSessionFamilyPrefix_(sessionType);
+  return {
+    status: p + '_Status',
+    uid: p + '_UID',
+    openedAt: p + '_Opened_At',
+    openedBy: p + '_Opened_By'
+  };
+}
 
 /**
  * Lazy-add session columns on Projects_Index (same pattern as Active_Operation).
@@ -47,22 +71,145 @@ function dalGetProjectIndexRow_(projectId, sheets) {
   return null;
 }
 
+function dalReadDomainSession_(row, sessionType) {
+  var cols = dalDomainSessionCols_(sessionType);
+  var m = row.map;
+  var status = m[cols.status] !== undefined ? String(row.data[m[cols.status]] || '') : '';
+  return {
+    status: status,
+    sessionUid: m[cols.uid] !== undefined ? String(row.data[m[cols.uid]] || '') : '',
+    openedAt: m[cols.openedAt] !== undefined ? (row.data[m[cols.openedAt]] || '') : '',
+    openedBy: m[cols.openedBy] !== undefined ? String(row.data[m[cols.openedBy]] || '') : '',
+    sessionType: sessionType
+  };
+}
+
+function dalWriteDomainSession_(indexSheet, rowNum, map, sessionType, fields) {
+  var cols = dalDomainSessionCols_(sessionType);
+  var write = {};
+  if (fields.status !== undefined) write[cols.status] = fields.status;
+  if (fields.sessionUid !== undefined) write[cols.uid] = fields.sessionUid;
+  if (fields.openedAt !== undefined) write[cols.openedAt] = fields.openedAt;
+  if (fields.openedBy !== undefined) write[cols.openedBy] = fields.openedBy;
+  dalWriteSessionIndexFields_(indexSheet, rowNum, map, write);
+}
+
+function dalClearDomainSession_(indexSheet, rowNum, map, sessionType) {
+  dalWriteDomainSession_(indexSheet, rowNum, map, sessionType, {
+    status: '',
+    sessionUid: '',
+    openedAt: '',
+    openedBy: ''
+  });
+}
+
+function dalDomainOpenedAtMs_(row, sessionType) {
+  var cols = dalDomainSessionCols_(sessionType);
+  if (!row || !row.map || row.map[cols.openedAt] === undefined) return 0;
+  var raw = row.data[row.map[cols.openedAt]];
+  if (raw === null || raw === undefined || raw === '') return 0;
+  if (Object.prototype.toString.call(raw) === '[object Date]') return raw.getTime();
+  var t = new Date(raw).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
 /**
- * Read session record for a project (google.script.run safe — read only).
+ * Copy singleton Dal_Session_* into the matching domain family once, then clear legacy columns.
+ */
+function dalMigrateLegacySessionToDomain_(indexSheet, row) {
+  var legacyType = String(row.data[row.map['Dal_Session_Type']] || '');
+  var legacyStatus = String(row.data[row.map['Dal_Session_Status']] || '');
+  if (!legacyType || !legacyStatus) return false;
+
+  var domain = dalReadDomainSession_(row, legacyType);
+  if (!domain.status) {
+    dalWriteDomainSession_(indexSheet, row.rowNum, row.map, legacyType, {
+      status: legacyStatus,
+      sessionUid: row.data[row.map['Dal_Session_UID']],
+      openedAt: row.data[row.map['Dal_Session_Opened_At']],
+      openedBy: row.data[row.map['Dal_Session_Opened_By']]
+    });
+    var cols = dalDomainSessionCols_(legacyType);
+    row.data[row.map[cols.status]] = legacyStatus;
+    row.data[row.map[cols.uid]] = row.data[row.map['Dal_Session_UID']];
+    row.data[row.map[cols.openedAt]] = row.data[row.map['Dal_Session_Opened_At']];
+    row.data[row.map[cols.openedBy]] = row.data[row.map['Dal_Session_Opened_By']];
+  }
+
+  dalWriteSessionIndexFields_(indexSheet, row.rowNum, row.map, {
+    Dal_Session_Type: '',
+    Dal_Session_Status: '',
+    Dal_Session_UID: '',
+    Dal_Session_Opened_At: '',
+    Dal_Session_Opened_By: ''
+  });
+  row.data[row.map['Dal_Session_Type']] = '';
+  row.data[row.map['Dal_Session_Status']] = '';
+  row.data[row.map['Dal_Session_UID']] = '';
+  flushCache();
+  return true;
+}
+
+function dalFindSessionTypeForUid_(row, sessionUid) {
+  if (!sessionUid) return '';
+  var uid = String(sessionUid);
+  var prep = dalReadDomainSession_(row, DAL_SESSION_TYPE.PREP);
+  if (prep.sessionUid === uid) return DAL_SESSION_TYPE.PREP;
+  var tl = dalReadDomainSession_(row, DAL_SESSION_TYPE.TIMELINE_COLLAB);
+  if (tl.sessionUid === uid) return DAL_SESSION_TYPE.TIMELINE_COLLAB;
+  if (String(row.data[row.map['Dal_Session_UID']] || '') === uid) {
+    return String(row.data[row.map['Dal_Session_Type']] || '');
+  }
+  return '';
+}
+
+function dalLegacyFlatFromDomains_(prep, timeline) {
+  var pick = null;
+  if (prep && prep.status) pick = prep;
+  else if (timeline && timeline.status) pick = timeline;
+  if (!pick) {
+    return { status: '', sessionType: '', sessionUid: '', openedAt: '', openedBy: '' };
+  }
+  return {
+    status: pick.status,
+    sessionType: pick.sessionType,
+    sessionUid: pick.sessionUid,
+    openedAt: pick.openedAt,
+    openedBy: pick.openedBy
+  };
+}
+
+/**
+ * Read session records for a project (google.script.run safe — read only).
+ * Returns independent prep + timeline domains; legacy flat fields mirror the first active domain only.
  */
 function getDalSessionInfo(projectId) {
   return executeWithRetry(function () {
     var sheets = verifyDatabaseSchema(true);
     var row = dalGetProjectIndexRow_(projectId, sheets);
-    if (!row) return { projectId: projectId, status: DAL_SESSION.NORMAL, sessionType: '', sessionUid: '' };
-    var m = row.map;
+    if (!row) {
+      var empty = { status: '', sessionUid: '', openedAt: '', openedBy: '', sessionType: '' };
+      return {
+        projectId: projectId,
+        prep: Object.assign({}, empty, { sessionType: DAL_SESSION_TYPE.PREP }),
+        timeline: Object.assign({}, empty, { sessionType: DAL_SESSION_TYPE.TIMELINE_COLLAB })
+      };
+    }
+
+    dalMigrateLegacySessionToDomain_(sheets.index, row);
+
+    var prep = dalReadDomainSession_(row, DAL_SESSION_TYPE.PREP);
+    var timeline = dalReadDomainSession_(row, DAL_SESSION_TYPE.TIMELINE_COLLAB);
+    var legacy = dalLegacyFlatFromDomains_(prep, timeline);
     return {
       projectId: projectId,
-      status: String(row.data[m['Dal_Session_Status']] || DAL_SESSION.NORMAL),
-      sessionType: String(row.data[m['Dal_Session_Type']] || ''),
-      sessionUid: String(row.data[m['Dal_Session_UID']] || ''),
-      openedAt: row.data[m['Dal_Session_Opened_At']] || '',
-      openedBy: row.data[m['Dal_Session_Opened_By']] || ''
+      prep: prep,
+      timeline: timeline,
+      status: legacy.status,
+      sessionType: legacy.sessionType,
+      sessionUid: legacy.sessionUid,
+      openedAt: legacy.openedAt,
+      openedBy: legacy.openedBy
     };
   }, 3, true);
 }
@@ -73,19 +220,16 @@ function resolveDalSessionStatus_(projectId, domain) {
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) return DAL_SESSION.NORMAL;
 
-    var m = row.map;
-    var status = String(row.data[m['Dal_Session_Status']] || '').toLowerCase();
-    var sessionType = String(row.data[m['Dal_Session_Type']] || '');
+    dalMigrateLegacySessionToDomain_(sheets.index, row);
+
+    var sessionType = domain === DAL_DOMAIN.PROJECT_ASSETS
+      ? DAL_SESSION_TYPE.PREP
+      : DAL_SESSION_TYPE.TIMELINE_COLLAB;
+    var d = dalReadDomainSession_(row, sessionType);
+    var status = String(d.status || '').toLowerCase();
 
     if (status === 'committing') return DAL_SESSION.COMMITTING;
-    if (status !== 'open') return DAL_SESSION.NORMAL;
-
-    if (domain === DAL_DOMAIN.PROJECT_ASSETS && sessionType === DAL_SESSION_TYPE.PREP) {
-      return DAL_SESSION.SESSION_OPEN;
-    }
-    if (domain === DAL_DOMAIN.TIMELINE && sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
-      return DAL_SESSION.SESSION_OPEN;
-    }
+    if (status === 'open') return DAL_SESSION.SESSION_OPEN;
     return DAL_SESSION.NORMAL;
   } catch (e) {
     return DAL_SESSION.NORMAL;
@@ -100,58 +244,31 @@ function dalWriteSessionIndexFields_(indexSheet, rowNum, map, fields) {
   });
 }
 
-/** Stale "opening" after client timeout / "committing" after crashed close — reclaim so START COLLAB is not dead. */
+/** Stale "opening" after client timeout / "committing" after crashed close — reclaim per domain. */
 var DAL_STALE_OPENING_MS_ = 90 * 1000;
 var DAL_STALE_COMMITTING_MS_ = 5 * 60 * 1000;
 
-/**
- * Clear Projects_Index session fields for a known sessionUid (rollback / finish close).
- */
-function dalClearSessionIndexIfUid_(projectId, sessionUid) {
+function dalClearDomainSessionIfUid_(projectId, sessionType, sessionUid) {
   var sheets = verifyDatabaseSchema();
   var row = dalGetProjectIndexRow_(projectId, sheets);
   if (!row) return;
-  if (sessionUid && String(row.data[row.map['Dal_Session_UID']] || '') !== String(sessionUid)) return;
-  dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
-    Dal_Session_Type: '',
-    Dal_Session_Status: '',
-    Dal_Session_UID: '',
-    Dal_Session_Opened_At: '',
-    Dal_Session_Opened_By: ''
-  });
+  var d = dalReadDomainSession_(row, sessionType);
+  if (sessionUid && d.sessionUid !== String(sessionUid)) return;
+  dalClearDomainSession_(sheets.index, row.rowNum, row.map, sessionType);
   flushCache();
 }
 
-function dalSessionOpenedAtMs_(row) {
-  if (!row || !row.map || row.map['Dal_Session_Opened_At'] === undefined) return 0;
-  var raw = row.data[row.map['Dal_Session_Opened_At']];
-  if (raw === null || raw === undefined || raw === '') return 0;
-  if (Object.prototype.toString.call(raw) === '[object Date]') return raw.getTime();
-  var t = new Date(raw).getTime();
-  return isNaN(t) ? 0 : t;
-}
-
-/**
- * Clear stuck opening/committing rows so a failed START COLLAB does not permanently block the project.
- * Must be called inside executeWithRetry (holds sheet write lock).
- */
-function dalReclaimStaleSessionRow_(indexSheet, row) {
-  var status = String(row.data[row.map['Dal_Session_Status']] || '').toLowerCase();
+function dalReclaimStaleDomainSession_(indexSheet, row, sessionType) {
+  var cols = dalDomainSessionCols_(sessionType);
+  var status = String(row.data[row.map[cols.status]] || '').toLowerCase();
   if (status !== 'opening' && status !== 'committing') return false;
-  var openedMs = dalSessionOpenedAtMs_(row);
+  var openedMs = dalDomainOpenedAtMs_(row, sessionType);
   var age = openedMs ? (Date.now() - openedMs) : Number.POSITIVE_INFINITY;
   var limit = status === 'opening' ? DAL_STALE_OPENING_MS_ : DAL_STALE_COMMITTING_MS_;
   if (age < limit) return false;
-  dalWriteSessionIndexFields_(indexSheet, row.rowNum, row.map, {
-    Dal_Session_Type: '',
-    Dal_Session_Status: '',
-    Dal_Session_UID: '',
-    Dal_Session_Opened_At: '',
-    Dal_Session_Opened_By: ''
-  });
-  row.data[row.map['Dal_Session_Type']] = '';
-  row.data[row.map['Dal_Session_Status']] = '';
-  row.data[row.map['Dal_Session_UID']] = '';
+  dalClearDomainSession_(indexSheet, row.rowNum, row.map, sessionType);
+  row.data[row.map[cols.status]] = '';
+  row.data[row.map[cols.uid]] = '';
   flushCache();
   return true;
 }
@@ -170,8 +287,7 @@ function dalAssertCanOpenSessionType_(sessionType, actor) {
 }
 
 /**
- * Phase 1 of open — join existing same-type session, or reserve "opening".
- * Timeline UI chains this with finishDalSession so each google.script.run stays under timeout.
+ * Phase 1 of open — join existing same-type session, or reserve "opening" on this domain only.
  */
 function beginDalSession(projectId, sessionType, actor) {
   dalAssertCanOpenSessionType_(sessionType, actor);
@@ -183,14 +299,14 @@ function beginDalSession(projectId, sessionType, actor) {
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) throw new Error('Project not found.');
 
-    dalReclaimStaleSessionRow_(sheets.index, row);
+    dalMigrateLegacySessionToDomain_(sheets.index, row);
+    dalReclaimStaleDomainSession_(sheets.index, row, sessionType);
 
-    var curStatus = String(row.data[row.map['Dal_Session_Status']] || '').toLowerCase();
-    var curType = String(row.data[row.map['Dal_Session_Type']] || '');
-    var curUid = String(row.data[row.map['Dal_Session_UID']] || '');
+    var cur = dalReadDomainSession_(row, sessionType);
+    var curStatus = String(cur.status || '').toLowerCase();
+    var curUid = cur.sessionUid;
 
-    // Second user (or retry after timeout): join live same-type session — no re-snapshot.
-    if (curStatus === 'open' && curType === sessionType) {
+    if (curStatus === 'open') {
       return {
         success: true,
         joined: true,
@@ -200,32 +316,18 @@ function beginDalSession(projectId, sessionType, actor) {
       };
     }
 
-    if (curStatus === 'open' || curStatus === 'committing' || curStatus === 'opening') {
-      // One Projects_Index session slot per project — prep and timelineCollab cannot overlap.
-      if (curType === DAL_SESSION_TYPE.PREP && sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
-        throw new Error(
-          'Preparation is still active on this project. Open Project Assets → END PREP, then start timeline collab.'
-        );
-      }
-      if (curType === DAL_SESSION_TYPE.TIMELINE_COLLAB && sessionType === DAL_SESSION_TYPE.PREP) {
-        throw new Error(
-          'Timeline collab is still active. Open the timeline → END COLLAB, then start prep.'
-        );
-      }
+    if (curStatus === 'committing' || curStatus === 'opening') {
       throw new Error(
-        'A session is already ' + curStatus + ' on this project' +
-        (curType ? ' (' + curType + ')' : '') +
-        '. End that session first' +
-        (curStatus === 'opening' ? ', or wait ~90s if a prior start timed out.' : '.')
+        'A ' + sessionType + ' session is already ' + curStatus + ' on this project.' +
+        (curStatus === 'opening' ? ' Wait ~90s if a prior start timed out, or End Collab / End Prep to abort.' : ' End that session first.')
       );
     }
 
-    dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
-      Dal_Session_Type: sessionType,
-      Dal_Session_Status: 'opening',
-      Dal_Session_UID: sessionUid,
-      Dal_Session_Opened_At: now,
-      Dal_Session_Opened_By: actor
+    dalWriteDomainSession_(sheets.index, row.rowNum, row.map, sessionType, {
+      status: 'opening',
+      sessionUid: sessionUid,
+      openedAt: now,
+      openedBy: actor
     });
     flushCache();
     return {
@@ -248,11 +350,13 @@ function finishDalSession(projectId, sessionUid, actor) {
     var sheets = verifyDatabaseSchema();
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) throw new Error('Project not found.');
-    if (String(row.data[row.map['Dal_Session_UID']] || '') !== String(sessionUid)) {
-      throw new Error('Session open raced — retry START COLLAB.');
-    }
-    var status = String(row.data[row.map['Dal_Session_Status']] || '').toLowerCase();
-    var type = String(row.data[row.map['Dal_Session_Type']] || '');
+
+    dalMigrateLegacySessionToDomain_(sheets.index, row);
+    var sessionType = dalFindSessionTypeForUid_(row, sessionUid);
+    if (!sessionType) throw new Error('Session open raced — retry START COLLAB.');
+
+    var cur = dalReadDomainSession_(row, sessionType);
+    var status = String(cur.status || '').toLowerCase();
     if (status === 'open') {
       return {
         alreadyOpen: true,
@@ -260,7 +364,7 @@ function finishDalSession(projectId, sessionUid, actor) {
           success: true,
           joined: true,
           sessionUid: sessionUid,
-          sessionType: type,
+          sessionType: sessionType,
           status: 'open'
         }
       };
@@ -268,8 +372,8 @@ function finishDalSession(projectId, sessionUid, actor) {
     if (status !== 'opening') {
       throw new Error('Session is not opening (status=' + status + '). Retry START COLLAB.');
     }
-    dalAssertCanOpenSessionType_(type, actor);
-    return { alreadyOpen: false, sessionType: type };
+    dalAssertCanOpenSessionType_(sessionType, actor);
+    return { alreadyOpen: false, sessionType: sessionType };
   });
 
   if (gate.alreadyOpen) return gate.result;
@@ -285,7 +389,7 @@ function finishDalSession(projectId, sessionUid, actor) {
     }
   } catch (snapErr) {
     try {
-      executeWithRetry(function () { dalClearSessionIndexIfUid_(projectId, sessionUid); });
+      executeWithRetry(function () { dalClearDomainSessionIfUid_(projectId, sessionType, sessionUid); });
     } catch (clearErr) { /* keep original error */ }
     throw snapErr;
   }
@@ -294,21 +398,19 @@ function finishDalSession(projectId, sessionUid, actor) {
     var sheets = verifyDatabaseSchema();
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) throw new Error('Project not found.');
-    if (String(row.data[row.map['Dal_Session_UID']] || '') !== String(sessionUid)) {
-      throw new Error('Session open raced — retry.');
-    }
-    dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
-      Dal_Session_Status: 'open'
-    });
+    var resolvedType = dalFindSessionTypeForUid_(row, sessionUid);
+    if (!resolvedType) throw new Error('Session open raced — retry.');
+    var cur = dalReadDomainSession_(row, resolvedType);
+    if (cur.sessionUid !== String(sessionUid)) throw new Error('Session open raced — retry.');
+    dalWriteDomainSession_(sheets.index, row.rowNum, row.map, resolvedType, { status: 'open' });
     flushCache();
-    writeToAuditLog(actor, 'OPEN', 'DAL_SESSION', projectId, sessionUid, 'Opened ' + sessionType + ' session.');
-    return { success: true, joined: false, sessionUid: sessionUid, sessionType: sessionType, status: 'open' };
+    writeToAuditLog(actor, 'OPEN', 'DAL_SESSION', projectId, sessionUid, 'Opened ' + resolvedType + ' session.');
+    return { success: true, joined: false, sessionUid: sessionUid, sessionType: resolvedType, status: 'open' };
   });
 }
 
 /**
  * Open a DAL session (prep or timelineCollab). Wrapper = begin + finish.
- * Timeline UI prefers beginDalSession → finishDalSession to avoid client timeout.
  */
 function openDalSession(projectId, sessionType, actor) {
   var begin = beginDalSession(projectId, sessionType, actor);
@@ -317,67 +419,65 @@ function openDalSession(projectId, sessionType, actor) {
 }
 
 /**
- * Close DAL session — commit Firestore → Sheets, clear fork.
- * Mark committing under short lock; Firestore+commit body outside so ScriptLock is not held for UrlFetch.
+ * Close one domain's DAL session — commit Firestore → Sheets, clear that fork only.
+ * sessionType: 'prep' | 'timelineCollab' (required when both domains may be open).
  */
-function closeDalSession(projectId, actor) {
-  var sessionType = executeWithRetry(function () {
+function closeDalSession(projectId, actor, sessionType) {
+  if (!sessionType) {
+    throw new Error('Missing session type — pass prep or timelineCollab.');
+  }
+
+  var gate = executeWithRetry(function () {
     var sheets = verifyDatabaseSchema();
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) throw new Error('Project not found.');
 
-    var type = String(row.data[row.map['Dal_Session_Type']] || '');
-    var curStatus = String(row.data[row.map['Dal_Session_Status']] || '').toLowerCase();
+    dalMigrateLegacySessionToDomain_(sheets.index, row);
+    var cur = dalReadDomainSession_(row, sessionType);
+    var curStatus = String(cur.status || '').toLowerCase();
 
-    // Abort a stuck/half-open reserve without commit (client timed out during START COLLAB).
     if (curStatus === 'opening') {
-      if (type === DAL_SESSION_TYPE.TIMELINE_COLLAB) assertActorCanEditTimeline(actor);
+      if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) assertActorCanEditTimeline(actor);
       else assertActorCanManageDalPrepSession(actor);
-      dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
-        Dal_Session_Type: '',
-        Dal_Session_Status: '',
-        Dal_Session_UID: '',
-        Dal_Session_Opened_At: '',
-        Dal_Session_Opened_By: ''
-      });
+      dalClearDomainSession_(sheets.index, row.rowNum, row.map, sessionType);
       flushCache();
-      return { abortOpening: true, type: type };
+      return { abortOpening: true, type: sessionType };
     }
 
-    if (curStatus !== 'open') throw new Error('No open session on this project.');
+    if (curStatus !== 'open') throw new Error('No open ' + sessionType + ' session on this project.');
 
-    if (type === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
+    if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
       assertActorCanEditTimeline(actor);
     } else {
       assertActorCanManageDalPrepSession(actor);
     }
 
-    // Mark committing on Sheets first so polls never report "open" while Firestore drains.
-    dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, { Dal_Session_Status: 'committing' });
+    dalWriteDomainSession_(sheets.index, row.rowNum, row.map, sessionType, { status: 'committing' });
     flushCache();
-    return { abortOpening: false, type: type };
+    return { abortOpening: false, type: sessionType };
   });
 
-  if (sessionType && sessionType.abortOpening) {
+  if (gate && gate.abortOpening) {
     try {
-      if (sessionType.type === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
+      if (gate.type === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
         firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta');
         firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
-      } else if (sessionType.type === DAL_SESSION_TYPE.PREP) {
+      } else if (gate.type === DAL_SESSION_TYPE.PREP) {
         firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
       }
     } catch (cleanErr) { /* index already cleared */ }
-    return { success: true, sessionType: sessionType.type, status: 'aborted' };
+    return { success: true, sessionType: gate.type, status: 'aborted' };
   }
-  sessionType = sessionType.type;
+
+  var closingType = gate.type;
 
   try {
-    if (sessionType === DAL_SESSION_TYPE.PREP) {
+    if (closingType === DAL_SESSION_TYPE.PREP) {
       dalCommitPaFromFirestore_(projectId);
-    } else if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
+    } else if (closingType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
       dalCommitTimelineFromFirestore_(projectId, actor);
     } else {
-      throw new Error('Close not implemented for session type: ' + sessionType);
+      throw new Error('Close not implemented for session type: ' + closingType);
     }
   } catch (commitErr) {
     throw commitErr;
@@ -387,15 +487,9 @@ function closeDalSession(projectId, actor) {
     var sheets = verifyDatabaseSchema();
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) throw new Error('Project not found.');
-    dalWriteSessionIndexFields_(sheets.index, row.rowNum, row.map, {
-      Dal_Session_Type: '',
-      Dal_Session_Status: '',
-      Dal_Session_UID: '',
-      Dal_Session_Opened_At: '',
-      Dal_Session_Opened_By: ''
-    });
+    dalClearDomainSession_(sheets.index, row.rowNum, row.map, closingType);
     flushCache();
-    writeToAuditLog(actor, 'CLOSE', 'DAL_SESSION', projectId, projectId, 'Closed ' + sessionType + ' session — committed to Sheets.');
-    return { success: true, sessionType: sessionType, status: 'closed' };
+    writeToAuditLog(actor, 'CLOSE', 'DAL_SESSION', projectId, projectId, 'Closed ' + closingType + ' session — committed to Sheets.');
+    return { success: true, sessionType: closingType, status: 'closed' };
   });
 }

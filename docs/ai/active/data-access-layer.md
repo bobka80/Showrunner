@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice C shipped**; **Slice D documented** (dual-domain prep∥timeline — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md), before Phase 5). **Production:** GAS **v598+**. **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** **Phase 4 Slice D shipped** (dual-domain prep∥timeline). **Production:** GAS **v603+**. **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -350,15 +350,15 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Timeline live sync** — while both users are in timeline: session open/close + fork state sync (`03a2_Timeline_Dal_Live.html`; Firestore listener with GAS poll fallback); SAVE stays in room during collab
 - [x] **Hotfix** — `openDalSession` / `closeDalSession` release ScriptLock during Firestore UrlFetch (was starving presence → stuck 🔒 door + client timeout on START COLLAB)
 - [x] **Hotfix** — timeline START COLLAB: `beginDalSession` + `finishDalSession` (join if open, reclaim stale opening ~90s, faster Firestore upsert)
-- [ ] **Slice D — Dual-domain sessions** — prep + timelineCollab **concurrent** on one project (design lock: per project + per domain). Spec + harm analysis: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md). **Do before Phase 5.**
-  - [ ] Independent prep + timeline lifecycle columns on `Projects_Index` (migrate off singleton `Dal_Session_*`)
-  - [ ] Domain-specific begin/finish/close / stale reclaim / `getDalSessionInfo`
-  - [ ] Close prep must not touch timeline fork; close timeline must not touch prep fork
+- [x] **Slice D — Dual-domain sessions** — prep + timelineCollab **concurrent** on one project (design lock: per project + per domain). Spec: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
+  - [x] Independent prep + timeline lifecycle columns on `Projects_Index` (migrate off singleton `Dal_Session_*`)
+  - [x] Domain-specific begin/finish/close / stale reclaim / `getDalSessionInfo`
+  - [x] Close prep must not touch timeline fork; close timeline must not touch prep fork
   - [ ] Smoke: both open → each domain routes only its fork; end either → other stays live
 - [ ] End session → reconciliation engine (Phase 5)
 - [ ] **Logistics Hub:** atomic per-op path (no fork) per [design lock §2](dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
 
-**Known gap until Slice D:** one `Dal_Session_*` slot → prep blocks timeline collab (and reverse). Floor workaround: END PREP before START COLLAB. Error copy documents this; do not treat as product intent.
+**Known gap until Slice D:** ~~one `Dal_Session_*` slot~~ **Resolved v603** — prep and timeline use independent column families. Legacy singleton migrates on first read.
 
 ### Phase 5 — Reconciliation + failed-writes pocket
 

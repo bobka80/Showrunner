@@ -2,8 +2,7 @@
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) · **Platform:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Safety:** [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md)
 
-**Status:** **Documented / not started** (2026-07-15). Waiting for director **OK go** to implement.  
-**Why this file exists:** Phase 4 Slice A–C shipped a **single** `Projects_Index` session slot. That mutually excludes prep and timeline collab. The design lock already requires **per project + per domain** forks. This slice closes that gap **before Phase 5**.
+**Status:** **Shipped** (2026-07-16, GAS v603). Prep + timeline concurrent on one project.
 
 ---
 

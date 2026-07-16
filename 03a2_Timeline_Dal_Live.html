@@ -216,10 +216,10 @@ window.stopDalTimelineSessionWatcher = function() {
 };
 
 window.dalHandleTimelineSessionInfo_ = function(info) {
-  var st = info ? String(info.status).toLowerCase() : '';
-  var isTl = info && info.sessionType === 'timelineCollab';
-  var isOpen = !!(isTl && st === 'open');
-  var isOpening = !!(isTl && st === 'opening');
+  var tl = window.dalTimelineInfoFromSession_(info);
+  var st = tl ? String(tl.status).toLowerCase() : '';
+  var isOpen = st === 'open';
+  var isOpening = st === 'opening';
   var wasOpen = !!window.dalTlWasSessionOpen;
 
   window.dalApplyTimelineSessionUi_(isOpen, isOpening);

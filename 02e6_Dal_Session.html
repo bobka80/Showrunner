@@ -7,6 +7,8 @@ window.dalPrepSheetsPollGen = 0;
 window.dalPrepClosing = false;
 
 window.dalIsPrepOpenFromInfo_ = function(info) {
+  var prep = info && info.prep;
+  if (prep) return String(prep.status).toLowerCase() === 'open';
   return !!(info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'prep');
 };
 
@@ -153,6 +155,6 @@ window.closeDalPrepSession = function() {
       window.dalPrepClosing = false;
       alert('Preparation ended — committed to Sheets.');
     })
-    .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));
+    .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'prep');
 };
 </script>

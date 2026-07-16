@@ -2,6 +2,12 @@
 <script>
 window.dalTimelineSessionOpen = false;
 
+window.dalTimelineInfoFromSession_ = function(info) {
+  if (info && info.timeline) return info.timeline;
+  if (info && info.sessionType === 'timelineCollab') return info;
+  return { status: '', sessionType: 'timelineCollab', sessionUid: '' };
+};
+
 window.refreshTimelineDalBanner = function() {
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
   var banner = document.getElementById('dal-timeline-session-banner');
@@ -25,10 +31,10 @@ window.refreshTimelineDalBanner = function() {
         window.dalHandleTimelineSessionInfo_(info);
         return;
       }
-      var st = info ? String(info.status).toLowerCase() : '';
-      var isTl = info && info.sessionType === 'timelineCollab';
-      var isOpen = isTl && st === 'open';
-      var isOpening = isTl && st === 'opening';
+      var tl = window.dalTimelineInfoFromSession_(info);
+      var st = tl ? String(tl.status).toLowerCase() : '';
+      var isOpen = st === 'open';
+      var isOpening = st === 'opening';
       window.dalTimelineSessionOpen = !!isOpen;
       if (banner) {
         banner.style.display = (isOpen || isOpening) ? 'block' : 'none';
@@ -47,10 +53,6 @@ function dalTimelineErrMsg_(err) {
     msg = msg.replace(/^Database Lockout after \d+ attempts:\s*/, '');
   }
   if (msg.indexOf('Error: ') === 0) msg = msg.slice(7);
-  // Prep ↔ timeline share one session slot — do not attach the timeout hint.
-  if (/Preparation is still active|Timeline collab is still active|session is already open/i.test(msg)) {
-    return msg;
-  }
   if (/timed out|Timeout|timeout/i.test(msg)) {
     return msg + '\n\nWait a few seconds and click START COLLAB again — a stuck open clears automatically after ~90s.';
   }
@@ -84,12 +86,12 @@ function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
           alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
         })
         .withSuccessHandler(function(info) {
-          var status = info ? String(info.status).toLowerCase() : '';
-          if (status === 'open' && info.sessionType === 'timelineCollab') {
+          var tl = window.dalTimelineInfoFromSession_(info);
+          if (String(tl.status).toLowerCase() === 'open') {
             dalTimelineCollabStarted_(true);
             return;
           }
-          if (status === 'opening') {
+          if (String(tl.status).toLowerCase() === 'opening') {
             alert('Timeline collab is still opening. Wait ~10 seconds, then click START COLLAB again.');
             return;
           }
@@ -122,7 +124,8 @@ window.openDalTimelineCollabSession = function() {
           alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
         })
         .withSuccessHandler(function(info) {
-          if (info && String(info.status).toLowerCase() === 'open' && info.sessionType === 'timelineCollab') {
+          var tl = window.dalTimelineInfoFromSession_(info);
+          if (String(tl.status).toLowerCase() === 'open') {
             dalTimelineCollabStarted_(true);
             return;
           }
@@ -160,7 +163,8 @@ window.closeDalTimelineCollabSession = function() {
           alert('End timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
         })
         .withSuccessHandler(function(info) {
-          var status = info ? String(info.status).toLowerCase() : '';
+          var tl = window.dalTimelineInfoFromSession_(info);
+          var status = tl ? String(tl.status).toLowerCase() : '';
           if (!status || status === 'normal' || status === '') {
             window.dalTimelineSessionOpen = false;
             window.refreshTimelineDalBanner();
@@ -179,6 +183,6 @@ window.closeDalTimelineCollabSession = function() {
       window.refreshTimelineDalBanner();
       alert('Timeline collaboration ended — committed to Sheets.');
     })
-    .closeDalSession(projectId, actor);
+    .closeDalSession(projectId, actor, 'timelineCollab');
 };
 </script>
