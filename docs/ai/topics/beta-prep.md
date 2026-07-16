@@ -2,7 +2,9 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-06-28 · **Status:** Partial — RBAC 1–5 + fin globals shipped; full beta payroll/transport pending
+**Last swept:** 2026-07-16 · **Status:** Partial — RBAC 1–5 + fin globals shipped; full beta payroll/transport pending
+
+**Before inviting users:** run [pre-beta-hardening.md](pre-beta-hardening.md) (multi-sweep debug — **last** on the roadmap). This file = product beta features; that file = whole-app purity + root-cause sweeps.
 
 ---
 
@@ -23,3 +25,5 @@
 - [ ] **RBAC Phase 6 QA** — role templates + director test checklist before beta
 
 Push notification scenarios: [notifications-catalog.md](notifications-catalog.md).
+
+Pre-beta whole-app debug (comes after product work): [pre-beta-hardening.md](pre-beta-hardening.md).

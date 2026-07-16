@@ -23,6 +23,7 @@ One file per feature area. **Read only the topic you need.**
 - [availability-fleet.md](availability-fleet.md) — availability & fleet tracker
 - [ux-platform.md](ux-platform.md) — UX, Personal Hub, desktop lock
 - [beta-prep.md](beta-prep.md) — beta prep (payroll, transport, audit)
+- [pre-beta-hardening.md](pre-beta-hardening.md) — **final** multi-sweep debug before users (after product TODO)
 - [training-manuals.md](training-manuals.md) — training manuals
 - [workspace-migration.md](workspace-migration.md) — Google Workspace migration (done)
 - [drive-nas-year-archive.md](drive-nas-year-archive.md) — Drive → NAS year archive
@@ -32,6 +33,6 @@ One file per feature area. **Read only the topic you need.**
 - [timeline-collab-session.md](timeline-collab-session.md) — multi-user timeline room
 - [timeline-shift-field-crew.md](timeline-shift-field-crew.md) — shift confirm & field actuals
 
-**Build order:** ~~[workspace-migration.md](workspace-migration.md)~~ ✓ → DAL campaign ([../active/data-access-layer.md](../active/data-access-layer.md)) through **Phase 4 Slice D** ([../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md)) → Phase 5–6 → fuller [warehouse-prep-session.md](warehouse-prep-session.md) / [timeline-collab-session.md](timeline-collab-session.md) UX. **Shift confirm** may start early; **field actuals** after confirm.
+**Build order:** ~~[workspace-migration.md](workspace-migration.md)~~ ✓ → DAL campaign ([../active/data-access-layer.md](../active/data-access-layer.md)) through **Phase 4 Slice D** ([../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md)) → Phase 5–6 → fuller [warehouse-prep-session.md](warehouse-prep-session.md) / [timeline-collab-session.md](timeline-collab-session.md) UX. **Shift confirm** may start early; **field actuals** after confirm. **Last before users:** [pre-beta-hardening.md](pre-beta-hardening.md).
 
 When adding a new area: create a topic file here, add one line to `Project_TODO.md` index (the only status table). **Do not** put canonical “how it works” docs in this folder — use [drawer placement rules](../README.md#where-to-put-new-documentation) in the parent README.

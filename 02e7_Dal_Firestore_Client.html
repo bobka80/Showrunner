@@ -294,8 +294,10 @@ window.startDalPaLiveSync_ = function(projectId) {
   window.startDalPaFirestoreListener(projectId);
 };
 
-window.stopDalPaSessionWatcher = function() {
+window.stopDalPaSessionWatcher = function(opts) {
+  opts = opts || {};
   window.stopDalPaLiveSync_();
+  if (typeof window.stopDalPrepSessionPoll_ === 'function') window.stopDalPrepSessionPoll_();
   if (window.dalPaSessionMetaUnsub) {
     try { window.dalPaSessionMetaUnsub(); } catch (e) { /* ignore */ }
     window.dalPaSessionMetaUnsub = null;
@@ -303,8 +305,8 @@ window.stopDalPaSessionWatcher = function() {
   window.dalPaSessionWatchProjectId = '';
   window.dalMetaAuthority = false;
   window.dalPaSessionWatchStarting = false;
-  // Clear latch on leave so reopen re-reads Sheets (other user may have ended prep).
-  if (!window.dalPrepClosing) {
+  // Clear latch only when leaving PA / ending prep — not when re-attaching the watcher.
+  if (opts.clearLatch && !window.dalPrepClosing) {
     window.dalPrepLatched = false;
     window.dalPrepUiOpen = false;
   }
@@ -312,8 +314,14 @@ window.stopDalPaSessionWatcher = function() {
 
 window.startDalPaSessionWatcher = function(projectId) {
   if (!projectId || projectId === 'NEW') return;
-  if (window.dalPaSessionWatchProjectId === String(projectId) && (window.dalPaSessionMetaUnsub || window.dalPaSessionWatchStarting || window.dalPrepLatched)) {
+  // Only skip re-attach when meta listener is already live for this project.
+  if (window.dalPaSessionWatchProjectId === String(projectId) && window.dalPaSessionMetaUnsub) {
     if (window.dalPrepUiOpen) window.startDalPaLiveSync_(projectId);
+    if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
+    return;
+  }
+  if (window.dalPaSessionWatchProjectId === String(projectId) && window.dalPaSessionWatchStarting) {
+    if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
     return;
   }
 
@@ -322,14 +330,15 @@ window.startDalPaSessionWatcher = function(projectId) {
   window.dalPaSessionWatchStarting = true;
   window.dalMetaAuthority = false;
 
-  // One Sheets read to latch prep ON for joiners — never polls in a loop.
+  // One Sheets read to latch prep ON for joiners — close detection uses poll + meta.
   if (typeof refreshDalSessionBanner === 'function') refreshDalSessionBanner();
+  if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
 
-  // Optional: Firestore _meta confirms close across users (also fails open to latch).
+  // Firestore _meta confirms close across users (poll is the fallback).
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     window.dalPaSessionWatchStarting = false;
     if (err) {
-      console.warn('DAL meta watcher auth failed (OK — latch + server sync used):', err && err.message ? err.message : err);
+      console.warn('DAL meta watcher auth failed (OK — latch + Sheets poll used):', err && err.message ? err.message : err);
       if (window.dalPrepUiOpen) window.startDalPaLiveSync_(projectId);
       return;
     }
@@ -346,19 +355,20 @@ window.startDalPaSessionWatcher = function(projectId) {
         window.dalSessionState = {
           status: 'open',
           sessionType: 'prep',
-          sessionUid: data.sessionUid || ''
+          sessionUid: data.sessionUid || '',
+          prepStatus: 'open'
         };
         if (typeof dalApplyDalPrepUiState_ === 'function') {
           dalApplyDalPrepUiState_(true, projectId, { invalidateCache: !window.dalPrepUiOpen });
         }
       } else if (snap.exists === false && !(snap.metadata && snap.metadata.fromCache)) {
-        // Server-confirmed close — only place meta is allowed to clear the latch.
+        // Server-confirmed close — clear latch on remote browsers.
         if (typeof dalApplyDalPrepUiState_ === 'function') {
           dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
         }
       }
     }, function(watchErr) {
-      console.warn('DAL meta listener error (OK — latch + server sync used):', watchErr);
+      console.warn('DAL meta listener error (OK — latch + Sheets poll used):', watchErr);
       window.dalMetaAuthority = false;
       if (window.dalPrepUiOpen) window.startDalPaLiveSync_(projectId);
     });

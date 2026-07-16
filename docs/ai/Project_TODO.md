@@ -56,6 +56,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Availability & fleet tracker | Partial — equipment tracker matrix | [topics/availability-fleet.md](topics/availability-fleet.md) |
 | UX & platform | Partial — desktop lock @ v388 (polish → v409); Personal Hub profile TBD | [topics/ux-platform.md](topics/ux-platform.md) |
 | Beta prep (payroll, transport, audit) | Partial — RBAC 1–5, fin globals | [topics/beta-prep.md](topics/beta-prep.md) |
+| **Pre-beta hardening (full debug sweeps)** | Backlog — **runs last** (see Final section below) | [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md) |
 | Training manuals | Backlog | [topics/training-manuals.md](topics/training-manuals.md) |
 | Google Workspace migration | Done — in-place host upgrade verified | [topics/workspace-migration.md](topics/workspace-migration.md) |
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
@@ -65,7 +66,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Timeline collab session | Partial — Phase A + live sync + Slice D; **optional post-campaign:** auto-room + idle commit | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
 
-**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → **DAL campaign** (Phase 0 sweep → repos/router → **Phase 3 delta-only gate** → Firebase → reconciliation → cache) — [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) → **warehouse prep** → **timeline collab** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. Do **not** start Firebase prep/timeline fork before DAL Phase 3 (delta saves) + Phase 4 shell.
+**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → **DAL campaign** (Phase 0 sweep → repos/router → **Phase 3 delta-only gate** → Firebase → reconciliation → cache) — [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) → **warehouse prep** → **timeline collab** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. Do **not** start Firebase prep/timeline fork before DAL Phase 3 (delta saves) + Phase 4 shell. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).
 
 ---
 
@@ -83,6 +84,18 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | **Desktop gate PC power schedule** | Spec captured 2026-07-11 — hibernate + weekday 09:50 wake; not built | [topics/deferred-when-operational.md](topics/deferred-when-operational.md) § F |
 
 **Full checklist + rejected approaches:** [topics/deferred-when-operational.md](topics/deferred-when-operational.md)
+
+---
+
+## Final (pre-beta) — runs last
+
+**After** product TODO / active campaigns are done enough for real users — **not** mid-feature, **not** “after DAL only.” Major freeze backup first; then multi-sweep hardening (purity → map/registry → S0/S1 root causes → selective S2 → beta readiness). Re-evaluate after every phase.
+
+| Item | Status | File |
+|------|--------|------|
+| **Pre-beta hardening (multi-sweep debug)** | Backlog — **last** before inviting users | [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md) |
+
+Product beta features (payroll, transport, RBAC QA) stay in [topics/beta-prep.md](topics/beta-prep.md) — that is **what to ship for beta**; pre-beta hardening is **how to debug the whole app before users**.
 
 ---
 

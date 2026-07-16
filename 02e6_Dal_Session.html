@@ -2,19 +2,64 @@
 <script>
 window.dalSessionState = { status: 'normal', sessionType: '' };
 window.dalPrepUiOpen = false;
-window.dalPrepLatched = false; // once true, Sheets/async cannot turn prep OFF
+window.dalPrepLatched = false; // once true, ignore spurious "closed" until allowClose
 window.dalPrepSheetsPollGen = 0;
 window.dalPrepClosing = false;
+window.dalPrepSessionPollTimer = null;
 
-window.dalIsPrepOpenFromInfo_ = function(info) {
-  if (!info) return false;
+window.dalPrepStatusFromInfo_ = function(info) {
+  if (!info) return '';
   if (info.prepStatus !== undefined && info.prepStatus !== null) {
-    return String(info.prepStatus).toLowerCase() === 'open';
+    return String(info.prepStatus || '').toLowerCase();
   }
   if (info.prep && typeof info.prep === 'object') {
-    return String(info.prep.status || '').toLowerCase() === 'open';
+    return String(info.prep.status || '').toLowerCase();
   }
-  return !!(String(info.status || '').toLowerCase() === 'open' && info.sessionType === 'prep');
+  if (String(info.sessionType || '') === 'prep') {
+    return String(info.status || '').toLowerCase();
+  }
+  return '';
+};
+
+window.dalIsPrepOpenFromInfo_ = function(info) {
+  var st = window.dalPrepStatusFromInfo_(info);
+  // opening/committing = still in prep lifecycle (do not clear remote UI mid-transition)
+  return st === 'open' || st === 'opening' || st === 'committing';
+};
+
+window.stopDalPrepSessionPoll_ = function() {
+  if (window.dalPrepSessionPollTimer) {
+    clearInterval(window.dalPrepSessionPollTimer);
+    window.dalPrepSessionPollTimer = null;
+  }
+};
+
+/**
+ * Poll Sheets prep domain so END PREP on another browser clears the latch
+ * even if Firestore _meta listener missed the delete.
+ */
+window.startDalPrepSessionPoll_ = function(projectId) {
+  if (!projectId || projectId === 'NEW') return;
+  if (window.dalPrepSessionPollTimer) return;
+
+  var tick = function() {
+    if (window.dalPrepClosing) return;
+    if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
+      window.stopDalPrepSessionPoll_();
+      return;
+    }
+    google.script.run
+      .withFailureHandler(function() { /* keep latch */ })
+      .withSuccessHandler(function(info) {
+        if (window.dalPrepClosing) return;
+        if (window.dalIsPrepOpenFromInfo_(info)) return;
+        // Server confirmed prep closed (other user END PREP, or commit finished).
+        window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
+      })
+      .getDalSessionInfo(projectId);
+  };
+  tick();
+  window.dalPrepSessionPollTimer = setInterval(tick, 2500);
 };
 
 window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
@@ -27,7 +72,7 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   isPrepOpen = !!isPrepOpen;
 
   // Latch: once prep is known-open, ignore spurious "closed" (Sheets lag / cache / auth blips)
-  // unless this call explicitly allows close (END PREP or server-confirmed meta gone).
+  // unless this call explicitly allows close (END PREP or server-confirmed close).
   if (!isPrepOpen && window.dalPrepLatched && !opts.allowClose) {
     isPrepOpen = true;
   }
@@ -59,8 +104,10 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
     }
     if (typeof startDalPaLiveSync_ === 'function') startDalPaLiveSync_(projectId);
-  } else if (changed && typeof stopDalPaLiveSync_ === 'function') {
-    stopDalPaLiveSync_();
+    window.startDalPrepSessionPoll_(projectId);
+  } else if (changed || opts.allowClose) {
+    window.stopDalPrepSessionPoll_();
+    if (typeof stopDalPaLiveSync_ === 'function') stopDalPaLiveSync_();
   }
 };
 
@@ -72,7 +119,7 @@ window.dalCanShowPrepButtons = function() {
 };
 
 /**
- * Sheets session check — open can latch ON; never turns OFF once latched.
+ * Sheets session check — open can latch ON; close only via allowClose paths (poll / meta / END PREP).
  */
 window.refreshDalSessionBanner = function() {
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
@@ -81,7 +128,7 @@ window.refreshDalSessionBanner = function() {
     return;
   }
 
-  // Already latched open — do not re-poll Sheets for banner state (avoids toggle under GAS load).
+  // Already open — keep UI and ensure close-detection poll is running (do not block on latch forever).
   if (window.dalPrepLatched || window.dalPrepUiOpen) {
     window.dalApplyDalPrepUiState_(true, projectId);
     return;
@@ -130,7 +177,7 @@ window.openDalPrepSession = function() {
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
-      window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId };
+      window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
       window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
       alert('Preparation started.');
@@ -143,19 +190,21 @@ window.closeDalPrepSession = function() {
   if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
   window.dalPrepClosing = true;
   window.dalPrepSheetsPollGen++;
+  window.stopDalPrepSessionPoll_();
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
   google.script.run
     .withFailureHandler(function(err) {
       window.dalPrepClosing = false;
       if (overlay) overlay.style.cursor = '';
+      if (window.dalPrepUiOpen) window.startDalPrepSessionPoll_(projectId);
       alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
     })
     .withSuccessHandler(function() {
       if (overlay) overlay.style.cursor = '';
-      window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId };
+      window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
       window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
-      if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher();
+      if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.dalPrepClosing = false;
       alert('Preparation ended — committed to Sheets.');

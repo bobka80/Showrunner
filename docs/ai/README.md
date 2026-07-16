@@ -53,7 +53,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | If the content is… | Put it in… | Examples |
 |--------------------|------------|----------|
 | **Urgent / in-flight campaign** | [active/](active/) | Recovery, production blockers |
-| **Backlog, shipped checklist, feature plan** | [topics/](topics/) + one row in [Project_TODO.md](Project_TODO.md) | logistics-warehouse, notifications |
+| **Backlog, shipped checklist, feature plan** | [topics/](topics/) + one row in [Project_TODO.md](Project_TODO.md) | logistics-warehouse, notifications, [pre-beta-hardening.md](topics/pre-beta-hardening.md) (final debug sweeps) |
 | **Finished campaign or obsolete plan** | [archive/](archive/) + stub at old path if moved | rbac-event-access-plan |
 | **“Don’t break this” pre-flight** | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) quick table + link to detail | Triangle, boot pipeline |
 | **How a domain works (canonical model)** | New or existing **stable** file in `docs/ai/` + row in stable table above | `EQUIPMENT_MODEL.md` |
