@@ -6,6 +6,8 @@ window.dalPrepLatched = false; // once true, ignore spurious "closed" until allo
 window.dalPrepSheetsPollGen = 0;
 window.dalPrepClosing = false;
 window.dalPrepSessionPollTimer = null;
+window.dalPrepIgnoreCloseUntil = 0;
+window.dalPrepClosedPollStreak = 0;
 
 window.dalPrepStatusFromInfo_ = function(info) {
   if (!info) return '';
@@ -35,8 +37,8 @@ window.stopDalPrepSessionPoll_ = function() {
 };
 
 /**
- * Poll Sheets prep domain so END PREP on another browser clears the latch
- * even if Firestore _meta listener missed the delete.
+ * While Project Assets is open, poll prep domain for BOTH remote START and remote END.
+ * Close requires grace + two consecutive closed reads so Sheets lag cannot wipe a fresh open.
  */
 window.startDalPrepSessionPoll_ = function(projectId) {
   if (!projectId || projectId === 'NEW') return;
@@ -44,16 +46,32 @@ window.startDalPrepSessionPoll_ = function(projectId) {
 
   var tick = function() {
     if (window.dalPrepClosing) return;
-    if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
+    // Stop only when PA session watcher left this project.
+    if (window.dalPaSessionWatchProjectId && window.dalPaSessionWatchProjectId !== String(projectId)) {
       window.stopDalPrepSessionPoll_();
       return;
     }
     google.script.run
-      .withFailureHandler(function() { /* keep latch */ })
+      .withFailureHandler(function() { /* keep current */ })
       .withSuccessHandler(function(info) {
         if (window.dalPrepClosing) return;
-        if (window.dalIsPrepOpenFromInfo_(info)) return;
-        // Server confirmed prep closed (other user END PREP, or commit finished).
+        if (window.dalPaSessionWatchProjectId && window.dalPaSessionWatchProjectId !== String(projectId)) return;
+
+        if (window.dalIsPrepOpenFromInfo_(info)) {
+          window.dalPrepClosedPollStreak = 0;
+          window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: !window.dalPrepUiOpen });
+          return;
+        }
+
+        // Server says closed — only clear an existing open UI after grace + confirmation.
+        if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
+          window.dalPrepClosedPollStreak = 0;
+          return;
+        }
+        if (Date.now() < (window.dalPrepIgnoreCloseUntil || 0)) return;
+        window.dalPrepClosedPollStreak = (window.dalPrepClosedPollStreak || 0) + 1;
+        if (window.dalPrepClosedPollStreak < 2) return;
+        window.dalPrepClosedPollStreak = 0;
         window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       })
       .getDalSessionInfo(projectId);
@@ -100,13 +118,18 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
 
   if (isPrepOpen && projectId) {
+    if (changed) {
+      // After a fresh open (local or remote), do not let a lagging Sheets poll clear the banner.
+      window.dalPrepIgnoreCloseUntil = Date.now() + 8000;
+      window.dalPrepClosedPollStreak = 0;
+    }
     if (opts.invalidateCache || changed) {
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
     }
     if (typeof startDalPaLiveSync_ === 'function') startDalPaLiveSync_(projectId);
     window.startDalPrepSessionPoll_(projectId);
   } else if (changed || opts.allowClose) {
-    window.stopDalPrepSessionPoll_();
+    // Keep poll running while PA is open so remote START PREP can still latch this browser.
     if (typeof stopDalPaLiveSync_ === 'function') stopDalPaLiveSync_();
   }
 };
@@ -128,7 +151,7 @@ window.refreshDalSessionBanner = function() {
     return;
   }
 
-  // Already open — keep UI and ensure close-detection poll is running (do not block on latch forever).
+  // Already open — keep UI and ensure close/open poll is running.
   if (window.dalPrepLatched || window.dalPrepUiOpen) {
     window.dalApplyDalPrepUiState_(true, projectId);
     return;
@@ -190,14 +213,14 @@ window.closeDalPrepSession = function() {
   if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
   window.dalPrepClosing = true;
   window.dalPrepSheetsPollGen++;
-  window.stopDalPrepSessionPoll_();
+  window.dalPrepIgnoreCloseUntil = 0;
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
   google.script.run
     .withFailureHandler(function(err) {
       window.dalPrepClosing = false;
       if (overlay) overlay.style.cursor = '';
-      if (window.dalPrepUiOpen) window.startDalPrepSessionPoll_(projectId);
+      if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
       alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
     })
     .withSuccessHandler(function() {
@@ -205,6 +228,8 @@ window.closeDalPrepSession = function() {
       window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
       window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
+      // Re-open watcher/poll so this browser can see a later remote START PREP without leaving PA.
+      if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       window.dalPrepClosing = false;
       alert('Preparation ended — committed to Sheets.');
