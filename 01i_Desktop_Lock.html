@@ -427,7 +427,8 @@
   window.lockDesktopScreen = function() {
     if (!isDesktopLockEligible()) return;
     if (desktopLockActive) return;
-    if (typeof closeModals === 'function') closeModals();
+    // Do NOT closeModals() — that hid project/timeline/etc and dumped the user on the calendar.
+    // Lock is an overlay; unlock must restore the same working screen.
     if (typeof closePersonalHub === 'function') closePersonalHub();
 
     buildDesktopLockBuses();

@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-04 · **Production:** GAS **v429** · **Status:** Partial — Personal Hub + **desktop lock shipped** (lock polish through v409)
+**Last swept:** 2026-07-17 · **Production:** GAS **v625** · **Status:** Partial — Personal Hub + **desktop lock shipped** (lock preserves working screen @ v625)
 
 ## Backlog
 
@@ -36,6 +36,11 @@
 - [x] Idle **5–30 min** (5-min steps) or **Disabled** (manual padlock only), per crew device in Personal Hub
 - [x] **Desktop auto-login opt-out** — Personal Hub **DISABLE AUTO-LOGIN**; mobile always stay signed in; re-enable via checkbox on login screen
 - [x] **Mobile** — out of scope (no lock)
+- [x] **Preserve working screen** — lock must **not** call `closeModals()` (that closed project/timeline and jumped to calendar). Overlay only; unlock returns to the same view (**v625**)
+
+### Never do
+
+- Call `closeModals()` from `lockDesktopScreen` — tears down project editor / timeline / hubs and forces calendar.
 
 ### Recovery campaign
 
