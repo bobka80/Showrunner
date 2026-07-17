@@ -35,7 +35,7 @@ When the director reports a bug in these areas, state the risk in plain language
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
 | **Warehouse ledger** | `Operations.js` | Mutate assignments directly during RFID chaos | Append to `Operations_Ledger` |
 | **DAL prep / timeline session UI (dual-domain)** | `Dal_Sessions.js`, `02e6_Dal_Session.html`, `02e7_Dal_Firestore_Client.html`, `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html` | Trust legacy flat `sessionType` when both domains open; clear prep latch on first “closed” poll; poll only for END not START; put `*/` inside `Dal_Sessions.js` block comments | Read `prepStatus` / `timelineStatus`; poll both START+END with grace; see § DAL prep/timeline session UI |
-| **DAL timeline fork live sync** | `03a2_Timeline_Dal_Live.html`, `02e7_Dal_Firestore_Client.html`, `host-boot.js` (`SHOWRUNNER_DAL_FS_*`), `Dal_Firebase.js`, `push-hosting/firestore.rules` | Full-doc LWW overwrite; flush-on-every-remote; empty-touch “diff all locals”; Auth inside GAS iframe only; host reply only into `#app-frame`; skip Firebase Authentication enable; **PA host Auth without `LISTEN_COL`** (falls to 2.5s GAS poll) | Touch/patch merge + `writeSeq` + entity hold; Auth/listen/write on **web.app host**; deep `frames` walk + `ev.source`; prep PA uses **`SHOWRUNNER_DAL_FS_LISTEN_COL`**; see § DAL timeline fork live sync |
+| **DAL timeline / prep fork live sync** | `03a2_Timeline_Dal_Live.html`, `02e7_Dal_Firestore_Client.html`, `host-boot.js` (`SHOWRUNNER_DAL_FS_*`), `Dal_Firebase.js`, `push-hosting/firestore.rules` | Full-doc / **full-collection** LWW overwrite; flush-on-every-remote; empty-touch “diff all locals”; Auth inside GAS iframe only; host reply only into `#app-frame`; skip Firebase Authentication enable; **PA host Auth without `LISTEN_COL` / `PA_BATCH_WRITE`**; prep PA **rewrite every asset doc on each flush** | Touch/patch merge + entity hold (+ timeline `writeSeq`); Auth/listen/write on **web.app host**; deep `frames` walk + `ev.source`; prep PA **patch-only** sets/deletes + per-UID merge; see § DAL timeline fork live sync **and** § DAL prep PA fork live sync |
 
 ---
 
@@ -529,7 +529,7 @@ Hard-refresh **two browsers**:
 | Echo | Own `clientId` acks without re-install; ignore duplicate applied sig. |
 | Banner | `live sync (patch)` = host/direct Firestore. `server patch` = GAS poll fallback (slow). Prep PA: `live sync (direct)` = Firestore listen (host or iframe); `live sync (server)` = GAS poll. |
 | Scale | One doc per project timeline — fine for a small crew; same-strip edits are last-write-wins on that entity. |
-| Prep vs timeline | Independent forks (Slice D). Closing one must not commit/delete the other. Prep live feel: host collection listen on `projects/{id}/assets` + host `_meta` doc listen. If no `SNAP_COL` within ~4s (stale host-boot), fall back to GAS poll. |
+| Prep vs timeline | Independent forks (Slice D). Closing one must not commit/delete the other. Prep live feel: host collection listen + `_meta` doc listen. Prep **row** sync: § DAL prep PA fork live sync (patch-only + entity hold). |
 
 ### Smoke (after any live-sync / host-bridge change)
 
@@ -540,6 +540,55 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 3. Optional third browser — edit a third crew; no thrash.
 
 **AI rule:** Before editing live-sync or host DAL FS bridge, state stutter/Auth/nest risk in plain language. Ship GAS **and** `node deploy-hosting.js` (bump `host-boot.js?v=`) when host-boot changes.
+
+---
+
+## DAL prep PA fork live sync (equipment list)
+
+**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · Same Firebase session-buffer rule as timeline; different shape (**many docs** under `projects/{id}/assets/*`, not one state doc).
+
+**Plain language:** While START PREP is open, both browsers listen to the PA fork collection and flush local edits to Firestore. If either browser **rewrites every asset document** from its full local list, fixtures **flip back and forth** (same class of bug as timeline strip stutter). Live sync must be **patch-only** (only rows you changed/deleted) with **per-UID merge** and a short **entity hold** — not last-full-collection-wins.
+
+**Research note (2026-07-17):** Confirmed in code before the patch fix: `dalWritePaForkToFirestore_` built a `set` for **every** current UID (full inventory rewrite) and `dalApplyRemotePaAssets_` did a **full list replace** when clean. That matches “changes reverse on both sides” and the timeline LWW failure mode.
+
+**Primary files:**
+
+| File | Role |
+|------|------|
+| `02e7_Dal_Firestore_Client.html` | Patch compute, host/iframe batch write, collection listen apply, entity hold, banner |
+| `02d_Equipment_Render.html` | Calls `dalFlushPaIfPrepOpen_` after PA UI refresh |
+| `push-hosting/public/host-boot.js` | `LISTEN_COL` + `PA_BATCH_WRITE` on web.app host |
+| `Dal_Firebase.js` | GAS fork save/commit (SAVE / END PREP path) |
+
+### Never do
+
+1. **Full-collection LWW on flush.** Writing every local PA doc on each edit lets a stale browser stomp peers’ untouched rows → A↔B fixture thrash.
+2. **Full list replace on every snapshot while the other side is editing.** Apply must **merge by UID**: take remote for clean rows; keep locally dirty / held UIDs.
+3. **Run `dalProcessPaFormulas_` explode on remote apply.** Exploding unique qty>1 strips UIDs and mints new rows → endless write wars. Remote docs are authoritative; only normalize formula flags (`skipExplode`).
+4. **Host Auth/listen without host PA batch write.** `viaHost` has no `client.db` — listen-only left flushes failing or on GAS while the other browser heard “direct.”
+5. **Flush Firebase from `renderProjectAssetsUI` without `dalPaApplyingRemote` guard** (and without patch-only writes) — remote apply re-render becomes a counter-write.
+
+### Safe rules (locked)
+
+| Concern | Rule |
+|---------|------|
+| Write | **Patch only** — `set`/`delete` UIDs whose content differs from `originalProjectAssets` (or local deletes). Never rewrite the whole collection. |
+| Apply | Start from **remote** collection snap; overlay locally **dirty** and **held** UIDs; keep local-only dirty adds. |
+| Local yank guard | After patch write, **entity hold ~2s** per touched/deleted UID — remote cannot overwrite that id until hold expires. |
+| Formula | Remote apply: `dalProcessPaFormulas_(…, { skipExplode: true })`. |
+| Banner | `live sync (direct)` = Firestore listen; `live sync (server)` = GAS poll. Do not thrash banner text on unchanged state. |
+| Host bridge | `SHOWRUNNER_DAL_FS_LISTEN_COL` + `SHOWRUNNER_DAL_FS_PA_BATCH_WRITE`; Index relays both. |
+| vs timeline | Same *discipline* (patch + hold); timeline also has doc-level `writeSeq` / touch maps. PA is per-document UID in a collection. |
+
+### Smoke (prep PA live)
+
+Hard-refresh **two browsers** on web.app (banner **live sync (direct)**):
+
+1. A changes one fixture location/qty; B idle — B updates once; **no** flip-back on A or B.  
+2. A and B change **different** fixtures near-simultaneously — both stick.  
+3. A changes the same fixture twice quickly — settles on A’s last value; no oscillation.
+
+**AI rule:** Before editing prep live flush/apply, re-read this section and § DAL timeline fork live sync. Ship GAS; also `deploy-hosting.js` if host-boot message types change.
 
 ---
 

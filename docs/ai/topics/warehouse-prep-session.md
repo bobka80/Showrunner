@@ -8,7 +8,7 @@
 
 **Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. **Blocked items** remain on [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Live sync (2026-07-17):** Prep PA assets listen + `_meta` use the same **web.app host** bridge as timeline (`SHOWRUNNER_DAL_FS_LISTEN_COL` / doc listen). Banner should show `live sync (direct)` on web.app — not `live sync (server)` (2.5s GAS poll).
+**Live sync (2026-07-17):** Prep PA assets listen + `_meta` use the same **web.app host** bridge as timeline (`SHOWRUNNER_DAL_FS_LISTEN_COL` / doc listen / `PA_BATCH_WRITE`). Banner should show `live sync (direct)` on web.app — not `live sync (server)` (2.5s GAS poll). **Patch discipline (same class as timeline):** flush only changed/deleted UIDs; apply merges by UID with ~2s entity hold — never full-collection LWW ([FRAGILE_ZONES § DAL prep PA fork live sync](../FRAGILE_ZONES.md)).
 
 **Last swept:** 2026-07-17
 

@@ -40,25 +40,29 @@ window.dalFsDocToPaAsset_ = function(docId, d) {
   };
 };
 
-window.dalProcessPaFormulas_ = function(arr) {
+window.dalProcessPaFormulas_ = function(arr, opts) {
   if (!arr) return;
+  opts = opts || {};
   var exploded = [];
-  for (var i = arr.length - 1; i >= 0; i--) {
-    var pa = arr[i];
-    var vaultAsset = typeof globalAssets !== 'undefined' ? globalAssets.find(function(a) { return a.id === pa.assetId; }) : null;
-    if (vaultAsset && vaultAsset.type !== 'Bulk' && vaultAsset.isConsumable !== true && vaultAsset.isConsumable !== 'true') {
-      var parsedQty = parseInt(pa.qty, 10);
-      if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
-        arr.splice(i, 1);
-        for (var k = 0; k < parsedQty; k++) {
-          var newPa = Object.assign({}, pa, { qty: 1 });
-          delete newPa.uid;
-          exploded.push(newPa);
+  // Live remote apply must NOT explode — that strips uids and mints new rows → write wars.
+  if (!opts.skipExplode) {
+    for (var i = arr.length - 1; i >= 0; i--) {
+      var pa = arr[i];
+      var vaultAsset = typeof globalAssets !== 'undefined' ? globalAssets.find(function(a) { return a.id === pa.assetId; }) : null;
+      if (vaultAsset && vaultAsset.type !== 'Bulk' && vaultAsset.isConsumable !== true && vaultAsset.isConsumable !== 'true') {
+        var parsedQty = parseInt(pa.qty, 10);
+        if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
+          arr.splice(i, 1);
+          for (var k = 0; k < parsedQty; k++) {
+            var newPa = Object.assign({}, pa, { qty: 1 });
+            delete newPa.uid;
+            exploded.push(newPa);
+          }
         }
       }
     }
+    if (exploded.length > 0) arr.push.apply(arr, exploded);
   }
-  if (exploded.length > 0) arr.push.apply(arr, exploded);
   arr.forEach(function(pa) {
     if (pa.formula === 'Manual') pa.formula = 'Standalone';
     if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
@@ -79,6 +83,119 @@ window.dalPaAssetsSig_ = function(assets) {
   }).sort().join('|');
 };
 
+/** Stable per-row content for patch compare (matches what we write to Firestore). */
+window.dalPaContentSig_ = function(pa) {
+  if (!pa) return '';
+  return [
+    String(pa.assetId || ''),
+    String(parseInt(pa.qty, 10) || 0),
+    String(pa.location || 'General'),
+    String(window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || '')),
+    String(pa.containerUid || ''),
+    String(pa.scanStatus || 'Assigned'),
+    String(pa.outboundTruckUid || ''),
+    String(pa.outboundX != null ? pa.outboundX : ''),
+    String(pa.outboundY != null ? pa.outboundY : ''),
+    String(pa.outboundZ != null ? pa.outboundZ : ''),
+    pa.outboundRotated ? '1' : '0',
+    pa.outboundStaged ? '1' : '0',
+    String(pa.inboundTruckUid || ''),
+    String(pa.inboundX != null ? pa.inboundX : ''),
+    String(pa.inboundY != null ? pa.inboundY : ''),
+    String(pa.inboundZ != null ? pa.inboundZ : ''),
+    pa.inboundRotated ? '1' : '0',
+    pa.inboundStaged ? '1' : '0'
+  ].join('\t');
+};
+
+window.dalPaHoldUntil_ = window.dalPaHoldUntil_ || {};
+
+window.dalPaHoldEntities_ = function(uids, ms) {
+  ms = ms == null ? 2000 : ms;
+  var until = Date.now() + ms;
+  (uids || []).forEach(function(uid) {
+    if (!uid || uid === '_meta') return;
+    window.dalPaHoldUntil_[String(uid)] = until;
+  });
+};
+
+window.dalPaIsHeld_ = function(uid) {
+  if (!uid) return false;
+  var until = window.dalPaHoldUntil_[String(uid)] || 0;
+  return Date.now() < until;
+};
+
+window.dalPaDirtyUidMap_ = function() {
+  var dirty = {};
+  var origBy = {};
+  var currBy = {};
+  (window.originalProjectAssets || []).forEach(function(pa) {
+    if (pa && pa.uid) origBy[String(pa.uid)] = pa;
+  });
+  (typeof currentProjectAssets !== 'undefined' && currentProjectAssets ? currentProjectAssets : []).forEach(function(pa) {
+    if (!pa) return;
+    if (!pa.uid) {
+      dirty['__new_' + Math.random()] = true;
+      return;
+    }
+    currBy[String(pa.uid)] = pa;
+  });
+  Object.keys(currBy).forEach(function(uid) {
+    var o = origBy[uid];
+    if (!o || window.dalPaContentSig_(currBy[uid]) !== window.dalPaContentSig_(o)) dirty[uid] = true;
+  });
+  Object.keys(origBy).forEach(function(uid) {
+    if (!currBy[uid]) dirty[uid] = true;
+  });
+  return dirty;
+};
+
+window.dalPaMapByUid_ = function(assets) {
+  var map = {};
+  (assets || []).forEach(function(pa) {
+    if (pa && pa.uid) map[String(pa.uid)] = pa;
+  });
+  return map;
+};
+
+/**
+ * Patch merge for prep PA (same class as timeline touch/patch):
+ * start from REMOTE, keep locally dirty / held UIDs, keep local-only dirty adds.
+ */
+window.dalPaPatchMergeFromRemote_ = function(serverAssets) {
+  var dirty = window.dalPaDirtyUidMap_();
+  var local = Array.isArray(currentProjectAssets) ? currentProjectAssets : [];
+  var localBy = window.dalPaMapByUid_(local);
+  var merged = [];
+  var used = {};
+
+  (serverAssets || []).forEach(function(remotePa) {
+    if (!remotePa) return;
+    var uid = remotePa.uid ? String(remotePa.uid) : '';
+    if (!uid) return;
+    if (window.dalPaIsHeld_(uid) || dirty[uid]) {
+      if (localBy[uid]) merged.push(localBy[uid]);
+      else merged.push(remotePa);
+    } else {
+      merged.push(remotePa);
+    }
+    used[uid] = true;
+  });
+
+  local.forEach(function(pa) {
+    if (!pa) return;
+    if (!pa.uid) {
+      merged.push(pa);
+      return;
+    }
+    var uid = String(pa.uid);
+    if (used[uid]) return;
+    if (dirty[uid] || window.dalPaIsHeld_(uid)) merged.push(pa);
+  });
+
+  return merged;
+};
+
 window.dalUpdateRemotePendingBanner_ = function() {
   var banner = document.getElementById('dal-session-banner');
   if (!banner || !window.dalPrepUiOpen) return;
@@ -97,33 +214,6 @@ window.dalUpdateRemotePendingBanner_ = function() {
   banner.textContent = text;
 };
 
-window.dalMergeRemoteOnlyPaAssets_ = function(serverAssets) {
-  var local = Array.isArray(currentProjectAssets) ? currentProjectAssets : [];
-  var localUids = {};
-  local.forEach(function(pa) {
-    if (pa && pa.uid) localUids[String(pa.uid)] = true;
-  });
-  var added = [];
-  (serverAssets || []).forEach(function(pa) {
-    if (!pa || !pa.uid) return;
-    if (localUids[String(pa.uid)]) return;
-    added.push(JSON.parse(JSON.stringify(pa)));
-  });
-  if (!added.length) return false;
-  currentProjectAssets = local.concat(added);
-  if (!Array.isArray(window.originalProjectAssets)) window.originalProjectAssets = [];
-  added.forEach(function(pa) {
-    window.originalProjectAssets.push(JSON.parse(JSON.stringify(pa)));
-  });
-  var overlay = document.getElementById('project-assets-modal-overlay');
-  if (overlay && overlay.style.display !== 'none' && typeof renderProjectAssetsUI === 'function') {
-    window.dalPaApplyingRemote = true;
-    try { renderProjectAssetsUI(); } finally { window.dalPaApplyingRemote = false; }
-  }
-  if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
-  return true;
-};
-
 window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
   if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) return;
   if (window.dalPaFlushInFlight) return;
@@ -131,28 +221,50 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
   if (fromCacheEmpty) return;
 
   var serverAssets = JSON.parse(JSON.stringify(assets || []));
-  window.dalProcessPaFormulas_(serverAssets);
+  // skipExplode: remote fork docs are authoritative — exploding would mint new uids and thrash.
+  window.dalProcessPaFormulas_(serverAssets, { skipExplode: true });
   var sig = window.dalPaAssetsSig_(serverAssets);
   if (sig === window.dalPaLastRemoteSig) return;
 
-  if (typeof calculatePaDeltas === 'function' && calculatePaDeltas().length > 0) {
-    if (window.dalMergeRemoteOnlyPaAssets_(serverAssets)) {
+  var dirty = window.dalPaDirtyUidMap_();
+  var hasDirty = Object.keys(dirty).length > 0;
+  var merged = window.dalPaPatchMergeFromRemote_(serverAssets);
+  var mergedSig = window.dalPaAssetsSig_(merged);
+  var localSig = window.dalPaAssetsSig_(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []);
+  if (mergedSig === localSig) {
+    window.dalPaLastRemoteSig = sig;
+    if (!hasDirty) {
+      window.dalPaRemotePending = false;
+      window.originalProjectAssets = JSON.parse(JSON.stringify(merged));
+    } else {
       window.dalPaRemotePending = true;
-      window.dalUpdateRemotePendingBanner_();
-      return;
     }
-    window.dalPaRemotePending = true;
-    // Do not advance lastSig — after local flush, next snapshot must still apply.
     window.dalUpdateRemotePendingBanner_();
     return;
   }
 
   window.dalPaLastRemoteSig = sig;
-  window.dalPaRemotePending = false;
+  window.dalPaRemotePending = hasDirty;
   window.dalPaApplyingRemote = true;
   try {
-    currentProjectAssets = JSON.parse(JSON.stringify(serverAssets));
-    window.originalProjectAssets = JSON.parse(JSON.stringify(serverAssets));
+    currentProjectAssets = JSON.parse(JSON.stringify(merged));
+    if (!hasDirty) {
+      window.originalProjectAssets = JSON.parse(JSON.stringify(merged));
+    } else {
+      // Advance original for clean UIDs so they are not flushed as false dirty.
+      var origBy = window.dalPaMapByUid_(window.originalProjectAssets || []);
+      var remoteBy = window.dalPaMapByUid_(serverAssets);
+      Object.keys(remoteBy).forEach(function(uid) {
+        if (!dirty[uid] && !window.dalPaIsHeld_(uid)) {
+          origBy[uid] = JSON.parse(JSON.stringify(remoteBy[uid]));
+        }
+      });
+      Object.keys(origBy).forEach(function(uid) {
+        if (!remoteBy[uid] && !dirty[uid] && !window.dalPaIsHeld_(uid)) delete origBy[uid];
+      });
+      window.originalProjectAssets = Object.keys(origBy).map(function(k) { return origBy[k]; });
+      // Keep local-only dirty rows (no uid yet / pending adds) represented in original? adds stay dirty via missing orig.
+    }
 
     var overlay = document.getElementById('project-assets-modal-overlay');
     if (overlay && overlay.style.display !== 'none' && typeof renderProjectAssetsUI === 'function') {
@@ -163,6 +275,10 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
     window.dalPaApplyingRemote = false;
   }
   window.dalUpdateRemotePendingBanner_();
+  // Render ran under applyingRemote (flush skipped) — publish any still-dirty local patch.
+  if (hasDirty && typeof window.dalFlushPaIfPrepOpen_ === 'function') {
+    window.dalFlushPaIfPrepOpen_();
+  }
 };
 
 window.dalEnsureFirebaseSdk_ = function(done) {
@@ -710,7 +826,8 @@ window.startDalPaSessionWatcher = function(projectId) {
 };
 
 window.dalMarkPaLocalSave_ = function() {
-  window.dalPaIgnoreListenerUntil = Date.now() + 800;
+  // Echo guard only — per-UID entity hold is the real anti-yank (timeline parity).
+  window.dalPaIgnoreListenerUntil = Date.now() + 400;
 };
 
 window.dalNewUid_ = function() {
@@ -760,7 +877,42 @@ window.dalPaAssetToFsDoc_ = function(pa, projectId) {
 };
 
 /**
- * Direct browser → Firestore PA fork write (no GAS round-trip).
+ * Only touched/deleted PA rows — NEVER rewrite the whole collection (timeline LWW lesson).
+ */
+window.dalPaComputeForkPatch_ = function(projectId) {
+  var current = Array.isArray(currentProjectAssets) ? currentProjectAssets : [];
+  var currentByUid = {};
+  var i;
+  for (i = 0; i < current.length; i++) {
+    var pa = current[i];
+    if (!pa) continue;
+    if (!pa.uid) pa.uid = window.dalNewUid_();
+    currentByUid[String(pa.uid)] = pa;
+  }
+  var prev = Array.isArray(window.originalProjectAssets) ? window.originalProjectAssets : [];
+  var origByUid = {};
+  for (i = 0; i < prev.length; i++) {
+    if (prev[i] && prev[i].uid) origByUid[String(prev[i].uid)] = prev[i];
+  }
+
+  var sets = [];
+  var deletes = [];
+  Object.keys(currentByUid).forEach(function(uid) {
+    var cur = currentByUid[uid];
+    var old = origByUid[uid];
+    if (!old || window.dalPaContentSig_(cur) !== window.dalPaContentSig_(old)) {
+      sets.push({ uid: uid, doc: window.dalPaAssetToFsDoc_(cur, projectId) });
+    }
+  });
+  Object.keys(origByUid).forEach(function(uid) {
+    if (uid === '_meta') return;
+    if (!currentByUid[uid]) deletes.push(uid);
+  });
+  return { sets: sets, deletes: deletes };
+};
+
+/**
+ * Direct browser → Firestore PA fork write (patch only).
  * Falls back to caller if auth/client unavailable.
  */
 window.dalWritePaForkToFirestore_ = function(projectId, done) {
@@ -775,36 +927,28 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
       return;
     }
     try {
-      var current = Array.isArray(currentProjectAssets) ? currentProjectAssets : [];
-      var currentByUid = {};
-      var i;
-      for (i = 0; i < current.length; i++) {
-        var pa = current[i];
-        if (!pa) continue;
-        if (!pa.uid) pa.uid = window.dalNewUid_();
-        currentByUid[String(pa.uid)] = pa;
-      }
-      var prev = Array.isArray(window.originalProjectAssets) ? window.originalProjectAssets : [];
-      var toDelete = [];
-      for (i = 0; i < prev.length; i++) {
-        var oldUid = prev[i] && prev[i].uid ? String(prev[i].uid) : '';
-        if (oldUid && !currentByUid[oldUid]) toDelete.push(oldUid);
-      }
-
-      var sets = Object.keys(currentByUid).map(function(uid) {
-        return { uid: uid, doc: window.dalPaAssetToFsDoc_(currentByUid[uid], projectId) };
-      });
+      var patch = window.dalPaComputeForkPatch_(projectId);
+      var sets = patch.sets || [];
+      var toDelete = patch.deletes || [];
 
       if (sets.length === 0 && toDelete.length === 0) {
-        done(null);
+        done(null, { sets: [], deletes: [] });
         return;
       }
       window.dalMarkPaLocalSave_();
+      window.dalPaHoldEntities_(sets.map(function(s) { return s.uid; }).concat(toDelete), 2000);
+
+      var afterOk_ = function() {
+        done(null, { sets: sets, deletes: toDelete });
+      };
 
       // Host bridge: batch write on web.app (listen path uses viaHost without client.db).
       if (client.viaHost && !client.db && typeof window.dalHostFsPaBatchWrite_ === 'function') {
         var colPath = 'projects/' + String(projectId) + '/assets';
-        window.dalHostFsPaBatchWrite_(colPath, sets, toDelete, done);
+        window.dalHostFsPaBatchWrite_(colPath, sets, toDelete, function(writeErr) {
+          if (writeErr) done(writeErr);
+          else afterOk_();
+        });
         return;
       }
       if (!client.db) {
@@ -824,7 +968,7 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
 
       function commitChunk(start) {
         if (start >= ops.length) {
-          done(null);
+          afterOk_();
           return;
         }
         var batch = client.db.batch();
