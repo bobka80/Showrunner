@@ -16,9 +16,13 @@
 // @INDEX: PA_LOGIC -> Asset Provisioning & Mutations
 
 window.insertIntoProjectAssets = function(newItem) {
+    if (!newItem.uid && typeof window.dalNewUid_ === 'function') newItem.uid = window.dalNewUid_();
     if (window.overrideInsertIndex !== undefined && window.overrideInsertIndex !== null) {
         currentProjectAssets.splice(window.overrideInsertIndex, 0, newItem);
         window.overrideInsertIndex++;
+        if (typeof window.dalPaNoteTouch_ === 'function' && newItem.uid && !newItem.isAuto && !newItem.isGenericAuto) {
+            window.dalPaNoteTouch_(newItem.uid);
+        }
         return;
     }
     let lastIdx = -1;
@@ -31,6 +35,9 @@ window.insertIntoProjectAssets = function(newItem) {
     }
     if (lastIdx !== -1) currentProjectAssets.splice(lastIdx + 1, 0, newItem);
     else currentProjectAssets.push(newItem);
+    if (typeof window.dalPaNoteTouch_ === 'function' && newItem.uid && !newItem.isAuto && !newItem.isGenericAuto) {
+        window.dalPaNoteTouch_(newItem.uid);
+    }
 };
 
 window.addSelectedVaultPa = function() {
@@ -560,10 +567,13 @@ window.modifyPaIndices = function(indicesStr, delta) {
             
             pa.qty = parseInt(pa.qty, 10) - 1;
             if (pa.qty <= 0) {
+                if (typeof window.dalPaNoteDelete_ === 'function' && pa.uid) window.dalPaNoteDelete_(pa.uid);
                 currentProjectAssets.splice(validIdx, 1);
                 for (let k = 0; k < indices.length; k++) {
                     if (indices[k] > validIdx) indices[k]--;
                 }
+            } else if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid) {
+                window.dalPaNoteTouch_(pa.uid);
             }
             
             if (form && form !== "Standalone" && typeof window.syncFormulaToItems === 'function') {
@@ -628,6 +638,7 @@ function updateAssignedQty(repAssetId, loc, form, delta, containerUid = null) {
                 let matchPa = currentProjectAssets.find(pa => pa.assetId === representativeId && pa.formula === form && pa.location === loc && (containerUid === null || (pa.containerUid||"") === containerUid));
                 if (matchPa) {
                     matchPa.qty = parseInt(matchPa.qty, 10) + 1;
+                    if (typeof window.dalPaNoteTouch_ === 'function' && matchPa.uid) window.dalPaNoteTouch_(matchPa.uid);
                 } else {
                     window.insertIntoProjectAssets({ assetId: representativeId, qty: 1, formula: form, location: loc, containerUid: targetCid, isAuto: false, isShortage: isGroupShortage, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
                 }

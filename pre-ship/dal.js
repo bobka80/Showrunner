@@ -46,8 +46,10 @@ function runDalGates({ forDeploy }) {
     cwd: ROOT,
     stdio: 'inherit',
   });
+  // Timeline-parity PA live sync regression (pure sim — no Firebase credentials required).
+  runNode('scripts/dal-pa-live-sync-test.js', [], 'PA live sync timeline-parity test');
   console.log('  → DAL gates OK');
-  return { ok: true, steps: ['dal-persistence-lint', 'dal-client-inventory', 'dal-phase3-gate'] };
+  return { ok: true, steps: ['dal-persistence-lint', 'dal-client-inventory', 'dal-phase3-gate', 'dal-pa-live-sync-test'] };
 }
 
 module.exports = { dalTouched, runDalGates, DAL_HOT_PATTERNS };

@@ -547,7 +547,21 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 
 **Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · Same Firebase session-buffer rule as timeline; different shape (**many docs** under `projects/{id}/assets/*`, not one state doc).
 
-**Plain language:** While START PREP is open, both browsers listen to the PA fork collection and flush local edits to Firestore. If either browser **rewrites every asset document** from its full local list, fixtures **flip back and forth** (same class of bug as timeline strip stutter). Live sync must be **patch-only** (only rows you changed/deleted) with **per-UID merge** and a short **entity hold** — not last-full-collection-wins.
+### Timeline vs prep PA (same bug class)
+
+| | **Timeline (fixed)** | **Prep PA (must match)** |
+|--|----------------------|---------------------------|
+| Identity of edit | Explicit **touch/delete maps** (`dalTlNoteShiftTouch_`) | Explicit **`dalPaNoteTouch_` / `dalPaNoteDelete_`** — never invent diffs from full-list compare |
+| Write | Host **transaction** patches only touched entities onto remote | Host batch **only touched fixture UIDs**; stamp **`writeSeq` + `clientId`** per doc |
+| Ordering | Monotonic **`writeSeq`** on state doc | Monotonic **`writeSeq`** per asset doc; ignore `seq < lastApplied` |
+| Echo | Own **`clientId`** ack without re-install | Own **`clientId`** keep local row |
+| Yank guard | Entity hold ~2s | Entity hold ~3s + recently-deleted |
+| Autos / extras | N/A | **Never live-write auto-containers** (UID churn = snap storms) |
+| Failure mode | Strips stutter left↔right | Fixture qty flips up↓down + browser stutter |
+
+**Research / test (2026-07-17):** `node scripts/dal-pa-live-sync-test.js` — buggy full-rewrite produces `5→4→5→4…`; touch+hold+writeSeq settles at `4`. Core: `scripts/lib/dal-pa-live-sync-core.js`.
+
+**Plain language:** While START PREP is open, both browsers listen to the PA fork collection and flush local edits to Firestore. If either browser **rewrites every asset document** from its full local list (or invents “diffs” from `recalcAutoContainers` sibling `containerUid` changes), fixtures **flip back and forth** — same class as timeline strip stutter. Live sync must be **touch/patch** with **writeSeq**, not last-full-collection-wins.
 
 **Research note (2026-07-17):** Confirmed in code before the patch fix: `dalWritePaForkToFirestore_` built a `set` for **every** current UID (full inventory rewrite) and `dalApplyRemotePaAssets_` did a **full list replace** when clean. That matches “changes reverse on both sides” and the timeline LWW failure mode.
 
@@ -576,10 +590,11 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 
 | Concern | Rule |
 |---------|------|
-| Write | **Fixtures-only patch** — never live-write auto-container rows (UID churn → snap storms). Autos rebuild locally after fixture apply. |
-| Apply | Coalesce ~300ms; re-queue if hold active. Merge fixtures; local `recalcAutoContainers` under `dalPaApplyingRemote`. After flush, **4s guard** ignores lagging fixture sigs. |
-| Loop break | Never flush from apply. Render-end flush only when not applying remote. Gate flush on **non-empty fixture patch**, not `calculatePaDeltas` alone. |
+| Write | **Touch-only fixtures** — `dalPaNoteTouch_` / `dalPaNoteDelete_` then flush those UIDs only. Stamp `writeSeq`+`clientId` on host. Never live-write autos. |
+| Apply | Coalesce ~300ms; re-queue if hold active. Timeline-parity: own clientId echo, stale seq ignore, hold/touch keep local, never resurrect deletes. Local `recalcAutoContainers` after fixture merge (not written live). |
+| Loop break | Never flush from apply. Render-end flush only when touches pending. |
 | Load race | During prep+firestore mode, late `getProjectAssets` must not full-replace+explode — route through live apply. |
+| Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed. |
 | Formula | Remote apply: `dalProcessPaFormulas_(…, { skipExplode: true })`. |
 | Banner | `live sync (direct)` = Firestore listen; `live sync (server)` = GAS poll. Do not thrash banner text on unchanged state. |
 | Host bridge | `SHOWRUNNER_DAL_FS_LISTEN_COL` + `SHOWRUNNER_DAL_FS_PA_BATCH_WRITE`; Index relays both. |

@@ -2821,54 +2821,68 @@
     }
   }
 
-  /** Prep PA fork batch write on host (viaHost listen has no in-iframe db). */
+  /** Prep PA fork batch write — stamp writeSeq per doc (timeline parity). */
   function dalFsHandlePaBatchWrite_(data, sourceWin) {
     var requestId = data.requestId || '';
     var colPath = data.colPath || '';
     var sets = data.sets || [];
     var deletes = data.deletes || [];
-    function reply(ok, errMsg) {
+    var meta = data.meta || {};
+    var clientId = meta.clientId || '';
+    function reply(ok, errMsg, result) {
       dalFsPostToIframe_({
         type: 'SHOWRUNNER_DAL_FS_WRITE_RESULT',
         requestId: requestId,
         ok: !!ok,
-        result: null,
+        result: result || null,
         error: errMsg || ''
       }, sourceWin);
     }
     try {
       var col = dalFsColRef_(colPath);
-      var ops = [];
+      var setList = [];
       sets.forEach(function(w) {
         if (!w || !w.uid || w.uid === '_meta') return;
-        ops.push({ type: 'set', ref: col.doc(String(w.uid)), data: w.doc || {} });
+        setList.push(w);
       });
+      var delList = [];
       (deletes || []).forEach(function(uid) {
         if (!uid || uid === '_meta') return;
-        ops.push({ type: 'delete', ref: col.doc(String(uid)) });
+        delList.push(String(uid));
       });
-      if (ops.length === 0) {
+      if (setList.length === 0 && delList.length === 0) {
         reply(true);
         return;
       }
-      function commitChunk(start) {
-        if (start >= ops.length) {
-          reply(true);
-          return;
-        }
-        var batch = firebase.firestore().batch();
-        var end = Math.min(start + 450, ops.length);
-        for (var j = start; j < end; j++) {
-          if (ops[j].type === 'delete') batch.delete(ops[j].ref);
-          else batch.set(ops[j].ref, ops[j].data, { merge: true });
-        }
-        batch.commit().then(function() {
-          commitChunk(end);
-        }).catch(function(err) {
-          reply(false, err && err.message ? err.message : String(err));
+      // Read current writeSeq then batch-write (same discipline as timeline state writeSeq).
+      var reads = setList.map(function(w) {
+        return col.doc(String(w.uid)).get().then(function(doc) {
+          var prevSeq = 0;
+          try {
+            if (doc.exists) prevSeq = Number((doc.data() && doc.data().writeSeq) || 0) || 0;
+          } catch (e0) { prevSeq = 0; }
+          var payload = Object.assign({}, w.doc || {});
+          payload.writeSeq = prevSeq + 1;
+          payload.clientId = clientId;
+          payload.updatedAt = new Date().toISOString();
+          if (meta.actor) payload.updatedBy = meta.actor;
+          return { uid: String(w.uid), data: payload, writeSeq: payload.writeSeq };
         });
-      }
-      commitChunk(0);
+      });
+      Promise.all(reads).then(function(prepared) {
+        var batch = firebase.firestore().batch();
+        prepared.forEach(function(p) {
+          batch.set(col.doc(p.uid), p.data, { merge: true });
+        });
+        delList.forEach(function(uid) {
+          batch.delete(col.doc(uid));
+        });
+        return batch.commit().then(function() {
+          reply(true, '', { written: prepared });
+        });
+      }).catch(function(err) {
+        reply(false, err && err.message ? err.message : String(err));
+      });
     } catch (e) {
       reply(false, e && e.message ? e.message : String(e));
     }
