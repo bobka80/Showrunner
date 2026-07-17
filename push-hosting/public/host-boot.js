@@ -2556,8 +2556,11 @@
     //    document.querySelectorAll('iframe') on the host only sees #app-frame —
     //    never the googleusercontent / userHtmlFrame nest where Index actually runs.
     //    Same lesson as desktop RFID: must reach the inner GAS frame.
+    var seen = [];
     function walk(w, depth) {
       if (!w || depth > 8) return;
+      for (var s = 0; s < seen.length; s++) { if (seen[s] === w) return; }
+      seen.push(w);
       try { w.postMessage(msg, '*'); } catch (e0) { /* ignore */ }
       var len = 0;
       try { len = w.length; } catch (e1) { return; }
@@ -2604,6 +2607,7 @@
     return false;
   }
 
+  // Mirror client: only touched/deleted entities overwrite remote (no silent full-diff upsert).
   function dalFsPatchList_(remoteList, localList, touchedMap, deletedMap, fields) {
     var remoteMap = {};
     var localMap = {};
@@ -2620,12 +2624,6 @@
       tKeys.forEach(function(id) {
         if (localMap[id]) out[id] = localMap[id];
         else delete out[id];
-      });
-    } else {
-      Object.keys(localMap).forEach(function(id) {
-        if (!remoteMap[id] || dalFsEntityChanged_(localMap[id], remoteMap[id], fields)) {
-          out[id] = localMap[id];
-        }
       });
     }
     return Object.keys(out).map(function(k) { return out[k]; });
@@ -2700,7 +2698,11 @@
         reply(true);
       }).catch(function(err) {
         dalFsAuthReady_ = false;
-        reply(false, err && err.message ? err.message : String(err));
+        var em = err && err.message ? err.message : String(err);
+        if (/configuration-not-found/i.test(em)) {
+          em = 'auth/configuration-not-found — enable Authentication in Firebase Console (Get Started; Custom is enough)';
+        }
+        reply(false, em);
       });
     } catch (e) {
       dalFsAuthReady_ = false;

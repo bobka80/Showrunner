@@ -327,10 +327,7 @@ function endDrag() {
       let s = shifts.find(x => x.id === sampleId);
       if (s) lastEditedDurationMain = s.duration;
   }
-  setTimeout(() => {
-    dragMode = null;
-    if (typeof window.dalDrainPendingRemoteTimeline_ === 'function') window.dalDrainPendingRemoteTimeline_();
-  }, 50);
+  dragMode = null;
   document.removeEventListener('mousemove', onDrag); 
   document.removeEventListener('mouseup', endDrag); 
   document.removeEventListener('touchmove', onDrag); 
@@ -343,6 +340,9 @@ function endDrag() {
   }
   window.isTimelineDirty = true;
   if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
+  setTimeout(function() {
+    if (typeof window.dalDrainPendingRemoteTimeline_ === 'function') window.dalDrainPendingRemoteTimeline_();
+  }, 50);
 }
 
 // ==========================================

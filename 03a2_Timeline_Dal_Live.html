@@ -11,6 +11,8 @@ window.dalTlLiveSyncMode = ''; // 'firestore' | 'gas' | ''
 window.dalTlLiveSyncFailReason_ = '';
 window.dalTlWasSessionOpen = false;
 window.dalTlLastRemoteUpdatedAt = '';
+window.dalTlLastAppliedRemoteSig_ = '';
+window.dalTlHaveServerSnap_ = false;
 window.dalTlApplyingRemote = false;
 window.dalTlPendingRemote = null;
 window.dalTlSyncBase_ = null;
@@ -226,15 +228,8 @@ window.dalTlPatchEntityList_ = function(remoteList, localList, touchedMap, delet
       if (localMap[id]) out[id] = localMap[id];
       else delete out[id];
     });
-  } else {
-    // Fallback (missed touch hooks): upsert only local rows that differ from remote / are new.
-    // Never delete remote-only rows without an explicit delete touch.
-    Object.keys(localMap).forEach(function(id) {
-      if (!remoteMap[id] || window.dalTlEntityChanged_(localMap[id], remoteMap[id], fields)) {
-        out[id] = localMap[id];
-      }
-    });
   }
+  // No touches: keep remote as-is. Inventing "local differs → overwrite" caused A↔B stutter loops.
 
   return Object.keys(out).map(function(k) { return out[k]; });
 };
@@ -252,13 +247,8 @@ window.dalTlPatchOverrides_ = function(remoteObj, localObj, touchedMap, deletedM
       if (Object.prototype.hasOwnProperty.call(local, k)) out[k] = local[k];
       else delete out[k];
     });
-  } else {
-    Object.keys(local).forEach(function(k) {
-      if (!Object.prototype.hasOwnProperty.call(out, k) || String(out[k]) !== String(local[k])) {
-        out[k] = local[k];
-      }
-    });
   }
+  // No touches: keep remote overrides (no silent local overwrite).
   return out;
 };
 
@@ -276,7 +266,8 @@ window.dalTlPatchTimelineState_ = function(remoteState, localState, mutations) {
 };
 
 window.dalMarkTimelineLocalSave_ = function() {
-  window.dalTlIgnoreListenerUntil = Date.now() + 200;
+  // Own write echo can arrive after the short window — clientId + sig guards are primary.
+  window.dalTlIgnoreListenerUntil = Date.now() + 800;
 };
 
 window.dalStashPendingRemoteTimeline_ = function(shiftsIn, phasesIn, overridesIn, meta) {
@@ -536,15 +527,23 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
   if (!window.dalTimelineSessionOpen) return;
   if (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly) return;
   if (window.dalTlApplyingRemote) return;
-  if (!window.isTimelineDirty && !window.dalTlHasPendingMutations_()) return;
+  // Collab writes require explicit touches — dirty alone must not rewrite the whole fork.
+  if (!window.dalTlHasPendingMutations_()) {
+    window.isTimelineDirty = false;
+    return;
+  }
   if (window.dalTlFlushInFlight) {
     window.dalTlFlushAgain = true;
     return;
   }
   clearTimeout(window.dalTlFlushTimer);
   window.dalTlFlushTimer = setTimeout(function() {
+    window.dalTlFlushTimer = null;
     if (!window.dalTimelineSessionOpen) return;
-    if (!window.isTimelineDirty && !window.dalTlHasPendingMutations_()) return;
+    if (!window.dalTlHasPendingMutations_()) {
+      window.isTimelineDirty = false;
+      return;
+    }
     if (window.dalTlIsLocalDragging_()) {
       window.dalFlushTimelineIfCollabOpen_();
       return;
@@ -555,11 +554,12 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
 
     var finish = function() {
       window.dalTlFlushInFlight = false;
-      if (window.dalTlFlushAgain || window.isTimelineDirty || window.dalTlHasPendingMutations_()) {
+      if (window.dalTlFlushAgain || window.dalTlHasPendingMutations_()) {
         window.dalTlFlushAgain = false;
         window.dalFlushTimelineIfCollabOpen_();
         return;
       }
+      window.isTimelineDirty = false;
       window.dalDrainPendingRemoteTimeline_();
     };
 
@@ -614,6 +614,13 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
 
   meta = meta || {};
   if (meta.hasPendingWrites) return;
+  // Stale IndexedDB/cache snaps flip strips back after a live write — ignore once we have server data.
+  if (meta.fromCache && window.dalTlHaveServerSnap_) return;
+  if (!meta.fromCache) window.dalTlHaveServerSnap_ = true;
+
+  if (Date.now() < (window.dalTlIgnoreListenerUntil || 0) && meta.clientId === window.dalTlClientId) {
+    return;
+  }
 
   var remoteUpdatedAt = String(meta.updatedAt || '');
   var shiftsIn = window.dalTlSanitizeShiftsForFork_(Array.isArray(remoteShifts) ? remoteShifts : []);
@@ -624,6 +631,7 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
 
   if (meta.clientId && meta.clientId === window.dalTlClientId) {
     window.dalTlLastStateSig = sig;
+    window.dalTlLastAppliedRemoteSig_ = sig;
     if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
     window.dalTlSetSyncBase_(remoteState);
     window.dalTlPendingRemote = null;
@@ -632,11 +640,18 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
     return;
   }
 
-  if (remoteUpdatedAt && window.dalTlLastRemoteUpdatedAt && remoteUpdatedAt < window.dalTlLastRemoteUpdatedAt) {
+  // Duplicate host-bridge deliveries / same doc version — never re-install.
+  if (sig && sig === window.dalTlLastAppliedRemoteSig_) {
+    if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
+    return;
+  }
+
+  if (remoteUpdatedAt && window.dalTlLastRemoteUpdatedAt && remoteUpdatedAt <= window.dalTlLastRemoteUpdatedAt) {
     return;
   }
 
   if (sig === window.dalTlLastStateSig && !window.dalTlHasPendingMutations_()) {
+    window.dalTlLastAppliedRemoteSig_ = sig;
     if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
     window.dalTlSetSyncBase_(remoteState);
     window.dalTlPendingRemote = null;
@@ -663,6 +678,7 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
     var localSig = window.dalTimelineStateSig_(localState.shifts, localState.phases, localState.overrides);
     if (mergedSig === localSig && !hasMut) {
       window.dalTlLastStateSig = sig;
+      window.dalTlLastAppliedRemoteSig_ = sig;
       if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
       window.dalTlSetSyncBase_(remoteState);
       window.dalTlPendingRemote = null;
@@ -671,23 +687,25 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
     }
 
     if (remoteUpdatedAt) window.dalTlLastRemoteUpdatedAt = remoteUpdatedAt;
+    window.dalTlLastAppliedRemoteSig_ = sig;
     window.dalTlPendingRemote = null;
     window.dalTlRemotePending = hasMut;
     if (!hasMut) {
       window.dalTlLastStateSig = mergedSig;
       window.dalTlSetSyncBase_(merged);
-    }
-    // While dirty, keep base as last fully-acked remote without local touches mixed in.
-    if (!hasMut) {
-      /* base set above */
     } else {
+      // Keep base as last remote without local touches mixed in.
       window.dalTlSetSyncBase_(remoteState);
     }
 
     window.dalTlInstallMergedLocal_(merged, { forceRebuild: false });
     if (hasMut) {
+      // Keep dirty so the pending/in-flight flush publishes touches — do NOT flush here.
+      // Flush-on-every-remote caused A↔B write wars (strips stutter left/right).
       window.isTimelineDirty = true;
-      window.dalFlushTimelineIfCollabOpen_();
+      if (!window.dalTlFlushInFlight && !window.dalTlFlushTimer) {
+        window.dalFlushTimelineIfCollabOpen_();
+      }
     }
     window.dalUpdateTimelineLiveBanner_();
   } finally {
@@ -734,6 +752,8 @@ window.stopDalTimelineStateSync_ = function() {
   }
   window.dalTlLiveSyncMode = '';
   window.dalTlRemotePending = false;
+  window.dalTlLastAppliedRemoteSig_ = '';
+  window.dalTlHaveServerSnap_ = false;
 };
 
 window.startDalTimelineGasStateSync_ = function(projectId, failReason) {
@@ -791,6 +811,7 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
       var parsed = window.dalTlParseStateDoc_(d);
       window.dalApplyRemoteTimelineState_(parsed.shifts, parsed.phases, parsed.overrides, {
         hasPendingWrites: !!(meta && meta.hasPendingWrites),
+        fromCache: !!(meta && meta.fromCache),
         updatedAt: parsed.updatedAt || '',
         updatedBy: parsed.updatedBy || '',
         clientId: parsed.clientId || ''
@@ -801,7 +822,10 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
       window.dalTlStateUnsub = window.dalHostFsListenDoc_(path, function(msg) {
         if (!msg || !msg.exists) return;
         if (msg.fromCache && !msg.data) return;
-        onSnapPayload({ hasPendingWrites: !!msg.hasPendingWrites }, msg.data);
+        onSnapPayload({
+          hasPendingWrites: !!msg.hasPendingWrites,
+          fromCache: !!msg.fromCache
+        }, msg.data);
       }, function(listenErr) {
         var lmsg = (listenErr && listenErr.message) ? listenErr.message : 'host listen failed';
         console.warn('Timeline host Firestore listener error — retrying once:', lmsg);
@@ -818,7 +842,10 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
             window.dalTlStateUnsub = window.dalHostFsListenDoc_(path, function(msg) {
               if (!msg || !msg.exists) return;
               if (msg.fromCache && !msg.data) return;
-              onSnapPayload({ hasPendingWrites: !!msg.hasPendingWrites }, msg.data);
+              onSnapPayload({
+                hasPendingWrites: !!msg.hasPendingWrites,
+                fromCache: !!msg.fromCache
+              }, msg.data);
             }, function() {
               console.warn('Timeline host listener failed again — server sync');
               window.stopDalTimelineStateSync_();
@@ -840,7 +867,8 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
       if (!snap.exists) return;
       if (snap.metadata && snap.metadata.fromCache && !snap.data()) return;
       onSnapPayload({
-        hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites)
+        hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites),
+        fromCache: !!(snap.metadata && snap.metadata.fromCache)
       }, snap.data());
     }, function(listenErr) {
       var lmsg2 = (listenErr && listenErr.message) ? listenErr.message : 'listener error';

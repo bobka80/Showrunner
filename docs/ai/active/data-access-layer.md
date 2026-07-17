@@ -354,6 +354,8 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Hotfix** — force direct live sync on host: Firebase Auth/listen/write via **host-boot** (`SHOWRUNNER_DAL_FS_*`) so web.app users get `patch` not `server patch` after reload
 - [x] **Hotfix** — host DAL FS replies via **`ev.source`** (not only `#app-frame`); client posts only to `window.top` (duplicate parent posts made host reply to the wrong nest frame → Auth timeout → `server patch`)
 - [x] **Hotfix** — host DAL FS **deep `window.frames` walk** (cross-origin nest) so AUTH_RESULT/SNAP reach inner Index; banner shows server-patch fail reason
+- [x] **Prerequisite** — Firebase Console → **Authentication → Get Started** (enable Auth / any sign-in method). Without this, `signInWithCustomToken` returns `auth/configuration-not-found` → server patch. Custom-token minting alone is not enough. (Director enabled 2026-07-17 — live sync `(patch)` confirmed)
+- [x] **Hotfix** — timeline collab stutter loop: no flush-on-every-remote; dedupe applied remote sig; ignore stale `fromCache`; writes require explicit touches (no full-diff fallback)
 - [x] **Hotfix** — `openDalSession` / `closeDalSession` release ScriptLock during Firestore UrlFetch (was starving presence → stuck 🔒 door + client timeout on START COLLAB)
 - [x] **Hotfix** — timeline START COLLAB: `beginDalSession` + `finishDalSession` (join if open, reclaim stale opening ~90s, faster Firestore upsert)
 - [x] **Slice D — Dual-domain sessions** — prep + timelineCollab **concurrent** on one project (design lock: per project + per domain). Spec: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
