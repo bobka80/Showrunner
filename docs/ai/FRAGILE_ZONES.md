@@ -565,19 +565,22 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 1. **Full-collection LWW on flush.** Writing every local PA doc on each edit lets a stale browser stomp peers’ untouched rows → A↔B fixture thrash.
 2. **Full list replace on every snapshot while the other side is editing.** Apply must **merge by UID**: take remote for clean rows; keep locally dirty / held UIDs.
 3. **Resurrect a UID after minus/delete from a lagging snap.** Pending-delete / held-absent / recently-deleted UIDs must stay absent — otherwise qty flips up/down rapidly on both browsers (confirmed 2026-07-17).
-4. **Apply stale `fromCache` collection snaps** after a live server snap — same resurrection / yank class as timeline.
-5. **Run `dalProcessPaFormulas_` explode on remote apply.** Exploding unique qty>1 strips UIDs and mints new rows → endless write wars. Remote docs are authoritative; only normalize formula flags (`skipExplode`).
-6. **Host Auth/listen without host PA batch write.** `viaHost` has no `client.db` — listen-only left flushes failing or on GAS while the other browser heard “direct.”
-7. **Flush Firebase from `renderProjectAssetsUI` without `dalPaApplyingRemote` guard** (and without patch-only writes) — remote apply re-render becomes a counter-write.
+4. **Apply stale `fromCache` / `hasPendingWrites` collection snaps** after a live server snap — same resurrection / yank class as timeline; also causes snap→full PA re-render storms (browser stutter).
+5. **Flush Firebase from remote apply** (`hasDirty → dalFlushPaIfPrepOpen_`). That is a closed loop: snap → render → flush → snap.
+6. **Local-recalc auto-containers on remote apply.** That mints new auto UIDs per browser → collection write wars. Apply fixtures by merge; take **remote autos** as written by the mutator.
+7. **Run `dalProcessPaFormulas_` explode on remote apply.** Exploding unique qty>1 strips UIDs and mints new rows → endless write wars. Remote docs are authoritative; only normalize formula flags (`skipExplode`).
+8. **Host Auth/listen without host PA batch write.** `viaHost` has no `client.db` — listen-only left flushes failing or on GAS while the other browser heard “direct.”
+9. **Flush Firebase from `renderProjectAssetsUI` without `dalPaApplyingRemote` guard** (and without patch-only writes) — remote apply re-render becomes a counter-write.
 
 ### Safe rules (locked)
 
 | Concern | Rule |
 |---------|------|
 | Write | **Patch only** — `set`/`delete` UIDs whose content differs from `originalProjectAssets` (or local deletes). Never rewrite the whole collection. |
-| Apply | Start from **remote** collection snap; overlay locally **dirty** and **held** UIDs; keep local-only dirty adds. **Never re-add** recently-deleted / held-absent UIDs. |
-| Local yank guard | On local mutate (before debounce), **entity hold ~3s** + **recently-deleted ~5s** for removed UIDs. |
-| Cache | Ignore `fromCache` snaps after the first server snap. |
+| Apply | Coalesce ~300ms. Merge **fixtures** by UID; keep dirty/held; never resurrect deletes. Attach **remote autos** (no local recalc on apply). |
+| Local yank guard | On local mutate (before debounce), **entity hold ~3s** + **recently-deleted ~8s**. While any hold active, **skip apply entirely**. |
+| Cache | Ignore `fromCache` after first server snap; ignore **`hasPendingWrites`**. |
+| Loop break | **Never flush from apply.** Render only when fixture sig changes. |
 | Formula | Remote apply: `dalProcessPaFormulas_(…, { skipExplode: true })`. |
 | Banner | `live sync (direct)` = Firestore listen; `live sync (server)` = GAS poll. Do not thrash banner text on unchanged state. |
 | Host bridge | `SHOWRUNNER_DAL_FS_LISTEN_COL` + `SHOWRUNNER_DAL_FS_PA_BATCH_WRITE`; Index relays both. |
