@@ -72,6 +72,11 @@ window.deleteSelectedPa = function() {
     }
     
     currentProjectAssets = currentProjectAssets.filter(pa => !toDelete.includes(pa));
+    toDelete.forEach(function(pa) {
+        if (typeof window.dalPaNoteDelete_ === 'function' && pa && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+            window.dalPaNoteDelete_(pa.uid);
+        }
+    });
     window.selectedPaIndices.clear(); window.lastSelectedPaIndex = null;
     window.selectedSummedIds.clear(); window.lastSelectedSummedId = null;
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
@@ -599,6 +604,7 @@ window.removePaIndices = function(indicesStr) {
                 if (!syncMap[loc]) syncMap[loc] = new Set();
                 syncMap[loc].add(form);
             }
+            if (typeof window.dalPaNoteDelete_ === 'function' && pa.uid) window.dalPaNoteDelete_(pa.uid);
             currentProjectAssets.splice(idx, 1);
         }
     });
@@ -853,7 +859,10 @@ function updatePaQtyGeneric(assetId, delta) {
             if ((alreadyAssigned + overlappingAssigned) < maxQty) {
                 if (sib.type === 'Bulk') {
                     let match = currentProjectAssets.find(pa => pa.assetId === sib.id && pa.formula === "Standalone");
-                    if (match) match.qty = parseInt(match.qty, 10) + 1;
+                    if (match) {
+                        match.qty = parseInt(match.qty, 10) + 1;
+                        if (typeof window.dalPaNoteTouch_ === 'function' && match.uid) window.dalPaNoteTouch_(match.uid);
+                    }
                     else window.insertIntoProjectAssets({ assetId: sib.id, qty: 1, formula: "Standalone", location: "General" });
                 } else {
                     window.insertIntoProjectAssets({ assetId: sib.id, qty: 1, formula: "Standalone", location: "General" });
@@ -882,7 +891,12 @@ function updatePaQtyGeneric(assetId, delta) {
                 if (matchIndex > -1) {
                     let pa = currentProjectAssets[matchIndex];
                     pa.qty = parseInt(pa.qty, 10) - 1;
-                    if (pa.qty <= 0) currentProjectAssets.splice(matchIndex, 1);
+                    if (pa.qty <= 0) {
+                        if (typeof window.dalPaNoteDelete_ === 'function' && pa.uid) window.dalPaNoteDelete_(pa.uid);
+                        currentProjectAssets.splice(matchIndex, 1);
+                    } else if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid) {
+                        window.dalPaNoteTouch_(pa.uid);
+                    }
                 }
             } else {
                 break;
@@ -897,7 +911,9 @@ function removePaGeneric(assetId) {
     if (!confirm("Remove ALL instances of this asset from Standalone gear?")) return;
     currentProjectAssets = currentProjectAssets.filter(pa => {
         let isStandalone = (pa.location || "General") === "General" && (pa.formula || "Standalone") === "Standalone";
-        return !(isStandalone && pa.assetId === assetId);
+        let kill = isStandalone && pa.assetId === assetId;
+        if (kill && typeof window.dalPaNoteDelete_ === 'function' && pa.uid) window.dalPaNoteDelete_(pa.uid);
+        return !kill;
     });
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
     renderProjectAssetsUI();
@@ -910,7 +926,9 @@ function removePaGroup(idsStr, loc, form) {
     currentProjectAssets = currentProjectAssets.filter(pa => {
         let matchesLoc = (pa.location || "General") === (loc || "General");
         let matchesForm = (pa.formula || "Standalone") === (form || "Standalone");
-        return !(matchesLoc && matchesForm && ids.includes(pa.assetId));
+        let kill = matchesLoc && matchesForm && ids.includes(pa.assetId);
+        if (kill && typeof window.dalPaNoteDelete_ === 'function' && pa.uid) window.dalPaNoteDelete_(pa.uid);
+        return !kill;
     });
     
     if (form && form !== "Standalone" && typeof window.syncFormulaToItems === 'function') {

@@ -302,7 +302,13 @@ window.dalPaApplyRemoteFixturesTimeline_ = function(remoteFixtures, localFixture
       if (localBy[uid]) { out.push(localBy[uid]); used[uid] = true; }
       return;
     }
-    if (seq && window.dalPaLastAppliedSeq_[uid] && seq < window.dalPaLastAppliedSeq_[uid]) return;
+    // Unstamped (seq=0) or older seq must not yank after a stamped write.
+    // GAS getProjectAssets strips writeSeq — those snaps used to re-open the LWW war.
+    var lastSeq = Number(window.dalPaLastAppliedSeq_[uid] || 0) || 0;
+    if (lastSeq > 0 && (!seq || seq < lastSeq)) {
+      if (localBy[uid]) { out.push(localBy[uid]); used[uid] = true; }
+      return;
+    }
     if (window.dalPaIsRecentlyDeleted_(uid) || window.dalPaDeletedUids_[uid]) return;
     if (window.dalPaIsHeld_(uid) || window.dalPaTouchedUids_[uid]) {
       if (localBy[uid]) { out.push(localBy[uid]); used[uid] = true; }
@@ -1209,34 +1215,56 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
       }
 
       var col = client.db.collection('projects').doc(String(projectId)).collection('assets');
-      var ops = [];
-      sets.forEach(function(w) {
-        ops.push({ type: 'set', ref: col.doc(w.uid), data: w.doc });
-      });
-      toDelete.forEach(function(uid) {
-        if (uid === '_meta') return;
-        ops.push({ type: 'delete', ref: col.doc(uid) });
-      });
-
-      function commitChunk(start) {
-        if (start >= ops.length) {
-          afterOk_();
+      var clientId = window.dalPaClientId || '';
+      var prepared = [];
+      var readNext = function(idx) {
+        if (idx >= sets.length) {
+          var ops = [];
+          prepared.forEach(function(p) {
+            ops.push({ type: 'set', ref: col.doc(p.uid), data: p.data, writeSeq: p.writeSeq });
+          });
+          toDelete.forEach(function(uid) {
+            if (uid === '_meta') return;
+            ops.push({ type: 'delete', ref: col.doc(uid) });
+          });
+          function commitChunk(start) {
+            if (start >= ops.length) {
+              afterOk_({ written: prepared });
+              return;
+            }
+            var batch = client.db.batch();
+            var end = Math.min(start + 450, ops.length);
+            var j;
+            for (j = start; j < end; j++) {
+              if (ops[j].type === 'delete') batch.delete(ops[j].ref);
+              else batch.set(ops[j].ref, ops[j].data, { merge: true });
+            }
+            batch.commit().then(function() {
+              commitChunk(end);
+            }).catch(function(eWrite) {
+              done(eWrite);
+            });
+          }
+          commitChunk(0);
           return;
         }
-        var batch = client.db.batch();
-        var end = Math.min(start + 450, ops.length);
-        var j;
-        for (j = start; j < end; j++) {
-          if (ops[j].type === 'delete') batch.delete(ops[j].ref);
-          else batch.set(ops[j].ref, ops[j].data, { merge: true });
-        }
-        batch.commit().then(function() {
-          commitChunk(end);
-        }).catch(function(eWrite) {
-          done(eWrite);
+        var w = sets[idx];
+        col.doc(String(w.uid)).get().then(function(doc) {
+          var prevSeq = 0;
+          try {
+            if (doc.exists) prevSeq = Number((doc.data() && doc.data().writeSeq) || 0) || 0;
+          } catch (e0) { prevSeq = 0; }
+          var payload = Object.assign({}, w.doc || {});
+          payload.writeSeq = prevSeq + 1;
+          payload.clientId = clientId;
+          payload.updatedAt = new Date().toISOString();
+          prepared.push({ uid: String(w.uid), data: payload, writeSeq: payload.writeSeq });
+          readNext(idx + 1);
+        }).catch(function(eRead) {
+          done(eRead);
         });
-      }
-      commitChunk(0);
+      };
+      readNext(0);
     } catch (e2) {
       done(e2);
     }
@@ -1304,6 +1332,11 @@ window.dalFlushPaIfPrepOpen_ = function() {
         if (typeof updateMobilePaUnsavedUI === 'function') updateMobilePaUnsavedUI();
       } else {
         try { console.warn('DAL PA live flush failed — will retry or use SAVE'); } catch (e1) { /* ignore */ }
+        if (window.dalPaHasPendingTouches_()) {
+          setTimeout(function() {
+            if (window.dalPrepUiOpen && window.dalPaHasPendingTouches_()) window.dalFlushPaIfPrepOpen_();
+          }, 600);
+        }
       }
       if (window.dalPaFlushAgain) {
         window.dalPaFlushAgain = false;
@@ -1311,20 +1344,17 @@ window.dalFlushPaIfPrepOpen_ = function() {
       }
     };
 
-    // Fast path: direct client → Firestore
+    // Fast path: direct client → Firestore. Never fall back to GAS save during
+    // firestore live mode — GAS firestoreWriteDocument_ replaces the whole doc
+    // and wipes writeSeq/clientId, reopening the LWW war with the listener.
     if (projectId && window.dalPaLiveSyncMode === 'firestore') {
       window.dalWritePaForkToFirestore_(projectId, function(writeErr) {
         if (!writeErr) {
           finish(true);
           return;
         }
-        try { console.warn('Direct PA Firestore write failed, falling back to GAS:', writeErr); } catch (e2) { /* ignore */ }
-        // Fall through to GAS
-        if (typeof saveProjectAssets !== 'function') {
-          finish(false);
-          return;
-        }
-        saveProjectAssets(function(ok) { finish(!!ok); }, true);
+        try { console.warn('Direct PA Firestore write failed (touches kept for retry):', writeErr); } catch (e2) { /* ignore */ }
+        finish(false);
       });
       return;
     }

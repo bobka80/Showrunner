@@ -68,6 +68,56 @@ var stale = core.applyRemoteFixtures(
 );
 assert(stale.fixtures.length === 0 || Number(stale.fixtures[0].qty) !== 99, 'stale seq cannot yank qty to 99');
 
+console.log('\n--- Unit: ignore unstamped GAS snap after stamped write (v633 miss) ---');
+var unstamped = core.applyRemoteFixtures(
+  [{ uid: 'u1', qty: 5, writeSeq: 0, clientId: '' }],
+  [{ uid: 'u1', qty: 4, writeSeq: 3 }],
+  { lastAppliedSeq: { u1: 3 }, clientId: 'me', now: Date.now() }
+);
+assert(unstamped.fixtures.length === 1 && Number(unstamped.fixtures[0].qty) === 4,
+  'GAS-stripped writeSeq (seq=0) must not yank qty 4→5');
+
+console.log('\n--- Case C: stamped write then unstamped GAS snaps must not oscillate ---');
+(function() {
+  var store = {
+    'fix-1': { uid: 'fix-1', assetId: 'A1', qty: 4, writeSeq: 3, clientId: 'clientA' }
+  };
+  var client = {
+    fixtures: [{ uid: 'fix-1', assetId: 'A1', qty: 4, writeSeq: 3 }],
+    lastAppliedSeq: { 'fix-1': 3 },
+    touched: {},
+    deleted: {},
+    holdUntil: {},
+    qtyHistory: []
+  };
+  for (var i = 0; i < 6; i++) {
+    // Alternate: good listener snap vs GAS get without writeSeq (stale qty 5)
+    var remote = (i % 2 === 0)
+      ? [{ uid: 'fix-1', assetId: 'A1', qty: 4, writeSeq: 3, clientId: 'clientA' }]
+      : [{ uid: 'fix-1', assetId: 'A1', qty: 5, writeSeq: 0, clientId: '' }];
+    var result = core.applyRemoteFixtures(remote, client.fixtures, {
+      lastAppliedSeq: client.lastAppliedSeq,
+      touched: client.touched,
+      deleted: client.deleted,
+      holdUntil: client.holdUntil,
+      clientId: 'clientA',
+      now: Date.now()
+    });
+    client.fixtures = result.fixtures.length ? result.fixtures : client.fixtures;
+    Object.keys(result.appliedSeq || {}).forEach(function(uid) {
+      client.lastAppliedSeq[uid] = result.appliedSeq[uid];
+    });
+    var row = client.fixtures[0];
+    client.qtyHistory.push(row ? Number(row.qty) : 0);
+  }
+  console.log('  history', client.qtyHistory.join('→'));
+  var osc = false;
+  for (var j = 1; j < client.qtyHistory.length; j++) {
+    if (client.qtyHistory[j] !== client.qtyHistory[0]) osc = true;
+  }
+  assert(!osc && client.qtyHistory[0] === 4, 'GAS/listener alternation must stay at 4');
+})();
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);

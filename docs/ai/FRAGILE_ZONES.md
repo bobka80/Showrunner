@@ -585,6 +585,8 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 7. **Run `dalProcessPaFormulas_` explode on remote apply.** Exploding unique qty>1 strips UIDs and mints new rows → endless write wars. Remote docs are authoritative; only normalize formula flags (`skipExplode`).
 8. **Host Auth/listen without host PA batch write.** `viaHost` has no `client.db` — listen-only left flushes failing or on GAS while the other browser heard “direct.”
 9. **Flush Firebase from `renderProjectAssetsUI` without `dalPaApplyingRemote` guard** (and without patch-only writes) — remote apply re-render becomes a counter-write.
+10. **Apply GAS `getProjectAssets` fixtures while `dalPaLiveSyncMode === 'firestore'`.** GAS strips `writeSeq`/`clientId` → listener↔GAS qty oscillation (confirmed still broken after v633).
+11. **Fall back live flush to `saveProjectAssets` in firestore mode.** GAS full-document PATCH wiped host `writeSeq` stamps.
 
 ### Safe rules (locked)
 
@@ -593,8 +595,10 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | Write | **Touch-only fixtures** — `dalPaNoteTouch_` / `dalPaNoteDelete_` then flush those UIDs only. Stamp `writeSeq`+`clientId` on host. Never live-write autos. |
 | Apply | Coalesce ~300ms; re-queue if hold active. Timeline-parity: own clientId echo, stale seq ignore, hold/touch keep local, never resurrect deletes. Local `recalcAutoContainers` after fixture merge (not written live). |
 | Loop break | Never flush from apply. Render-end flush only when touches pending. |
-| Load race | During prep+firestore mode, late `getProjectAssets` must not full-replace+explode — route through live apply. |
-| Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed. |
+| Load race | During prep+firestore mode, late `getProjectAssets` must **not apply fixtures at all** (overlap map only). GAS responses strip `writeSeq`/`clientId` — applying them reopens qty LWW thrash against the listener. |
+| Unstamped seq | After any stamped write (`lastAppliedSeq[uid] > 0`), ignore remote docs with `writeSeq` missing/0 or `seq < lastApplied`. |
+| GAS save | Never fall back to `saveProjectAssets` on live flush failure while `dalPaLiveSyncMode === 'firestore'` (GAS PATCH replace wiped host `writeSeq`). Manual SAVE via GAS must re-stamp `writeSeq`. |
+| Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed (includes unstamped-GAS case). |
 | Formula | Remote apply: `dalProcessPaFormulas_(…, { skipExplode: true })`. |
 | Banner | `live sync (direct)` = Firestore listen; `live sync (server)` = GAS poll. Do not thrash banner text on unchanged state. |
 | Host bridge | `SHOWRUNNER_DAL_FS_LISTEN_COL` + `SHOWRUNNER_DAL_FS_PA_BATCH_WRITE`; Index relays both. |

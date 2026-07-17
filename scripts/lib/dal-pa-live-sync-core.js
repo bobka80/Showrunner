@@ -79,8 +79,15 @@ function applyRemoteFixtures(remoteFixtures, localFixtures, opts) {
       return;
     }
 
-    // Stale seq
-    if (seq && lastAppliedSeq[uid] && seq < lastAppliedSeq[uid]) return;
+    // Stale / unstamped seq — never yank after a stamped write (GAS strips writeSeq).
+    var lastSeq = Number(lastAppliedSeq[uid] || 0) || 0;
+    if (lastSeq > 0 && (!seq || seq < lastSeq)) {
+      if (localBy[uid]) {
+        out.push(localBy[uid]);
+        used[uid] = true;
+      }
+      return;
+    }
 
     // Local hold / pending delete / pending touch — keep local absence or local row
     if ((holdUntil[uid] || 0) > now || deleted[uid]) {

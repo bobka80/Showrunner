@@ -193,6 +193,13 @@ window.autoSaveAndExecute = function(callback, optimistic = true, failureCallbac
         .withSuccessHandler(res2 => {
             window.isBackgroundSyncing = false;
             document.body.style.cursor = origCursor;
+            // Prep live fork: Firestore listen owns fixture qty — do not re-apply GAS
+            // getProjectAssets (strips writeSeq → LWW thrash). Overlap map only.
+            if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore') {
+                window.overlappingAllocations = res2.overlapping || window.overlappingAllocations || {};
+                if ((!optimistic || forceSync) && callback) callback();
+                return;
+            }
             let serverAssets = res2.current || [];
             window.overlappingAllocations = res2.overlapping || {};
             

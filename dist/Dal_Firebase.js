@@ -102,7 +102,22 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
 
     classified.rowsToUpdate.forEach(function (r) {
       var docId = r.docId || String(r.data[hdr.map['uid']]);
-      firestoreWriteDocument_(basePath + '/' + docId, dalPaSheetRowToObject_(r.data, hdr.map));
+      var obj = dalPaSheetRowToObject_(r.data, hdr.map);
+      // Preserve/increment writeSeq — full PATCH replace would otherwise wipe host stamps
+      // and reopen client LWW thrash against the live listener.
+      try {
+        var existing = firestoreFetch_('get', basePath + '/' + docId);
+        if (existing && existing.fields) {
+          var plain = firestoreDecodeFields_(existing.fields);
+          obj.writeSeq = (Number(plain.writeSeq || 0) || 0) + 1;
+        } else {
+          obj.writeSeq = 1;
+        }
+      } catch (eSeq) {
+        obj.writeSeq = 1;
+      }
+      obj.clientId = 'gas_' + String(actor || 'system');
+      firestoreWriteDocument_(basePath + '/' + docId, obj);
     });
     classified.rowsToDelete.forEach(function (docId) {
       firestoreDeleteDocument_(basePath + '/' + docId);
@@ -110,7 +125,10 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
     classified.rowsToAppend.forEach(function (rowData) {
       var docId = String(rowData[hdr.map['uid']] || Utilities.getUuid());
       if (!rowData[hdr.map['uid']]) rowData[hdr.map['uid']] = docId;
-      firestoreWriteDocument_(basePath + '/' + docId, dalPaSheetRowToObject_(rowData, hdr.map));
+      var obj = dalPaSheetRowToObject_(rowData, hdr.map);
+      obj.writeSeq = 1;
+      obj.clientId = 'gas_' + String(actor || 'system');
+      firestoreWriteDocument_(basePath + '/' + docId, obj);
     });
 
     writeToAuditLog(actor, "UPDATE", "PROJECT_ASSETS_FIRESTORE", projectId, projectId, 'Applied ' + deltas.length + ' delta(s) on prep fork.');
