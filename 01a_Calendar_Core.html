@@ -702,19 +702,39 @@ document.addEventListener('DOMContentLoaded', function() {
 // --- DASHBOARD DATA INTERCEPTOR (CONTOUR ENGINE) ---
 // ==========================================
 // @INDEX: DATA -> Contour Engine Interceptor
-function refreshData() {
-  document.getElementById('calendar-container').style.opacity = '0.4';
-  document.getElementById('calendar-container').style.pointerEvents = 'none';
+/**
+ * Refresh calendar contour from GAS.
+ * opts.quiet / default when events already painted: stale-while-revalidate — no opacity "sing".
+ * opts.forceDim: old blocking dim (rare; hard reload).
+ */
+function refreshData(opts) {
+  opts = opts || {};
+  var cal = document.getElementById('calendar-container');
+  var alreadyLive = false;
+  try {
+    alreadyLive = !!(calendar && typeof calendar.getEvents === 'function' && calendar.getEvents().length > 0);
+  } catch (e0) { alreadyLive = false; }
+  var quiet = opts.forceDim ? false : (opts.quiet === true || (opts.quiet !== false && alreadyLive));
+
+  if (cal && !quiet) {
+    cal.style.opacity = '0.4';
+    cal.style.pointerEvents = 'none';
+  }
+
   google.script.run
     .withFailureHandler(err => {
         alert("Data Error: " + err.message);
-        document.getElementById('calendar-container').style.opacity = '1';
-        document.getElementById('calendar-container').style.pointerEvents = 'auto';
+        if (cal) {
+          cal.style.opacity = '1';
+          cal.style.pointerEvents = 'auto';
+        }
     })
     .withSuccessHandler(payload => {
         applyRefreshPayload(payload);
-        document.getElementById('calendar-container').style.opacity = '1';
-        document.getElementById('calendar-container').style.pointerEvents = 'auto';
+        if (cal) {
+          cal.style.opacity = '1';
+          cal.style.pointerEvents = 'auto';
+        }
         
         // Update Phantom Cache with fresh contour data
         try {

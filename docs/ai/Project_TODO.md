@@ -54,7 +54,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |
 | Availability & fleet tracker | Partial — equipment tracker matrix | [topics/availability-fleet.md](topics/availability-fleet.md) |
-| UX & platform | Partial — desktop lock @ v388 (polish → v409); Personal Hub profile TBD | [topics/ux-platform.md](topics/ux-platform.md) |
+| UX & platform | Partial — desktop lock preserves working screen @ **v625**; Personal Hub profile TBD | [topics/ux-platform.md](topics/ux-platform.md) |
 | Beta prep (payroll, transport, audit) | Partial — RBAC 1–5, fin globals | [topics/beta-prep.md](topics/beta-prep.md) |
 | **Pre-beta hardening (full debug sweeps)** | Backlog — **runs last** (see Final section below) | [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md) |
 | Training manuals | Backlog | [topics/training-manuals.md](topics/training-manuals.md) |

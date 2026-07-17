@@ -6,12 +6,16 @@
 
 **Status:** **Phase 6B live** — client CacheCoordinator covers PA + calendar/vault/tracker/fleet/clients/warehouse; GAS `getSheetData` cache re-enabled with tag-aware purge. See [active/data-access-layer.md](../active/data-access-layer.md).
 
-**Last swept:** 2026-07-16
+**Last swept:** 2026-07-17
 
 **Design lock — Cache Coordinator public API:** [../active/dal-firebase-design-lock-2026-07-13.md §4](../active/dal-firebase-design-lock-2026-07-13.md#4-caching-strategy-cache-coordinator) — `check`, `set`, `invalidate`, `registerPolicy`; UI → coordinator → repos (never UI → repos directly).
 
 **Active campaign:** [../active/data-access-layer.md](../active/data-access-layer.md) · **Design locked 2026-07-13**
 
+### Calendar refresh (contour)
+
+- `refreshData()` in `01a_Calendar_Core.html` — when the calendar **already has events**, refresh is **quiet** (no opacity 0.4 “sing”); stale-while-revalidate. Use `{ forceDim: true }` only for a hard blocking reload.
+- Phantom payload (`calendar:phantom` / `dalCacheSetPhantom_`) still updated on success.
 ---
 
 ## Director intent
