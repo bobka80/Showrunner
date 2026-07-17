@@ -59,7 +59,9 @@ window.startDalPrepSessionPoll_ = function(projectId) {
 
         if (window.dalIsPrepOpenFromInfo_(info)) {
           window.dalPrepClosedPollStreak = 0;
-          window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: !window.dalPrepUiOpen });
+          if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
+            window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
+          }
           return;
         }
 

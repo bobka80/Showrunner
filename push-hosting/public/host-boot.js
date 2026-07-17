@@ -2821,6 +2821,59 @@
     }
   }
 
+  /** Prep PA fork batch write on host (viaHost listen has no in-iframe db). */
+  function dalFsHandlePaBatchWrite_(data, sourceWin) {
+    var requestId = data.requestId || '';
+    var colPath = data.colPath || '';
+    var sets = data.sets || [];
+    var deletes = data.deletes || [];
+    function reply(ok, errMsg) {
+      dalFsPostToIframe_({
+        type: 'SHOWRUNNER_DAL_FS_WRITE_RESULT',
+        requestId: requestId,
+        ok: !!ok,
+        result: null,
+        error: errMsg || ''
+      }, sourceWin);
+    }
+    try {
+      var col = dalFsColRef_(colPath);
+      var ops = [];
+      sets.forEach(function(w) {
+        if (!w || !w.uid || w.uid === '_meta') return;
+        ops.push({ type: 'set', ref: col.doc(String(w.uid)), data: w.doc || {} });
+      });
+      (deletes || []).forEach(function(uid) {
+        if (!uid || uid === '_meta') return;
+        ops.push({ type: 'delete', ref: col.doc(String(uid)) });
+      });
+      if (ops.length === 0) {
+        reply(true);
+        return;
+      }
+      function commitChunk(start) {
+        if (start >= ops.length) {
+          reply(true);
+          return;
+        }
+        var batch = firebase.firestore().batch();
+        var end = Math.min(start + 450, ops.length);
+        for (var j = start; j < end; j++) {
+          if (ops[j].type === 'delete') batch.delete(ops[j].ref);
+          else batch.set(ops[j].ref, ops[j].data, { merge: true });
+        }
+        batch.commit().then(function() {
+          commitChunk(end);
+        }).catch(function(err) {
+          reply(false, err && err.message ? err.message : String(err));
+        });
+      }
+      commitChunk(0);
+    } catch (e) {
+      reply(false, e && e.message ? e.message : String(e));
+    }
+  }
+
   function dalFsHandlePatchWrite_(data, sourceWin) {
     var requestId = data.requestId || '';
     var path = data.path || '';
@@ -2912,6 +2965,10 @@
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_PATCH_WRITE') {
       dalFsHandlePatchWrite_(ev.data, ev.source);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_PA_BATCH_WRITE') {
+      dalFsHandlePaBatchWrite_(ev.data, ev.source);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION_TOKEN') {
