@@ -109,9 +109,11 @@ window.dalPaContentSig_ = function(pa) {
 };
 
 window.dalPaHoldUntil_ = window.dalPaHoldUntil_ || {};
+window.dalPaRecentlyDeleted_ = window.dalPaRecentlyDeleted_ || {};
+window.dalPaSeenServerSnap_ = false;
 
 window.dalPaHoldEntities_ = function(uids, ms) {
-  ms = ms == null ? 2000 : ms;
+  ms = ms == null ? 3000 : ms;
   var until = Date.now() + ms;
   (uids || []).forEach(function(uid) {
     if (!uid || uid === '_meta') return;
@@ -119,10 +121,29 @@ window.dalPaHoldEntities_ = function(uids, ms) {
   });
 };
 
+window.dalPaMarkDeleted_ = function(uids, ms) {
+  ms = ms == null ? 5000 : ms;
+  var until = Date.now() + ms;
+  (uids || []).forEach(function(uid) {
+    if (!uid || uid === '_meta') return;
+    window.dalPaRecentlyDeleted_[String(uid)] = until;
+  });
+};
+
 window.dalPaIsHeld_ = function(uid) {
   if (!uid) return false;
   var until = window.dalPaHoldUntil_[String(uid)] || 0;
   return Date.now() < until;
+};
+
+window.dalPaIsRecentlyDeleted_ = function(uid) {
+  if (!uid) return false;
+  var until = window.dalPaRecentlyDeleted_[String(uid)] || 0;
+  if (Date.now() >= until) {
+    delete window.dalPaRecentlyDeleted_[String(uid)];
+    return false;
+  }
+  return true;
 };
 
 window.dalPaDirtyUidMap_ = function() {
@@ -145,7 +166,7 @@ window.dalPaDirtyUidMap_ = function() {
     if (!o || window.dalPaContentSig_(currBy[uid]) !== window.dalPaContentSig_(o)) dirty[uid] = true;
   });
   Object.keys(origBy).forEach(function(uid) {
-    if (!currBy[uid]) dirty[uid] = true;
+    if (!currBy[uid]) dirty[uid] = true; // pending local delete
   });
   return dirty;
 };
@@ -161,11 +182,14 @@ window.dalPaMapByUid_ = function(assets) {
 /**
  * Patch merge for prep PA (same class as timeline touch/patch):
  * start from REMOTE, keep locally dirty / held UIDs, keep local-only dirty adds.
+ * NEVER resurrect a UID that is pending-delete, held-absent, or recently deleted
+ * (stale snaps after minus were re-adding rows → rapid up/down thrash).
  */
 window.dalPaPatchMergeFromRemote_ = function(serverAssets) {
   var dirty = window.dalPaDirtyUidMap_();
   var local = Array.isArray(currentProjectAssets) ? currentProjectAssets : [];
   var localBy = window.dalPaMapByUid_(local);
+  var origBy = window.dalPaMapByUid_(window.originalProjectAssets || []);
   var merged = [];
   var used = {};
 
@@ -173,6 +197,12 @@ window.dalPaPatchMergeFromRemote_ = function(serverAssets) {
     if (!remotePa) return;
     var uid = remotePa.uid ? String(remotePa.uid) : '';
     if (!uid) return;
+
+    // Local intentionally removed this row — do not take it back from a lagging snap.
+    if (window.dalPaIsRecentlyDeleted_(uid)) return;
+    if ((dirty[uid] || window.dalPaIsHeld_(uid)) && !localBy[uid] && origBy[uid]) return;
+    if (window.dalPaIsHeld_(uid) && !localBy[uid]) return;
+
     if (window.dalPaIsHeld_(uid) || dirty[uid]) {
       if (localBy[uid]) merged.push(localBy[uid]);
       else merged.push(remotePa);
@@ -214,15 +244,23 @@ window.dalUpdateRemotePendingBanner_ = function() {
   banner.textContent = text;
 };
 
-window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
+window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty, snapMeta) {
+  snapMeta = snapMeta || {};
   if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) return;
   if (window.dalPaFlushInFlight) return;
   if (!window.dalPrepUiOpen) return;
   if (fromCacheEmpty) return;
+  // Stale IndexedDB/cache snaps re-introduce deleted rows after minus → up/down thrash.
+  if (snapMeta.fromCache && window.dalPaSeenServerSnap_) return;
+  if (!snapMeta.fromCache) window.dalPaSeenServerSnap_ = true;
 
   var serverAssets = JSON.parse(JSON.stringify(assets || []));
   // skipExplode: remote fork docs are authoritative — exploding would mint new uids and thrash.
   window.dalProcessPaFormulas_(serverAssets, { skipExplode: true });
+  // Drop recently-deleted UIDs from the remote view before sig/merge.
+  serverAssets = serverAssets.filter(function(pa) {
+    return !(pa && pa.uid && window.dalPaIsRecentlyDeleted_(String(pa.uid)));
+  });
   var sig = window.dalPaAssetsSig_(serverAssets);
   if (sig === window.dalPaLastRemoteSig) return;
 
@@ -232,7 +270,8 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
   var mergedSig = window.dalPaAssetsSig_(merged);
   var localSig = window.dalPaAssetsSig_(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []);
   if (mergedSig === localSig) {
-    window.dalPaLastRemoteSig = sig;
+    // Only advance remote sig when merge accepted the server view (or matched local).
+    window.dalPaLastRemoteSig = mergedSig;
     if (!hasDirty) {
       window.dalPaRemotePending = false;
       window.originalProjectAssets = JSON.parse(JSON.stringify(merged));
@@ -243,7 +282,7 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
     return;
   }
 
-  window.dalPaLastRemoteSig = sig;
+  window.dalPaLastRemoteSig = mergedSig;
   window.dalPaRemotePending = hasDirty;
   window.dalPaApplyingRemote = true;
   try {
@@ -255,7 +294,7 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
       var origBy = window.dalPaMapByUid_(window.originalProjectAssets || []);
       var remoteBy = window.dalPaMapByUid_(serverAssets);
       Object.keys(remoteBy).forEach(function(uid) {
-        if (!dirty[uid] && !window.dalPaIsHeld_(uid)) {
+        if (!dirty[uid] && !window.dalPaIsHeld_(uid) && !window.dalPaIsRecentlyDeleted_(uid)) {
           origBy[uid] = JSON.parse(JSON.stringify(remoteBy[uid]));
         }
       });
@@ -263,7 +302,6 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty) {
         if (!remoteBy[uid] && !dirty[uid] && !window.dalPaIsHeld_(uid)) delete origBy[uid];
       });
       window.originalProjectAssets = Object.keys(origBy).map(function(k) { return origBy[k]; });
-      // Keep local-only dirty rows (no uid yet / pending adds) represented in original? adds stay dirty via missing orig.
     }
 
     var overlay = document.getElementById('project-assets-modal-overlay');
@@ -597,6 +635,10 @@ window.stopDalPaLiveSync_ = function() {
   window.dalPaLiveSyncMode = '';
   window.dalPaRemotePending = false;
   window.dalPaLastRemoteSig = '';
+  window.dalPaSeenServerSnap_ = false;
+  window.dalPaHoldUntil_ = {};
+  window.dalPaRecentlyDeleted_ = {};
+  window.dalPaBannerLastText_ = '';
 };
 
 /** GAS-backed sync — works inside Apps Script iframe without Firebase Auth authorized domains. */
@@ -656,7 +698,7 @@ window.startDalPaFirestoreListener = function(projectId) {
         var a = window.dalFsDocToPaAsset_(entry.id, entry.data);
         if (a) assets.push(a);
       });
-      window.dalApplyRemotePaAssets_(assets, fromCache && assets.length === 0);
+      window.dalApplyRemotePaAssets_(assets, fromCache && assets.length === 0, { fromCache: !!fromCache });
     };
 
     // Host bridge: collection listen on web.app (same Auth path as timeline).
@@ -936,7 +978,9 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
         return;
       }
       window.dalMarkPaLocalSave_();
-      window.dalPaHoldEntities_(sets.map(function(s) { return s.uid; }).concat(toDelete), 2000);
+      var touchUids = sets.map(function(s) { return s.uid; }).concat(toDelete);
+      window.dalPaHoldEntities_(touchUids, 3000);
+      window.dalPaMarkDeleted_(toDelete, 5000);
 
       var afterOk_ = function() {
         done(null, { sets: sets, deletes: toDelete });
@@ -1008,6 +1052,19 @@ window.dalFlushPaIfPrepOpen_ = function() {
   if (typeof calculatePaDeltas !== 'function') return;
   if (calculatePaDeltas().length === 0) return;
 
+  // Arm holds immediately (before debounce/write) so lagging snaps cannot resurrect rows after minus.
+  var earlyProjectId = document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value
+    : '';
+  if (earlyProjectId && typeof window.dalPaComputeForkPatch_ === 'function') {
+    try {
+      var earlyPatch = window.dalPaComputeForkPatch_(earlyProjectId);
+      var earlyTouches = (earlyPatch.sets || []).map(function(s) { return s.uid; }).concat(earlyPatch.deletes || []);
+      window.dalPaHoldEntities_(earlyTouches, 3000);
+      window.dalPaMarkDeleted_(earlyPatch.deletes || [], 5000);
+    } catch (eEarly) { /* ignore */ }
+  }
+
   clearTimeout(window.dalPaFlushTimer);
   window.dalPaFlushTimer = setTimeout(function() {
     if (!window.dalPrepUiOpen) return;
@@ -1023,6 +1080,7 @@ window.dalFlushPaIfPrepOpen_ = function() {
       window.dalPaFlushInFlight = false;
       if (ok) {
         window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+        window.dalPaLastRemoteSig = window.dalPaAssetsSig_(currentProjectAssets || []);
         window.dalPaRemotePending = false;
         if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
         if (typeof updateMobilePaUnsavedUI === 'function') updateMobilePaUnsavedUI();
