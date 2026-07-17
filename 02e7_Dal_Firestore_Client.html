@@ -154,7 +154,19 @@ window.dalEnsureFirebaseSdk_ = function(done) {
 
 /** True when running inside hosting shell (web.app) — preferred for live Firestore. */
 window.dalHostFsAvailable_ = function() {
-  try { return !!(window.parent && window.parent !== window); } catch (e) { return false; }
+  try {
+    if (!window.parent || window.parent === window) return false;
+    // Raw script.google.com bookmark has no host-boot — skip host bridge.
+    try {
+      var topHref = String((window.top && window.top.location && window.top.location.href) || '');
+      if (topHref && /script\.google\.com/i.test(topHref) && !/web\.app/i.test(topHref)) {
+        return false;
+      }
+    } catch (eTop) {
+      // Cross-origin top (web.app embedding GAS) — cannot read href; host bridge is expected.
+    }
+    return true;
+  } catch (e) { return false; }
 };
 
 window.dalFsReqSeq_ = 1;
@@ -206,17 +218,21 @@ window.dalFsBindHostMessages_ = function() {
 };
 
 window.dalFsPostToHost_ = function(msg) {
-  // Only window.top (web.app). Also posting to parent duplicates the request with
-  // ev.source = middle wrapper — host then replies to the wrong frame and snaps never arrive.
+  // Hit window.top (web.app host-boot) and every ancestor — GAS is multi-nested.
+  var seen = [];
+  function post(w) {
+    if (!w) return;
+    for (var i = 0; i < seen.length; i++) { if (seen[i] === w) return; }
+    seen.push(w);
+    try { w.postMessage(msg, '*'); } catch (e) { /* ignore */ }
+  }
+  try { post(window.top); } catch (e0) { /* ignore */ }
   try {
-    if (window.top && window.top !== window) {
-      window.top.postMessage(msg, '*');
-      return;
-    }
-  } catch (e0) { /* ignore */ }
-  try {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage(msg, '*');
+    var w = window;
+    for (var n = 0; n < 8; n++) {
+      if (!w.parent || w.parent === w) break;
+      w = w.parent;
+      post(w);
     }
   } catch (e1) { /* ignore */ }
 };
@@ -234,10 +250,25 @@ window.dalEnsureFirestoreClientAuth_ = function(cb) {
 
   var finishWithIframeAuth_ = function() {
     google.script.run
-      .withFailureHandler(function(err) { cb(err); })
+      .withFailureHandler(function(err) {
+        if (window.__dalFsLastHostFail_ && (!err || !err.message)) {
+          cb(new Error(window.__dalFsLastHostFail_));
+          return;
+        }
+        if (window.__dalFsLastHostFail_) {
+          cb(new Error(window.__dalFsLastHostFail_ + '; iframe: ' + ((err && err.message) || String(err || 'fail'))));
+          return;
+        }
+        cb(err);
+      })
       .withSuccessHandler(function(res) {
         window.dalEnsureFirebaseSdk_(function(sdkErr) {
-          if (sdkErr) { cb(sdkErr); return; }
+          if (sdkErr) {
+            cb(window.__dalFsLastHostFail_
+              ? new Error(window.__dalFsLastHostFail_ + '; iframe sdk: ' + (sdkErr.message || sdkErr))
+              : sdkErr);
+            return;
+          }
           try {
             if (!window.dalFirestoreClient || window.dalFirestoreClient.appName !== res.config.projectId) {
               if (window.dalFirestoreClient && window.dalFirestoreClient.app) {
@@ -263,10 +294,19 @@ window.dalEnsureFirestoreClientAuth_ = function(cb) {
             window.dalFirestoreClient.auth.signInWithCustomToken(res.customToken)
               .then(function() {
                 window.dalFirestoreClient.ready = true;
+                window.__dalFsLastHostFail_ = '';
                 cb(null, window.dalFirestoreClient);
               })
-              .catch(function(e) { cb(e); });
-          } catch (e) { cb(e); }
+              .catch(function(e) {
+                cb(window.__dalFsLastHostFail_
+                  ? new Error(window.__dalFsLastHostFail_ + '; iframe auth: ' + (e.message || e))
+                  : e);
+              });
+          } catch (e) {
+            cb(window.__dalFsLastHostFail_
+              ? new Error(window.__dalFsLastHostFail_ + '; iframe: ' + (e.message || e))
+              : e);
+          }
         });
       })
       .getDalFirebaseClientAuth(actor);
@@ -291,8 +331,10 @@ window.dalEnsureFirestoreClientAuth_ = function(cb) {
         settled = true;
         delete window.dalFsPending_[requestId];
         try { console.warn('Host DAL auth timed out — trying iframe Auth'); } catch (e1) { /* ignore */ }
+        // Pass a clear error through iframe path; if iframe also fails, banner shows this.
+        window.__dalFsLastHostFail_ = 'host auth timed out (no AUTH_RESULT)';
         finishWithIframeAuth_();
-      }, 12000);
+      }, 8000);
       window.dalFsPending_[requestId] = {
         cb: function(err, client) {
           if (settled) return;
@@ -306,6 +348,7 @@ window.dalEnsureFirestoreClientAuth_ = function(cb) {
           cb(null, client);
         }
       };
+      try { console.log('[DAL FS] posting AUTH to host', requestId); } catch (ePost) { /* ignore */ }
       window.dalFsPostToHost_({
         type: 'SHOWRUNNER_DAL_FS_AUTH',
         requestId: requestId,
@@ -415,6 +458,16 @@ window.startDalPaFirestoreListener = function(projectId) {
     window.dalPaLiveSyncMode = 'firestore';
     window.dalPaLiveSyncFailed = false;
     window.dalUpdateRemotePendingBanner_();
+
+    // Host bridge client has no in-iframe db — PA stays on GAS poll until collection listen is bridged.
+    if (client.viaHost && !client.db) {
+      window.startDalPaGasSync_(projectId);
+      return;
+    }
+    if (!client.db) {
+      window.startDalPaGasSync_(projectId);
+      return;
+    }
 
     var col = client.db.collection('projects').doc(String(projectId)).collection('assets');
     window.dalPaFirestoreUnsub = col.onSnapshot(function(snap) {

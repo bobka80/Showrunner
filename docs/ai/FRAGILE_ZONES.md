@@ -117,7 +117,7 @@ web.app (host-boot.js)                 GAS iframe (Index / station shell)
 | Scan result → app UI | Iframe reload with `srScan` (QR); server cache pull (backup) | Shell `postMessage` alone into `#app-frame` |
 | Gun EPC → station strip (Chainway APK) | Iframe `AndroidStation.pollScans()` every ~300 ms | `evaluateJavascript('onStationRfidScan')` into iframe; lossy `postMessage` relay alone |
 | Gun EPC → station strip (TSL desktop) | Top `showrunnerStationDeliverScan` → nested iframe → `onStationRfidScan` in **inner** GAS frame | `ExecuteScript` on **wrapper** `script.google.com` only → grey `#sr-desktop-scan-feed` shim; session in wrapper only → `no-session` |
-| **DAL live Firestore (prep/timeline fork)** | Host shell Auth + listen/write (`SHOWRUNNER_DAL_FS_*` in `host-boot.js`); **reply via `ev.source`** (sender window) + client `postMessage` to `window.top` only | Firebase Auth / Firestore SDK **inside** GAS iframe alone; host reply only into `#app-frame` (stops at outer `script.google.com` wrapper) → Auth timeout → `server patch` |
+| **DAL live Firestore (prep/timeline fork)** | Host shell Auth + listen/write (`SHOWRUNNER_DAL_FS_*`); reply via **`ev.source` + deep `window.frames` walk** into GAS nest; client posts up parent chain to `window.top` | Firebase Auth inside GAS iframe alone; host reply only into `#app-frame` / `querySelectorAll('iframe')` on host DOM (never reaches nested Index) → Auth timeout → `server patch` |
 
 **Shared AI rules (both bridges):**
 

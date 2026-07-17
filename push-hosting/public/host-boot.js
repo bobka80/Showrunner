@@ -2548,25 +2548,27 @@
   var dalFsAuthReady_ = false;
 
   function dalFsPostToIframe_(msg, sourceWin) {
-    // Prefer the window that sent the request (deep nested Index). Same pattern as FCM token.
+    // 1) Prefer the window that sent the request (deep nested Index).
     if (sourceWin) {
       try { sourceWin.postMessage(msg, '*'); } catch (eSrc) { /* ignore */ }
     }
-    // Backup: outer GAS frame + every host-visible iframe (nest relay may forward further).
-    try {
-      if (frame && frame.contentWindow && frame.contentWindow !== sourceWin) {
-        frame.contentWindow.postMessage(msg, '*');
+    // 2) Walk EVERY nested frame via window.frames (cross-origin-safe).
+    //    document.querySelectorAll('iframe') on the host only sees #app-frame —
+    //    never the googleusercontent / userHtmlFrame nest where Index actually runs.
+    //    Same lesson as desktop RFID: must reach the inner GAS frame.
+    function walk(w, depth) {
+      if (!w || depth > 8) return;
+      try { w.postMessage(msg, '*'); } catch (e0) { /* ignore */ }
+      var len = 0;
+      try { len = w.length; } catch (e1) { return; }
+      for (var i = 0; i < len; i++) {
+        try { walk(w[i], depth + 1); } catch (e2) { /* ignore */ }
       }
-    } catch (e) { /* ignore */ }
+    }
+    try { walk(window, 0); } catch (eWalk) { /* ignore */ }
     try {
-      var frames = document.querySelectorAll('iframe');
-      for (var i = 0; i < frames.length; i++) {
-        try {
-          var cw = frames[i].contentWindow;
-          if (cw && cw !== sourceWin) cw.postMessage(msg, '*');
-        } catch (e1) { /* ignore */ }
-      }
-    } catch (e2) { /* ignore */ }
+      if (frame && frame.contentWindow) walk(frame.contentWindow, 0);
+    } catch (eFrame) { /* ignore */ }
   }
 
   function dalFsDocRef_(path) {
@@ -2823,6 +2825,9 @@
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_AUTH') {
+      try {
+        console.log('[DAL FS host] AUTH from', ev.origin || '?', 'source=', !!(ev.source), 'frames=', (frame && frame.contentWindow) ? frame.contentWindow.length : -1);
+      } catch (eAuthLog) { /* ignore */ }
       dalFsHandleAuth_(ev.data, ev.source);
       return;
     }

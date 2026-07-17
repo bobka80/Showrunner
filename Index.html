@@ -147,12 +147,22 @@
       SHOWRUNNER_DAL_FS_WRITE_RESULT: 1
     };
     function forwardToInnerFrames(data) {
+      function walk(w, depth) {
+        if (!w || depth > 8) return;
+        try { w.postMessage(data, '*'); } catch (e0) { /* ignore */ }
+        var len = 0;
+        try { len = w.length; } catch (e1) { return; }
+        for (var i = 0; i < len; i++) {
+          try { walk(w[i], depth + 1); } catch (e2) { /* ignore */ }
+        }
+      }
       try {
         var frames = document.querySelectorAll('iframe');
         for (var i = 0; i < frames.length; i++) {
-          try { frames[i].contentWindow.postMessage(data, '*'); } catch (e) { /* ignore */ }
+          try { walk(frames[i].contentWindow, 0); } catch (e) { /* ignore */ }
         }
-      } catch (e) { /* ignore */ }
+      } catch (e3) { /* ignore */ }
+      try { walk(window, 1); } catch (e4) { /* ignore */ }
     }
     function forwardDalFsToHost(data) {
       try { if (window.top && window.top !== window) window.top.postMessage(data, '*'); } catch (e0) { /* ignore */ }
