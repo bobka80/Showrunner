@@ -28,7 +28,7 @@ function dalFirestorePaCollection_(projectId) {
 function dalLoadPaProjectRowsFromFirestore_(projectId, header, map) {
   var docs = firestoreListCollection_(dalFirestorePaCollection_(projectId));
   return docs.filter(function (doc) {
-    return doc._docId !== '_meta';
+    return doc._docId !== '_meta' && doc._docId !== 'state';
   }).map(function (doc) {
     var row = dalPaRowObjectToSheetArray_(doc, header, map);
     var docId = doc._docId || String(doc.uid || '');
@@ -132,6 +132,38 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
     });
 
     writeToAuditLog(actor, "UPDATE", "PROJECT_ASSETS_FIRESTORE", projectId, projectId, 'Applied ' + deltas.length + ' delta(s) on prep fork.');
+    // Keep live state doc aligned (clients listen to assets/state, not only collection rows).
+    try {
+      var allRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+      var fixtures = (allRows || []).map(function (r) {
+        var obj = dalPaSheetRowToObject_(r.data, hdr.map);
+        return {
+          uid: String(obj.uid || r.docId || ''),
+          assetId: String(obj.asset_uid || ''),
+          qty: obj.assigned_quantity != null ? obj.assigned_quantity : 1,
+          location: obj.location || 'General',
+          formula: obj.formula || '',
+          creator: obj.creator || 'System',
+          containerUid: obj.container_uid || '',
+          scanStatus: obj.scan_status || 'Assigned'
+        };
+      });
+      var prevSeq = 0;
+      try {
+        var st = firestoreFetch_('get', basePath + '/state');
+        if (st && st.fields) {
+          var plain = firestoreDecodeFields_(st.fields);
+          prevSeq = Number(plain.writeSeq || 0) || 0;
+        }
+      } catch (eSt) { prevSeq = 0; }
+      firestoreWriteDocument_(basePath + '/state', {
+        fixturesJson: JSON.stringify(fixtures),
+        writeSeq: prevSeq + 1,
+        clientId: 'gas_' + String(actor || 'system'),
+        updatedAt: new Date().toISOString(),
+        updatedBy: actor || 'System'
+      });
+    } catch (eState) { /* live clients may seed */ }
     return "Saved Delta";
   });
 }
@@ -140,10 +172,29 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
   var hdr = dalGetProjectAssetsHeaderAndMap_();
   var projectRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId);
   var basePath = dalFirestorePaCollection_(projectId);
+  var fixtures = [];
   projectRows.forEach(function (r) {
     var obj = dalPaSheetRowToObject_(r.data, hdr.map);
     var docId = String(obj.uid || Utilities.getUuid());
     firestoreWriteDocument_(basePath + '/' + docId, obj);
+    fixtures.push({
+      uid: docId,
+      assetId: String(obj.asset_uid || ''),
+      qty: obj.assigned_quantity != null ? obj.assigned_quantity : 1,
+      location: obj.location || 'General',
+      formula: obj.formula || '',
+      creator: obj.creator || 'System',
+      containerUid: obj.container_uid || '',
+      scanStatus: obj.scan_status || 'Assigned'
+    });
+  });
+  // Live collab state doc (timeline twin) — transactional patch target for clients.
+  firestoreWriteDocument_(basePath + '/state', {
+    fixturesJson: JSON.stringify(fixtures),
+    writeSeq: 1,
+    clientId: 'snapshot',
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor || 'System'
   });
   firestoreSetSessionMeta_(projectId, {
     sessionUid: sessionUid,

@@ -552,12 +552,13 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | | **Timeline (fixed)** | **Prep PA (must match)** |
 |--|----------------------|---------------------------|
 | Identity of edit | Explicit **touch/delete maps** (`dalTlNoteShiftTouch_`) | Explicit **`dalPaNoteTouch_` / `dalPaNoteDelete_`** — never invent diffs from full-list compare |
-| Write | Host **transaction** patches only touched entities onto remote | Host batch **only touched fixture UIDs**; stamp **`writeSeq` + `clientId`** per doc |
-| Ordering | Monotonic **`writeSeq`** on state doc | Monotonic **`writeSeq`** per asset doc; ignore `seq < lastApplied` |
-| Echo | Own **`clientId`** ack without re-install | Own **`clientId`** keep local row |
+| Write | Host **transaction** patches only touched entities onto remote | Host **`PA_PATCH_WRITE` transaction** on `assets/state` (fixturesJson); mirrors touched UIDs to collection docs for commit |
+| Ordering | Monotonic **`writeSeq`** on state doc | Monotonic **`writeSeq`** on **state doc** (not per-asset LWW) |
+| Echo | Own **`clientId`** ack without re-install | Own **`clientId`** ack without re-install |
 | Yank guard | Entity hold ~2s | Entity hold ~3s + recently-deleted |
 | Autos / extras | N/A | **Never live-write auto-containers** (UID churn = snap storms) |
 | Failure mode | Strips stutter left↔right | Fixture qty flips up↓down + browser stutter |
+| Live path | `timeline/state` doc listen | `assets/state` doc listen (**not** collection onSnapshot) |
 
 **Research / test (2026-07-17):** `node scripts/dal-pa-live-sync-test.js` — buggy full-rewrite produces `5→4→5→4…`; touch+hold+writeSeq settles at `4`. Core: `scripts/lib/dal-pa-live-sync-core.js`.
 
@@ -600,13 +601,13 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | GAS save | Never fall back to `saveProjectAssets` on live flush failure while `dalPaLiveSyncMode === 'firestore'` (GAS PATCH replace wiped host `writeSeq`). Manual SAVE via GAS must re-stamp `writeSeq`. |
 | Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed (includes unstamped-GAS case). |
 | Formula | Remote apply: `dalProcessPaFormulas_(…, { skipExplode: true })`. |
-| Banner | `live sync (direct)` = Firestore listen; `live sync (server)` = GAS poll. Do not thrash banner text on unchanged state. |
-| Host bridge | `SHOWRUNNER_DAL_FS_LISTEN_COL` + `SHOWRUNNER_DAL_FS_PA_BATCH_WRITE`; Index relays both. |
-| vs timeline | Same *discipline* (patch + hold); timeline also has doc-level `writeSeq` / touch maps. PA is per-document UID in a collection. |
+| Banner | `live sync (patch)` = state-doc Firestore transaction; `live sync (server)` = GAS poll. |
+| Host bridge | `SHOWRUNNER_DAL_FS_LISTEN` on `assets/state` + `SHOWRUNNER_DAL_FS_PA_PATCH_WRITE`; Index relays both. |
+| vs timeline | **Same architecture** now: one state doc, transactional patch-merge, doc writeSeq. |
 
 ### Smoke (prep PA live)
 
-Hard-refresh **two browsers** on web.app (banner **live sync (direct)**):
+Hard-refresh **two browsers** on web.app (banner **live sync (patch)**):
 
 1. A changes one fixture location/qty; B idle — B updates once; **no** flip-back on A or B.  
 2. A and B change **different** fixtures near-simultaneously — both stick.  

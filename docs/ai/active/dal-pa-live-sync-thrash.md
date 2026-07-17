@@ -1,49 +1,33 @@
 # Prep PA live sync thrash — investigation log (2026-07-17)
 
-**Status:** Root cause #2 fixed (GAS unstamped snaps). **Test:** `node scripts/dal-pa-live-sync-test.js`  
-**Compare:** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL timeline fork live sync **vs** § DAL prep PA fork live sync
+**Status:** Structural fix shipped — transactional **state doc** (timeline twin).  
+**Test:** `node scripts/dal-pa-live-sync-test.js` (Case C = race fails nontxn; Case D = txn settles)
 
-## Symptom
+## Root cause (why v628–v634 failed)
 
-Pressing **−** on a fixture during START PREP: qty flips up/down on **both** browsers; tab stutters. Persisted through v628–v633.
+Timeline works because live collab is **one doc + `runTransaction` + patch-merge touched only**.
 
-## Same class as timeline stutter
+Prep PA was still **many docs + non-transactional set**. Two browsers can read the same `writeSeq`, both write `N+1` with different qty → equal-seq LWW → **both UIs flip 4↔5 forever**.
 
-Timeline failed when both browsers **full-doc LWW**’d the collab state. Fix was touch maps + host patch + **`writeSeq`** + **`clientId`** + entity hold.
+Client guards (hold, ignore unstamped GAS, touch-only flush) cannot beat that race. The node test for touch-only passed while production still thrashed because the test never simulated concurrent equal-seq writes.
 
-Prep PA is a **collection of docs**, not one state doc, but the failure mode is identical.
+## Proof
 
-## What v628–v632 missed
-
-| Attempt | Gap |
-|---------|-----|
-| Host LISTEN_COL / PA_BATCH_WRITE | Listen worked; writes were blind sets |
-| “Patch” via original↔current contentSig | Invented sibling diffs; still flushed autos |
-| Entity hold / no resurrect | Incomplete without writeSeq + touch maps |
-| Coalesce apply / no flush-from-apply | Helped stutter; didn’t stop LWW rewrite war |
-
-## What v633 missed (why thrash continued)
-
-Touch + host `writeSeq` was correct — but **two side doors** still yanked qty:
-
-1. **Late / overlapping `getProjectAssets` (GAS)** still called `dalApplyRemotePaAssets_`. GAS maps sheet-shaped rows and **strips `writeSeq`/`clientId`**. Apply treated `seq=0` as “not stale” → old qty overwrote the stamped listener state → **listener↔GAS oscillation** (`4↔5`) on both browsers.
-2. **Live flush fallback to `saveProjectAssets`** → `firestoreWriteDocument_` full PATCH replace **wiped** host `writeSeq` on the fork → same war.
-3. Summed-mode **`updatePaQtyGeneric`** (−/+) did not call `dalPaNoteTouch_` / delete notes.
-
-## Proof test
-
-`scripts/lib/dal-pa-live-sync-core.js` + `scripts/dal-pa-live-sync-test.js`:
-
-- **Buggy full-rewrite:** qty history `5→4→5→4…` (oscillates)  
-- **Touch + hold + writeSeq:** settles at `4`  
-- **Unstamped GAS snap after stamped write:** must keep `4` (Case C)
-
-## Locked direction
-
-| Rule | Detail |
+| Case | Result |
 |------|--------|
-| Live flush | Only `dalPaNoteTouch_` / `dalPaNoteDelete_` fixture UIDs + host/client **`writeSeq`/`clientId`** |
-| GAS get during firestore live | **Overlap map only** — never apply fixture list |
-| Stale guard | `lastAppliedSeq > 0` ⇒ ignore `seq=0` or `seq < lastApplied` |
-| Flush failure | Retry client write — **no** GAS save fallback in firestore mode |
-| Autos | Rebuild locally; full fork sync on **END PREP** only |
+| A full-rewrite LWW | oscillates `5→4→5→4…` |
+| B touch-only per-doc | settles (incomplete vs real race) |
+| C **non-txn concurrent equal-seq** | oscillates (production bug) |
+| D **txn state patch** | settles at `4` |
+
+## Fix
+
+- Live listen/write: `projects/{id}/assets/state` (`fixturesJson` + doc `writeSeq` + `clientId`)
+- Host `SHOWRUNNER_DAL_FS_PA_PATCH_WRITE` = timeline-style transaction
+- Mirrors touched/deleted UIDs onto collection docs for END PREP commit
+- START PREP snapshot seeds `state`
+- Banner: **live sync (patch)**
+
+## Compare to timeline
+
+Same architecture. Collection remains the durable fork rows for commit; **live** is the state doc.

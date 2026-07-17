@@ -18,6 +18,7 @@ window.dalPaClientId = window.dalPaClientId || ('pa_' + Date.now().toString(36) 
 window.dalPaTouchedUids_ = window.dalPaTouchedUids_ || {};
 window.dalPaDeletedUids_ = window.dalPaDeletedUids_ || {};
 window.dalPaLastAppliedSeq_ = window.dalPaLastAppliedSeq_ || {};
+window.dalPaLastDocWriteSeq_ = window.dalPaLastDocWriteSeq_ || 0;
 
 window.dalPaNoteTouch_ = function(uid) {
   if (!uid || uid === '_meta' || !window.dalPrepUiOpen) return;
@@ -332,7 +333,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
   if (window.dalPaRemotePending) {
     text = '🔒 IN PREPARATION — remote updates available (save or reload to sync)';
   } else if (window.dalPaLiveSyncMode === 'firestore') {
-    text = '🔒 IN PREPARATION — live sync (direct)';
+    text = '🔒 IN PREPARATION — live sync (patch)';
   } else if (window.dalPaLiveSyncMode === 'gas') {
     text = '🔒 IN PREPARATION — live sync (server)';
   } else {
@@ -727,6 +728,22 @@ window.dalHostFsListenCollection_ = function(path, onSnap, onErr) {
   };
 };
 
+/** Prep PA fork transactional patch on web.app host (timeline twin). */
+window.dalHostFsPaPatchWrite_ = function(path, localFixtures, mutations, meta, done) {
+  done = done || function() {};
+  window.dalFsBindHostMessages_();
+  var requestId = 'PA' + (window.dalFsReqSeq_++);
+  window.dalFsPending_[requestId] = { cb: done };
+  window.dalFsPostToHost_({
+    type: 'SHOWRUNNER_DAL_FS_PA_PATCH_WRITE',
+    requestId: requestId,
+    path: path,
+    localFixtures: localFixtures || [],
+    mutations: mutations || {},
+    meta: meta || {}
+  });
+};
+
 /** Prep PA fork batch write on web.app host (viaHost client has no in-iframe db). */
 window.dalHostFsPaBatchWrite_ = function(colPath, sets, deletes, done) {
   done = done || function() {};
@@ -790,6 +807,8 @@ window.stopDalPaLiveSync_ = function() {
   window.dalPaTouchedUids_ = {};
   window.dalPaDeletedUids_ = {};
   window.dalPaLastAppliedSeq_ = {};
+  window.dalPaLastDocWriteSeq_ = 0;
+  window.dalPaStateSeeded_ = false;
   if (window.dalPaApplyTimer_) {
     try { clearTimeout(window.dalPaApplyTimer_); } catch (eT) { /* ignore */ }
     window.dalPaApplyTimer_ = null;
@@ -827,6 +846,52 @@ window.startDalPaGasSync_ = function(projectId) {
   window.dalPaGasSyncTimer = setInterval(pull, 2500);
 };
 
+/**
+ * Apply remote PA state doc (timeline parity — one writeSeq for the whole list).
+ */
+window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
+  snapMeta = snapMeta || {};
+  if (!window.dalPrepUiOpen) return;
+  if (snapMeta.hasPendingWrites) return;
+  if (snapMeta.fromCache && window.dalPaSeenServerSnap_) return;
+  if (!snapMeta.fromCache) window.dalPaSeenServerSnap_ = true;
+  if (!data) return;
+
+  var writeSeq = Number(data.writeSeq || 0) || 0;
+  var remoteClient = String(data.clientId || '');
+  var fixtures = [];
+  try { fixtures = JSON.parse(data.fixturesJson || '[]'); } catch (e0) { fixtures = []; }
+  if (!Array.isArray(fixtures)) fixtures = [];
+
+  // Seed: empty state while we have local fixtures — upload once via full touch patch.
+  if ((!data.fixturesJson || fixtures.length === 0) && !window.dalPaStateSeeded_) {
+    var localSeed = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
+      return pa && !window.dalPaIsAutoRow_(pa);
+    });
+    if (localSeed.length) {
+      window.dalPaStateSeeded_ = true;
+      localSeed.forEach(function(pa) {
+        if (pa.uid) window.dalPaTouchedUids_[String(pa.uid)] = 1;
+      });
+      if (typeof window.dalFlushPaIfPrepOpen_ === 'function') window.dalFlushPaIfPrepOpen_();
+      return;
+    }
+  }
+
+  if (writeSeq && window.dalPaLastDocWriteSeq_ && writeSeq < window.dalPaLastDocWriteSeq_) return;
+  if (window.dalPaClientId && remoteClient === window.dalPaClientId) {
+    if (writeSeq > window.dalPaLastDocWriteSeq_) window.dalPaLastDocWriteSeq_ = writeSeq;
+    return;
+  }
+
+  window.dalApplyRemotePaAssets_(fixtures, false, {
+    fromCache: !!snapMeta.fromCache,
+    hasPendingWrites: !!snapMeta.hasPendingWrites,
+    docWriteSeq: writeSeq
+  });
+  if (writeSeq > window.dalPaLastDocWriteSeq_) window.dalPaLastDocWriteSeq_ = writeSeq;
+};
+
 window.startDalPaFirestoreListener = function(projectId) {
   if (!projectId) return;
   if (window.dalPaFirestoreUnsub && window.dalPaFirestoreListenProjectId === String(projectId)) return;
@@ -845,43 +910,43 @@ window.startDalPaFirestoreListener = function(projectId) {
     window.dalPaFirestoreListenProjectId = String(projectId);
     window.dalPaLiveSyncMode = 'firestore';
     window.dalPaLiveSyncFailed = false;
+    window.dalPaStateSeeded_ = false;
     window.dalUpdateRemotePendingBanner_();
 
-    var applyPaDocs_ = function(docs, fromCache, hasPendingWrites) {
-      var assets = [];
-      (docs || []).forEach(function(entry) {
-        var a = window.dalFsDocToPaAsset_(entry.id, entry.data);
-        if (a) assets.push(a);
-      });
-      window.dalApplyRemotePaAssets_(assets, fromCache && assets.length === 0, {
-        fromCache: !!fromCache,
-        hasPendingWrites: !!hasPendingWrites
-      });
-    };
+    var statePath = 'projects/' + String(projectId) + '/assets/state';
 
-    // Host bridge: collection listen on web.app (same Auth path as timeline).
+    // Host bridge: listen to ONE state doc (timeline twin) — not the whole collection.
     if (client.viaHost && !client.db) {
-      if (typeof window.dalHostFsListenCollection_ !== 'function') {
+      if (typeof window.dalHostFsListenDoc_ !== 'function') {
         window.startDalPaGasSync_(projectId);
         return;
       }
-      var colPath = 'projects/' + String(projectId) + '/assets';
       var gotHostPaSnap_ = false;
       var hostPaWatchTimer_ = setTimeout(function() {
         if (gotHostPaSnap_) return;
         if (window.dalPaFirestoreListenProjectId !== String(projectId)) return;
-        // Stale host-boot (no LISTEN_COL) never replies — do not strand on "direct" with no updates.
-        console.warn('DAL host PA collection listen timed out — falling back to server sync');
+        console.warn('DAL host PA state listen timed out — falling back to server sync');
         window.stopDalPaFirestoreListener();
         window.startDalPaGasSync_(projectId);
       }, 4000);
-      var rawUnsub_ = window.dalHostFsListenCollection_(colPath, function(d) {
+      var rawUnsub_ = window.dalHostFsListenDoc_(statePath, function(d) {
         gotHostPaSnap_ = true;
         try { clearTimeout(hostPaWatchTimer_); } catch (eT) { /* ignore */ }
-        applyPaDocs_(d.docs || [], !!(d.fromCache), !!(d.hasPendingWrites));
+        if (!d || !d.exists) {
+          // No state yet — seed from local once.
+          window.dalApplyRemotePaStateDoc_({ fixturesJson: '[]', writeSeq: 0, clientId: '' }, {
+            fromCache: !!(d && d.fromCache),
+            hasPendingWrites: !!(d && d.hasPendingWrites)
+          });
+          return;
+        }
+        window.dalApplyRemotePaStateDoc_(d.data || {}, {
+          fromCache: !!d.fromCache,
+          hasPendingWrites: !!d.hasPendingWrites
+        });
       }, function(listenErr) {
         try { clearTimeout(hostPaWatchTimer_); } catch (eT2) { /* ignore */ }
-        console.warn('DAL host PA collection listen error — falling back to server sync:', listenErr);
+        console.warn('DAL host PA state listen error — falling back to server sync:', listenErr);
         window.stopDalPaFirestoreListener();
         window.startDalPaGasSync_(projectId);
       });
@@ -896,17 +961,23 @@ window.startDalPaFirestoreListener = function(projectId) {
       return;
     }
 
-    var col = client.db.collection('projects').doc(String(projectId)).collection('assets');
-    window.dalPaFirestoreUnsub = col.onSnapshot(function(snap) {
-      var docs = [];
-      snap.forEach(function(doc) {
-        docs.push({ id: doc.id, data: doc.data() || {} });
-      });
+    var ref = client.db.collection('projects').doc(String(projectId)).collection('assets').doc('state');
+    window.dalPaFirestoreUnsub = ref.onSnapshot(function(snap) {
       var fromCache = !!(snap.metadata && snap.metadata.fromCache);
       var hasPendingWrites = !!(snap.metadata && snap.metadata.hasPendingWrites);
-      applyPaDocs_(docs, fromCache, hasPendingWrites);
+      if (!snap.exists) {
+        window.dalApplyRemotePaStateDoc_({ fixturesJson: '[]', writeSeq: 0, clientId: '' }, {
+          fromCache: fromCache,
+          hasPendingWrites: hasPendingWrites
+        });
+        return;
+      }
+      window.dalApplyRemotePaStateDoc_(snap.data() || {}, {
+        fromCache: fromCache,
+        hasPendingWrites: hasPendingWrites
+      });
     }, function(listenErr) {
-      console.warn('DAL Firestore listener error — falling back to server sync:', listenErr);
+      console.warn('DAL Firestore PA state listener error — falling back to server sync:', listenErr);
       window.stopDalPaFirestoreListener();
       window.startDalPaGasSync_(projectId);
     });
@@ -1140,8 +1211,46 @@ window.dalWritePaForkFullToFirestore_ = function(projectId, done) {
       });
       if (sets.length === 0 && toDelete.length === 0) { done(null); return; }
 
+      // Also refresh live state doc so commit + live stay aligned.
+      var finishFull_ = function(err) {
+        if (err) { done(err); return; }
+        var fixtures = Object.keys(currentByUid).filter(function(uid) {
+          return !window.dalPaIsAutoRow_(currentByUid[uid]);
+        }).map(function(uid) {
+          var pa = currentByUid[uid];
+          return {
+            uid: String(pa.uid),
+            assetId: String(pa.assetId || ''),
+            qty: pa.qty != null ? pa.qty : 1,
+            location: pa.location || 'General',
+            formula: window.dalPaEncodeFormulaForFs_(pa),
+            creator: pa.creator || 'System',
+            containerUid: pa.containerUid || '',
+            scanStatus: pa.scanStatus || 'Assigned'
+          };
+        });
+        var allTouched = {};
+        fixtures.forEach(function(f) { allTouched[f.uid] = 1; });
+        var statePath = 'projects/' + String(projectId) + '/assets/state';
+        var meta = {
+          clientId: window.dalPaClientId || '',
+          actor: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+        };
+        if (client.viaHost && typeof window.dalHostFsPaPatchWrite_ === 'function') {
+          // Replace: empty remote merge with all touched = full fixture set.
+          // Pass deleted for removed fixtures.
+          var delMap = {};
+          toDelete.forEach(function(uid) { delMap[uid] = 1; });
+          window.dalHostFsPaPatchWrite_(statePath, fixtures, { touched: allTouched, deleted: delMap }, meta, function(e2) {
+            done(e2 || null);
+          });
+          return;
+        }
+        done(null);
+      };
+
       if (client.viaHost && !client.db && typeof window.dalHostFsPaBatchWrite_ === 'function') {
-        window.dalHostFsPaBatchWrite_('projects/' + String(projectId) + '/assets', sets, toDelete, done);
+        window.dalHostFsPaBatchWrite_('projects/' + String(projectId) + '/assets', sets, toDelete, finishFull_);
         return;
       }
       if (!client.db) { done(new Error('firestore_client_unavailable')); return; }
@@ -1150,7 +1259,7 @@ window.dalWritePaForkFullToFirestore_ = function(projectId, done) {
       sets.forEach(function(w) { ops.push({ type: 'set', ref: col.doc(w.uid), data: w.doc }); });
       toDelete.forEach(function(uid) { ops.push({ type: 'delete', ref: col.doc(uid) }); });
       function commitChunk(start) {
-        if (start >= ops.length) { done(null); return; }
+        if (start >= ops.length) { finishFull_(null); return; }
         var batch = client.db.batch();
         var end = Math.min(start + 450, ops.length);
         for (var j = start; j < end; j++) {
@@ -1176,34 +1285,52 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
       return;
     }
     try {
-      var patch = window.dalPaComputeForkPatch_(projectId);
-      var sets = patch.sets || [];
-      var toDelete = patch.deletes || [];
-
-      if (sets.length === 0 && toDelete.length === 0) {
+      var touched = Object.assign({}, window.dalPaTouchedUids_ || {});
+      var deleted = Object.assign({}, window.dalPaDeletedUids_ || {});
+      if (!Object.keys(touched).length && !Object.keys(deleted).length) {
         done(null, { sets: [], deletes: [] });
         return;
       }
+      var localFixtures = [];
+      (Array.isArray(currentProjectAssets) ? currentProjectAssets : []).forEach(function(pa) {
+        if (!pa || window.dalPaIsAutoRow_(pa)) return;
+        if (!pa.uid) pa.uid = window.dalNewUid_();
+        // Snapshot plain fields for state JSON (formula encoded for collection mirror).
+        localFixtures.push({
+          uid: String(pa.uid),
+          assetId: String(pa.assetId || ''),
+          qty: pa.qty != null ? pa.qty : 1,
+          location: pa.location || 'General',
+          formula: window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || ''),
+          creator: pa.creator || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'),
+          containerUid: pa.containerUid || '',
+          scanStatus: pa.scanStatus || 'Assigned'
+        });
+      });
+
       window.dalMarkPaLocalSave_();
-      var touchUids = sets.map(function(s) { return s.uid; }).concat(toDelete);
+      var touchUids = Object.keys(touched).concat(Object.keys(deleted));
       window.dalPaHoldEntities_(touchUids, 3000);
-      window.dalPaMarkDeleted_(toDelete, 8000);
+      window.dalPaMarkDeleted_(Object.keys(deleted), 8000);
+
+      var path = 'projects/' + String(projectId) + '/assets/state';
+      var meta = {
+        clientId: window.dalPaClientId || '',
+        actor: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+      };
+      var mutations = { touched: touched, deleted: deleted };
 
       var afterOk_ = function(result) {
         Object.keys(window.dalPaTouchedUids_ || {}).forEach(function(uid) { delete window.dalPaTouchedUids_[uid]; });
         Object.keys(window.dalPaDeletedUids_ || {}).forEach(function(uid) { delete window.dalPaDeletedUids_[uid]; });
-        if (result && result.written && result.written.length) {
-          result.written.forEach(function(p) {
-            if (p && p.uid && p.writeSeq) window.dalPaLastAppliedSeq_[String(p.uid)] = Number(p.writeSeq) || 0;
-          });
-        }
-        done(null, { sets: sets, deletes: toDelete, result: result || null });
+        var writeSeq = Number((result && result.writeSeq) || 0) || 0;
+        if (writeSeq > window.dalPaLastDocWriteSeq_) window.dalPaLastDocWriteSeq_ = writeSeq;
+        done(null, { mutations: mutations, result: result || null });
       };
 
-      // Host bridge: batch write on web.app (listen path uses viaHost without client.db).
-      if (client.viaHost && !client.db && typeof window.dalHostFsPaBatchWrite_ === 'function') {
-        var colPath = 'projects/' + String(projectId) + '/assets';
-        window.dalHostFsPaBatchWrite_(colPath, sets, toDelete, function(writeErr, result) {
+      // Host transactional patch (preferred — true timeline parity).
+      if (client.viaHost && typeof window.dalHostFsPaPatchWrite_ === 'function') {
+        window.dalHostFsPaPatchWrite_(path, localFixtures, mutations, meta, function(writeErr, result) {
           if (writeErr) done(writeErr);
           else afterOk_(result);
         });
@@ -1214,57 +1341,62 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
         return;
       }
 
+      var ref = client.db.collection('projects').doc(String(projectId)).collection('assets').doc('state');
       var col = client.db.collection('projects').doc(String(projectId)).collection('assets');
-      var clientId = window.dalPaClientId || '';
-      var prepared = [];
-      var readNext = function(idx) {
-        if (idx >= sets.length) {
-          var ops = [];
-          prepared.forEach(function(p) {
-            ops.push({ type: 'set', ref: col.doc(p.uid), data: p.data, writeSeq: p.writeSeq });
-          });
-          toDelete.forEach(function(uid) {
-            if (uid === '_meta') return;
-            ops.push({ type: 'delete', ref: col.doc(uid) });
-          });
-          function commitChunk(start) {
-            if (start >= ops.length) {
-              afterOk_({ written: prepared });
-              return;
-            }
-            var batch = client.db.batch();
-            var end = Math.min(start + 450, ops.length);
-            var j;
-            for (j = start; j < end; j++) {
-              if (ops[j].type === 'delete') batch.delete(ops[j].ref);
-              else batch.set(ops[j].ref, ops[j].data, { merge: true });
-            }
-            batch.commit().then(function() {
-              commitChunk(end);
-            }).catch(function(eWrite) {
-              done(eWrite);
-            });
-          }
-          commitChunk(0);
-          return;
-        }
-        var w = sets[idx];
-        col.doc(String(w.uid)).get().then(function(doc) {
+      client.db.runTransaction(function(tx) {
+        return tx.get(ref).then(function(doc) {
+          var remoteFixtures = [];
           var prevSeq = 0;
-          try {
-            if (doc.exists) prevSeq = Number((doc.data() && doc.data().writeSeq) || 0) || 0;
-          } catch (e0) { prevSeq = 0; }
-          var payload = Object.assign({}, w.doc || {});
-          payload.writeSeq = prevSeq + 1;
-          payload.clientId = clientId;
-          payload.updatedAt = new Date().toISOString();
-          prepared.push({ uid: String(w.uid), data: payload, writeSeq: payload.writeSeq });
-          readNext(idx + 1);
-        }).catch(function(eRead) {
-          done(eRead);
+          if (doc.exists) {
+            try { remoteFixtures = JSON.parse((doc.data() && doc.data().fixturesJson) || '[]'); } catch (eP) { remoteFixtures = []; }
+            prevSeq = Number((doc.data() && doc.data().writeSeq) || 0) || 0;
+          }
+          var remoteMap = {};
+          var localMap = {};
+          (remoteFixtures || []).forEach(function(e) { if (e && e.uid) remoteMap[String(e.uid)] = e; });
+          localFixtures.forEach(function(e) { if (e && e.uid) localMap[String(e.uid)] = e; });
+          var out = {};
+          Object.keys(remoteMap).forEach(function(id) { out[id] = remoteMap[id]; });
+          Object.keys(deleted).forEach(function(id) { delete out[id]; });
+          Object.keys(touched).forEach(function(id) {
+            if (localMap[id]) out[id] = localMap[id];
+            else delete out[id];
+          });
+          var merged = Object.keys(out).map(function(k) { return out[k]; });
+          var updatedAt = new Date().toISOString();
+          var writeSeq = prevSeq + 1;
+          var clientId = window.dalPaClientId || '';
+          tx.set(ref, {
+            fixturesJson: JSON.stringify(merged),
+            updatedAt: updatedAt,
+            updatedBy: meta.actor,
+            clientId: clientId,
+            writeSeq: writeSeq
+          });
+          Object.keys(deleted).forEach(function(uid) {
+            if (uid && uid !== '_meta' && uid !== 'state') tx.delete(col.doc(String(uid)));
+          });
+          Object.keys(touched).forEach(function(uid) {
+            var pa = out[uid];
+            if (!pa) return;
+            tx.set(col.doc(String(uid)), window.dalPaAssetToFsDoc_({
+              uid: pa.uid,
+              assetId: pa.assetId,
+              qty: pa.qty,
+              location: pa.location,
+              formula: pa.formula,
+              creator: pa.creator,
+              containerUid: pa.containerUid,
+              scanStatus: pa.scanStatus
+            }, projectId), { merge: true });
+          });
+          return { merged: merged, updatedAt: updatedAt, writeSeq: writeSeq };
         });
-      };
-      readNext(0);
+      }).then(function(result) {
+        afterOk_(result);
+      }).catch(function(eWrite) {
+        done(eWrite);
+      });
     } catch (e2) {
       done(e2);
     }

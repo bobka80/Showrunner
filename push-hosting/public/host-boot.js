@@ -2821,7 +2821,132 @@
     }
   }
 
-  /** Prep PA fork batch write — stamp writeSeq per doc (timeline parity). */
+  /** Prep PA fixtures — patch-merge by uid (same discipline as timeline dalFsPatchList_). */
+  function dalFsPatchPaFixtures_(remoteList, localList, touchedMap, deletedMap) {
+    var remoteMap = {};
+    var localMap = {};
+    (remoteList || []).forEach(function(e) {
+      if (e && e.uid) remoteMap[String(e.uid)] = e;
+    });
+    (localList || []).forEach(function(e) {
+      if (e && e.uid) localMap[String(e.uid)] = e;
+    });
+    var out = {};
+    Object.keys(remoteMap).forEach(function(id) { out[id] = remoteMap[id]; });
+    Object.keys(deletedMap || {}).forEach(function(id) { delete out[id]; });
+    Object.keys(touchedMap || {}).forEach(function(id) {
+      if (localMap[id]) out[id] = localMap[id];
+      else delete out[id];
+    });
+    return Object.keys(out).map(function(k) { return out[k]; });
+  }
+
+  function dalFsPaFixtureToColDoc_(pa, projectId, meta) {
+    pa = pa || {};
+    meta = meta || {};
+    return {
+      uid: String(pa.uid || ''),
+      project_uid: String(projectId || ''),
+      asset_uid: String(pa.assetId || pa.asset_uid || ''),
+      assigned_quantity: pa.qty != null ? pa.qty : (pa.assigned_quantity != null ? pa.assigned_quantity : 1),
+      location: pa.location || 'General',
+      formula: pa.formula || pa.formulaEncoded || '',
+      creator: pa.creator || 'System',
+      container_uid: pa.containerUid || pa.container_uid || '',
+      scan_status: pa.scanStatus || pa.scan_status || 'Assigned',
+      clientId: meta.clientId || '',
+      writeSeq: meta.writeSeq || 0,
+      updatedAt: meta.updatedAt || ''
+    };
+  }
+
+  /**
+   * Prep PA live write — ONE state doc + transaction (true timeline parity).
+   * Also mirrors touched/deleted UIDs onto collection docs for END PREP commit.
+   */
+  function dalFsHandlePaPatchWrite_(data, sourceWin) {
+    var requestId = data.requestId || '';
+    var path = data.path || '';
+    var localFixtures = data.localFixtures || [];
+    var mutations = data.mutations || {};
+    var meta = data.meta || {};
+    function reply(ok, result, errMsg) {
+      dalFsPostToIframe_({
+        type: 'SHOWRUNNER_DAL_FS_WRITE_RESULT',
+        requestId: requestId,
+        ok: !!ok,
+        result: result || null,
+        error: errMsg || ''
+      }, sourceWin);
+    }
+    try {
+      var ref = dalFsDocRef_(path);
+      var parts = String(path || '').split('/');
+      // projects/{id}/assets/state
+      var projectId = parts.length >= 2 ? parts[1] : '';
+      var col = projectId
+        ? firebase.firestore().collection('projects').doc(String(projectId)).collection('assets')
+        : null;
+      firebase.firestore().runTransaction(function(tx) {
+        return tx.get(ref).then(function(doc) {
+          var remoteFixtures = [];
+          var prevSeq = 0;
+          if (doc.exists) {
+            try {
+              remoteFixtures = JSON.parse((doc.data() && doc.data().fixturesJson) || '[]');
+            } catch (eParse) { remoteFixtures = []; }
+            prevSeq = Number((doc.data() && doc.data().writeSeq) || 0) || 0;
+          }
+          var merged = dalFsPatchPaFixtures_(
+            remoteFixtures,
+            localFixtures,
+            mutations.touched || {},
+            mutations.deleted || {}
+          );
+          var updatedAt = new Date().toISOString();
+          var writeSeq = prevSeq + 1;
+          var clientId = meta.clientId || '';
+          var payload = {
+            fixturesJson: JSON.stringify(merged),
+            updatedAt: updatedAt,
+            updatedBy: meta.actor || 'System',
+            clientId: clientId,
+            writeSeq: writeSeq
+          };
+          tx.set(ref, payload);
+          // Mirror touched/deleted into collection so END PREP commit (list collection) stays correct.
+          if (col) {
+            Object.keys(mutations.deleted || {}).forEach(function(uid) {
+              if (!uid || uid === '_meta' || uid === 'state') return;
+              tx.delete(col.doc(String(uid)));
+            });
+            Object.keys(mutations.touched || {}).forEach(function(uid) {
+              if (!uid || uid === '_meta' || uid === 'state') return;
+              var pa = null;
+              for (var i = 0; i < merged.length; i++) {
+                if (merged[i] && String(merged[i].uid) === String(uid)) { pa = merged[i]; break; }
+              }
+              if (!pa) return;
+              tx.set(col.doc(String(uid)), dalFsPaFixtureToColDoc_(pa, projectId, {
+                clientId: clientId,
+                writeSeq: writeSeq,
+                updatedAt: updatedAt
+              }), { merge: true });
+            });
+          }
+          return { merged: merged, updatedAt: updatedAt, writeSeq: writeSeq };
+        });
+      }).then(function(result) {
+        reply(true, result);
+      }).catch(function(err) {
+        reply(false, null, err && err.message ? err.message : String(err));
+      });
+    } catch (e) {
+      reply(false, null, e && e.message ? e.message : String(e));
+    }
+  }
+
+  /** Prep PA fork batch write — stamp writeSeq per doc (legacy; live flush uses PA_PATCH_WRITE). */
   function dalFsHandlePaBatchWrite_(data, sourceWin) {
     var requestId = data.requestId || '';
     var colPath = data.colPath || '';
@@ -2983,6 +3108,10 @@
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_PA_BATCH_WRITE') {
       dalFsHandlePaBatchWrite_(ev.data, ev.source);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_PA_PATCH_WRITE') {
+      dalFsHandlePaPatchWrite_(ev.data, ev.source);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION_TOKEN') {
