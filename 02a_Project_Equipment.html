@@ -368,6 +368,15 @@ function openProjectAssetsModal() {
             document.getElementById('pa-assigned-list').innerHTML = `<div style="padding:20px; text-align:center; color:#ef4444; font-weight:bold;">Error Loading Assignments:<br>${err.message}</div>`;
         })
         .withSuccessHandler(res => {
+            // During live prep fork, do not yank the list from a late getProjectAssets
+            // (formula explode + full replace fights Firestore and causes qty thrash).
+            if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore') {
+                window.overlappingAllocations = res.overlapping || window.overlappingAllocations || {};
+                if (typeof window.dalApplyRemotePaAssets_ === 'function') {
+                    window.dalApplyRemotePaAssets_((res && res.current) || [], false, { fromCache: false });
+                }
+                return;
+            }
             currentProjectAssets = res.current || [];
             window.overlappingAllocations = res.overlapping || {};
             window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets)); // Store pristine DB state

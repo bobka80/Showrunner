@@ -1241,8 +1241,12 @@ function renderProjectAssetsUI() {
     }
     vaultContainer.innerHTML = vaultHtml;
     if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
-    // Live prep collab: flush Firebase after any PA UI refresh that followed a local mutate.
-    if (typeof dalFlushPaIfPrepOpen_ === 'function') dalFlushPaIfPrepOpen_();
+    // Live prep collab: flush only after local mutates — never while applying remote / pending remote.
+    if (typeof dalFlushPaIfPrepOpen_ === 'function' &&
+        !window.dalPaApplyingRemote &&
+        !window.dalPaFlushInFlight) {
+      dalFlushPaIfPrepOpen_();
+    }
 }
 
 window.toggleEqDeptFinished = function(deptUid, isFinished) {

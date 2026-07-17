@@ -220,25 +220,41 @@ window.closeDalPrepSession = function() {
   window.dalPrepIgnoreCloseUntil = 0;
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
-  google.script.run
-    .withFailureHandler(function(err) {
-      window.dalPrepClosing = false;
-      if (overlay) overlay.style.cursor = '';
-      if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
-      alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
-    })
-    .withSuccessHandler(function() {
-      if (overlay) overlay.style.cursor = '';
-      window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
-      window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
-      if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
-      // Re-open watcher/poll so this browser can see a later remote START PREP without leaving PA.
-      if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
-      if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
-      else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
-      window.dalPrepClosing = false;
-      alert('Preparation ended — committed to Sheets.');
-    })
-    .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'prep');
+
+  var runClose_ = function() {
+    google.script.run
+      .withFailureHandler(function(err) {
+        window.dalPrepClosing = false;
+        if (overlay) overlay.style.cursor = '';
+        if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
+        alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
+      })
+      .withSuccessHandler(function() {
+        if (overlay) overlay.style.cursor = '';
+        window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
+        window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
+        if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
+        if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+        if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
+        else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+        window.dalPrepClosing = false;
+        alert('Preparation ended — committed to Sheets.');
+      })
+      .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'prep');
+  };
+
+  // Live sync writes fixtures only — push autos too before Sheets commit.
+  if (typeof window.dalWritePaForkFullToFirestore_ === 'function' && window.dalPaLiveSyncMode === 'firestore') {
+    window.dalWritePaForkFullToFirestore_(projectId, function(writeErr) {
+      if (writeErr) {
+        try { console.warn('Full PA fork sync before END PREP failed; committing anyway:', writeErr); } catch (e1) { /* ignore */ }
+      } else {
+        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+      }
+      runClose_();
+    });
+    return;
+  }
+  runClose_();
 };
 </script>
