@@ -849,6 +849,19 @@ window.startDalPaGasSync_ = function(projectId) {
 /**
  * Apply remote PA state doc (timeline parity — one writeSeq for the whole list).
  */
+window.dalPaSeedStateFromLocal_ = function() {
+  if (!window.dalPrepUiOpen || window.dalPaStateSeeded_) return;
+  var localSeed = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
+    return pa && !window.dalPaIsAutoRow_(pa) && pa.uid;
+  });
+  if (!localSeed.length) return;
+  window.dalPaStateSeeded_ = true;
+  localSeed.forEach(function(pa) {
+    window.dalPaTouchedUids_[String(pa.uid)] = 1;
+  });
+  if (typeof window.dalFlushPaIfPrepOpen_ === 'function') window.dalFlushPaIfPrepOpen_();
+};
+
 window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   snapMeta = snapMeta || {};
   if (!window.dalPrepUiOpen) return;
@@ -863,24 +876,30 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   try { fixtures = JSON.parse(data.fixturesJson || '[]'); } catch (e0) { fixtures = []; }
   if (!Array.isArray(fixtures)) fixtures = [];
 
-  // Seed: empty state while we have local fixtures — upload once via full touch patch.
-  if ((!data.fixturesJson || fixtures.length === 0) && !window.dalPaStateSeeded_) {
-    var localSeed = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
-      return pa && !window.dalPaIsAutoRow_(pa);
-    });
+  var localSeed = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
+    return pa && !window.dalPaIsAutoRow_(pa);
+  });
+
+  // Empty/missing state: seed from local if we have it; otherwise wait for GAS hydrate.
+  // Never apply [] over an unloaded UI (blank vault + blank assigned).
+  if (!data.fixturesJson || fixtures.length === 0) {
     if (localSeed.length) {
-      window.dalPaStateSeeded_ = true;
-      localSeed.forEach(function(pa) {
-        if (pa.uid) window.dalPaTouchedUids_[String(pa.uid)] = 1;
-      });
-      if (typeof window.dalFlushPaIfPrepOpen_ === 'function') window.dalFlushPaIfPrepOpen_();
+      window.dalPaSeedStateFromLocal_();
       return;
     }
+    if (!window.paLoadedForProject) return;
+    // Intentionally empty project after load — allow empty apply below.
   }
 
   if (writeSeq && window.dalPaLastDocWriteSeq_ && writeSeq < window.dalPaLastDocWriteSeq_) return;
   if (window.dalPaClientId && remoteClient === window.dalPaClientId) {
     if (writeSeq > window.dalPaLastDocWriteSeq_) window.dalPaLastDocWriteSeq_ = writeSeq;
+    return;
+  }
+
+  // Do not wipe a hydrated list with an empty lagging state snap.
+  if (fixtures.length === 0 && localSeed.length > 0) {
+    window.dalPaSeedStateFromLocal_();
     return;
   }
 

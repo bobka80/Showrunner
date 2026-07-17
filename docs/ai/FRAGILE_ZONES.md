@@ -596,7 +596,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | Write | **Touch-only fixtures** — `dalPaNoteTouch_` / `dalPaNoteDelete_` then flush those UIDs only. Stamp `writeSeq`+`clientId` on host. Never live-write autos. |
 | Apply | Coalesce ~300ms; re-queue if hold active. Timeline-parity: own clientId echo, stale seq ignore, hold/touch keep local, never resurrect deletes. Local `recalcAutoContainers` after fixture merge (not written live). |
 | Loop break | Never flush from apply. Render-end flush only when touches pending. |
-| Load race | During prep+firestore mode, late `getProjectAssets` must **not apply fixtures at all** (overlap map only). GAS responses strip `writeSeq`/`clientId` — applying them reopens qty LWW thrash against the listener. |
+| Load race | During prep+firestore: ongoing snaps must not apply unstamped GAS lists. **Exception:** if local PA is still empty (join mid-fork / no `assets/state` yet), one-shot hydrate from `getProjectAssets` then `dalPaSeedStateFromLocal_`. Never apply empty state over an unloaded UI. |
 | Unstamped seq | After any stamped write (`lastAppliedSeq[uid] > 0`), ignore remote docs with `writeSeq` missing/0 or `seq < lastApplied`. |
 | GAS save | Never fall back to `saveProjectAssets` on live flush failure while `dalPaLiveSyncMode === 'firestore'` (GAS PATCH replace wiped host `writeSeq`). Manual SAVE via GAS must re-stamp `writeSeq`. |
 | Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed (includes unstamped-GAS case). |

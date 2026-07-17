@@ -368,14 +368,19 @@ function openProjectAssetsModal() {
             document.getElementById('pa-assigned-list').innerHTML = `<div style="padding:20px; text-align:center; color:#ef4444; font-weight:bold;">Error Loading Assignments:<br>${err.message}</div>`;
         })
         .withSuccessHandler(res => {
-            // During live prep fork, Firestore collection listen is authoritative.
-            // GAS getProjectAssets strips writeSeq/clientId → applying it reopens qty LWW thrash.
+            // Live prep: state-doc listen is authoritative for ongoing edits.
+            // But joining a fork that predates assets/state (or before first snap)
+            // still needs a one-shot hydrate from getProjectAssets — otherwise both
+            // lists stay blank ("Loading…" forever).
             if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore') {
                 window.overlappingAllocations = res.overlapping || window.overlappingAllocations || {};
-                return;
+                var localEmpty = !currentProjectAssets || currentProjectAssets.length === 0;
+                var remoteHas = res && res.current && res.current.length > 0;
+                if (!(localEmpty && remoteHas)) return;
+                // fall through to hydrate below
             }
             currentProjectAssets = res.current || [];
-            window.overlappingAllocations = res.overlapping || {};
+            window.overlappingAllocations = res.overlapping || window.overlappingAllocations || {};
             window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets)); // Store pristine DB state
             
             try {
@@ -439,6 +444,11 @@ function openProjectAssetsModal() {
             } catch (err) {
                 console.error(err);
                 document.getElementById('pa-view-logistics').innerHTML = `<div style="padding:20px; text-align:center; color:#ef4444; font-weight:bold;">Render Error:<br>${err.message}</div>`;
+            }
+            // If live fork has no assets/state yet, seed it from this hydrate.
+            if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore' &&
+                typeof window.dalPaSeedStateFromLocal_ === 'function') {
+                window.dalPaSeedStateFromLocal_();
             }
         }).getProjectAssets(projectId, sDate, eDate);
     };
