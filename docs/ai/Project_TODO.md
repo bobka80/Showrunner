@@ -89,7 +89,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Final (pre-beta) — runs last
 
-**After** product TODO / active campaigns are done enough for real users — **not** mid-feature, **not** “after DAL only.” Major freeze backup first; then multi-sweep hardening (purity → map/registry → S0/S1 root causes → selective S2 → beta readiness). Re-evaluate after every phase.
+**After** product TODO / active campaigns are done enough for real users — **not** mid-feature, **not** “after DAL only.” Major freeze backup first; **intent survey** (director labels Bug vs Intentional vs Spec); then multi-sweep hardening (purity → map/registry → S0/S1 root causes → selective S2 → beta readiness). Re-evaluate after every phase.
 
 | Item | Status | File |
 |------|--------|------|

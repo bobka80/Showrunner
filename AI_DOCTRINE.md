@@ -33,7 +33,7 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 | Station gun scans, `RfidManager`, `showrunnerStationDeliverScan` | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Station RFID delivery |
 | Cursor IDE session, rules, review gates | [CURSOR_WORKFLOW.md](docs/ai/CURSOR_WORKFLOW.md) |
 | Warehouse gate, guns, station profile, PA concurrency | [topics/logistics-warehouse.md](docs/ai/topics/logistics-warehouse.md) + [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) |
-| Pre-beta / full-app debug sweeps (before real users) | [topics/pre-beta-hardening.md](docs/ai/topics/pre-beta-hardening.md) — **runs last**; freeze pin first; purity → registry → S0/S1 RCs |
+| Pre-beta / full-app debug sweeps (before real users) | [topics/pre-beta-hardening.md](docs/ai/topics/pre-beta-hardening.md) — **runs last**; Freeze → **Intent survey** → purity → registry → S0/S1 RCs |
 
 The director may dictate by voice — match **terminology lock** in [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) when searching code. See **Rule 12 (dictation mode)** — speech-to-text errors are common; confirm ambiguous terms before acting.
 

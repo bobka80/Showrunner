@@ -2586,6 +2586,19 @@
     return ref;
   }
 
+  /** Collection path: odd segments, e.g. projects/{id}/assets */
+  function dalFsColRef_(path) {
+    var parts = String(path || '').split('/').filter(Boolean);
+    if (parts.length < 1 || parts.length % 2 === 0) {
+      throw new Error('Invalid Firestore collection path: ' + path);
+    }
+    var ref = firebase.firestore();
+    for (var i = 0; i < parts.length - 1; i += 2) {
+      ref = ref.collection(parts[i]).doc(parts[i + 1]);
+    }
+    return ref.collection(parts[parts.length - 1]);
+  }
+
   function dalFsRound_(n) {
     var x = Number(n);
     if (!isFinite(x)) return 0;
@@ -2763,6 +2776,51 @@
     }
   }
 
+  /** Prep PA live sync — collection onSnapshot on host (parity with timeline doc listen). */
+  function dalFsHandleListenCol_(data, sourceWin) {
+    var requestId = data.requestId || '';
+    var path = data.path || '';
+    try {
+      var ref = dalFsColRef_(path);
+      if (dalFsListeners_[requestId] && dalFsListeners_[requestId].unsub) {
+        return;
+      }
+      if (dalFsListeners_[requestId]) {
+        try {
+          if (typeof dalFsListeners_[requestId].unsub === 'function') dalFsListeners_[requestId].unsub();
+          else if (typeof dalFsListeners_[requestId] === 'function') dalFsListeners_[requestId]();
+        } catch (e0) { /* ignore */ }
+        delete dalFsListeners_[requestId];
+      }
+      var unsub = ref.onSnapshot(function(snap) {
+        var docs = [];
+        snap.forEach(function(doc) {
+          docs.push({ id: doc.id, data: doc.data() || {} });
+        });
+        dalFsPostToIframe_({
+          type: 'SHOWRUNNER_DAL_FS_SNAP_COL',
+          requestId: requestId,
+          hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites),
+          fromCache: !!(snap.metadata && snap.metadata.fromCache),
+          docs: docs
+        }, sourceWin);
+      }, function(err) {
+        dalFsPostToIframe_({
+          type: 'SHOWRUNNER_DAL_FS_SNAP_COL_ERROR',
+          requestId: requestId,
+          error: err && err.message ? err.message : String(err)
+        }, sourceWin);
+      });
+      dalFsListeners_[requestId] = { unsub: unsub, source: sourceWin };
+    } catch (e) {
+      dalFsPostToIframe_({
+        type: 'SHOWRUNNER_DAL_FS_SNAP_COL_ERROR',
+        requestId: requestId,
+        error: e && e.message ? e.message : String(e)
+      }, sourceWin);
+    }
+  }
+
   function dalFsHandlePatchWrite_(data, sourceWin) {
     var requestId = data.requestId || '';
     var path = data.path || '';
@@ -2842,6 +2900,10 @@
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_LISTEN') {
       dalFsHandleListen_(ev.data, ev.source);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_LISTEN_COL') {
+      dalFsHandleListenCol_(ev.data, ev.source);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_UNLISTEN') {

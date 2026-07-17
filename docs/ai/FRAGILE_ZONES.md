@@ -35,7 +35,7 @@ When the director reports a bug in these areas, state the risk in plain language
 | **App boot pipeline (black screen)** | `build.js`, `Index.html` includes, `LogicPayload_*`, `dist/Index.html` | Append bootloader after `</body>`; edit `dist/` manually; ship milestone without login smoke test | Bootloader **before** `</body>`; edit sources → `node build.js` → test login on **web.app + desktop** every milestone |
 | **Warehouse ledger** | `Operations.js` | Mutate assignments directly during RFID chaos | Append to `Operations_Ledger` |
 | **DAL prep / timeline session UI (dual-domain)** | `Dal_Sessions.js`, `02e6_Dal_Session.html`, `02e7_Dal_Firestore_Client.html`, `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html` | Trust legacy flat `sessionType` when both domains open; clear prep latch on first “closed” poll; poll only for END not START; put `*/` inside `Dal_Sessions.js` block comments | Read `prepStatus` / `timelineStatus`; poll both START+END with grace; see § DAL prep/timeline session UI |
-| **DAL timeline fork live sync** | `03a2_Timeline_Dal_Live.html`, `02e7_Dal_Firestore_Client.html`, `host-boot.js` (`SHOWRUNNER_DAL_FS_*`), `Dal_Firebase.js`, `push-hosting/firestore.rules` | Full-doc LWW overwrite; flush-on-every-remote; empty-touch “diff all locals”; Auth inside GAS iframe only; host reply only into `#app-frame`; skip Firebase Authentication enable | Touch/patch merge + `writeSeq` + entity hold; Auth/listen/write on **web.app host**; deep `frames` walk + `ev.source`; see § DAL timeline fork live sync |
+| **DAL timeline fork live sync** | `03a2_Timeline_Dal_Live.html`, `02e7_Dal_Firestore_Client.html`, `host-boot.js` (`SHOWRUNNER_DAL_FS_*`), `Dal_Firebase.js`, `push-hosting/firestore.rules` | Full-doc LWW overwrite; flush-on-every-remote; empty-touch “diff all locals”; Auth inside GAS iframe only; host reply only into `#app-frame`; skip Firebase Authentication enable; **PA host Auth without `LISTEN_COL`** (falls to 2.5s GAS poll) | Touch/patch merge + `writeSeq` + entity hold; Auth/listen/write on **web.app host**; deep `frames` walk + `ev.source`; prep PA uses **`SHOWRUNNER_DAL_FS_LISTEN_COL`**; see § DAL timeline fork live sync |
 
 ---
 
@@ -504,8 +504,8 @@ Hard-refresh **two browsers**:
 | File | Role |
 |------|------|
 | `03a2_Timeline_Dal_Live.html` | Touch maps, patch merge, flush, apply, `writeSeq`, entity hold, banner `patch` vs `server patch` |
-| `02e7_Dal_Firestore_Client.html` | Host bridge client (`SHOWRUNNER_DAL_FS_*`) + iframe Auth fallback |
-| `push-hosting/public/host-boot.js` | Host Auth / listen / patch-write; deep `window.frames` reply walk |
+| `02e7_Dal_Firestore_Client.html` | Host bridge client (`SHOWRUNNER_DAL_FS_*`) + iframe Auth fallback; prep PA **collection** listen + `_meta` doc listen |
+| `push-hosting/public/host-boot.js` | Host Auth / doc listen / **collection listen** / patch-write; deep `window.frames` reply walk |
 | `Dal_Firebase.js` / `Dal_Firebase_Auth.js` | Fork snapshot/commit; custom token mint |
 | `push-hosting/firestore.rules` | Client read/write while `request.auth.token.showrunner` |
 
@@ -514,7 +514,7 @@ Hard-refresh **two browsers**:
 1. **Full-document LWW from either browser.** Untouched strips must keep the remote version. Empty-touch “upsert every local diff” recreated A↔B write wars.
 2. **Flush Firebase on every remote snapshot while dirty.** That turns every peer edit into a counter-write → stutter loop. Keep touches; let the pending/in-flight flush publish.
 3. **Re-install the grid from your own write result** when the UI already shows the drag — causes flicker even when data is correct.
-4. **Run Firebase Auth / Firestore only inside the GAS iframe** on web.app. Auth domains + nesting fail → `server patch`. Auth + listen + write belong on the **host shell**; reply via **`ev.source` + deep `frames` walk** (not only `#app-frame`).
+4. **Run Firebase Auth / Firestore only inside the GAS iframe** on web.app. Auth domains + nesting fail → `server patch`. Auth + listen + write belong on the **host shell**; reply via **`ev.source` + deep `frames` walk** (not only `#app-frame`). Prep PA must use host **`LISTEN_COL`** — Auth-only without collection listen silently falls back to slow GAS poll.
 5. **Ship host bridge without Firebase Console → Authentication → Get Started.** Custom tokens alone yield `auth/configuration-not-found`.
 6. **Apply stale `fromCache` snaps** after a live server version — yank strips back to old positions.
 7. **Hold ScriptLock across Firestore UrlFetch** on session open/close (starves presence / START COLLAB timeout).
@@ -527,9 +527,9 @@ Hard-refresh **two browsers**:
 | Ordering | Monotonic **`writeSeq`** on the state doc; ignore snaps with `writeSeq < lastApplied`. |
 | Local yank guard | After touch/write, **entity hold ~2s** — remote cannot move that id until hold expires. |
 | Echo | Own `clientId` acks without re-install; ignore duplicate applied sig. |
-| Banner | `live sync (patch)` = host/direct Firestore. `server patch` = GAS poll fallback (slow). |
+| Banner | `live sync (patch)` = host/direct Firestore. `server patch` = GAS poll fallback (slow). Prep PA: `live sync (direct)` = Firestore listen (host or iframe); `live sync (server)` = GAS poll. |
 | Scale | One doc per project timeline — fine for a small crew; same-strip edits are last-write-wins on that entity. |
-| Prep vs timeline | Independent forks (Slice D). Closing one must not commit/delete the other. |
+| Prep vs timeline | Independent forks (Slice D). Closing one must not commit/delete the other. Prep live feel: host collection listen on `projects/{id}/assets` + host `_meta` doc listen. If no `SNAP_COL` within ~4s (stale host-boot), fall back to GAS poll. |
 
 ### Smoke (after any live-sync / host-bridge change)
 

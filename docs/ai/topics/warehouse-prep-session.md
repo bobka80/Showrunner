@@ -8,7 +8,9 @@
 
 **Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. **Blocked items** remain on [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Last swept:** 2026-07-16
+**Live sync (2026-07-17):** Prep PA assets listen + `_meta` use the same **web.app host** bridge as timeline (`SHOWRUNNER_DAL_FS_LISTEN_COL` / doc listen). Banner should show `live sync (direct)` on web.app — not `live sync (server)` (2.5s GAS poll).
+
+**Last swept:** 2026-07-17
 
 **Dual-domain vs timeline:** **Resolved** (Slice D / GAS v603) — prep + timeline collab may both be open. Spec: [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md).
 
