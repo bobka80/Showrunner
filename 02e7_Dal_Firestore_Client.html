@@ -547,6 +547,11 @@ window.startDalPaSessionWatcher = function(projectId) {
       if (window.dalPrepUiOpen) window.startDalPaLiveSync_(projectId);
       return;
     }
+    if (!client || !client.db) {
+      // Host-only client has no in-iframe Firestore — Sheets poll covers close detection.
+      if (window.dalPrepUiOpen) window.startDalPaLiveSync_(projectId);
+      return;
+    }
     var metaRef = client.db.collection('projects').doc(String(projectId)).collection('assets').doc('_meta');
     window.dalPaSessionMetaUnsub = metaRef.onSnapshot(function(snap) {
       if (window.dalPrepClosing) return;
