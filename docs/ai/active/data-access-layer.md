@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** Live PA/timeline forks; prep PA live = transactional `assets/state` (timeline twin) — [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md). **Production:** GAS **v635** + hosting (`host-boot.js?v=635`). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** Live PA/timeline forks; prep PA live = transactional `assets/state` (timeline twin) — [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md). **Production:** GAS **v636** + hosting (`host-boot.js?v=635`). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 

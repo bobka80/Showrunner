@@ -1069,6 +1069,7 @@ window.startDalPaSessionWatcher = function(projectId) {
       window.dalMetaAuthority = true;
 
       if (isPrepOpen) {
+        window.dalPrepIgnoreOpenUntil = 0;
         window.dalSessionState = {
           status: 'open',
           sessionType: 'prep',
@@ -1080,6 +1081,10 @@ window.startDalPaSessionWatcher = function(projectId) {
         }
       } else if (exists === false && !fromCache) {
         // Server-confirmed close — clear latch on remote browsers.
+        // Block Sheets poll from re-latching while commit still shows open/committing.
+        window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
+        window.dalPrepIgnoreCloseUntil = 0;
+        window.dalPrepClosedPollStreak = 0;
         if (typeof dalApplyDalPrepUiState_ === 'function') {
           dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
         }

@@ -7,6 +7,7 @@ window.dalPrepSheetsPollGen = 0;
 window.dalPrepClosing = false;
 window.dalPrepSessionPollTimer = null;
 window.dalPrepIgnoreCloseUntil = 0;
+window.dalPrepIgnoreOpenUntil = 0;
 window.dalPrepClosedPollStreak = 0;
 
 window.dalPrepStatusFromInfo_ = function(info) {
@@ -59,7 +60,13 @@ window.startDalPrepSessionPoll_ = function(projectId) {
 
         if (window.dalIsPrepOpenFromInfo_(info)) {
           window.dalPrepClosedPollStreak = 0;
+          // After Firestore _meta confirmed END PREP, Sheets can lag as open/committing —
+          // do not resurrect the banner (that caused remote stutter / stuck-in-prep).
+          if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
           if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
+            var stOpen = window.dalPrepStatusFromInfo_(info);
+            // Mid-transition must not latch a closed UI; only a stable 'open' may remote-START.
+            if (stOpen === 'committing' || stOpen === 'opening') return;
             window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
           }
           return;
@@ -124,6 +131,7 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
       // After a fresh open (local or remote), do not let a lagging Sheets poll clear the banner.
       window.dalPrepIgnoreCloseUntil = Date.now() + 8000;
       window.dalPrepClosedPollStreak = 0;
+      window.dalPrepIgnoreOpenUntil = 0;
     }
     if (opts.invalidateCache || changed) {
       if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
@@ -134,6 +142,11 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   } else if (changed || opts.allowClose) {
     // Keep poll running while PA is open so remote START PREP can still latch this browser.
     if (typeof stopDalPaLiveSync_ === 'function') stopDalPaLiveSync_();
+    window.dalPaBannerLastText_ = '';
+    if (banner && !isPrepOpen) {
+      banner.style.display = 'none';
+      banner.textContent = '';
+    }
   }
 };
 
@@ -218,6 +231,8 @@ window.closeDalPrepSession = function() {
   window.dalPrepClosing = true;
   window.dalPrepSheetsPollGen++;
   window.dalPrepIgnoreCloseUntil = 0;
+  // Local END — also block lagging Sheets from re-opening this tab during commit.
+  window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
 
