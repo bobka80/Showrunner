@@ -2799,6 +2799,11 @@
             }
           });
           var updatedAt = new Date().toISOString();
+          var prevSeq = 0;
+          try {
+            if (doc.exists) prevSeq = Number((doc.data() && doc.data().writeSeq) || 0) || 0;
+          } catch (eSeq) { prevSeq = 0; }
+          var writeSeq = prevSeq + 1;
           var payload = {
             mode: meta.mode || remote.mode || 'main',
             shiftsJson: JSON.stringify(mergedShifts),
@@ -2806,12 +2811,14 @@
             overridesJson: JSON.stringify(mergedOverrides),
             updatedAt: updatedAt,
             updatedBy: meta.actor || 'System',
-            clientId: meta.clientId || ''
+            clientId: meta.clientId || '',
+            writeSeq: writeSeq
           };
           tx.set(ref, payload);
           return {
             merged: { shifts: mergedShifts, phases: mergedPhases, overrides: mergedOverrides },
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            writeSeq: writeSeq
           };
         });
       }).then(function(result) {
