@@ -176,9 +176,11 @@ window.dalFsBindHostMessages_ = function() {
       if (d.ok) {
         window.dalFsHostAuthReady_ = true;
         window.dalFirestoreClient = { viaHost: true, ready: true };
+        try { console.log('[DAL FS] host Auth OK'); } catch (eOk) { /* ignore */ }
         pend.cb(null, window.dalFirestoreClient);
       } else {
         window.dalFsHostAuthReady_ = false;
+        try { console.warn('[DAL FS] host Auth fail:', d.error); } catch (eFail) { /* ignore */ }
         pend.cb(new Error(d.error || 'Host Firebase auth failed'));
       }
       return;
@@ -204,10 +206,16 @@ window.dalFsBindHostMessages_ = function() {
 };
 
 window.dalFsPostToHost_ = function(msg) {
-  // GAS nests iframes — parent is often NOT web.app. Always hit top (host-boot).
-  try { if (window.top) window.top.postMessage(msg, '*'); } catch (e0) { /* ignore */ }
+  // Only window.top (web.app). Also posting to parent duplicates the request with
+  // ev.source = middle wrapper — host then replies to the wrong frame and snaps never arrive.
   try {
-    if (window.parent && window.parent !== window && window.parent !== window.top) {
+    if (window.top && window.top !== window) {
+      window.top.postMessage(msg, '*');
+      return;
+    }
+  } catch (e0) { /* ignore */ }
+  try {
+    if (window.parent && window.parent !== window) {
       window.parent.postMessage(msg, '*');
     }
   } catch (e1) { /* ignore */ }

@@ -2542,19 +2542,28 @@
 
   // ——— DAL live Firestore on host (first-party web.app) ———
   // GAS iframe Auth often fails → "server patch". Auth + listen + write run here instead.
+  // CRITICAL: reply via ev.source (sender window). Posting only into #app-frame hits the
+  // outer script.google.com wrapper; nested Index never sees AUTH_RESULT → 12s timeout → gas.
   var dalFsListeners_ = {};
   var dalFsAuthReady_ = false;
 
-  function dalFsPostToIframe_(msg) {
-    // Outer GAS frame + every iframe we can see (nesting). Inner Index also forwards down.
+  function dalFsPostToIframe_(msg, sourceWin) {
+    // Prefer the window that sent the request (deep nested Index). Same pattern as FCM token.
+    if (sourceWin) {
+      try { sourceWin.postMessage(msg, '*'); } catch (eSrc) { /* ignore */ }
+    }
+    // Backup: outer GAS frame + every host-visible iframe (nest relay may forward further).
     try {
-      if (frame && frame.contentWindow) frame.contentWindow.postMessage(msg, '*');
+      if (frame && frame.contentWindow && frame.contentWindow !== sourceWin) {
+        frame.contentWindow.postMessage(msg, '*');
+      }
     } catch (e) { /* ignore */ }
     try {
       var frames = document.querySelectorAll('iframe');
       for (var i = 0; i < frames.length; i++) {
         try {
-          if (frames[i].contentWindow) frames[i].contentWindow.postMessage(msg, '*');
+          var cw = frames[i].contentWindow;
+          if (cw && cw !== sourceWin) cw.postMessage(msg, '*');
         } catch (e1) { /* ignore */ }
       }
     } catch (e2) { /* ignore */ }
@@ -2639,15 +2648,18 @@
     };
   }
 
-  function dalFsHandleAuth_(data) {
+  function dalFsHandleAuth_(data, sourceWin) {
     var requestId = data.requestId || '';
     function reply(ok, errMsg) {
+      try {
+        console.log('[DAL FS host] AUTH_RESULT', ok ? 'ok' : 'fail', errMsg || '');
+      } catch (eLog) { /* ignore */ }
       dalFsPostToIframe_({
         type: 'SHOWRUNNER_DAL_FS_AUTH_RESULT',
         requestId: requestId,
         ok: !!ok,
         error: errMsg || ''
-      });
+      }, sourceWin);
     }
     try {
       if (typeof firebase === 'undefined') {
@@ -2673,6 +2685,14 @@
         reply(false, 'Missing custom token');
         return;
       }
+      // Already signed in on this host tab — answer immediately (second collab user / reopen).
+      var cur = null;
+      try { cur = firebase.auth().currentUser; } catch (eCur) { cur = null; }
+      if (cur) {
+        dalFsAuthReady_ = true;
+        reply(true);
+        return;
+      }
       firebase.auth().signInWithCustomToken(data.customToken).then(function() {
         dalFsAuthReady_ = true;
         reply(true);
@@ -2686,16 +2706,23 @@
     }
   }
 
-  function dalFsHandleListen_(data) {
+  function dalFsHandleListen_(data, sourceWin) {
     var requestId = data.requestId || '';
     var path = data.path || '';
     try {
+      var ref = dalFsDocRef_(path);
+      // Same requestId twice = leaf + nest relay. Keep the first source (usually deepest Index).
+      if (dalFsListeners_[requestId] && dalFsListeners_[requestId].unsub) {
+        return;
+      }
       if (dalFsListeners_[requestId]) {
-        try { dalFsListeners_[requestId](); } catch (e0) { /* ignore */ }
+        try {
+          if (typeof dalFsListeners_[requestId].unsub === 'function') dalFsListeners_[requestId].unsub();
+          else if (typeof dalFsListeners_[requestId] === 'function') dalFsListeners_[requestId]();
+        } catch (e0) { /* ignore */ }
         delete dalFsListeners_[requestId];
       }
-      var ref = dalFsDocRef_(path);
-      dalFsListeners_[requestId] = ref.onSnapshot(function(snap) {
+      var unsub = ref.onSnapshot(function(snap) {
         dalFsPostToIframe_({
           type: 'SHOWRUNNER_DAL_FS_SNAP',
           requestId: requestId,
@@ -2703,32 +2730,36 @@
           hasPendingWrites: !!(snap.metadata && snap.metadata.hasPendingWrites),
           fromCache: !!(snap.metadata && snap.metadata.fromCache),
           data: snap.exists ? (snap.data() || {}) : null
-        });
+        }, sourceWin);
       }, function(err) {
         dalFsPostToIframe_({
           type: 'SHOWRUNNER_DAL_FS_SNAP_ERROR',
           requestId: requestId,
           error: err && err.message ? err.message : String(err)
-        });
+        }, sourceWin);
       });
+      dalFsListeners_[requestId] = { unsub: unsub, source: sourceWin };
     } catch (e) {
       dalFsPostToIframe_({
         type: 'SHOWRUNNER_DAL_FS_SNAP_ERROR',
         requestId: requestId,
         error: e && e.message ? e.message : String(e)
-      });
+      }, sourceWin);
     }
   }
 
   function dalFsHandleUnlisten_(data) {
     var requestId = data.requestId || '';
     if (dalFsListeners_[requestId]) {
-      try { dalFsListeners_[requestId](); } catch (e) { /* ignore */ }
+      try {
+        if (typeof dalFsListeners_[requestId].unsub === 'function') dalFsListeners_[requestId].unsub();
+        else if (typeof dalFsListeners_[requestId] === 'function') dalFsListeners_[requestId]();
+      } catch (e) { /* ignore */ }
       delete dalFsListeners_[requestId];
     }
   }
 
-  function dalFsHandlePatchWrite_(data) {
+  function dalFsHandlePatchWrite_(data, sourceWin) {
     var requestId = data.requestId || '';
     var path = data.path || '';
     var localState = data.localState || { shifts: [], phases: [], overrides: {} };
@@ -2741,7 +2772,7 @@
         ok: !!ok,
         result: result || null,
         error: errMsg || ''
-      });
+      }, sourceWin);
     }
     try {
       var ref = dalFsDocRef_(path);
@@ -2792,11 +2823,11 @@
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_AUTH') {
-      dalFsHandleAuth_(ev.data);
+      dalFsHandleAuth_(ev.data, ev.source);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_LISTEN') {
-      dalFsHandleListen_(ev.data);
+      dalFsHandleListen_(ev.data, ev.source);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_UNLISTEN') {
@@ -2804,7 +2835,7 @@
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_PATCH_WRITE') {
-      dalFsHandlePatchWrite_(ev.data);
+      dalFsHandlePatchWrite_(ev.data, ev.source);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION_TOKEN') {
