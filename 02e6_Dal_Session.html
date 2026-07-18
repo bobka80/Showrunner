@@ -19,12 +19,36 @@ window.dalPrepSheetsOpenBlocked_ = false;
 // A lone _meta blip was closing BOTH users mid-prep → sync off → fixture desync (9 vs 1).
 window.dalPrepMetaEndPending_ = false;
 window.dalPrepMetaEndPendingSince_ = 0;
+window.dalPrepActiveSessionUid_ = '';
+// After END, refuse to reopen the *same* prep sessionUid (stale _meta / lag).
+// Time-only IgnoreOpenUntil (~30s) was letting the banner return → ~1 min on/off loop.
+window.dalPrepEndedSessionUid_ = '';
+
+window.dalPrepAllowRemoteOpen_ = function(sessionUid) {
+  sessionUid = String(sessionUid || '');
+  var ended = String(window.dalPrepEndedSessionUid_ || '');
+  if (!ended) return true;
+  if (sessionUid && sessionUid === ended) return false;
+  // No uid on snap but we already ended — stay closed until local START or new uid.
+  if (!sessionUid && window.dalPrepSheetsOpenBlocked_) return false;
+  return true;
+};
 
 window.dalPrepMarkSessionEnded_ = function(projectId) {
+  var uid = '';
+  try {
+    if (window.dalSessionState) {
+      uid = String(window.dalSessionState.sessionUid || window.dalSessionState.prepUid || '');
+    }
+  } catch (e0) { /* ignore */ }
+  if (!uid) uid = String(window.dalPrepActiveSessionUid_ || '');
+  if (uid) window.dalPrepEndedSessionUid_ = uid;
+  window.dalPrepActiveSessionUid_ = '';
   window.dalPrepMetaEndPending_ = false;
   window.dalPrepMetaEndPendingSince_ = 0;
   window.dalPrepSheetsOpenBlocked_ = true;
-  window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
+  // Sticky block — do not rely on a 30s timer (that caused minute-scale reopen loops).
+  window.dalPrepIgnoreOpenUntil = Date.now() + 24 * 60 * 60 * 1000;
   window.dalMetaConfirmedOpen_ = false;
   window.dalMetaSeenOpen_ = false;
   if (typeof dalApplyDalPrepUiState_ === 'function') {
@@ -140,12 +164,19 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   var canShow = window.dalCanShowPrepButtons();
   isPrepOpen = !!isPrepOpen;
 
-  // After remote END, block reopen from lagging Sheets / stale _meta cache (banner flicker).
-  // Local START: localOpen. Remote START from Firestore: fromMeta.
+  // After remote END, block reopen from lagging Sheets / stale _meta (same sessionUid).
+  // Local START: localOpen. Remote START from Firestore: fromMeta with a *new* sessionUid.
   if (isPrepOpen && !opts.localOpen && !opts.fromMeta) {
-    if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
     if (window.dalPrepSheetsOpenBlocked_) return;
-  } else if (isPrepOpen && (opts.localOpen || opts.fromMeta)) {
+    if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
+    if (!window.dalPrepAllowRemoteOpen_(opts.sessionUid || '')) return;
+  } else if (isPrepOpen && opts.localOpen) {
+    window.dalPrepEndedSessionUid_ = '';
+    window.dalPrepSheetsOpenBlocked_ = false;
+    window.dalPrepIgnoreOpenUntil = 0;
+  } else if (isPrepOpen && opts.fromMeta) {
+    if (!window.dalPrepAllowRemoteOpen_(opts.sessionUid || '')) return;
+    window.dalPrepEndedSessionUid_ = '';
     window.dalPrepSheetsOpenBlocked_ = false;
     window.dalPrepIgnoreOpenUntil = 0;
   }
@@ -288,6 +319,7 @@ window.openDalPrepSession = function() {
       window.dalMetaCloseStreak_ = 0;
       window.dalPrepMetaEndPending_ = false;
       window.dalPrepMetaEndPendingSince_ = 0;
+      window.dalPrepEndedSessionUid_ = '';
       window.dalPrepIgnoreOpenUntil = 0;
       window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
@@ -317,8 +349,8 @@ window.closeDalPrepSession = function() {
       })
       .withSuccessHandler(function() {
         if (overlay) overlay.style.cursor = '';
+        window.dalPrepMarkSessionEnded_(projectId);
         window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
-        window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
         if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
         if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
         if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);

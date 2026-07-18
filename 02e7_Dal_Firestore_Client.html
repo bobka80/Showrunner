@@ -1074,23 +1074,29 @@ window.startDalPaSessionWatcher = function(projectId) {
       window.dalMetaAuthority = true;
 
       if (isPrepOpen) {
-        // Honor remote-END grace — do not clear IgnoreOpenUntil or re-latch.
-        if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0) && !window.dalPrepUiOpen) return;
+        var sid = String((data && data.sessionUid) || '');
+        // After END, ignore resurrected _meta for the same session (minute on/off loop).
+        if (!window.dalPrepAllowRemoteOpen_(sid)) return;
+        if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0) && !window.dalPrepUiOpen &&
+            window.dalPrepSheetsOpenBlocked_ && !sid) return;
         window.dalPrepMetaEndPending_ = false;
         window.dalPrepMetaEndPendingSince_ = 0;
         window.dalMetaSeenOpen_ = true;
         window.dalMetaConfirmedOpen_ = true;
         window.dalMetaCloseStreak_ = 0;
-        window.dalPrepIgnoreOpenUntil = 0;
-        window.dalPrepSheetsOpenBlocked_ = false;
+        window.dalPrepActiveSessionUid_ = sid;
         window.dalSessionState = {
           status: 'open',
           sessionType: 'prep',
-          sessionUid: data.sessionUid || '',
+          sessionUid: sid,
           prepStatus: 'open'
         };
         if (!window.dalPrepUiOpen && typeof dalApplyDalPrepUiState_ === 'function') {
-          dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, fromMeta: true });
+          dalApplyDalPrepUiState_(true, projectId, {
+            invalidateCache: true,
+            fromMeta: true,
+            sessionUid: sid
+          });
         }
         return;
       }
