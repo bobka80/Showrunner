@@ -1076,6 +1076,8 @@ window.startDalPaSessionWatcher = function(projectId) {
       if (isPrepOpen) {
         // Honor remote-END grace — do not clear IgnoreOpenUntil or re-latch.
         if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0) && !window.dalPrepUiOpen) return;
+        window.dalPrepMetaEndPending_ = false;
+        window.dalPrepMetaEndPendingSince_ = 0;
         window.dalMetaSeenOpen_ = true;
         window.dalMetaConfirmedOpen_ = true;
         window.dalMetaCloseStreak_ = 0;
@@ -1095,24 +1097,16 @@ window.startDalPaSessionWatcher = function(projectId) {
 
       if (exists !== false) return;
 
-      // Idle PA / local START before _meta write: empty is normal — do not END.
-      // Only close after we have seen a real server _meta open (then delete = peer/local END).
+      // Idle / local START before _meta write: empty is normal.
+      if (!window.dalMetaConfirmedOpen_ && !window.dalPrepUiOpen && !window.dalPrepLatched) return;
       if (!window.dalMetaConfirmedOpen_) return;
-      // START grace: ignore premature empty _meta while snapshot/meta write catches up.
       if (!window.dalPrepClosing && Date.now() < (window.dalPrepIgnoreCloseUntil || 0)) {
         return;
       }
-      // One server-missing snap is enough. Delete only fires once.
-      window.dalMetaCloseStreak_ = 0;
-      window.dalMetaSeenOpen_ = false;
-      window.dalMetaConfirmedOpen_ = false;
-      window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
-      window.dalPrepIgnoreCloseUntil = 0;
-      window.dalPrepClosedPollStreak = 0;
-      window.dalPrepSheetsOpenBlocked_ = true;
-      if (typeof dalApplyDalPrepUiState_ === 'function') {
-        dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
-      }
+      // Do NOT close the banner here. A brief missing snap was killing live sync on BOTH
+      // browsers mid-prep. Mark pending — Sheets poll / timeout confirms real END.
+      window.dalPrepMetaEndPending_ = true;
+      if (!window.dalPrepMetaEndPendingSince_) window.dalPrepMetaEndPendingSince_ = Date.now();
     };
 
     var onMetaErr_ = function(watchErr) {

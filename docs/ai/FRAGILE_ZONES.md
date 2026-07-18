@@ -465,7 +465,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 ### Never do
 
 1. **Trust legacy flat `sessionType` / `status` when both domains may be open.** Those fields preferred prep and made timeline collab look closed (banner gone, START COLLAB stuck) while the timeline fork was still live (**v604**). Always read **`prepStatus` / `timelineStatus`** (or nested `prep` / `timeline`). When both domains are active, flat legacy fields are intentionally empty.
-2. **Clear the prep latch on the first “closed” Sheets poll.** Prep UI latches open (`dalPrepLatched`) so flaky reads cannot flicker. Remote END PREP must use `allowClose: true` (Firestore `_meta` gone **or** confirmed Sheets poll). After END, Sheets often stays `open`/`committing` for a long commit — a timed `IgnoreOpenUntil` (~30s) **expires while Sheets still says open** → peer banner reopens, then closes, then oscillates (**v642 symptom**). **Rule:** after leaving prep UI set `dalPrepSheetsOpenBlocked_`; Sheets poll must **not** remote-START until a new server `_meta` (`fromMeta`) or local START (`localOpen`). Meta-close only after `dalMetaConfirmedOpen_`. Never apply `_meta` fromCache.
+2. **Never kill prep banner / live sync on a single flaky signal.** Closing prep UI calls `stopDalPaLiveSync_` — peers stop receiving fixture patches (adds vanish; later qty shows as 9 vs 1). **Close only when:** local END, or `_meta` missing **and** Sheets `committing`/`closed` (or `_meta` missing ≥~8s). **Do not** close on Sheets-alone “closed” while `dalMetaConfirmedOpen_`. **Do not** close immediately on one `_meta` missing snap (blip) — set `dalPrepMetaEndPending_` and confirm. After real END: `dalPrepSheetsOpenBlocked_` until new `_meta` (`fromMeta`) or local START. Never apply `_meta` fromCache.
 3. **Poll only for END, not START.** While Project Assets is open, the prep poll must detect **remote START and remote END**. Stopping the poll when not latched breaks “other PC started prep.”
 4. **Put `*/` inside a `Dal_Sessions.js` block comment** (e.g. `prep*/timeline*`). It terminates the comment early → GAS syntax error → white screen / failed push (same class as **v577** `persist*/fetch*` in `Dal_Repos.js`).
 5. **Hold ScriptLock across Firestore UrlFetch** on open/close — starves presence and times out START COLLAB (fixed earlier in Phase 4 hotfixes).
@@ -475,7 +475,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 | Concern | Rule |
 |---------|------|
 | Dual-domain reads | Client: `prepStatus` / `timelineStatus`. Server close: always pass `'prep'` or `'timelineCollab'`. |
-| Prep remote sync | Live open/close authority: Firestore `_meta`. Sheets poll = fallback close + **blocked** reopen after END until new `_meta`. Fresh open: ~30s IgnoreCloseUntil. |
+| Prep remote sync | Live open/close: `_meta` + Sheets **agree** (or meta-end timeout). Never Sheets-alone close while meta confirmed. After END: block Sheets reopen until new `_meta`. |
 | Timeline remote sync | Session watcher polls `getDalSessionInfo` → `dalTimelineInfoFromSession_` (domain fields only). |
 | Sheet vs UI | Banner sync is **not** Sheet truth. Fork may be correct while UI is wrong — fix clients, do not “re-open” blindly. |
 
