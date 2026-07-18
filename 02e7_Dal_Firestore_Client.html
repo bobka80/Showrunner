@@ -1075,11 +1075,12 @@ window.startDalPaSessionWatcher = function(projectId) {
 
       if (isPrepOpen) {
         // Honor remote-END grace — do not clear IgnoreOpenUntil or re-latch.
-        if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
+        if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0) && !window.dalPrepUiOpen) return;
         window.dalMetaSeenOpen_ = true;
         window.dalMetaConfirmedOpen_ = true;
         window.dalMetaCloseStreak_ = 0;
         window.dalPrepIgnoreOpenUntil = 0;
+        window.dalPrepSheetsOpenBlocked_ = false;
         window.dalSessionState = {
           status: 'open',
           sessionType: 'prep',
@@ -1087,7 +1088,7 @@ window.startDalPaSessionWatcher = function(projectId) {
           prepStatus: 'open'
         };
         if (!window.dalPrepUiOpen && typeof dalApplyDalPrepUiState_ === 'function') {
-          dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
+          dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, fromMeta: true });
         }
         return;
       }
@@ -1108,6 +1109,7 @@ window.startDalPaSessionWatcher = function(projectId) {
       window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
       window.dalPrepIgnoreCloseUntil = 0;
       window.dalPrepClosedPollStreak = 0;
+      window.dalPrepSheetsOpenBlocked_ = true;
       if (typeof dalApplyDalPrepUiState_ === 'function') {
         dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       }

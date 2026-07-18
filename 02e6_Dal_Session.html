@@ -12,6 +12,9 @@ window.dalPrepClosedPollStreak = 0;
 window.dalMetaSeenOpen_ = false;
 window.dalMetaCloseStreak_ = 0;
 window.dalMetaConfirmedOpen_ = false; // true only after server _meta with sessionType prep
+// After END PREP, Sheets can lag as "open" for a long time. Do not re-latch from Sheets
+// alone — wait for a new Firestore _meta (or local START). Stops ~30s banner oscillation.
+window.dalPrepSheetsOpenBlocked_ = false;
 
 window.dalPrepStatusFromInfo_ = function(info) {
   if (!info) return '';
@@ -72,6 +75,7 @@ window.startDalPrepSessionPoll_ = function(projectId) {
             if (window.dalPrepClosedPollStreak < 2) return;
             window.dalPrepClosedPollStreak = 0;
             window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
+            window.dalPrepSheetsOpenBlocked_ = true;
             window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
             return;
           }
@@ -79,9 +83,11 @@ window.startDalPrepSessionPoll_ = function(projectId) {
           // After Firestore _meta confirmed END PREP, Sheets can lag as open/committing —
           // do not resurrect the banner (that caused remote stutter / stuck-in-prep).
           if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
+          if (window.dalPrepSheetsOpenBlocked_) return;
           if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
             // Mid-transition must not latch a closed UI; only a stable 'open' may remote-START.
             if (stOpen === 'committing' || stOpen === 'opening') return;
+            // Sheets-only remote START — blocked after END until _meta returns (see flag).
             window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
           }
           return;
@@ -96,6 +102,7 @@ window.startDalPrepSessionPoll_ = function(projectId) {
         window.dalPrepClosedPollStreak = (window.dalPrepClosedPollStreak || 0) + 1;
         if (window.dalPrepClosedPollStreak < 2) return;
         window.dalPrepClosedPollStreak = 0;
+        window.dalPrepSheetsOpenBlocked_ = true;
         window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       })
       .getDalSessionInfo(projectId);
@@ -114,9 +121,13 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   isPrepOpen = !!isPrepOpen;
 
   // After remote END, block reopen from lagging Sheets / stale _meta cache (banner flicker).
-  // Local START PREP passes localOpen: true.
-  if (isPrepOpen && !opts.localOpen && Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) {
-    return;
+  // Local START: localOpen. Remote START from Firestore: fromMeta.
+  if (isPrepOpen && !opts.localOpen && !opts.fromMeta) {
+    if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
+    if (window.dalPrepSheetsOpenBlocked_) return;
+  } else if (isPrepOpen && (opts.localOpen || opts.fromMeta)) {
+    window.dalPrepSheetsOpenBlocked_ = false;
+    window.dalPrepIgnoreOpenUntil = 0;
   }
 
   // Latch: once prep is known-open, ignore spurious "closed" (Sheets lag / cache / auth blips)
@@ -169,6 +180,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     window.dalMetaSeenOpen_ = false;
     window.dalMetaConfirmedOpen_ = false;
     window.dalMetaCloseStreak_ = 0;
+    // Leaving prep UI → do not let lagging Sheets "open" flip the banner back on.
+    if (changed) window.dalPrepSheetsOpenBlocked_ = true;
     if (banner && !isPrepOpen) {
       banner.style.display = 'none';
       banner.textContent = '';
@@ -207,6 +220,8 @@ window.refreshDalSessionBanner = function() {
       if (window.dalPrepClosing) return;
       window.dalSessionState = info || {};
       if (window.dalIsPrepOpenFromInfo_(info)) {
+        if (window.dalPrepSheetsOpenBlocked_) return;
+        if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
         window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       } else if (!window.dalPrepLatched) {
         window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
