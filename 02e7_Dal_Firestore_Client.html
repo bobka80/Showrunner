@@ -851,6 +851,8 @@ window.startDalPaGasSync_ = function(projectId) {
  */
 window.dalPaSeedStateFromLocal_ = function() {
   if (!window.dalPrepUiOpen || window.dalPaStateSeeded_) return;
+  // Remote already has authority — never heal by touching every local UID (resurrects peer deletes).
+  if (Number(window.dalPaLastDocWriteSeq_ || 0) > 0) return;
   var localSeed = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
     return pa && !window.dalPaIsAutoRow_(pa) && pa.uid;
   });
@@ -879,16 +881,19 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   var localSeed = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
     return pa && !window.dalPaIsAutoRow_(pa);
   });
+  var haveRemoteAuthority = writeSeq > 0 || Number(window.dalPaLastDocWriteSeq_ || 0) > 0;
 
-  // Empty/missing state: seed from local if we have it; otherwise wait for GAS hydrate.
-  // Never apply [] over an unloaded UI (blank vault + blank assigned).
+  // Empty/missing state: seed from local ONLY once before any remote writeSeq exists.
+  // Never re-seed after peers have written (puts deleted rows back).
   if (!data.fixturesJson || fixtures.length === 0) {
-    if (localSeed.length) {
+    if (!haveRemoteAuthority && localSeed.length) {
       window.dalPaSeedStateFromLocal_();
       return;
     }
-    if (!window.paLoadedForProject) return;
-    // Intentionally empty project after load — allow empty apply below.
+    if (!haveRemoteAuthority && !window.paLoadedForProject) return;
+    // Lagging empty snap (writeSeq 0) after we already saw real seq — ignore.
+    if (Number(window.dalPaLastDocWriteSeq_ || 0) > 0 && writeSeq === 0) return;
+    // Intentionally empty after load / after authoritative empty — apply below.
   }
 
   if (writeSeq && window.dalPaLastDocWriteSeq_ && writeSeq < window.dalPaLastDocWriteSeq_) return;
@@ -897,11 +902,8 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
     return;
   }
 
-  // Do not wipe a hydrated list with an empty lagging state snap.
-  if (fixtures.length === 0 && localSeed.length > 0) {
-    window.dalPaSeedStateFromLocal_();
-    return;
-  }
+  // Empty with authority: apply empty (do not seed). Unloaded UI: wait for hydrate.
+  if (fixtures.length === 0 && localSeed.length === 0 && !window.paLoadedForProject) return;
 
   window.dalApplyRemotePaAssets_(fixtures, false, {
     fromCache: !!snapMeta.fromCache,
@@ -929,7 +931,8 @@ window.startDalPaFirestoreListener = function(projectId) {
     window.dalPaFirestoreListenProjectId = String(projectId);
     window.dalPaLiveSyncMode = 'firestore';
     window.dalPaLiveSyncFailed = false;
-    window.dalPaStateSeeded_ = false;
+    // Do not clear seed flag if remote already wrote — listener restart must not re-seed full local.
+    if (!Number(window.dalPaLastDocWriteSeq_ || 0)) window.dalPaStateSeeded_ = false;
     window.dalUpdateRemotePendingBanner_();
 
     var statePath = 'projects/' + String(projectId) + '/assets/state';

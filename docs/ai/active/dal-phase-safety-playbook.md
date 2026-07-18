@@ -1,8 +1,10 @@
 # DAL campaign — Phase Safety Playbook (read before Phase 1+)
 
-**Campaign:** [data-access-layer.md](data-access-layer.md) · **Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) · **Phase 0 report:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md) · **Pre-ship gates:** [dal-pre-ship-gates.md](dal-pre-ship-gates.md)
+**Campaign:** [data-access-layer.md](data-access-layer.md) · **Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) · **Phase 0 report:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md) · **Pre-ship gates:** [dal-pre-ship-gates.md](dal-pre-ship-gates.md) · **Prep live sync:** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md)
 
 This document is written so a **fresh chat** (no context from prior sessions) can safely execute DAL phases without breaking fragile systems.
+
+**Prep PA live sync:** Before any code in `02e7_Dal_Firestore_Client.html` / prep flush-apply / `host-boot` `PA_PATCH_*`, read [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) §4 (prove with sim + mutation inventory). Do not ship another symptom guard without a failing Case.
 
 ---
 

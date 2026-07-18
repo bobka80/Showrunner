@@ -673,7 +673,10 @@ function updateAssignedQty(repAssetId, loc, form, delta, containerUid = null) {
             if (matchPa) {
                 matchPa.qty = parseInt(matchPa.qty, 10) - 1;
                 if (matchPa.qty <= 0) {
+                    if (typeof window.dalPaNoteDelete_ === 'function' && matchPa.uid) window.dalPaNoteDelete_(matchPa.uid);
                     currentProjectAssets.splice(currentProjectAssets.indexOf(matchPa), 1);
+                } else if (typeof window.dalPaNoteTouch_ === 'function' && matchPa.uid) {
+                    window.dalPaNoteTouch_(matchPa.uid);
                 }
             }
         }
@@ -721,7 +724,11 @@ function removeFormulaGroup(loc, form) {
     currentProjectAssets = currentProjectAssets.filter(pa => {
         let pLoc = pa.location || "General";
         let pForm = pa.formula || "Standalone";
-        return !(pLoc === loc && pForm === form);
+        let kill = (pLoc === loc && pForm === form);
+        if (kill && typeof window.dalPaNoteDelete_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+            window.dalPaNoteDelete_(pa.uid);
+        }
+        return !kill;
     });
         if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
     renderProjectAssetsUI();
@@ -826,7 +833,14 @@ window.updateConsumableUsage = function(mode, targetId, newVal) {
         let pa = currentProjectAssets[paIndex];
         if (pa) {
             pa.qty = numVal;
-            if (numVal === 0) currentProjectAssets.splice(paIndex, 1);
+            if (numVal === 0) {
+                if (typeof window.dalPaNoteDelete_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                    window.dalPaNoteDelete_(pa.uid);
+                }
+                currentProjectAssets.splice(paIndex, 1);
+            } else if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                window.dalPaNoteTouch_(pa.uid);
+            }
         }
     } else if (mode === 'summed') {
         let groupItems = currentProjectAssets.filter(pa => (pa.formula || "Standalone") === "Standalone" && (pa.location || "General") === "General" && pa.assetId === targetId);
@@ -834,7 +848,15 @@ window.updateConsumableUsage = function(mode, targetId, newVal) {
             groupItems[0].qty = numVal;
             if (numVal === 0) {
                 let matchIndex = currentProjectAssets.indexOf(groupItems[0]);
-                if (matchIndex > -1) currentProjectAssets.splice(matchIndex, 1);
+                if (matchIndex > -1) {
+                    let killPa = currentProjectAssets[matchIndex];
+                    if (typeof window.dalPaNoteDelete_ === 'function' && killPa.uid && !killPa.isAuto && !killPa.isGenericAuto) {
+                        window.dalPaNoteDelete_(killPa.uid);
+                    }
+                    currentProjectAssets.splice(matchIndex, 1);
+                }
+            } else if (typeof window.dalPaNoteTouch_ === 'function' && groupItems[0].uid && !groupItems[0].isAuto && !groupItems[0].isGenericAuto) {
+                window.dalPaNoteTouch_(groupItems[0].uid);
             }
         } else if (numVal > 0) {
             window.insertIntoProjectAssets({ assetId: targetId, qty: numVal, formula: "Standalone", location: "General", creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
@@ -942,6 +964,9 @@ function removePa(idx) {
     let pa = currentProjectAssets[idx];
     let oldLoc = pa ? (pa.location || "General") : "General";
     let oldForm = pa ? (pa.formula || "Standalone") : "Standalone";
+    if (pa && typeof window.dalPaNoteDelete_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+        window.dalPaNoteDelete_(pa.uid);
+    }
     currentProjectAssets.splice(idx, 1); 
     if (oldForm && oldForm !== "Standalone") {
         if (typeof window.syncFormulaToItems === 'function') window.syncFormulaToItems(oldLoc, oldForm);

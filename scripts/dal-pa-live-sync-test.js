@@ -8,6 +8,10 @@
  *   C) Non-transactional concurrent equal-seq race OSCILLATES (production bug after v634)
  *   D) Transactional state-doc patch SETTLES at 4 (real fix)
  *
+ *   E) Silent local delete (no delete map) leaves UID in state → resurrects on A
+ *   F) Noted delete + peer unrelated edit — UID stays gone
+ *   G) Seed-from-local gated after writeSeq — cannot stomp peer deletes
+ *
  * Run: node scripts/dal-pa-live-sync-test.js
  */
 'use strict';
@@ -49,6 +53,25 @@ console.log('  historyB', txn.historyB.join('→'));
 console.log('  store=%s', txn.storeQty);
 assert(txn.ok, 'txn state patch: both clients + store at 4, no oscillation');
 
+console.log('\n--- Case E: silent delete resurrects (bug mode) ---');
+var silent = core.simulateDeleteResurrect({ mode: 'silent' });
+console.log('  storeHasU1=%s aHasU1=%s bHasU1=%s', silent.storeHasU1, silent.aHasU1, silent.bHasU1);
+assert(silent.ok, 'silent delete must leave u1 in store and resurrect on A');
+
+console.log('\n--- Case F: noted delete stays gone after peer edit ---');
+var noted = core.simulateDeleteResurrect({ mode: 'noted' });
+console.log('  storeHasU1=%s aHasU1=%s bHasU1=%s', noted.storeHasU1, noted.aHasU1, noted.bHasU1);
+assert(noted.ok, 'noted delete: u1 gone from store + both clients after B edits u2');
+
+console.log('\n--- Case G: seed gate blocks stomp after writeSeq ---');
+var seedGate = core.shouldSeedFromLocal({ lastDocWriteSeq: 3, localCount: 2, stateSeeded: false, remoteWriteSeq: 0 });
+assert(!seedGate, 'shouldSeedFromLocal false when lastDocWriteSeq > 0');
+var seedOk = core.simulateSeedStomp({ allowSeed: true });
+console.log('  canSeed=%s storeHasU1=%s', seedOk.canSeed, seedOk.storeHasU1);
+assert(seedOk.ok, 'gated seed does not resurrect u1');
+var seedBad = core.simulateSeedStomp({ allowSeed: false });
+assert(seedBad.storeHasU1, 'ungated full-local seed WOULD resurrect u1 (bug proof)');
+
 console.log('\n--- Unit: patchMergeFixtures only applies touches ---');
 var merged = core.patchMergeFixtures(
   [{ uid: 'u1', qty: 5 }, { uid: 'u2', qty: 1 }],
@@ -69,9 +92,17 @@ var echo = core.applyRemotePaState(
 );
 assert(echo.skipped === 'echo' && echo.docWriteSeq === 3, 'own echo acks seq without yank');
 
+var delMerge = core.patchMergeFixtures(
+  [{ uid: 'u1', qty: 1 }, { uid: 'u2', qty: 1 }],
+  [{ uid: 'u2', qty: 1 }],
+  {},
+  { u1: 1 }
+);
+assert(!delMerge.find(function (x) { return x.uid === 'u1'; }), 'delete map removes u1 from merge');
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (txn state = timeline parity)');
+console.log('\nDAL PA live-sync TEST PASSED (txn state = timeline parity + delete/seed)');
 process.exit(0);

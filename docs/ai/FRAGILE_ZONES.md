@@ -545,7 +545,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 
 ## DAL prep PA fork live sync (equipment list)
 
-**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · Same Firebase session-buffer rule as timeline; different shape (**many docs** under `projects/{id}/assets/*`, not one state doc).
+**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Doctrine (industry + process):** [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md) · Live shape matches timeline (**one** `assets/state` doc); collection under `projects/{id}/assets/*` is the END PREP commit mirror.
 
 ### Timeline vs prep PA (same bug class)
 
@@ -588,6 +588,8 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 9. **Flush Firebase from `renderProjectAssetsUI` without `dalPaApplyingRemote` guard** (and without patch-only writes) — remote apply re-render becomes a counter-write.
 10. **Apply GAS `getProjectAssets` fixtures while `dalPaLiveSyncMode === 'firestore'`.** GAS strips `writeSeq`/`clientId` → listener↔GAS qty oscillation (confirmed still broken after v633).
 11. **Fall back live flush to `saveProjectAssets` in firestore mode.** GAS full-document PATCH wiped host `writeSeq` stamps.
+12. **Remove a fixture without `dalPaNoteDelete_`.** Local splice alone leaves the row in `assets/state` → peer never drops it; later snaps **resurrect** on the deleter (“one step behind”). UI **DEL** on unique rows calls `removePa(idx)` — that path must note delete (incident 2026-07-18: [dal-pa-delete-resurrect.md](active/dal-pa-delete-resurrect.md)).
+13. **Re-seed full local list into live state after peers have written.** `dalPaSeedStateFromLocal_` touches every local UID; empty/lagging snaps must not trigger that once `writeSeq > 0` — a stale browser re-inserts deleted rows.
 
 ### Safe rules (locked)
 
@@ -596,7 +598,8 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | Write | **Touch-only fixtures** — `dalPaNoteTouch_` / `dalPaNoteDelete_` then flush those UIDs only. Stamp `writeSeq`+`clientId` on host. Never live-write autos. |
 | Apply | Coalesce ~300ms; re-queue if hold active. Timeline-parity: own clientId echo, stale seq ignore, hold/touch keep local, never resurrect deletes. Local `recalcAutoContainers` after fixture merge (not written live). |
 | Loop break | Never flush from apply. Render-end flush only when touches pending. |
-| Load race | During prep+firestore: ongoing snaps must not apply unstamped GAS lists. **Exception:** if local PA is still empty (join mid-fork / no `assets/state` yet), one-shot hydrate from `getProjectAssets` then `dalPaSeedStateFromLocal_`. Never apply empty state over an unloaded UI. |
+| Load race | During prep+firestore: ongoing snaps must not apply unstamped GAS lists. **Exception:** if local PA is still empty (join mid-fork / no `assets/state` yet), one-shot hydrate from `getProjectAssets` then `dalPaSeedStateFromLocal_` **once**. Never re-seed after remote `writeSeq > 0`. Never apply empty state over an unloaded UI. |
+| Delete | Every UI remove path notes `dalPaNoteDelete_(uid)` before render/flush. Absence on remote state = gone (unless hold). |
 | Unstamped seq | After any stamped write (`lastAppliedSeq[uid] > 0`), ignore remote docs with `writeSeq` missing/0 or `seq < lastApplied`. |
 | GAS save | Never fall back to `saveProjectAssets` on live flush failure while `dalPaLiveSyncMode === 'firestore'` (GAS PATCH replace wiped host `writeSeq`). Manual SAVE via GAS must re-stamp `writeSeq`. |
 | Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed (includes unstamped-GAS case). |
@@ -613,7 +616,7 @@ Hard-refresh **two browsers** on web.app (banner **live sync (patch)**):
 2. A and B change **different** fixtures near-simultaneously — both stick.  
 3. A changes the same fixture twice quickly — settles on A’s last value; no oscillation.
 
-**AI rule:** Before editing prep live flush/apply, re-read this section and § DAL timeline fork live sync. Ship GAS; also `deploy-hosting.js` if host-boot message types change.
+**AI rule:** Before editing prep live flush/apply, re-read this section, § DAL timeline fork live sync, and campaign doctrine [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md) (industry model + prove-with-sim process). Ship GAS; also `deploy-hosting.js` if host-boot message types change.
 
 ---
 

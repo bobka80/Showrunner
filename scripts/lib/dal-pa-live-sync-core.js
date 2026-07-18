@@ -426,6 +426,163 @@ function simulateTwoClients(opts) {
   };
 }
 
+/** True only before remote writeSeq authority exists (production seed gate). */
+function shouldSeedFromLocal(opts) {
+  opts = opts || {};
+  if (opts.stateSeeded) return false;
+  if (Number(opts.lastDocWriteSeq || 0) > 0) return false;
+  if (Number(opts.remoteWriteSeq || 0) > 0) return false;
+  return !!(opts.localCount > 0);
+}
+
+/**
+ * Case E/F: delete without note resurrects; delete with note + later peer edit stays gone.
+ * mode: 'silent' | 'noted'
+ */
+function simulateDeleteResurrect(opts) {
+  opts = opts || {};
+  var mode = opts.mode || 'noted';
+  var u1 = 'fix-1';
+  var u2 = 'fix-2';
+  var state = {
+    fixtures: [
+      { uid: u1, assetId: 'A1', qty: 1 },
+      { uid: u2, assetId: 'A2', qty: 1 }
+    ],
+    writeSeq: 1,
+    clientId: 'seed'
+  };
+  var A = {
+    id: 'clientA',
+    fixtures: JSON.parse(JSON.stringify(state.fixtures)),
+    lastDocSeq: 1,
+    holdUntil: {},
+    touched: {},
+    deleted: {}
+  };
+  var B = {
+    id: 'clientB',
+    fixtures: JSON.parse(JSON.stringify(state.fixtures)),
+    lastDocSeq: 1,
+    holdUntil: {},
+    touched: {},
+    deleted: {}
+  };
+
+  // A removes u1 locally
+  A.fixtures = A.fixtures.filter(function (pa) { return pa.uid !== u1; });
+  if (mode === 'noted') {
+    A.deleted[u1] = 1;
+    A.holdUntil[u1] = Date.now() + 3000;
+    state = txnStatePatch(state, A.fixtures, A.touched, A.deleted, 'clientA');
+    A.deleted = {};
+    A.lastDocSeq = state.writeSeq;
+  } else {
+    // Silent splice — flush with empty maps (production removePa bug)
+    state = txnStatePatch(state, A.fixtures, {}, {}, 'clientA');
+    A.lastDocSeq = state.writeSeq;
+  }
+
+  // B pulls — should lose u1 only if noted
+  var pullB = applyRemotePaState(state, B.fixtures, {
+    clientId: 'clientB',
+    lastDocWriteSeq: B.lastDocSeq,
+    holdUntil: B.holdUntil,
+    touched: B.touched,
+    deleted: B.deleted
+  });
+  B.fixtures = pullB.fixtures;
+  B.lastDocSeq = pullB.docWriteSeq;
+
+  // B edits u2 (unrelated) — must not resurrect u1 when noted
+  var bRow = mapByUid(B.fixtures)[u2];
+  if (bRow) bRow.qty = 2;
+  B.touched[u2] = 1;
+  state = txnStatePatch(state, B.fixtures, B.touched, {}, 'clientB');
+  B.touched = {};
+  B.lastDocSeq = state.writeSeq;
+
+  // A pulls after B's edit (hold expired for silent path)
+  A.holdUntil = {};
+  var pullA = applyRemotePaState(state, A.fixtures, {
+    clientId: 'clientA',
+    lastDocWriteSeq: A.lastDocSeq,
+    holdUntil: A.holdUntil,
+    touched: {},
+    deleted: {}
+  });
+  A.fixtures = pullA.fixtures;
+  A.lastDocSeq = pullA.docWriteSeq;
+
+  var storeHasU1 = !!mapByUid(state.fixtures)[u1];
+  var aHasU1 = !!mapByUid(A.fixtures)[u1];
+  var bHasU1 = !!mapByUid(B.fixtures)[u1];
+
+  if (mode === 'silent') {
+    return {
+      mode: mode,
+      storeHasU1: storeHasU1,
+      aHasU1: aHasU1,
+      bHasU1: bHasU1,
+      // Bug: store still has u1 → A resurrects after B's unrelated edit
+      ok: storeHasU1 && aHasU1
+    };
+  }
+  return {
+    mode: mode,
+    storeHasU1: storeHasU1,
+    aHasU1: aHasU1,
+    bHasU1: bHasU1,
+    ok: !storeHasU1 && !aHasU1 && !bHasU1
+  };
+}
+
+/**
+ * Case G: full-local seed after remote writeSeq must not resurrect deleted UID.
+ */
+function simulateSeedStomp(opts) {
+  opts = opts || {};
+  var allowSeed = opts.allowSeed !== false;
+  var u1 = 'fix-1';
+  var u2 = 'fix-2';
+  var state = {
+    fixtures: [{ uid: u2, assetId: 'A2', qty: 1 }],
+    writeSeq: 3,
+    clientId: 'clientA'
+  };
+  // Stale browser still has deleted u1 locally
+  var local = [
+    { uid: u1, assetId: 'A1', qty: 1 },
+    { uid: u2, assetId: 'A2', qty: 1 }
+  ];
+  var lastDoc = 3;
+  var canSeed = shouldSeedFromLocal({
+    stateSeeded: false,
+    lastDocWriteSeq: lastDoc,
+    remoteWriteSeq: 0,
+    localCount: local.length
+  });
+  if (allowSeed && canSeed) {
+    var touched = {};
+    local.forEach(function (pa) { touched[pa.uid] = 1; });
+    state = txnStatePatch(state, local, touched, {}, 'clientB');
+  } else if (allowSeed && !canSeed) {
+    // gated — no op
+  } else if (!allowSeed) {
+    // buggy path: ignore gate and seed anyway
+    var touchedBad = {};
+    local.forEach(function (pa) { touchedBad[pa.uid] = 1; });
+    state = txnStatePatch(state, local, touchedBad, {}, 'clientB');
+  }
+  var storeHasU1 = !!mapByUid(state.fixtures)[u1];
+  return {
+    canSeed: canSeed,
+    storeHasU1: storeHasU1,
+    writeSeq: state.writeSeq,
+    ok: !canSeed && !storeHasU1
+  };
+}
+
 module.exports = {
   isAutoRow: isAutoRow,
   fixturesOnly: fixturesOnly,
@@ -436,5 +593,8 @@ module.exports = {
   computeTouchPatch: computeTouchPatch,
   txnStatePatch: txnStatePatch,
   simulateTwoClients: simulateTwoClients,
-  simulateConcurrentWriteRace: simulateConcurrentWriteRace
+  simulateConcurrentWriteRace: simulateConcurrentWriteRace,
+  shouldSeedFromLocal: shouldSeedFromLocal,
+  simulateDeleteResurrect: simulateDeleteResurrect,
+  simulateSeedStomp: simulateSeedStomp
 };

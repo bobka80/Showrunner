@@ -1,7 +1,7 @@
 # Prep PA live sync thrash — investigation log (2026-07-17)
 
-**Status:** Structural fix shipped — transactional **state doc** (timeline twin).  
-**Test:** `node scripts/dal-pa-live-sync-test.js` (Case C = race fails nontxn; Case D = txn settles)
+**Status:** Structural qty thrash fix shipped (txn state doc). **Follow-on failure:** delete not syncing / resurrection — see [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) (awaiting OK go).  
+**Test:** `node scripts/dal-pa-live-sync-test.js` (Case C = race fails nontxn; Case D = txn settles; delete/resurrect case TBD)
 
 ## Root cause (why v628–v634 failed)
 

@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** Live PA/timeline forks; prep PA live = transactional `assets/state` (timeline twin) — [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md). **Production:** GAS **v638** + hosting (`host-boot.js?v=635`). **Rollback baseline:** GAS **v576**.
+**Opened:** 2026-07-05 · **Status:** Live PA/timeline forks; prep delete/seed fix shipped — [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) (await director smoke). **Prep live doctrine:** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md). Prior thrash: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md). **Rollback baseline:** GAS **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -15,6 +15,8 @@
 **Phase safety playbook (for fresh chats):** [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md) — phase-by-phase preflight/postflight sweeps + security guardrails.
 
 **Slice D (dual-domain sessions):** [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md) — prep + timeline concurrent; **gate before Phase 5**.
+
+**Prep PA live sync (industry standards + investigation process):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — Figma/Linear-class entity patch (not CRDT); hardening backlog H1–H6; **mandatory** prove-with-sim + mutation inventory before another prep live ship. Never-dos stay in [FRAGILE_ZONES.md](../FRAGILE_ZONES.md).
 
 This is the **live campaign file** for the single database layer.
 
@@ -61,6 +63,7 @@ Before warehouse prep Firebase, expanded ledger, or timeline collab fork:
 | [session-fork-platform.md](../topics/session-fork-platform.md) | Normal → Firebase session → GAS commit lifecycle |
 | [data-cache-engine.md](../topics/data-cache-engine.md) | Cache coordinator sits **on top of** repos — **Phase 6** per [design lock](dal-firebase-design-lock-2026-07-13.md) |
 | [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) | **Canonical design lock** — execution order, reconciliation, Logistics Hub atomic ops |
+| [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) | **Prep multi-user live** — industry model lock, harden backlog H1–H6, stop thrash-by-guard process |
 
 ---
 
