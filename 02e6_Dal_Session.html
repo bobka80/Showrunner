@@ -61,12 +61,24 @@ window.startDalPrepSessionPoll_ = function(projectId) {
         if (window.dalPaSessionWatchProjectId && window.dalPaSessionWatchProjectId !== String(projectId)) return;
 
         if (window.dalIsPrepOpenFromInfo_(info)) {
+          var stOpen = window.dalPrepStatusFromInfo_(info);
+          // Peer END PREP: Sheets goes to "committing" while _meta is already gone.
+          // Do not treat committing as "still open" for an already-latched UI — that
+          // blocked the Sheets fallback close for the whole commit (minutes).
+          if ((stOpen === 'committing') && (window.dalPrepUiOpen || window.dalPrepLatched)) {
+            if (Date.now() < (window.dalPrepIgnoreCloseUntil || 0)) return;
+            window.dalPrepClosedPollStreak = (window.dalPrepClosedPollStreak || 0) + 1;
+            if (window.dalPrepClosedPollStreak < 2) return;
+            window.dalPrepClosedPollStreak = 0;
+            window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
+            window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
+            return;
+          }
           window.dalPrepClosedPollStreak = 0;
           // After Firestore _meta confirmed END PREP, Sheets can lag as open/committing —
           // do not resurrect the banner (that caused remote stutter / stuck-in-prep).
           if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
           if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
-            var stOpen = window.dalPrepStatusFromInfo_(info);
             // Mid-transition must not latch a closed UI; only a stable 'open' may remote-START.
             if (stOpen === 'committing' || stOpen === 'opening') return;
             window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
@@ -132,7 +144,7 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     if (changed) {
       // After a fresh open (local or remote), do not let lagging Sheets OR empty _meta
       // snaps clear the banner (START PREP used to flip START↔END rapidly).
-      window.dalPrepIgnoreCloseUntil = Date.now() + 30000;
+      window.dalPrepIgnoreCloseUntil = Date.now() + 8000;
       window.dalPrepClosedPollStreak = 0;
       window.dalMetaCloseStreak_ = 0;
       window.dalPrepIgnoreOpenUntil = 0;

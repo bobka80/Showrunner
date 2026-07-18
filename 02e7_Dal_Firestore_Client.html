@@ -1090,7 +1090,6 @@ window.startDalPaSessionWatcher = function(projectId) {
       if (exists !== false) return;
 
       // Idle PA (never started prep): empty _meta is normal — do NOT treat as END PREP.
-      // That used to set IgnoreOpenUntil and fight a later START (banner/button flip storm).
       if (!window.dalPrepUiOpen && !window.dalPrepLatched && !window.dalMetaSeenOpen_) {
         return;
       }
@@ -1098,9 +1097,9 @@ window.startDalPaSessionWatcher = function(projectId) {
       if (!window.dalPrepClosing && Date.now() < (window.dalPrepIgnoreCloseUntil || 0)) {
         return;
       }
-      // Require two consecutive server-missing snaps before closing (listener blips).
-      window.dalMetaCloseStreak_ = (window.dalMetaCloseStreak_ || 0) + 1;
-      if (window.dalMetaCloseStreak_ < 2 && !window.dalPrepClosing) return;
+      // One server-missing snap is enough. Delete only fires once — requiring two
+      // consecutive missing snaps left remote END PREP stuck until Sheets finished
+      // committing (and poll treated "committing" as still open).
       window.dalMetaCloseStreak_ = 0;
       window.dalMetaSeenOpen_ = false;
       window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
