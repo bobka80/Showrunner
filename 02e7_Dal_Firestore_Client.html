@@ -1066,12 +1066,16 @@ window.startDalPaSessionWatcher = function(projectId) {
 
     var applyMetaSnap_ = function(exists, fromCache, data) {
       if (window.dalPrepClosing) return;
-      if (!exists && fromCache) return;
+      // Never open OR close from cache-only snaps — stale cache after DELETE reopened
+      // prep (cleared IgnoreOpenUntil) → banner flicker + live-sync item wander.
+      if (fromCache) return;
 
       var isPrepOpen = !!(data && String(data.sessionType || '') === 'prep');
       window.dalMetaAuthority = true;
 
       if (isPrepOpen) {
+        // Honor remote-END grace — do not clear IgnoreOpenUntil or re-latch.
+        if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
         window.dalMetaSeenOpen_ = true;
         window.dalMetaCloseStreak_ = 0;
         window.dalPrepIgnoreOpenUntil = 0;
@@ -1097,9 +1101,7 @@ window.startDalPaSessionWatcher = function(projectId) {
       if (!window.dalPrepClosing && Date.now() < (window.dalPrepIgnoreCloseUntil || 0)) {
         return;
       }
-      // One server-missing snap is enough. Delete only fires once — requiring two
-      // consecutive missing snaps left remote END PREP stuck until Sheets finished
-      // committing (and poll treated "committing" as still open).
+      // One server-missing snap is enough. Delete only fires once.
       window.dalMetaCloseStreak_ = 0;
       window.dalMetaSeenOpen_ = false;
       window.dalPrepIgnoreOpenUntil = Date.now() + 30000;

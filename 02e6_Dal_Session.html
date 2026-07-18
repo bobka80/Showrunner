@@ -112,6 +112,12 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   var canShow = window.dalCanShowPrepButtons();
   isPrepOpen = !!isPrepOpen;
 
+  // After remote END, block reopen from lagging Sheets / stale _meta cache (banner flicker).
+  // Local START PREP passes localOpen: true.
+  if (isPrepOpen && !opts.localOpen && Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) {
+    return;
+  }
+
   // Latch: once prep is known-open, ignore spurious "closed" (Sheets lag / cache / auth blips)
   // unless this call explicitly allows close (END PREP or server-confirmed close).
   if (!isPrepOpen && window.dalPrepLatched && !opts.allowClose) {
@@ -238,7 +244,8 @@ window.openDalPrepSession = function() {
       window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
       window.dalMetaSeenOpen_ = true;
       window.dalMetaCloseStreak_ = 0;
-      window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
+      window.dalPrepIgnoreOpenUntil = 0;
+      window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
       alert('Preparation started.');
     })
