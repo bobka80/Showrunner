@@ -9,6 +9,8 @@ window.dalPrepSessionPollTimer = null;
 window.dalPrepIgnoreCloseUntil = 0;
 window.dalPrepIgnoreOpenUntil = 0;
 window.dalPrepClosedPollStreak = 0;
+window.dalMetaSeenOpen_ = false;
+window.dalMetaCloseStreak_ = 0;
 
 window.dalPrepStatusFromInfo_ = function(info) {
   if (!info) return '';
@@ -128,9 +130,11 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
 
   if (isPrepOpen && projectId) {
     if (changed) {
-      // After a fresh open (local or remote), do not let a lagging Sheets poll clear the banner.
-      window.dalPrepIgnoreCloseUntil = Date.now() + 8000;
+      // After a fresh open (local or remote), do not let lagging Sheets OR empty _meta
+      // snaps clear the banner (START PREP used to flip START↔END rapidly).
+      window.dalPrepIgnoreCloseUntil = Date.now() + 30000;
       window.dalPrepClosedPollStreak = 0;
+      window.dalMetaCloseStreak_ = 0;
       window.dalPrepIgnoreOpenUntil = 0;
     }
     if (opts.invalidateCache || changed) {
@@ -143,6 +147,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     // Keep poll running while PA is open so remote START PREP can still latch this browser.
     if (typeof stopDalPaLiveSync_ === 'function') stopDalPaLiveSync_();
     window.dalPaBannerLastText_ = '';
+    window.dalMetaSeenOpen_ = false;
+    window.dalMetaCloseStreak_ = 0;
     if (banner && !isPrepOpen) {
       banner.style.display = 'none';
       banner.textContent = '';
@@ -218,6 +224,8 @@ window.openDalPrepSession = function() {
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
       window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
+      window.dalMetaSeenOpen_ = true;
+      window.dalMetaCloseStreak_ = 0;
       window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
       alert('Preparation started.');

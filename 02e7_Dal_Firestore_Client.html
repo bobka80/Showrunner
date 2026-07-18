@@ -1069,6 +1069,8 @@ window.startDalPaSessionWatcher = function(projectId) {
       window.dalMetaAuthority = true;
 
       if (isPrepOpen) {
+        window.dalMetaSeenOpen_ = true;
+        window.dalMetaCloseStreak_ = 0;
         window.dalPrepIgnoreOpenUntil = 0;
         window.dalSessionState = {
           status: 'open',
@@ -1079,15 +1081,30 @@ window.startDalPaSessionWatcher = function(projectId) {
         if (!window.dalPrepUiOpen && typeof dalApplyDalPrepUiState_ === 'function') {
           dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
         }
-      } else if (exists === false && !fromCache) {
-        // Server-confirmed close — clear latch on remote browsers.
-        // Block Sheets poll from re-latching while commit still shows open/committing.
-        window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
-        window.dalPrepIgnoreCloseUntil = 0;
-        window.dalPrepClosedPollStreak = 0;
-        if (typeof dalApplyDalPrepUiState_ === 'function') {
-          dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
-        }
+        return;
+      }
+
+      if (exists !== false) return;
+
+      // Idle PA (never started prep): empty _meta is normal — do NOT treat as END PREP.
+      // That used to set IgnoreOpenUntil and fight a later START (banner/button flip storm).
+      if (!window.dalPrepUiOpen && !window.dalPrepLatched && !window.dalMetaSeenOpen_) {
+        return;
+      }
+      // START grace: ignore premature empty _meta while snapshot/meta write catches up.
+      if (!window.dalPrepClosing && Date.now() < (window.dalPrepIgnoreCloseUntil || 0)) {
+        return;
+      }
+      // Require two consecutive server-missing snaps before closing (listener blips).
+      window.dalMetaCloseStreak_ = (window.dalMetaCloseStreak_ || 0) + 1;
+      if (window.dalMetaCloseStreak_ < 2 && !window.dalPrepClosing) return;
+      window.dalMetaCloseStreak_ = 0;
+      window.dalMetaSeenOpen_ = false;
+      window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
+      window.dalPrepIgnoreCloseUntil = 0;
+      window.dalPrepClosedPollStreak = 0;
+      if (typeof dalApplyDalPrepUiState_ === 'function') {
+        dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       }
     };
 
