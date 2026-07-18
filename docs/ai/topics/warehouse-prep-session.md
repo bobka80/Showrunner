@@ -8,7 +8,7 @@
 
 **Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. **Blocked items** remain on [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Live sync (2026-07-17+):** Prep PA uses timeline twin — `assets/state` + host `PA_PATCH_WRITE` (banner **`live sync (patch)`**). Doctrine: [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md). Never-dos: [FRAGILE_ZONES § DAL prep PA fork live sync](../FRAGILE_ZONES.md).
+**Live sync (stable GAS v645):** Timeline-twin `assets/state` + host `PA_PATCH_WRITE` (banner **`live sync (patch)`**). Session banner lifecycle locked in [FRAGILE § prep session UI](../FRAGILE_ZONES.md). Doctrine: [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md).
 
 **Last swept:** 2026-07-17
 

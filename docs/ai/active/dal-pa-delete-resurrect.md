@@ -1,6 +1,6 @@
 # Prep PA live sync — delete / resurrect failure (2026-07-18)
 
-**Status:** Fix shipped — note deletes on remove paths + seed-once after remote `writeSeq` · Cases E–G in `dal-pa-live-sync-test.js`  
+**Status:** **Stable** — director-confirmed with session UI at GAS **v645**. Delete notes + seed-once + Cases E–G. Canonical how-it-works: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § session UI + § prep PA.  
 **Campaign:** [data-access-layer.md](data-access-layer.md)  
 **Prior science:** [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md) · [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ timeline / prep PA / session UI  
 **Industry + process (canonical):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — Figma/Linear-class entity patch; harden H1–H6; prove-with-sim before ship.

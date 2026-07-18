@@ -449,50 +449,93 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 ## DAL prep / timeline session UI (dual-domain) (Critical)
 
-**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Slice D:** [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) · **Design lock:** [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md)
+**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Slice D:** [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) · **Design lock:** [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) · **Prep live doctrine:** [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md)
 
-**Plain language:** Prep and timeline collab can both be open on one project (independent forks). The **banners and START/END buttons** are UI state synced across browsers. Getting that sync wrong looks like “collab died” or “prep never started on the other PC” even when the server fork is fine.
+**Stable baseline (director-confirmed 2026-07-18):** GAS **v645** (+ hosting `host-boot.js?v=635` for PA patch). Banner START/END and fixture live sync held through multi-user smoke. Do not “simplify” the session-UI rules below without a new failing test + director OK.
+
+**Plain language:** Prep and timeline collab can both be open on one project (independent forks). The **banner** means “live sync is on.” Turning the banner off **stops** fixture live sync (`stopDalPaLiveSync_`). Session open/close must be rock-solid so the equipment list does not silently diverge.
 
 **Primary files:**
 
 | File | Role |
 |------|------|
 | `Dal_Sessions.js` | Dual-domain registry on `Projects_Index`; `getDalSessionInfo`; begin/finish/close |
-| `02e6_Dal_Session.html` | Prep START/END UI, latch, Sheets poll |
-| `02e7_Dal_Firestore_Client.html` | Prep Firestore `_meta` + live PA sync |
+| `02e6_Dal_Session.html` | Prep START/END UI, latch, Sheets poll, ended-sessionUid gate |
+| `02e7_Dal_Firestore_Client.html` | Prep Firestore `_meta` + live PA `assets/state` sync |
 | `03a1_Timeline_Dal_Session.html` / `03a2_Timeline_Dal_Live.html` | Timeline collab START/END + session watcher |
+
+### How prep session UI works now (locked definition)
+
+```
+START PREP (local)
+  → Sheets domain status = open + new sessionUid
+  → Firestore assets/_meta written (sessionType prep, sessionUid)
+  → Snapshot fixtures → assets/* collection + assets/state
+  → Banner on · live sync (patch) · dalPrepEndedSessionUid_ cleared
+
+Peer joins
+  → Sees server _meta (fromMeta, new sessionUid) OR (first join) Sheets open if not blocked
+  → Banner on · listens to assets/state
+
+While banner ON
+  → Fixture edits: dalPaNoteTouch_/Delete_ → PA_PATCH_WRITE transaction on assets/state
+  → Peer applies by writeSeq (banner must stay on or sync stops)
+
+END PREP (local or peer)
+  → Sheets → committing → commit → clear domain
+  → _meta deleted early in commit
+  → Peer: meta missing → dalPrepMetaEndPending_ (do NOT drop banner yet)
+  → Confirm END when Sheets committing/closed OR meta missing ≥ ~8s
+  → dalPrepMarkSessionEnded_: remember dalPrepEndedSessionUid_, SheetsOpenBlocked, banner OFF, stop live sync
+
+After END — reopen rules
+  → Same sessionUid on stale _meta → IGNORE (no banner)  ← kills ~1 min on/off loop
+  → Sheets still saying "open" → IGNORE (blocked)
+  → New START only: localOpen OR _meta with a *new* sessionUid
+```
+
+**Authorities:**
+
+| Signal | Role |
+|--------|------|
+| Firestore `assets/_meta` | Fast live open/close hint; never trust `fromCache` |
+| Sheets `prepStatus` | Confirm END; never close banner on Sheets-alone “closed” while meta still confirmed |
+| `assets/state` | Fixture list live truth while banner on |
+| `dalPrepEndedSessionUid_` | Sticky “this prep is over” — blocks resurrect of that session |
 
 ### Never do
 
-1. **Trust legacy flat `sessionType` / `status` when both domains may be open.** Those fields preferred prep and made timeline collab look closed (banner gone, START COLLAB stuck) while the timeline fork was still live (**v604**). Always read **`prepStatus` / `timelineStatus`** (or nested `prep` / `timeline`). When both domains are active, flat legacy fields are intentionally empty.
-2. **Never kill prep banner / live sync on a single flaky signal.** Closing prep UI calls `stopDalPaLiveSync_`. **Close only when:** local END, or `_meta` missing **and** Sheets `committing`/`closed` (or `_meta` missing ≥~8s). **After END:** remember `dalPrepEndedSessionUid_` — refuse reopen for that same uid (stale `_meta` was causing ~1 min on/off). Clear only on local START or `_meta` with a **new** sessionUid. Never Sheets-alone close while meta confirmed. Never apply `_meta` fromCache.
-3. **Poll only for END, not START.** While Project Assets is open, the prep poll must detect **remote START and remote END**. Stopping the poll when not latched breaks “other PC started prep.”
-4. **Put `*/` inside a `Dal_Sessions.js` block comment** (e.g. `prep*/timeline*`). It terminates the comment early → GAS syntax error → white screen / failed push (same class as **v577** `persist*/fetch*` in `Dal_Repos.js`).
-5. **Hold ScriptLock across Firestore UrlFetch** on open/close — starves presence and times out START COLLAB (fixed earlier in Phase 4 hotfixes).
+1. **Trust legacy flat `sessionType` / `status` when both domains may be open.** Always read **`prepStatus` / `timelineStatus`**. When both domains are active, flat legacy fields are intentionally empty (**v604**).
+2. **Kill banner / live sync on a single flaky signal.** One Sheets “closed” or one `_meta` blip must not end prep. Close only per the definition above. After END, never reopen the **same** `sessionUid`.
+3. **Poll only for END, not START.** While Project Assets is open, poll covers remote START and END (START still gated by ended-uid / SheetsOpenBlocked after an END).
+4. **Put `*/` inside a `Dal_Sessions.js` block comment** — GAS syntax death (**v577** class).
+5. **Hold ScriptLock across Firestore UrlFetch** on open/close.
+6. **Edit fixtures while treating banner-off as “still in collab.”** Banner off = live sync off. Local edits will not reach peers.
 
 ### Safe rules (locked)
 
 | Concern | Rule |
 |---------|------|
 | Dual-domain reads | Client: `prepStatus` / `timelineStatus`. Server close: always pass `'prep'` or `'timelineCollab'`. |
-| Prep remote sync | Close when `_meta`+Sheets agree (or meta-end timeout). After END: block same `sessionUid` forever until new START. |
-| Timeline remote sync | Session watcher polls `getDalSessionInfo` → `dalTimelineInfoFromSession_` (domain fields only). |
-| Sheet vs UI | Banner sync is **not** Sheet truth. Fork may be correct while UI is wrong — fix clients, do not “re-open” blindly. |
+| Prep open | Local START (`localOpen`) or server `_meta` (`fromMeta`) with allowed sessionUid. |
+| Prep close | Local END, or meta-end pending + Sheets committing/closed, or meta missing ≥~8s → `dalPrepMarkSessionEnded_`. |
+| After END | Block same `sessionUid`; block Sheets-only reopen; clear only on new START. |
+| Fixture live | See § DAL prep PA fork live sync — only while banner on + `live sync (patch)`. |
+| Timeline remote sync | Session watcher polls `getDalSessionInfo` → domain fields only. |
 
-### Smoke (after any session-UI / `Dal_Sessions` change)
+### Smoke (after any session-UI / prep-live change)
 
-Hard-refresh **two browsers**:
+Hard-refresh **two browsers** on web.app (banner must say **live sync (patch)**):
 
-1. Timeline collab both sides → START COLLAB → banners stick.  
-2. Leave timeline on A (no END COLLAB) → START PREP on A → B’s **collab banner must stay**.  
-3. Both in Project Assets → START PREP on A → B shows prep within a few seconds.  
-4. END PREP on A → B clears within a few seconds.  
-5. Optional: both domains open → END COLLAB / END PREP independently — other domain stays live.
+1. START PREP on A → B banner on within a few seconds; stays on.  
+2. Add/remove/qty on A → B matches; no flip-back.  
+3. END PREP on A → B banner off **once** and stays off for 2+ minutes.  
+4. START PREP again on A → B gets a **new** banner.  
+5. Optional: timeline collab both sides stays independent of prep.
 
-**AI rule:** Before editing these files, state the dual-domain + latch risk in plain language. Prefer small ships with the smoke above over “one more poll tweak” without both START and END covered.
+**AI rule:** Before editing these files, re-read this section + § prep PA fork live sync. Prefer one root-cause ship with the smoke above. Stable known-good: **GAS v645**.
 
 ---
-
 ## DAL timeline fork live sync (collab strips)
 
 **Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · Design lock: Sheets = long-term DB; Firebase = **session buffer** while collab/prep is open.
@@ -610,13 +653,15 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 
 ### Smoke (prep PA live)
 
-Hard-refresh **two browsers** on web.app (banner **live sync (patch)**):
+Hard-refresh **two browsers** on web.app (banner **live sync (patch)**). **Stable known-good with session UI:** GAS **v645**.
 
 1. A changes one fixture location/qty; B idle — B updates once; **no** flip-back on A or B.  
 2. A and B change **different** fixtures near-simultaneously — both stick.  
-3. A changes the same fixture twice quickly — settles on A’s last value; no oscillation.
+3. A changes the same fixture twice quickly — settles on A’s last value; no oscillation.  
+4. DEL / remove on A → gone on B; B’s later edit does not resurrect.  
+5. END PREP on A → B banner off once and stays off; START again → B rejoins.
 
-**AI rule:** Before editing prep live flush/apply, re-read this section, § DAL timeline fork live sync, and campaign doctrine [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md) (industry model + prove-with-sim process). Ship GAS; also `deploy-hosting.js` if host-boot message types change.
+**AI rule:** Before editing prep live flush/apply, re-read this section, § DAL prep / timeline session UI, § DAL timeline fork live sync, and [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md). Ship GAS; also `deploy-hosting.js` if host-boot message types change.
 
 ---
 
@@ -662,6 +707,17 @@ LESSON (never do X again):
 ```
 
 ### Entries
+
+#### 2026-07-18 — Prep multi-user live + session banner stable (v639–v645)
+
+```
+DATE: 2026-07-18
+SYMPTOM: Prep live qty thrash; deletes not syncing / resurrect; END PREP not on peer; banner flicker; START auto-ends; ~30s–1min banner on/off after END; mid-prep false END stopped sync (8 fixtures missing; 9 vs 1).
+CAUSE: Incomplete touch/delete notes + seed-from-local; meta dual-missing-snap / fromCache reopen; optimistic MetaSeenOpen; Sheets reopen after IgnoreOpenUntil; single-signal false END killed live sync; stale same sessionUid _meta reopen.
+FRAGILE ZONE: DAL prep / timeline session UI; DAL prep PA fork live sync
+FILES TOUCHED: 02e2_Logic_CRUD.html, 02e6_Dal_Session.html, 02e7_Dal_Firestore_Client.html, host-boot PA_PATCH (earlier), scripts/dal-pa-live-sync-*.js, FRAGILE, dal-prep-live-sync-standards.md
+LESSON: Banner off = sync off. Close only meta+Sheets agree (or meta-end timeout). After END block same sessionUid. Fixture writes = touch/delete maps + txn state doc only. Stable baseline GAS v645. See FRAGILE § session UI "How prep session UI works now".
+```
 
 #### 2026-07-16 — Dual-domain session UI + prep latch sync (fixed v604–v606)
 

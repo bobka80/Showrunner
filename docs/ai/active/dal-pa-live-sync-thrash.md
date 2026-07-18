@@ -1,7 +1,7 @@
 # Prep PA live sync thrash — investigation log (2026-07-17)
 
-**Status:** Structural qty thrash fix shipped (txn state doc). **Follow-on failure:** delete not syncing / resurrection — see [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) (awaiting OK go).  
-**Test:** `node scripts/dal-pa-live-sync-test.js` (Case C = race fails nontxn; Case D = txn settles; delete/resurrect case TBD)
+**Status:** **Stable** at GAS **v645** (with session UI). Structural qty thrash fix = txn state doc. Delete/resurrect + banner lifecycle: [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) · [FRAGILE § session UI](../FRAGILE_ZONES.md).  
+**Test:** `node scripts/dal-pa-live-sync-test.js` (Cases A–G)
 
 ## Root cause (why v628–v634 failed)
 

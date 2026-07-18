@@ -7,7 +7,9 @@
 
 **Purpose:** Durable campaign doctrine for **warehouse prep multi-user live sync**. Not an incident log. Fresh agents read this **before** another prep live sync code change.
 
-**Locked:** 2026-07-18 (director: document industry harden + stop thrash-by-patch)
+**Locked:** 2026-07-18 (industry harden + process) · **Stable baseline (director-confirmed):** GAS **v645** — session banner + fixture live sync held in multi-user smoke. Hosting `host-boot.js?v=635`.
+
+**Canonical “how it works” (session + fixtures):** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep / timeline session UI · § DAL prep PA fork live sync.
 
 ---
 
@@ -137,6 +139,10 @@ If a path mutates without note → **bug**, not “edge case.”
 
 ---
 
-## 6. Current incident pointer
+## 6. Stable baseline (director-confirmed)
 
-**Open incident (fix shipped — await director smoke):** [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) — note deletes + seed-once + Cases E–G. Next polish: H1/H5 from §2, not another architecture swing.
+**GAS v645** (2026-07-18) — prep session banner + fixture live sync stable in director multi-user smoke.
+
+Incidents closed into FRAGILE definition: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md).  
+
+Next polish (not required for “works”): harden backlog H1–H6 in §2 — prove with sim before code.
