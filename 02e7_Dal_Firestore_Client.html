@@ -1077,6 +1077,7 @@ window.startDalPaSessionWatcher = function(projectId) {
         // Honor remote-END grace — do not clear IgnoreOpenUntil or re-latch.
         if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
         window.dalMetaSeenOpen_ = true;
+        window.dalMetaConfirmedOpen_ = true;
         window.dalMetaCloseStreak_ = 0;
         window.dalPrepIgnoreOpenUntil = 0;
         window.dalSessionState = {
@@ -1093,10 +1094,9 @@ window.startDalPaSessionWatcher = function(projectId) {
 
       if (exists !== false) return;
 
-      // Idle PA (never started prep): empty _meta is normal — do NOT treat as END PREP.
-      if (!window.dalPrepUiOpen && !window.dalPrepLatched && !window.dalMetaSeenOpen_) {
-        return;
-      }
+      // Idle PA / local START before _meta write: empty is normal — do not END.
+      // Only close after we have seen a real server _meta open (then delete = peer/local END).
+      if (!window.dalMetaConfirmedOpen_) return;
       // START grace: ignore premature empty _meta while snapshot/meta write catches up.
       if (!window.dalPrepClosing && Date.now() < (window.dalPrepIgnoreCloseUntil || 0)) {
         return;
@@ -1104,6 +1104,7 @@ window.startDalPaSessionWatcher = function(projectId) {
       // One server-missing snap is enough. Delete only fires once.
       window.dalMetaCloseStreak_ = 0;
       window.dalMetaSeenOpen_ = false;
+      window.dalMetaConfirmedOpen_ = false;
       window.dalPrepIgnoreOpenUntil = Date.now() + 30000;
       window.dalPrepIgnoreCloseUntil = 0;
       window.dalPrepClosedPollStreak = 0;

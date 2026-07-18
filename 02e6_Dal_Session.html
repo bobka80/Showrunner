@@ -11,6 +11,7 @@ window.dalPrepIgnoreOpenUntil = 0;
 window.dalPrepClosedPollStreak = 0;
 window.dalMetaSeenOpen_ = false;
 window.dalMetaCloseStreak_ = 0;
+window.dalMetaConfirmedOpen_ = false; // true only after server _meta with sessionType prep
 
 window.dalPrepStatusFromInfo_ = function(info) {
   if (!info) return '';
@@ -149,8 +150,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   if (isPrepOpen && projectId) {
     if (changed) {
       // After a fresh open (local or remote), do not let lagging Sheets OR empty _meta
-      // snaps clear the banner (START PREP used to flip START↔END rapidly).
-      window.dalPrepIgnoreCloseUntil = Date.now() + 8000;
+      // snaps clear the banner while snapshot/_meta write catches up.
+      window.dalPrepIgnoreCloseUntil = Date.now() + 30000;
       window.dalPrepClosedPollStreak = 0;
       window.dalMetaCloseStreak_ = 0;
       window.dalPrepIgnoreOpenUntil = 0;
@@ -166,6 +167,7 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     if (typeof stopDalPaLiveSync_ === 'function') stopDalPaLiveSync_();
     window.dalPaBannerLastText_ = '';
     window.dalMetaSeenOpen_ = false;
+    window.dalMetaConfirmedOpen_ = false;
     window.dalMetaCloseStreak_ = 0;
     if (banner && !isPrepOpen) {
       banner.style.display = 'none';
@@ -242,7 +244,10 @@ window.openDalPrepSession = function() {
       try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
       if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
       window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
-      window.dalMetaSeenOpen_ = true;
+      // Do NOT set MetaSeenOpen/Confirmed here — _meta write is still in flight.
+      // Optimistic "seen" made empty _meta snaps END prep a few seconds later.
+      window.dalMetaConfirmedOpen_ = false;
+      window.dalMetaSeenOpen_ = false;
       window.dalMetaCloseStreak_ = 0;
       window.dalPrepIgnoreOpenUntil = 0;
       window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
