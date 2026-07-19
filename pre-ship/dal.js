@@ -13,6 +13,8 @@ const DAL_HOT_PATTERNS = [
   /^Resources_Core\.js$/i,
   /^02[a-z0-9_]*_Project/i,
   /^02e\d*_Logic/i,
+  /^02e\d*_Dal/i,
+  /^03a\d*_Timeline_Dal/i,
   /^02c_Project_Operations/i,
   /^03a_Timeline/i,
   /^docs\/ai\/active\/dal-/i,
