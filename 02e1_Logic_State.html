@@ -263,6 +263,7 @@ function executeTogglePaMode(targetMode) {
     window.selectedPaIndices.clear();
     if (window.selectedPaGroups) window.selectedPaGroups.clear();
     window.paPasteSublistTarget = null;
+    let toggleBtn = document.getElementById('mode-toggle-btn');
     let btnSub = document.getElementById('pa-new-sublist-btn');
     let btnAdd = document.getElementById('pa-add-container-btn');
     let clipActions = document.getElementById('pa-clipboard-actions');
