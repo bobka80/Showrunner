@@ -30,6 +30,7 @@ Also on the board (do not mix into the fork campaign without director pick):
 
 | Item | Status | File |
 |------|--------|------|
+| **Error reports + daily journal triage** | Campaign opened — after Part A for capture/UI; use in Part B | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog — OK go per domain | [active/pre-ship-pipeline-expansion-2026-07-18.md](active/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
 | **Phone app** | In-flight mobile (parallel) | [topics/mobile-crew.md](topics/mobile-crew.md) |
@@ -42,6 +43,7 @@ Also on the board (do not mix into the fork campaign without director pick):
 | Campaign | Status | File |
 |----------|--------|------|
 | **Multi-user fork: test pipeline → bulletproof → auto fork** | **Active** — **A5/H3 done**; next **A6/H2** | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **Error reports + daily journal triage** | Opened — Phase 0; capture after Part A | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | Near-complete — prep live rollback **v654** · DAL-era **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
 

@@ -27,6 +27,18 @@ window.dalPaLastDocWriteSeq_ = window.dalPaLastDocWriteSeq_ || 0;
 /** H3 — uid → { sig, until } for non-combining field LWW loss toasts */
 window.dalPaLwwWatch_ = window.dalPaLwwWatch_ || {};
 window.dalPaLwwToastAt_ = 0;
+/** Recent local edits — peer delete toast even if LWW watch TTL already expired */
+window.dalPaRecentEditUntil_ = window.dalPaRecentEditUntil_ || {};
+
+window.dalPaMarkRecentEdit_ = function(uids, ttlMs) {
+  ttlMs = ttlMs || 45000;
+  var until = Date.now() + ttlMs;
+  if (!window.dalPaRecentEditUntil_) window.dalPaRecentEditUntil_ = {};
+  (uids || []).forEach(function(uid) {
+    if (!uid || uid === '_meta') return;
+    window.dalPaRecentEditUntil_[String(uid)] = until;
+  });
+};
 
 window.dalPaNonCombiningSig_ = function(pa) {
   pa = pa || {};
@@ -43,7 +55,7 @@ window.dalPaNonCombiningSig_ = function(pa) {
 };
 
 window.dalPaArmLwwWatch_ = function(uids, ttlMs) {
-  ttlMs = ttlMs || 12000;
+  ttlMs = ttlMs || 45000;
   var until = Date.now() + ttlMs;
   var byUid = {};
   (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).forEach(function(pa) {
@@ -56,6 +68,7 @@ window.dalPaArmLwwWatch_ = function(uids, ttlMs) {
     if (!pa || window.dalPaIsAutoRow_(pa)) return;
     window.dalPaLwwWatch_[uid] = { sig: window.dalPaNonCombiningSig_(pa), until: until };
   });
+  window.dalPaMarkRecentEdit_(uids, ttlMs);
 };
 
 window.dalPaNotifyConflict_ = function(overwritten, deleted) {
@@ -63,7 +76,10 @@ window.dalPaNotifyConflict_ = function(overwritten, deleted) {
   deleted = deleted || [];
   var all = overwritten.concat(deleted);
   if (!all.length) return;
-  all.forEach(function(uid) { delete window.dalPaLwwWatch_[uid]; });
+  all.forEach(function(uid) {
+    delete window.dalPaLwwWatch_[uid];
+    if (window.dalPaRecentEditUntil_) delete window.dalPaRecentEditUntil_[uid];
+  });
   if (Date.now() < (window.dalPaLwwToastAt_ || 0)) return;
   window.dalPaLwwToastAt_ = Date.now() + 3500;
   var msg;
@@ -87,35 +103,58 @@ window.dalPaNotifyConflict_ = function(overwritten, deleted) {
 
 window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
   var watch = window.dalPaLwwWatch_ || {};
-  if (!Object.keys(watch).length) return;
+  var recent = window.dalPaRecentEditUntil_ || {};
+  var now = Date.now();
   var remoteBy = {};
   (remoteFixtures || []).forEach(function(pa) {
     if (pa && pa.uid) remoteBy[String(pa.uid)] = pa;
   });
-  var now = Date.now();
-  var protectedMap = {};
-  Object.keys(window.dalPaTouchedUids_ || {}).forEach(function(u) { protectedMap[u] = 1; });
-  Object.keys(window.dalPaDeletedUids_ || {}).forEach(function(u) { protectedMap[u] = 1; });
-  Object.keys(window.dalPaHoldUntil_ || {}).forEach(function(u) {
-    if ((window.dalPaHoldUntil_[u] || 0) > now) protectedMap[u] = 1;
-  });
+
+  // Own pending delete / recent own delete — never toast those.
+  var ownDelete = {};
+  Object.keys(window.dalPaDeletedUids_ || {}).forEach(function(u) { ownDelete[u] = 1; });
   if (typeof window.dalPaIsRecentlyDeleted_ === 'function') {
     Object.keys(watch).forEach(function(uid) {
-      if (window.dalPaIsRecentlyDeleted_(uid)) protectedMap[uid] = 1;
+      if (window.dalPaIsRecentlyDeleted_(uid)) ownDelete[uid] = 1;
+    });
+    Object.keys(recent).forEach(function(uid) {
+      if (window.dalPaIsRecentlyDeleted_(uid)) ownDelete[uid] = 1;
     });
   }
-  var overwritten = [];
-  var deleted = [];
+
+  // Hold/touch still suppress *overwrite* toasts (local still winning those fields).
+  var fieldProtected = {};
+  Object.keys(window.dalPaTouchedUids_ || {}).forEach(function(u) { fieldProtected[u] = 1; });
+  Object.keys(window.dalPaHoldUntil_ || {}).forEach(function(u) {
+    if ((window.dalPaHoldUntil_[u] || 0) > now) fieldProtected[u] = 1;
+  });
+
+  var candidates = {};
   Object.keys(watch).forEach(function(uid) {
     var w = watch[uid];
-    if (!w || !w.sig) return;
+    if (!w) return;
     if (w.until && now > w.until) { delete watch[uid]; return; }
-    if (protectedMap[uid]) return;
+    candidates[uid] = w;
+  });
+  Object.keys(recent).forEach(function(uid) {
+    if ((recent[uid] || 0) <= now) { delete recent[uid]; return; }
+    if (!candidates[uid]) candidates[uid] = { sig: '', until: recent[uid], recentOnly: true };
+  });
+  if (!Object.keys(candidates).length) return;
+
+  var overwritten = [];
+  var deleted = [];
+  Object.keys(candidates).forEach(function(uid) {
+    if (ownDelete[uid]) return;
     var remote = remoteBy[uid];
     if (!remote) {
+      // Peer delete: hold/touch must NOT suppress the toast (dept-move race).
       deleted.push(uid);
       return;
     }
+    var w = candidates[uid];
+    if (!w || !w.sig || w.recentOnly) return;
+    if (fieldProtected[uid]) return;
     if (window.dalPaNonCombiningSig_(remote) !== w.sig) overwritten.push(uid);
   });
   window.dalPaNotifyConflict_(overwritten, deleted);
@@ -255,6 +294,7 @@ window.dalPaNoteDelete_ = function(uid) {
   window.dalPaDeletedUids_[uid] = 1;
   delete window.dalPaTouchedUids_[uid];
   delete window.dalPaLwwWatch_[uid];
+  if (window.dalPaRecentEditUntil_) delete window.dalPaRecentEditUntil_[uid];
   window.dalPaHoldEntities_([uid], 3000);
   window.dalPaMarkDeleted_([uid], 8000);
 };
@@ -814,6 +854,10 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
     // Remote differs but merge kept locals (holds/touches). NEVER ack lastRemoteSig —
     // that made the peer edit "forgotten" until hard refresh.
     if (fixtureSig !== localFixSig) {
+      // Still toast peer deletes of rows we recently edited (dept-move hold race).
+      if (typeof window.dalPaCheckLwwLossesAgainstRemote_ === 'function') {
+        window.dalPaCheckLwwLossesAgainstRemote_(remoteFixtures);
+      }
       window.dalPaRemotePending = true;
       window.dalUpdateRemotePendingBanner_();
       if (!forceApply) window.dalPaRequeueRemoteApply_(assets, snapMeta, 450);
@@ -1312,6 +1356,8 @@ window.stopDalPaLiveSync_ = function() {
   window.dalPaFlushGuardUntil_ = 0;
   window.dalPaTouchedUids_ = {};
   window.dalPaDeletedUids_ = {};
+  window.dalPaLwwWatch_ = {};
+  window.dalPaRecentEditUntil_ = {};
   window.dalPaLastAppliedSeq_ = {};
   window.dalPaLastDocWriteSeq_ = 0;
   window.dalPaStateSeeded_ = false;
@@ -1943,15 +1989,18 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
           }
           delete window.dalPaTouchedUids_[uid];
         });
-        // H3: watch what we committed (not mid-flight local) for peer LWW overwrite.
+        // H3: watch what we committed (not mid-flight local) for peer LWW overwrite / delete.
         Object.keys(touched).forEach(function(uid) {
           var sent = sentBy[uid];
           if (!sent) return;
           window.dalPaLwwWatch_[uid] = {
             sig: window.dalPaNonCombiningSig_(sent),
-            until: Date.now() + 14000
+            until: Date.now() + 45000
           };
         });
+        if (typeof window.dalPaMarkRecentEdit_ === 'function') {
+          window.dalPaMarkRecentEdit_(Object.keys(touched), 45000);
+        }
         Object.keys(deleted).forEach(function(uid) {
           if (nowBy[uid]) {
             delete window.dalPaDeletedUids_[uid];

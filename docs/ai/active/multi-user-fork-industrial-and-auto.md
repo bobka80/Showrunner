@@ -7,9 +7,9 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Active** — **A5/H3 done** @ GAS **v667**; next **A6/H2**. Prior: **A0 + H1 + H5 + Gap 1 + H4**.  
+**Opened:** 2026-07-18 · **Status:** **Active** — **A5/H3 done** @ GAS **v668** + `host-boot.js?v=665`; next **A6/H2**. Prior: **A0 + H1 + H5 + Gap 1 + H4**.  
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
-**Latest:** H3 conflict toast + peer-delete of watched rows **v667**.  
+**Latest:** Peer delete wins over concurrent dept-move **v668** / hosting **v665**.  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
@@ -204,6 +204,8 @@ Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync
 
 **Do not start until Part A exit is checked and director says OK go for Part B.**
 
+**Floor debugging channel (recommended before/during Part B smoke):** [user-error-reporting-journal-2026-07-19.md](user-error-reporting-journal-2026-07-19.md) — daily error-log packs → agent triage → journal.
+
 **Canonical UX (do not reinvent):** [timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject)  
 Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md)
 
@@ -301,6 +303,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **A5 / H3 shipped:** PA + timeline toast on non-combining LWW loss; qty-only ignored; Case T; `scripts/lib/dal-lww-conflict-core.js`. **Next: A6 / H2**. |
 | 2026-07-19 | **H3 follow-up:** peer **delete** of watched rows also toasts (PA + timeline); Case T peer-delete asserts. |
 | 2026-07-19 | **Peer delete vs dept move:** pierce hold/touch on apply; flush must not resurrect known UIDs (Case U); host-boot `?v=665`. |
+| 2026-07-19 | **H3 toast harden:** peer-delete toast ignores hold/touch; 45s recent-edit window; check on requeue path (formula dept set moves). |
 
 ---
 
