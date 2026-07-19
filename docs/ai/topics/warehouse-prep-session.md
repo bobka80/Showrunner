@@ -8,9 +8,9 @@
 
 **Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. **Blocked items** remain on [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Live sync (stable GAS v645):** Timeline-twin `assets/state` + host `PA_PATCH_WRITE` (banner **`live sync (patch)`**). Session banner lifecycle locked in [FRAGILE § prep session UI](../FRAGILE_ZONES.md). Doctrine: [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md).
+**Live sync:** Session UI baseline GAS **v645**; hosting `host-boot.js?v=652`. **Floor scope (locked):** search/formula batch absolute adds are primary; packing + RFID checkout run in parallel; floor +/- secondary — [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
 
-**Last swept:** 2026-07-17
+**Last swept:** 2026-07-19
 
 **Dual-domain vs timeline:** **Resolved** (Slice D / GAS v603) — prep + timeline collab may both be open. Spec: [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md).
 

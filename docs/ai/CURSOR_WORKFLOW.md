@@ -25,6 +25,7 @@ This doc maps **Cursor IDE features** (rules, skills, subagents, review agents) 
 | Rule file | When it applies |
 |-----------|-----------------|
 | `showrunner-core.mdc` | **Always** — doctrine entry, modes, ship |
+| `director-chat-layout.mdc` | **Always** — stack reply sections vertically (narrow chat; no side-by-side) |
 | `mobile-pwa-hosting.mdc` | `push-hosting/**`, `01j_Mobile_Scan.html`, mobile styles |
 | `equipment-fragile.mdc` | Formula, PA, packing, `Operations.js` |
 | `session-bridge.mdc` | `host-boot.js`, `Login.html`, `Security.js`, `Main.js` |

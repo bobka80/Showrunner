@@ -41,7 +41,7 @@ Also on the board (do not mix into the fork campaign without director pick):
 |----------|--------|------|
 | **Multi-user fork: test pipeline → bulletproof → auto fork** | **NEXT — A0 testing first** | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | Near-complete — prep live **stable v645** · rollback **v576** — close/archive when director ready | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) |
+| **Data access layer (DAL + router)** | Near-complete — prep live **v645** · sync approach = batch upsert SSOT · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
 
 ---
 

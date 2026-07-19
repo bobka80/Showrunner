@@ -229,6 +229,19 @@ window.dalPaContentSig_ = function(pa) {
   ].join('\t');
 };
 
+/** Fields included in live PA_PATCH localFixtures — use for mid-flight touch retain. */
+window.dalPaFlushPayloadSig_ = function(pa) {
+  if (!pa) return '';
+  return [
+    String(pa.assetId || ''),
+    String(pa.qty != null ? pa.qty : 1),
+    String(pa.location || 'General'),
+    String(window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || '')),
+    String(pa.containerUid || ''),
+    String(pa.scanStatus || 'Assigned')
+  ].join('\t');
+};
+
 window.dalPaIsAutoRow_ = function(pa) {
   if (!pa) return false;
   if (pa.isAuto || pa.isGenericAuto) return true;
@@ -327,6 +340,26 @@ window.dalPaMapByUid_ = function(assets) {
     if (pa && pa.uid) map[String(pa.uid)] = pa;
   });
   return map;
+};
+
+/** Advance originalProjectAssets baselines for UIDs just committed (merged server rows). */
+window.dalPaAdvanceOriginalsFromMerged_ = function(merged, committedUids) {
+  if (!merged || !committedUids || !committedUids.length) return;
+  var origBy = window.dalPaMapByUid_((window.originalProjectAssets || []).filter(function(pa) {
+    return !window.dalPaIsAutoRow_(pa);
+  }));
+  var mergedBy = window.dalPaMapByUid_(merged);
+  committedUids.forEach(function(uid) {
+    uid = String(uid);
+    if (mergedBy[uid]) origBy[uid] = JSON.parse(JSON.stringify(mergedBy[uid]));
+    else delete origBy[uid];
+  });
+  var autos = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
+    return window.dalPaIsAutoRow_(pa);
+  });
+  window.originalProjectAssets = Object.keys(origBy).map(function(k) { return origBy[k]; }).concat(
+    JSON.parse(JSON.stringify(autos))
+  );
 };
 
 /**
@@ -518,18 +551,11 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
 
   var fixtureSig = window.dalPaFixturesSig_(serverAssets);
   if (!forceApply && fixtureSig === window.dalPaLastRemoteSig) return;
-  // FlushGuard: older seq OK to skip only if local already matches remote content.
-  if (!forceApply && window.dalPaFlushGuardUntil_ && Date.now() < window.dalPaFlushGuardUntil_) {
-    var remoteSeq = Number(snapMeta.docWriteSeq || 0) || 0;
-    var lastSeq = Number(window.dalPaLastDocWriteSeq_ || 0) || 0;
-    if (remoteSeq && lastSeq && remoteSeq < lastSeq) {
-      var guardLocal = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
-        return !window.dalPaIsAutoRow_(pa);
-      });
-      if (fixtureSig === window.dalPaFixturesSig_(guardLocal)) return;
-      // local lags — fall through (concurrent flush absorbed peer into newer own write)
-    }
-  }
+  // Always drop older doc seq (requeued snaps after a newer flush). Fall-through
+  // when local ≠ older sig caused flash-then-revert after batch adds.
+  var remoteSeqGate = Number(snapMeta.docWriteSeq || 0) || 0;
+  var lastSeqGate = Number(window.dalPaLastDocWriteSeq_ || 0) || 0;
+  if (!forceApply && remoteSeqGate && lastSeqGate && remoteSeqGate < lastSeqGate) return;
 
   var hasTouches = window.dalPaHasPendingTouches_();
   var remoteFixtures = (serverAssets || []).filter(function(pa) { return !window.dalPaIsAutoRow_(pa); });
@@ -565,7 +591,30 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
 
     if (forceApply || !hasTouches) {
-      window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+      // forceApply with mid-flight touches: do NOT stamp pending edits into originals
+      // (that zeroed the next delta / lost batch clicks). Partial advance only.
+      if (forceApply && hasTouches) {
+        var origByFa = window.dalPaMapByUid_((window.originalProjectAssets || []).filter(function(pa) {
+          return !window.dalPaIsAutoRow_(pa);
+        }));
+        var remoteByFa = window.dalPaMapByUid_(mergedFixtures);
+        Object.keys(remoteByFa).forEach(function(uid) {
+          if (!window.dalPaTouchedUids_[uid] && !window.dalPaDeletedUids_[uid] && !window.dalPaIsHeld_(uid)) {
+            origByFa[uid] = JSON.parse(JSON.stringify(remoteByFa[uid]));
+          }
+        });
+        Object.keys(origByFa).forEach(function(uid) {
+          if (!remoteByFa[uid] && !window.dalPaTouchedUids_[uid] && !window.dalPaDeletedUids_[uid] && !window.dalPaIsHeld_(uid)) {
+            delete origByFa[uid];
+          }
+        });
+        var autosFa = (currentProjectAssets || []).filter(function(pa) { return window.dalPaIsAutoRow_(pa); });
+        window.originalProjectAssets = Object.keys(origByFa).map(function(k) { return origByFa[k]; }).concat(
+          JSON.parse(JSON.stringify(autosFa))
+        );
+      } else {
+        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+      }
     } else {
       // Keep original for untouched fixtures; advance applied remotes into original for clean ones.
       var origBy = window.dalPaMapByUid_((window.originalProjectAssets || []).filter(function(pa) {
@@ -641,8 +690,11 @@ window.dalPaHealTick_ = function() {
   // Compare to last *applied* UI sig (post-recalc), not raw wire fixtures.
   if (localSig && localSig === window.dalPaLastRemoteSig) return;
   try { console.log('[DAL PA] heal tick — local lagged server, force apply'); } catch (eH) { /* ignore */ }
+  var healSeq = Number(window.dalPaLastServerWriteSeq_ || 0) || 0;
+  var lastDoc = Number(window.dalPaLastDocWriteSeq_ || 0) || 0;
+  if (healSeq && lastDoc && healSeq < lastDoc) return;
   window.dalApplyRemotePaAssetsNow_(remote, {
-    docWriteSeq: Number(window.dalPaLastServerWriteSeq_ || 0) || 0,
+    docWriteSeq: healSeq,
     forceApply: true
   });
 };
@@ -1614,14 +1666,43 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
       var mutations = { touched: touched, deleted: deleted, qtyDeltas: qtyDeltas };
 
       var afterOk_ = function(result) {
-        Object.keys(window.dalPaTouchedUids_ || {}).forEach(function(uid) { delete window.dalPaTouchedUids_[uid]; });
-        Object.keys(window.dalPaDeletedUids_ || {}).forEach(function(uid) { delete window.dalPaDeletedUids_[uid]; });
+        var sentBy = {};
+        localFixtures.forEach(function(e) { if (e && e.uid) sentBy[String(e.uid)] = e; });
+        var nowBy = {};
+        (Array.isArray(currentProjectAssets) ? currentProjectAssets : []).forEach(function(pa) {
+          if (pa && pa.uid && !window.dalPaIsAutoRow_(pa)) nowBy[String(pa.uid)] = pa;
+        });
         var writeSeq = Number((result && result.writeSeq) || 0) || 0;
         if (writeSeq > window.dalPaLastDocWriteSeq_) window.dalPaLastDocWriteSeq_ = writeSeq;
+        var committedUids = Object.keys(touched).concat(Object.keys(deleted));
+        // Clear flush snapshot touches only if local still matches what we sent.
+        // Mid-flight same-UID edits keep the touch for FlushAgain.
+        Object.keys(touched).forEach(function(uid) {
+          var sent = sentBy[uid];
+          var cur = nowBy[uid];
+          if (sent && cur && typeof window.dalPaFlushPayloadSig_ === 'function' &&
+              window.dalPaFlushPayloadSig_(sent) !== window.dalPaFlushPayloadSig_(cur)) {
+            return; // keep touch
+          }
+          delete window.dalPaTouchedUids_[uid];
+        });
+        Object.keys(deleted).forEach(function(uid) {
+          if (nowBy[uid]) {
+            delete window.dalPaDeletedUids_[uid];
+            if (typeof window.dalPaNoteTouch_ === 'function') window.dalPaNoteTouch_(uid);
+            return;
+          }
+          delete window.dalPaDeletedUids_[uid];
+        });
         // Heal concurrent flush: txn-merged list includes peer rows our UI may have missed.
         if (result && result.merged && typeof window.dalPaApplyOwnWriteMerged_ === 'function') {
           try { window.dalPaApplyOwnWriteMerged_(result.merged, writeSeq); } catch (eM) { /* ignore */ }
         }
+        // Always stamp baselines for committed UIDs from merged (even if touch kept).
+        if (result && result.merged && typeof window.dalPaAdvanceOriginalsFromMerged_ === 'function') {
+          try { window.dalPaAdvanceOriginalsFromMerged_(result.merged, committedUids); } catch (eAdv) { /* ignore */ }
+        }
+        if (window.dalPaHasPendingTouches_()) window.dalPaFlushAgain = true;
         done(null, { mutations: mutations, result: result || null });
       };
 
@@ -1670,7 +1751,8 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
               var base = remoteMap[id]
                 ? Number(remoteMap[id].qty != null ? remoteMap[id].qty : 1)
                 : 0;
-              stamped.qty = base + Number(dRaw);
+              var nextQ = base + Number(dRaw);
+              stamped.qty = nextQ < 0 ? 0 : nextQ;
             }
             stamped.writeSeq = writeSeq;
             stamped.clientId = clientId;
@@ -1769,13 +1851,16 @@ window.dalFlushPaIfPrepOpen_ = function() {
     var finish = function(ok) {
       window.dalPaFlushInFlight = false;
       if (ok) {
-        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+        // Do not stamp mid-flight pending edits into originals (zeros next delta).
+        if (!window.dalPaHasPendingTouches_()) {
+          window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+        }
         var fixSig = window.dalPaFixturesSig_(currentProjectAssets || []);
         window.dalPaLastRemoteSig = fixSig;
         window.dalPaExpectedFixtureSig_ = fixSig;
         window.dalPaFlushGuardUntil_ = Date.now() + 4000;
         window.dalPaLastRenderSig_ = fixSig;
-        window.dalPaRemotePending = false;
+        window.dalPaRemotePending = !!window.dalPaHasPendingTouches_();
         if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
         if (typeof updateMobilePaUnsavedUI === 'function') updateMobilePaUnsavedUI();
       } else {

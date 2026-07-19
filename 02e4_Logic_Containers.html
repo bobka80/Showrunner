@@ -100,14 +100,36 @@ window.packItem = function(paIndex, containerUid, requestedQty) {
     
     let qtyToPack = parseInt(requestedQty, 10) || pa.qty;
     if (qtyToPack <= 0 || qtyToPack > pa.qty) return alert("Invalid quantity");
+    let assetId = pa.assetId;
+    let loc = pa.location || "General";
+    let form = pa.formula || "Standalone";
     
     if (qtyToPack == pa.qty) {
         pa.containerUid = containerUid;
         pa.isExplicitlyUnpacked = false;
+        if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid) window.dalPaNoteTouch_(pa.uid);
     } else { 
-        pa.qty = pa.qty - qtyToPack; let clone = JSON.parse(JSON.stringify(pa)); clone.qty = qtyToPack; clone.containerUid = containerUid; clone.isExplicitlyUnpacked = false; clone.scannedQty = 0; currentProjectAssets.push(clone); 
+        pa.qty = pa.qty - qtyToPack;
+        if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid) window.dalPaNoteTouch_(pa.uid);
+        let clone = JSON.parse(JSON.stringify(pa));
+        clone.qty = qtyToPack;
+        clone.containerUid = containerUid;
+        clone.isExplicitlyUnpacked = false;
+        clone.scannedQty = 0;
+        if (typeof window.dalNewUid_ === 'function') clone.uid = window.dalNewUid_();
+        currentProjectAssets.push(clone);
+        if (typeof window.dalPaNoteTouch_ === 'function' && clone.uid) window.dalPaNoteTouch_(clone.uid);
     }
-    mergeLooseItems(); 
+    mergeLooseItems();
+    // mergeLooseItems may collapse UIDs — note survivors so live flush keeps qty/pack links
+    if (typeof window.dalPaNoteTouch_ === 'function') {
+        (currentProjectAssets || []).forEach(function(row) {
+            if (row && row.uid && row.assetId === assetId &&
+                (row.location || "General") === loc && (row.formula || "Standalone") === form) {
+                window.dalPaNoteTouch_(row.uid);
+            }
+        });
+    }
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
     renderProjectAssetsUI();
 };
@@ -117,13 +139,34 @@ window.unpackItem = function(paIndex, requestedQty) {
     if (!pa) return;
     let qtyToUnpack = parseInt(requestedQty, 10) || pa.qty;
     if (qtyToUnpack <= 0 || qtyToUnpack > pa.qty) return alert("Invalid quantity");
+    let assetId = pa.assetId;
+    let loc = pa.location || "General";
+    let form = pa.formula || "Standalone";
     if (qtyToUnpack == pa.qty) {
         pa.containerUid = "";
         pa.isExplicitlyUnpacked = true;
+        if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid) window.dalPaNoteTouch_(pa.uid);
     } else { 
-        pa.qty = pa.qty - qtyToUnpack; let clone = JSON.parse(JSON.stringify(pa)); clone.qty = qtyToUnpack; clone.containerUid = ""; clone.isExplicitlyUnpacked = true; clone.scannedQty = 0; currentProjectAssets.push(clone); 
+        pa.qty = pa.qty - qtyToUnpack;
+        if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid) window.dalPaNoteTouch_(pa.uid);
+        let clone = JSON.parse(JSON.stringify(pa));
+        clone.qty = qtyToUnpack;
+        clone.containerUid = "";
+        clone.isExplicitlyUnpacked = true;
+        clone.scannedQty = 0;
+        if (typeof window.dalNewUid_ === 'function') clone.uid = window.dalNewUid_();
+        currentProjectAssets.push(clone);
+        if (typeof window.dalPaNoteTouch_ === 'function' && clone.uid) window.dalPaNoteTouch_(clone.uid);
     }
-    mergeLooseItems(); 
+    mergeLooseItems();
+    if (typeof window.dalPaNoteTouch_ === 'function') {
+        (currentProjectAssets || []).forEach(function(row) {
+            if (row && row.uid && row.assetId === assetId &&
+                (row.location || "General") === loc && (row.formula || "Standalone") === form) {
+                window.dalPaNoteTouch_(row.uid);
+            }
+        });
+    }
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
     renderProjectAssetsUI();
 };

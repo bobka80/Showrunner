@@ -771,6 +771,63 @@ module.exports = {
       ok: storeQty === 8
     };
   },
+  /**
+   * Case P: (1) batch absolute upsert of many new UIDs sticks on store;
+   * (2) older requeued seq must always be dropped (no fall-through → flash-then-revert);
+   * (3) mid-flush clear only removes flushed touch UIDs.
+   */
+  simulateBatchUpsertAndStaleReject: function() {
+    var state = {
+      fixtures: [{ uid: 'fx-seed', assetId: 'S', qty: 1 }],
+      writeSeq: 1,
+      clientId: 'seed'
+    };
+    var batch = [
+      { uid: 'fx-seed', assetId: 'S', qty: 1 },
+      { uid: 'fx-a', assetId: 'A', qty: 10 },
+      { uid: 'fx-b', assetId: 'B', qty: 1000 },
+      { uid: 'fx-c', assetId: 'C', qty: 3 }
+    ];
+    var touch = { 'fx-a': 1, 'fx-b': 1, 'fx-c': 1 };
+    // New rows: orig missing → delta = absolute qty (base 0)
+    var deltas = { 'fx-a': 10, 'fx-b': 1000, 'fx-c': 3 };
+    state = txnStatePatch(state, batch, touch, {}, 'designer', deltas);
+    var store = mapByUid(state.fixtures);
+    var batchOk = !!store['fx-a'] && Number(store['fx-a'].qty) === 10 &&
+      !!store['fx-b'] && Number(store['fx-b'].qty) === 1000 &&
+      !!store['fx-c'] && Number(store['fx-c'].qty) === 3;
+
+    // Older snap after newer lastSeq — must NOT apply (production fall-through was the revert bug)
+    var applyOlder = this.shouldApplyDuringFlushGuard({
+      mode: 'fixed',
+      guardActive: true,
+      remoteSeq: 4,
+      lastSeq: 5,
+      fixtureSig: 'stale-batch',
+      expectedSig: 'fresh-batch'
+    });
+    var applyEqual = this.shouldApplyDuringFlushGuard({
+      mode: 'fixed',
+      guardActive: true,
+      remoteSeq: 5,
+      lastSeq: 5,
+      fixtureSig: 'fresh',
+      expectedSig: 'other'
+    });
+
+    var flushed = { 'fx-a': 1, 'fx-b': 1 };
+    var currentTouches = { 'fx-a': 1, 'fx-b': 1, 'fx-mid': 1 };
+    Object.keys(flushed).forEach(function(uid) { delete currentTouches[uid]; });
+    var midOk = !currentTouches['fx-a'] && !currentTouches['fx-b'] && !!currentTouches['fx-mid'];
+
+    return {
+      batchOk: batchOk,
+      rejectOlder: applyOlder === false,
+      allowEqualOrNewer: applyEqual === true,
+      midFlushRetain: midOk,
+      ok: batchOk && applyOlder === false && applyEqual === true && midOk
+    };
+  },
   /** After END, refuse reopen for the same sessionUid. */
   shouldAllowRemotePrepOpen: function(opts) {
     opts = opts || {};

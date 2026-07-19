@@ -2821,7 +2821,8 @@
     }
   }
 
-  /** Prep PA fixtures — patch-merge by uid. Qty uses additive deltas when provided (multi-window +/+). */
+  /** Prep PA fixtures — patch-merge by uid. Absolute local fields for touched rows;
+   * optional qtyDeltas add to remote (concurrent +/-). New UID: remote base 0. */
   function dalFsPatchPaFixtures_(remoteList, localList, touchedMap, deletedMap, qtyDeltas) {
     var remoteMap = {};
     var localMap = {};
@@ -2846,7 +2847,8 @@
         var base = remoteMap[id]
           ? Number(remoteMap[id].qty != null ? remoteMap[id].qty : 1)
           : 0;
-        row.qty = base + Number(dRaw);
+        var nextQ = base + Number(dRaw);
+        row.qty = nextQ < 0 ? 0 : nextQ;
       }
       out[id] = row;
     });

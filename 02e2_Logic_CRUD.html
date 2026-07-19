@@ -379,8 +379,9 @@ function addPa(assetId, qtyToAdd = 1) {
         let match = currentProjectAssets.find(pa => pa.assetId === assetId && pa.formula === "Standalone" && pa.location === "General" && (pa.containerUid||"") === cid);
         if (match) {
             match.qty = isCons ? (parseFloat(match.qty) + q) : (parseInt(match.qty, 10) + q);
+            if (typeof window.dalPaNoteTouch_ === 'function' && match.uid) window.dalPaNoteTouch_(match.uid);
         } else {
-            currentProjectAssets.push({
+            window.insertIntoProjectAssets({
                 assetId: assetId, qty: q, formula: "Standalone", location: "General", containerUid: cid,
                 creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
             });
@@ -516,10 +517,12 @@ function addPa(assetId, qtyToAdd = 1) {
             let match = currentProjectAssets.find(pa => pa.assetId === representativeAsset.id && pa.formula === targetForm && pa.location === targetLoc);
             if (match && targetForm !== "Standalone") {
                 match.qty = isCons ? (parseFloat(match.qty) + actualQ) : (parseInt(match.qty, 10) + actualQ);
+                if (typeof window.dalPaNoteTouch_ === 'function' && match.uid) window.dalPaNoteTouch_(match.uid);
             } else {
                 let manMatch = currentProjectAssets.find(pa => pa.assetId === representativeAsset.id && pa.formula === "Standalone" && targetForm === "Standalone" && pa.location === targetLoc);
                 if (manMatch) {
                     manMatch.qty = isCons ? (parseFloat(manMatch.qty) + actualQ) : (parseInt(manMatch.qty, 10) + actualQ);
+                    if (typeof window.dalPaNoteTouch_ === 'function' && manMatch.uid) window.dalPaNoteTouch_(manMatch.uid);
                 } else {
                         window.insertIntoProjectAssets({ assetId: representativeAsset.id, qty: actualQ, formula: targetForm, location: targetLoc, isShortage: isTargetShortage, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
                 }

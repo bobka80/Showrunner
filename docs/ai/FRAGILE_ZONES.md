@@ -513,9 +513,9 @@ After END — reopen rules
 5. **Hold ScriptLock across Firestore UrlFetch** on open/close.
 6. **Edit fixtures while treating banner-off as “still in collab.”** Banner off = live sync off. Local edits will not reach peers.
 7. **Fall back to silent GAS `live sync (server)` multi-edit when Auth/listen fails.** H1: enter **blocked** (hard banner + edits locked). Read-only poll OK; patch writes only.
-8. **Drop peer state snaps during FlushGuard / flush-in-flight** because fixture sig ≠ expected. That silently loses the only delivery of a peer edit. Re-queue or apply; FlushGuard may drop only older `writeSeq` when local already matches.
+8. **Drop peer state snaps during FlushGuard / flush-in-flight** because fixture sig ≠ expected. That silently loses the only delivery of a peer edit. Re-queue or apply; **always** drop older `writeSeq` (never fall through to apply stale fixtures).
 9. **Skip applying own write echo when local UI lags the txn-merged doc.** Concurrent flush absorbs peer rows into your write; echo used to advance `writeSeq` only → peer edit forgotten until refresh. Always apply `result.merged` after PA_PATCH OK.
-10. **Replace absolute qty on touch (LWW) when multi-window +/- must combine.** Live flush sends **qty deltas** vs last-acked originals; host txn does `remote.qty + delta`. Heal ticker force-applies last server fixtures if UI drifts with no pending touches.
+10. **Let stale requeued snaps or mid-flush touch-wipe yank the UI below newer `writeSeq`.** That is flash-then-revert after batch adds. Always drop `docWriteSeq < lastDocWriteSeq`; only clear touches that were in the flush snapshot; keep mid-flight edits for the next flush.
 
 ### Safe rules (locked)
 
@@ -525,7 +525,7 @@ After END — reopen rules
 | Prep open | Local START (`localOpen`) or server `_meta` (`fromMeta`) with allowed sessionUid. |
 | Prep close | Local END, or meta-end pending + Sheets committing/closed, or meta missing ≥~8s → `dalPrepMarkSessionEnded_`. |
 | After END | Block same `sessionUid`; block Sheets-only reopen; clear only on new START. |
-| Fixture live | See § DAL prep PA fork live sync — only while banner on + `live sync (patch)`. |
+| Fixture live | See § DAL prep PA fork live sync — banner on + `live sync (patch)`. **Primary:** batch absolute upserts. **Secondary:** same-row +/- deltas. |
 | Timeline remote sync | Session watcher polls `getDalSessionInfo` → domain fields only. |
 
 ### Smoke (after any session-UI / prep-live change)
@@ -533,12 +533,13 @@ After END — reopen rules
 Hard-refresh **two browsers** on web.app (banner must say **live sync (patch)**):
 
 1. START PREP on A → B banner on within a few seconds; stays on.  
-2. Add/remove/qty on A → B matches; no flip-back.  
-3. END PREP on A → B banner off **once** and stays off for 2+ minutes.  
-4. START PREP again on A → B gets a **new** banner.  
-5. Optional: timeline collab both sides stays independent of prep.
+2. A search/formula **batch-add** many rows → B shows the full batch; **no** flip-back.  
+3. Same-row multi-window +/- → may combine (secondary).  
+4. END PREP on A → B banner off **once** and stays off for 2+ minutes.  
+5. START PREP again on A → B gets a **new** banner.  
+6. Optional: timeline collab both sides stays independent of prep.
 
-**AI rule:** Before editing these files, re-read this section + § prep PA fork live sync. Prefer one root-cause ship with the smoke above. Stable known-good: **GAS v645**.
+**AI rule:** Before editing these files, re-read this section + § prep PA fork live sync + campaign **floor scope**. Prefer one root-cause ship. Session UI known-good: **GAS v645**.
 
 ---
 ## DAL timeline fork live sync (collab strips)
@@ -600,17 +601,20 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | | **Timeline (fixed)** | **Prep PA (must match)** |
 |--|----------------------|---------------------------|
 | Identity of edit | Explicit **touch/delete maps** (`dalTlNoteShiftTouch_`) | Explicit **`dalPaNoteTouch_` / `dalPaNoteDelete_`** — never invent diffs from full-list compare |
-| Write | Host **transaction** patches only touched entities onto remote | Host **`PA_PATCH_WRITE` transaction** on `assets/state` (fixturesJson); mirrors touched UIDs to collection docs for commit |
+| Write | Host **transaction** patches only touched entities onto remote | Host **`PA_PATCH_WRITE` transaction** on `assets/state`; **qty = remote + delta**; other fields LWW |
 | Ordering | Monotonic **`writeSeq`** on state doc | Monotonic **`writeSeq`** on **state doc** (not per-asset LWW) |
-| Echo | Own **`clientId`** ack without re-install | Own **`clientId`** ack without re-install |
+| Echo | Own **`clientId`** ack without re-install | Own **`clientId`** ack + apply **txn-merged** fixtures (heal if UI lags) |
 | Yank guard | Entity hold ~2s | Entity hold ~3s + recently-deleted |
 | Autos / extras | N/A | **Never live-write auto-containers** (UID churn = snap storms) |
-| Failure mode | Strips stutter left↔right | Fixture qty flips up↓down + browser stutter |
+| Failure mode | Strips stutter left↔right | Fixture qty flips / stuck-behind-server (absolute LWW or missed apply) |
 | Live path | `timeline/state` doc listen | `assets/state` doc listen (**not** collection onSnapshot) |
+| Same-row merge | Entity **LWW** | **Absolute upsert** of touched UIDs (batch add primary); same-row +/- may **delta-combine**; other fields **LWW** |
 
 **Research / test (2026-07-17):** `node scripts/dal-pa-live-sync-test.js` — buggy full-rewrite produces `5→4→5→4…`; touch+hold+writeSeq settles at `4`. Core: `scripts/lib/dal-pa-live-sync-core.js`.
 
-**Plain language:** While START PREP is open, both browsers listen to the PA fork collection and flush local edits to Firestore. If either browser **rewrites every asset document** from its full local list (or invents “diffs” from `recalcAutoContainers` sibling `containerUid` changes), fixtures **flip back and forth** — same class as timeline strip stutter. Live sync must be **touch/patch** with **writeSeq**, not last-full-collection-wins.
+**Plain language:** While START PREP is open, browsers listen to `assets/state` and flush **touched** fixtures via host `PA_PATCH_WRITE`. Full-collection rewrite or inventing diffs from auto-container churn → fixtures **flip back and forth** (timeline stutter class). Live sync must be **touch/patch** + **writeSeq**.
+
+**Qty / upsert sync context (locked 2026-07-19):** **Primary** = search/formula/CRUD **batch absolute upserts** of touched UIDs (campaign floor scope). **Secondary** = same-UID floor +/- may send qty deltas so concurrent taps combine. Never redesign sync as increment-only. Peers must keep newer `writeSeq`; no flash-then-revert. Heal only applies last server fixtures when UI lags with no pending touches and seq is not older.
 
 **Research note (2026-07-17):** Confirmed in code before the patch fix: `dalWritePaForkToFirestore_` built a `set` for **every** current UID (full inventory rewrite) and `dalApplyRemotePaAssets_` did a **full list replace** when clean. That matches “changes reverse on both sides” and the timeline LWW failure mode.
 
@@ -618,9 +622,9 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 
 | File | Role |
 |------|------|
-| `02e7_Dal_Firestore_Client.html` | Patch compute, host/iframe batch write, collection listen apply, entity hold, banner |
+| `02e7_Dal_Firestore_Client.html` | Patch compute (`qtyDeltas`), heal ticker, host/iframe patch write, state listen apply, entity hold, banner |
 | `02d_Equipment_Render.html` | Calls `dalFlushPaIfPrepOpen_` after PA UI refresh |
-| `push-hosting/public/host-boot.js` | `LISTEN_COL` + `PA_BATCH_WRITE` on web.app host |
+| `push-hosting/public/host-boot.js` | `LISTEN` on `assets/state` + **`PA_PATCH_WRITE`** txn (qty = remote + delta) |
 | `Dal_Firebase.js` | GAS fork save/commit (SAVE / END PREP path) |
 
 ### Never do
@@ -638,33 +642,40 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 11. **Fall back live flush to `saveProjectAssets` in firestore mode.** GAS full-document PATCH wiped host `writeSeq` stamps.
 12. **Remove a fixture without `dalPaNoteDelete_`.** Local splice alone leaves the row in `assets/state` → peer never drops it; later snaps **resurrect** on the deleter (“one step behind”). UI **DEL** on unique rows calls `removePa(idx)` — that path must note delete (incident 2026-07-18: [dal-pa-delete-resurrect.md](active/dal-pa-delete-resurrect.md)).
 13. **Re-seed full local list into live state after peers have written.** `dalPaSeedStateFromLocal_` touches every local UID; empty/lagging snaps must not trigger that once `writeSeq > 0` — a stale browser re-inserts deleted rows.
+14. **Clear all touch maps on flush OK while the user kept editing mid-flight.** That wipes batch/search clicks that arrived during the write. Clear only the flushed snapshot; arm FlushAgain for the rest.
+15. **Apply a requeued snap with `docWriteSeq < lastDocWriteSeq`.** Fall-through when local ≠ older sig causes flash-then-revert. Always drop older seq (Case L / production).
+16. **Ship increment-only sync as the product model.** Floor +/- deltas are secondary; batch absolute upserts are primary.
 
 ### Safe rules (locked)
 
 | Concern | Rule |
 |---------|------|
 | Write | **Touch-only fixtures** — `dalPaNoteTouch_` / `dalPaNoteDelete_` then flush those UIDs only. Stamp `writeSeq`+`clientId` on host. Never live-write autos. |
-| Apply | Coalesce ~300ms; re-queue if flush-in-flight / ignore / pending-writes. **Never ack `lastRemoteSig` when merge kept locals but remote differs** (forgotten-until-refresh). Per-UID hold only — no global anyHold gate. Stamp doc writeSeq onto unstamped fixture rows. |
+| **Upsert / qty** | Touched rows publish **absolute** local fields (batch add). Optional `qtyDeltas` for concurrent same-UID +/-: host `remote.qty + delta` (clamp ≥ 0). New UIDs: base remote 0 + delta = absolute. |
+| Apply | Coalesce ~300ms; re-queue if flush-in-flight / ignore / pending-writes. **Always drop** `docWriteSeq < lastDocWriteSeq` in `Now_` (no fall-through). **Never ack `lastRemoteSig` when merge kept locals but remote differs**. After PA_PATCH OK, apply **`result.merged`**; clear **only flushed** touch UIDs. |
+| Heal | If UI lags last server snap, no pending touches, server seq not older → **force-apply**. Do not heal to an older seq. |
 | Loop break | Never flush from apply. Render-end flush only when touches pending. |
 | Load race | During prep+firestore: ongoing snaps must not apply unstamped GAS lists. **Exception:** if local PA is still empty (join mid-fork / no `assets/state` yet), one-shot hydrate from `getProjectAssets` then `dalPaSeedStateFromLocal_` **once**. Never re-seed after remote `writeSeq > 0`. Never apply empty state over an unloaded UI. |
 | Delete | Every UI remove path notes `dalPaNoteDelete_(uid)` before render/flush. Absence on remote state = gone (unless hold). |
 | Unstamped seq | After any stamped write (`lastAppliedSeq[uid] > 0`), ignore remote docs with `writeSeq` missing/0 or `seq < lastApplied`. |
 | GAS save | Never fall back to `saveProjectAssets` on live flush failure while `dalPaLiveSyncMode === 'firestore'` (GAS PATCH replace wiped host `writeSeq`). Manual SAVE via GAS must re-stamp `writeSeq`. |
-| Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed (includes unstamped-GAS case). |
+| Test | `node scripts/dal-pa-live-sync-test.js` must PASS (Cases **A–P** + units). Case **O** = +/- combine; Case **P** = batch upsert + no stale revert. |
 | Formula | Remote apply: `dalProcessPaFormulas_(…, { skipExplode: true })`. |
-| Banner | `live sync (patch)` = state-doc Firestore transaction. **`LIVE SYNC DOWN — edits blocked`** on Auth/listen/write fail (H1) — read-only GAS poll may continue; no silent multi-edit. |
-| Host bridge | `SHOWRUNNER_DAL_FS_LISTEN` on `assets/state` + `SHOWRUNNER_DAL_FS_PA_PATCH_WRITE`; Index relays both. |
-| vs timeline | **Same architecture** now: one state doc, transactional patch-merge, doc writeSeq. |
+| Banner | `live sync (patch)` = state-doc Firestore transaction. **`LIVE SYNC DOWN — edits blocked`** on Auth/listen/write fail (H1). |
+| Host bridge | `SHOWRUNNER_DAL_FS_LISTEN` on `assets/state` + `SHOWRUNNER_DAL_FS_PA_PATCH_WRITE`; bump hosting when merge shape changes. |
+| vs timeline | **Same shell:** one state doc, patch-merge, writeSeq. Prep **primary** = absolute entity upsert; timeline strips = entity LWW. |
 
 ### Smoke (prep PA live)
 
-Hard-refresh **two browsers** on web.app (banner **live sync (patch)**). **Stable known-good with session UI:** GAS **v645**.
+Hard-refresh browsers on web.app (banner **live sync (patch)**). Floor scope: campaign § Warehouse prep. Session UI **v645**.
 
-1. A changes one fixture location/qty; B idle — B updates once; **no** flip-back on A or B.  
-2. A and B change **different** fixtures near-simultaneously — both stick.  
-3. A changes the same fixture twice quickly — settles on A’s last value; no oscillation.  
-4. DEL / remove on A → gone on B; B’s later edit does not resurrect.  
-5. END PREP on A → B banner off once and stays off; START again → B rejoins.
+1. A **search/formula batch-add** many rows; B idle — B shows full batch; **no** flip-back.  
+2. A and B add into **different** sublists near-simultaneously — both batches stick.  
+3. A taps +/- on one fixture twice quickly — net sticks; no oscillation.  
+4. **Same-row combine (secondary):** multi-window +/- on one UID — may sum.  
+5. Idle peers catch up within a few seconds **without** refresh.  
+6. DEL / remove on A → gone on B; B’s later edit does not resurrect.  
+7. END PREP on A → B banner off once and stays off; START again → B rejoins.
 
 **AI rule:** Before editing prep live flush/apply, re-read this section, § DAL prep / timeline session UI, § DAL timeline fork live sync, and [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md). Ship GAS; also `deploy-hosting.js` if host-boot message types change.
 

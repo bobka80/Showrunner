@@ -501,10 +501,13 @@ function commitSyntaxCommand() {
                 let matchPa = currentProjectAssets.find(pa => pa.assetId === temp.assetId && pa.formula === temp.formula && pa.location === temp.location);
                 if (matchPa && temp.formula !== "Standalone") {
                     matchPa.qty = parseInt(matchPa.qty, 10) + parseInt(temp.qty, 10);
+                    if (typeof window.dalPaNoteTouch_ === 'function' && matchPa.uid) window.dalPaNoteTouch_(matchPa.uid);
                 } else {
                     let manMatch = currentProjectAssets.find(pa => pa.assetId === temp.assetId && pa.formula === "Standalone" && pa.location === temp.location);
-                    if (manMatch) manMatch.qty = parseInt(manMatch.qty, 10) + parseInt(temp.qty, 10);
-                    else window.insertIntoProjectAssets({...temp, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'});
+                    if (manMatch) {
+                        manMatch.qty = parseInt(manMatch.qty, 10) + parseInt(temp.qty, 10);
+                        if (typeof window.dalPaNoteTouch_ === 'function' && manMatch.uid) window.dalPaNoteTouch_(manMatch.uid);
+                    } else window.insertIntoProjectAssets({...temp, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'});
                 }
             });
             

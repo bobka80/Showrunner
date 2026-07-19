@@ -184,6 +184,13 @@ var comb = core.simulateThreeClientQtyCombine();
 console.log('  storeQty=%s (LWW would be %s)', comb.storeQty, comb.lwwWouldBe);
 assert(comb.ok, 'three +1 from 5 → store 8');
 
+// Case P: batch absolute upsert + always-drop older seq + mid-flush touch retain.
+// Covers flash-then-revert class missed by Case O.
+console.log('\n--- Case P: batch upsert + stale reject + mid-flush retain ---');
+var batchP = core.simulateBatchUpsertAndStaleReject();
+console.log('  batchOk=%s rejectOlder=%s midRetain=%s', batchP.batchOk, batchP.rejectOlder, batchP.midFlushRetain);
+assert(batchP.ok, 'batch upsert sticks; older seq dropped; mid-flush touches kept');
+
 console.log('\n--- Unit: patchMergeFixtures only applies touches ---');
 var merged = core.patchMergeFixtures(
   [{ uid: 'u1', qty: 5 }, { uid: 'u2', qty: 1 }],
@@ -226,5 +233,5 @@ if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–O + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–P + units)');
 process.exit(0);

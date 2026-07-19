@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** Prep multi-user live + session UI **stable** — behavior **v645**, docs lock **v646**. **Next campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) (**A0/H0 testing pipeline done** → bulletproof H1–H5 → auto fork). Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md). How it works: [FRAGILE § session UI](../FRAGILE_ZONES.md) · [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md). Hosting `host-boot.js?v=635`. **Rollback:** **v576**.
+**Opened:** 2026-07-05 · **Status:** Prep multi-user live + session UI **stable** — behavior **v645**, docs lock **v646**. **Sync approach (locked):** batch absolute entity upserts primary; client must not flash-then-revert — see campaign [multi-user-fork § floor scope](multi-user-fork-industrial-and-auto.md) · [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md). **Next campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) (**A0/H0 done** → H1–H5 → auto fork). Hosting `host-boot.js?v=652`. **Rollback:** **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -16,7 +16,7 @@
 
 **Slice D (dual-domain sessions):** [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md) — prep + timeline concurrent; **gate before Phase 5**.
 
-**Prep PA live sync (industry standards + investigation process):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — Figma/Linear-class entity patch (not CRDT); hardening backlog H1–H6; **mandatory** prove-with-sim + mutation inventory before another prep live ship. Never-dos stay in [FRAGILE_ZONES.md](../FRAGILE_ZONES.md).
+**Prep PA live sync (industry standards + investigation process):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — entity patch (not CRDT); **batch absolute upserts primary** (search/formula); floor +/- deltas secondary; hardening H1–H5; prove-with-sim + mutation inventory before another prep live ship. Floor scope: [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md). Never-dos: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md).
 
 This is the **live campaign file** for the single database layer.
 

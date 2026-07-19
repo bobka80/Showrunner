@@ -7,14 +7,15 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **A1/H1 shipped** — next recommend **H5** (mutation ALLOWLIST + timeline twin). Fresh agents: read this file first for multi-user fork work.  
-**Production:** GAS **v648** · hosting `host-boot.js?v=635` · Prep banner must say **`live sync (patch)`** (or **LIVE SYNC DOWN — edits blocked** if Auth fails)
+**Opened:** 2026-07-18 · **Status:** Floor scope locked; sync rework in flight (batch upsert SSOT + no flash-then-revert). Next also **H5**. Fresh agents: read § floor scope first.  
+**Production:** GAS **v653** · hosting `host-boot.js?v=652` (bump on this ship) · Prep banner **`live sync (patch)`**  
+**Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
 ---
 
 ## Fresh-agent start (other computer)
 
-1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → **this file** → [bulletproof](bulletproof-multiuser-live-editors-2026-07-18.md) → FRAGILE §§ above.  
+1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → **this file** (especially § **Warehouse prep — real multi-user scope**) → [bulletproof](bulletproof-multiuser-live-editors-2026-07-18.md) → FRAGILE §§ above.  
 2. **Build order (locked 2026-07-19):** **(1) testing pipeline H0** → **(2) bulletproof multi-user H1–H5 + Gap 1** → **(3) Part B auto fork**.  
 3. **Do not** start Part B until Part A exit is director-confirmed.  
 4. **No code** until director says **OK go** (or names a Part A slice).  
@@ -22,6 +23,73 @@
 
 **Point the new agent here:**  
 `docs/ai/active/multi-user-fork-industrial-and-auto.md`
+
+---
+
+## Warehouse prep — real multi-user scope (locked 2026-07-19)
+
+**Director lock.** Explained in session; agents must not divert back to an “increments are the product” mental model. Equipment model: [../EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md). Prep session: [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md). Concurrency intent: [../topics/project-assets-concurrency.md](../topics/project-assets-concurrency.md).
+
+### What prep actually is
+
+While **START PREP** is open, Project Assets is a **shared warehouse prep room** on one project — several departments, several roles, one equipment list. People are not only tapping +/-. They are **designing** the show’s gear, **packing** it into cases/trunks, and **checking it out** of the building, often at the same time. Headcount is not capped at “4–6”; sync must stay correct as more people join.
+
+### How gear gets onto the list (primary path)
+
+The search bar (`#pa-search-cli`) is an **add engine**, not only search (left vault/search → right list).
+
+- Type / pick → Enter adds into the **active sublist** (`activePaTarget` = location + formula).
+- Quantities are often **absolute and large** (`10x …`, `*`, formula lines, kit explosions) — not +1 taps.
+- One Enter can create **many rows** (bulk absolute qty, physical explode to qty 1, fixed rack + children, fluid kit blueprint).
+- Formulas use the **Triangle of Truth** (human slash formula ↔ beautiful formula ↔ list). Sublist identity = `(location, formula)`.
+- Kits/cases can expand into many children in one action; auto-fill can round to full cases.
+
+**Concurrent picture:** Person A dumps a big Audio formula sublist; Person B dumps another department’s lines; neither is “incrementing.”
+
+### How the list is adjusted (secondary / also concurrent)
+
+- Floor **+/-** or typed qty on existing rows — real, but **not** the design center of sync.
+- **Remove / DEL** on rows/groups today.
+- **Red X = remove a whole set of items** — **future** product control (not shipped yet); when built, it must live-sync like any other delete batch.
+- Autos (`isAuto` / `isGenericAuto`) rebuild **locally** — never the live peer write surface.
+
+### Packing (same list, different job)
+
+Two engines — **never merge** ([EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)):
+
+1. **Auto-Containerization** — physical fixtures → phantom/physical cases (`recalcAutoContainers`).
+2. **Auto-Packing** — **bulk cables only** → `[BULK] …` trunk sublists (`autoProvisionCableCases`).
+
+Manual pack/unpack sets `containerUid`. Cable trunks are sublists of bulk counts married to case identity for door checkout. Department packing filters are **UI view only**, not separate databases.
+
+**Concurrent picture:** someone still adds lines in design while others pack Audio cases and fill cable trunks.
+
+### RFID / gate / checkout (parallel subsystem)
+
+Checkout uses the **shared ops ledger / session** (guns, stations, gate). Design lock today: ledger is **atomic Sheets ops**, not the PA Firebase fork — but the **floor story** is simultaneous: scanners check out packed gear while the list is still being built/packed. Case scan expands packed children. Gate = building exit. Live PA truth and checkout must not silently fight even across subsystems.
+
+### What “single source of truth” must survive
+
+At once, on one project:
+
+1. Designers adding **big batches** via search/formula into different department sublists  
+2. Others **removing or tweaking** qty on existing lines  
+3. Packers moving items into containers / cable bulk trunks  
+4. RFID operators **checking out** at stations/gate  
+5. Later: bulk remove-by-set (red X)
+
+Live sync’s job is **not** “combine +1 forever.” It is: every real list mutation (**batch insert**, **absolute qty**, pack link, delete) becomes shared server truth **without flash-then-revert**, for as many people as the floor needs.
+
+### Sync design implications (do not forget)
+
+| Priority | Operation class | Intent |
+|----------|-----------------|--------|
+| **1 — primary** | Search / formula / kit add → many new or bumped UIDs with **absolute** fields | Peer lists must show the full batch; no yank back to pre-batch |
+| **2 — concurrent** | Pack / unpack (`containerUid`), deletes, DEL / future red-X set-delete | Same SSOT; every path must note touch/delete (H5) |
+| **3 — secondary** | Floor +/- on an existing UID | May use delta-combine so concurrent taps don’t erase each other; **byproduct**, not the product model |
+| **Never** | Treat prep as a CRDT text editor or as “increment API only” | Wrong workflow |
+
+Technical merge rules and never-dos stay in [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) + [FRAGILE_ZONES.md](../FRAGILE_ZONES.md). If a proposal conflicts with **this section**, **stop and ask the director**.
 
 ---
 
@@ -47,7 +115,11 @@ Director-confirmed **manual** multi-user prep (and timeline twin):
 - Banner **`live sync (patch)`** while open; banner off = live sync off  
 - END: `_meta` + Sheets agree (or meta-end timeout); after END block **same `sessionUid`** reopen  
 - Deletes note `dalPaNoteDelete_`; seed-from-local only before remote `writeSeq`  
-- Sim: `node scripts/dal-pa-live-sync-test.js` (Cases A–J) must stay green for PA work  
+- **Floor scope:** § **Warehouse prep — real multi-user scope** — search/formula **batch absolute upserts** are primary; packing + delete concurrent; floor +/- secondary  
+- **Prep qty (secondary path):** same-row multi-window +/- may **combine** via deltas (v653 Case O) — must not redefine the product as increments  
+- Apply `result.merged` / heal so UI cannot stick behind server or **flash then revert** after peer/batch applies  
+- Sim: `node scripts/dal-pa-live-sync-test.js` (Cases **A–O**) green; extend sims for **batch add** thrash when fixing revert class  
+- Doctrine: this file § floor scope + [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md)  
 - Gate: `node scripts/dal-mutation-inventory-check.js` (wired in `pre-ship/dal.js`)  
 
 Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v645"** (last known good behavior) or the **Part B try-baseline** milestone named when Part B starts.
@@ -104,7 +176,7 @@ Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync
 
 ### A5 — H3 Same-row conflict visibility
 
-- [ ] Toast or clear cue when same UID loses to peer LWW  
+- [ ] Toast or clear cue when same UID loses to peer **LWW on non-combining fields** (location/notes/flags; timeline strips). **Not** for floor qty +/- — those **combine** (v653 Case O).  
 - [ ] **Both** prep fixtures **and** timeline entities in the **same** milestone — no “as practical” hedge; if timeline slips, open an explicit follow-up checkbox here  
 
 ### A6 — H2 Cheaper remote apply
