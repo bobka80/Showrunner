@@ -71,6 +71,42 @@ window.dalPaArmLwwWatch_ = function(uids, ttlMs) {
   window.dalPaMarkRecentEdit_(uids, ttlMs);
 };
 
+window.dalPaShowConflictToast_ = function(title, body) {
+  title = String(title || 'Conflict');
+  body = String(body || '');
+  try {
+    var c = document.getElementById('push-toast-container');
+    if (c) c.style.zIndex = '2147483000';
+  } catch (eZ) { /* ignore */ }
+  try {
+    if (typeof showPushToast === 'function') showPushToast(title, body);
+    else if (typeof window.showMobilePaToast === 'function') window.showMobilePaToast(title, body);
+    else if (typeof showNotification === 'function') showNotification(title + (body ? (': ' + body) : ''));
+    else window.alert(title + (body ? ('\n' + body) : ''));
+  } catch (eT) {
+    try { window.alert(title + (body ? ('\n' + body) : '')); } catch (eA) { /* ignore */ }
+  }
+  // Prep vault SYNC strip — visible even if toast CSS is buried.
+  try {
+    var statusEl = document.getElementById('pa-prep-live-status');
+    if (statusEl) {
+      statusEl.setAttribute('data-dal-conflict', '1');
+      statusEl.textContent = title + (body ? (' — ' + body) : '');
+      statusEl.style.color = '#fb7185';
+      statusEl.style.fontWeight = '800';
+      setTimeout(function() {
+        if (!statusEl.getAttribute('data-dal-conflict')) return;
+        statusEl.removeAttribute('data-dal-conflict');
+        statusEl.style.color = '';
+        statusEl.style.fontWeight = '';
+        if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+          window.dalUpdateRemotePendingBanner_();
+        }
+      }, 8000);
+    }
+  } catch (eS) { /* ignore */ }
+};
+
 window.dalPaNotifyConflict_ = function(overwritten, deleted) {
   overwritten = overwritten || [];
   deleted = deleted || [];
@@ -82,23 +118,55 @@ window.dalPaNotifyConflict_ = function(overwritten, deleted) {
   });
   if (Date.now() < (window.dalPaLwwToastAt_ || 0)) return;
   window.dalPaLwwToastAt_ = Date.now() + 3500;
-  var msg;
+  var title = 'Live conflict';
+  var body;
   if (deleted.length && !overwritten.length) {
-    msg = deleted.length === 1
+    body = deleted.length === 1
       ? 'Another editor removed an item you just changed.'
       : ('Another editor removed ' + deleted.length + ' items you just changed.');
   } else if (overwritten.length && !deleted.length) {
-    msg = overwritten.length === 1
+    body = overwritten.length === 1
       ? 'Another editor overwrote your equipment change on this item.'
       : ('Another editor overwrote your equipment changes (' + overwritten.length + ' items).');
   } else {
-    msg = 'Another editor changed or removed items you just edited (' + all.length + ').';
+    body = 'Another editor changed or removed items you just edited (' + all.length + ').';
   }
-  try {
-    if (typeof showToast === 'function') showToast(msg);
-    else if (typeof window.showMobilePaToast === 'function') window.showMobilePaToast('Conflict', msg);
-    else console.warn('[DAL PA H3]', msg);
-  } catch (eT) { /* ignore */ }
+  window.dalPaShowConflictToast_(title, body);
+};
+
+/**
+ * Peer delete cue: local still has a known/recently-edited uid that remote lacks.
+ * Does not depend on LWW watch alone (formula dept-set moves were missing toasts).
+ */
+window.dalPaNotifyPeerDeletesVsLocal_ = function(remoteFixtures, localFixtures) {
+  var now = Date.now();
+  var remoteBy = {};
+  (remoteFixtures || []).forEach(function(pa) {
+    if (pa && pa.uid) remoteBy[String(pa.uid)] = pa;
+  });
+  var origBy = window.dalPaMapByUid_
+    ? window.dalPaMapByUid_((window.originalProjectAssets || []).filter(function(pa) {
+      return !window.dalPaIsAutoRow_(pa);
+    }))
+    : {};
+  var gone = [];
+  (localFixtures || []).forEach(function(pa) {
+    if (!pa || !pa.uid || window.dalPaIsAutoRow_(pa)) return;
+    var uid = String(pa.uid);
+    if (remoteBy[uid]) return;
+    if (window.dalPaDeletedUids_[uid]) return;
+    if (typeof window.dalPaIsRecentlyDeleted_ === 'function' && window.dalPaIsRecentlyDeleted_(uid)) return;
+    var known = (Number(window.dalPaLastAppliedSeq_[uid] || 0) || 0) > 0 ||
+      !!origBy[uid] ||
+      (Number(pa.writeSeq || 0) || 0) > 0;
+    if (!known) return; // pending local insert — not a peer delete
+    var interesting = !!(window.dalPaLwwWatch_[uid]) ||
+      ((window.dalPaRecentEditUntil_[uid] || 0) > now) ||
+      !!window.dalPaTouchedUids_[uid] ||
+      (typeof window.dalPaIsHeld_ === 'function' && window.dalPaIsHeld_(uid));
+    if (interesting) gone.push(uid);
+  });
+  if (gone.length) window.dalPaNotifyConflict_([], gone);
 };
 
 window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
@@ -110,7 +178,6 @@ window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
     if (pa && pa.uid) remoteBy[String(pa.uid)] = pa;
   });
 
-  // Own pending delete / recent own delete — never toast those.
   var ownDelete = {};
   Object.keys(window.dalPaDeletedUids_ || {}).forEach(function(u) { ownDelete[u] = 1; });
   if (typeof window.dalPaIsRecentlyDeleted_ === 'function') {
@@ -122,7 +189,6 @@ window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
     });
   }
 
-  // Hold/touch still suppress *overwrite* toasts (local still winning those fields).
   var fieldProtected = {};
   Object.keys(window.dalPaTouchedUids_ || {}).forEach(function(u) { fieldProtected[u] = 1; });
   Object.keys(window.dalPaHoldUntil_ || {}).forEach(function(u) {
@@ -148,7 +214,6 @@ window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
     if (ownDelete[uid]) return;
     var remote = remoteBy[uid];
     if (!remote) {
-      // Peer delete: hold/touch must NOT suppress the toast (dept-move race).
       deleted.push(uid);
       return;
     }
@@ -854,8 +919,9 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
     // Remote differs but merge kept locals (holds/touches). NEVER ack lastRemoteSig —
     // that made the peer edit "forgotten" until hard refresh.
     if (fixtureSig !== localFixSig) {
-      // Still toast peer deletes of rows we recently edited (dept-move hold race).
-      if (typeof window.dalPaCheckLwwLossesAgainstRemote_ === 'function') {
+      if (typeof window.dalPaNotifyPeerDeletesVsLocal_ === 'function') {
+        window.dalPaNotifyPeerDeletesVsLocal_(remoteFixtures, localFixtures);
+      } else if (typeof window.dalPaCheckLwwLossesAgainstRemote_ === 'function') {
         window.dalPaCheckLwwLossesAgainstRemote_(remoteFixtures);
       }
       window.dalPaRemotePending = true;
@@ -873,6 +939,9 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   window.dalPaRemotePending = hasTouches;
   window.dalPaApplyingRemote = true;
   try {
+    if (typeof window.dalPaNotifyPeerDeletesVsLocal_ === 'function') {
+      window.dalPaNotifyPeerDeletesVsLocal_(remoteFixtures, localFixtures);
+    }
     if (typeof window.dalPaCheckLwwLossesAgainstRemote_ === 'function') {
       window.dalPaCheckLwwLossesAgainstRemote_(remoteFixtures);
     }

@@ -718,16 +718,29 @@ function updateAssignedQty(repAssetId, loc, form, delta, containerUid = null) {
 }
 
 function updateFormulaDept(loc, form, newDept) {
+    var touchedUids = [];
     currentProjectAssets.forEach(pa => {
         let pLoc = pa.location || "General";
         let pForm = pa.formula || "Standalone";
         if (pLoc === loc && pForm === form) {
             pa.overrideDept = newDept || '';
-            if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
-                window.dalPaNoteTouch_(pa.uid);
+            if (pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                touchedUids.push(String(pa.uid));
+                if (typeof window.dalPaNoteTouch_ === 'function') {
+                    window.dalPaNoteTouch_(pa.uid);
+                }
             }
         }
     });
+    // Belt-and-suspenders: dept-set moves must stay in the conflict window even if noteTouch no-ops.
+    if (touchedUids.length) {
+        if (typeof window.dalPaMarkRecentEdit_ === 'function') {
+            window.dalPaMarkRecentEdit_(touchedUids, 60000);
+        }
+        if (typeof window.dalPaArmLwwWatch_ === 'function') {
+            window.dalPaArmLwwWatch_(touchedUids, 60000);
+        }
+    }
     if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
     renderProjectAssetsUI();
 }
