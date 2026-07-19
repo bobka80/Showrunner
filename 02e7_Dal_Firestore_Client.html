@@ -482,18 +482,17 @@ window.dalPaRequeueRemoteApply_ = function(assets, snapMeta, delayMs) {
 
 window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   snapMeta = snapMeta || {};
-  if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) {
+  var forceApply = !!snapMeta.forceApply;
+  if (!forceApply && Date.now() < (window.dalPaIgnoreListenerUntil || 0)) {
     window.dalPaRequeueRemoteApply_(assets, snapMeta, (window.dalPaIgnoreListenerUntil - Date.now()) + 50);
     return;
   }
-  if (window.dalPaFlushInFlight) {
+  if (!forceApply && window.dalPaFlushInFlight) {
     window.dalPaRequeueRemoteApply_(assets, snapMeta, 200);
     return;
   }
   if (!window.dalPrepUiOpen) return;
-  // Do NOT block the whole apply on anyHoldActive — per-UID hold/touch in the merge
-  // already protects local rows. Global gating delayed peer snaps until they were
-  // false-acked (lastRemoteSig) and then forgotten until refresh.
+  // Per-UID hold/touch in the merge protects local rows (no global anyHold gate).
 
   var serverAssets = JSON.parse(JSON.stringify(assets || []));
   // State-doc authority: fixtures may lack per-row writeSeq (older writes). Stamp the
@@ -511,12 +510,18 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   });
 
   var fixtureSig = window.dalPaFixturesSig_(serverAssets);
-  if (fixtureSig === window.dalPaLastRemoteSig) return;
-  // After local flush: drop only strictly older state docs.
-  if (window.dalPaFlushGuardUntil_ && Date.now() < window.dalPaFlushGuardUntil_) {
+  if (!forceApply && fixtureSig === window.dalPaLastRemoteSig) return;
+  // FlushGuard: older seq OK to skip only if local already matches remote content.
+  if (!forceApply && window.dalPaFlushGuardUntil_ && Date.now() < window.dalPaFlushGuardUntil_) {
     var remoteSeq = Number(snapMeta.docWriteSeq || 0) || 0;
     var lastSeq = Number(window.dalPaLastDocWriteSeq_ || 0) || 0;
-    if (remoteSeq && lastSeq && remoteSeq < lastSeq) return;
+    if (remoteSeq && lastSeq && remoteSeq < lastSeq) {
+      var guardLocal = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
+        return !window.dalPaIsAutoRow_(pa);
+      });
+      if (fixtureSig === window.dalPaFixturesSig_(guardLocal)) return;
+      // local lags — fall through (concurrent flush absorbed peer into newer own write)
+    }
   }
 
   var hasTouches = window.dalPaHasPendingTouches_();
@@ -534,7 +539,7 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
     if (fixtureSig !== localFixSig) {
       window.dalPaRemotePending = true;
       window.dalUpdateRemotePendingBanner_();
-      window.dalPaRequeueRemoteApply_(assets, snapMeta, 450);
+      if (!forceApply) window.dalPaRequeueRemoteApply_(assets, snapMeta, 450);
       return;
     }
     window.dalPaLastRemoteSig = fixtureSig;
@@ -576,11 +581,12 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
 
     var renderSig = window.dalPaFixturesSig_(currentProjectAssets);
     if (renderSig !== window.dalPaLastRenderSig_) {
-      window.dalPaLastRenderSig_ = renderSig;
       var overlay = document.getElementById('project-assets-modal-overlay');
       if (overlay && overlay.style.display !== 'none' && typeof renderProjectAssetsUI === 'function') {
+        window.dalPaLastRenderSig_ = renderSig;
         renderProjectAssetsUI();
       }
+      // If overlay hidden, do not advance lastRenderSig — next apply must retry paint.
       if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
     }
   } finally {
@@ -588,6 +594,21 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   }
   window.dalUpdateRemotePendingBanner_();
   // NEVER flush from apply — that was the snap→render→flush→snap browser stutter loop.
+};
+
+/**
+ * After our PA_PATCH txn succeeds, apply the host-merged fixture list.
+ * The txn may have absorbed peer edits that our UI never saw (concurrent flush race).
+ */
+window.dalPaApplyOwnWriteMerged_ = function(merged, writeSeq) {
+  if (!window.dalPrepUiOpen) return;
+  if (!merged || !Array.isArray(merged)) return;
+  window.dalApplyRemotePaAssetsNow_(merged, {
+    docWriteSeq: Number(writeSeq || 0) || 0,
+    fromCache: false,
+    hasPendingWrites: false,
+    forceApply: true
+  });
 };
 
 window.dalEnsureFirebaseSdk_ = function(done) {
@@ -1035,9 +1056,15 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   }
 
   if (writeSeq && window.dalPaLastDocWriteSeq_ && writeSeq < window.dalPaLastDocWriteSeq_) return;
+
+  // Own write echo: still apply when local UI lags the txn-merged doc (peer edits
+  // absorbed into our write). Skipping here + FlushGuard on older peer snaps = forgotten UI.
   if (window.dalPaClientId && remoteClient === window.dalPaClientId) {
     if (writeSeq > window.dalPaLastDocWriteSeq_) window.dalPaLastDocWriteSeq_ = writeSeq;
-    return;
+    var echoLocalSig = window.dalPaFixturesSig_(localSeed);
+    var echoRemoteSig = window.dalPaFixturesSig_(fixtures);
+    if (echoRemoteSig === echoLocalSig) return;
+    // fall through — apply absorbed peer rows
   }
 
   // Empty with authority: apply empty (do not seed). Unloaded UI: wait for hydrate.
@@ -1514,6 +1541,10 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
         Object.keys(window.dalPaDeletedUids_ || {}).forEach(function(uid) { delete window.dalPaDeletedUids_[uid]; });
         var writeSeq = Number((result && result.writeSeq) || 0) || 0;
         if (writeSeq > window.dalPaLastDocWriteSeq_) window.dalPaLastDocWriteSeq_ = writeSeq;
+        // Heal concurrent flush: txn-merged list includes peer rows our UI may have missed.
+        if (result && result.merged && typeof window.dalPaApplyOwnWriteMerged_ === 'function') {
+          try { window.dalPaApplyOwnWriteMerged_(result.merged, writeSeq); } catch (eM) { /* ignore */ }
+        }
         done(null, { mutations: mutations, result: result || null });
       };
 

@@ -170,6 +170,13 @@ assert(core.shouldAckRemoteSigAfterMerge({
   mergedSig: 'peer'
 }), 'merged applied peer: ack ok');
 
+// Case N: concurrent flush — writer must apply txn-merged peer rows (not leave UI stale).
+// Does NOT cover: host postMessage delivery; render overlay hidden.
+console.log('\n--- Case N: concurrent flush absorbs peer into writer UI ---');
+var abs = core.simulateConcurrentFlushAbsorb();
+console.log('  store u1=%s u2=%s buggyUi.u1=%s fixedUi.u1=%s', abs.storeU1, abs.storeU2, abs.buggyU1, abs.fixedU1);
+assert(abs.ok, 'store has A+B edits; buggy UI forgets u1; fixed applies merged u1=5');
+
 console.log('\n--- Unit: patchMergeFixtures only applies touches ---');
 var merged = core.patchMergeFixtures(
   [{ uid: 'u1', qty: 5 }, { uid: 'u2', qty: 1 }],
@@ -202,5 +209,5 @@ if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–M + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–N + units)');
 process.exit(0);

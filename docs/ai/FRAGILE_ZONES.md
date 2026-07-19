@@ -513,7 +513,8 @@ After END — reopen rules
 5. **Hold ScriptLock across Firestore UrlFetch** on open/close.
 6. **Edit fixtures while treating banner-off as “still in collab.”** Banner off = live sync off. Local edits will not reach peers.
 7. **Fall back to silent GAS `live sync (server)` multi-edit when Auth/listen fails.** H1: enter **blocked** (hard banner + edits locked). Read-only poll OK; patch writes only.
-8. **Drop peer state snaps during FlushGuard / flush-in-flight** because fixture sig ≠ expected. That silently loses the only delivery of a peer edit. Re-queue or apply; FlushGuard may drop only older `writeSeq`.
+8. **Drop peer state snaps during FlushGuard / flush-in-flight** because fixture sig ≠ expected. That silently loses the only delivery of a peer edit. Re-queue or apply; FlushGuard may drop only older `writeSeq` when local already matches.
+9. **Skip applying own write echo when local UI lags the txn-merged doc.** Concurrent flush absorbs peer rows into your write; echo used to advance `writeSeq` only → peer edit forgotten until refresh. Always apply `result.merged` after PA_PATCH OK.
 
 ### Safe rules (locked)
 

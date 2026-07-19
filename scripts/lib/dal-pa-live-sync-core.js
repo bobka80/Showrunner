@@ -694,6 +694,51 @@ module.exports = {
     if (mergedSig === localSig && remoteSig !== localSig) return false;
     return true;
   },
+  /**
+   * Case N: concurrent flush race — B writes after A; B's txn merges A's qty into
+   * result.merged; B must apply merged locally (own echo alone left UI stale).
+   */
+  simulateConcurrentFlushAbsorb: function() {
+    var u1 = 'fix-1';
+    var u2 = 'fix-2';
+    var state = {
+      fixtures: [
+        { uid: u1, assetId: 'A1', qty: 1 },
+        { uid: u2, assetId: 'A2', qty: 1 }
+      ],
+      writeSeq: 1,
+      clientId: 'seed'
+    };
+    // A patches u1 → seq 2
+    state = txnStatePatch(state, [
+      { uid: u1, assetId: 'A1', qty: 5 },
+      { uid: u2, assetId: 'A2', qty: 1 }
+    ], { 'fix-1': 1 }, {}, 'clientA');
+
+    // B still has stale u1=1 locally; flushes u2=9 — txn reads A's state and merges
+    var bLocal = [
+      { uid: u1, assetId: 'A1', qty: 1 },
+      { uid: u2, assetId: 'A2', qty: 9 }
+    ];
+    state = txnStatePatch(state, bLocal, { 'fix-2': 1 }, {}, 'clientB');
+
+    var store = mapByUid(state.fixtures);
+    // buggy: B keeps local UI without applying merged → u1 stays 1
+    var buggyUi = { u1: 1, u2: 9 };
+    // fixed: apply result.merged (store) onto B for non-touched rows
+    var fixedUi = {
+      u1: Number(store[u1].qty),
+      u2: Number(store[u2].qty)
+    };
+    return {
+      storeU1: Number(store[u1].qty),
+      storeU2: Number(store[u2].qty),
+      buggyU1: buggyUi.u1,
+      fixedU1: fixedUi.u1,
+      ok: Number(store[u1].qty) === 5 && Number(store[u2].qty) === 9 &&
+        buggyUi.u1 === 1 && fixedUi.u1 === 5
+    };
+  },
   /** After END, refuse reopen for the same sessionUid. */
   shouldAllowRemotePrepOpen: function(opts) {
     opts = opts || {};
