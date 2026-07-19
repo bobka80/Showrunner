@@ -2605,6 +2605,12 @@
     return Math.round(x * 100) / 100;
   }
 
+  function dalFsNormalizeHasArrow_(v) {
+    if (v === 'open' || v === 'Open') return 'open';
+    if (v === true || v === 'true' || v === 1 || v === '1') return true;
+    return false;
+  }
+
   function dalFsEntityChanged_(a, b, fields) {
     if (!a || !b) return true;
     for (var i = 0; i < fields.length; i++) {
@@ -2612,7 +2618,7 @@
       if (f === 'start' || f === 'duration') {
         if (dalFsRound_(a[f]) !== dalFsRound_(b[f])) return true;
       } else if (f === 'hasArrow') {
-        if (!!a[f] !== !!b[f]) return true;
+        if (dalFsNormalizeHasArrow_(a[f]) !== dalFsNormalizeHasArrow_(b[f])) return true;
       } else if (String(a[f] || '') !== String(b[f] || '')) {
         return true;
       }
@@ -2855,6 +2861,15 @@
     return Object.keys(out).map(function(k) { return out[k]; });
   }
 
+  function dalFsPaEncodeFormula_(pa) {
+    pa = pa || {};
+    var pForm = pa.formula || pa.formulaEncoded || 'Standalone';
+    if (pa.isShortage === true || pa.isShortage === 'true') {
+      if (String(pForm).indexOf('[SHORT] ') !== 0) pForm = '[SHORT] ' + pForm;
+    }
+    return pForm;
+  }
+
   function dalFsPaFixtureToColDoc_(pa, projectId, meta) {
     pa = pa || {};
     meta = meta || {};
@@ -2864,7 +2879,7 @@
       asset_uid: String(pa.assetId || pa.asset_uid || ''),
       assigned_quantity: pa.qty != null ? pa.qty : (pa.assigned_quantity != null ? pa.assigned_quantity : 1),
       location: pa.location || 'General',
-      formula: pa.formula || pa.formulaEncoded || '',
+      formula: dalFsPaEncodeFormula_(pa),
       creator: pa.creator || 'System',
       container_uid: pa.containerUid || pa.container_uid || '',
       scan_status: pa.scanStatus || pa.scan_status || 'Assigned',

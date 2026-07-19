@@ -8,7 +8,7 @@
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
 **Opened:** 2026-07-18 · **Status:** **A0 complete** · **H1 shipped** · **H5 shipped** (PA + timeline mutation inventory). Next: **Gap 1 (A3)** or director pick. Fresh agents: read § floor scope first.  
-**Production / prep live rollback:** GAS **v654** · hosting `host-boot.js?v=653` · Prep banner **`live sync (patch)`** — update pins after H5 milestone  
+**Production / prep live rollback:** GAS **v655** (H5) · prior good sync **v654** · hosting `host-boot.js?v=653` · Prep banner **`live sync (patch)`**  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
@@ -293,7 +293,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **Order locked:** H0 testing → bulletproof H1–H5 + Gap 1 → Part B. Process → bulletproof brief. Gap 1 folded into hub (no parallel gap-closure novel). Pre-ship expansion brief filed separately. |
 | 2026-07-19 | **A0 / H0 shipped:** Cases A–J + scope comments; mutation inventory gate; FRAGILE `ATTEMPTS BEFORE THIS HELD`; ready for director OK on **H1**. |
 | 2026-07-19 | **A1 / H1 shipped:** Auth/listen/write fail → blocked mode (hard banner + edits locked); no silent GAS multi-edit; Case K mid-edit sim; timeline twin. |
-| 2026-07-19 | **A2 / H5 shipped:** PA notes on dept/location/shortage/formula rewrite/cancel; timeline notes on note/arrow/crew override; timeline inventory gate; ALLOWLIST shrunk. |
+| 2026-07-19 | **A2 / H5 shipped @ v655:** PA notes on location/shortage/formula rewrite/cancel; timeline notes on note/arrow/crew override; timeline inventory gate; crew DONE/CANCEL single flush; ALLOWLIST overrideDept (not in FS schema). |
 
 ---
 

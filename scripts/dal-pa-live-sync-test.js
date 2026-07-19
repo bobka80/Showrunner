@@ -229,9 +229,22 @@ var delMerge = core.patchMergeFixtures(
 );
 assert(!delMerge.find(function (x) { return x.uid === 'u1'; }), 'delete map removes u1 from merge');
 
+console.log('\n--- Case Q: shortage flag changes fixtureSig (peer must apply) ---');
+var sigPlain = core.fixtureSig([{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x' }]);
+var sigShort = core.fixtureSig([{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x', isShortage: true }]);
+assert(sigPlain !== sigShort, 'shortage toggle must change fixtureSig');
+var shortMerge = core.patchMergeFixtures(
+  [{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x', isShortage: false }],
+  [{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x', isShortage: true }],
+  { u1: 1 },
+  {}
+);
+var sm = shortMerge.find(function (x) { return x.uid === 'u1'; });
+assert(sm && sm.isShortage === true, 'touched shortage upsert lands in store');
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–P + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–Q + units)');
 process.exit(0);

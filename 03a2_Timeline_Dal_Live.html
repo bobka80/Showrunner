@@ -205,6 +205,19 @@ window.dalTlApplyEntityHolds_ = function(remoteState, localState) {
   return { shifts: shiftsOut, phases: phasesOut, overrides: ovOut };
 };
 
+window.dalTlNormalizeHasArrow_ = function(v) {
+  if (v === 'open' || v === 'Open') return 'open';
+  if (v === true || v === 'true' || v === 1 || v === '1') return true;
+  return false;
+};
+
+window.dalTlHasArrowSig_ = function(v) {
+  var n = window.dalTlNormalizeHasArrow_(v);
+  if (n === 'open') return 2;
+  if (n === true) return 1;
+  return 0;
+};
+
 window.dalTimelineStateSig_ = function(shifts, phases, overrides) {
   var s = (shifts || []).map(function(x) {
     return [
@@ -213,7 +226,7 @@ window.dalTimelineStateSig_ = function(shifts, phases, overrides) {
       x.role || '',
       window.dalTlRound_(x.start),
       window.dalTlRound_(x.duration),
-      x.hasArrow ? 1 : 0,
+      window.dalTlHasArrowSig_(x.hasArrow),
       x.note || ''
     ].join(':');
   }).sort().join('|');
@@ -242,7 +255,7 @@ window.dalTlSanitizeShiftsForFork_ = function(list) {
       role: s.role || '',
       start: window.dalTlRound_(s.start),
       duration: window.dalTlRound_(s.duration),
-      hasArrow: !!s.hasArrow,
+      hasArrow: window.dalTlNormalizeHasArrow_(s.hasArrow),
       note: s.note || ''
     };
   });
@@ -297,7 +310,9 @@ window.dalTlEntityChanged_ = function(a, b, fields) {
     if (f === 'start' || f === 'duration') {
       if (window.dalTlRound_(a[f]) !== window.dalTlRound_(b[f])) return true;
     } else if (f === 'hasArrow') {
-      if (!!a[f] !== !!b[f]) return true;
+      var na = window.dalTlNormalizeHasArrow_ ? window.dalTlNormalizeHasArrow_(a[f]) : !!a[f];
+      var nb = window.dalTlNormalizeHasArrow_ ? window.dalTlNormalizeHasArrow_(b[f]) : !!b[f];
+      if (na !== nb) return true;
     } else if (String(a[f] || '') !== String(b[f] || '')) {
       return true;
     }

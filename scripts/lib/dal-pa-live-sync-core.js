@@ -32,7 +32,14 @@ function mapByUid(list) {
 
 function fixtureSig(list) {
   return fixturesOnly(list).map(function (a) {
-    return [a.uid || '', a.qty || 0, a.location || '', a.formula || '', a.assetId || ''].join(':');
+    return [
+      a.uid || '',
+      a.qty || 0,
+      a.location || '',
+      a.formula || '',
+      a.assetId || '',
+      a.isShortage ? '1' : '0'
+    ].join(':');
   }).sort().join('|');
 }
 

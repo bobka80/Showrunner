@@ -190,6 +190,10 @@ window.dalProcessPaFormulas_ = function(arr, opts) {
     if (pa.formula && pa.formula.indexOf('[SHORT] ') === 0) {
       pa.isShortage = true;
       pa.formula = pa.formula.substring(8);
+    } else if (pa.isShortage === true || pa.isShortage === 'true') {
+      pa.isShortage = true;
+    } else {
+      pa.isShortage = false;
     }
     if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; }
     else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
@@ -253,8 +257,10 @@ window.dalPaIsAutoRow_ = function(pa) {
 /** Fixture-only sig — live collab ignores auto-container UID churn for equality. */
 window.dalPaFixturesSig_ = function(assets) {
   return (assets || []).filter(function(a) { return !window.dalPaIsAutoRow_(a); }).map(function(a) {
+    // Include shortage — toggle only flips isShortage (formula string unchanged in state doc).
     return (a.uid || '') + ':' + (a.qty || 0) + ':' + (a.location || '') + ':' +
-      (a.formula || '') + ':' + (a.assetId || '') + ':' + (a.containerUid || '');
+      (a.formula || '') + ':' + (a.assetId || '') + ':' + (a.containerUid || '') + ':' +
+      (a.isShortage ? '1' : '0');
   }).sort().join('|');
 };
 
