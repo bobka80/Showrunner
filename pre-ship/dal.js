@@ -53,6 +53,8 @@ function runDalGates({ forDeploy }) {
   // H0/H5: every PA + timeline mutator notes touch/delete (or explicit allowlist).
   runNode('scripts/dal-mutation-inventory-check.js', [], 'PA mutation inventory (touch/delete notes)');
   runNode('scripts/dal-tl-mutation-inventory-check.js', [], 'timeline mutation inventory (dalTlNote*)');
+  // Gap 1 / A3: Firestore vs GAS mode structural lint (FRAGILE #10/#11).
+  runNode('scripts/dal-sync-mode-lint.js', [], 'Firestore/GAS sync-mode lint (Gap 1)');
   console.log('  → DAL gates OK');
   return {
     ok: true,
@@ -62,7 +64,8 @@ function runDalGates({ forDeploy }) {
       'dal-phase3-gate',
       'dal-pa-live-sync-test',
       'dal-mutation-inventory-check',
-      'dal-tl-mutation-inventory-check'
+      'dal-tl-mutation-inventory-check',
+      'dal-sync-mode-lint'
     ]
   };
 }

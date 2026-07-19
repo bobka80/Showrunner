@@ -7,9 +7,9 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **PAUSED** (director 2026-07-19) for cross-dept working/paste target ship — resume at **Gap 1 (A3)**. Prior: **A0 + H1 + H5** complete.  
+**Opened:** 2026-07-18 · **Status:** **Active** — Gap 1 (A3) shipping. Prior: **A0 + H1 + H5** complete; side-feature pause lifted.  
 **Production / prep live rollback:** GAS **v656** (shortage sig + hasArrow `open`) · hosting `host-boot.js?v=655` · prior sync baseline **v654** · Prep banner **`live sync (patch)`**  
-**Side feature (this pause):** GAS **v658** · hosting `host-boot.js?v=658` — working/paste dept + `override_dept` live sync.  
+**Latest side ships:** working/paste dept + `override_dept` (v658+) · overrideDept refresh fix **v663**.  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
@@ -161,15 +161,13 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v654"** (pr
 - [x] PA ALLOWLIST shrunk to DUMMY shell only; timeline mid-drag / sub-event ALLOWLIST documented in gate script  
 
 
-### A3 — Gap 1 Firestore / GAS mode structural lint
+### A3 — Gap 1 Firestore / GAS mode structural lint ✅
 
-**New (was only in a draft gap brief — folded here; no parallel gap-closure file).**
-
-- [ ] After A0 mode-seam sims exist: add `pre-ship/dal-sync-mode-lint.js` (or extend `pre-ship/dal.js`)  
-- [ ] Fail diffs that call `saveProjectAssets` / `saveTimelineData` from Firestore-mode paths without allowlist  
-- [ ] Fail applying GAS responses into live apply without `writeSeq` presence check  
-- [ ] Document in [dal-pre-ship-gates.md](dal-pre-ship-gates.md)  
-- [ ] Detection only — no runtime behavior change required for the gate itself  
+- [x] After A0 mode-seam sims exist: add `scripts/dal-sync-mode-lint.js` (wired in `pre-ship/dal.js`)  
+- [x] Fail diffs that call `saveProjectAssets` / `saveTimelineData` from live client modules without allowlist  
+- [x] Fail applying GAS responses into live apply without firestore-mode guard or `writeSeq` presence  
+- [x] Document in [dal-pre-ship-gates.md](dal-pre-ship-gates.md)  
+- [x] Detection only — no runtime behavior change required for the gate itself  
 
 Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) / FRAGILE — mechanical guard replaces “don’t” alone.
 
@@ -296,6 +294,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **A1 / H1 shipped:** Auth/listen/write fail → blocked mode (hard banner + edits locked); no silent GAS multi-edit; Case K mid-edit sim; timeline twin. |
 | 2026-07-19 | **A2 / H5 shipped @ v655:** PA notes on location/shortage/formula rewrite/cancel; timeline notes on note/arrow/crew override; timeline inventory gate; crew DONE/CANCEL single flush; ALLOWLIST overrideDept (not in FS schema). |
 | 2026-07-19 | **Campaign paused** for side feature: PA **working dept** (new-add stamp) + **green selected dept** (paste target) + `override_dept` Sheets/FS live sync. Resume → **Gap 1 (A3)**. |
+| 2026-07-19 | **A3 / Gap 1 shipped:** `scripts/dal-sync-mode-lint.js` in pre-ship; FRAGILE #10/#11 mechanical; post-END timeline hydrate allowlisted. **Next: A4 / H4** (state size + END mirror). |
 
 ---
 

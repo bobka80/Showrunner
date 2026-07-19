@@ -1182,6 +1182,7 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
           if (!data || window.isTimelineDirty) return;
           window.dalTlLastStateSig = '';
           window.dalTlSyncBase_ = null;
+          // DAL-SYNC-MODE-ALLOW: post-END COLLAB Sheets hydrate (session already closed; not live firestore)
           window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides, {});
         })
         .getTimelineData(projectId, mode);

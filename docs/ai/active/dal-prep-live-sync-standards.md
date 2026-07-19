@@ -161,4 +161,4 @@ If a path mutates without note → **bug**, not “edge case.”
 
 Incidents closed into FRAGILE: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md).  
 
-**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **A0 + H1 done → H5 next → Gap 1 → H4 → H3 → H2 → Part A exit → Part B**. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).
+**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **A0 + H1 + H5 + Gap 1 done → H4 next → H3 → H2 → Part A exit → Part B**. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).

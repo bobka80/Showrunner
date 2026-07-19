@@ -67,9 +67,10 @@ Wired from `pre-ship/layers.js` → `runDalGates()`:
 1. scripts/dal-persistence-lint.js
 2. scripts/dal-client-inventory.js --check
 3. scripts/dal-phase3-gate.js [--deploy]
-4. scripts/dal-pa-live-sync-test.js          # Cases A–J (scope + mode seam + 3-client)
+4. scripts/dal-pa-live-sync-test.js          # Cases A–R (scope + mode seam + 3-client)
 5. scripts/dal-mutation-inventory-check.js     # PA touch/delete notes
 6. scripts/dal-tl-mutation-inventory-check.js  # timeline dalTlNote* (H5 twin)
+7. scripts/dal-sync-mode-lint.js               # Gap 1 Firestore vs GAS (#10/#11)
 ```
 
 ---
@@ -201,26 +202,29 @@ When Logistics / Operations hot paths change, `pre-ship/bugbot-policy.js` adds a
 | `scripts/dal-phase3-gate.js` | Delta-only deploy gate |
 | `scripts/dal-pa-live-sync-test.js` | PA live-sync Cases A–J (pure sim) |
 | `scripts/dal-mutation-inventory-check.js` | PA mutators must note touch/delete |
+| `scripts/dal-tl-mutation-inventory-check.js` | Timeline mutators must note dalTlNote* |
+| `scripts/dal-sync-mode-lint.js` | Gap 1 — Firestore vs GAS mode structural lint |
 | `docs/ai/active/dal-client-inventory.md` | Generated inventory artifact |
 
 All scripts are **Node-only** (`gas-node-only.js`) — never deployed to GAS.
 
 ---
 
-## Planned — Gap 1: Firestore / GAS sync-mode lint
+## Gap 1: Firestore / GAS sync-mode lint ✅
 
-**Status:** Not built — hub [multi-user-fork A3](multi-user-fork-industrial-and-auto.md) · after **H0** mode-seam sims ([bulletproof](bulletproof-multiuser-live-editors-2026-07-18.md)).  
-**H0 prerequisite met:** Case H in `scripts/dal-pa-live-sync-test.js` (`shouldApplyGasPaList`).  
-**Do not start without director OK go.**
+**Status:** Shipped — hub [multi-user-fork A3](multi-user-fork-industrial-and-auto.md).  
+**H0 prerequisite:** Case H in `scripts/dal-pa-live-sync-test.js` (`shouldApplyGasPaList`).
 
 **Risk:** Firestore live path and GAS poll/full-save path must never cross-write. Documented “don’t” (#10/#11 in live-sync standards / FRAGILE) is not enough — a future edit can reintroduce LWW thrash or wipe `writeSeq` stamps.
 
-**Proposed:** `pre-ship/dal-sync-mode-lint.js` (or extend `pre-ship/dal.js`) — detection only:
+**Script:** `scripts/dal-sync-mode-lint.js` — wired in `pre-ship/dal.js` (detection only):
 
-- Flag `saveProjectAssets(` / `saveTimelineData(` reachable from Firestore-mode code paths unless allowlisted with reason comment  
-- Flag GAS response objects fed into live apply helpers without confirming `writeSeq` presence  
+- Ban `saveProjectAssets(` / `saveTimelineData(` call sites in live client modules (`02e7`, `03a2`) unless `// DAL-SYNC-MODE-ALLOW: reason`
+- Ban live-flush bodies from Sheets-save fallback
+- Flag GAS `res.current` / `data.shifts` fed into live apply helpers without firestore-mode early return or `writeSeq`/`docWriteSeq`
+- Assert `shouldApplyGasPaList` still rejects `firestore` mode
 
-**Also shipped (hub A0 + A2/H5):** `scripts/dal-mutation-inventory-check.js` (PA) + `scripts/dal-tl-mutation-inventory-check.js` (timeline twin). Wired in `pre-ship/dal.js`.
+**Also shipped (hub A0 + A2/H5):** `scripts/dal-mutation-inventory-check.js` (PA) + `scripts/dal-tl-mutation-inventory-check.js` (timeline twin).
 
 **Other domains (RBAC, FCM, truck, financials):** [pre-ship-pipeline-expansion-2026-07-18.md](pre-ship-pipeline-expansion-2026-07-18.md) — parallel board, not this Gap 1.
 
