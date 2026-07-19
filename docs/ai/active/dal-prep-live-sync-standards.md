@@ -44,7 +44,7 @@ If a future proposal conflicts with this table, **stop and ask the director** �
 | ID | Standard | Why | Done when |
 |----|----------|-----|-----------|
 | **H0** | **Testing pipeline** | Green sims without documented scope caused false confidence (v628–v638). | Scope comments on every Case; mutation gate script; mode-seam sims; incident “attempts” field — see bulletproof Phase H0 |
-| **H1** | **Fail closed on weak sync** | Multi-user prep must not silently run on GAS `live sync (server)` poll (2.5s lag + no txn). Banner must be **`patch`**, or show a hard warning / block edits. | Two browsers cannot edit live list while either is on `server` without an explicit banner |
+| **H1** | **Fail closed on weak sync** | Multi-user prep must not silently run on GAS `live sync (server)` poll (2.5s lag + no txn). Banner must be **`patch`**, or show a hard warning / block edits. | **Done (v648):** `blocked` mode + Case K; timeline twin |
 | **H2** | **Cheaper remote apply** | Full PA rebuild every snap causes stutter (same class as timeline strip thrash). Diff/merge then targeted redraw. | Remote qty/delete updates without full-list flash storms + measurable pass condition |
 | **H3** | **Same-row conflict visibility** | Industry LWW still loses one edit; product should toast “overwritten by peer” on same UID race. | User sees when their row lost — **both** PA and timeline (no hedge) |
 | **H4** | **State size + END PREP mirror check** | Large `fixturesJson` + collection drift = silent commit wrongness. Cap/warn; verify mirror before Sheets write. | END PREP refuses or alerts on mirror mismatch |

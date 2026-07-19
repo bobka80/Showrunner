@@ -603,6 +603,62 @@ module.exports = {
     if (String(opts.liveSyncMode || '') === 'firestore') return false;
     return true;
   },
+  /**
+   * H1: live PA writes only in healthy firestore patch mode.
+   * connecting / blocked / gas / empty-during-prep → no writes.
+   */
+  shouldAllowLivePaWrite: function(opts) {
+    opts = opts || {};
+    if (!opts.prepUiOpen) return true;
+    return String(opts.liveSyncMode || '') === 'firestore';
+  },
+  /**
+   * Case K: Auth/listen fails mid-edit — post-fail flush must not land in store via GAS LWW.
+   * Simulates: A edits in firestore, then mode→blocked; further local qty must not txn-patch store.
+   */
+  simulateAuthFailMidEdit: function() {
+    var u1 = 'fix-1';
+    var state = {
+      fixtures: [{ uid: u1, assetId: 'A1', qty: 2 }],
+      writeSeq: 1,
+      clientId: 'seed'
+    };
+    var mode = 'firestore';
+    var A = {
+      fixtures: JSON.parse(JSON.stringify(state.fixtures)),
+      touched: {},
+      lastDocSeq: 1
+    };
+    // Mid-edit local change while healthy
+    var row = mapByUid(A.fixtures)[u1];
+    row.qty = 5;
+    A.touched[u1] = 1;
+    state = txnStatePatch(state, A.fixtures, A.touched, {}, 'clientA');
+    A.touched = {};
+    A.lastDocSeq = state.writeSeq;
+
+    // Auth fails mid-session
+    mode = 'blocked';
+    var allowAfter = module.exports.shouldAllowLivePaWrite({ prepUiOpen: true, liveSyncMode: mode });
+    // User keeps clicking + — local only, flush refused
+    row = mapByUid(A.fixtures)[u1];
+    row.qty = 9;
+    var storeBefore = Number(mapByUid(state.fixtures)[u1].qty);
+    if (allowAfter) {
+      var touchBad = {};
+      touchBad[u1] = 1;
+      state = txnStatePatch(state, A.fixtures, touchBad, {}, 'clientA');
+    }
+    var storeAfter = Number(mapByUid(state.fixtures)[u1].qty);
+    return {
+      mode: mode,
+      allowAfter: allowAfter,
+      storeBefore: storeBefore,
+      storeAfter: storeAfter,
+      localQty: Number(row.qty),
+      ok: !allowAfter && storeBefore === 5 && storeAfter === 5 && Number(row.qty) === 9
+    };
+  },
   /** After END, refuse reopen for the same sessionUid. */
   shouldAllowRemotePrepOpen: function(opts) {
     opts = opts || {};

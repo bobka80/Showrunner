@@ -111,6 +111,18 @@ assert(!core.shouldAllowRemotePrepOpen({
   sheetsOpenBlocked: true
 }), 'empty uid blocked while sheetsOpenBlocked');
 
+// Case K: Auth fails mid-edit — further flush must not patch store (H1 fail closed).
+// Does NOT cover: UI toast copy; retry timer; timeline twin (mirrors same gate).
+console.log('\n--- Case K: auth fail mid-edit blocks writes ---');
+assert(core.shouldAllowLivePaWrite({ prepUiOpen: true, liveSyncMode: 'firestore' }), 'firestore allows writes');
+assert(!core.shouldAllowLivePaWrite({ prepUiOpen: true, liveSyncMode: 'blocked' }), 'blocked denies writes');
+assert(!core.shouldAllowLivePaWrite({ prepUiOpen: true, liveSyncMode: 'gas' }), 'legacy gas denies writes');
+assert(!core.shouldAllowLivePaWrite({ prepUiOpen: true, liveSyncMode: 'connecting' }), 'connecting denies writes');
+assert(core.shouldAllowLivePaWrite({ prepUiOpen: false, liveSyncMode: '' }), 'outside prep allows (normal save)');
+var mid = core.simulateAuthFailMidEdit();
+console.log('  mode=%s store %s→%s local=%s', mid.mode, mid.storeBefore, mid.storeAfter, mid.localQty);
+assert(mid.ok, 'mid-edit auth fail: store stays at 5, local may be 9, flush denied');
+
 console.log('\n--- Unit: patchMergeFixtures only applies touches ---');
 var merged = core.patchMergeFixtures(
   [{ uid: 'u1', qty: 5 }, { uid: 'u2', qty: 1 }],
@@ -143,5 +155,5 @@ if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–J + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–K + units)');
 process.exit(0);

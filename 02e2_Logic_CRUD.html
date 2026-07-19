@@ -16,6 +16,10 @@
 // @INDEX: PA_LOGIC -> Asset Provisioning & Mutations
 
 window.insertIntoProjectAssets = function(newItem) {
+    if (window.dalPrepUiOpen && typeof window.dalPaLiveWritesAllowed_ === 'function' && !window.dalPaLiveWritesAllowed_()) {
+        if (typeof window.dalPaWarnBlockedOnce_ === 'function') window.dalPaWarnBlockedOnce_();
+        return;
+    }
     if (!newItem.uid && typeof window.dalNewUid_ === 'function') newItem.uid = window.dalNewUid_();
     if (window.overrideInsertIndex !== undefined && window.overrideInsertIndex !== null) {
         currentProjectAssets.splice(window.overrideInsertIndex, 0, newItem);

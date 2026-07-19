@@ -10,7 +10,12 @@ window.dalPaLastRemoteSig = '';
 window.dalPaFirestoreListenProjectId = '';
 window.dalMetaAuthority = false;
 window.dalPaLiveSyncFailed = false;
-window.dalPaLiveSyncMode = ''; // 'firestore' | 'gas'
+window.dalPaLiveSyncMode = ''; // 'firestore' | 'connecting' | 'blocked' | '' (legacy 'gas' treated as blocked)
+window.dalPaLiveSyncFailReason_ = '';
+window.dalPaSyncBlockedReadOnlyLatch_ = false;
+window.dalPaReadOnlyBeforeBlock_ = false;
+window.dalPaBlockedRetryTimer_ = null;
+window.dalPaBlockedWarnAt_ = 0;
 window.dalPaSessionWatchStarting = false;
 window.dalPaBannerLastText_ = '';
 // Timeline-parity: explicit touches only (never invent full-list diffs).
@@ -20,8 +25,91 @@ window.dalPaDeletedUids_ = window.dalPaDeletedUids_ || {};
 window.dalPaLastAppliedSeq_ = window.dalPaLastAppliedSeq_ || {};
 window.dalPaLastDocWriteSeq_ = window.dalPaLastDocWriteSeq_ || 0;
 
+/** H1: live prep writes only while Firestore patch mode is healthy. */
+window.dalPaLiveWritesAllowed_ = function() {
+  if (!window.dalPrepUiOpen) return true;
+  return window.dalPaLiveSyncMode === 'firestore';
+};
+
+window.dalPaWarnBlockedOnce_ = function() {
+  if (Date.now() < (window.dalPaBlockedWarnAt_ || 0)) return;
+  window.dalPaBlockedWarnAt_ = Date.now() + 4000;
+  var msg = 'Live sync is down — fixture edits are blocked until patch restores.';
+  try {
+    if (typeof showToast === 'function') showToast(msg);
+    else if (typeof showNotification === 'function') showNotification(msg);
+    else console.warn(msg);
+  } catch (eW) { /* ignore */ }
+};
+
+window.dalPaApplySyncBlockedUi_ = function(blocked) {
+  var overlay = document.getElementById('project-assets-modal-overlay');
+  if (overlay) overlay.classList.toggle('pa-sync-blocked-mode', !!blocked);
+  if (blocked) {
+    if (!window.dalPaSyncBlockedReadOnlyLatch_) {
+      window.dalPaReadOnlyBeforeBlock_ = !!window.projectAssetsReadOnly;
+      window.dalPaSyncBlockedReadOnlyLatch_ = true;
+      if (typeof applyProjectAssetsReadOnly === 'function') applyProjectAssetsReadOnly(true);
+    }
+  } else if (window.dalPaSyncBlockedReadOnlyLatch_) {
+    window.dalPaSyncBlockedReadOnlyLatch_ = false;
+    if (typeof applyProjectAssetsReadOnly === 'function') {
+      applyProjectAssetsReadOnly(!!window.dalPaReadOnlyBeforeBlock_);
+    }
+  }
+};
+
+window.dalPaClearBlockedRetry_ = function() {
+  if (window.dalPaBlockedRetryTimer_) {
+    try { clearInterval(window.dalPaBlockedRetryTimer_); } catch (eR) { /* ignore */ }
+    window.dalPaBlockedRetryTimer_ = null;
+  }
+};
+
+/**
+ * H1 fail-closed: Auth/listen failure must NOT open silent GAS multi-edit.
+ * Read-only GAS poll may continue so the list can still refresh; writes stay blocked.
+ */
+window.enterDalPaLiveSyncBlocked_ = function(projectId, reason) {
+  if (!projectId || !window.dalPrepUiOpen) return;
+  window.stopDalPaFirestoreListener();
+  window.dalPaLiveSyncMode = 'blocked';
+  window.dalPaLiveSyncFailed = true;
+  window.dalPaLiveSyncFailReason_ = String(reason || 'live sync unavailable').slice(0, 100);
+  window.dalPaApplySyncBlockedUi_(true);
+  window.dalUpdateRemotePendingBanner_();
+  // Read-only awareness pull (does not enable writes — mode stays blocked).
+  window.startDalPaGasReadOnlyPull_(projectId);
+  window.dalPaClearBlockedRetry_();
+  window.dalPaBlockedRetryTimer_ = setInterval(function() {
+    if (!window.dalPrepUiOpen) {
+      window.dalPaClearBlockedRetry_();
+      return;
+    }
+    if (window.dalPaLiveSyncMode === 'firestore' && window.dalPaFirestoreUnsub) {
+      window.dalPaClearBlockedRetry_();
+      return;
+    }
+    try { console.log('[DAL PA] retrying Firestore live sync after block…'); } catch (eLog) { /* ignore */ }
+    window.startDalPaFirestoreListener(projectId);
+  }, 8000);
+};
+
+window.dalPaClearBlockedStateIfHealthy_ = function() {
+  if (window.dalPaLiveSyncMode !== 'firestore') return;
+  window.dalPaLiveSyncFailed = false;
+  window.dalPaLiveSyncFailReason_ = '';
+  window.dalPaClearBlockedRetry_();
+  window.stopDalPaGasSync_();
+  window.dalPaApplySyncBlockedUi_(false);
+};
+
 window.dalPaNoteTouch_ = function(uid) {
   if (!uid || uid === '_meta' || !window.dalPrepUiOpen) return;
+  if (!window.dalPaLiveWritesAllowed_()) {
+    window.dalPaWarnBlockedOnce_();
+    return;
+  }
   uid = String(uid);
   window.dalPaTouchedUids_[uid] = 1;
   delete window.dalPaDeletedUids_[uid];
@@ -30,6 +118,10 @@ window.dalPaNoteTouch_ = function(uid) {
 
 window.dalPaNoteDelete_ = function(uid) {
   if (!uid || uid === '_meta' || !window.dalPrepUiOpen) return;
+  if (!window.dalPaLiveWritesAllowed_()) {
+    window.dalPaWarnBlockedOnce_();
+    return;
+  }
   uid = String(uid);
   window.dalPaDeletedUids_[uid] = 1;
   delete window.dalPaTouchedUids_[uid];
@@ -330,12 +422,15 @@ window.dalUpdateRemotePendingBanner_ = function() {
   var banner = document.getElementById('dal-session-banner');
   if (!banner || !window.dalPrepUiOpen) return;
   var text;
-  if (window.dalPaRemotePending) {
+  if (window.dalPaLiveSyncMode === 'blocked' || window.dalPaLiveSyncMode === 'gas') {
+    var why = window.dalPaLiveSyncFailReason_ ? (' — ' + window.dalPaLiveSyncFailReason_) : '';
+    text = '🔒 IN PREPARATION — LIVE SYNC DOWN — edits blocked' + why;
+  } else if (window.dalPaLiveSyncMode === 'connecting') {
+    text = '🔒 IN PREPARATION — connecting live sync…';
+  } else if (window.dalPaRemotePending) {
     text = '🔒 IN PREPARATION — remote updates available (save or reload to sync)';
   } else if (window.dalPaLiveSyncMode === 'firestore') {
     text = '🔒 IN PREPARATION — live sync (patch)';
-  } else if (window.dalPaLiveSyncMode === 'gas') {
-    text = '🔒 IN PREPARATION — live sync (server)';
   } else {
     text = '🔒 IN PREPARATION';
   }
@@ -793,7 +888,11 @@ window.stopDalPaGasSync_ = function() {
 window.stopDalPaLiveSync_ = function() {
   window.stopDalPaFirestoreListener();
   window.stopDalPaGasSync_();
+  window.dalPaClearBlockedRetry_();
+  window.dalPaApplySyncBlockedUi_(false);
   window.dalPaLiveSyncMode = '';
+  window.dalPaLiveSyncFailed = false;
+  window.dalPaLiveSyncFailReason_ = '';
   window.dalPaRemotePending = false;
   window.dalPaLastRemoteSig = '';
   window.dalPaSeenServerSnap_ = false;
@@ -815,20 +914,20 @@ window.stopDalPaLiveSync_ = function() {
   }
 };
 
-/** GAS-backed sync — works inside Apps Script iframe without Firebase Auth authorized domains. */
-window.startDalPaGasSync_ = function(projectId) {
+/**
+ * Read-only GAS poll while live sync is blocked (H1).
+ * Does NOT set multi-edit server mode — callers must keep mode=blocked.
+ */
+window.startDalPaGasReadOnlyPull_ = function(projectId) {
   if (!projectId) return;
-  if (window.dalPaGasSyncTimer && window.dalPaLiveSyncMode === 'gas') return;
-
-  window.stopDalPaGasSync_();
-  window.dalPaLiveSyncMode = 'gas';
-  window.dalPaLiveSyncFailed = false;
-  window.dalUpdateRemotePendingBanner_();
+  if (window.dalPaGasSyncTimer) return;
 
   var pull = function() {
     var overlay = document.getElementById('project-assets-modal-overlay');
     if (!overlay || overlay.style.display === 'none' || !window.dalPrepUiOpen) return;
     if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) return;
+    // Never apply unstamped GAS lists into firestore mode (Case H).
+    if (window.dalPaLiveSyncMode === 'firestore') return;
 
     var sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
     var eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
@@ -836,6 +935,7 @@ window.startDalPaGasSync_ = function(projectId) {
       .withFailureHandler(function() { /* keep last good view */ })
       .withSuccessHandler(function(res) {
         if (!window.dalPrepUiOpen) return;
+        if (window.dalPaLiveSyncMode === 'firestore') return;
         window.overlappingAllocations = (res && res.overlapping) || window.overlappingAllocations || {};
         window.dalApplyRemotePaAssets_((res && res.current) || [], false);
       })
@@ -844,6 +944,11 @@ window.startDalPaGasSync_ = function(projectId) {
 
   pull();
   window.dalPaGasSyncTimer = setInterval(pull, 2500);
+};
+
+/** @deprecated H1 — use enterDalPaLiveSyncBlocked_ (no silent multi-edit on GAS). */
+window.startDalPaGasSync_ = function(projectId) {
+  window.enterDalPaLiveSyncBlocked_(projectId, 'server fallback disabled');
 };
 
 /**
@@ -917,11 +1022,13 @@ window.startDalPaFirestoreListener = function(projectId) {
   if (!projectId) return;
   if (window.dalPaFirestoreUnsub && window.dalPaFirestoreListenProjectId === String(projectId)) return;
 
+  window.dalPaLiveSyncMode = 'connecting';
+  window.dalUpdateRemotePendingBanner_();
+
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     if (err) {
-      console.warn('DAL Firestore client auth failed — using server sync:', err && err.message ? err.message : err);
-      window.dalPaLiveSyncFailed = true;
-      window.startDalPaGasSync_(projectId);
+      console.warn('DAL Firestore client auth failed — blocking edits (H1):', err && err.message ? err.message : err);
+      window.enterDalPaLiveSyncBlocked_(projectId, (err && err.message) || 'auth failed');
       return;
     }
     if (window.dalPaFirestoreListenProjectId === String(projectId) && window.dalPaFirestoreUnsub) return;
@@ -930,7 +1037,7 @@ window.startDalPaFirestoreListener = function(projectId) {
     window.stopDalPaFirestoreListener();
     window.dalPaFirestoreListenProjectId = String(projectId);
     window.dalPaLiveSyncMode = 'firestore';
-    window.dalPaLiveSyncFailed = false;
+    window.dalPaClearBlockedStateIfHealthy_();
     // Do not clear seed flag if remote already wrote — listener restart must not re-seed full local.
     if (!Number(window.dalPaLastDocWriteSeq_ || 0)) window.dalPaStateSeeded_ = false;
     window.dalUpdateRemotePendingBanner_();
@@ -940,16 +1047,16 @@ window.startDalPaFirestoreListener = function(projectId) {
     // Host bridge: listen to ONE state doc (timeline twin) — not the whole collection.
     if (client.viaHost && !client.db) {
       if (typeof window.dalHostFsListenDoc_ !== 'function') {
-        window.startDalPaGasSync_(projectId);
+        window.enterDalPaLiveSyncBlocked_(projectId, 'host listen unavailable');
         return;
       }
       var gotHostPaSnap_ = false;
       var hostPaWatchTimer_ = setTimeout(function() {
         if (gotHostPaSnap_) return;
         if (window.dalPaFirestoreListenProjectId !== String(projectId)) return;
-        console.warn('DAL host PA state listen timed out — falling back to server sync');
+        console.warn('DAL host PA state listen timed out — blocking edits (H1)');
         window.stopDalPaFirestoreListener();
-        window.startDalPaGasSync_(projectId);
+        window.enterDalPaLiveSyncBlocked_(projectId, 'host listen timeout');
       }, 4000);
       var rawUnsub_ = window.dalHostFsListenDoc_(statePath, function(d) {
         gotHostPaSnap_ = true;
@@ -968,9 +1075,9 @@ window.startDalPaFirestoreListener = function(projectId) {
         });
       }, function(listenErr) {
         try { clearTimeout(hostPaWatchTimer_); } catch (eT2) { /* ignore */ }
-        console.warn('DAL host PA state listen error — falling back to server sync:', listenErr);
+        console.warn('DAL host PA state listen error — blocking edits (H1):', listenErr);
         window.stopDalPaFirestoreListener();
-        window.startDalPaGasSync_(projectId);
+        window.enterDalPaLiveSyncBlocked_(projectId, 'host listen failed');
       });
       window.dalPaFirestoreUnsub = function() {
         try { clearTimeout(hostPaWatchTimer_); } catch (eT3) { /* ignore */ }
@@ -979,7 +1086,7 @@ window.startDalPaFirestoreListener = function(projectId) {
       return;
     }
     if (!client.db) {
-      window.startDalPaGasSync_(projectId);
+      window.enterDalPaLiveSyncBlocked_(projectId, 'no firestore db');
       return;
     }
 
@@ -999,9 +1106,9 @@ window.startDalPaFirestoreListener = function(projectId) {
         hasPendingWrites: hasPendingWrites
       });
     }, function(listenErr) {
-      console.warn('DAL Firestore PA state listener error — falling back to server sync:', listenErr);
+      console.warn('DAL Firestore PA state listener error — blocking edits (H1):', listenErr);
       window.stopDalPaFirestoreListener();
-      window.startDalPaGasSync_(projectId);
+      window.enterDalPaLiveSyncBlocked_(projectId, 'listener error');
     });
   });
 };
@@ -1009,9 +1116,10 @@ window.startDalPaFirestoreListener = function(projectId) {
 window.startDalPaLiveSync_ = function(projectId) {
   if (!projectId || !window.dalPrepUiOpen) return;
   if (typeof window.dalInstallPaLiveFlushHook_ === 'function') window.dalInstallPaLiveFlushHook_();
-  // Prefer Firestore; auth/domain failure auto-falls back to GAS poll.
+  // Prefer Firestore; Auth/listen failure → blocked (H1), not silent GAS multi-edit.
   if (window.dalPaLiveSyncMode === 'firestore' && window.dalPaFirestoreUnsub) return;
-  if (window.dalPaLiveSyncMode === 'gas' && window.dalPaGasSyncTimer) return;
+  if (window.dalPaLiveSyncMode === 'blocked' && window.dalPaBlockedRetryTimer_) return;
+  if (window.dalPaLiveSyncMode === 'connecting') return;
   window.startDalPaFirestoreListener(projectId);
 };
 
@@ -1457,6 +1565,10 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
  */
 window.dalFlushPaIfPrepOpen_ = function() {
   if (!window.dalPrepUiOpen) return;
+  if (!window.dalPaLiveWritesAllowed_()) {
+    window.dalPaWarnBlockedOnce_();
+    return;
+  }
   if (window.dalPaApplyingRemote) return;
   if (window.isBackgroundSyncing) return;
   if (window.dalPaFlushInFlight) {
@@ -1525,25 +1637,22 @@ window.dalFlushPaIfPrepOpen_ = function() {
     };
 
     // Fast path: direct client → Firestore. Never fall back to GAS save during
-    // firestore live mode — GAS firestoreWriteDocument_ replaces the whole doc
-    // and wipes writeSeq/clientId, reopening the LWW war with the listener.
+    // live prep — GAS full-doc write reopens LWW; H1 also forbids gas multi-edit.
     if (projectId && window.dalPaLiveSyncMode === 'firestore') {
       window.dalWritePaForkToFirestore_(projectId, function(writeErr) {
         if (!writeErr) {
           finish(true);
           return;
         }
-        try { console.warn('Direct PA Firestore write failed (touches kept for retry):', writeErr); } catch (e2) { /* ignore */ }
+        try { console.warn('Direct PA Firestore write failed — blocking further edits (H1):', writeErr); } catch (e2) { /* ignore */ }
+        window.enterDalPaLiveSyncBlocked_(projectId, 'write failed');
         finish(false);
       });
       return;
     }
 
-    if (typeof saveProjectAssets !== 'function') {
-      finish(false);
-      return;
-    }
-    saveProjectAssets(function(ok) { finish(!!ok); }, true);
+    // Not in patch mode — do not saveProjectAssets (would be silent GAS multi-edit).
+    finish(false);
   }, 150);
 };
 

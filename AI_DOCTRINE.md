@@ -64,7 +64,12 @@ The director may dictate by voice — match **terminology lock** in [EQUIPMENT_M
 
 5. **Structural UI Compliance:** Follow **[UI_DOCTRINE.md](docs/ai/UI_DOCTRINE.md)**. Reuse `Styles.html` classes.
 
-6. **Plain-Language Handoff After Fixes:** What was wrong, what changed, how to test, what to report if it fails. Ask before adding to FRAGILE_ZONES incident log.
+6. **Plain-Language Handoff After Fixes:** After every completed build / ship (or a finished docs-only session that advances a campaign), end the reply with **all** of the following, in order:
+   1. **What was wrong** (or what was asked)
+   2. **What changed**
+   3. **How to test** on web.app (and what to report if it fails)
+   4. **Campaign next** — same active campaign only: a short list of **what is left** (unchecked items / remaining stages) and an explicit **what is next** (the recommended next slice to OK go). Pull from that campaign’s active file checklist — do not invent a new campaign or jump to Part B while Part A is open unless the director asked.
+   Ask before adding to the FRAGILE_ZONES incident log.
 
 7. **Fragile-Zone Disclosure:** Before editing [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) areas, state risk in plain language.
 

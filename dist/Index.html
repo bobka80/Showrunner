@@ -1439,6 +1439,13 @@
     .pa-readonly-mode #pa-vault-list input,
     .pa-readonly-mode #pa-assigned-list input,
     .pa-readonly-mode #pa-view-logistics input { pointer-events: none !important; }
+    /* H1: live sync down — block qty/delete clicks, not only inputs */
+    .pa-sync-blocked-mode #pa-vault-list,
+    .pa-sync-blocked-mode #pa-assigned-list,
+    .pa-sync-blocked-mode #pa-view-logistics,
+    .pa-sync-blocked-mode #pa-search-cli,
+    .pa-sync-blocked-mode #pa-new-sublist-btn,
+    .pa-sync-blocked-mode #pa-add-container-btn { pointer-events: none !important; opacity: 0.72; }
     .tt-readonly-mode #tt-save-btn,
     .tt-readonly-mode #tt-crew-finished-wrap,
     .tt-readonly-mode .tt-bottom-actions button[onclick="openCrewManager()"] { display: none !important; }

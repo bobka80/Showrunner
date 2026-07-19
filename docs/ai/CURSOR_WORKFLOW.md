@@ -58,7 +58,7 @@ One clear outcome per build session (e.g. scan panel camera, not camera + notifi
 2. If **Bugbot gate = REQUIRE** → run Bugbot **before** ship completes (see [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) § Bugbot gate).
 3. `node milestone.js "<descriptive note>"` — after Bugbot cleared if required (`PRE_SHIP_BUGBOT_OK=1`).
 4. `push-hosting/public/**` → bump `host-boot.js?v=` if needed → `node deploy-hosting.js`
-5. Report **GAS version** and plain-language **test steps on web.app**
+5. Report **GAS version**, plain-language **test steps on web.app**, then **campaign next** (what’s left in this active campaign + recommended next slice) — [AI_DOCTRINE.md](../../AI_DOCTRINE.md) **Rule 6**
 
 ### 5. Bugbot + optional gates
 

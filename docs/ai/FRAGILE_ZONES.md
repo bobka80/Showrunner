@@ -478,8 +478,9 @@ Peer joins
   → Banner on · listens to assets/state
 
 While banner ON
-  → Fixture edits: dalPaNoteTouch_/Delete_ → PA_PATCH_WRITE transaction on assets/state
-  → Peer applies by writeSeq (banner must stay on or sync stops)
+  → Healthy: live sync (patch) · fixture edits flush via PA_PATCH_WRITE
+  → Auth/listen/write fail (H1): banner **LIVE SYNC DOWN — edits blocked** · no silent GAS multi-edit
+  → Peer applies by writeSeq (banner must stay on *and* mode=firestore or sync stops)
 
 END PREP (local or peer)
   → Sheets → committing → commit → clear domain
@@ -570,7 +571,7 @@ Hard-refresh **two browsers** on web.app (banner must say **live sync (patch)**)
 | Ordering | Monotonic **`writeSeq`** on the state doc; ignore snaps with `writeSeq < lastApplied`. |
 | Local yank guard | After touch/write, **entity hold ~2s** — remote cannot move that id until hold expires. |
 | Echo | Own `clientId` acks without re-install; ignore duplicate applied sig. |
-| Banner | `live sync (patch)` = host/direct Firestore. `server patch` = GAS poll fallback (slow). Prep PA: `live sync (direct)` = Firestore listen (host or iframe); `live sync (server)` = GAS poll. |
+| Banner | `live sync (patch)` = healthy Firestore. **`LIVE SYNC DOWN — edits blocked`** = Auth/listen/write failed (H1 fail-closed). Legacy `live sync (server)` must not silently multi-edit. |
 | Scale | One doc per project timeline — fine for a small crew; same-strip edits are last-write-wins on that entity. |
 | Prep vs timeline | Independent forks (Slice D). Closing one must not commit/delete the other. Prep live feel: host collection listen + `_meta` doc listen. Prep **row** sync: § DAL prep PA fork live sync (patch-only + entity hold). |
 
@@ -647,7 +648,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | GAS save | Never fall back to `saveProjectAssets` on live flush failure while `dalPaLiveSyncMode === 'firestore'` (GAS PATCH replace wiped host `writeSeq`). Manual SAVE via GAS must re-stamp `writeSeq`. |
 | Test | `node scripts/dal-pa-live-sync-test.js` must PASS before claiming PA live sync fixed (includes unstamped-GAS case). |
 | Formula | Remote apply: `dalProcessPaFormulas_(…, { skipExplode: true })`. |
-| Banner | `live sync (patch)` = state-doc Firestore transaction; `live sync (server)` = GAS poll. |
+| Banner | `live sync (patch)` = state-doc Firestore transaction. **`LIVE SYNC DOWN — edits blocked`** on Auth/listen/write fail (H1) — read-only GAS poll may continue; no silent multi-edit. |
 | Host bridge | `SHOWRUNNER_DAL_FS_LISTEN` on `assets/state` + `SHOWRUNNER_DAL_FS_PA_PATCH_WRITE`; Index relays both. |
 | vs timeline | **Same architecture** now: one state doc, transactional patch-merge, doc writeSeq. |
 

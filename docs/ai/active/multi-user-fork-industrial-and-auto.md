@@ -7,8 +7,8 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **A0 testing pipeline shipped** — next: Part A product H-items (recommend **H1** then **H5**). Fresh agents: read this file first for multi-user fork work.  
-**Production at open:** GAS **v646** · hosting `host-boot.js?v=635` · Prep banner must say **`live sync (patch)`** · H0 harness: Cases A–J + `dal-mutation-inventory-check.js`
+**Opened:** 2026-07-18 · **Status:** **A1/H1 shipped** — next recommend **H5** (mutation ALLOWLIST + timeline twin). Fresh agents: read this file first for multi-user fork work.  
+**Production:** GAS **v648** (pending ship) · hosting `host-boot.js?v=635` · Prep banner must say **`live sync (patch)`** (or **LIVE SYNC DOWN — edits blocked** if Auth fails)
 
 ---
 
@@ -72,12 +72,12 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v645"** (la
 - [x] Former **H6** stronger sims absorbed: Case I (3-client delete), Case J (sticky ended sessionUid)  
 - [ ] Summarize → wait for **OK go** on first product H-item (recommend **H1** then **H5**)
 
-### A1 — H1 Fail closed on weak sync
+### A1 — H1 Fail closed on weak sync ✅ 2026-07-19
 
-- [ ] If Auth/listen fails → do **not** silently multi-edit on GAS `live sync (server)` poll  
-- [ ] Hard banner warning and/or block fixture/timeline edits until `patch` restored  
-- [ ] Adversarial sim: Auth fails *mid-edit*, not only at start  
-- [ ] Smoke: force server mode → user cannot thrash peer without knowing  
+- [x] If Auth/listen fails → do **not** silently multi-edit on GAS `live sync (server)` poll  
+- [x] Hard banner warning and/or block fixture/timeline edits until `patch` restored  
+- [x] Adversarial sim: Auth fails *mid-edit*, not only at start (Case K)  
+- [x] Smoke: force server mode → user cannot thrash peer without knowing (blocked mode + Case K) 
 
 ### A2 — H5 Mutation-path inventory gate
 
@@ -217,6 +217,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-18 | Campaign opened. Next work = Part A harden. Auto fork locked in timeline topic. |
 | 2026-07-19 | **Order locked:** H0 testing → bulletproof H1–H5 + Gap 1 → Part B. Process → bulletproof brief. Gap 1 folded into hub (no parallel gap-closure novel). Pre-ship expansion brief filed separately. |
 | 2026-07-19 | **A0 / H0 shipped:** Cases A–J + scope comments; mutation inventory gate; FRAGILE `ATTEMPTS BEFORE THIS HELD`; ready for director OK on **H1**. |
+| 2026-07-19 | **A1 / H1 shipped:** Auth/listen/write fail → blocked mode (hard banner + edits locked); no silent GAS multi-edit; Case K mid-edit sim; timeline twin. |
 
 ---
 

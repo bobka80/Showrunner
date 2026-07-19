@@ -7,8 +7,10 @@ window.dalTlWatchProjectId = '';
 window.dalTlIgnoreListenerUntil = 0;
 window.dalTlLastStateSig = '';
 window.dalTlRemotePending = false;
-window.dalTlLiveSyncMode = ''; // 'firestore' | 'gas' | ''
+window.dalTlLiveSyncMode = ''; // 'firestore' | 'connecting' | 'blocked' | '' (legacy 'gas' = blocked)
 window.dalTlLiveSyncFailReason_ = '';
+window.dalTlBlockedRetryTimer_ = null;
+window.dalTlBlockedWarnAt_ = 0;
 window.dalTlWasSessionOpen = false;
 window.dalTlLastRemoteUpdatedAt = '';
 window.dalTlLastAppliedRemoteSig_ = '';
@@ -74,8 +76,54 @@ window.dalTlSnapshotMutations_ = function() {
 };
 
 /** Record local edits — only these entities may overwrite remote on flush. */
+window.dalTlLiveWritesAllowed_ = function() {
+  if (!window.dalTimelineSessionOpen) return true;
+  return window.dalTlLiveSyncMode === 'firestore';
+};
+
+window.dalTlWarnBlockedOnce_ = function() {
+  if (Date.now() < (window.dalTlBlockedWarnAt_ || 0)) return;
+  window.dalTlBlockedWarnAt_ = Date.now() + 4000;
+  var msg = 'Timeline live sync is down — edits are blocked until patch restores.';
+  try {
+    if (typeof showToast === 'function') showToast(msg);
+    else if (typeof showNotification === 'function') showNotification(msg);
+    else console.warn(msg);
+  } catch (eW) { /* ignore */ }
+};
+
+window.dalTlClearBlockedRetry_ = function() {
+  if (window.dalTlBlockedRetryTimer_) {
+    try { clearInterval(window.dalTlBlockedRetryTimer_); } catch (eR) { /* ignore */ }
+    window.dalTlBlockedRetryTimer_ = null;
+  }
+};
+
+window.enterDalTlLiveSyncBlocked_ = function(projectId, reason) {
+  if (!projectId || !window.dalTimelineSessionOpen) return;
+  window.stopDalTimelineStateSync_();
+  window.dalTlLiveSyncMode = 'blocked';
+  window.dalTlLiveSyncFailReason_ = String(reason || 'live sync unavailable').slice(0, 100);
+  window.dalUpdateTimelineLiveBanner_();
+  window.startDalTimelineGasReadOnlyPull_(projectId);
+  window.dalTlClearBlockedRetry_();
+  window.dalTlBlockedRetryTimer_ = setInterval(function() {
+    if (!window.dalTimelineSessionOpen) {
+      window.dalTlClearBlockedRetry_();
+      return;
+    }
+    if (window.dalTlLiveSyncMode === 'firestore' && window.dalTlStateUnsub) {
+      window.dalTlClearBlockedRetry_();
+      return;
+    }
+    try { console.log('[DAL TL] retrying Firestore live sync after block…'); } catch (eLog) { /* ignore */ }
+    window.startDalTimelineFirestoreStateSync_(projectId);
+  }, 8000);
+};
+
 window.dalTlNoteShiftTouch_ = function(id) {
   if (!id || !window.dalTimelineSessionOpen) return;
+  if (!window.dalTlLiveWritesAllowed_()) { window.dalTlWarnBlockedOnce_(); return; }
   window.dalTlTouchedShifts_[id] = 1;
   delete window.dalTlDeletedShifts_[id];
   window.dalTlHoldEntity_(id);
@@ -83,6 +131,7 @@ window.dalTlNoteShiftTouch_ = function(id) {
 
 window.dalTlNoteShiftDelete_ = function(id) {
   if (!id || !window.dalTimelineSessionOpen) return;
+  if (!window.dalTlLiveWritesAllowed_()) { window.dalTlWarnBlockedOnce_(); return; }
   window.dalTlDeletedShifts_[id] = 1;
   delete window.dalTlTouchedShifts_[id];
   window.dalTlHoldEntity_(id);
@@ -90,6 +139,7 @@ window.dalTlNoteShiftDelete_ = function(id) {
 
 window.dalTlNotePhaseTouch_ = function(id) {
   if (!id || !window.dalTimelineSessionOpen) return;
+  if (!window.dalTlLiveWritesAllowed_()) { window.dalTlWarnBlockedOnce_(); return; }
   window.dalTlTouchedPhases_[id] = 1;
   delete window.dalTlDeletedPhases_[id];
   window.dalTlHoldEntity_(id);
@@ -97,6 +147,7 @@ window.dalTlNotePhaseTouch_ = function(id) {
 
 window.dalTlNotePhaseDelete_ = function(id) {
   if (!id || !window.dalTimelineSessionOpen) return;
+  if (!window.dalTlLiveWritesAllowed_()) { window.dalTlWarnBlockedOnce_(); return; }
   window.dalTlDeletedPhases_[id] = 1;
   delete window.dalTlTouchedPhases_[id];
   window.dalTlHoldEntity_(id);
@@ -104,6 +155,7 @@ window.dalTlNotePhaseDelete_ = function(id) {
 
 window.dalTlNoteOverrideTouch_ = function(uid) {
   if (!uid || !window.dalTimelineSessionOpen) return;
+  if (!window.dalTlLiveWritesAllowed_()) { window.dalTlWarnBlockedOnce_(); return; }
   window.dalTlTouchedOverrides_[uid] = 1;
   delete window.dalTlDeletedOverrides_[uid];
   window.dalTlHoldEntity_(uid);
@@ -623,6 +675,10 @@ window.dalMergeThenGasTimelineSave_ = function(done) {
 
 window.dalFlushTimelineIfCollabOpen_ = function() {
   if (!window.dalTimelineSessionOpen) return;
+  if (!window.dalTlLiveWritesAllowed_()) {
+    window.dalTlWarnBlockedOnce_();
+    return;
+  }
   if (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly) return;
   if (window.dalTlApplyingRemote) return;
   // Collab writes require explicit touches — dirty alone must not rewrite the whole fork.
@@ -667,27 +723,30 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
           finish();
           return;
         }
-        try { console.warn('Timeline Firestore patch failed, GAS fallback:', writeErr); } catch (e1) { /* ignore */ }
-        window.dalMergeThenGasTimelineSave_(function() { finish(); });
+        try { console.warn('Timeline Firestore patch failed — blocking edits (H1):', writeErr); } catch (e1) { /* ignore */ }
+        var pid = window.dalTlWatchProjectId || '';
+        if (pid) window.enterDalTlLiveSyncBlocked_(pid, 'write failed');
+        finish();
       });
       return;
     }
 
-    window.dalMergeThenGasTimelineSave_(function() { finish(); });
+    // H1: never GAS-merge multi-edit while collab is open without patch mode.
+    finish();
   }, 40);
 };
 
 window.dalUpdateTimelineLiveBanner_ = function() {
   var banner = document.getElementById('dal-timeline-session-banner');
   if (!banner || !window.dalTimelineSessionOpen) return;
-  if (window.dalTlRemotePending) {
+  if (window.dalTlLiveSyncMode === 'blocked' || window.dalTlLiveSyncMode === 'gas') {
+    var whyB = window.dalTlLiveSyncFailReason_ ? (' — ' + window.dalTlLiveSyncFailReason_) : '';
+    banner.textContent = '👥 TIMELINE COLLAB — LIVE SYNC DOWN — edits blocked' + whyB;
+  } else if (window.dalTlRemotePending) {
     banner.textContent = '👥 TIMELINE COLLAB — syncing…';
   } else if (window.dalTlLiveSyncMode === 'firestore') {
     banner.textContent = '👥 TIMELINE COLLAB — live sync (patch)';
-  } else if (window.dalTlLiveSyncMode === 'gas') {
-    var why = window.dalTlLiveSyncFailReason_ ? (' — ' + window.dalTlLiveSyncFailReason_) : '';
-    banner.textContent = '👥 TIMELINE COLLAB — live sync (server patch)' + why;
-  } else if (window.dalTlConnecting_) {
+  } else if (window.dalTlLiveSyncMode === 'connecting' || window.dalTlConnecting_) {
     banner.textContent = '👥 TIMELINE COLLAB — connecting live sync…';
   } else {
     banner.textContent = '👥 TIMELINE COLLAB — live edits sync to Firebase';
@@ -855,6 +914,8 @@ window.stopDalTimelineStateSync_ = function() {
     window.dalTlStatePollTimer = null;
   }
   window.dalTlLiveSyncMode = '';
+  window.dalTlLiveSyncFailReason_ = '';
+  window.dalTlClearBlockedRetry_();
   window.dalTlRemotePending = false;
   window.dalTlLastAppliedRemoteSig_ = '';
   window.dalTlHaveServerSnap_ = false;
@@ -862,22 +923,20 @@ window.stopDalTimelineStateSync_ = function() {
   window.dalTlEntityHoldUntil_ = {};
 };
 
-window.startDalTimelineGasStateSync_ = function(projectId, failReason) {
+/** Read-only GAS poll while blocked (H1) — does not enable multi-edit. */
+window.startDalTimelineGasReadOnlyPull_ = function(projectId) {
   if (!projectId || !window.dalTimelineSessionOpen) return;
-  if (window.dalTlStatePollTimer && window.dalTlLiveSyncMode === 'gas') return;
-
-  window.stopDalTimelineStateSync_();
-  window.dalTlLiveSyncMode = 'gas';
-  window.dalTlLiveSyncFailReason_ = String(failReason || '').slice(0, 80);
-  window.dalUpdateTimelineLiveBanner_();
+  if (window.dalTlStatePollTimer) return;
 
   var pull = function() {
     if (!window.dalTimelineLayerOpen_() || !window.dalTimelineSessionOpen) return;
+    if (window.dalTlLiveSyncMode === 'firestore') return;
     var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
     google.script.run
       .withFailureHandler(function() { /* keep last */ })
       .withSuccessHandler(function(data) {
         if (!data || !window.dalTimelineSessionOpen) return;
+        if (window.dalTlLiveSyncMode === 'firestore') return;
         window.dalApplyRemoteTimelineState_(data.shifts, data.phases, data.overrides, {});
       })
       .getTimelineData(projectId, mode);
@@ -886,26 +945,36 @@ window.startDalTimelineGasStateSync_ = function(projectId, failReason) {
   window.dalTlStatePollTimer = setInterval(pull, 1200);
 };
 
+/** @deprecated H1 — use enterDalTlLiveSyncBlocked_. */
+window.startDalTimelineGasStateSync_ = function(projectId, failReason) {
+  window.enterDalTlLiveSyncBlocked_(projectId, failReason || 'server fallback disabled');
+};
+
 window.startDalTimelineFirestoreStateSync_ = function(projectId) {
   if (!projectId || !window.dalTimelineSessionOpen) return;
   if (typeof window.dalEnsureFirestoreClientAuth_ !== 'function') {
-    window.startDalTimelineGasStateSync_(projectId, 'no auth helper');
+    window.enterDalTlLiveSyncBlocked_(projectId, 'no auth helper');
     return;
   }
   window.dalTlConnecting_ = true;
+  window.dalTlLiveSyncMode = 'connecting';
   window.dalTlLiveSyncFailReason_ = '';
   window.dalUpdateTimelineLiveBanner_();
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     window.dalTlConnecting_ = false;
     if (err || !client) {
       var msg = (err && err.message) ? err.message : 'auth failed';
-      console.warn('Timeline Firestore auth failed — using server sync:', msg);
-      window.startDalTimelineGasStateSync_(projectId, msg);
+      console.warn('Timeline Firestore auth failed — blocking edits (H1):', msg);
+      window.enterDalTlLiveSyncBlocked_(projectId, msg);
       return;
     }
     if (!window.dalTimelineSessionOpen || !window.dalTimelineLayerOpen_()) return;
 
-    window.stopDalTimelineStateSync_();
+    if (window.dalTlStatePollTimer) {
+      clearInterval(window.dalTlStatePollTimer);
+      window.dalTlStatePollTimer = null;
+    }
+    window.dalTlClearBlockedRetry_();
     window.dalTlLiveSyncMode = 'firestore';
     window.dalTlLiveSyncFailReason_ = '';
     window.dalUpdateTimelineLiveBanner_();
@@ -941,10 +1010,11 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
           if (window.dalTlLiveSyncMode === 'firestore' && window.dalTlStateUnsub) return;
           window.dalEnsureFirestoreClientAuth_(function(err2, client2) {
             if (err2 || !client2 || !client2.viaHost) {
-              window.startDalTimelineGasStateSync_(projectId, lmsg);
+              window.enterDalTlLiveSyncBlocked_(projectId, lmsg);
               return;
             }
             window.dalTlLiveSyncMode = 'firestore';
+            window.dalTlLiveSyncFailReason_ = '';
             window.dalUpdateTimelineLiveBanner_();
             window.dalTlStateUnsub = window.dalHostFsListenDoc_(path, function(msg) {
               if (!msg || !msg.exists) return;
@@ -954,9 +1024,9 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
                 fromCache: !!msg.fromCache
               }, msg.data);
             }, function() {
-              console.warn('Timeline host listener failed again — server sync');
+              console.warn('Timeline host listener failed again — blocking edits (H1)');
               window.stopDalTimelineStateSync_();
-              window.startDalTimelineGasStateSync_(projectId, 'host listen retry failed');
+              window.enterDalTlLiveSyncBlocked_(projectId, 'host listen retry failed');
             });
           });
         }, 400);
@@ -965,7 +1035,7 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
     }
 
     if (!client.db) {
-      window.startDalTimelineGasStateSync_(projectId, client.viaHost ? 'host client missing db' : 'no firestore db');
+      window.enterDalTlLiveSyncBlocked_(projectId, client.viaHost ? 'host client missing db' : 'no firestore db');
       return;
     }
     var ref = client.db.collection('projects').doc(String(projectId)).collection('timeline').doc('state');
@@ -979,9 +1049,9 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
       }, snap.data());
     }, function(listenErr) {
       var lmsg2 = (listenErr && listenErr.message) ? listenErr.message : 'listener error';
-      console.warn('Timeline Firestore listener error — falling back to server sync:', lmsg2);
+      console.warn('Timeline Firestore listener error — blocking edits (H1):', lmsg2);
       window.stopDalTimelineStateSync_();
-      window.startDalTimelineGasStateSync_(projectId, lmsg2);
+      window.enterDalTlLiveSyncBlocked_(projectId, lmsg2);
     });
   });
 };
@@ -989,7 +1059,8 @@ window.startDalTimelineFirestoreStateSync_ = function(projectId) {
 window.startDalTimelineStateSync_ = function(projectId) {
   if (!projectId || !window.dalTimelineSessionOpen) return;
   if (window.dalTlLiveSyncMode === 'firestore' && window.dalTlStateUnsub) return;
-  if (window.dalTlLiveSyncMode === 'gas' && window.dalTlStatePollTimer) return;
+  if (window.dalTlLiveSyncMode === 'blocked' && window.dalTlBlockedRetryTimer_) return;
+  if (window.dalTlLiveSyncMode === 'connecting') return;
   window.startDalTimelineFirestoreStateSync_(projectId);
 };
 
