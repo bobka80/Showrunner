@@ -470,8 +470,38 @@ window.dalPaApplyRemoteFixturesTimeline_ = function(remoteFixtures, localFixture
   return out;
 };
 
+window.dalPaSyncPanelExpanded_ = false;
+
+window.dalTogglePaSyncPanel_ = function() {
+  window.dalPaSyncPanelExpanded_ = !window.dalPaSyncPanelExpanded_;
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
+};
+
+window.dalApplyPaSyncPanelLayout_ = function() {
+  var panel = document.getElementById('pa-prep-live-panel');
+  var rosterEl = document.getElementById('pa-prep-live-roster');
+  var chevron = document.getElementById('pa-prep-live-chevron');
+  var vaultList = document.getElementById('pa-vault-list');
+  if (!panel) return;
+  var expanded = !!window.dalPaSyncPanelExpanded_;
+  panel.setAttribute('data-expanded', expanded ? '1' : '0');
+  if (expanded) {
+    panel.style.height = '33%';
+    panel.style.minHeight = '140px';
+    if (rosterEl) rosterEl.style.display = 'block';
+    if (chevron) chevron.textContent = '▼';
+    if (vaultList) vaultList.style.paddingBottom = 'calc(33% + 8px)';
+  } else {
+    panel.style.height = 'auto';
+    panel.style.minHeight = '0';
+    if (rosterEl) rosterEl.style.display = 'none';
+    if (chevron) chevron.textContent = '▲';
+    if (vaultList) vaultList.style.paddingBottom = '40px';
+  }
+};
+
 window.dalUpdateRemotePendingBanner_ = function() {
-  // Top banner retired — prep status lives in #pa-prep-live-panel (vault bottom ⅓).
+  // Top banner retired — prep status lives in #pa-prep-live-panel (vault SYNC strip).
   var banner = document.getElementById('dal-session-banner');
   if (banner) {
     banner.style.display = 'none';
@@ -487,26 +517,27 @@ window.dalUpdateRemotePendingBanner_ = function() {
     if (panel) panel.style.display = 'none';
     if (vaultList) vaultList.style.paddingBottom = '';
     window.dalPaBannerLastText_ = '';
+    window.dalPaSyncPanelExpanded_ = false;
     return;
   }
 
   if (panel) {
     panel.style.display = 'flex';
-    if (vaultList) vaultList.style.paddingBottom = 'calc(33% + 12px)';
+    window.dalApplyPaSyncPanelLayout_();
   }
 
   var text;
   if (window.dalPaLiveSyncMode === 'blocked' || window.dalPaLiveSyncMode === 'gas') {
     var why = window.dalPaLiveSyncFailReason_ ? (' — ' + window.dalPaLiveSyncFailReason_) : '';
-    text = 'LIVE SYNC DOWN — edits blocked' + why;
+    text = 'DOWN' + why;
   } else if (window.dalPaLiveSyncMode === 'connecting') {
-    text = 'Connecting live sync…';
+    text = 'connecting…';
   } else if (window.dalPaRemotePending) {
-    text = 'Remote updates available (save or reload to sync)';
+    text = 'pending…';
   } else if (window.dalPaLiveSyncMode === 'firestore') {
-    text = 'live sync (patch)';
+    text = 'live (patch)';
   } else {
-    text = 'In preparation';
+    text = 'on';
   }
 
   if (statusEl && text !== window.dalPaBannerLastText_) {
@@ -516,7 +547,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
     statusEl.textContent = text;
   }
 
-  if (rosterEl) {
+  if (rosterEl && window.dalPaSyncPanelExpanded_) {
     if (typeof window.dalPaSyncPresencePaMode_ === 'function') window.dalPaSyncPresencePaMode_();
     var me = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'You';
     var meMode = window.activePresencePaMode || 'design';
@@ -538,11 +569,11 @@ window.dalUpdateRemotePendingBanner_ = function() {
       var whoRaw = r.self ? (r.name + ' (you)') : r.name;
       var who = (typeof escapeHTML === 'function') ? escapeHTML(whoRaw) : String(whoRaw).replace(/</g, '&lt;');
       var lab = (typeof escapeHTML === 'function') ? escapeHTML(label) : String(label).replace(/</g, '&lt;');
-      return '<div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.12);">' +
-        '<span style="font-weight:800; color:#fff7ed; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + who + '</span>' +
-        '<span style="font-weight:700; color:#fde68a; flex-shrink:0;">' + lab + '</span></div>';
+      return '<div style="display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-bottom:1px solid #222;">' +
+        '<span style="font-weight:800; color:#e4e4e7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + who + '</span>' +
+        '<span style="font-weight:700; color:#f59e0b; flex-shrink:0;">' + lab + '</span></div>';
     }).join('');
-    if (!html) html = '<div style="color:#fed7aa; font-style:italic;">Waiting for roommates…</div>';
+    if (!html) html = '<div style="color:#71717a; font-style:italic;">Waiting for roommates…</div>';
     rosterEl.innerHTML = html;
   }
 };

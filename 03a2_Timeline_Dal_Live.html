@@ -749,20 +749,83 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
   }, 40);
 };
 
+window.dalTlSyncPanelExpanded_ = false;
+
+window.dalToggleTlSyncPanel_ = function() {
+  window.dalTlSyncPanelExpanded_ = !window.dalTlSyncPanelExpanded_;
+  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
+};
+
+window.dalApplyTlSyncPanelLayout_ = function() {
+  var panel = document.getElementById('tl-sync-panel');
+  var rosterEl = document.getElementById('tl-sync-roster');
+  var chevron = document.getElementById('tl-sync-chevron');
+  if (!panel) return;
+  var expanded = !!window.dalTlSyncPanelExpanded_;
+  panel.setAttribute('data-expanded', expanded ? '1' : '0');
+  if (expanded) {
+    if (rosterEl) rosterEl.style.display = 'block';
+    if (chevron) chevron.textContent = '▼';
+  } else {
+    if (rosterEl) rosterEl.style.display = 'none';
+    if (chevron) chevron.textContent = '▲';
+  }
+};
+
 window.dalUpdateTimelineLiveBanner_ = function() {
   var banner = document.getElementById('dal-timeline-session-banner');
-  if (!banner || !window.dalTimelineSessionOpen) return;
-  if (window.dalTlLiveSyncMode === 'blocked' || window.dalTlLiveSyncMode === 'gas') {
+  if (banner) {
+    banner.style.display = 'none';
+    banner.textContent = '';
+  }
+
+  var panel = document.getElementById('tl-sync-panel');
+  var statusEl = document.getElementById('tl-sync-status');
+  var rosterEl = document.getElementById('tl-sync-roster');
+  var open = !!window.dalTimelineSessionOpen || !!window.dalTlOpeningUi_;
+
+  if (!open) {
+    if (panel) panel.style.display = 'none';
+    window.dalTlSyncPanelExpanded_ = false;
+    return;
+  }
+
+  if (panel) {
+    panel.style.display = 'flex';
+    window.dalApplyTlSyncPanelLayout_();
+  }
+
+  var text = '';
+  if (window.dalTlOpeningUi_) {
+    text = 'opening…';
+  } else if (window.dalTlLiveSyncMode === 'blocked' || window.dalTlLiveSyncMode === 'gas') {
     var whyB = window.dalTlLiveSyncFailReason_ ? (' — ' + window.dalTlLiveSyncFailReason_) : '';
-    banner.textContent = '👥 TIMELINE COLLAB — LIVE SYNC DOWN — edits blocked' + whyB;
+    text = 'DOWN' + whyB;
   } else if (window.dalTlRemotePending) {
-    banner.textContent = '👥 TIMELINE COLLAB — syncing…';
+    text = 'pending…';
   } else if (window.dalTlLiveSyncMode === 'firestore') {
-    banner.textContent = '👥 TIMELINE COLLAB — live sync (patch)';
+    text = 'live (patch)';
   } else if (window.dalTlLiveSyncMode === 'connecting' || window.dalTlConnecting_) {
-    banner.textContent = '👥 TIMELINE COLLAB — connecting live sync…';
+    text = 'connecting…';
   } else {
-    banner.textContent = '👥 TIMELINE COLLAB — live edits sync to Firebase';
+    text = 'on';
+  }
+  if (statusEl) statusEl.textContent = text;
+
+  if (rosterEl && window.dalTlSyncPanelExpanded_) {
+    var me = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'You';
+    var names = [];
+    names.push(me + ' (you)');
+    (window.timelineOccupants || []).forEach(function(n) {
+      if (!n || String(n) === String(me)) return;
+      names.push(n);
+    });
+    var html = names.map(function(n) {
+      var who = (typeof escapeHTML === 'function') ? escapeHTML(n) : String(n).replace(/</g, '&lt;');
+      return '<div style="padding:3px 0; border-bottom:1px solid #222; color:#e4e4e7; font-weight:700;">' + who + '</div>';
+    }).join('');
+    if (!html) html = '<div style="color:#71717a; font-style:italic;">Only you</div>';
+    rosterEl.innerHTML = html;
   }
 };
 
@@ -895,11 +958,14 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
   var startBtn = document.getElementById('dal-timeline-start-btn');
   var endBtn = document.getElementById('dal-timeline-end-btn');
   window.dalTimelineSessionOpen = !!isOpen;
+  window.dalTlOpeningUi_ = !!isOpening && !isOpen;
 
   if (banner) {
-    banner.style.display = (isOpen || isOpening) ? 'block' : 'none';
-    if (isOpening) banner.textContent = '⏳ TIMELINE COLLAB opening… — End Collab aborts a stuck start';
-    else if (isOpen) window.dalUpdateTimelineLiveBanner_();
+    banner.style.display = 'none';
+    banner.textContent = '';
+  }
+  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+    window.dalUpdateTimelineLiveBanner_();
   }
   if (startBtn) {
     startBtn.style.display = (isOpen || isOpening || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly))
@@ -914,6 +980,11 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
     window.stopDalTimelineStateSync_();
     window.dalTlSyncBase_ = null;
     window.dalTlClearMutations_();
+    if (!isOpening) {
+      window.dalTlOpeningUi_ = false;
+      window.dalTlSyncPanelExpanded_ = false;
+      if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
+    }
   }
 };
 

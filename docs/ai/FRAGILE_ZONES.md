@@ -466,7 +466,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 ### How prep session UI works now (locked definition)
 
-**UI surface (2026-07-19):** No full-width top banner. While prep is open, an **orange panel** covers the **bottom ~⅓ of the vault list** (`#pa-prep-live-panel`) — title **PREPARATION LIVE SYNC**, sync status line, roster (presence + PA mode: Editing / Packing / Check-out|in). Internal latch is still `dalPrepUiOpen` / `dalPrepLatched` (docs may say “banner on” for that latch).
+**UI surface (2026-07-19):** No full-width top banner. While prep is open, a **SYNC** mini-header sits at the bottom of the vault (`#pa-prep-live-panel`) — orange strip + orange frame; click expands ~⅓ (black body, roster with modes). Collapsed by default. Timeline collab uses the same pattern: blue **SYNC** mini-header at the bottom of the crew-name column (`#tl-sync-panel`); expand shows names only. Internal latch is still `dalPrepUiOpen` / `dalPrepLatched` / `dalTimelineSessionOpen` (docs may say “banner on” for that latch).
 
 ```
 START PREP (local)

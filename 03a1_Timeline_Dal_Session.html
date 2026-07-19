@@ -45,6 +45,8 @@ window.refreshTimelineDalBanner = function() {
     if (banner) banner.style.display = 'none';
     if (startBtn) startBtn.style.display = 'none';
     if (endBtn) endBtn.style.display = 'none';
+    var panel = document.getElementById('tl-sync-panel');
+    if (panel) panel.style.display = 'none';
     return;
   }
   if (typeof canDrawPhases === 'function' && !canDrawPhases()) {
@@ -63,12 +65,12 @@ window.refreshTimelineDalBanner = function() {
       var st = tl ? String(tl.status).toLowerCase() : '';
       var isOpen = st === 'open';
       var isOpening = st === 'opening';
-      window.dalTimelineSessionOpen = !!isOpen;
-      if (banner) {
-        banner.style.display = (isOpen || isOpening) ? 'block' : 'none';
-        if (isOpen) banner.textContent = '👥 TIMELINE COLLAB — saves go to Firebase until End Collab';
-        else if (isOpening) banner.textContent = '⏳ TIMELINE COLLAB opening… — End Collab aborts a stuck start';
+      if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+        window.dalApplyTimelineSessionUi_(isOpen, isOpening);
+        return;
       }
+      window.dalTimelineSessionOpen = !!isOpen;
+      if (banner) banner.style.display = 'none';
       if (startBtn) startBtn.style.display = (isOpen || isOpening || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly)) ? 'none' : 'inline-flex';
       if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
     })

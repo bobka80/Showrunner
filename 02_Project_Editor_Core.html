@@ -232,6 +232,7 @@ function startPresencePing(projectId) {
                 }
             }
             if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
+            if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
         }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule, window.activePresencePaMode || '');
     };
     
