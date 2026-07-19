@@ -37,7 +37,8 @@ var MUST_NOTE = [
   'updateLocationName',
   'toggleGroupShortage',
   'updateFormulaInline',
-  'cancelFormulaEdit'
+  'cancelFormulaEdit',
+  'updateFormulaDept'
 ];
 
 /**
@@ -45,8 +46,7 @@ var MUST_NOTE = [
  * Keep this list small — each entry needs a product reason.
  */
 var ALLOWLIST = {
-  createNewSublistPa: 'local DUMMY empty-group shell — no uid until real fixtures added',
-  updateFormulaDept: 'overrideDept not in live FS fixture schema/sigs yet — Sheets-only until field added'
+  createNewSublistPa: 'local DUMMY empty-group shell — no uid until real fixtures added'
 };
 
 var MUTATE_RE = /currentProjectAssets\s*=|currentProjectAssets\.(push|splice|unshift|pop|shift)\s*\(|currentProjectAssets\.forEach\s*\(/;

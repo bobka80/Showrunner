@@ -493,6 +493,27 @@ function renderProjectAssetsUI() {
 
     let opBtnText = window.currentOperationType ? window.currentOperationType.replace('-', ' ') : 'CHECK OUT';
 
+    let packFiltersEl = document.getElementById('pa-packing-filters');
+    if (window.currentPaMode === 'design' && packFiltersEl) {
+        if (typeof window.dalPaEnsureWorkingDept_ === 'function') window.dalPaEnsureWorkingDept_();
+        let workUid = window.paWorkingDept || '';
+        let workOpts = '';
+        if (typeof SYSTEM_DEPARTMENTS !== 'undefined') {
+            SYSTEM_DEPARTMENTS.forEach(d => {
+                let sel = (workUid === d.uid) ? 'selected' : '';
+                workOpts += `<option value="${d.uid}" ${sel}>${d.name}</option>`;
+            });
+        }
+        packFiltersEl.innerHTML = `<div style="display:inline-flex; align-items:center; gap:8px;">
+            <span style="color:#a1a1aa; font-size:10px; font-weight:900; letter-spacing:0.04em;">WORKING</span>
+            <select id="pa-working-dept-select" onchange="setPaWorkingDept(this.value)" title="New adds go into this department"
+                style="padding:5px 8px; height:28px; font-size:11px; font-weight:bold; background:#111; color:#e4e4e7; border:1px solid #d8b4fe; border-radius:4px; outline:none; min-width:120px;">
+                ${workOpts}
+            </select>
+        </div>`;
+        packFiltersEl.style.setProperty('display', 'flex', 'important');
+    }
+
     if (window.currentPaMode === 'packing' || window.currentPaMode === 'operation') {
         let allAvailableDepts = new Set();
         currentProjectAssets.forEach(pa => {
@@ -503,7 +524,6 @@ function renderProjectAssetsUI() {
             }
         });
         
-        let packFiltersEl = document.getElementById('pa-packing-filters');
         if (packFiltersEl) {
             window.togglePackFilterMenu = function(e) {
                 e.stopPropagation();
@@ -809,6 +829,19 @@ function renderProjectAssetsUI() {
         assignedByDept[fg.department].formulas.push(fg);
     });
 
+    // Empty SYSTEM depts stay visible so paste can target them (green select).
+    if (typeof SYSTEM_DEPARTMENTS !== 'undefined') {
+        SYSTEM_DEPARTMENTS.forEach(d => {
+            if (d && d.uid && !assignedByDept[d.uid]) assignedByDept[d.uid] = { formulas: [] };
+        });
+    }
+    if (window.paWorkingDept && !assignedByDept[window.paWorkingDept]) {
+        assignedByDept[window.paWorkingDept] = { formulas: [] };
+    }
+    if (window.paSelectedDept && !assignedByDept[window.paSelectedDept]) {
+        assignedByDept[window.paSelectedDept] = { formulas: [] };
+    }
+
     let sortedDepts = Object.keys(assignedByDept).sort((a,b) => getDeptObj(a).name.localeCompare(getDeptObj(b).name));
 
     window.togglePaDeptAssigned = function(safeDept) {
@@ -825,8 +858,6 @@ function renderProjectAssetsUI() {
     for (let deptUid of sortedDepts) {
         let deptFormulas = assignedByDept[deptUid].formulas || [];
 
-        if (deptFormulas.length === 0) continue;
-
         let safeDept = deptUid.replace(/\s+/g, '-');
         let deptObj = getDeptObj(deptUid);
         let deptName = deptObj.name;
@@ -836,14 +867,28 @@ function renderProjectAssetsUI() {
         let iconTextDept = isExpandedDept ? '▼' : '▶';
 
         let isDeptFinished = window.currentReadinessState && window.currentReadinessState.eq_depts && window.currentReadinessState.eq_depts.includes(deptUid);
+        let isPasteSelected = window.paSelectedDept === deptUid;
+        let isWorking = window.paWorkingDept === deptUid;
+        let headerBg = isPasteSelected ? '#064e3b' : '#1f1f23';
+        let headerBorder = isPasteSelected ? '#10b981' : (isWorking ? '#d8b4fe' : deptObj.color);
+        let workingBadge = isWorking ? `<span style="margin-left:8px; color:#d8b4fe; font-size:9px; font-weight:900; letter-spacing:0.05em;">WORKING</span>` : '';
+        let pasteHint = isPasteSelected ? `<span style="margin-left:8px; color:#10b981; font-size:9px; font-weight:900; letter-spacing:0.05em;">PASTE</span>` : '';
+        let jsSafeDeptUid = String(deptUid).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
-        assignedHtml += `<div onclick="togglePaDeptAssigned('${safeDept}')" style="background: #1f1f23; color: #fff; cursor: pointer; border: 1px solid ${deptObj.color}; border-right: none; border-left: none; padding: 8px 15px; font-size: 11px; font-weight: 900; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; width: 100%; position: sticky; top: 0; z-index: 15; box-sizing: border-box; margin-top: 5px;">
-                            <div><span id="pa-icon-assigned-dept-${safeDept}" style="margin-right: 10px; display: inline-block; width: 12px;">${iconTextDept}</span> ${deptName}</div>
+        assignedHtml += `<div onclick="selectPaDeptForPaste('${jsSafeDeptUid}')" style="background: ${headerBg}; color: #fff; cursor: pointer; border: 1px solid ${headerBorder}; border-right: none; border-left: none; padding: 8px 15px; font-size: 11px; font-weight: 900; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; width: 100%; position: sticky; top: 0; z-index: 15; box-sizing: border-box; margin-top: 5px;">
+                            <div style="display:flex; align-items:center;">
+                                <span id="pa-icon-assigned-dept-${safeDept}" onclick="event.stopPropagation(); togglePaDeptAssigned('${safeDept}')" style="margin-right: 10px; display: inline-block; width: 14px; cursor: pointer; user-select: none;">${iconTextDept}</span>
+                                ${deptName}${workingBadge}${pasteHint}
+                            </div>
                             <label style="color:#10b981; font-size:10px; display:flex; align-items:center; gap:6px; margin:0;" onclick="event.stopPropagation()">
                                 <input type="checkbox" class="eq-dept-finished-cb" data-dept="${deptUid}" onchange="window.toggleEqDeptFinished('${deptUid}', this.checked)" ${isDeptFinished ? 'checked' : ''} style="margin:0; width:14px; height:14px; accent-color:#10b981;"> FINISHED
                             </label>
                          </div>
                          <div id="${groupId}" style="display: ${displayStyleDept}; width: 100%; box-sizing: border-box;">`;
+
+        if (deptFormulas.length === 0) {
+            assignedHtml += `<div style="padding:10px 15px; color:#555; font-size:11px; font-style:italic; border-bottom:1px solid #222;">Empty — select header (green) to paste here</div>`;
+        }
 
         deptFormulas.forEach(fg => {
         let fLoc = fg.location || "General";

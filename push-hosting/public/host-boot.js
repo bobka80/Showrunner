@@ -2873,7 +2873,7 @@
   function dalFsPaFixtureToColDoc_(pa, projectId, meta) {
     pa = pa || {};
     meta = meta || {};
-    return {
+    var doc = {
       uid: String(pa.uid || ''),
       project_uid: String(projectId || ''),
       asset_uid: String(pa.assetId || pa.asset_uid || ''),
@@ -2887,6 +2887,9 @@
       writeSeq: meta.writeSeq || 0,
       updatedAt: meta.updatedAt || ''
     };
+    var od = pa.overrideDept != null ? pa.overrideDept : (pa.override_dept || '');
+    doc.override_dept = od || '';
+    return doc;
   }
 
   /**

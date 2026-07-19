@@ -153,7 +153,7 @@ function verifyDatabaseSchema(readOnly = false) {
   }
 
   let projectAssetsSheet = sm["Project_Assets"];
-  const projectAssetsHeaders = ["uid", "project_uid", "asset_uid", "assigned_quantity", "location", "formula", "creator", "container_uid", "scan_status", "outbound_truck_uid", "outbound_x", "outbound_y", "outbound_z", "outbound_rotated", "outbound_staged", "inbound_truck_uid", "inbound_x", "inbound_y", "inbound_z", "inbound_rotated", "inbound_staged"];
+  const projectAssetsHeaders = ["uid", "project_uid", "asset_uid", "assigned_quantity", "location", "formula", "creator", "override_dept", "container_uid", "scan_status", "outbound_truck_uid", "outbound_x", "outbound_y", "outbound_z", "outbound_rotated", "outbound_staged", "inbound_truck_uid", "inbound_x", "inbound_y", "inbound_z", "inbound_rotated", "inbound_staged"];
   if (!projectAssetsSheet) { 
       projectAssetsSheet = ss.insertSheet("Project_Assets"); 
       projectAssetsSheet.appendRow(projectAssetsHeaders); 

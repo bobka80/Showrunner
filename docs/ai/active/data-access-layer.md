@@ -150,7 +150,7 @@ Storage
 
 | Sheet (ENGINE) | `Logistics_Schema.js` headers | `SCHEMA.md` | Match |
 |----------------|------------------------------|-------------|-------|
-| `Project_Assets` | uid, project_uid, asset_uid, assigned_quantity, location, formula, creator, container_uid, scan_status, outbound_*, inbound_* | Listed in ENGINE set; column detail in code | **OK** — schema builder is source of truth for columns |
+| `Project_Assets` | uid, project_uid, asset_uid, assigned_quantity, location, formula, creator, **override_dept**, container_uid, scan_status, outbound_*, inbound_* | Listed in ENGINE set; column detail in code | **OK** — schema builder is source of truth for columns |
 | `Operations_Ledger` | uid, session_uid, project_uid, operation_type, asset_uid, asset_code, asset_name, department, rfid_tag, timestamp, actor | Listed in ENGINE set | **OK** |
 | `Shift_Assignments` | uid, project_uid, Phase_Mode, user_uid, Role, Start, Duration, … | Listed as `Shift_Assignments` | **OK** |
 | `Phase_Blocks` | uid, project_uid, Phase_Mode, Phase_Name, Start, Duration, Note | Listed as `Phase_Blocks` | **OK** |

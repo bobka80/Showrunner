@@ -20,6 +20,7 @@ window.insertIntoProjectAssets = function(newItem) {
         if (typeof window.dalPaWarnBlockedOnce_ === 'function') window.dalPaWarnBlockedOnce_();
         return;
     }
+    if (typeof window.dalPaStampOverrideDept_ === 'function') window.dalPaStampOverrideDept_(newItem);
     if (!newItem.uid && typeof window.dalNewUid_ === 'function') newItem.uid = window.dalNewUid_();
     if (window.overrideInsertIndex !== undefined && window.overrideInsertIndex !== null) {
         currentProjectAssets.splice(window.overrideInsertIndex, 0, newItem);
@@ -700,7 +701,10 @@ function updateFormulaDept(loc, form, newDept) {
         let pLoc = pa.location || "General";
         let pForm = pa.formula || "Standalone";
         if (pLoc === loc && pForm === form) {
-            pa.overrideDept = newDept;
+            pa.overrideDept = newDept || '';
+            if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                window.dalPaNoteTouch_(pa.uid);
+            }
         }
     });
     renderProjectAssetsUI();

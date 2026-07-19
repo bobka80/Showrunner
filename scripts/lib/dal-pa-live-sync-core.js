@@ -38,7 +38,8 @@ function fixtureSig(list) {
       a.location || '',
       a.formula || '',
       a.assetId || '',
-      a.isShortage ? '1' : '0'
+      a.isShortage ? '1' : '0',
+      a.overrideDept || ''
     ].join(':');
   }).sort().join('|');
 }

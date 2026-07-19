@@ -7,6 +7,54 @@
 window.currentPaMode = 'design';
 window.activeContainerTarget = null;
 window.packingDeptFilters = [];
+/** Design-mode write target for new vault/search/formula adds (local UI). */
+window.paWorkingDept = '';
+/** Green paste target — independent of working dept (local UI). */
+window.paSelectedDept = null;
+
+window.dalPaResolveUserHomeDept_ = function() {
+    var creatorName = (typeof ACTIVE_USER_NAME !== 'undefined') ? ACTIVE_USER_NAME : '';
+    if (!creatorName || creatorName === 'System') {
+        return (typeof SYSTEM_DEPARTMENTS !== 'undefined' && SYSTEM_DEPARTMENTS[0]) ? SYSTEM_DEPARTMENTS[0].uid : '';
+    }
+    var roster = (typeof globalRosterData !== 'undefined' && globalRosterData && globalRosterData.roster)
+        ? globalRosterData.roster
+        : ((typeof activeRoster !== 'undefined') ? activeRoster : null);
+    if (roster) {
+        var person = roster.find(function(c) { return c.name === creatorName || c.email === creatorName; });
+        if (person && person.department) {
+            var d = typeof person.department === 'object' ? (person.department.uid || person.department.name) : person.department;
+            if (d && d !== '[object Object]') return d;
+        }
+    }
+    return (typeof SYSTEM_DEPARTMENTS !== 'undefined' && SYSTEM_DEPARTMENTS[0]) ? SYSTEM_DEPARTMENTS[0].uid : '';
+};
+
+window.dalPaEnsureWorkingDept_ = function() {
+    if (!window.paWorkingDept) {
+        window.paWorkingDept = window.dalPaResolveUserHomeDept_() || '';
+    }
+    return window.paWorkingDept;
+};
+
+/** Stamp overrideDept for new inserts (working) or paste (selected). Keeps existing if already set and no forceDept. */
+window.dalPaStampOverrideDept_ = function(pa, forceDept) {
+    if (!pa) return pa;
+    var d = forceDept != null ? forceDept : (pa.overrideDept || window.dalPaEnsureWorkingDept_());
+    if (d) pa.overrideDept = d;
+    return pa;
+};
+
+window.setPaWorkingDept = function(deptUid) {
+    window.paWorkingDept = deptUid || '';
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+};
+
+window.selectPaDeptForPaste = function(deptUid) {
+    if (!deptUid) return;
+    window.paSelectedDept = (window.paSelectedDept === deptUid) ? null : deptUid;
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+};
 
 window.explodeProjectAssets = function() {
     let exploded = [];
@@ -236,7 +284,8 @@ function executeTogglePaMode(targetMode) {
         if (btnSub) btnSub.style.setProperty('display', 'inline-flex', 'important');
         if (btnAdd) btnAdd.style.setProperty('display', 'none', 'important');
         if (clipActions) clipActions.style.setProperty('display', 'flex', 'important');
-        if (packFilters) packFilters.style.setProperty('display', 'none', 'important');
+        // Design: working-dept picker lives in the same slot as packing FILTER.
+        if (packFilters) packFilters.style.setProperty('display', 'flex', 'important');
         if (arrangeBtn) arrangeBtn.style.setProperty('display', 'none', 'important');
         if (autoAddCasesBtn) autoAddCasesBtn.style.setProperty('display', 'none', 'important');
         if (loadinPlanBtn) loadinPlanBtn.style.setProperty('display', 'none', 'important');

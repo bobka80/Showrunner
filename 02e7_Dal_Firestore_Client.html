@@ -142,6 +142,7 @@ window.dalFsDocToPaAsset_ = function(docId, d) {
     location: d.location || '',
     formula: d.formula || '',
     creator: d.creator || 'System',
+    overrideDept: d.override_dept || d.overrideDept || '',
     containerUid: d.container_uid || '',
     scanStatus: d.scan_status || 'Assigned',
     writeSeq: Number(d.writeSeq || 0) || 0,
@@ -232,7 +233,8 @@ window.dalPaContentSig_ = function(pa) {
     String(pa.inboundY != null ? pa.inboundY : ''),
     String(pa.inboundZ != null ? pa.inboundZ : ''),
     pa.inboundRotated ? '1' : '0',
-    pa.inboundStaged ? '1' : '0'
+    pa.inboundStaged ? '1' : '0',
+    String(pa.overrideDept || '')
   ].join('\t');
 };
 
@@ -245,7 +247,8 @@ window.dalPaFlushPayloadSig_ = function(pa) {
     String(pa.location || 'General'),
     String(window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || '')),
     String(pa.containerUid || ''),
-    String(pa.scanStatus || 'Assigned')
+    String(pa.scanStatus || 'Assigned'),
+    String(pa.overrideDept || '')
   ].join('\t');
 };
 
@@ -263,7 +266,7 @@ window.dalPaFixturesSig_ = function(assets) {
     // Include shortage — toggle only flips isShortage (formula string unchanged in state doc).
     return (a.uid || '') + ':' + (a.qty || 0) + ':' + (a.location || '') + ':' +
       (a.formula || '') + ':' + (a.assetId || '') + ':' + (a.containerUid || '') + ':' +
-      (a.isShortage ? '1' : '0');
+      (a.isShortage ? '1' : '0') + ':' + (a.overrideDept || '');
   }).sort().join('|');
 };
 
@@ -1469,7 +1472,8 @@ window.dalPaAssetToFsDoc_ = function(pa, projectId) {
     formula: window.dalPaEncodeFormulaForFs_(pa),
     creator: pa.creator || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'),
     container_uid: pa.containerUid || '',
-    scan_status: pa.scanStatus || 'Assigned'
+    scan_status: pa.scanStatus || 'Assigned',
+    override_dept: pa.overrideDept || ''
   };
   if (pa.outboundTruckUid) doc.outbound_truck_uid = pa.outboundTruckUid;
   if (pa.outboundX != null) doc.outbound_x = pa.outboundX;
@@ -1563,6 +1567,8 @@ window.dalWritePaForkFullToFirestore_ = function(projectId, done) {
             location: pa.location || 'General',
             formula: window.dalPaEncodeFormulaForFs_(pa),
             creator: pa.creator || 'System',
+            overrideDept: pa.overrideDept || '',
+            isShortage: !!pa.isShortage,
             containerUid: pa.containerUid || '',
             scanStatus: pa.scanStatus || 'Assigned'
           };
@@ -1642,6 +1648,8 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
           location: pa.location || 'General',
           formula: window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || ''),
           creator: pa.creator || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'),
+          overrideDept: pa.overrideDept || '',
+          isShortage: !!pa.isShortage,
           containerUid: pa.containerUid || '',
           scanStatus: pa.scanStatus || 'Assigned'
         });
@@ -1789,6 +1797,8 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
               location: pa.location,
               formula: pa.formula,
               creator: pa.creator,
+              overrideDept: pa.overrideDept,
+              isShortage: pa.isShortage,
               containerUid: pa.containerUid,
               scanStatus: pa.scanStatus
             }, projectId), { merge: true });

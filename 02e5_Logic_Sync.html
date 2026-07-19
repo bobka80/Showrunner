@@ -117,6 +117,7 @@ window.calculatePaDeltas = function() {
     });
     
     let newMap = {};
+    let sampleByKey = {};
     currentProjectAssets.forEach(pa => {
         let pForm = pa.formula || 'Standalone';
         if (pa.isShortage) pForm = '[SHORT] ' + pForm;
@@ -126,6 +127,7 @@ window.calculatePaDeltas = function() {
         else if (pa.isAuto) pForm = 'Auto-Container';
         let k = `${pa.assetId}_@@@_${pa.location || 'General'}_@@@_${pForm}_@@@_${pa.containerUid || ''}`;
         newMap[k] = (newMap[k] || 0) + parseInt(pa.qty, 10);
+        if (!sampleByKey[k]) sampleByKey[k] = pa;
     });
     
     let deltas = [];
@@ -139,7 +141,33 @@ window.calculatePaDeltas = function() {
             let isBulk = false;
             let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pts[0]) : null;
             if (asset && asset.type === 'Bulk') isBulk = true;
-            deltas.push({ assetId: pts[0], location: pts[1], rawFormula: pts[2], containerUid: pts[3], deltaQty: diff, isBulk: isBulk, creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System' });
+            let sample = sampleByKey[k];
+            deltas.push({
+                assetId: pts[0],
+                location: pts[1],
+                rawFormula: pts[2],
+                containerUid: pts[3],
+                deltaQty: diff,
+                isBulk: isBulk,
+                creator: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System',
+                overrideDept: sample ? (sample.overrideDept || '') : ''
+            });
+        }
+    });
+
+    // Dept-only changes (same qty key) — Sheets would otherwise skip them.
+    let origByUid = {};
+    (window.originalProjectAssets || []).forEach(pa => {
+        if (pa && pa.uid) origByUid[String(pa.uid)] = pa;
+    });
+    (currentProjectAssets || []).forEach(pa => {
+        if (!pa || !pa.uid || pa.isAuto || pa.isGenericAuto) return;
+        let orig = origByUid[String(pa.uid)];
+        if (!orig) return;
+        let a = String(pa.overrideDept || '');
+        let b = String(orig.overrideDept || '');
+        if (a !== b) {
+            deltas.push({ uid: String(pa.uid), metaOnly: true, overrideDept: a, deltaQty: 0 });
         }
     });
     return deltas;

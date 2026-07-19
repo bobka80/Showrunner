@@ -40,6 +40,13 @@ function dalLoadPaProjectRowsFromSheet_(sheet, map, projectId) {
 
 function dalApplyPaDeltas_(projectRows, deltas, map, colCount, projectId) {
     deltas.forEach(d => {
+        if (d.metaOnly && d.uid) {
+            let match = projectRows.find(r => String(r.data[map['uid']]) === String(d.uid));
+            if (match && map['override_dept'] !== undefined) {
+                match.data[map['override_dept']] = d.overrideDept != null ? d.overrideDept : '';
+            }
+            return;
+        }
         if (d.isBulk) {
             let match = projectRows.find(r =>
                 String(r.data[map['asset_uid']]) === String(d.assetId) &&
@@ -50,6 +57,9 @@ function dalApplyPaDeltas_(projectRows, deltas, map, colCount, projectId) {
             if (match) {
                 let currentQty = parseInt(match.data[map['assigned_quantity']], 10) || 0;
                 match.data[map['assigned_quantity']] = currentQty + d.deltaQty;
+                if (d.overrideDept != null && map['override_dept'] !== undefined) {
+                    match.data[map['override_dept']] = d.overrideDept;
+                }
             } else if (d.deltaQty > 0) {
                 let r = new Array(colCount).fill("");
                 if (map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
@@ -59,6 +69,7 @@ function dalApplyPaDeltas_(projectRows, deltas, map, colCount, projectId) {
                 if (map['location'] !== undefined) r[map['location']] = d.location || "General";
                 if (map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
                 if (map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
+                if (map['override_dept'] !== undefined) r[map['override_dept']] = d.overrideDept || "";
                 if (map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
                 if (map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
                 projectRows.push({ data: r });
@@ -74,6 +85,7 @@ function dalApplyPaDeltas_(projectRows, deltas, map, colCount, projectId) {
                     if (map['location'] !== undefined) r[map['location']] = d.location || "General";
                     if (map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
                     if (map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
+                    if (map['override_dept'] !== undefined) r[map['override_dept']] = d.overrideDept || "";
                     if (map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
                     if (map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
                     projectRows.push({ data: r });
@@ -217,6 +229,7 @@ function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
                     location: data[i][map['location']] || "",
                     formula: data[i][map['formula']] || "",
                     creator: data[i][map['creator']] || "System",
+                    overrideDept: map['override_dept'] !== undefined ? (data[i][map['override_dept']] || "") : "",
                     containerUid: data[i][map['container_uid']] || "",
                     scanStatus: data[i][map['scan_status']] || "Assigned",
                     outboundTruckUid: map['outbound_truck_uid'] !== undefined ? (data[i][map['outbound_truck_uid']] || "") : "",
@@ -383,6 +396,7 @@ function saveProjectAssetsAPI(projectId, assignedList, actor = "System UI") {
                 if(map['location'] !== undefined) r[map['location']] = a.location || "";
                 if(map['formula'] !== undefined) r[map['formula']] = a.formula || "";
                 if(map['creator'] !== undefined) r[map['creator']] = a.creator || "System";
+                if(map['override_dept'] !== undefined) r[map['override_dept']] = a.overrideDept || "";
                 if(map['container_uid'] !== undefined) r[map['container_uid']] = a.containerUid || "";
                 if(map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
                 return r;

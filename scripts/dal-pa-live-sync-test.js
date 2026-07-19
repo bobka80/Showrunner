@@ -242,9 +242,22 @@ var shortMerge = core.patchMergeFixtures(
 var sm = shortMerge.find(function (x) { return x.uid === 'u1'; });
 assert(sm && sm.isShortage === true, 'touched shortage upsert lands in store');
 
+console.log('\n--- Case R: overrideDept changes fixtureSig (peer must apply) ---');
+var sigNoDept = core.fixtureSig([{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x' }]);
+var sigDept = core.fixtureSig([{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x', overrideDept: 'dept_sound' }]);
+assert(sigNoDept !== sigDept, 'overrideDept must change fixtureSig');
+var deptMerge = core.patchMergeFixtures(
+  [{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x', overrideDept: '' }],
+  [{ uid: 'u1', qty: 1, location: 'A', formula: 'Standalone', assetId: 'x', overrideDept: 'dept_sound' }],
+  { u1: 1 },
+  {}
+);
+var dm = deptMerge.find(function (x) { return x.uid === 'u1'; });
+assert(dm && dm.overrideDept === 'dept_sound', 'touched overrideDept upsert lands in store');
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–Q + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–R + units)');
 process.exit(0);

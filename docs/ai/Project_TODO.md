@@ -16,7 +16,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-19)
 
-**Primary campaign:** Multi-user fork — **A0 + H1 + H5 done** @ **v655**. Prep live sync rollback still **v654** + `host-boot.js?v=653`. **Next: Gap 1 (A3)** — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md). Process: [active/bulletproof-multiuser-live-editors-2026-07-18.md](active/bulletproof-multiuser-live-editors-2026-07-18.md).
+**Primary campaign:** Multi-user fork — **PAUSED** for PA working/paste dept feature; resume **Gap 1 (A3)**. Prior: **A0 + H1 + H5** @ **v655**. Prep live sync rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md). Process: [active/bulletproof-multiuser-live-editors-2026-07-18.md](active/bulletproof-multiuser-live-editors-2026-07-18.md).
 
 | Stage | What | Gate |
 |-------|------|------|
@@ -41,7 +41,7 @@ Also on the board (do not mix into the fork campaign without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Multi-user fork: test pipeline → bulletproof → auto fork** | **NEXT — Gap 1 (A3)** (H5 @ **v655**; sync rollback **v654**) | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **Multi-user fork: test pipeline → bulletproof → auto fork** | **PAUSED** — resume **Gap 1 (A3)** | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | Near-complete — prep live rollback **v654** · DAL-era **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
 

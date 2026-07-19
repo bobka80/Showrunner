@@ -44,6 +44,7 @@ function dalFirestoreAssetFromRow_(row, map) {
     location: row[map['location']] || "",
     formula: row[map['formula']] || "",
     creator: row[map['creator']] || "System",
+    overrideDept: map['override_dept'] !== undefined ? (row[map['override_dept']] || "") : "",
     containerUid: row[map['container_uid']] || "",
     scanStatus: row[map['scan_status']] || "Assigned",
     outboundTruckUid: map['outbound_truck_uid'] !== undefined ? (row[map['outbound_truck_uid']] || "") : "",
@@ -148,6 +149,7 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
           formula: formula,
           isShortage: isShortage,
           creator: obj.creator || 'System',
+          overrideDept: obj.override_dept || '',
           containerUid: obj.container_uid || '',
           scanStatus: obj.scan_status || 'Assigned'
         };
@@ -192,6 +194,7 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
       formula: formula,
       isShortage: isShortage,
       creator: obj.creator || 'System',
+      overrideDept: obj.override_dept || '',
       containerUid: obj.container_uid || '',
       scanStatus: obj.scan_status || 'Assigned'
     });

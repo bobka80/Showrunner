@@ -139,6 +139,16 @@ window.pasteClipboardPa = function() {
     let toPaste = [...toPasteCuts, ...toPasteCopies];
     if (toPaste.length === 0) return;
 
+    let pasteDept = window.paSelectedDept;
+    if (!pasteDept) {
+        if (typeof window.showMobilePaToast === 'function') {
+            window.showMobilePaToast('Select a department', 'Click a department header (green) to set the paste target.');
+        } else {
+            alert('Select a department first — click a department header (turns green) to set the paste target.');
+        }
+        return;
+    }
+
     let remainingAssets = currentProjectAssets.filter(pa => !pa.isCut || (pa.isCut && pa.cutQty && pa.cutQty < pa.qty));
     let itemsToInsert = [];
     
@@ -151,6 +161,9 @@ window.pasteClipboardPa = function() {
             pa.qty = parseInt(pa.qty, 10) - parseInt(pa.cutQty, 10);
             pa.isCut = false;
             delete pa.cutQty;
+            if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                window.dalPaNoteTouch_(pa.uid);
+            }
             itemsToInsert.push(splitClone);
         } else {
             pa.isCut = false;
@@ -164,9 +177,18 @@ window.pasteClipboardPa = function() {
         clone.isCopied = false;
         if (clone.copiedQty) clone.qty = clone.copiedQty;
         delete clone.copiedQty;
+        delete clone.uid;
         pa.isCopied = false;
         delete pa.copiedQty;
         itemsToInsert.push(clone);
+    });
+
+    itemsToInsert.forEach(pa => {
+        pa.overrideDept = pasteDept;
+        if (!pa.uid && typeof window.dalNewUid_ === 'function') pa.uid = window.dalNewUid_();
+        if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+            window.dalPaNoteTouch_(pa.uid);
+        }
     });
 
     if (targetLoc !== null) {
