@@ -343,9 +343,36 @@ var peerDelShift = lww.detectWatchedPeerDeletes(
 );
 assert(peerDelShift.indexOf('s1') >= 0, 'timeline peer strip delete detected');
 
+console.log('\n--- Case U: peer delete wins over concurrent dept touch ---');
+var core = require('./lib/dal-pa-live-sync-core.js');
+var knownLocal = [{ uid: 'u1', assetId: 'a', qty: 1, location: 'General', formula: 'Standalone', overrideDept: 'Audio', writeSeq: 5 }];
+var afterPeerDel = core.patchMergeFixtures(
+  [], // remote already deleted
+  knownLocal,
+  { u1: 1 },
+  {},
+  {}
+);
+assert(afterPeerDel.length === 0, 'flush must not resurrect peer-deleted known uid');
+var brandNew = [{ uid: 'u2', assetId: 'b', qty: 1, location: 'General', formula: 'Standalone', overrideDept: 'Audio', writeSeq: 0 }];
+var createOk = core.patchMergeFixtures([], brandNew, { u2: 1 }, {}, {});
+assert(createOk.length === 1 && createOk[0].uid === 'u2', 'new insert (writeSeq 0) still creates');
+var heldKeep = core.applyRemoteFixtures(
+  [],
+  [{ uid: 'u1', assetId: 'a', qty: 1, writeSeq: 5 }],
+  { touched: { u1: 1 }, holdUntil: { u1: Date.now() + 99999 }, lastAppliedSeq: { u1: 5 }, now: Date.now() }
+);
+assert(heldKeep.fixtures.length === 0, 'apply pierces hold/touch for peer delete of known uid');
+var pendingInsert = core.applyRemoteFixtures(
+  [],
+  [{ uid: 'u3', assetId: 'c', qty: 1, writeSeq: 0 }],
+  { touched: { u3: 1 }, holdUntil: {}, lastAppliedSeq: {}, now: Date.now() }
+);
+assert(pendingInsert.fixtures.length === 1, 'pending new insert kept when absent from remote');
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–T + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–U + units)');
 process.exit(0);

@@ -44,7 +44,9 @@ function fixtureSig(list) {
   }).sort().join('|');
 }
 
-/** Timeline-style patch merge onto remote fixture list (touched/deleted only). */
+/** Timeline-style patch merge onto remote fixture list (touched/deleted only).
+ * Peer delete wins: do not resurrect a UID absent from remote if local already
+ * carried a server writeSeq (known row). New inserts (writeSeq 0) still create. */
 function patchMergeFixtures(remoteFixtures, localFixtures, touched, deleted, qtyDeltas) {
   var remoteMap = mapByUid(remoteFixtures);
   var localMap = mapByUid(localFixtures);
@@ -54,6 +56,10 @@ function patchMergeFixtures(remoteFixtures, localFixtures, touched, deleted, qty
   Object.keys(touched || {}).forEach(function (uid) {
     if (!localMap[uid]) {
       delete out[uid];
+      return;
+    }
+    // Concurrent dept/qty edit must not undo a peer delete of a known row.
+    if (!remoteMap[uid] && (Number(localMap[uid].writeSeq || 0) || 0) > 0) {
       return;
     }
     var row = Object.assign({}, localMap[uid]);
@@ -126,6 +132,10 @@ function applyRemoteFixtures(remoteFixtures, localFixtures, opts) {
   Object.keys(localBy).forEach(function (uid) {
     if (used[uid]) return;
     if (touched[uid] || (holdUntil[uid] || 0) > now) {
+      // Peer deleted a known server row — do not keep local under hold/touch.
+      var known = (Number(lastAppliedSeq[uid] || 0) || 0) > 0 ||
+        (localBy[uid] && (Number(localBy[uid].writeSeq || 0) || 0) > 0);
+      if (known) return;
       out.push(localBy[uid]);
     }
   });

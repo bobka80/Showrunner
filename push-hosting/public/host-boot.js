@@ -2828,7 +2828,8 @@
   }
 
   /** Prep PA fixtures — patch-merge by uid. Absolute local fields for touched rows;
-   * optional qtyDeltas add to remote (concurrent +/-). New UID: remote base 0. */
+   * optional qtyDeltas add to remote (concurrent +/-). New UID: remote base 0.
+   * Peer delete wins: do not resurrect a known row (local.writeSeq > 0) absent from remote. */
   function dalFsPatchPaFixtures_(remoteList, localList, touchedMap, deletedMap, qtyDeltas) {
     var remoteMap = {};
     var localMap = {};
@@ -2845,6 +2846,9 @@
       if (!localMap[id]) {
         delete out[id];
         return;
+      }
+      if (!remoteMap[id] && (Number(localMap[id].writeSeq || 0) || 0) > 0) {
+        return; // peer deleted — do not resurrect via concurrent dept/qty touch
       }
       var row = {};
       Object.keys(localMap[id]).forEach(function(k) { row[k] = localMap[id][k]; });

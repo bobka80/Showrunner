@@ -595,7 +595,20 @@ window.dalPaApplyRemoteFixturesTimeline_ = function(remoteFixtures, localFixture
   });
   Object.keys(localBy).forEach(function(uid) {
     if (used[uid]) return;
-    if (window.dalPaTouchedUids_[uid] || (!forceApply && window.dalPaIsHeld_(uid))) out.push(localBy[uid]);
+    var pendingLocal = !!(window.dalPaTouchedUids_[uid] || (!forceApply && window.dalPaIsHeld_(uid)));
+    if (!pendingLocal) return;
+    // Peer deleted a known row: pierce hold/touch so dept-move flush cannot keep a ghost.
+    var known = (Number(window.dalPaLastAppliedSeq_[uid] || 0) || 0) > 0 ||
+      !!(window.dalPaMapByUid_((window.originalProjectAssets || []).filter(function(pa) {
+        return !window.dalPaIsAutoRow_(pa);
+      }))[uid]) ||
+      (localBy[uid] && (Number(localBy[uid].writeSeq || 0) || 0) > 0);
+    if (known) {
+      delete window.dalPaTouchedUids_[uid];
+      if (window.dalPaHoldUntil_) delete window.dalPaHoldUntil_[uid];
+      return;
+    }
+    out.push(localBy[uid]);
   });
   return out;
 };
@@ -1990,8 +2003,15 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
           Object.keys(remoteMap).forEach(function(id) { out[id] = remoteMap[id]; });
           Object.keys(deleted).forEach(function(id) { delete out[id]; });
           Object.keys(touched).forEach(function(id) {
-            if (localMap[id]) out[id] = localMap[id];
-            else delete out[id];
+            if (!localMap[id]) {
+              delete out[id];
+              return;
+            }
+            // Peer delete wins over concurrent touch of a known row.
+            if (!remoteMap[id] && (Number(localMap[id].writeSeq || 0) || 0) > 0) {
+              return;
+            }
+            out[id] = localMap[id];
           });
           var writeSeq = prevSeq + 1;
           var clientId = window.dalPaClientId || '';
