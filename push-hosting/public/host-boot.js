@@ -2821,8 +2821,8 @@
     }
   }
 
-  /** Prep PA fixtures — patch-merge by uid (same discipline as timeline dalFsPatchList_). */
-  function dalFsPatchPaFixtures_(remoteList, localList, touchedMap, deletedMap) {
+  /** Prep PA fixtures — patch-merge by uid. Qty uses additive deltas when provided (multi-window +/+). */
+  function dalFsPatchPaFixtures_(remoteList, localList, touchedMap, deletedMap, qtyDeltas) {
     var remoteMap = {};
     var localMap = {};
     (remoteList || []).forEach(function(e) {
@@ -2835,8 +2835,20 @@
     Object.keys(remoteMap).forEach(function(id) { out[id] = remoteMap[id]; });
     Object.keys(deletedMap || {}).forEach(function(id) { delete out[id]; });
     Object.keys(touchedMap || {}).forEach(function(id) {
-      if (localMap[id]) out[id] = localMap[id];
-      else delete out[id];
+      if (!localMap[id]) {
+        delete out[id];
+        return;
+      }
+      var row = {};
+      Object.keys(localMap[id]).forEach(function(k) { row[k] = localMap[id][k]; });
+      var dRaw = qtyDeltas && qtyDeltas[id];
+      if (dRaw != null && dRaw !== '' && !isNaN(Number(dRaw))) {
+        var base = remoteMap[id]
+          ? Number(remoteMap[id].qty != null ? remoteMap[id].qty : 1)
+          : 0;
+        row.qty = base + Number(dRaw);
+      }
+      out[id] = row;
     });
     return Object.keys(out).map(function(k) { return out[k]; });
   }
@@ -2901,7 +2913,8 @@
             remoteFixtures,
             localFixtures,
             mutations.touched || {},
-            mutations.deleted || {}
+            mutations.deleted || {},
+            mutations.qtyDeltas || {}
           );
           var updatedAt = new Date().toISOString();
           var writeSeq = prevSeq + 1;

@@ -515,6 +515,7 @@ After END — reopen rules
 7. **Fall back to silent GAS `live sync (server)` multi-edit when Auth/listen fails.** H1: enter **blocked** (hard banner + edits locked). Read-only poll OK; patch writes only.
 8. **Drop peer state snaps during FlushGuard / flush-in-flight** because fixture sig ≠ expected. That silently loses the only delivery of a peer edit. Re-queue or apply; FlushGuard may drop only older `writeSeq` when local already matches.
 9. **Skip applying own write echo when local UI lags the txn-merged doc.** Concurrent flush absorbs peer rows into your write; echo used to advance `writeSeq` only → peer edit forgotten until refresh. Always apply `result.merged` after PA_PATCH OK.
+10. **Replace absolute qty on touch (LWW) when multi-window +/- must combine.** Live flush sends **qty deltas** vs last-acked originals; host txn does `remote.qty + delta`. Heal ticker force-applies last server fixtures if UI drifts with no pending touches.
 
 ### Safe rules (locked)
 

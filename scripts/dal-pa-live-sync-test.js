@@ -177,6 +177,13 @@ var abs = core.simulateConcurrentFlushAbsorb();
 console.log('  store u1=%s u2=%s buggyUi.u1=%s fixedUi.u1=%s', abs.storeU1, abs.storeU2, abs.buggyU1, abs.fixedU1);
 assert(abs.ok, 'store has A+B edits; buggy UI forgets u1; fixed applies merged u1=5');
 
+// Case O: three +1 on same row with qty deltas → combined truth (5+3=8), not LWW 6.
+// Does NOT cover: type-in absolute qty intent; heal ticker timing.
+console.log('\n--- Case O: three-client qty deltas combine ---');
+var comb = core.simulateThreeClientQtyCombine();
+console.log('  storeQty=%s (LWW would be %s)', comb.storeQty, comb.lwwWouldBe);
+assert(comb.ok, 'three +1 from 5 → store 8');
+
 console.log('\n--- Unit: patchMergeFixtures only applies touches ---');
 var merged = core.patchMergeFixtures(
   [{ uid: 'u1', qty: 5 }, { uid: 'u2', qty: 1 }],
@@ -188,6 +195,16 @@ var m1 = merged.find(function (x) { return x.uid === 'u1'; });
 var m2 = merged.find(function (x) { return x.uid === 'u2'; });
 assert(m1 && Number(m1.qty) === 4, 'touched u1 becomes 4');
 assert(m2 && Number(m2.qty) === 1, 'untouched u2 keeps remote 1 (not local 99)');
+
+var mergedDelta = core.patchMergeFixtures(
+  [{ uid: 'u1', qty: 5 }],
+  [{ uid: 'u1', qty: 6 }],
+  { u1: 1 },
+  {},
+  { u1: 1 }
+);
+var md = mergedDelta.find(function (x) { return x.uid === 'u1'; });
+assert(md && Number(md.qty) === 6, 'delta +1 on remote 5 → 6');
 
 console.log('\n--- Unit: state apply ignores own echo ---');
 var echo = core.applyRemotePaState(
@@ -209,5 +226,5 @@ if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–N + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–O + units)');
 process.exit(0);

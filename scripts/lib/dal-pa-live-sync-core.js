@@ -37,15 +37,24 @@ function fixtureSig(list) {
 }
 
 /** Timeline-style patch merge onto remote fixture list (touched/deleted only). */
-function patchMergeFixtures(remoteFixtures, localFixtures, touched, deleted) {
+function patchMergeFixtures(remoteFixtures, localFixtures, touched, deleted, qtyDeltas) {
   var remoteMap = mapByUid(remoteFixtures);
   var localMap = mapByUid(localFixtures);
   var out = {};
   Object.keys(remoteMap).forEach(function (uid) { out[uid] = remoteMap[uid]; });
   Object.keys(deleted || {}).forEach(function (uid) { delete out[uid]; });
   Object.keys(touched || {}).forEach(function (uid) {
-    if (localMap[uid]) out[uid] = Object.assign({}, localMap[uid]);
-    else delete out[uid];
+    if (!localMap[uid]) {
+      delete out[uid];
+      return;
+    }
+    var row = Object.assign({}, localMap[uid]);
+    var dRaw = qtyDeltas && qtyDeltas[uid];
+    if (dRaw != null && dRaw !== '' && !isNaN(Number(dRaw))) {
+      var base = remoteMap[uid] ? Number(remoteMap[uid].qty != null ? remoteMap[uid].qty : 1) : 0;
+      row.qty = base + Number(dRaw);
+    }
+    out[uid] = row;
   });
   return Object.keys(out).map(function (k) { return out[k]; });
 }
@@ -194,9 +203,9 @@ function buggyNonTxnWrite(storeDocs, uid, qty, clientId) {
   return storeDocs[uid];
 }
 
-function txnStatePatch(state, localFixtures, touched, deleted, clientId) {
+function txnStatePatch(state, localFixtures, touched, deleted, clientId, qtyDeltas) {
   var remote = (state && state.fixtures) || [];
-  var merged = patchMergeFixtures(remote, localFixtures, touched, deleted);
+  var merged = patchMergeFixtures(remote, localFixtures, touched, deleted, qtyDeltas);
   var prevSeq = Number((state && state.writeSeq) || 0) || 0;
   return {
     fixtures: merged,
@@ -737,6 +746,29 @@ module.exports = {
       fixedU1: fixedUi.u1,
       ok: Number(store[u1].qty) === 5 && Number(store[u2].qty) === 9 &&
         buggyUi.u1 === 1 && fixedUi.u1 === 5
+    };
+  },
+  /**
+   * Case O: three clients each +1 on same uid — additive deltas → store qty = start+3.
+   * Absolute LWW would end at start+1.
+   */
+  simulateThreeClientQtyCombine: function() {
+    var u1 = 'fix-1';
+    var state = {
+      fixtures: [{ uid: u1, assetId: 'A1', qty: 5 }],
+      writeSeq: 1,
+      clientId: 'seed'
+    };
+    // Each client saw 5, clicked + once → local 6, delta +1
+    state = txnStatePatch(state, [{ uid: u1, assetId: 'A1', qty: 6 }], { 'fix-1': 1 }, {}, 'A', { 'fix-1': 1 });
+    state = txnStatePatch(state, [{ uid: u1, assetId: 'A1', qty: 6 }], { 'fix-1': 1 }, {}, 'B', { 'fix-1': 1 });
+    state = txnStatePatch(state, [{ uid: u1, assetId: 'A1', qty: 6 }], { 'fix-1': 1 }, {}, 'C', { 'fix-1': 1 });
+    var storeQty = Number(mapByUid(state.fixtures)[u1].qty);
+    var lwwWouldBe = 6;
+    return {
+      storeQty: storeQty,
+      lwwWouldBe: lwwWouldBe,
+      ok: storeQty === 8
     };
   },
   /** After END, refuse reopen for the same sessionUid. */
