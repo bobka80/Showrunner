@@ -511,9 +511,9 @@ function renderProjectAssetsUI() {
             });
         }
         packFiltersEl.innerHTML = `<div style="display:inline-flex; align-items:center; gap:8px;">
-            <span style="color:#a1a1aa; font-size:10px; font-weight:900; letter-spacing:0.04em;">WORKING</span>
+            <span style="color:#ffffff; font-size:10px; font-weight:900; letter-spacing:0.04em;">WORKING</span>
             <select id="pa-working-dept-select" onchange="setPaWorkingDept(this.value)" title="New adds go into this department"
-                style="padding:5px 8px; height:28px; font-size:11px; font-weight:bold; background:#111; color:#e4e4e7; border:1px solid #d8b4fe; border-radius:4px; outline:none; min-width:120px;">
+                style="padding:5px 8px; height:28px; font-size:11px; font-weight:bold; background:#111; color:#e4e4e7; border:2px solid ${(typeof getDeptObj === 'function' ? getDeptObj(workUid).color : null) || '#ffffff'}; border-radius:4px; outline:none; min-width:120px;">
                 ${workOpts}
             </select>
         </div>`;
@@ -878,12 +878,14 @@ function renderProjectAssetsUI() {
         let isPasteSelected = window.paSelectedDept === deptUid;
         let isWorking = window.paWorkingDept === deptUid;
         let headerBg = isPasteSelected ? '#064e3b' : '#1f1f23';
-        let headerBorder = isPasteSelected ? '#10b981' : (isWorking ? '#d8b4fe' : deptObj.color);
-        let workingBadge = isWorking ? `<span style="margin-left:8px; color:#d8b4fe; font-size:9px; font-weight:900; letter-spacing:0.05em;">WORKING</span>` : '';
+        // Working dept: white frame (not purple). Non-working: dept color. Paste: green.
+        let headerBorder = isPasteSelected ? '#10b981' : (isWorking ? '#ffffff' : deptObj.color);
+        let headerBorderW = '2px'; // was 1px — white/dept frames +1px
+        let workingBadge = isWorking ? `<span style="margin-left:8px; color:#ffffff; font-size:9px; font-weight:900; letter-spacing:0.05em;">WORKING</span>` : '';
         let pasteHint = isPasteSelected ? `<span style="margin-left:8px; color:#10b981; font-size:9px; font-weight:900; letter-spacing:0.05em;">PASTE</span>` : '';
         let jsSafeDeptUid = String(deptUid).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
-        assignedHtml += `<div onclick="selectPaDeptForPaste('${jsSafeDeptUid}')" style="background: ${headerBg}; color: #fff; cursor: pointer; border: 1px solid ${headerBorder}; border-right: none; border-left: none; padding: 8px 15px; font-size: 11px; font-weight: 900; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; width: 100%; position: sticky; top: 0; z-index: 15; box-sizing: border-box; margin-top: 5px;">
+        assignedHtml += `<div onclick="selectPaDeptForPaste('${jsSafeDeptUid}')" style="background: ${headerBg}; color: #fff; cursor: pointer; border: ${headerBorderW} solid ${headerBorder}; border-right: none; border-left: none; padding: 8px 15px; font-size: 11px; font-weight: 900; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; width: 100%; position: sticky; top: 0; z-index: 15; box-sizing: border-box; margin-top: 5px;">
                             <div style="display:flex; align-items:center;">
                                 <span id="pa-icon-assigned-dept-${safeDept}" onclick="event.stopPropagation(); togglePaDeptAssigned('${safeDept}')" style="margin-right: 10px; display: inline-block; width: 14px; cursor: pointer; user-select: none;">${iconTextDept}</span>
                                 ${deptName}${workingBadge}${pasteHint}
@@ -1095,7 +1097,7 @@ function renderProjectAssetsUI() {
                     else assignedHtml += `<div style="${widthStyle} color:#a1a1aa;">-</div>`;
                     if (isLastDataCol) assignedHtml += `<div class="ug-flex-spacer" style="flex: 1; min-width: 0px;"></div>`;
                 });
-                assignedHtml += `</div><div id="${groupId}" style="display: ${displayStyleChild}; border-left: 2px solid #e4e4e7; margin-left: 6px; padding-left: 6px; background: rgba(255, 255, 255, 0.05); width: 100%; box-sizing: border-box;">`;
+                assignedHtml += `</div><div id="${groupId}" style="display: ${displayStyleChild}; border-left: 3px solid #e4e4e7; margin-left: 6px; padding-left: 6px; background: rgba(255, 255, 255, 0.05); width: 100%; box-sizing: border-box;">`;
                 items.forEach(child => { assignedHtml += renderPaRow(child.asset, child.pa.qty, true, 'assigned', child.originalIndex); });
                 assignedHtml += `</div>`;
             }
@@ -1270,7 +1272,7 @@ function renderProjectAssetsUI() {
                 });
                 vaultHtml += `</div>`;
                 
-                vaultHtml += `<div id="${groupId}" style="display: ${displayStyle}; border-left: 2px solid #e4e4e7; margin-left: 6px; padding-left: 6px; background: rgba(255, 255, 255, 0.05); width: 100%; box-sizing: border-box;">`;
+                vaultHtml += `<div id="${groupId}" style="display: ${displayStyle}; border-left: 3px solid #e4e4e7; margin-left: 6px; padding-left: 6px; background: rgba(255, 255, 255, 0.05); width: 100%; box-sizing: border-box;">`;
                 items.forEach(child => {
                     if (child.type === 'Bulk') {
                         let cMax = parseInt(child.totalQuantity, 10) || 1;

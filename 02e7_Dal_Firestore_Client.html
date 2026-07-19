@@ -103,67 +103,122 @@ window.dalPaDescribePaUids_ = function(uids, localFixtures) {
   return labels.slice(0, 3).join(', ') + ' +' + (labels.length - 3) + ' more';
 };
 
-window.dalPaShowConflictToast_ = function(title, body) {
-  title = String(title || 'Conflict');
-  body = String(body || '');
-  var holdMs = 7000;
-  // Always show one centered toast in the PA modal / page (do not rely on host alone).
+window.dalPaShowConflictToast_ = function(/* title, body */) {
+  // Conflicts stay in the SYNC strip only — no mid-screen toast.
   try {
     var oldBan = document.getElementById('dal-pa-conflict-banner');
     if (oldBan) oldBan.style.display = 'none';
-    var overlay = document.getElementById('project-assets-modal-overlay');
-    var mount = document.body;
-    if (overlay && overlay.style.display && overlay.style.display !== 'none') mount = overlay;
-    var el = document.getElementById('dal-pa-center-toast');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'dal-pa-center-toast';
-      el.setAttribute('role', 'status');
-      mount.appendChild(el);
-    } else if (el.parentNode !== mount) {
-      mount.appendChild(el);
-    }
-    el.style.cssText = [
-      'position:fixed', 'left:50%', 'top:50%', 'transform:translate(-50%,-50%)',
-      'z-index:2147483646', 'max-width:min(440px,90vw)', 'width:max-content',
-      'background:#18181b', 'border:2px solid #f43f5e', 'border-radius:12px',
-      'padding:14px 18px', 'box-shadow:0 16px 40px rgba(0,0,0,0.7)',
-      'pointer-events:none', 'text-align:center'
-    ].join(';');
-    el.innerHTML =
-      '<div style="font-size:11px;font-weight:900;letter-spacing:0.08em;color:#f43f5e;margin-bottom:6px;">SHOWRUNNER</div>' +
-      '<div style="font-size:15px;font-weight:800;color:#fff;line-height:1.3;">' + title.replace(/</g, '&lt;') + '</div>' +
-      (body
-        ? ('<div style="font-size:12px;color:#a1a1aa;margin-top:8px;line-height:1.45;text-align:left;">' + body.replace(/</g, '&lt;') + '</div>')
-        : '');
-    el.style.display = 'block';
-    clearTimeout(window.dalPaCenterToastTimer_);
-    window.dalPaCenterToastTimer_ = setTimeout(function() {
-      var t = document.getElementById('dal-pa-center-toast');
-      if (t) t.style.display = 'none';
-    }, holdMs);
-  } catch (eC) { /* ignore */ }
-  // Do not also ping host toast — one mid-screen toast only (avoids dual top+center).
+    var t = document.getElementById('dal-pa-center-toast');
+    if (t) t.style.display = 'none';
+  } catch (eHide) { /* ignore */ }
 };
 
-/** Sticky per-person note in the live-sync roster (stays until replaced / prep ends). */
+/** Per-peer operation log for SYNC hover (newest first). */
+window.dalPaPeerOpsLog_ = window.dalPaPeerOpsLog_ || {};
 window.dalPaPeerRosterNotes_ = window.dalPaPeerRosterNotes_ || {};
+window.dalPaSyncHoverWho_ = '';
 
-window.dalPaSetPeerRosterNote_ = function(who, text) {
+window.dalPaAppendPeerOp_ = function(who, text) {
   who = String(who || 'Another editor').trim() || 'Another editor';
   text = String(text || '').trim();
-  window.dalPaPeerRosterNotes_ = {};
-  if (text) {
-    window.dalPaPeerRosterNotes_[who] = { text: text, at: Date.now() };
-    window.dalPaSyncPanelExpanded_ = true;
+  if (!text) return;
+  window.dalPaPeerOpsLog_ = window.dalPaPeerOpsLog_ || {};
+  if (!window.dalPaPeerOpsLog_[who]) window.dalPaPeerOpsLog_[who] = [];
+  window.dalPaPeerOpsLog_[who].unshift({ text: text, at: Date.now() });
+  if (window.dalPaPeerOpsLog_[who].length > 25) {
+    window.dalPaPeerOpsLog_[who] = window.dalPaPeerOpsLog_[who].slice(0, 25);
   }
+  // Latest one-liner for the roster row (no auto-expand, no toast).
+  window.dalPaPeerRosterNotes_ = window.dalPaPeerRosterNotes_ || {};
+  window.dalPaPeerRosterNotes_[who] = { text: text, at: Date.now() };
   if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
     window.dalUpdateRemotePendingBanner_();
   }
 };
 
+window.dalPaSetPeerRosterNote_ = function(who, text) {
+  window.dalPaAppendPeerOp_(who, text);
+};
+
 window.dalPaClearPeerRosterNotes_ = function() {
   window.dalPaPeerRosterNotes_ = {};
+  window.dalPaPeerOpsLog_ = {};
+  window.dalPaSyncHoverWho_ = '';
+};
+
+window.dalPaPeerOpsFor_ = function(who) {
+  who = String(who || '').trim();
+  var log = window.dalPaPeerOpsLog_ || {};
+  if (log[who] && log[who].length) return log[who];
+  var keys = Object.keys(log);
+  for (var i = 0; i < keys.length; i++) {
+    if (String(keys[i]).toLowerCase() === who.toLowerCase()) return log[keys[i]] || [];
+  }
+  return [];
+};
+
+window.dalPaHidePeerOpsPopover_ = function() {
+  window.dalPaSyncHoverWho_ = '';
+  var pop = document.getElementById('pa-prep-peer-ops');
+  if (pop) pop.style.display = 'none';
+};
+
+window.dalPaShowPeerOpsPopover_ = function(who, anchorEl) {
+  who = String(who || '').trim();
+  if (!who) return;
+  window.dalPaSyncHoverWho_ = who;
+  var panel = document.getElementById('pa-prep-live-panel');
+  if (!panel) return;
+  var pop = document.getElementById('pa-prep-peer-ops');
+  if (!pop) {
+    pop = document.createElement('div');
+    pop.id = 'pa-prep-peer-ops';
+    pop.style.cssText = [
+      'display:none', 'position:absolute', 'left:8px', 'right:8px', 'bottom:100%',
+      'margin-bottom:6px', 'z-index:30', 'max-height:220px', 'overflow-y:auto',
+      'background:#18181b', 'border:1px solid #fb7185', 'border-radius:8px',
+      'padding:8px 10px', 'box-shadow:0 -8px 24px rgba(0,0,0,0.55)',
+      'font-size:11px', 'line-height:1.45', 'color:#e4e4e7'
+    ].join(';');
+    pop.addEventListener('mouseenter', function() {
+      clearTimeout(window.dalPaPeerOpsHideTimer_);
+    });
+    pop.addEventListener('mouseleave', function() {
+      window.dalPaScheduleHidePeerOps_();
+    });
+    panel.appendChild(pop);
+  }
+  var ops = window.dalPaPeerOpsFor_(who);
+  var safeWho = (typeof escapeHTML === 'function') ? escapeHTML(who) : String(who).replace(/</g, '&lt;');
+  var body;
+  if (!ops.length) {
+    body = '<div style="color:#71717a; font-style:italic;">No recent operations logged.</div>';
+  } else {
+    body = ops.map(function(op) {
+      var t = (typeof escapeHTML === 'function') ? escapeHTML(op.text) : String(op.text).replace(/</g, '&lt;');
+      var when = '';
+      try {
+        when = new Date(op.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      } catch (eT) { when = ''; }
+      return '<div style="padding:5px 0; border-bottom:1px solid #27272a;">' +
+        '<div style="font-size:9px; color:#71717a; font-weight:700;">' + when + '</div>' +
+        '<div style="color:#fb7185; font-weight:700;">' + t + '</div></div>';
+    }).join('');
+  }
+  pop.innerHTML =
+    '<div style="font-size:10px; font-weight:900; letter-spacing:0.06em; color:#fda4af; margin-bottom:6px;">' +
+    safeWho + ' — OPERATIONS</div>' + body;
+  pop.style.display = 'block';
+  if (anchorEl && anchorEl.scrollIntoView) {
+    try { anchorEl.scrollIntoView({ block: 'nearest' }); } catch (eS) { /* ignore */ }
+  }
+};
+
+window.dalPaScheduleHidePeerOps_ = function() {
+  clearTimeout(window.dalPaPeerOpsHideTimer_);
+  window.dalPaPeerOpsHideTimer_ = setTimeout(function() {
+    window.dalPaHidePeerOpsPopover_();
+  }, 180);
 };
 
 window.dalPaNotifyConflict_ = function(overwritten, deleted, actorOpt, detailText) {
@@ -183,35 +238,22 @@ window.dalPaNotifyConflict_ = function(overwritten, deleted, actorOpt, detailTex
   if (me && actor === me) return; // own echo / self — no peer cue
 
   detailText = String(detailText || '').trim();
-  var title = 'Live conflict';
-  var body;
   var rosterText;
   if (deleted.length && !overwritten.length) {
-    body = deleted.length === 1
-      ? (actor + ' removed an item from the live list.')
-      : (actor + ' removed ' + deleted.length + ' items from the live list.');
-    if (detailText) body += ' ' + detailText;
     rosterText = deleted.length === 1
       ? ('removed: ' + (detailText || '1 item'))
       : ('removed ' + deleted.length + ': ' + (detailText || 'items'));
   } else if (overwritten.length && !deleted.length) {
-    body = overwritten.length === 1
-      ? (actor + ' overwrote your equipment change.')
-      : (actor + ' overwrote your equipment changes (' + overwritten.length + ').');
-    if (detailText) body += ' ' + detailText;
     rosterText = overwritten.length === 1
       ? ('overwrote: ' + (detailText || '1 item'))
       : ('overwrote ' + overwritten.length + ': ' + (detailText || 'items'));
   } else {
-    body = actor + ' changed or removed items (' + all.length + ').';
-    if (detailText) body += ' ' + detailText;
     rosterText = 'changed/removed: ' + (detailText || (all.length + ' items'));
   }
 
-  if (typeof window.dalPaSetPeerRosterNote_ === 'function') {
-    window.dalPaSetPeerRosterNote_(actor, rosterText);
+  if (typeof window.dalPaAppendPeerOp_ === 'function') {
+    window.dalPaAppendPeerOp_(actor, rosterText);
   }
-  window.dalPaShowConflictToast_(title, body);
 };
 
 /**
@@ -941,18 +983,26 @@ window.dalApplyPaSyncPanelLayout_ = function() {
   if (!panel) return;
   var expanded = !!window.dalPaSyncPanelExpanded_;
   panel.setAttribute('data-expanded', expanded ? '1' : '0');
+  // Roster always visible (compact) so peer names/warnings are hoverable without auto-expand.
+  if (rosterEl) rosterEl.style.display = 'block';
   if (expanded) {
     panel.style.height = '33%';
     panel.style.minHeight = '140px';
-    if (rosterEl) rosterEl.style.display = 'block';
+    if (rosterEl) {
+      rosterEl.style.maxHeight = '';
+      rosterEl.style.flex = '1';
+    }
     if (chevron) chevron.textContent = '▼';
     if (vaultList) vaultList.style.paddingBottom = 'calc(33% + 8px)';
   } else {
     panel.style.height = 'auto';
     panel.style.minHeight = '0';
-    if (rosterEl) rosterEl.style.display = 'none';
+    if (rosterEl) {
+      rosterEl.style.maxHeight = '88px';
+      rosterEl.style.flex = '0 1 auto';
+    }
     if (chevron) chevron.textContent = '▲';
-    if (vaultList) vaultList.style.paddingBottom = '40px';
+    if (vaultList) vaultList.style.paddingBottom = '120px';
   }
 };
 
@@ -975,6 +1025,9 @@ window.dalUpdateRemotePendingBanner_ = function() {
     window.dalPaBannerLastText_ = '';
     window.dalPaSyncPanelExpanded_ = false;
     window.dalPaPeerRosterNotes_ = {};
+    window.dalPaPeerOpsLog_ = {};
+    window.dalPaSyncHoverWho_ = '';
+    window.dalPaHidePeerOpsPopover_ && window.dalPaHidePeerOpsPopover_();
     return;
   }
 
@@ -1004,7 +1057,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
     statusEl.textContent = text;
   }
 
-  if (rosterEl && window.dalPaSyncPanelExpanded_) {
+  if (rosterEl) {
     if (typeof window.dalPaSyncPresencePaMode_ === 'function') window.dalPaSyncPresencePaMode_();
     var me = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'You';
     var meMode = window.activePresencePaMode || 'design';
@@ -1035,13 +1088,20 @@ window.dalUpdateRemotePendingBanner_ = function() {
         });
       }
       var noteSpan = '';
+      var hoverName = (typeof escapeHTML === 'function')
+        ? escapeHTML(r.name).replace(/"/g, '&quot;')
+        : String(r.name).replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      var hoverAttrs = r.self
+        ? ''
+        : (' data-peer-ops="' + hoverName + '" onmouseenter="window.dalPaOnPeerOpsEnter_&&window.dalPaOnPeerOpsEnter_(event)" onmouseleave="window.dalPaOnPeerOpsLeave_&&window.dalPaOnPeerOpsLeave_(event)"');
       if (noteObj && noteObj.text && !r.self) {
         var nt = (typeof escapeHTML === 'function') ? escapeHTML(noteObj.text) : String(noteObj.text).replace(/</g, '&lt;');
-        noteSpan = '<span style="font-size:10px; font-weight:700; color:#fb7185; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">' + nt + '</span>';
+        noteSpan = '<span' + hoverAttrs + ' style="cursor:help; font-size:10px; font-weight:700; color:#fb7185; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">' + nt + '</span>';
       }
+      var nameSpan = '<span' + (r.self ? '' : hoverAttrs) + ' style="font-weight:800; color:#e4e4e7; flex-shrink:0;' + (r.self ? '' : 'cursor:help;') + '">' + who + '</span>';
       return '<div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline; padding:4px 0; border-bottom:1px solid #222;">' +
         '<span style="display:flex; gap:8px; align-items:baseline; min-width:0; overflow:hidden; flex:1;">' +
-        '<span style="font-weight:800; color:#e4e4e7; flex-shrink:0;">' + who + '</span>' +
+        nameSpan +
         noteSpan +
         '</span>' +
         '<span style="font-weight:700; color:#f59e0b; flex-shrink:0;">' + lab + '</span></div>';
@@ -1056,12 +1116,32 @@ window.dalUpdateRemotePendingBanner_ = function() {
       if (already) return;
       var ok = (typeof escapeHTML === 'function') ? escapeHTML(k) : String(k).replace(/</g, '&lt;');
       var ot = (typeof escapeHTML === 'function') ? escapeHTML(orphanNotes[k].text) : String(orphanNotes[k].text).replace(/</g, '&lt;');
+      var hoverOrphan = (typeof escapeHTML === 'function')
+        ? escapeHTML(k).replace(/"/g, '&quot;')
+        : String(k).replace(/"/g, '&quot;').replace(/</g, '&lt;');
+      var oHover = ' data-peer-ops="' + hoverOrphan + '" onmouseenter="window.dalPaOnPeerOpsEnter_&&window.dalPaOnPeerOpsEnter_(event)" onmouseleave="window.dalPaOnPeerOpsLeave_&&window.dalPaOnPeerOpsLeave_(event)"';
       html += '<div style="display:flex; gap:8px; align-items:baseline; padding:4px 0; border-bottom:1px solid #222;">' +
-        '<span style="font-weight:800; color:#e4e4e7; flex-shrink:0;">' + ok + '</span>' +
-        '<span style="font-size:10px; font-weight:700; color:#fb7185; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">' + ot + '</span></div>';
+        '<span' + oHover + ' style="cursor:help; font-weight:800; color:#e4e4e7; flex-shrink:0;">' + ok + '</span>' +
+        '<span' + oHover + ' style="cursor:help; font-size:10px; font-weight:700; color:#fb7185; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">' + ot + '</span></div>';
     });
     if (!html) html = '<div style="color:#71717a; font-style:italic;">Waiting for roommates…</div>';
     rosterEl.innerHTML = html;
+  }
+};
+
+window.dalPaOnPeerOpsEnter_ = function(ev) {
+  clearTimeout(window.dalPaPeerOpsHideTimer_);
+  var el = ev && ev.currentTarget;
+  var who = el && el.getAttribute ? el.getAttribute('data-peer-ops') : '';
+  if (!who) return;
+  if (typeof window.dalPaShowPeerOpsPopover_ === 'function') {
+    window.dalPaShowPeerOpsPopover_(who, el);
+  }
+};
+
+window.dalPaOnPeerOpsLeave_ = function() {
+  if (typeof window.dalPaScheduleHidePeerOps_ === 'function') {
+    window.dalPaScheduleHidePeerOps_();
   }
 };
 
@@ -1698,6 +1778,8 @@ window.stopDalPaLiveSync_ = function() {
   window.dalPaLwwWatch_ = {};
   window.dalPaRecentEditUntil_ = {};
   window.dalPaPeerRosterNotes_ = {};
+  window.dalPaPeerOpsLog_ = {};
+  window.dalPaSyncHoverWho_ = '';
   window.dalPaLastRemoteActor_ = '';
   window.dalPaLastAppliedSeq_ = {};
   window.dalPaLastDocWriteSeq_ = 0;
