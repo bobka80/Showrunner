@@ -2,7 +2,7 @@
 
 **Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [dal-pre-ship-gates.md](dal-pre-ship-gates.md)
 
-**Generated:** 2026-07-18 · **Root HTML modules scanned:** 94
+**Generated:** 2026-07-19 · **Root HTML modules scanned:** 94
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 

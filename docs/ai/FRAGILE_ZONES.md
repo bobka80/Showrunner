@@ -451,7 +451,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Slice D:** [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) · **Design lock:** [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) · **Prep live doctrine:** [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md)
 
-**Stable baseline (director-confirmed 2026-07-18):** GAS **v645** (+ hosting `host-boot.js?v=635` for PA patch). Banner START/END and fixture live sync held through multi-user smoke. Do not “simplify” the session-UI rules below without a new failing test + director OK.
+**Stable baseline (director-confirmed 2026-07-18):** Behavior locked at GAS **v645**; docs lock milestone **v646**. Hosting `host-boot.js?v=635` for PA patch. Do not “simplify” the session-UI rules below without a new failing test + director OK.
 
 **Plain language:** Prep and timeline collab can both be open on one project (independent forks). The **banner** means “live sync is on.” Turning the banner off **stops** fixture live sync (`stopDalPaLiveSync_`). Session open/close must be rock-solid so the equipment list does not silently diverge.
 
@@ -703,8 +703,11 @@ SYMPTOM (what the director saw):
 CAUSE (what change broke it):
 FRAGILE ZONE (if any):
 FILES TOUCHED:
+ATTEMPTS BEFORE THIS HELD: (how many prior fix ships / false-greens before the lasting fix — e.g. "4 ships (v641–v644) before sticky sessionUid held")
 LESSON (never do X again):
 ```
+
+When logging a multi-ship thrash class, fill **ATTEMPTS BEFORE THIS HELD** so the next session does not treat the first green sim as “done.”
 
 ### Entries
 
@@ -716,6 +719,7 @@ SYMPTOM: Prep live qty thrash; deletes not syncing / resurrect; END PREP not on 
 CAUSE: Incomplete touch/delete notes + seed-from-local; meta dual-missing-snap / fromCache reopen; optimistic MetaSeenOpen; Sheets reopen after IgnoreOpenUntil; single-signal false END killed live sync; stale same sessionUid _meta reopen.
 FRAGILE ZONE: DAL prep / timeline session UI; DAL prep PA fork live sync
 FILES TOUCHED: 02e2_Logic_CRUD.html, 02e6_Dal_Session.html, 02e7_Dal_Firestore_Client.html, host-boot PA_PATCH (earlier), scripts/dal-pa-live-sync-*.js, FRAGILE, dal-prep-live-sync-standards.md
+ATTEMPTS BEFORE THIS HELD: ~7 ships (v639–v645) after earlier false-green sims (v628–v638); lasting behavior at sticky ended sessionUid (v645), docs lock v646.
 LESSON: Banner off = sync off. Close only meta+Sheets agree (or meta-end timeout). After END block same sessionUid. Fixture writes = touch/delete maps + txn state doc only. Stable baseline GAS v645. See FRAGILE § session UI "How prep session UI works now".
 ```
 

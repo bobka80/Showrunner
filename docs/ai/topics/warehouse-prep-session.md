@@ -14,6 +14,8 @@
 
 **Dual-domain vs timeline:** **Resolved** (Slice D / GAS v603) — prep + timeline collab may both be open. Spec: [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md).
 
+**Post-campaign optional (do not build during DAL):** now **Part B** of [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) (**after H0 testing + Part A harden**). Spec: [timeline-collab-session.md § Optional update](timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject).
+
 **Design lock note:** Logistics Hub / ledger = **atomic ops, not a prep fork** ([design lock §2](../active/dal-firebase-design-lock-2026-07-13.md)). Older bullet below about ledger/hub on the Firebase fork is aspirational floor UX; router today keeps `LEDGER` on Sheets.
 
 ---

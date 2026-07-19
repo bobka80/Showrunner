@@ -67,6 +67,8 @@ Wired from `pre-ship/layers.js` → `runDalGates()`:
 1. scripts/dal-persistence-lint.js
 2. scripts/dal-client-inventory.js --check
 3. scripts/dal-phase3-gate.js [--deploy]
+4. scripts/dal-pa-live-sync-test.js          # Cases A–J (scope + mode seam + 3-client)
+5. scripts/dal-mutation-inventory-check.js  # PA touch/delete notes (ALLOWLIST = H5 debt)
 ```
 
 ---
@@ -196,9 +198,30 @@ When Logistics / Operations hot paths change, `pre-ship/bugbot-policy.js` adds a
 | `scripts/dal-client-inventory.js` | Generate / check client inventory |
 | `scripts/dal-persistence-lint.js` | Client/server persistence lint |
 | `scripts/dal-phase3-gate.js` | Delta-only deploy gate |
+| `scripts/dal-pa-live-sync-test.js` | PA live-sync Cases A–J (pure sim) |
+| `scripts/dal-mutation-inventory-check.js` | PA mutators must note touch/delete |
 | `docs/ai/active/dal-client-inventory.md` | Generated inventory artifact |
 
 All scripts are **Node-only** (`gas-node-only.js`) — never deployed to GAS.
+
+---
+
+## Planned — Gap 1: Firestore / GAS sync-mode lint
+
+**Status:** Not built — hub [multi-user-fork A3](multi-user-fork-industrial-and-auto.md) · after **H0** mode-seam sims ([bulletproof](bulletproof-multiuser-live-editors-2026-07-18.md)).  
+**H0 prerequisite met:** Case H in `scripts/dal-pa-live-sync-test.js` (`shouldApplyGasPaList`).  
+**Do not start without director OK go.**
+
+**Risk:** Firestore live path and GAS poll/full-save path must never cross-write. Documented “don’t” (#10/#11 in live-sync standards / FRAGILE) is not enough — a future edit can reintroduce LWW thrash or wipe `writeSeq` stamps.
+
+**Proposed:** `pre-ship/dal-sync-mode-lint.js` (or extend `pre-ship/dal.js`) — detection only:
+
+- Flag `saveProjectAssets(` / `saveTimelineData(` reachable from Firestore-mode code paths unless allowlisted with reason comment  
+- Flag GAS response objects fed into live apply helpers without confirming `writeSeq` presence  
+
+**Also shipped (hub A0):** `scripts/dal-mutation-inventory-check.js` — PA mutators note touch/delete (or explicit ALLOWLIST debt for A2/H5). Wired in `pre-ship/dal.js`. Timeline twin still A2.
+
+**Other domains (RBAC, FCM, truck, financials):** [pre-ship-pipeline-expansion-2026-07-18.md](pre-ship-pipeline-expansion-2026-07-18.md) — parallel board, not this Gap 1.
 
 ---
 

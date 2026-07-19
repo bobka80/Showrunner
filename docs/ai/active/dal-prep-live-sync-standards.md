@@ -37,18 +37,21 @@ If a future proposal conflicts with this table, **stop and ask the director** �
 
 ---
 
-## 2. Industry-aligned hardening backlog (ordered)
+## 2. Industry-aligned hardening backlog (definitions)
 
-Do these **after** the current delete/seed holes are closed. Placement: polish after Slice D / Phase 5–6 product work, not a rewrite.
+**What each H means** lives here. **Build order + checkboxes** live only on [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) Part A (locked 2026-07-19: **H0 testing → H1/H5 → Gap 1 → H4 → H3 → H2 → Part B**). **Process depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).
 
 | ID | Standard | Why | Done when |
 |----|----------|-----|-----------|
+| **H0** | **Testing pipeline** | Green sims without documented scope caused false confidence (v628–v638). | Scope comments on every Case; mutation gate script; mode-seam sims; incident “attempts” field — see bulletproof Phase H0 |
 | **H1** | **Fail closed on weak sync** | Multi-user prep must not silently run on GAS `live sync (server)` poll (2.5s lag + no txn). Banner must be **`patch`**, or show a hard warning / block edits. | Two browsers cannot edit live list while either is on `server` without an explicit banner |
-| **H2** | **Cheaper remote apply** | Full PA rebuild every snap causes stutter (same class as timeline strip thrash). Diff/merge then targeted redraw. | Remote qty/delete updates without full-list flash storms |
-| **H3** | **Same-row conflict visibility** | Industry LWW still loses one edit; product should toast “overwritten by peer” on same UID race. | User sees when their row lost |
+| **H2** | **Cheaper remote apply** | Full PA rebuild every snap causes stutter (same class as timeline strip thrash). Diff/merge then targeted redraw. | Remote qty/delete updates without full-list flash storms + measurable pass condition |
+| **H3** | **Same-row conflict visibility** | Industry LWW still loses one edit; product should toast “overwritten by peer” on same UID race. | User sees when their row lost — **both** PA and timeline (no hedge) |
 | **H4** | **State size + END PREP mirror check** | Large `fixturesJson` + collection drift = silent commit wrongness. Cap/warn; verify mirror before Sheets write. | END PREP refuses or alerts on mirror mismatch |
-| **H5** | **Mutation-path inventory gate** | Every UI path that mutates `currentProjectAssets` during prep must note touch/delete. Silent splice = peer never sees change + resurrection later. | Checklist + grep gate in pre-ship (see §3) |
-| **H6** | **N-client + twin sims before “many users safe”** | One browser + hope is not a proof. Extend Cases A–D with delete/resurrect, seed-stomp, 3-client, and a timeline-twin check. | Sim green required before claiming live prep stable |
+| **H5** | **Mutation-path inventory gate** | Every UI path that mutates `currentProjectAssets` during prep must note touch/delete. Silent splice = peer never sees change + resurrection later. | Mechanical gate in pre-ship (not only a manual table) |
+| **H6** | **N-client + twin sims** | One browser + hope is not a proof. | **Absorbed into H0** on the hub — do not open a rival forever-checklist |
+
+**Gap 1 (Firestore/GAS mode lint):** hub A3 + [dal-pre-ship-gates.md](dal-pre-ship-gates.md) — after H0 mode-seam sims.
 
 **Explicit non-goals:** Yjs/Automerge rewrite; per-doc live LWW; inventing full-list diffs from local vs remote compare.
 
@@ -70,39 +73,29 @@ The architecture landed (v635 state doc), but **process** stayed “symptom → 
 
 ## 4. Better way to investigate and resolve (mandatory process)
 
-Use this for **any** future prep live sync bug. Do **not** ship another one-line guard without §4.2–4.4.
+**Full process (testing rules, adversarial sims, escalate on 3rd incident, rule-named milestones):**  
+→ [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md) Parts 1–2.
 
-### 4.1 Stop rule
+**Do not** ship another one-line guard without a failing sim (or path inventory) and a named root-cause rule. Short checklist below stays for floor debugging; do not re-expand this section into a second essay.
 
-If the director reports multi-user prep thrash / resurrect / banner flip:
+### 4.1 Stop rule (short)
 
-1. **Summarize** understanding → wait for **OK go**.
-2. **No code** until a written hypothesis list + one chosen root cause + a **failing sim or path inventory** exists in an active incident file.
-3. Prefer **one root-cause ship** over three layered guards.
+1. **Summarize** → wait for **OK go**.  
+2. **No code** until hypothesis list + one root cause + **failing sim or path inventory** in an incident file.  
+3. Prefer **one root-cause ship** over layered guards.  
+4. Third incident in the same zone → scoped hot-path sweep (see bulletproof §2.3).
 
-### 4.2 Reproduce with evidence (not vibes)
+### 4.2 Reproduce with evidence (short)
 
-| Check | Pass criteria |
-|-------|----------------|
-| Banner | Both browsers **`live sync (patch)`** — if either is `server`, that *is* the first bug |
-| Action | Name the UI control (DEL / minus / START PREP / END PREP) |
-| Path | Grep which function mutates assets (`removePa`, `modifyPaIndices`, …) |
-| Note? | Did that function call `dalPaNoteTouch_` / `dalPaNoteDelete_`? |
-| Host | Did `PA_PATCH_WRITE` run? Did `writeSeq` advance? |
-| Peer | Did peer apply that seq and drop/update the UID? |
+Banner both **`live sync (patch)`**? Name the UI control → mutator → `dalPaNoteTouch_` / `dalPaNoteDelete_`? → `PA_PATCH_WRITE` / `writeSeq`? → peer apply?
 
-Director can help with: banner text + “I pressed DEL on a unique row” vs “grouped DEL”.
+### 4.3 Prove before ship (short)
 
-### 4.3 Prove before ship
+Failing Case → fix one rule → sim green (Case states scope + non-coverage) → two-browser smoke → FRAGILE only for durable rules.
 
-1. Add or extend a **Case** in `dal-pa-live-sync-test.js` that **fails** on the bug (delete/resurrect, seed-stomp, equal-seq, …).
-2. Fix the **single** missing discipline (note delete, ban re-seed, txn already present, …).
-3. Sim must pass; then smoke on web.app (two browsers).
-4. Update FRAGILE never-dos only for **durable** rules, not one-off symptoms.
+### 4.4 Mutation inventory table (H5 data)
 
-### 4.4 Mutation inventory (H5) — run before claiming “deletes work”
-
-Every prep-time mutator of `currentProjectAssets` must be listed and marked:
+Every prep-time mutator of `currentProjectAssets` must be listed and marked. Mechanical gate: `scripts/dal-mutation-inventory-check.js` (wired in `pre-ship/dal.js`; timeline twin = hub A2 / H5).
 
 | Mutator | Notes delete/touch? | Live flush? |
 |---------|---------------------|-------------|
@@ -114,12 +107,11 @@ Every prep-time mutator of `currentProjectAssets` must be listed and marked:
 
 If a path mutates without note → **bug**, not “edge case.”
 
-### 4.5 Ship shape
+### 4.5 Ship shape (short)
 
-- One milestone theme: e.g. “prep delete notes + seed once” — not “misc live sync guards.”
-- Hosting deploy only if `host-boot.js` message types change.
-- Smoke script in the incident file; director confirms on web.app.
-- If a new symptom appears, **new incident file** — do not pile anonymous guards onto the last fix.
+- Milestone names the **rule** fixed, not only the symptom.  
+- Hosting deploy only if `host-boot.js` message types change.  
+- New symptom → **new incident file** + “attempts before held” field.
 
 ---
 
@@ -128,9 +120,11 @@ If a path mutates without note → **bug**, not “edge case.”
 | Layer | Doc | What belongs here |
 |-------|-----|-------------------|
 | **Never-dos (durable)** | [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ timeline + prep PA + session UI | Rules that must survive every future ship — silent remove, re-seed, full LWW, flush-from-apply |
-| **Industry + process** | **This file** | Model lock (not CRDT), harden H1–H6, prove-with-sim before code |
+| **Industry model + H definitions** | **This file** | Model lock (not CRDT), H0–H5 meanings |
+| **Process depth** | [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md) | Testing pipeline, fix approach, harden phases |
+| **Campaign checklist** | [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) | Part A/B checkboxes + locked build order |
 | **Incident science** | [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) | What broke this week, hypotheses, proposed fix — archive when stable |
-| **Campaign hub** | [data-access-layer.md](data-access-layer.md) | Status line + link to doctrine/incident |
+| **Campaign hub (DAL era)** | [data-access-layer.md](data-access-layer.md) | Status line + link to doctrine/incident |
 | **Phase gate** | [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md) | Fresh-chat stop rule before touching prep live |
 | **Production log** | root `RELEASES.md` | **Only when a milestone ships** — one plain note + GAS version (what fixed, smoke) |
 | **“This works” log** | root `WORKS_LOG.md` | **Only when director says “This works”** — Git checkpoint, not a substitute for FRAGILE |
@@ -145,4 +139,4 @@ If a path mutates without note → **bug**, not “edge case.”
 
 Incidents closed into FRAGILE definition: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md).  
 
-Next polish (not required for “works”): harden backlog H1–H6 in §2 — prove with sim before code.
+**Next campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **H0 testing → bulletproof H1–H5 + Gap 1 → Part B auto fork**. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).

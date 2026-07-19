@@ -10,7 +10,7 @@
 
 **Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed**. ~~forgotten / disappearing concurrent edits~~ **Fixed** — touch/patch merge (editing crew B cannot rewrite crew A’s untouched strip).
 
-**Post-campaign optional (do not build during DAL campaign):** [§ Optional update — auto room + idle commit](#optional-update--auto-room--idle-commit) — after whole DAL/fork campaign finishes; milestone first; try on floor; revert if disliked.
+**Post-campaign optional → now owned by next campaign:** auto fork / pull-in / idle eject (timeline **and** PA). **Build order:** **(1) testing pipeline H0 → (2) bulletproof multi-user → (3) auto UX** — [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) · process [../active/bulletproof-multiuser-live-editors-2026-07-18.md](../active/bulletproof-multiuser-live-editors-2026-07-18.md). Spec text remains in § Optional update below (canonical UX).
 
 ---
 
@@ -27,56 +27,138 @@ Is: **collaborative room** with shared live state.
 
 ---
 
-## Optional update — auto room + idle commit
+## Optional update — auto fork, live pull-in & idle eject
 
-**When:** **After** the current DAL / fork campaign is complete (Phases through reconciliation/cache as director closes them). **Not** in-flight campaign work.
+**When:** **Part B** of [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) — **after** Part A (industrial harden) is director-confirmed. Not during DAL close paperwork alone.
 
-**Why document now:** Reconstruct this UX later without re-brainstorming. Locked product shape from director (2026-07-16).
+**Why document:** Reconstruct this UX without re-brainstorming. Locked **2026-07-18** (director survey: all recommended picks + freelancer exclusion). Supersedes the 2026-07-16 “auto room + idle commit” sketch.
+
+**Applies to:** `timelineCollab` **and** Project Assets / prep (`prep` session). Same lifecycle; different **who may start**. Canonical home for both; prep topic links here.
 
 **Ship protocol (mandatory for this optional slice):**
 
-1. Finish campaign first.
-2. **`node milestone.js`** with a clear note — that version is the **try/revert baseline**.
-3. Implement this optional update and ship a **new** milestone.
+1. Finish Part A of the multi-user fork campaign first.
+2. **`node milestone.js`** with a clear note — that version is the **try/revert baseline** (campaign Part B0).
+3. Implement this optional update and ship a **new** milestone (behavior **and** redesigned visual cues in the **same** milestone).
 4. Floor smoke — if liked, keep; if not, **rollback production to the baseline milestone**.
 
-### Product shape
+### 1. Goal
 
-| Rule | Intent |
-|------|--------|
-| **First user into timeline opens co-op** | Fork starts with person 1 — room is hot **before** person 2 arrives. No separate START COLLAB ritual. |
-| **Second user joins live** | Opens timeline → joins existing Firebase fork → sees live grid immediately. |
-| **Seamless warm-up** | User may edit while snapshot/fork is still opening; when Firebase is ready, **cross-check** local pending work vs snapshot and **delta** immediately so entry feels continuous. |
-| **Always fork while in timeline** | Timeline open = working on the fork (not Sheets mid-session). |
-| **Idle timeout → Sheets + clear room** | After inactivity (no meaningful edits + dead presence heartbeats — e.g. hibernated laptop), **commit fork → Sheets** and **push everyone out** of timeline room mode. Mediates ghost sessions. |
+People should not babysit START/END COLLAB or START/END PREP for normal work. Allowed surfaces **open** the Firebase fork when work is intended; everyone else who may see live **joins**; people already on the screen **get pulled in** when a fork opens; abandoned rooms **idle-eject** with commit to Sheets. **Freelancers never see the live fork.**
 
-### Idle timeout details (locked intent)
+### 2. Who may **start** a fork (open when closed)
 
-- **Happy path:** last person leaves timeline → commit (unchanged).
-- **Safety net:** room abandoned (all heartbeats dead / no room-level activity for N minutes) → same commit path → clear room.
-- **Room-level activity:** one idle ghost must not close the room while another user is still editing.
-- **Grace:** short “Stay in room” warning before kick; one action resets the timer.
-- **On timeout:** **commit**, never silent discard.
-- **Re-entry:** opening timeline again re-opens the room (first-user-opens model).
-- **Timing (starting point, not code yet):** heartbeat ~30–60s; idle threshold ~15–30 min — tune after try.
+| Domain | Desktop (non-mobile shell) | Phone / mobile web | Station (RFID / dock host) |
+|--------|----------------------------|--------------------|----------------------------|
+| **Timeline** | Auto-start **only if** user has **timeline edit** credentials | Does **not** start — join only if already open | Does **not** start timeline forks |
+| **Project Assets** | Auto-start if user has **PA / prep** credentials | **Never** auto-start — explicit **button** (“I’m working” / Start prep) | **Always** start (or join if open) — check-in/out intent |
 
-### Explicitly out of this optional update
+**Desktop means:** desktop shell / non-mobile UA — not “phone browser zoomed wide.” Tablets follow **phone** rules (button for PA start).
 
-- Prep session UX (START/END PREP stays manager-driven unless a separate topic says otherwise).
-- Logistics Hub atomic ops.
-- Changing Sheets as official record between sessions.
+**Join if already open:** any allowed non-freelancer on any surface joins the existing fork (no second snapshot).
 
-### Checklist (when building — leave unchecked until then)
+### 3. Lifecycle phases
 
-- [ ] Auto-open `timelineCollab` on timeline enter (saved project only)
-- [ ] Join existing open fork for second+ users (no re-snapshot if live)
-- [ ] Local pending buffer + merge/delta when fork becomes `open`
-- [ ] Remove primary START COLLAB ceremony (manager force-close may remain)
-- [ ] Last leave + idle timeout both commit → Sheets and clear room UI
-- [ ] Presence heartbeat + room-level idle detection
-- [ ] Pre-build: dedicated baseline milestone; post-try: keep or rollback
+**A — Normal (no fork)**  
+Slice reads/writes Sheets (or current non-session path). No live Firebase room.
+
+**B — Opening (warm-up)**  
+Starter has triggered open. Server snapshots → Firebase; **starter’s local pending edits** flush as the **entry delta**.
+
+- **Only the starter** may change data.
+- Everyone else on that view: **UI frozen** + clear sign (“Starting live session…” / equivalent).
+- If Opening hangs **~45–60s**: starter gets Retry / Cancel; another **credentialed desktop** may **Take over / restart**.
+
+**C — Live**  
+Fork `open`. Multi-user edits on Firebase per credentials. Soft switch for early watchers completes here.
+
+**D — Closing**  
+Commit fork → Sheets, clear room, kick UIs out of live mode. Triggers: see §6.
+
+### 4. Early watchers → auto pull-in (both domains)
+
+If user A is already on timeline or PA in **Normal**, and user B (allowed starter) opens the fork:
+
+1. A (if still on **that** view, and not freelancer) gets the fork-open signal.
+2. During **Opening**: freeze + sign (same as other non-starters).
+3. At **Live**: **soft switch** onto Firebase (no full reload preferred) + short banner (“Live session started — joining…”).
+4. Visual **flag / cue system redesigned** in this same milestone — not only today’s banners.
+
+**Scope:** only if still on that timeline/PA view — do **not** yank from calendar/home.  
+**Phone PA:** may not *start*, but **does** auto-join when someone else already opened prep (watch + edit per creds).
+
+### 5. Freelancers (hard rule)
+
+Freelancers **must not** see the live fork at all:
+
+- No auto-join, no pull-in, no live roster/patch UI for that slice.
+- No “live session open” treatment that exposes Firebase room state.
+- They stay on the **normal** path for that slice even while a fork is open for staff.
+
+Exact role detection = existing freelancer / tunneling identity — confirm at build against RBAC.
+
+### 6. Who closes / idle eject
+
+**Close + commit** when any of these happens first:
+
+- Explicit **End** (manager / allowed closer), or
+- **Last person leaves** the live view (eligible participants), or
+- **Room idle eject** (below).
+
+Always **commit** on close — never silent discard.
+
+**Room idle** (not “one person AFK while others still present”):
+
+- No meaningful fork **writes** and no live **presence** in the room for N minutes.
+- **Timeline:** **45 minutes**.
+- **Project Assets / prep:** **75 minutes**.
+- **T−5 minutes:** banner “Session closing — tap to keep open” (resets timer).
+- **Station:** do **not** idle-close while **any station heartbeat** for that prep room is alive.
+- On eject: commit → Sheets, clear room, push everyone out of live mode with a clear message.
+
+Presence heartbeat cadence: ~30–60s (implementation detail; tune on floor).
+
+### 7. Credentials vs surfaces (summary)
+
+- **Start** = surface rules (§2) ∩ credentials ∩ not freelancer.
+- **Join / pull-in** = fork open ∩ allowed to see that slice ∩ not freelancer.
+- **Edit in Live** = join ∩ domain edit permission.
+- **Watch-only in Live** = join without edit (e.g. timeline on phone without edit creds) — still on Firebase read path, not Sheets ghost.
+- **Freelancer** = excluded from all live paths (§5).
+
+### 8. Flag / cue redesign (same milestone)
+
+Replace today’s ad-hoc live/collab cues with a clear system that shows at least:
+
+- Normal vs Opening vs Live vs Closing
+- Frozen warm-up vs editable
+- Idle warning
+- “Live session started — joining…” for pull-in
+
+Exact art/copy TBD at build; behavior above is locked.
+
+### 9. Explicitly out of this optional update
+
+- Building during the DAL campaign.
+- Logistics Hub atomic ops (not a session fork).
+- Changing Sheets as official record **between** sessions.
+- Auto-starting timeline from station.
+- Phone auto-starting PA without the button.
+
+### 10. Checklist (when building — leave unchecked until then)
+
+- [ ] Timeline: desktop+edit auto-start; others join-only; station never starts timeline
+- [ ] PA: desktop auto-start; phone button-only start; station always start/join
+- [ ] Opening: starter-only + entry delta; freeze+sign for others; timeout + take over
+- [ ] Live pull-in for early watchers on same view (soft switch + banner)
+- [ ] Freelancers excluded from all live fork visibility/join
+- [ ] Close: last leave ∪ End ∪ idle; always commit
+- [ ] Idle: 45m timeline / 75m prep; T−5 keep-open; station heartbeat blocks idle close
+- [ ] Redesigned visual cues same milestone
+- [ ] Baseline milestone → try → keep or rollback
 
 ---
+
 
 ## Mode & UX
 
@@ -139,8 +221,8 @@ Is: **collaborative room** with shared live state.
 ### Phase C — Polish
 - [ ] Grace period, force-close, session history export to `SM_Showrunner_LOGS` optional
 
-### After campaign — optional UX (see section above)
-- [ ] Auto room on enter + join live + warm-up delta + idle commit/kick — **post-campaign only**; milestone-before-try / revert-if-disliked
+### After campaign — optional UX → **active campaign Part B**
+- [ ] Auto fork + live pull-in + Opening warm-up + idle eject (timeline **and** PA) — see [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) Part B; milestone-before-try / revert-if-disliked; freelancers excluded from live
 
 ---
 
@@ -148,8 +230,8 @@ Is: **collaborative room** with shared live state.
 
 | | Prep session | Timeline session |
 |--|--------------|------------------|
-| **Ends when** | Manager **End preparation** | **Last person leaves** timeline (optional later: idle timeout = synthetic last leave) |
-| **Who** | Whole floor on project | Whoever opened timeline |
+| **Ends when** | Last leave ∪ End ∪ idle eject (optional post-campaign — see § above); today still manager **End preparation** | Last leave ∪ End ∪ idle eject (optional post-campaign) |
+| **Who starts (optional post-campaign)** | Desktop+creds / station always / phone button only | Desktop + timeline **edit** creds only |
 | **Data** | PA + ledger + trucks | Shifts / phases |
 
 Both use [session-fork-platform.md](session-fork-platform.md).

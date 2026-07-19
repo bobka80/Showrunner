@@ -14,21 +14,24 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ---
 
-## Next up (director, 2026-07-11)
+## Next up (director, 2026-07-19)
 
-**Station UI rework** (after director **OK go**) — full spec: [STATION_UI.md](STATION_UI.md) · handoff: [active/station-ui-handoff.md](active/station-ui-handoff.md) · baseline: [active/REWIND-pre-station-ui-split.md](active/REWIND-pre-station-ui-split.md) (**GAS 530**).
+**Primary next campaign:** Multi-user fork — **(1) testing pipeline H0 → (2) bulletproof multi-user → (3) auto fork** — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md). **Point new agents at that file.** Process depth: [active/bulletproof-multiuser-live-editors-2026-07-18.md](active/bulletproof-multiuser-live-editors-2026-07-18.md).
 
-| Phase | Task | Status |
-|-------|------|--------|
-| **0** | REWIND + docs + rollback to v530 | [x] Done |
-| **A** | Mechanical split `11_Station_Shell.html` → `11b`–`11l` (zero logic change, parse-check, Chainway + TSL regression) | [ ] Not started |
-| **B** | Dock panel UI — right scan rail, bottom eject, sidebar, UI scale (`phone_sled` unchanged) | [ ] Blocked on Phase A |
-| **C** | Screensaver / bulletin (dock only); gate layout UI | [ ] Deferred |
+| Stage | What | Gate |
+|-------|------|------|
+| **A0** | Testing pipeline (sim scope, mutation gate, mode-seam) | Before product H-items |
+| **A1** | Bulletproof multi-user (H1–H5 + Gap 1 lint) | Before auto fork |
+| **B** | Auto fork + pull-in + idle eject | After Part A; milestone try/revert |
 
-1. **Phone app** — finish in-flight mobile work (director priority; not blocked on DAL).
-2. **Data access layer (DAL)** — Hub atomic + 5C shipped; campaign near-complete. Close does **not** require every domain through repos — [§ Out of this campaign](active/data-access-layer.md#out-of-this-campaign--not-routed-through-dal). Rollback **v576**. [active/data-access-layer.md](active/data-access-layer.md)
-3. **After DAL campaign:** fuller warehouse prep UX, timeline drag-end autosave — via repos ([warehouse-prep-session.md](topics/warehouse-prep-session.md), [timeline-collab-session.md](topics/timeline-collab-session.md)). **Optional later:** timeline auto-room + idle commit — [timeline-collab-session.md § Optional update](topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) (milestone-before-try / revert-if-disliked).
-4. **Parallel when ready:** Google Chat update → [topics/workspace-migration.md](topics/workspace-migration.md).
+Also on the board (do not mix into the fork campaign without director pick):
+
+| Item | Status | File |
+|------|--------|------|
+| **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog — OK go per domain | [active/pre-ship-pipeline-expansion-2026-07-18.md](active/pre-ship-pipeline-expansion-2026-07-18.md) |
+| **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
+| **Phone app** | In-flight mobile (parallel) | [topics/mobile-crew.md](topics/mobile-crew.md) |
+| **DAL campaign close** | Near-complete — archive paperwork when ready | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---
 
@@ -36,8 +39,9 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. **Next:** Phase A shell split → Phase B dock UI — [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | Near-complete — prep live **stable v645** · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [FRAGILE session UI](FRAGILE_ZONES.md) · [Slice D](active/dal-phase4-slice-d-dual-domain-sessions.md) |
+| **Multi-user fork: test pipeline → bulletproof → auto fork** | **NEXT — A0 testing first** | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+| **Data access layer (DAL + router)** | Near-complete — prep live **stable v645** · rollback **v576** — close/archive when director ready | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) |
 
 ---
 
@@ -62,8 +66,8 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
 | Session fork platform | Backlog — Firebase buffer + router | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
 | Unified data cache engine **+ data access layer (backend abstraction)** | **Phase 6B + Hub atomic live** — [active/data-access-layer.md](active/data-access-layer.md) | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
-| Warehouse prep session | Partial — PA fork live; dual-domain vs timeline **resolved** (Slice D) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) |
-| Timeline collab session | Partial — live sync + merge/txn hotfix; **optional post-campaign:** auto-room + idle commit | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) |
+| Warehouse prep session | Partial — PA fork live **stable**; auto-fork = campaign **Part B** (after A0+A1) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| Timeline collab session | Live sync stable; **auto fork** = campaign **Part B** | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
 
 **Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → **DAL campaign** (Phase 0 sweep → repos/router → **Phase 3 delta-only gate** → Firebase → reconciliation → cache) — [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) → **warehouse prep** → **timeline collab** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. Do **not** start Firebase prep/timeline fork before DAL Phase 3 (delta saves) + Phase 4 shell. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).

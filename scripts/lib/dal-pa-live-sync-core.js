@@ -596,5 +596,88 @@ module.exports = {
   simulateConcurrentWriteRace: simulateConcurrentWriteRace,
   shouldSeedFromLocal: shouldSeedFromLocal,
   simulateDeleteResurrect: simulateDeleteResurrect,
-  simulateSeedStomp: simulateSeedStomp
+  simulateSeedStomp: simulateSeedStomp,
+  /** Reject GAS getProjectAssets apply while live mode is firestore (unstamped lists). */
+  shouldApplyGasPaList: function(opts) {
+    opts = opts || {};
+    if (String(opts.liveSyncMode || '') === 'firestore') return false;
+    return true;
+  },
+  /** After END, refuse reopen for the same sessionUid. */
+  shouldAllowRemotePrepOpen: function(opts) {
+    opts = opts || {};
+    var ended = String(opts.endedSessionUid || '');
+    var sid = String(opts.sessionUid || '');
+    if (!ended) return true;
+    if (sid && sid === ended) return false;
+    if (!sid && opts.sheetsOpenBlocked) return false;
+    return true;
+  },
+  /**
+   * Case I: three clients — A deletes u1 (noted), B touches u2, C idle.
+   * All must end without u1; store without u1.
+   */
+  simulateThreeClientDelete: function() {
+    var u1 = 'fix-1';
+    var u2 = 'fix-2';
+    var u3 = 'fix-3';
+    var state = {
+      fixtures: [
+        { uid: u1, assetId: 'A1', qty: 1 },
+        { uid: u2, assetId: 'A2', qty: 1 },
+        { uid: u3, assetId: 'A3', qty: 1 }
+      ],
+      writeSeq: 1,
+      clientId: 'seed'
+    };
+    function client(id) {
+      return {
+        id: id,
+        fixtures: JSON.parse(JSON.stringify(state.fixtures)),
+        lastDocSeq: 1
+      };
+    }
+    var A = client('A');
+    var B = client('B');
+    var C = client('C');
+
+    A.fixtures = A.fixtures.filter(function(pa) { return pa.uid !== u1; });
+    var del = {};
+    del[u1] = 1;
+    state = txnStatePatch(state, A.fixtures, {}, del, 'A');
+    A.lastDocSeq = state.writeSeq;
+
+    function pull(cl) {
+      var r = applyRemotePaState(state, cl.fixtures, {
+        clientId: cl.id,
+        lastDocWriteSeq: cl.lastDocSeq,
+        holdUntil: {},
+        touched: {},
+        deleted: {}
+      });
+      cl.fixtures = r.fixtures;
+      cl.lastDocSeq = r.docWriteSeq;
+    }
+    pull(B);
+    pull(C);
+
+    var bRow = mapByUid(B.fixtures)[u2];
+    if (bRow) bRow.qty = 2;
+    var touch = {};
+    touch[u2] = 1;
+    state = txnStatePatch(state, B.fixtures, touch, {}, 'B');
+    B.lastDocSeq = state.writeSeq;
+
+    pull(A);
+    pull(C);
+
+    var store = mapByUid(state.fixtures);
+    return {
+      storeHasU1: !!store[u1],
+      aHasU1: !!mapByUid(A.fixtures)[u1],
+      bHasU1: !!mapByUid(B.fixtures)[u1],
+      cHasU1: !!mapByUid(C.fixtures)[u1],
+      ok: !store[u1] && !mapByUid(A.fixtures)[u1] && !mapByUid(B.fixtures)[u1] && !mapByUid(C.fixtures)[u1]
+    };
+  }
 };

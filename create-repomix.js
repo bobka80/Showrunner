@@ -7,7 +7,7 @@
  * Usage:
  *   node create-repomix.js
  *   node create-repomix.js --full          # include vendor reference trees (much larger)
- *   node create-repomix.js --split 2mb     # split into numbered parts for upload limits
+ *   node create-repomix.js --split 2mb     # split into numbered parts (~2 MiB each; config uses bytes)
  *   node create-repomix.js --stdout        # print summary paths only after pack
  *
  * Output: claude-pack/repomix-output.md (or repomix-output_001.md, … when split)
@@ -22,6 +22,19 @@ const OUT_DIR = path.join(ROOT, 'claude-pack');
 const INSTRUCTIONS_PATH = path.join(OUT_DIR, 'instructions.md');
 const OUTPUT_FILE = path.join(OUT_DIR, 'repomix-output.md');
 
+/** Parse human size (2mb / 500kb / bare number) → bytes for Repomix splitOutput. */
+function parseSplitBytes(raw) {
+  const s = String(raw == null ? '2mb' : raw).trim().toLowerCase();
+  const m = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/.exec(s);
+  if (!m) {
+    throw new Error(`Invalid --split size "${raw}". Use e.g. 2mb, 500kb, or byte count.`);
+  }
+  const n = Number(m[1]);
+  const unit = m[2] || 'b';
+  const mult = { b: 1, kb: 1024, mb: 1024 * 1024, gb: 1024 * 1024 * 1024 }[unit];
+  return Math.max(1, Math.floor(n * mult));
+}
+
 function parseArgs(argv) {
   const opts = { full: false, split: null, stdout: false };
   for (let i = 0; i < argv.length; i++) {
@@ -29,7 +42,7 @@ function parseArgs(argv) {
     if (a === '--full') opts.full = true;
     else if (a === '--stdout') opts.stdout = true;
     else if (a === '--split') {
-      opts.split = argv[i + 1] || '2mb';
+      opts.split = parseSplitBytes(argv[i + 1] || '2mb');
       i++;
     }
   }

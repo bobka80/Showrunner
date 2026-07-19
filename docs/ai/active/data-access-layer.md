@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** Prep multi-user live + session UI **stable baseline GAS v645** (director-confirmed 2026-07-18). How it works: [FRAGILE § session UI](../FRAGILE_ZONES.md) · doctrine [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md). Hosting `host-boot.js?v=635`. **Rollback:** **v576**.
+**Opened:** 2026-07-05 · **Status:** Prep multi-user live + session UI **stable** — behavior **v645**, docs lock **v646**. **Next campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) (**A0/H0 testing pipeline done** → bulletproof H1–H5 → auto fork). Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md). How it works: [FRAGILE § session UI](../FRAGILE_ZONES.md) · [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md). Hosting `host-boot.js?v=635`. **Rollback:** **v576**.
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
@@ -411,7 +411,9 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - **2026-07-15:** Pre-ship DAL gates shipped — [dal-pre-ship-gates.md](dal-pre-ship-gates.md). Phase 1 repos still await **OK go**.
 - **2026-07-13:** Director design lock imported → [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md). Phase 3 (delta-only) explicit gate before Firebase.
 - **2026-07-15:** **Slice D documented** — dual-domain concurrent prep + timeline — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md). **Shipped v603.**
-- **2026-07-16:** Post-campaign **optional** timeline UX (auto room on enter + idle commit) documented in [../topics/timeline-collab-session.md](../topics/timeline-collab-session.md#optional-update--auto-room--idle-commit) — do **not** build during this campaign; milestone-before-try / revert-if-disliked.
+- **2026-07-16:** Post-campaign **optional** timeline UX (auto room on enter + idle commit) documented — do **not** build during this campaign.
+- **2026-07-18:** Optional UX **expanded & locked** (auto fork + live pull-in + idle eject; timeline **and** PA; freelancer exclusion) — [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject); prep cross-link in [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md). Build only as multi-user fork **Part B** after harden.
+- **2026-07-19:** Multi-user fork **order locked** — H0 testing pipeline → bulletproof H1–H5 + Gap 1 → Part B auto fork. Process brief [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md); Gap 1 folded into hub + [dal-pre-ship-gates.md](dal-pre-ship-gates.md) (no parallel gap-closure novel); other-domain gates [pre-ship-pipeline-expansion-2026-07-18.md](pre-ship-pipeline-expansion-2026-07-18.md).
 - **2026-07-16:** Director clarified close bar — **not** “absolutely every DB path through DAL.” Documented out-of-campaign inventory below.
 
 ## What DAL must NOT do
