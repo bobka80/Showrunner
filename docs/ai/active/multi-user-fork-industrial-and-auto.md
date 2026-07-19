@@ -7,7 +7,7 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Active** — **A5/H3 done** @ GAS **v673** + `host-boot.js?v=666`; next **A6/H2**. Prior: **A0 + H1 + H5 + Gap 1 + H4**.  
+**Opened:** 2026-07-18 · **Status:** **Active** — **A6/H2 done**; next **A7 Part A exit**. Prior: **A0 + H1 + H5 + Gap 1 + H4 + H3**.  
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
 **Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
@@ -185,9 +185,10 @@ Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync
 
 ### A6 — H2 Cheaper remote apply
 
-- [ ] Reduce full PA / timeline redraw storms on remote snap (targeted merge → redraw)  
-- [ ] Define measurable pass condition before coding (e.g. no full DOM re-render for diffs touching <5% of rows, or a frame-time budget)  
-- [ ] Smoke: remote qty/delete without browser stutter  
+- [x] Reduce full PA / timeline redraw storms on remote snap (targeted merge → redraw)  
+- [x] Define measurable pass condition before coding (e.g. no full DOM re-render for diffs touching <5% of rows, or a frame-time budget)  
+- [x] Smoke: remote qty/delete without browser stutter  
+- **Pass condition (locked):** PA qty-only on ≤ `max(3, 5% of fixture rows)` → DOM qty patch (`data-pa-uid`), zero `renderProjectAssetsUI`. Timeline ≤5 shift-only changes (no adds/phases/overrides) → in-place block patch, zero `drawShifts`/`rebuildTimelineGrid`. Else full/layer fallback. Case V.  
 
 ### A7 — Part A exit
 
@@ -308,6 +309,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **Twin General DEL:** dept-scoped `removeFormulaGroup` / `updateFormulaDept`; cut→green-dept unique loc (like copy). Normal unique lists unchanged. |
 | 2026-07-19 | **Conflict toast visible:** in-PA-modal banner + `SHOWRUNNER_HOST_TOAST`; peer-delete toasts any known remote remove (not only recent-edit). |
 | 2026-07-19 | **Conflict toast UX:** centered mid-screen toast (not host-only); toast + roster note both name what was removed/overwritten. |
+| 2026-07-19 | **A6 / H2 shipped:** PA qty-only patch + timeline shift-only DOM patch; Case V; pass bar max(3,5%) / ≤5 entities. **Next: A7 Part A exit.** |
 
 ---
 

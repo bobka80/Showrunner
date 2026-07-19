@@ -32,6 +32,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`scripts/dal-client-inventory.js`**: Node-only. Scans root `*.html` for `google.script.run` + `localStorage`; writes [dal-client-inventory.md](docs/ai/active/dal-client-inventory.md). `--check` on pre-ship when DAL hot paths change.
 - **`scripts/dal-persistence-lint.js`**: Node-only. Bans `SpreadsheetApp` / `clearContents` in client HTML; server `clearContents` allowlist.
 - **`scripts/dal-phase3-gate.js`**: Node-only. Blocks deploy when delta-only saves ship without `PRE_SHIP_DAL_CONCURRENCY_OK=1`. `--deploy` flag from pre-ship.
+- **`scripts/dal-pa-live-sync-test.js`** + **`scripts/lib/dal-*-core.js`**: Node-only PA/timeline live-sync sims (Cases A–V). Includes `dal-remote-apply-diff-core.js` (H2 targeted redraw gate).
 - **`gas-push-sync.js`**: Node-only. Replaces all Apps Script project files from `dist/` via API (deletes orphans). Used by `milestone.js` and `dev-push.js` instead of bare `clasp push`.
 - **`Security.js`**: Manages user authentication and extracts security profiles.
 - **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.

@@ -590,6 +590,124 @@ window.dalPaFixturesSig_ = function(assets) {
   }).sort().join('|');
 };
 
+/** H2 — structural identity (qty ignored). Keep aligned with scripts/lib/dal-remote-apply-diff-core.js */
+window.dalPaStructuralKey_ = function(pa) {
+  pa = pa || {};
+  var short = (pa.isShortage === true || pa.isShortage === 'true' ||
+    String(pa.formula || '').indexOf('[SHORT] ') === 0) ? '1' : '0';
+  return [
+    String(pa.assetId || ''),
+    String(pa.location || 'General'),
+    String(pa.formula || 'Standalone').replace(/^\[SHORT\]\s*/, ''),
+    short,
+    String(pa.overrideDept || pa.override_dept || ''),
+    String(pa.containerUid || pa.container_uid || '')
+  ].join('\t');
+};
+
+window.dalPaIsFormulaGrouped_ = function(pa) {
+  var f = String((pa && pa.formula) || 'Standalone');
+  return f !== 'Standalone' && f.indexOf('[SHORT] Standalone') !== 0;
+};
+
+/**
+ * H2 pass condition: qty-only diffs on ≤ max(3, 5% of rows) use DOM qty patch (no full PA rebuild).
+ * Structural / formula-group / larger diffs → full renderProjectAssetsUI.
+ */
+window.dalPaDiffFixtures_ = function(before, after) {
+  var beforeBy = {};
+  var afterBy = {};
+  (before || []).forEach(function(pa) {
+    if (pa && pa.uid) beforeBy[String(pa.uid)] = pa;
+  });
+  (after || []).forEach(function(pa) {
+    if (pa && pa.uid) afterBy[String(pa.uid)] = pa;
+  });
+  var added = [];
+  var deleted = [];
+  var changed = [];
+  var qtyOnlyChanged = [];
+  var structural = false;
+  var hasFormulaGroupMembers = false;
+  Object.keys(afterBy).forEach(function(uid) {
+    if (!beforeBy[uid]) {
+      added.push(uid);
+      structural = true;
+      if (window.dalPaIsFormulaGrouped_(afterBy[uid])) hasFormulaGroupMembers = true;
+    }
+  });
+  Object.keys(beforeBy).forEach(function(uid) {
+    if (!afterBy[uid]) {
+      deleted.push(uid);
+      structural = true;
+      if (window.dalPaIsFormulaGrouped_(beforeBy[uid])) hasFormulaGroupMembers = true;
+      return;
+    }
+    var b = beforeBy[uid];
+    var a = afterBy[uid];
+    if (window.dalPaStructuralKey_(b) !== window.dalPaStructuralKey_(a)) {
+      changed.push(uid);
+      structural = true;
+      if (window.dalPaIsFormulaGrouped_(b) || window.dalPaIsFormulaGrouped_(a)) hasFormulaGroupMembers = true;
+      return;
+    }
+    var bQty = Number(b.qty != null ? b.qty : 1);
+    var aQty = Number(a.qty != null ? a.qty : 1);
+    var bScan = Number(b.scannedQty || 0) || 0;
+    var aScan = Number(a.scannedQty || 0) || 0;
+    if (bQty !== aQty || bScan !== aScan) {
+      changed.push(uid);
+      qtyOnlyChanged.push(uid);
+      if (window.dalPaIsFormulaGrouped_(b) || window.dalPaIsFormulaGrouped_(a)) hasFormulaGroupMembers = true;
+    }
+  });
+  var totalTouched = added.length + deleted.length + changed.length;
+  var n = Math.max(Object.keys(beforeBy).length, 1);
+  var patchThreshold = Math.max(3, Math.ceil(n * 0.05));
+  var canPatchQty = !structural &&
+    qtyOnlyChanged.length > 0 &&
+    qtyOnlyChanged.length === changed.length &&
+    !hasFormulaGroupMembers &&
+    totalTouched <= patchThreshold;
+  return {
+    added: added,
+    deleted: deleted,
+    changed: changed,
+    qtyOnlyChanged: qtyOnlyChanged,
+    structural: structural,
+    hasFormulaGroupMembers: hasFormulaGroupMembers,
+    totalTouched: totalTouched,
+    canPatchQty: canPatchQty,
+    patchThreshold: patchThreshold,
+    renderMode: canPatchQty ? 'patchQty' : 'full'
+  };
+};
+
+window.dalPaRemoteRenderStats_ = window.dalPaRemoteRenderStats_ || { patchQty: 0, full: 0, skip: 0 };
+
+/**
+ * Patch assigned-row qty cells in place (H2). Returns false → caller must full-render.
+ */
+window.dalPaPatchQtyDom_ = function(uids, fixturesByUid) {
+  uids = uids || [];
+  fixturesByUid = fixturesByUid || {};
+  if (!uids.length) return false;
+  var patched = 0;
+  for (var i = 0; i < uids.length; i++) {
+    var uid = String(uids[i]);
+    var pa = fixturesByUid[uid];
+    if (!pa) return false;
+    var row = document.querySelector('.asset-row[data-pa-uid="' + uid.replace(/"/g, '') + '"]');
+    if (!row) return false;
+    var qtyEl = row.querySelector('[data-pa-qty]');
+    if (!qtyEl) return false;
+    var qty = pa.qty != null ? pa.qty : 1;
+    qtyEl.textContent = String(qty);
+    patched++;
+  }
+  return patched === uids.length;
+};
+
 window.dalPaHoldUntil_ = window.dalPaHoldUntil_ || {};
 window.dalPaRecentlyDeleted_ = window.dalPaRecentlyDeleted_ || {};
 window.dalPaSeenServerSnap_ = false;
@@ -1121,11 +1239,41 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
     var renderSig = window.dalPaFixturesSig_(currentProjectAssets);
     if (renderSig !== window.dalPaLastRenderSig_) {
       var overlay = document.getElementById('project-assets-modal-overlay');
-      if (overlay && overlay.style.display !== 'none' && typeof renderProjectAssetsUI === 'function') {
-        window.dalPaLastRenderSig_ = renderSig;
-        renderProjectAssetsUI();
+      if (overlay && overlay.style.display !== 'none') {
+        var diff = typeof window.dalPaDiffFixtures_ === 'function'
+          ? window.dalPaDiffFixtures_(localFixtures, mergedFixtures)
+          : { canPatchQty: false, qtyOnlyChanged: [] };
+        var usedPatch = false;
+        if (diff.canPatchQty && typeof window.dalPaPatchQtyDom_ === 'function') {
+          var byUid = window.dalPaMapByUid_
+            ? window.dalPaMapByUid_((currentProjectAssets || []).filter(function(pa) {
+              return !window.dalPaIsAutoRow_(pa);
+            }))
+            : {};
+          usedPatch = window.dalPaPatchQtyDom_(diff.qtyOnlyChanged, byUid);
+        }
+        if (usedPatch) {
+          window.dalPaLastRenderSig_ = renderSig;
+          window.dalPaRemoteRenderStats_.patchQty = (window.dalPaRemoteRenderStats_.patchQty || 0) + 1;
+          if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+        } else if (typeof renderProjectAssetsUI === 'function') {
+          // Preserve scroll across full rebuild (less flash even when patch cannot run).
+          var assignedEl = document.getElementById('pa-view-logistics');
+          var vaultEl = document.getElementById('pa-vault-list');
+          var scrollA = assignedEl ? assignedEl.scrollTop : 0;
+          var scrollV = vaultEl ? vaultEl.scrollTop : 0;
+          window.dalPaLastRenderSig_ = renderSig;
+          window.dalPaRemoteRenderStats_.full = (window.dalPaRemoteRenderStats_.full || 0) + 1;
+          renderProjectAssetsUI();
+          if (assignedEl) assignedEl.scrollTop = scrollA;
+          if (vaultEl) vaultEl.scrollTop = scrollV;
+          if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+        }
+      } else if (typeof evaluatePackingReadiness === 'function') {
+        evaluatePackingReadiness(true);
       }
-      if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
+    } else {
+      window.dalPaRemoteRenderStats_.skip = (window.dalPaRemoteRenderStats_.skip || 0) + 1;
     }
     if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
   } finally {

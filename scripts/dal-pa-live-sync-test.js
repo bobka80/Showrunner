@@ -370,9 +370,66 @@ var pendingInsert = core.applyRemoteFixtures(
 );
 assert(pendingInsert.fixtures.length === 1, 'pending new insert kept when absent from remote');
 
+console.log('\n--- Case V: H2 cheaper remote apply diff (targeted redraw gate) ---');
+// Scenario: classify PA qty-only vs structural; timeline small entity patch vs layer redraw.
+// Does NOT cover: DOM patch success in browser; formula-group qty sum headers; transit recompute.
+var h2 = require('./lib/dal-remote-apply-diff-core.js');
+var beforePa = [];
+for (var i = 1; i <= 40; i++) {
+  beforePa.push({
+    uid: 'u' + i,
+    assetId: 'a' + i,
+    qty: 1,
+    location: 'General',
+    formula: 'Standalone'
+  });
+}
+var afterQty = beforePa.map(function (pa) {
+  return pa.uid === 'u1' ? Object.assign({}, pa, { qty: 3 }) : pa;
+});
+var qtyDiff = h2.diffPaFixtures(beforePa, afterQty);
+assert(qtyDiff.canPatchQty === true, 'qty-only on 1/40 rows → canPatchQty (under 5% / max3)');
+assert(qtyDiff.renderMode === 'patchQty', 'qty-only renderMode patchQty');
+assert(qtyDiff.patchThreshold === 3, 'threshold max(3, ceil(5%*40))=3');
+var afterLoc = beforePa.map(function (pa) {
+  return pa.uid === 'u1' ? Object.assign({}, pa, { location: 'FOH' }) : pa;
+});
+var locDiff = h2.diffPaFixtures(beforePa, afterLoc);
+assert(locDiff.canPatchQty === false && locDiff.structural === true, 'location change is structural → full');
+var afterDel = beforePa.filter(function (pa) { return pa.uid !== 'u2'; });
+var delDiff = h2.diffPaFixtures(beforePa, afterDel);
+assert(delDiff.canPatchQty === false && delDiff.deleted.indexOf('u2') >= 0, 'delete forces full render');
+var formulaBefore = [{ uid: 'f1', assetId: 'x', qty: 1, location: 'G', formula: 'MyList' }];
+var formulaAfter = [{ uid: 'f1', assetId: 'x', qty: 5, location: 'G', formula: 'MyList' }];
+var formDiff = h2.diffPaFixtures(formulaBefore, formulaAfter);
+assert(formDiff.canPatchQty === false, 'formula-group qty change must not patchQty');
+var prevTl = {
+  shifts: [{ id: 's1', user_uid: 'u', role: 'FOH', start: 1, duration: 2 }],
+  phases: [{ id: 'p1', name: 'Load', start: 0, duration: 1 }],
+  overrides: {}
+};
+var nextTl = {
+  shifts: [{ id: 's1', user_uid: 'u', role: 'FOH', start: 2, duration: 2 }],
+  phases: [{ id: 'p1', name: 'Load', start: 0, duration: 1 }],
+  overrides: {}
+};
+var tlPatch = h2.diffTimelineStates(prevTl, nextTl);
+assert(tlPatch.canPatchEntities === true, 'single shift move → canPatchEntities');
+assert(tlPatch.renderMode === 'patchEntities', 'timeline patchEntities mode');
+var nextTlAdd = {
+  shifts: [
+    { id: 's1', user_uid: 'u', role: 'FOH', start: 1, duration: 2 },
+    { id: 's2', user_uid: 'u', role: 'MON', start: 4, duration: 1 }
+  ],
+  phases: prevTl.phases,
+  overrides: {}
+};
+var tlAdd = h2.diffTimelineStates(prevTl, nextTlAdd);
+assert(tlAdd.canPatchEntities === false, 'added shift falls back to layer redraw');
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–U + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–V + units)');
 process.exit(0);

@@ -16,14 +16,14 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-19)
 
-**Primary campaign:** Multi-user fork — **Active**; **A5/H3 done** → next **A6 / H2** (cheaper remote apply). Prep live sync rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
+**Primary campaign:** Multi-user fork — **Active**; **A6/H2 done** → next **A7 Part A exit**. Prep live sync rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
 
 | Stage | What | Gate |
 |-------|------|------|
 | **A0** | Testing pipeline | **Done** (director smoke) |
 | **A1 / H1** | Fail closed weak sync | **Done** (v648) |
 | **A2 / H5** | Mutation inventory + timeline twin | **Done** |
-| **A3–A6** | Gap 1 → H4 → H3 → H2 | **A5 done → next A6/H2** |
+| **A3–A6** | Gap 1 → H4 → H3 → H2 | **A6/H2 done → next A7** |
 | **B** | Auto fork + pull-in + idle eject | After Part A exit |
 
 Also on the board (do not mix into the fork campaign without director pick):
@@ -42,7 +42,7 @@ Also on the board (do not mix into the fork campaign without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Multi-user fork: test pipeline → bulletproof → auto fork** | **Active** — **A5/H3 done**; next **A6/H2** | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **Multi-user fork: test pipeline → bulletproof → auto fork** | **Active** — **A6/H2 done**; next **A7 Part A exit** | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **Error reports + daily journal triage** | Opened — Phase 0; capture after Part A | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | Near-complete — prep live rollback **v654** · DAL-era **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |

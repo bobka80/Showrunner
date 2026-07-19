@@ -634,7 +634,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 1. **Full-collection LWW on flush.** Writing every local PA doc on each edit lets a stale browser stomp peers’ untouched rows → A↔B fixture thrash.
 2. **Full list replace on every snapshot while the other side is editing.** Apply must **merge by UID**: take remote for clean rows; keep locally dirty / held UIDs.
 3. **Resurrect a UID after minus/delete from a lagging snap.** Pending-delete / held-absent / recently-deleted UIDs must stay absent — otherwise qty flips up/down rapidly on both browsers (confirmed 2026-07-17).
-4. **Apply stale `fromCache` / `hasPendingWrites` collection snaps** after a live server snap — same resurrection / yank class as timeline; also causes snap→full PA re-render storms (browser stutter).
+4. **Apply stale `fromCache` / `hasPendingWrites` collection snaps** after a live server snap — same resurrection / yank class as timeline; also causes snap→full PA re-render storms (browser stutter). **H2 mitigation:** qty-only small diffs patch DOM (`data-pa-uid`); do not skip merge/hold rules to “optimize” redraw.
 5. **Flush Firebase from remote apply** (`hasDirty → dalFlushPaIfPrepOpen_`). That is a closed loop: snap → render → flush → snap.
 6. **Live-write auto-container rows after every minus.** `recalcAutoContainers` mints/churns UIDs → collection snap storms + browser stutter. Live patch is **fixtures only**; each browser rebuilds autos locally after fixture apply.
 7. **Run `dalProcessPaFormulas_` explode on remote apply.** Exploding unique qty>1 strips UIDs and mints new rows → endless write wars. Remote docs are authoritative; only normalize formula flags (`skipExplode`).

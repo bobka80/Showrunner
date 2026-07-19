@@ -289,7 +289,10 @@ function renderProjectAssetsUI() {
 
         if (mode === 'assigned' && paIndex !== -1) {
             isSelected = window.selectedPaIndices.has(paIndex);
-            dataAttr = `data-paindex="${paIndex}"`;
+            let paUidAttr = (currentProjectAssets[paIndex] && currentProjectAssets[paIndex].uid)
+              ? String(currentProjectAssets[paIndex].uid).replace(/"/g, '')
+              : '';
+            dataAttr = `data-paindex="${paIndex}"` + (paUidAttr ? ` data-pa-uid="${paUidAttr}"` : '');
             isCut = currentProjectAssets[paIndex] && currentProjectAssets[paIndex].isCut;
             isCopied = currentProjectAssets[paIndex] && currentProjectAssets[paIndex].isCopied;
             if (isCut && currentProjectAssets[paIndex].cutQty) modifiedQtyHtml = `<span style="color:#ef4444;" title="Cutting ${currentProjectAssets[paIndex].cutQty}">${currentProjectAssets[paIndex].cutQty}</span><span style="color:#555; font-size:9px;">/${displayQty}</span>`;
@@ -326,7 +329,7 @@ function renderProjectAssetsUI() {
                 let pLeft = isChild ? 'padding-left:14px; box-sizing:border-box;' : '';
                 html += `<div style="${widthStyle} ${pLeft} color:#fff; font-weight:bold; font-size:${fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${safeName}">${safeName}</div>`;
             }
-            else if (key === 'qty') html += `<div style="${widthStyle} color:#86efac; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${modifiedQtyHtml}</div>`;
+            else if (key === 'qty') html += `<div data-pa-qty="1" style="${widthStyle} color:#86efac; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${modifiedQtyHtml}</div>`;
             else if (key === 'unit') {
                 if (isPseudoBulk) {
                     html += `<div style="${widthStyle} color:#555; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="This is a soft-allocated model group. Specific units are assigned at checkout.">MODEL</div>`;

@@ -639,11 +639,188 @@ window.dalTlAssignedUids_ = function(list) {
   return assigned;
 };
 
+window.dalTlRemoteRenderStats_ = window.dalTlRemoteRenderStats_ || { patch: 0, layer: 0, grid: 0 };
+
+/** H2 — classify timeline entity diffs. Keep aligned with scripts/lib/dal-remote-apply-diff-core.js */
+window.dalTlDiffStates_ = function(prev, next) {
+  prev = prev || {};
+  next = next || {};
+  function mapById(list) {
+    var m = {};
+    (list || []).forEach(function(e) {
+      if (e && e.id != null) m[String(e.id)] = e;
+    });
+    return m;
+  }
+  function shiftSig(e) {
+    e = e || {};
+    return [
+      String(e.user_uid || e.userUid || e.email || ''),
+      String(e.role || ''),
+      String(e.Start != null ? e.Start : (e.start != null ? e.start : '')),
+      String(e.Duration != null ? e.Duration : (e.duration != null ? e.duration : '')),
+      String(e.Note != null ? e.Note : (e.note || '')),
+      e.Has_Arrow || e.hasArrow ? String(e.Has_Arrow || e.hasArrow) : '0',
+      String(e.color || '')
+    ].join('\t');
+  }
+  function phaseSig(e) {
+    e = e || {};
+    return [
+      String(e.Phase_Name || e.name || e.type || ''),
+      String(e.Start != null ? e.Start : (e.start != null ? e.start : '')),
+      String(e.Duration != null ? e.Duration : (e.duration != null ? e.duration : '')),
+      String(e.Note != null ? e.Note : (e.note || ''))
+    ].join('\t');
+  }
+  var prevS = mapById(prev.shifts);
+  var nextS = mapById(next.shifts);
+  var prevP = mapById(prev.phases);
+  var nextP = mapById(next.phases);
+  var addedShiftIds = [];
+  var deletedShiftIds = [];
+  var changedShiftIds = [];
+  Object.keys(nextS).forEach(function(id) {
+    if (!prevS[id]) addedShiftIds.push(id);
+  });
+  Object.keys(prevS).forEach(function(id) {
+    if (!nextS[id]) deletedShiftIds.push(id);
+    else if (shiftSig(prevS[id]) !== shiftSig(nextS[id])) changedShiftIds.push(id);
+  });
+  var addedPhaseIds = [];
+  var deletedPhaseIds = [];
+  var changedPhaseIds = [];
+  Object.keys(nextP).forEach(function(id) {
+    if (!prevP[id]) addedPhaseIds.push(id);
+  });
+  Object.keys(prevP).forEach(function(id) {
+    if (!nextP[id]) deletedPhaseIds.push(id);
+    else if (phaseSig(prevP[id]) !== phaseSig(nextP[id])) changedPhaseIds.push(id);
+  });
+  var overridesChanged = JSON.stringify(prev.overrides || {}) !== JSON.stringify(next.overrides || {});
+  var totalTouched = addedShiftIds.length + deletedShiftIds.length + changedShiftIds.length +
+    addedPhaseIds.length + deletedPhaseIds.length + changedPhaseIds.length +
+    (overridesChanged ? 1 : 0);
+  var patchThreshold = 5;
+  // Phase changes need renderPhases (guide lines have no stable ids) — patch shifts only.
+  var canPatchEntities = !overridesChanged &&
+    addedShiftIds.length === 0 &&
+    addedPhaseIds.length === 0 &&
+    changedPhaseIds.length === 0 &&
+    deletedPhaseIds.length === 0 &&
+    totalTouched > 0 &&
+    totalTouched <= patchThreshold;
+  return {
+    changedShiftIds: changedShiftIds,
+    deletedShiftIds: deletedShiftIds,
+    addedShiftIds: addedShiftIds,
+    changedPhaseIds: changedPhaseIds,
+    deletedPhaseIds: deletedPhaseIds,
+    addedPhaseIds: addedPhaseIds,
+    overridesChanged: overridesChanged,
+    totalTouched: totalTouched,
+    canPatchEntities: canPatchEntities,
+    patchThreshold: patchThreshold,
+    renderMode: canPatchEntities ? 'patchEntities' : (totalTouched === 0 ? 'none' : 'layer')
+  };
+};
+
+/**
+ * H2 — patch existing shift/phase blocks in place (no full drawShifts/renderPhases wipe).
+ * Returns false if any target DOM node is missing → caller falls back to layer redraw.
+ */
+window.dalTlPatchRemoteDom_ = function(diff, merged) {
+  diff = diff || {};
+  merged = merged || {};
+  var px = (typeof PX_PER_HR !== 'undefined') ? PX_PER_HR : 60;
+  var shiftBy = {};
+  (merged.shifts || []).forEach(function(s) {
+    if (s && s.id != null) shiftBy[String(s.id)] = s;
+  });
+  var phaseBy = {};
+  (merged.phases || []).forEach(function(p) {
+    if (p && p.id != null) phaseBy[String(p.id)] = p;
+  });
+
+  function patchShiftBlock(id, s) {
+    var block = document.querySelector('.shift-block[data-id="' + String(id).replace(/"/g, '') + '"]');
+    if (!block || !s) return false;
+    var start = Number(s.Start != null ? s.Start : s.start) || 0;
+    var dur = Number(s.Duration != null ? s.Duration : s.duration) || 0;
+    block.style.left = (start * px) + 'px';
+    block.style.width = (dur * px) + 'px';
+    if (s.color) block.style.background = s.color;
+    var roleEl = block.querySelector('.shift-role');
+    if (roleEl && s.role != null) roleEl.textContent = s.role || 'Technician';
+    var noteEl = block.querySelector('.shift-note');
+    var note = (s.Note != null ? s.Note : s.note) || '';
+    if (note) {
+      if (noteEl) noteEl.textContent = note;
+      else {
+        var label = block.querySelector('.shift-label-container');
+        if (label) {
+          var n = document.createElement('div');
+          n.className = 'shift-note';
+          n.textContent = note;
+          label.appendChild(n);
+        }
+      }
+    } else if (noteEl && noteEl.parentNode) {
+      noteEl.parentNode.removeChild(noteEl);
+    }
+    var timeEl = block.querySelector('.shift-time');
+    if (timeEl && typeof formatShiftTime === 'function') {
+      timeEl.textContent = formatShiftTime(start) + ' - ' + formatShiftTime(start + dur);
+    }
+    return true;
+  }
+
+  function patchPhaseBlock(id, p) {
+    var block = document.querySelector('.tt-grid-row[data-uid="PHASE_ROW"] .shift-block[data-id="' + String(id).replace(/"/g, '') + '"]');
+    if (!block || !p) return false;
+    var start = Number(p.Start != null ? p.Start : p.start) || 0;
+    var dur = Number(p.Duration != null ? p.Duration : p.duration) || 0;
+    block.style.left = (start * px) + 'px';
+    block.style.width = (dur * px) + 'px';
+    return true;
+  }
+
+  var i;
+  for (i = 0; i < (diff.deletedShiftIds || []).length; i++) {
+    var ds = document.querySelector('.shift-block[data-id="' + String(diff.deletedShiftIds[i]).replace(/"/g, '') + '"]');
+    if (ds && ds.parentNode) ds.parentNode.removeChild(ds);
+  }
+  for (i = 0; i < (diff.deletedPhaseIds || []).length; i++) {
+    var dp = document.querySelector('.tt-grid-row[data-uid="PHASE_ROW"] .shift-block[data-id="' + String(diff.deletedPhaseIds[i]).replace(/"/g, '') + '"]');
+    if (dp && dp.parentNode) dp.parentNode.removeChild(dp);
+    document.querySelectorAll('.phase-vline[data-phase-id="' + String(diff.deletedPhaseIds[i]).replace(/"/g, '') + '"]').forEach(function(el) {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    });
+  }
+  for (i = 0; i < (diff.changedShiftIds || []).length; i++) {
+    var sid = diff.changedShiftIds[i];
+    if (!patchShiftBlock(sid, shiftBy[sid])) return false;
+  }
+  for (i = 0; i < (diff.changedPhaseIds || []).length; i++) {
+    var pid = diff.changedPhaseIds[i];
+    if (!patchPhaseBlock(pid, phaseBy[pid])) return false;
+  }
+  return true;
+};
+
 window.dalTlInstallMergedLocal_ = function(merged, opts) {
   opts = opts || {};
   var prevAssigned = (typeof globalAssignedArr !== 'undefined' && globalAssignedArr)
     ? globalAssignedArr.slice()
     : [];
+  var prevState = {
+    shifts: (typeof shifts !== 'undefined' && shifts) ? JSON.parse(JSON.stringify(shifts)) : [],
+    phases: (typeof activePhases !== 'undefined' && activePhases) ? JSON.parse(JSON.stringify(activePhases)) : [],
+    overrides: (typeof localDeptOverrides !== 'undefined' && localDeptOverrides)
+      ? window.dalTlCloneOverrides_(localDeptOverrides)
+      : {}
+  };
+
   shifts = JSON.parse(JSON.stringify(merged.shifts || []));
   window.dalColorTimelineShifts_(shifts);
   activePhases = JSON.parse(JSON.stringify(merged.phases || []));
@@ -657,12 +834,34 @@ window.dalTlInstallMergedLocal_ = function(merged, opts) {
 
   var assignedChanged = prevAssigned.slice().sort().join('|') !== assigned.slice().sort().join('|');
   if (opts.forceRebuild || assignedChanged) {
+    window.dalTlRemoteRenderStats_.grid = (window.dalTlRemoteRenderStats_.grid || 0) + 1;
     if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
-  } else {
-    if (typeof drawShifts === 'function') drawShifts();
-    if (typeof renderPhases === 'function') renderPhases();
-    if (typeof renderSubEvents === 'function') renderSubEvents();
+    return;
   }
+
+  var diff = typeof window.dalTlDiffStates_ === 'function'
+    ? window.dalTlDiffStates_(prevState, {
+      shifts: shifts,
+      phases: activePhases,
+      overrides: localDeptOverrides
+    })
+    : { canPatchEntities: false };
+
+  if (diff.canPatchEntities && typeof window.dalTlPatchRemoteDom_ === 'function') {
+    if (window.dalTlPatchRemoteDom_(diff, {
+      shifts: shifts,
+      phases: activePhases,
+      overrides: localDeptOverrides
+    })) {
+      window.dalTlRemoteRenderStats_.patch = (window.dalTlRemoteRenderStats_.patch || 0) + 1;
+      return;
+    }
+  }
+
+  window.dalTlRemoteRenderStats_.layer = (window.dalTlRemoteRenderStats_.layer || 0) + 1;
+  if (typeof drawShifts === 'function') drawShifts();
+  if (typeof renderPhases === 'function') renderPhases();
+  if (typeof renderSubEvents === 'function') renderSubEvents();
 };
 
 /**

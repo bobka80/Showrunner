@@ -67,7 +67,7 @@ Wired from `pre-ship/layers.js` → `runDalGates()`:
 1. scripts/dal-persistence-lint.js
 2. scripts/dal-client-inventory.js --check
 3. scripts/dal-phase3-gate.js [--deploy]
-4. scripts/dal-pa-live-sync-test.js          # Cases A–R (scope + mode seam + 3-client)
+4. scripts/dal-pa-live-sync-test.js          # Cases A–V (scope + mode seam + H2/H3/H4)
 5. scripts/dal-mutation-inventory-check.js     # PA touch/delete notes
 6. scripts/dal-tl-mutation-inventory-check.js  # timeline dalTlNote* (H5 twin)
 7. scripts/dal-sync-mode-lint.js               # Gap 1 Firestore vs GAS (#10/#11)
@@ -200,7 +200,7 @@ When Logistics / Operations hot paths change, `pre-ship/bugbot-policy.js` adds a
 | `scripts/dal-client-inventory.js` | Generate / check client inventory |
 | `scripts/dal-persistence-lint.js` | Client/server persistence lint |
 | `scripts/dal-phase3-gate.js` | Delta-only deploy gate |
-| `scripts/dal-pa-live-sync-test.js` | PA live-sync Cases A–J (pure sim) |
+| `scripts/dal-pa-live-sync-test.js` | PA live-sync Cases A–V (pure sim; H2 Case V) |
 | `scripts/dal-mutation-inventory-check.js` | PA mutators must note touch/delete |
 | `scripts/dal-tl-mutation-inventory-check.js` | Timeline mutators must note dalTlNote* |
 | `scripts/dal-sync-mode-lint.js` | Gap 1 — Firestore vs GAS mode structural lint |
