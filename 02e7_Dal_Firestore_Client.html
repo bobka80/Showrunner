@@ -58,14 +58,26 @@ window.dalPaArmLwwWatch_ = function(uids, ttlMs) {
   });
 };
 
-window.dalPaNotifyLwwLosses_ = function(lostUids) {
-  if (!lostUids || !lostUids.length) return;
-  lostUids.forEach(function(uid) { delete window.dalPaLwwWatch_[uid]; });
+window.dalPaNotifyConflict_ = function(overwritten, deleted) {
+  overwritten = overwritten || [];
+  deleted = deleted || [];
+  var all = overwritten.concat(deleted);
+  if (!all.length) return;
+  all.forEach(function(uid) { delete window.dalPaLwwWatch_[uid]; });
   if (Date.now() < (window.dalPaLwwToastAt_ || 0)) return;
   window.dalPaLwwToastAt_ = Date.now() + 3500;
-  var msg = lostUids.length === 1
-    ? 'Another editor overwrote your equipment change on this item.'
-    : ('Another editor overwrote your equipment changes (' + lostUids.length + ' items).');
+  var msg;
+  if (deleted.length && !overwritten.length) {
+    msg = deleted.length === 1
+      ? 'Another editor removed an item you just changed.'
+      : ('Another editor removed ' + deleted.length + ' items you just changed.');
+  } else if (overwritten.length && !deleted.length) {
+    msg = overwritten.length === 1
+      ? 'Another editor overwrote your equipment change on this item.'
+      : ('Another editor overwrote your equipment changes (' + overwritten.length + ' items).');
+  } else {
+    msg = 'Another editor changed or removed items you just edited (' + all.length + ').';
+  }
   try {
     if (typeof showToast === 'function') showToast(msg);
     else if (typeof window.showMobilePaToast === 'function') window.showMobilePaToast('Conflict', msg);
@@ -83,20 +95,30 @@ window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
   var now = Date.now();
   var protectedMap = {};
   Object.keys(window.dalPaTouchedUids_ || {}).forEach(function(u) { protectedMap[u] = 1; });
+  Object.keys(window.dalPaDeletedUids_ || {}).forEach(function(u) { protectedMap[u] = 1; });
   Object.keys(window.dalPaHoldUntil_ || {}).forEach(function(u) {
     if ((window.dalPaHoldUntil_[u] || 0) > now) protectedMap[u] = 1;
   });
-  var lost = [];
+  if (typeof window.dalPaIsRecentlyDeleted_ === 'function') {
+    Object.keys(watch).forEach(function(uid) {
+      if (window.dalPaIsRecentlyDeleted_(uid)) protectedMap[uid] = 1;
+    });
+  }
+  var overwritten = [];
+  var deleted = [];
   Object.keys(watch).forEach(function(uid) {
     var w = watch[uid];
     if (!w || !w.sig) return;
     if (w.until && now > w.until) { delete watch[uid]; return; }
     if (protectedMap[uid]) return;
     var remote = remoteBy[uid];
-    if (!remote) return;
-    if (window.dalPaNonCombiningSig_(remote) !== w.sig) lost.push(uid);
+    if (!remote) {
+      deleted.push(uid);
+      return;
+    }
+    if (window.dalPaNonCombiningSig_(remote) !== w.sig) overwritten.push(uid);
   });
-  window.dalPaNotifyLwwLosses_(lost);
+  window.dalPaNotifyConflict_(overwritten, deleted);
 };
 
 /** H4 — keep aligned with scripts/lib/dal-state-size-mirror-core.js / Dal_Firebase.js */
@@ -232,6 +254,7 @@ window.dalPaNoteDelete_ = function(uid) {
   uid = String(uid);
   window.dalPaDeletedUids_[uid] = 1;
   delete window.dalPaTouchedUids_[uid];
+  delete window.dalPaLwwWatch_[uid];
   window.dalPaHoldEntities_([uid], 3000);
   window.dalPaMarkDeleted_([uid], 8000);
 };

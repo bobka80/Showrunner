@@ -321,6 +321,27 @@ var shiftLost = lww.detectWatchedLwwLosses(
   lww.shiftNonCombiningSig
 );
 assert(shiftLost.indexOf('s1') >= 0, 'timeline shift role overwrite detected');
+var peerDel = lww.detectWatchedPeerDeletes(
+  { u1: { sig: lww.paNonCombiningSig({ location: 'A' }), until: Date.now() + 9999 } },
+  {},
+  Date.now(),
+  {}
+);
+assert(peerDel.indexOf('u1') >= 0, 'peer delete of watched uid detected');
+var peerDelProtected = lww.detectWatchedPeerDeletes(
+  { u1: { sig: lww.paNonCombiningSig({ location: 'A' }), until: Date.now() + 9999 } },
+  {},
+  Date.now(),
+  { u1: 1 }
+);
+assert(peerDelProtected.length === 0, 'own pending delete not reported as peer delete');
+var peerDelShift = lww.detectWatchedPeerDeletes(
+  { s1: { sig: lww.shiftNonCombiningSig({ role: 'FOH' }), until: Date.now() + 9999 } },
+  {},
+  Date.now(),
+  {}
+);
+assert(peerDelShift.indexOf('s1') >= 0, 'timeline peer strip delete detected');
 
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');

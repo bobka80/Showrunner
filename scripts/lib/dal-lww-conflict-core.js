@@ -1,5 +1,5 @@
 /**
- * H3 — detect LWW loss on non-combining fields (PA + timeline).
+ * H3 — detect LWW loss on non-combining fields + peer delete of watched rows (PA + timeline).
  * Qty floor +/- combines (Case O) — never treat qty-only drift as a conflict toast.
  */
 'use strict';
@@ -60,10 +60,36 @@ function detectWatchedLwwLosses(watchMap, remoteByUid, now, stillProtected, sigF
     if (w.until && now > w.until) return;
     if (stillProtected[uid]) return;
     var remote = remoteByUid[uid];
-    if (!remote) return; // delete is a different cue; H3 is field LWW
+    if (!remote) return; // peer delete → detectWatchedPeerDeletes
     if (sigFn(remote) !== w.sig) lost.push(uid);
   });
   return lost;
+}
+
+/**
+ * Watched uid present locally (in watch) but absent from remote → peer deleted it.
+ * @param {object} [opts] { treatMissingKeyAsDelete: true for override maps }
+ */
+function detectWatchedPeerDeletes(watchMap, remoteByUid, now, stillProtected, opts) {
+  stillProtected = stillProtected || {};
+  remoteByUid = remoteByUid || {};
+  watchMap = watchMap || {};
+  now = now != null ? now : Date.now();
+  opts = opts || {};
+  var asMap = !!opts.treatMissingKeyAsDelete;
+  var deleted = [];
+  Object.keys(watchMap).forEach(function (uid) {
+    var w = watchMap[uid];
+    if (!w || !w.sig) return;
+    if (w.until && now > w.until) return;
+    if (stillProtected[uid]) return;
+    if (asMap) {
+      if (!Object.prototype.hasOwnProperty.call(remoteByUid, uid)) deleted.push(uid);
+      return;
+    }
+    if (!remoteByUid[uid]) deleted.push(uid);
+  });
+  return deleted;
 }
 
 function mapByUid(list) {
@@ -87,6 +113,7 @@ module.exports = {
   shiftNonCombiningSig: shiftNonCombiningSig,
   phaseNonCombiningSig: phaseNonCombiningSig,
   detectWatchedLwwLosses: detectWatchedLwwLosses,
+  detectWatchedPeerDeletes: detectWatchedPeerDeletes,
   mapByUid: mapByUid,
   mapById: mapById
 };

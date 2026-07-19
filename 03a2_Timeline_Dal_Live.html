@@ -163,6 +163,7 @@ window.dalTlNoteShiftDelete_ = function(id) {
   if (!window.dalTlLiveWritesAllowed_()) { window.dalTlWarnBlockedOnce_(); return; }
   window.dalTlDeletedShifts_[id] = 1;
   delete window.dalTlTouchedShifts_[id];
+  delete window.dalTlLwwWatchShifts_[id];
   window.dalTlHoldEntity_(id);
 };
 
@@ -182,6 +183,7 @@ window.dalTlNotePhaseDelete_ = function(id) {
   if (!window.dalTlLiveWritesAllowed_()) { window.dalTlWarnBlockedOnce_(); return; }
   window.dalTlDeletedPhases_[id] = 1;
   delete window.dalTlTouchedPhases_[id];
+  delete window.dalTlLwwWatchPhases_[id];
   window.dalTlHoldEntity_(id);
 };
 
@@ -273,13 +275,25 @@ window.dalTlArmLwwWatchFromLocal_ = function(kind, ids, ttlMs) {
   window.dalTlArmLwwWatch_(kind, ids, by, ttlMs);
 };
 
-window.dalTlNotifyLwwLosses_ = function(lostCount) {
-  if (!lostCount) return;
+window.dalTlNotifyLwwLosses_ = function(overwriteCount, deleteCount) {
+  overwriteCount = overwriteCount || 0;
+  deleteCount = deleteCount || 0;
+  var total = overwriteCount + deleteCount;
+  if (!total) return;
   if (Date.now() < (window.dalTlLwwToastAt_ || 0)) return;
   window.dalTlLwwToastAt_ = Date.now() + 3500;
-  var msg = lostCount === 1
-    ? 'Another editor overwrote your timeline change.'
-    : ('Another editor overwrote your timeline changes (' + lostCount + ').');
+  var msg;
+  if (deleteCount && !overwriteCount) {
+    msg = deleteCount === 1
+      ? 'Another editor removed a timeline item you just changed.'
+      : ('Another editor removed ' + deleteCount + ' timeline items you just changed.');
+  } else if (overwriteCount && !deleteCount) {
+    msg = overwriteCount === 1
+      ? 'Another editor overwrote your timeline change.'
+      : ('Another editor overwrote your timeline changes (' + overwriteCount + ').');
+  } else {
+    msg = 'Another editor changed or removed timeline items you just edited (' + total + ').';
+  }
   try {
     if (typeof showToast === 'function') showToast(msg);
     else if (typeof showNotification === 'function') showNotification(msg);
@@ -294,6 +308,9 @@ window.dalTlCheckLwwLossesAgainstRemote_ = function(remoteState) {
   Object.keys(window.dalTlTouchedShifts_ || {}).forEach(function(id) { protectedMap[id] = 1; });
   Object.keys(window.dalTlTouchedPhases_ || {}).forEach(function(id) { protectedMap[id] = 1; });
   Object.keys(window.dalTlTouchedOverrides_ || {}).forEach(function(id) { protectedMap[id] = 1; });
+  Object.keys(window.dalTlDeletedShifts_ || {}).forEach(function(id) { protectedMap[id] = 1; });
+  Object.keys(window.dalTlDeletedPhases_ || {}).forEach(function(id) { protectedMap[id] = 1; });
+  Object.keys(window.dalTlDeletedOverrides_ || {}).forEach(function(id) { protectedMap[id] = 1; });
   Object.keys(window.dalTlEntityHoldUntil_ || {}).forEach(function(id) {
     if ((window.dalTlEntityHoldUntil_[id] || 0) > now) protectedMap[id] = 1;
   });
@@ -302,7 +319,8 @@ window.dalTlCheckLwwLossesAgainstRemote_ = function(remoteState) {
   var phaseBy = {};
   (remoteState.phases || []).forEach(function(p) { if (p && p.id) phaseBy[String(p.id)] = p; });
   var ovBy = remoteState.overrides || {};
-  var lost = 0;
+  var overwritten = 0;
+  var deleted = 0;
 
   function sweep(watch, remoteBy, sigFn, isOverride) {
     Object.keys(watch || {}).forEach(function(id) {
@@ -311,20 +329,28 @@ window.dalTlCheckLwwLossesAgainstRemote_ = function(remoteState) {
       if (w.until && now > w.until) { delete watch[id]; return; }
       if (protectedMap[id]) return;
       if (isOverride) {
-        if (!Object.prototype.hasOwnProperty.call(remoteBy, id)) return;
-        if (sigFn(remoteBy[id]) !== w.sig) { delete watch[id]; lost++; }
+        if (!Object.prototype.hasOwnProperty.call(remoteBy, id)) {
+          delete watch[id];
+          deleted++;
+          return;
+        }
+        if (sigFn(remoteBy[id]) !== w.sig) { delete watch[id]; overwritten++; }
         return;
       }
       var remote = remoteBy[id];
-      if (!remote) return;
-      if (sigFn(remote) !== w.sig) { delete watch[id]; lost++; }
+      if (!remote) {
+        delete watch[id];
+        deleted++;
+        return;
+      }
+      if (sigFn(remote) !== w.sig) { delete watch[id]; overwritten++; }
     });
   }
 
   sweep(window.dalTlLwwWatchShifts_, shiftBy, window.dalTlShiftNonCombiningSig_, false);
   sweep(window.dalTlLwwWatchPhases_, phaseBy, window.dalTlPhaseNonCombiningSig_, false);
   sweep(window.dalTlLwwWatchOverrides_, ovBy, window.dalTlOverrideSig_, true);
-  window.dalTlNotifyLwwLosses_(lost);
+  window.dalTlNotifyLwwLosses_(overwritten, deleted);
 };
 
 window.dalTlArmLwwAfterFlush_ = function(mutations, localState) {
