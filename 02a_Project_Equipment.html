@@ -357,11 +357,19 @@ function openProjectAssetsModal() {
                 if (cachedRaw) cachedObj = JSON.parse(cachedRaw);
             }
             if (cachedObj && cachedObj.sDate === sDate && cachedObj.eDate === eDate) {
-                    currentProjectAssets = cachedObj.current || [];
+                    // Prep live: never let stale cache wipe overrideDept from the state doc.
+                    var cacheRows = cachedObj.current || [];
+                    if (typeof window.dalPaPreferLiveFixturesOverCache_ === 'function') {
+                        cacheRows = window.dalPaPreferLiveFixturesOverCache_(projectId, cacheRows);
+                    }
+                    currentProjectAssets = cacheRows;
+                    if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
+                        window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
+                    }
                     window.overlappingAllocations = cachedObj.overlapping || {};
                     window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
                     window.paLoadedForProject = projectId;
-                    const processFormulas = (arr) => { let exploded = []; for (let i = arr.length - 1; i >= 0; i--) { let pa = arr[i]; let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null; if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') { let parsedQty = parseInt(pa.qty, 10); if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') { arr.splice(i, 1); for (let k = 0; k < parsedQty; k++) { let newPa = {...pa, qty: 1}; delete newPa.uid; exploded.push(newPa); } } } } if (exploded.length > 0) arr.push(...exploded); arr.forEach(pa => { if (pa.formula === 'Manual') pa.formula = 'Standalone'; if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true; if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); } if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; } else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); } else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); } }); };
+                    const processFormulas = (arr) => { let exploded = []; for (let i = arr.length - 1; i >= 0; i--) { let pa = arr[i]; let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null; if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') { let parsedQty = parseInt(pa.qty, 10); if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') { arr.splice(i, 1); for (let k = 0; k < parsedQty; k++) { let newPa = {...pa, qty: 1}; delete newPa.uid; exploded.push(newPa); } } } } if (exploded.length > 0) arr.push(...exploded); arr.forEach(pa => { if (pa.formula === 'Manual') pa.formula = 'Standalone'; if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true; if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); } if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; } else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); } else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); } if (typeof window.dalPaNormalizeOverrideDept_ === 'function') window.dalPaNormalizeOverrideDept_(pa); }); };
                     processFormulas(currentProjectAssets); processFormulas(window.originalProjectAssets);
                     try {
                         if (typeof window.togglePaMode === 'function') window.togglePaMode('design');
@@ -425,6 +433,22 @@ function openProjectAssetsModal() {
                     // Sheets is not live SSOT — never leave "Loading Assigned Gear…" stuck.
                     try {
                         if (memoryForThisProject) {
+                            // Stale cache may have wiped overrideDept — heal from state-doc fixtures.
+                            if (typeof window.dalPaPreferLiveFixturesOverCache_ === 'function' &&
+                                window.dalPaLastServerFixtures_ && window.dalPaLastServerFixtures_.length &&
+                                typeof window.dalPaFixturesSig_ === 'function') {
+                                var memSig = window.dalPaFixturesSig_(currentProjectAssets || []);
+                                var liveSig2 = window.dalPaFixturesSig_(window.dalPaLastServerFixtures_);
+                                if (liveSig2 && liveSig2 !== memSig && typeof window.dalApplyRemotePaAssetsNow_ === 'function') {
+                                    window.dalApplyRemotePaAssetsNow_(window.dalPaLastServerFixtures_, {
+                                        docWriteSeq: window.dalPaLastServerWriteSeq_ || 0,
+                                        forceApply: true
+                                    });
+                                }
+                            }
+                            if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
+                                window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
+                            }
                             if (typeof window.togglePaMode === 'function') window.togglePaMode('design');
                             else if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
                         } else if (localEmpty && window.dalPaLastServerFixtures_ && window.dalPaLastServerFixtures_.length &&
@@ -464,12 +488,22 @@ function openProjectAssetsModal() {
                     // Wrong-project + Sheets has rows: fall through to full hydrate path below
                 }
             }
-            currentProjectAssets = res.current || [];
+            // Prep live: if state-doc fixtures already have overrideDept, do not replace with
+            // a collection/Sheets snapshot that still lacks it (common right after refresh).
+            var incoming = res.current || [];
+            if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore' &&
+                typeof window.dalPaPreferLiveFixturesOverCache_ === 'function') {
+                incoming = window.dalPaPreferLiveFixturesOverCache_(projectId, incoming);
+            }
+            currentProjectAssets = incoming;
+            if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
+                window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
+            }
             window.overlappingAllocations = res.overlapping || window.overlappingAllocations || {};
             window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets)); // Store pristine DB state
             
             try {
-                var paCachePayload = { sDate: sDate, eDate: eDate, current: res.current, overlapping: res.overlapping };
+                var paCachePayload = { sDate: sDate, eDate: eDate, current: currentProjectAssets, overlapping: window.overlappingAllocations };
                 if (typeof window.dalCacheSetPa_ === 'function') window.dalCacheSetPa_(projectId, paCachePayload);
                 else localStorage.setItem(cacheKey, JSON.stringify(paCachePayload));
             } catch(e) {}
@@ -515,6 +549,7 @@ function openProjectAssetsModal() {
                         pa.isAuto = true;
                         pa.formula = pa.formula.substring(7);
                     }
+                    if (typeof window.dalPaNormalizeOverrideDept_ === 'function') window.dalPaNormalizeOverrideDept_(pa);
                 });
             };
             

@@ -812,26 +812,38 @@ function renderProjectAssetsUI() {
 
     let hasFormulas = Object.keys(formulaGroups).length > 0;
 
-    Object.values(formulaGroups).forEach(fg => {
-        if (!fg.creator && fg.items.length > 0) fg.creator = fg.items[0].pa.creator;
-        let override = fg.items.find(item => item.pa.overrideDept);
-        if (override && override.pa.overrideDept) {
-            fg.department = override.pa.overrideDept;
-            fg.overrideDept = override.pa.overrideDept;
-        } else {
-            let fallbackDept = fg.items.length > 0 ? (getDeptObj(fg.items[0].asset.department).uid || 'Unassigned') : 'Unassigned';
-            fg.department = getCreatorDept(fg.creator, fallbackDept);
-            fg.overrideDept = "";
-        }
-    });
-    
     let assignedByDept = {};
     Object.values(formulaGroups).forEach(fg => {
-        if (!assignedByDept[fg.department]) assignedByDept[fg.department] = { formulas: [] };
-        sortAssetsList(fg.items, window.paAssignedSort, true);
-        assignedByDept[fg.department].formulas.push(fg);
+        if (!fg.creator && fg.items.length > 0) fg.creator = fg.items[0].pa.creator;
+        // Split one formula across departments when items have different overrideDept
+        // (paste/move must not drag the whole sublist to one dept via find()).
+        let buckets = {};
+        fg.items.forEach(item => {
+            if (typeof window.dalPaNormalizeOverrideDept_ === 'function') window.dalPaNormalizeOverrideDept_(item.pa);
+            let fallbackDept = getDeptObj(item.asset.department).uid || 'Unassigned';
+            let dept = item.pa.overrideDept || getCreatorDept(item.pa.creator || fg.creator, fallbackDept);
+            if (!buckets[dept]) {
+                buckets[dept] = {
+                    location: fg.location,
+                    formula: fg.formula,
+                    items: [],
+                    isTemp: fg.isTemp,
+                    creator: fg.creator,
+                    department: dept,
+                    overrideDept: item.pa.overrideDept || ''
+                };
+            }
+            buckets[dept].items.push(item);
+            if (item.pa.overrideDept) buckets[dept].overrideDept = item.pa.overrideDept;
+        });
+        Object.keys(buckets).forEach(dept => {
+            let slice = buckets[dept];
+            if (!assignedByDept[dept]) assignedByDept[dept] = { formulas: [] };
+            sortAssetsList(slice.items, window.paAssignedSort, true);
+            assignedByDept[dept].formulas.push(slice);
+        });
     });
-
+    
     // Only departments that currently have assigned gear — no empty folders.
     let sortedDepts = Object.keys(assignedByDept).sort((a,b) => getDeptObj(a).name.localeCompare(getDeptObj(b).name));
 

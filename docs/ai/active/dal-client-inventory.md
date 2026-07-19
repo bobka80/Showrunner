@@ -147,7 +147,7 @@
 | `sm_fleet_cache` | `01a_Calendar_Core.html`, `06d_Admin_Fleet.html` |
 | `sm_phantom_payload` | `01a_Calendar_Core.html`, `01b_Calendar_Tasks.html`, `01e_Mobile_Crew_Hub.html`, `08_Conflict_Manager.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html`, `11h_Station_Project_Logic_2.html`, `11m_Station_Dock_Logic.html` |
 | `sm_tasks_notifs_cache` | `01b_Calendar_Tasks.html` |
-| `sm_pa_cache_` | `01h_Mobile_Assets.html` |
+| `sm_pa_cache_` | `01h_Mobile_Assets.html`, `02e1_Logic_State.html` |
 | `sm_lock_idle_min_` | `01i_Desktop_Lock.html` |
 | `sm_mobile_qr_pending` | `01j_Mobile_Scan.html` |
 | `sm_mobile_scan_reopen_panel` | `01j_Mobile_Scan.html` |
@@ -191,7 +191,7 @@
 | 02b_Project_Syntax.html | 0 | 0 |
 | 02c_Project_Operations.html | 5 | 0 |
 | 02d_Equipment_Render.html | 1 | 1 |
-| 02e1_Logic_State.html | 0 | 0 |
+| 02e1_Logic_State.html | 0 | 1 |
 | 02e2_Logic_CRUD.html | 0 | 0 |
 | 02e3_Logic_Clipboard.html | 0 | 0 |
 | 02e4_Logic_Containers.html | 0 | 0 |

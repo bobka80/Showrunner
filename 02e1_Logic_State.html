@@ -37,12 +37,61 @@ window.dalPaEnsureWorkingDept_ = function() {
     return window.paWorkingDept;
 };
 
+/** Normalize snake/camel override dept onto pa.overrideDept (load/cache/FS). */
+window.dalPaNormalizeOverrideDept_ = function(pa) {
+    if (!pa) return pa;
+    var d = pa.overrideDept != null && pa.overrideDept !== ''
+        ? pa.overrideDept
+        : (pa.override_dept != null ? pa.override_dept : '');
+    pa.overrideDept = d ? String(d) : '';
+    return pa;
+};
+
+window.dalPaNormalizeAssetsOverrideDept_ = function(arr) {
+    if (!arr || !arr.length) return arr;
+    for (var i = 0; i < arr.length; i++) window.dalPaNormalizeOverrideDept_(arr[i]);
+    return arr;
+};
+
 /** Stamp overrideDept for new inserts (working) or paste (selected). Keeps existing if already set and no forceDept. */
 window.dalPaStampOverrideDept_ = function(pa, forceDept) {
     if (!pa) return pa;
+    if (typeof window.dalPaNormalizeOverrideDept_ === 'function') window.dalPaNormalizeOverrideDept_(pa);
     var d = forceDept != null ? forceDept : (pa.overrideDept || window.dalPaEnsureWorkingDept_());
     if (d) pa.overrideDept = d;
     return pa;
+};
+
+/** Prefer live prep fixtures over stale local PA cache (overrideDept survives refresh). */
+window.dalPaPreferLiveFixturesOverCache_ = function(projectId, cachedCurrent) {
+    if (!(window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore')) return cachedCurrent || [];
+    var live = window.dalPaLastServerFixtures_;
+    if (!live || !live.length) return cachedCurrent || [];
+    if (typeof window.dalPaFixturesSig_ !== 'function') return JSON.parse(JSON.stringify(live));
+    var cacheSig = window.dalPaFixturesSig_(cachedCurrent || []);
+    var liveSig = window.dalPaFixturesSig_(live);
+    if (liveSig && liveSig !== cacheSig) return JSON.parse(JSON.stringify(live));
+    return cachedCurrent || [];
+};
+
+/** Write current PA list into client cache so reopen keeps overrideDept before next server round-trip. */
+window.dalPaUpdateLocalCache_ = function() {
+    try {
+        var projectId = document.getElementById('edit-folder-id')
+            ? document.getElementById('edit-folder-id').value
+            : '';
+        if (!projectId || projectId === 'NEW') return;
+        var sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+        var eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
+        var payload = {
+            sDate: sDate,
+            eDate: eDate,
+            current: JSON.parse(JSON.stringify(currentProjectAssets || [])),
+            overlapping: window.overlappingAllocations || {}
+        };
+        if (typeof window.dalCacheSetPa_ === 'function') window.dalCacheSetPa_(projectId, payload);
+        else localStorage.setItem('sm_pa_cache_' + projectId, JSON.stringify(payload));
+    } catch (eCache) { /* ignore */ }
 };
 
 window.setPaWorkingDept = function(deptUid) {

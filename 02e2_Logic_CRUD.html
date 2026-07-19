@@ -728,6 +728,7 @@ function updateFormulaDept(loc, form, newDept) {
             }
         }
     });
+    if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
     renderProjectAssetsUI();
 }
 

@@ -159,6 +159,45 @@ function verifyDatabaseSchema(readOnly = false) {
       projectAssetsSheet.appendRow(projectAssetsHeaders); 
       projectAssetsSheet.getRange(1, 1, 1, projectAssetsHeaders.length).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff"); projectAssetsSheet.setFrozenRows(1); 
   } else {
+      // Mid-header override_dept must INSERT a real column — append+relabel shifts container_uid into override_dept.
+      (function healPaOverrideDeptCol_() {
+        var lastCol = Math.max(projectAssetsSheet.getLastColumn(), 1);
+        var header = projectAssetsSheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) {
+          return h != null ? String(h).trim() : '';
+        });
+        var odIdx = header.indexOf('override_dept');
+        var creatorIdx = header.indexOf('creator');
+        var containerIdx = header.indexOf('container_uid');
+        if (odIdx === -1) {
+          if (creatorIdx >= 0) projectAssetsSheet.insertColumnAfter(creatorIdx + 1);
+          else projectAssetsSheet.insertColumnsAfter(projectAssetsSheet.getMaxColumns(), 1);
+          return;
+        }
+        if (containerIdx < 0) return;
+        var lastRow = projectAssetsSheet.getLastRow();
+        if (lastRow < 2) return;
+        var sampleN = Math.min(lastRow - 1, 40);
+        var containerVals = projectAssetsSheet.getRange(2, containerIdx + 1, sampleN, 1).getValues();
+        var odVals = projectAssetsSheet.getRange(2, odIdx + 1, sampleN, 1).getValues();
+        var scanLike = { Assigned: 1, Packed: 1, Staged: 1, 'Checked Out': 1, 'Checked In': 1, Missing: 1 };
+        var scanVotes = 0;
+        var odEmpty = 0;
+        var odLooksLikeContainer = 0;
+        for (var si = 0; si < sampleN; si++) {
+          var cv = containerVals[si][0] != null ? String(containerVals[si][0]).trim() : '';
+          var ov = odVals[si][0] != null ? String(odVals[si][0]).trim() : '';
+          if (cv && scanLike[cv]) scanVotes++;
+          if (!ov) odEmpty++;
+          else if (ov.indexOf('|||') >= 0) odLooksLikeContainer++;
+        }
+        // Only auto-shift when container_uid clearly holds scan statuses AND override_dept
+        // still looks like old container data (or is empty) — never when override already has dept uids.
+        var shifted = scanVotes >= Math.max(2, Math.ceil(sampleN * 0.25));
+        var safeToInsert = (odEmpty + odLooksLikeContainer) >= Math.ceil(sampleN * 0.8);
+        if (shifted && safeToInsert) {
+          projectAssetsSheet.insertColumnBefore(odIdx + 1);
+        }
+      })();
       if (projectAssetsSheet.getMaxColumns() < projectAssetsHeaders.length) projectAssetsSheet.insertColumnsAfter(projectAssetsSheet.getMaxColumns(), projectAssetsHeaders.length - projectAssetsSheet.getMaxColumns());
       projectAssetsSheet.getRange(1, 1, 1, projectAssetsHeaders.length).setValues([projectAssetsHeaders]).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
   }

@@ -687,6 +687,9 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   window.dalPaApplyingRemote = true;
   try {
     currentProjectAssets = JSON.parse(JSON.stringify(mergedFixtures));
+    if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
+      window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
+    }
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
 
     if (forceApply || !hasTouches) {
@@ -748,6 +751,7 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
       }
       if (typeof evaluatePackingReadiness === 'function') evaluatePackingReadiness(true);
     }
+    if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
   } finally {
     window.dalPaApplyingRemote = false;
   }

@@ -338,6 +338,7 @@ window.pasteClipboardPa = function() {
     window.selectedSummedIds.clear();
     if (window.selectedPaGroups) window.selectedPaGroups.clear();
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
+    if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
     renderProjectAssetsUI();
     } catch(err) { console.error("pasteClipboardPa Error:", err); alert("Error pasting items: " + err.message); }
 }
