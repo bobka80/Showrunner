@@ -541,7 +541,7 @@ Hard-refresh **two browsers** on web.app (banner must say **live sync (patch)**)
 5. START PREP again on A → B gets a **new** banner.  
 6. Optional: timeline collab both sides stays independent of prep.
 
-**AI rule:** Before editing these files, re-read this section + § prep PA fork live sync + campaign **floor scope**. Prefer one root-cause ship. Prep live rollback: **GAS v654** + `host-boot.js?v=653`.
+**AI rule:** Before editing these files, re-read this section + § prep PA fork live sync + campaign **floor scope**. Prefer one root-cause ship. Prep live rollback: **GAS v654** + `host-boot.js?v=653`. **Part A industrial harden complete** @ v679 exit note (tip may be newer); do not start Part B until middle campaign + director OK.
 
 ---
 ## DAL timeline fork live sync (collab strips)

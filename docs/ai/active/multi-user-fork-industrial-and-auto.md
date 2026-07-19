@@ -7,7 +7,7 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Active** — **A6/H2 done**; next **A7 Part A exit**. Prior: **A0 + H1 + H5 + Gap 1 + H4 + H3**.  
+**Opened:** 2026-07-18 · **Status:** **Part A complete** @ GAS **v678** (exit wrap). **Next:** middle campaign (director names) → then Part B auto fork. Rollback pin still **v654** / `host-boot.js?v=653`.  
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
 **Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
@@ -192,12 +192,14 @@ Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync
 
 ### A7 — Part A exit
 
-- [ ] Director smoke (two browsers, prep **and** timeline) + ≥1 adversarial step  
-- [ ] Mutation-inventory gate green; sim cases all have scope comments  
-- [ ] Update FRAGILE + this file status: **Part A complete — OK for Part B**  
-- [ ] Milestone note names which **rules** closed: `Part A industrial harden complete — try baseline for auto fork`
+- [x] Director smoke (two browsers, prep **and** timeline) + ≥1 adversarial step — **director wrap 2026-07-19** (“looks good” / “it’s a wrap”)  
+- [x] Mutation-inventory gate green; sim cases all have scope comments (Cases A–V in pre-ship)  
+- [x] Update FRAGILE + this file status: **Part A complete** — middle campaign before Part B  
+- [x] Milestone note names which **rules** closed: `Part A industrial harden complete — try baseline for auto fork`
 
 **Part A ship rule:** Prefer **one H-item per milestone** (or tightly paired H1+H5). Gap 1 is a **lint** and may ship in its own milestone after A0. No “misc live sync guards” ships.
+
+**Part A closed rules (H0–H5 + Gap 1):** fail-closed weak sync; mutation inventory; Firestore/GAS mode lint; state size + END mirror; conflict visibility (roster/hover, no toast spam); cheaper remote apply (qty/shift patch).
 
 ---
 
@@ -312,6 +314,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **A6 / H2 shipped:** PA qty-only patch + timeline shift-only DOM patch; Case V; pass bar max(3,5%) / ≤5 entities. **Next: A7 Part A exit.** |
 | 2026-07-19 | **H2 follow-up:** qty patch also updates +/- control span (`data-pa-qty`); fixes peer “one step behind” on multi-qty bumps. |
 | 2026-07-19 | **Conflict UX:** no toast / no auto-expand; compact SYNC roster + hover peer → ops popover. Working dept: white label/frame, select border = dept color, white rails +1px. |
+| 2026-07-19 | **A7 / Part A exit:** director wrap — Part A industrial harden complete. Next = middle campaign (not Part B yet). |
 
 ---
 
