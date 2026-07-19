@@ -307,6 +307,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **H3 toast visible:** local-vs-remote peer-delete detect; `showPushToast` + prep SYNC strip; formula dept arms 60s watch. |
 | 2026-07-19 | **Twin General DEL:** dept-scoped `removeFormulaGroup` / `updateFormulaDept`; cut→green-dept unique loc (like copy). Normal unique lists unchanged. |
 | 2026-07-19 | **Conflict toast visible:** in-PA-modal banner + `SHOWRUNNER_HOST_TOAST`; peer-delete toasts any known remote remove (not only recent-edit). |
+| 2026-07-19 | **Conflict toast UX:** centered mid-screen toast (not host-only); toast + roster note both name what was removed/overwritten. |
 
 ---
 

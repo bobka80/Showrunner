@@ -71,34 +71,79 @@ window.dalPaArmLwwWatch_ = function(uids, ttlMs) {
   window.dalPaMarkRecentEdit_(uids, ttlMs);
 };
 
+window.dalPaDescribePaUids_ = function(uids, localFixtures) {
+  uids = uids || [];
+  var by = {};
+  (localFixtures || []).forEach(function(pa) {
+    if (pa && pa.uid) by[String(pa.uid)] = pa;
+  });
+  if (!Object.keys(by).length && typeof currentProjectAssets !== 'undefined') {
+    (currentProjectAssets || []).forEach(function(pa) {
+      if (pa && pa.uid) by[String(pa.uid)] = pa;
+    });
+  }
+  var labels = [];
+  uids.forEach(function(uid) {
+    var pa = by[String(uid)];
+    if (!pa) return;
+    var name = '';
+    try {
+      if (typeof globalAssets !== 'undefined' && globalAssets && pa.assetId) {
+        var asset = globalAssets.find(function(a) { return a && a.id === pa.assetId; });
+        if (asset && asset.name) name = String(asset.name);
+      }
+    } catch (eA) { /* ignore */ }
+    if (!name) name = String(pa.assetId || 'item');
+    var qty = pa.qty != null ? pa.qty : 1;
+    var loc = pa.location || 'General';
+    labels.push(qty + '× ' + name + ' (' + loc + ')');
+  });
+  if (!labels.length) return '';
+  if (labels.length <= 3) return labels.join(', ');
+  return labels.slice(0, 3).join(', ') + ' +' + (labels.length - 3) + ' more';
+};
+
 window.dalPaShowConflictToast_ = function(title, body) {
   title = String(title || 'Conflict');
   body = String(body || '');
-  // Retire the old dual in-modal banner if a prior build left it open.
+  var holdMs = 7000;
+  // Always show one centered toast in the PA modal / page (do not rely on host alone).
   try {
     var oldBan = document.getElementById('dal-pa-conflict-banner');
     if (oldBan) oldBan.style.display = 'none';
-  } catch (eOld) { /* ignore */ }
-  // One expiring toast only (host shell when available — sits above PA modal).
-  // Conflict cues stay ~2s longer than normal push toasts (7s).
-  var holdMs = 7000;
-  try {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({
-        type: 'SHOWRUNNER_HOST_TOAST',
-        title: title,
-        body: body,
-        durationMs: holdMs
-      }, '*');
-      return;
+    var overlay = document.getElementById('project-assets-modal-overlay');
+    var mount = document.body;
+    if (overlay && overlay.style.display && overlay.style.display !== 'none') mount = overlay;
+    var el = document.getElementById('dal-pa-center-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'dal-pa-center-toast';
+      el.setAttribute('role', 'status');
+      mount.appendChild(el);
+    } else if (el.parentNode !== mount) {
+      mount.appendChild(el);
     }
-  } catch (eHost) { /* fall through */ }
-  try {
-    var c = document.getElementById('push-toast-container');
-    if (c) c.style.zIndex = '2147483646';
-    if (typeof showPushToast === 'function') showPushToast(title, body, holdMs);
-    else if (typeof window.showMobilePaToast === 'function') window.showMobilePaToast(title, body);
-  } catch (eT) { /* ignore */ }
+    el.style.cssText = [
+      'position:fixed', 'left:50%', 'top:50%', 'transform:translate(-50%,-50%)',
+      'z-index:2147483646', 'max-width:min(440px,90vw)', 'width:max-content',
+      'background:#18181b', 'border:2px solid #f43f5e', 'border-radius:12px',
+      'padding:14px 18px', 'box-shadow:0 16px 40px rgba(0,0,0,0.7)',
+      'pointer-events:none', 'text-align:center'
+    ].join(';');
+    el.innerHTML =
+      '<div style="font-size:11px;font-weight:900;letter-spacing:0.08em;color:#f43f5e;margin-bottom:6px;">SHOWRUNNER</div>' +
+      '<div style="font-size:15px;font-weight:800;color:#fff;line-height:1.3;">' + title.replace(/</g, '&lt;') + '</div>' +
+      (body
+        ? ('<div style="font-size:12px;color:#a1a1aa;margin-top:8px;line-height:1.45;text-align:left;">' + body.replace(/</g, '&lt;') + '</div>')
+        : '');
+    el.style.display = 'block';
+    clearTimeout(window.dalPaCenterToastTimer_);
+    window.dalPaCenterToastTimer_ = setTimeout(function() {
+      var t = document.getElementById('dal-pa-center-toast');
+      if (t) t.style.display = 'none';
+    }, holdMs);
+  } catch (eC) { /* ignore */ }
+  // Do not also ping host toast — one mid-screen toast only (avoids dual top+center).
 };
 
 /** Sticky per-person note in the live-sync roster (stays until replaced / prep ends). */
@@ -121,7 +166,7 @@ window.dalPaClearPeerRosterNotes_ = function() {
   window.dalPaPeerRosterNotes_ = {};
 };
 
-window.dalPaNotifyConflict_ = function(overwritten, deleted, actorOpt) {
+window.dalPaNotifyConflict_ = function(overwritten, deleted, actorOpt, detailText) {
   overwritten = overwritten || [];
   deleted = deleted || [];
   var all = overwritten.concat(deleted);
@@ -137,26 +182,30 @@ window.dalPaNotifyConflict_ = function(overwritten, deleted, actorOpt) {
   var actor = String(actorOpt || window.dalPaLastRemoteActor_ || '').trim() || 'Another editor';
   if (me && actor === me) return; // own echo / self — no peer cue
 
+  detailText = String(detailText || '').trim();
   var title = 'Live conflict';
   var body;
   var rosterText;
   if (deleted.length && !overwritten.length) {
     body = deleted.length === 1
-      ? 'Another editor removed an item from the live list.'
-      : ('Another editor removed ' + deleted.length + ' items from the live list.');
+      ? (actor + ' removed an item from the live list.')
+      : (actor + ' removed ' + deleted.length + ' items from the live list.');
+    if (detailText) body += ' ' + detailText;
     rosterText = deleted.length === 1
-      ? 'removed an item from your list'
-      : ('removed ' + deleted.length + ' items from your list');
+      ? ('removed: ' + (detailText || '1 item'))
+      : ('removed ' + deleted.length + ': ' + (detailText || 'items'));
   } else if (overwritten.length && !deleted.length) {
     body = overwritten.length === 1
-      ? 'Another editor overwrote your equipment change on this item.'
-      : ('Another editor overwrote your equipment changes (' + overwritten.length + ' items).');
+      ? (actor + ' overwrote your equipment change.')
+      : (actor + ' overwrote your equipment changes (' + overwritten.length + ').');
+    if (detailText) body += ' ' + detailText;
     rosterText = overwritten.length === 1
-      ? 'overwrote your change on an item'
-      : ('overwrote your changes (' + overwritten.length + ' items)');
+      ? ('overwrote: ' + (detailText || '1 item'))
+      : ('overwrote ' + overwritten.length + ': ' + (detailText || 'items'));
   } else {
-    body = 'Another editor changed or removed items on the live list (' + all.length + ').';
-    rosterText = 'changed or removed items (' + all.length + ')';
+    body = actor + ' changed or removed items (' + all.length + ').';
+    if (detailText) body += ' ' + detailText;
+    rosterText = 'changed/removed: ' + (detailText || (all.length + ' items'));
   }
 
   if (typeof window.dalPaSetPeerRosterNote_ === 'function') {
@@ -180,6 +229,7 @@ window.dalPaNotifyPeerDeletesVsLocal_ = function(remoteFixtures, localFixtures) 
     }))
     : {};
   var gone = [];
+  var gonePas = [];
   (localFixtures || []).forEach(function(pa) {
     if (!pa || !pa.uid || window.dalPaIsAutoRow_(pa)) return;
     var uid = String(pa.uid);
@@ -191,8 +241,13 @@ window.dalPaNotifyPeerDeletesVsLocal_ = function(remoteFixtures, localFixtures) 
       (Number(pa.writeSeq || 0) || 0) > 0;
     if (!known) return; // pending local insert — not a peer delete
     gone.push(uid);
+    gonePas.push(pa);
   });
-  if (gone.length) window.dalPaNotifyConflict_([], gone);
+  if (!gone.length) return;
+  var detail = typeof window.dalPaDescribePaUids_ === 'function'
+    ? window.dalPaDescribePaUids_(gone, gonePas)
+    : '';
+  window.dalPaNotifyConflict_([], gone, null, detail);
 };
 
 window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
@@ -248,7 +303,11 @@ window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
     if (fieldProtected[uid]) return;
     if (window.dalPaNonCombiningSig_(remote) !== w.sig) overwritten.push(uid);
   });
-  window.dalPaNotifyConflict_(overwritten, deleted);
+  var detailUids = overwritten.concat(deleted);
+  var detail = (detailUids.length && typeof window.dalPaDescribePaUids_ === 'function')
+    ? window.dalPaDescribePaUids_(detailUids, typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : [])
+    : '';
+  window.dalPaNotifyConflict_(overwritten, deleted, null, detail);
 };
 
 /** H4 — keep aligned with scripts/lib/dal-state-size-mirror-core.js / Dal_Firebase.js */
