@@ -3137,6 +3137,10 @@
 
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
+    if (ev.data.type === 'SHOWRUNNER_HOST_TOAST') {
+      showHostPushToast(ev.data.title || 'Showrunner', ev.data.body || '');
+      return;
+    }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_AUTH') {
       try {
         console.log('[DAL FS host] AUTH from', ev.origin || '?', 'source=', !!(ev.source), 'frames=', (frame && frame.contentWindow) ? frame.contentWindow.length : -1);
