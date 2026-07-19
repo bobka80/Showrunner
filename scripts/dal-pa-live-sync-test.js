@@ -151,6 +151,25 @@ assert(!core.shouldApplyDuringFlushGuard({
   lastSeq: 6
 }), 'fixed: older seq still dropped');
 
+// Case M: held merge must not ack remote sig (forgotten-until-refresh class).
+// Does NOT cover: UI render skip; host delivery.
+console.log('\n--- Case M: do not ack remote sig when merge kept local ---');
+assert(!core.shouldAckRemoteSigAfterMerge({
+  remoteSig: 'peer-u1=5',
+  localSig: 'local-u1=1',
+  mergedSig: 'local-u1=1'
+}), 'held peer edit: do not ack');
+assert(core.shouldAckRemoteSigAfterMerge({
+  remoteSig: 'same',
+  localSig: 'same',
+  mergedSig: 'same'
+}), 'identical: ack ok');
+assert(core.shouldAckRemoteSigAfterMerge({
+  remoteSig: 'peer',
+  localSig: 'old',
+  mergedSig: 'peer'
+}), 'merged applied peer: ack ok');
+
 console.log('\n--- Unit: patchMergeFixtures only applies touches ---');
 var merged = core.patchMergeFixtures(
   [{ uid: 'u1', qty: 5 }, { uid: 'u2', qty: 1 }],
@@ -183,5 +202,5 @@ if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–L + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–M + units)');
 process.exit(0);

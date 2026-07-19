@@ -681,6 +681,19 @@ module.exports = {
     if (remoteSeq && lastSeq && remoteSeq < lastSeq) return false;
     return true;
   },
+  /**
+   * Case M: peer snap while local hold keeps row — must NOT ack lastRemoteSig
+   * (that permanently forgets the peer edit until refresh).
+   */
+  shouldAckRemoteSigAfterMerge: function(opts) {
+    opts = opts || {};
+    var remoteSig = String(opts.remoteSig || '');
+    var localSig = String(opts.localSig || '');
+    var mergedSig = String(opts.mergedSig || '');
+    // merged equals local but remote differs → held peer edit; do not ack
+    if (mergedSig === localSig && remoteSig !== localSig) return false;
+    return true;
+  },
   /** After END, refuse reopen for the same sessionUid. */
   shouldAllowRemotePrepOpen: function(opts) {
     opts = opts || {};

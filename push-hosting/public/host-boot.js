@@ -2906,6 +2906,18 @@
           var updatedAt = new Date().toISOString();
           var writeSeq = prevSeq + 1;
           var clientId = meta.clientId || '';
+          // Stamp per-fixture writeSeq/clientId on touched rows so peers can heal
+          // without relying on doc-level apply alone.
+          var touchedMap = mutations.touched || {};
+          merged = (merged || []).map(function(pa) {
+            if (!pa || !pa.uid) return pa;
+            if (!touchedMap[String(pa.uid)]) return pa;
+            var o = {};
+            Object.keys(pa).forEach(function(k) { o[k] = pa[k]; });
+            o.writeSeq = writeSeq;
+            o.clientId = clientId;
+            return o;
+          });
           var payload = {
             fixturesJson: JSON.stringify(merged),
             updatedAt: updatedAt,

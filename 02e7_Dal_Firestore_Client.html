@@ -446,6 +446,7 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty, snapMeta) {
   snapMeta = snapMeta || {};
   if (!window.dalPrepUiOpen) return;
   if (fromCacheEmpty) return;
+  // Metadata-only / local-pending snap — wait for the next server snap (do not requeue loop).
   if (snapMeta.hasPendingWrites) return;
   if (snapMeta.fromCache && window.dalPaSeenServerSnap_) return;
   if (!snapMeta.fromCache) window.dalPaSeenServerSnap_ = true;
@@ -490,12 +491,20 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
     return;
   }
   if (!window.dalPrepUiOpen) return;
-  if (window.dalPaAnyHoldActive_()) {
-    window.dalPaRequeueRemoteApply_(assets, snapMeta, 350);
-    return;
-  }
+  // Do NOT block the whole apply on anyHoldActive — per-UID hold/touch in the merge
+  // already protects local rows. Global gating delayed peer snaps until they were
+  // false-acked (lastRemoteSig) and then forgotten until refresh.
 
   var serverAssets = JSON.parse(JSON.stringify(assets || []));
+  // State-doc authority: fixtures may lack per-row writeSeq (older writes). Stamp the
+  // doc writeSeq so unstamped rows still lose to a newer doc (heal missed applies).
+  var docSeq = Number(snapMeta.docWriteSeq || 0) || 0;
+  if (docSeq) {
+    serverAssets.forEach(function(pa) {
+      if (!pa) return;
+      if (!Number(pa.writeSeq || 0)) pa.writeSeq = docSeq;
+    });
+  }
   window.dalProcessPaFormulas_(serverAssets, { skipExplode: true });
   serverAssets = serverAssets.filter(function(pa) {
     return !(pa && pa.uid && window.dalPaIsRecentlyDeleted_(String(pa.uid)));
@@ -503,9 +512,7 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
 
   var fixtureSig = window.dalPaFixturesSig_(serverAssets);
   if (fixtureSig === window.dalPaLastRemoteSig) return;
-  // After local flush: drop only strictly older state docs. Do NOT compare fixture
-  // signatures here — lastDocWriteSeq is bumped when the snap arrives (before apply),
-  // so a peer write at the new seq looks "equal" and was wrongly discarded (missed updates).
+  // After local flush: drop only strictly older state docs.
   if (window.dalPaFlushGuardUntil_ && Date.now() < window.dalPaFlushGuardUntil_) {
     var remoteSeq = Number(snapMeta.docWriteSeq || 0) || 0;
     var lastSeq = Number(window.dalPaLastDocWriteSeq_ || 0) || 0;
@@ -522,6 +529,14 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   var localFixSig = window.dalPaFixturesSig_(localFixtures);
 
   if (mergedFixSig === localFixSig) {
+    // Remote differs but merge kept locals (holds/touches). NEVER ack lastRemoteSig —
+    // that made the peer edit "forgotten" until hard refresh.
+    if (fixtureSig !== localFixSig) {
+      window.dalPaRemotePending = true;
+      window.dalUpdateRemotePendingBanner_();
+      window.dalPaRequeueRemoteApply_(assets, snapMeta, 450);
+      return;
+    }
     window.dalPaLastRemoteSig = fixtureSig;
     window.dalPaRemotePending = !!hasTouches;
     window.dalUpdateRemotePendingBanner_();
@@ -989,6 +1004,7 @@ window.dalPaSeedStateFromLocal_ = function() {
 window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   snapMeta = snapMeta || {};
   if (!window.dalPrepUiOpen) return;
+  // Wait for server snap (hasPendingWrites false) — Firestore fires again.
   if (snapMeta.hasPendingWrites) return;
   if (snapMeta.fromCache && window.dalPaSeenServerSnap_) return;
   if (!snapMeta.fromCache) window.dalPaSeenServerSnap_ = true;
@@ -1535,10 +1551,18 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
             if (localMap[id]) out[id] = localMap[id];
             else delete out[id];
           });
-          var merged = Object.keys(out).map(function(k) { return out[k]; });
-          var updatedAt = new Date().toISOString();
           var writeSeq = prevSeq + 1;
           var clientId = window.dalPaClientId || '';
+          Object.keys(touched).forEach(function(id) {
+            if (!out[id]) return;
+            var stamped = {};
+            Object.keys(out[id]).forEach(function(k) { stamped[k] = out[id][k]; });
+            stamped.writeSeq = writeSeq;
+            stamped.clientId = clientId;
+            out[id] = stamped;
+          });
+          var merged = Object.keys(out).map(function(k) { return out[k]; });
+          var updatedAt = new Date().toISOString();
           tx.set(ref, {
             fixturesJson: JSON.stringify(merged),
             updatedAt: updatedAt,

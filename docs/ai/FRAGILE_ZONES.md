@@ -642,7 +642,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | Concern | Rule |
 |---------|------|
 | Write | **Touch-only fixtures** — `dalPaNoteTouch_` / `dalPaNoteDelete_` then flush those UIDs only. Stamp `writeSeq`+`clientId` on host. Never live-write autos. |
-| Apply | Coalesce ~300ms; **re-queue** (never drop) if hold / flush-in-flight / ignore window. FlushGuard drops only **older** `writeSeq` — never drop peer snaps on fixture-sig mismatch. |
+| Apply | Coalesce ~300ms; re-queue if flush-in-flight / ignore / pending-writes. **Never ack `lastRemoteSig` when merge kept locals but remote differs** (forgotten-until-refresh). Per-UID hold only — no global anyHold gate. Stamp doc writeSeq onto unstamped fixture rows. |
 | Loop break | Never flush from apply. Render-end flush only when touches pending. |
 | Load race | During prep+firestore: ongoing snaps must not apply unstamped GAS lists. **Exception:** if local PA is still empty (join mid-fork / no `assets/state` yet), one-shot hydrate from `getProjectAssets` then `dalPaSeedStateFromLocal_` **once**. Never re-seed after remote `writeSeq > 0`. Never apply empty state over an unloaded UI. |
 | Delete | Every UI remove path notes `dalPaNoteDelete_(uid)` before render/flush. Absence on remote state = gone (unless hold). |
