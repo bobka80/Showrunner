@@ -687,6 +687,7 @@ window.dalPaRemoteRenderStats_ = window.dalPaRemoteRenderStats_ || { patchQty: 0
 
 /**
  * Patch assigned-row qty cells in place (H2). Returns false → caller must full-render.
+ * Must update EVERY qty surface on the row (column + +/- control), or peers look one step behind.
  */
 window.dalPaPatchQtyDom_ = function(uids, fixturesByUid) {
   uids = uids || [];
@@ -697,12 +698,16 @@ window.dalPaPatchQtyDom_ = function(uids, fixturesByUid) {
     var uid = String(uids[i]);
     var pa = fixturesByUid[uid];
     if (!pa) return false;
-    var row = document.querySelector('.asset-row[data-pa-uid="' + uid.replace(/"/g, '') + '"]');
+    var safeUid = uid.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    var row = document.querySelector('.asset-row[data-pa-uid="' + safeUid + '"]');
     if (!row) return false;
-    var qtyEl = row.querySelector('[data-pa-qty]');
-    if (!qtyEl) return false;
+    var qtyEls = row.querySelectorAll('[data-pa-qty]');
+    if (!qtyEls || !qtyEls.length) return false;
     var qty = pa.qty != null ? pa.qty : 1;
-    qtyEl.textContent = String(qty);
+    var qtyText = String(qty);
+    for (var q = 0; q < qtyEls.length; q++) {
+      qtyEls[q].textContent = qtyText;
+    }
     patched++;
   }
   return patched === uids.length;

@@ -431,7 +431,7 @@ function renderProjectAssetsUI() {
                                 html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
                                             ${autoBadge}
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${paIndex}', -1)">-</button>
-                                            <span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${displayQty}</span>
+                                            <span data-pa-qty="1" style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${displayQty}</span>
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${paIndex}', 1)">+</button>
                                             <button class="btn-delete btn-sm" style="margin:0; padding:2px 6px !important; font-weight:bold; margin-left:4px;" onclick="event.stopPropagation(); removePa(${paIndex})">DEL</button>
                                          </div>`;

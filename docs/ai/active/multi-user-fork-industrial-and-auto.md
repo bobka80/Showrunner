@@ -310,6 +310,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **Conflict toast visible:** in-PA-modal banner + `SHOWRUNNER_HOST_TOAST`; peer-delete toasts any known remote remove (not only recent-edit). |
 | 2026-07-19 | **Conflict toast UX:** centered mid-screen toast (not host-only); toast + roster note both name what was removed/overwritten. |
 | 2026-07-19 | **A6 / H2 shipped:** PA qty-only patch + timeline shift-only DOM patch; Case V; pass bar max(3,5%) / ≤5 entities. **Next: A7 Part A exit.** |
+| 2026-07-19 | **H2 follow-up:** qty patch also updates +/- control span (`data-pa-qty`); fixes peer “one step behind” on multi-qty bumps. |
 
 ---
 
