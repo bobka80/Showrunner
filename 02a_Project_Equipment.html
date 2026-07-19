@@ -360,12 +360,41 @@ function openProjectAssetsModal() {
         } catch(e) {}
 
         if (!isCachedRendered) {
-            document.getElementById('pa-view-logistics').innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Loading Assigned Gear...</div>';
+            // Live fork: never leave "Loading…" if memory already has THIS project's fixtures.
+            if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore' &&
+                window.paLoadedForProject === projectId &&
+                currentProjectAssets && currentProjectAssets.length > 0) {
+                try {
+                    if (typeof window.togglePaMode === 'function') window.togglePaMode('design');
+                    else if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+                    if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
+                    isCachedRendered = true;
+                } catch (eLive0) { /* fall through to Loading */ }
+            }
+            if (!isCachedRendered) {
+                document.getElementById('pa-view-logistics').innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Loading Assigned Gear...</div>';
+            }
         }
 
         google.script.run
         .withFailureHandler(err => {
             document.getElementById('pa-assigned-list').innerHTML = `<div style="padding:20px; text-align:center; color:#ef4444; font-weight:bold;">Error Loading Assignments:<br>${err.message}</div>`;
+            // Live fork: still paint THIS project's memory / last server snap so the modal is not stuck.
+            if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore') {
+                try {
+                    if (window.paLoadedForProject === projectId && currentProjectAssets && currentProjectAssets.length &&
+                        typeof renderProjectAssetsUI === 'function') {
+                        renderProjectAssetsUI();
+                    } else if (window.dalPaLastServerFixtures_ && window.dalPaLastServerFixtures_.length &&
+                               typeof window.dalApplyRemotePaAssetsNow_ === 'function') {
+                        window.dalApplyRemotePaAssetsNow_(window.dalPaLastServerFixtures_, {
+                            docWriteSeq: window.dalPaLastServerWriteSeq_ || 0,
+                            forceApply: true
+                        });
+                        window.paLoadedForProject = projectId;
+                    }
+                } catch (eFail) { /* ignore */ }
+            }
         })
         .withSuccessHandler(res => {
             // Live prep: state-doc listen is authoritative for ongoing edits.
@@ -376,8 +405,51 @@ function openProjectAssetsModal() {
                 window.overlappingAllocations = res.overlapping || window.overlappingAllocations || {};
                 var localEmpty = !currentProjectAssets || currentProjectAssets.length === 0;
                 var remoteHas = res && res.current && res.current.length > 0;
-                if (!(localEmpty && remoteHas)) return;
-                // fall through to hydrate below
+                var memoryForThisProject = !localEmpty && window.paLoadedForProject === projectId;
+                if (localEmpty && remoteHas) {
+                    // fall through to one-shot Sheets hydrate
+                } else {
+                    // Sheets is not live SSOT — never leave "Loading Assigned Gear…" stuck.
+                    try {
+                        if (memoryForThisProject) {
+                            if (typeof window.togglePaMode === 'function') window.togglePaMode('design');
+                            else if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+                        } else if (localEmpty && window.dalPaLastServerFixtures_ && window.dalPaLastServerFixtures_.length &&
+                                   typeof window.dalApplyRemotePaAssetsNow_ === 'function') {
+                            window.dalApplyRemotePaAssetsNow_(window.dalPaLastServerFixtures_, {
+                                docWriteSeq: window.dalPaLastServerWriteSeq_ || 0,
+                                forceApply: true
+                            });
+                            window.paLoadedForProject = projectId;
+                        } else if (!localEmpty && window.paLoadedForProject !== projectId) {
+                            // Memory is another project — do not paint it into this modal.
+                            currentProjectAssets = [];
+                            window.originalProjectAssets = [];
+                            if (remoteHas) {
+                                currentProjectAssets = res.current || [];
+                                window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                                // processFormulas + render happen below via shared tail — jump by not returning early after hydrate copy
+                            } else {
+                                var logisticsEl = document.getElementById('pa-view-logistics');
+                                if (logisticsEl) {
+                                    logisticsEl.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Syncing live prep…</div>';
+                                }
+                                if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
+                                return;
+                            }
+                        } else {
+                            var logisticsEl2 = document.getElementById('pa-view-logistics');
+                            if (logisticsEl2) {
+                                logisticsEl2.innerHTML = '<div style="padding:20px; text-align:center; color:#888;">Syncing live prep…</div>';
+                            }
+                            if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
+                            return;
+                        }
+                        if (typeof window.evalOperationButtons === 'function') window.evalOperationButtons();
+                    } catch (eLive1) { /* ignore */ }
+                    if (!( !localEmpty && window.paLoadedForProject !== projectId && remoteHas )) return;
+                    // Wrong-project + Sheets has rows: fall through to full hydrate path below
+                }
             }
             currentProjectAssets = res.current || [];
             window.overlappingAllocations = res.overlapping || window.overlappingAllocations || {};

@@ -841,11 +841,20 @@ window.updateLocationName = function(oldLoc, form, newLoc) {
 };
 
 window.toggleGroupShortage = function(loc, form, isShort) {
+    isShort = !!isShort;
     currentProjectAssets.forEach(pa => {
         let pLoc = pa.location || "General";
         let pForm = pa.formula || "Standalone";
+        // Live/Sheets may still carry a leftover [SHORT] prefix on formula identity.
+        if (typeof pForm === 'string' && pForm.indexOf('[SHORT] ') === 0) {
+            pForm = pForm.substring(8);
+            pa.formula = pForm;
+        }
         if (pLoc === loc && pForm === form) {
             pa.isShortage = isShort;
+            if (typeof pa.formula === 'string' && pa.formula.indexOf('[SHORT] ') === 0) {
+                pa.formula = pa.formula.substring(8);
+            }
             if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
                 window.dalPaNoteTouch_(pa.uid);
             }

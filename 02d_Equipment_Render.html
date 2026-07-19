@@ -874,7 +874,7 @@ function renderProjectAssetsUI() {
                 }
                 btnHtml = `
                     <label style="display:flex; align-items:center; gap:4px; margin-right:12px; margin-left:8px; color:#ef4444; font-size:10px; font-weight:bold; cursor:pointer;" title="External Subrent: Does not draw from Warehouse Vault">
-                        <input type="checkbox" ${isShortageGrp ? 'checked' : ''} onchange="toggleGroupShortage('${jsSafeLoc}', '${jsSafeForm}', this.checked)" style="margin:0; width:14px; height:14px; accent-color:#ef4444;"> SUBRENT
+                        <input type="checkbox" ${isShortageGrp ? 'checked' : ''} onclick="event.stopPropagation();" onchange="event.stopPropagation(); toggleGroupShortage('${jsSafeLoc}', '${jsSafeForm}', this.checked)" style="margin:0; width:14px; height:14px; accent-color:#ef4444;"> SUBRENT
                     </label>
                     <select onchange="updateFormulaDept('${jsSafeLoc}', '${jsSafeForm}', this.value)" onclick="event.stopPropagation();" style="width:100px; padding:2px; height:22px; font-size:10px; background:#111; color:#a1a1aa; border:1px solid #333; margin-right:5px; border-radius:4px; outline:none;">
                         ${deptOpts}

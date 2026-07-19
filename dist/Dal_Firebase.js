@@ -137,12 +137,16 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
       var allRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
       var fixtures = (allRows || []).map(function (r) {
         var obj = dalPaSheetRowToObject_(r.data, hdr.map);
+        var formula = obj.formula || '';
+        var isShortage = String(formula).indexOf('[SHORT] ') === 0;
+        if (isShortage) formula = formula.substring(8);
         return {
           uid: String(obj.uid || r.docId || ''),
           assetId: String(obj.asset_uid || ''),
           qty: obj.assigned_quantity != null ? obj.assigned_quantity : 1,
           location: obj.location || 'General',
-          formula: obj.formula || '',
+          formula: formula,
+          isShortage: isShortage,
           creator: obj.creator || 'System',
           containerUid: obj.container_uid || '',
           scanStatus: obj.scan_status || 'Assigned'
@@ -177,12 +181,16 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
     var obj = dalPaSheetRowToObject_(r.data, hdr.map);
     var docId = String(obj.uid || Utilities.getUuid());
     firestoreWriteDocument_(basePath + '/' + docId, obj);
+    var formula = obj.formula || '';
+    var isShortage = String(formula).indexOf('[SHORT] ') === 0;
+    if (isShortage) formula = formula.substring(8);
     fixtures.push({
       uid: docId,
       assetId: String(obj.asset_uid || ''),
       qty: obj.assigned_quantity != null ? obj.assigned_quantity : 1,
       location: obj.location || 'General',
-      formula: obj.formula || '',
+      formula: formula,
+      isShortage: isShortage,
       creator: obj.creator || 'System',
       containerUid: obj.container_uid || '',
       scanStatus: obj.scan_status || 'Assigned'

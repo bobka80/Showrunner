@@ -187,10 +187,13 @@ window.dalProcessPaFormulas_ = function(arr, opts) {
   arr.forEach(function(pa) {
     if (pa.formula === 'Manual') pa.formula = 'Standalone';
     if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
+    // Prefer explicit isShortage boolean (live state doc). [SHORT] prefix is Sheets/col encoding.
+    var explicitOff = (pa.isShortage === false || pa.isShortage === 'false');
+    var explicitOn = (pa.isShortage === true || pa.isShortage === 'true');
     if (pa.formula && pa.formula.indexOf('[SHORT] ') === 0) {
-      pa.isShortage = true;
       pa.formula = pa.formula.substring(8);
-    } else if (pa.isShortage === true || pa.isShortage === 'true') {
+      pa.isShortage = explicitOff ? false : true;
+    } else if (explicitOn) {
       pa.isShortage = true;
     } else {
       pa.isShortage = false;

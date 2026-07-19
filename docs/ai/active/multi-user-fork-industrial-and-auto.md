@@ -8,7 +8,7 @@
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
 **Opened:** 2026-07-18 · **Status:** **A0 complete** · **H1 shipped** · **H5 shipped** (PA + timeline mutation inventory). Next: **Gap 1 (A3)** or director pick. Fresh agents: read § floor scope first.  
-**Production / prep live rollback:** GAS **v655** (H5) · prior good sync **v654** · hosting `host-boot.js?v=653` · Prep banner **`live sync (patch)`**  
+**Production / prep live rollback:** GAS **v656** (shortage sig + hasArrow `open`) · hosting `host-boot.js?v=655` · prior sync baseline **v654** · Prep banner **`live sync (patch)`**  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
