@@ -28,6 +28,7 @@
 - **Fork right (PA):** Project Assets route to **Firebase** while prep open — **no direct Sheets** for PA until session closes. (Hub/ledger: see design lock — not forked via `Dal_Session_*`.)
 - **Working vs selected department (shipped):** Design-mode **WORKING** picker (same slot as packing FILTER) stamps `overrideDept` on new adds. Click department **header** → green **PASTE** target (independent of WORKING). Expand/collapse = **arrow only**. Persist: `Project_Assets.override_dept` + live FS fixtures/sigs. Empty department folders stay hidden.
 - **overrideDept refresh (shipped):** Live prep prefers state-doc fixtures over stale PA cache so dept moves survive browser refresh; load normalizes `override_dept`/`overrideDept`; schema inserts a real mid-sheet column (no append+relabel shift).
+- **Twin General buckets (shipped):** Cut→green-dept paste that kept the same location/formula under two departments made DEL wipe both and live sync resurrect. **DEL / dept dropdown are department-bucket scoped**; cut→green-dept now renames location like copy (`General (1)` …).
 - **Prep room board (shipped):** No top prep banner. Collapsed **SYNC** mini-header at bottom of vault (orange); click expands ~⅓ black body with roster + modes. Timeline: blue **SYNC** in crew column above Edit Crew; expand = names only.
 
 ---

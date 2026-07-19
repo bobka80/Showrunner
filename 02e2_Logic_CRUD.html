@@ -717,18 +717,24 @@ function updateAssignedQty(repAssetId, loc, form, delta, containerUid = null) {
     renderProjectAssetsUI();
 }
 
-function updateFormulaDept(loc, form, newDept) {
+function updateFormulaDept(loc, form, newDept, onlyDeptUid) {
     var touchedUids = [];
+    onlyDeptUid = onlyDeptUid != null && onlyDeptUid !== '' ? String(onlyDeptUid) : '';
     currentProjectAssets.forEach(pa => {
         let pLoc = pa.location || "General";
         let pForm = pa.formula || "Standalone";
-        if (pLoc === loc && pForm === form) {
-            pa.overrideDept = newDept || '';
-            if (pa.uid && !pa.isAuto && !pa.isGenericAuto) {
-                touchedUids.push(String(pa.uid));
-                if (typeof window.dalPaNoteTouch_ === 'function') {
-                    window.dalPaNoteTouch_(pa.uid);
-                }
+        if (pLoc !== loc || pForm !== form) return;
+        if (onlyDeptUid) {
+            let itemDept = typeof window.dalPaResolveItemDeptUid_ === 'function'
+                ? window.dalPaResolveItemDeptUid_(pa)
+                : String(pa.overrideDept || '');
+            if (String(itemDept) !== onlyDeptUid) return;
+        }
+        pa.overrideDept = newDept || '';
+        if (pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+            touchedUids.push(String(pa.uid));
+            if (typeof window.dalPaNoteTouch_ === 'function') {
+                window.dalPaNoteTouch_(pa.uid);
             }
         }
     });
@@ -774,16 +780,25 @@ function cancelFormulaEdit() {
     renderProjectAssetsUI();
 }
 
-function removeFormulaGroup(loc, form) {
+function removeFormulaGroup(loc, form, deptUid) {
     if (!confirm("Remove all items in this formula group?")) return;
+    deptUid = deptUid != null && deptUid !== '' ? String(deptUid) : '';
+    // When deptUid is set (normal DEL from a department bucket), only that bucket.
+    // Same loc+form can appear under Lighting and Audio after cut/paste — must not wipe both.
     currentProjectAssets = currentProjectAssets.filter(pa => {
         let pLoc = pa.location || "General";
         let pForm = pa.formula || "Standalone";
-        let kill = (pLoc === loc && pForm === form);
-        if (kill && typeof window.dalPaNoteDelete_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+        if (pLoc !== loc || pForm !== form) return true;
+        if (deptUid) {
+            let itemDept = typeof window.dalPaResolveItemDeptUid_ === 'function'
+                ? window.dalPaResolveItemDeptUid_(pa)
+                : String(pa.overrideDept || '');
+            if (String(itemDept) !== deptUid) return true;
+        }
+        if (typeof window.dalPaNoteDelete_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
             window.dalPaNoteDelete_(pa.uid);
         }
-        return !kill;
+        return false;
     });
         if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
     renderProjectAssetsUI();

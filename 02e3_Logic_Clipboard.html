@@ -204,6 +204,7 @@ window.pasteClipboardPa = function() {
             splitClone.qty = pa.cutQty;
             splitClone.isCut = false;
             delete splitClone.cutQty;
+            splitClone._dalDeptCut = 1;
             pa.qty = parseInt(pa.qty, 10) - parseInt(pa.cutQty, 10);
             pa.isCut = false;
             delete pa.cutQty;
@@ -214,6 +215,7 @@ window.pasteClipboardPa = function() {
         } else {
             pa.isCut = false;
             delete pa.cutQty;
+            pa._dalDeptCut = 1;
             itemsToInsert.push(pa);
         }
     });
@@ -243,7 +245,57 @@ window.pasteClipboardPa = function() {
             pa.formula = dest.formula;
         });
         remainingAssets.push(...itemsToInsert);
-    } else { // Dept-only move (green header) — keep location/formula, reorder insert
+    } else { // Dept-only move (green header)
+        // CUT into another dept with the same loc/form as leftovers in the source dept
+        // creates "twin" General buckets (Lighting+Audio). DEL used to wipe both.
+        // Give cut groups a unique location — same approach copy already uses.
+        if (toPasteCuts.length > 0 && pasteDept) {
+            let cutGroups = {};
+            itemsToInsert.forEach(item => {
+                if (!item || !item._dalDeptCut) return;
+                let key = (item.location || 'General') + '|||' + (item.formula || 'Standalone');
+                if (!cutGroups[key]) cutGroups[key] = [];
+                cutGroups[key].push(item);
+            });
+            Object.keys(cutGroups).forEach(function(key) {
+                let groupItems = cutGroups[key];
+                let baseLoc = groupItems[0].location || 'General';
+                let counter = 1;
+                let match;
+                if ((match = String(baseLoc).match(/^(.*)\s*\((\d+)\)$/))) {
+                    baseLoc = match[1].trim();
+                    counter = parseInt(match[2], 10) + 1;
+                }
+                let newLoc = baseLoc + ' (' + counter + ')';
+                while (
+                    currentProjectAssets.some(p => p && p.location === newLoc) ||
+                    remainingAssets.some(p => p && p.location === newLoc) ||
+                    itemsToInsert.some(p => p && p.location === newLoc && !p._dalDeptCut)
+                ) {
+                    counter++;
+                    newLoc = baseLoc + ' (' + counter + ')';
+                }
+                // Avoid colliding with other cut groups already renamed in this paste
+                while (Object.keys(cutGroups).some(function(k2) {
+                    if (k2 === key) return false;
+                    return cutGroups[k2].some(function(p) { return p.location === newLoc; });
+                })) {
+                    counter++;
+                    newLoc = baseLoc + ' (' + counter + ')';
+                }
+                let newForm = newLoc + ' Formula';
+                groupItems.forEach(function(item) {
+                    item.location = newLoc;
+                    if (!item.isShortage) item.formula = newForm;
+                    else item.formula = newLoc + ' Subrent Formula';
+                    delete item._dalDeptCut;
+                    if (typeof window.dalPaNoteTouch_ === 'function' && item.uid && !item.isAuto && !item.isGenericAuto) {
+                        window.dalPaNoteTouch_(item.uid);
+                    }
+                });
+            });
+        }
+
         let isCopyOperation = toPasteCopies.length > 0;
 
         if (isCopyOperation) {
@@ -332,7 +384,10 @@ window.pasteClipboardPa = function() {
     });
     currentProjectAssets = merged;
     
-    currentProjectAssets.forEach(pa => pa.isCopied = false);
+    currentProjectAssets.forEach(pa => {
+        pa.isCopied = false;
+        delete pa._dalDeptCut;
+    });
 
     window.selectedPaIndices.clear();
     window.selectedSummedIds.clear();

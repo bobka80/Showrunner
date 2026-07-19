@@ -62,6 +62,32 @@ window.dalPaStampOverrideDept_ = function(pa, forceDept) {
     return pa;
 };
 
+/**
+ * Department bucket for a PA row — must match assigned-list split in render
+ * (overrideDept, else creator home dept, else asset department).
+ */
+window.dalPaResolveItemDeptUid_ = function(pa) {
+    if (!pa) return 'Unassigned';
+    if (typeof window.dalPaNormalizeOverrideDept_ === 'function') window.dalPaNormalizeOverrideDept_(pa);
+    if (pa.overrideDept) return String(pa.overrideDept);
+    var asset = null;
+    try {
+        if (typeof globalAssets !== 'undefined' && globalAssets && pa.assetId) {
+            asset = globalAssets.find(function(a) { return a && a.id === pa.assetId; });
+        }
+    } catch (eA) { asset = null; }
+    var fallback = 'Unassigned';
+    if (asset && typeof getDeptObj === 'function') {
+        fallback = (getDeptObj(asset.department).uid || 'Unassigned');
+    } else if (asset && asset.department) {
+        fallback = String(asset.department);
+    }
+    if (typeof getCreatorDept === 'function') {
+        return String(getCreatorDept(pa.creator, fallback) || fallback || 'Unassigned');
+    }
+    return String(fallback || 'Unassigned');
+};
+
 /** Prefer live prep fixtures over stale local PA cache (overrideDept survives refresh). */
 window.dalPaPreferLiveFixturesOverCache_ = function(projectId, cachedCurrent) {
     if (!(window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore')) return cachedCurrent || [];
