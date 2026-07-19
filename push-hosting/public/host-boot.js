@@ -2958,6 +2958,11 @@
             clientId: clientId,
             writeSeq: writeSeq
           };
+          // H4 — refuse host write above Firestore-safe state size.
+          var maxBytes = 900 * 1024;
+          if (payload.fixturesJson && payload.fixturesJson.length >= maxBytes) {
+            throw new Error('PREP_STATE_TOO_LARGE: fixturesJson ' + payload.fixturesJson.length + ' bytes');
+          }
           tx.set(ref, payload);
           // Mirror touched/deleted into collection so END PREP commit (list collection) stays correct.
           if (col) {

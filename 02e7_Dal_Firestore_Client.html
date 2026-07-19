@@ -25,6 +25,38 @@ window.dalPaDeletedUids_ = window.dalPaDeletedUids_ || {};
 window.dalPaLastAppliedSeq_ = window.dalPaLastAppliedSeq_ || {};
 window.dalPaLastDocWriteSeq_ = window.dalPaLastDocWriteSeq_ || 0;
 
+/** H4 — keep aligned with scripts/lib/dal-state-size-mirror-core.js / Dal_Firebase.js */
+window.DAL_STATE_WARN_BYTES = 512 * 1024;
+window.DAL_STATE_MAX_BYTES = 900 * 1024;
+window.DAL_STATE_WARN_COUNT = 1500;
+window.DAL_STATE_MAX_COUNT = 4000;
+window.dalPaStateSizeWarned_ = false;
+
+window.dalPaStateSizeReport_ = function(fixtures) {
+  var list = (fixtures || []).filter(function(pa) {
+    return pa && pa.uid && !(pa.isAuto || pa.isGenericAuto);
+  });
+  var json = '[]';
+  try { json = JSON.stringify(list); } catch (e0) { json = '[]'; }
+  var bytes = json.length;
+  var count = list.length;
+  var overMax = bytes >= window.DAL_STATE_MAX_BYTES || count >= window.DAL_STATE_MAX_COUNT;
+  var overWarn = !overMax && (bytes >= window.DAL_STATE_WARN_BYTES || count >= window.DAL_STATE_WARN_COUNT);
+  return { bytes: bytes, count: count, overWarn: overWarn, overMax: overMax, ok: !overMax };
+};
+
+window.dalPaWarnStateSizeOnce_ = function(report) {
+  if (!report || !report.overWarn || window.dalPaStateSizeWarned_) return;
+  window.dalPaStateSizeWarned_ = true;
+  var msg = 'Prep list is getting large (' + report.count + ' rows / ~' +
+    Math.round(report.bytes / 1024) + ' KB). Near the live-sync size limit — consider ending prep soon.';
+  try {
+    if (typeof showToast === 'function') showToast(msg);
+    else if (typeof window.showMobilePaToast === 'function') window.showMobilePaToast('Large prep list', msg);
+    else console.warn(msg);
+  } catch (eW) { /* ignore */ }
+};
+
 /** H1: live prep writes only while Firestore patch mode is healthy. */
 window.dalPaLiveWritesAllowed_ = function() {
   if (!window.dalPrepUiOpen) return true;
@@ -1244,6 +1276,9 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   var fixtures = [];
   try { fixtures = JSON.parse(data.fixturesJson || '[]'); } catch (e0) { fixtures = []; }
   if (!Array.isArray(fixtures)) fixtures = [];
+  if (typeof window.dalPaStateSizeReport_ === 'function') {
+    window.dalPaWarnStateSizeOnce_(window.dalPaStateSizeReport_(fixtures));
+  }
 
   var localSeed = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
     return pa && !window.dalPaIsAutoRow_(pa);
@@ -1936,6 +1971,19 @@ window.dalFlushPaIfPrepOpen_ = function() {
   if (!earlyPatch || (!(earlyPatch.sets || []).length && !(earlyPatch.deletes || []).length)) {
     // No fixture patch — do not flush (avoids auto-only churn / false calculatePaDeltas).
     return;
+  }
+  if (typeof window.dalPaStateSizeReport_ === 'function') {
+    var sizeRep = window.dalPaStateSizeReport_(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []);
+    if (sizeRep.overMax) {
+      var blockMsg = 'Prep list too large for live sync (' + sizeRep.count + ' rows / ~' +
+        Math.round(sizeRep.bytes / 1024) + ' KB). End prep or remove lines before more edits sync.';
+      try {
+        if (typeof showToast === 'function') showToast(blockMsg);
+        else alert(blockMsg);
+      } catch (eMax) { /* ignore */ }
+      return;
+    }
+    window.dalPaWarnStateSizeOnce_(sizeRep);
   }
   // Arm holds immediately (before debounce/write) so lagging snaps cannot resurrect rows after minus.
   try {

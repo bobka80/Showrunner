@@ -8,6 +8,27 @@ window.dalTlIgnoreListenerUntil = 0;
 window.dalTlLastStateSig = '';
 window.dalTlRemotePending = false;
 window.dalTlLiveSyncMode = ''; // 'firestore' | 'connecting' | 'blocked' | '' (legacy 'gas' = blocked)
+window.dalTlStateSizeWarned_ = false;
+
+window.dalTlStateSizeReport_ = function(shifts, phases, overrides) {
+  var payload = {
+    shifts: shifts || [],
+    phases: phases || [],
+    overrides: overrides || {}
+  };
+  var json = '[]';
+  try { json = JSON.stringify(payload); } catch (e0) { json = '[]'; }
+  var bytes = json.length;
+  var count = (payload.shifts.length || 0) + (payload.phases.length || 0) +
+    Object.keys(payload.overrides || {}).length;
+  var warnB = window.DAL_STATE_WARN_BYTES || (512 * 1024);
+  var maxB = window.DAL_STATE_MAX_BYTES || (900 * 1024);
+  var warnC = window.DAL_STATE_WARN_COUNT || 1500;
+  var maxC = window.DAL_STATE_MAX_COUNT || 4000;
+  var overMax = bytes >= maxB || count >= maxC;
+  var overWarn = !overMax && (bytes >= warnB || count >= warnC);
+  return { bytes: bytes, count: count, overWarn: overWarn, overMax: overMax, ok: !overMax };
+};
 window.dalTlLiveSyncFailReason_ = '';
 window.dalTlBlockedRetryTimer_ = null;
 window.dalTlBlockedWarnAt_ = 0;
@@ -501,6 +522,27 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
   var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
   var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
   var clientId = window.dalTlClientId;
+
+  if (typeof window.dalTlStateSizeReport_ === 'function') {
+    var tlRep = window.dalTlStateSizeReport_(localState.shifts, localState.phases, localState.overrides);
+    if (tlRep.overMax) {
+      done(new Error('TIMELINE_STATE_TOO_LARGE: ' + tlRep.count + ' entities / ' + tlRep.bytes + ' bytes'));
+      try {
+        var tlMsg = 'Timeline collab state too large for live sync. End collab or trim shifts/phases.';
+        if (typeof showToast === 'function') showToast(tlMsg);
+        else alert(tlMsg);
+      } catch (eTl) { /* ignore */ }
+      return;
+    }
+    if (tlRep.overWarn && !window.dalTlStateSizeWarned_) {
+      window.dalTlStateSizeWarned_ = true;
+      try {
+        if (typeof showToast === 'function') {
+          showToast('Timeline state is getting large (~' + Math.round(tlRep.bytes / 1024) + ' KB).');
+        }
+      } catch (eW2) { /* ignore */ }
+    }
+  }
 
   window.dalEnsureFirestoreClientAuth_(function(err, client) {
     if (err || !client) {

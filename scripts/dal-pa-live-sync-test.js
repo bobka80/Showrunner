@@ -255,9 +255,40 @@ var deptMerge = core.patchMergeFixtures(
 var dm = deptMerge.find(function (x) { return x.uid === 'u1'; });
 assert(dm && dm.overrideDept === 'dept_sound', 'touched overrideDept upsert lands in store');
 
+console.log('\n--- Case S: H4 state size + END mirror ---');
+var sizeCore = require('./lib/dal-state-size-mirror-core.js');
+var small = sizeCore.stateSizeReport({ payload: [{ uid: 'a' }], count: 1 });
+assert(small.ok && !small.overWarn && !small.overMax, 'tiny state is ok');
+var warnCount = sizeCore.stateSizeReport({ payload: [], count: sizeCore.WARN_COUNT });
+assert(warnCount.overWarn && !warnCount.overMax, 'WARN_COUNT triggers overWarn');
+var maxCount = sizeCore.stateSizeReport({ payload: [], count: sizeCore.MAX_COUNT });
+assert(maxCount.overMax && !maxCount.ok, 'MAX_COUNT refuses');
+var bigJson = sizeCore.stateSizeReport({ json: new Array(sizeCore.MAX_BYTES + 2).join('x') });
+assert(bigJson.overMax, 'MAX_BYTES refuses');
+var mirrorOk = sizeCore.mirrorCompare(
+  [{ uid: 'u1', assetId: 'a', qty: 2, location: 'G', formula: 'Standalone' }],
+  [{ uid: 'u1', assetId: 'a', qty: 2, location: 'G', formula: 'Standalone' }]
+);
+assert(mirrorOk.ok, 'identical state/collection mirror ok');
+var mirrorDrift = sizeCore.mirrorCompare(
+  [{ uid: 'u1', assetId: 'a', qty: 2, location: 'G', formula: 'Standalone' }],
+  [{ uid: 'u1', assetId: 'a', qty: 9, location: 'G', formula: 'Standalone' }]
+);
+assert(!mirrorDrift.ok && mirrorDrift.fieldMismatches.indexOf('u1') >= 0, 'qty drift detected');
+var mirrorAutoIgnored = sizeCore.mirrorCompare(
+  [{ uid: 'u1', assetId: 'a', qty: 1, location: 'G', formula: 'Standalone' }],
+  [
+    { uid: 'u1', assetId: 'a', qty: 1, location: 'G', formula: 'Standalone' },
+    { uid: 'auto1', assetId: 'c', qty: 1, formula: 'Auto-Container', isAuto: true }
+  ]
+);
+assert(mirrorAutoIgnored.ok, 'auto rows excluded from mirror');
+var tlSize = sizeCore.timelineStateSizeReport([{ id: 1 }], [], {});
+assert(tlSize.ok, 'small timeline state ok');
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–R + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–S + units)');
 process.exit(0);

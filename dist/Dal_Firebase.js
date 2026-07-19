@@ -14,6 +14,119 @@ var __dalFirebaseAdapterSingleton = null;
 var DAL_FIRESTORE_PA_COLLECTION = 'assets';
 var DAL_FIRESTORE_TIMELINE_COLLECTION = 'timeline';
 
+/** H4 — keep in sync with scripts/lib/dal-state-size-mirror-core.js */
+var DAL_STATE_WARN_BYTES = 512 * 1024;
+var DAL_STATE_MAX_BYTES = 900 * 1024;
+var DAL_STATE_WARN_COUNT = 1500;
+var DAL_STATE_MAX_COUNT = 4000;
+
+function dalStateSizeReport_(opts) {
+  opts = opts || {};
+  var bytes = 0;
+  if (opts.json != null) bytes = String(opts.json).length;
+  else if (opts.payload !== undefined) {
+    try { bytes = JSON.stringify(opts.payload).length; } catch (e0) { bytes = 0; }
+  }
+  var count = Number(opts.count || 0) || 0;
+  var overMax = bytes >= DAL_STATE_MAX_BYTES || count >= DAL_STATE_MAX_COUNT;
+  var overWarn = !overMax && (bytes >= DAL_STATE_WARN_BYTES || count >= DAL_STATE_WARN_COUNT);
+  return { bytes: bytes, count: count, overWarn: overWarn, overMax: overMax, ok: !overMax };
+}
+
+function dalPaFormulaIsAuto_(formula) {
+  var f = String(formula || '');
+  return f === 'Auto-Container' || f === 'Gen-Auto-Container' ||
+    f.indexOf('[AUTO] ') === 0 || f.indexOf('[GEN_AUTO] ') === 0;
+}
+
+function dalPaFixtureIsAuto_(pa) {
+  if (!pa) return true;
+  if (pa.isAuto || pa.isGenericAuto) return true;
+  return dalPaFormulaIsAuto_(pa.formula);
+}
+
+function dalPaFixtureSigRow_(pa) {
+  pa = pa || {};
+  return [
+    String(pa.uid || ''),
+    String(pa.assetId || pa.asset_uid || ''),
+    String(pa.qty != null ? pa.qty : (pa.assigned_quantity != null ? pa.assigned_quantity : 1)),
+    String(pa.location || 'General'),
+    String(pa.formula || 'Standalone'),
+    (pa.isShortage === true || pa.isShortage === 'true' || String(pa.formula || '').indexOf('[SHORT] ') === 0) ? '1' : '0',
+    String(pa.overrideDept || pa.override_dept || ''),
+    String(pa.containerUid || pa.container_uid || '')
+  ].join('\t');
+}
+
+function dalPaMirrorCompare_(stateFixtures, collectionFixtures) {
+  var stateBy = {};
+  var colBy = {};
+  (stateFixtures || []).forEach(function (pa) {
+    if (!pa || !pa.uid || dalPaFixtureIsAuto_(pa)) return;
+    stateBy[String(pa.uid)] = pa;
+  });
+  (collectionFixtures || []).forEach(function (pa) {
+    if (!pa || !pa.uid || dalPaFixtureIsAuto_(pa)) return;
+    colBy[String(pa.uid)] = pa;
+  });
+  var missingInCollection = [];
+  var missingInState = [];
+  var fieldMismatches = [];
+  Object.keys(stateBy).forEach(function (uid) {
+    if (!colBy[uid]) missingInCollection.push(uid);
+    else if (dalPaFixtureSigRow_(stateBy[uid]) !== dalPaFixtureSigRow_(colBy[uid])) fieldMismatches.push(uid);
+  });
+  Object.keys(colBy).forEach(function (uid) {
+    if (!stateBy[uid]) missingInState.push(uid);
+  });
+  var ok = !missingInCollection.length && !missingInState.length && !fieldMismatches.length;
+  var parts = [];
+  if (missingInCollection.length) parts.push('state-only:' + missingInCollection.length);
+  if (missingInState.length) parts.push('collection-only:' + missingInState.length);
+  if (fieldMismatches.length) parts.push('field-diff:' + fieldMismatches.length);
+  return {
+    ok: ok,
+    missingInCollection: missingInCollection,
+    missingInState: missingInState,
+    fieldMismatches: fieldMismatches,
+    summary: ok ? 'ok' : parts.join(' ')
+  };
+}
+
+function dalReadPaStateFixtures_(projectId) {
+  var doc = firestoreFetch_('get', dalFirestorePaCollection_(projectId) + '/state');
+  if (!doc || !doc.fields) return { fixtures: [], fixturesJson: '[]', writeSeq: 0 };
+  var plain = firestoreDecodeFields_(doc.fields);
+  var fixtures = [];
+  try { fixtures = JSON.parse(plain.fixturesJson || '[]'); } catch (e1) { fixtures = []; }
+  if (!Array.isArray(fixtures)) fixtures = [];
+  return {
+    fixtures: fixtures,
+    fixturesJson: plain.fixturesJson || JSON.stringify(fixtures),
+    writeSeq: Number(plain.writeSeq || 0) || 0
+  };
+}
+
+function dalPaFixtureToCommitObj_(pa, projectId) {
+  var formula = pa.formula || 'Standalone';
+  if ((pa.isShortage === true || pa.isShortage === 'true') && String(formula).indexOf('[SHORT] ') !== 0) {
+    formula = '[SHORT] ' + formula;
+  }
+  return {
+    uid: String(pa.uid || ''),
+    project_uid: String(projectId || ''),
+    asset_uid: String(pa.assetId || pa.asset_uid || ''),
+    assigned_quantity: pa.qty != null ? pa.qty : (pa.assigned_quantity != null ? pa.assigned_quantity : 1),
+    location: pa.location || 'General',
+    formula: formula,
+    creator: pa.creator || 'System',
+    override_dept: pa.overrideDept || pa.override_dept || '',
+    container_uid: pa.containerUid || pa.container_uid || '',
+    scan_status: pa.scanStatus || pa.scan_status || 'Assigned'
+  };
+}
+
 function getFirebaseAdapter() {
   if (!__dalFirebaseAdapterSingleton) {
     __dalFirebaseAdapterSingleton = createFirebaseAdapter_();
@@ -218,10 +331,86 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
 
 function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   var hdr = dalGetProjectAssetsHeaderAndMap_();
-  var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
-  var intendedObjects = (projectRows || []).map(function (r) {
-    return dalPaSheetRowToObject_(r.data, hdr.map);
+  var stateSnap = dalReadPaStateFixtures_(projectId);
+  var stateFixtures = stateSnap.fixtures || [];
+  var size = dalStateSizeReport_({
+    json: stateSnap.fixturesJson,
+    count: stateFixtures.filter(function (pa) { return pa && pa.uid && !dalPaFixtureIsAuto_(pa); }).length
   });
+  if (size.overMax) {
+    throw new Error(
+      'PREP_STATE_TOO_LARGE: fixtures state is ' + size.bytes + ' bytes / ' + size.count +
+      ' rows (max ' + DAL_STATE_MAX_BYTES + ' bytes or ' + DAL_STATE_MAX_COUNT +
+      ' fixtures). Trim the list or split the project before END PREP.'
+    );
+  }
+
+  var collectionRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+  var colFixtures = [];
+  var colAutoRows = [];
+  (collectionRows || []).forEach(function (r) {
+    var obj = dalPaSheetRowToObject_(r.data, hdr.map);
+    var asPa = {
+      uid: obj.uid,
+      assetId: obj.asset_uid,
+      qty: obj.assigned_quantity,
+      location: obj.location,
+      formula: obj.formula,
+      creator: obj.creator,
+      overrideDept: obj.override_dept,
+      containerUid: obj.container_uid,
+      scanStatus: obj.scan_status,
+      isShortage: String(obj.formula || '').indexOf('[SHORT] ') === 0
+    };
+    if (dalPaFormulaIsAuto_(obj.formula)) colAutoRows.push(r);
+    else colFixtures.push(asPa);
+  });
+
+  var mirror = dalPaMirrorCompare_(stateFixtures, colFixtures);
+  if (!mirror.ok) {
+    try {
+      writeToAuditLog(actor, 'WARN', 'PROJECT_ASSETS_MIRROR', projectId, projectId,
+        'END PREP mirror mismatch (' + mirror.summary + ') — committing state SSOT + collection autos.');
+    } catch (eAud) { /* ignore */ }
+    try {
+      dalAlertFailedWrite_(projectId, 'assets', actor,
+        'END PREP mirror mismatch: ' + mirror.summary + ' (committed from state fixtures + collection autos)');
+    } catch (eAlert) { /* ignore */ }
+    try {
+      dalPocketFailedWrite_({
+        projectId: projectId,
+        domain: 'assets',
+        sessionUid: sessionUid,
+        actor: actor,
+        mismatchNote: 'END PREP mirror: ' + mirror.summary,
+        payload: {
+          missingInCollection: mirror.missingInCollection,
+          missingInState: mirror.missingInState,
+          fieldMismatches: mirror.fieldMismatches
+        }
+      });
+    } catch (ePocket) { /* ignore */ }
+  }
+
+  // State fixtures = SSOT for non-autos; autos live only on collection (rebuild locally during prep).
+  var commitObjs = [];
+  var fixtureSource = stateFixtures;
+  if ((!fixtureSource || !fixtureSource.length) && colFixtures.length) {
+    fixtureSource = colFixtures;
+  }
+  (fixtureSource || []).forEach(function (pa) {
+    if (!pa || !pa.uid || dalPaFixtureIsAuto_(pa)) return;
+    commitObjs.push(dalPaFixtureToCommitObj_(pa, projectId));
+  });
+  colAutoRows.forEach(function (r) {
+    commitObjs.push(dalPaSheetRowToObject_(r.data, hdr.map));
+  });
+
+  var projectRows = commitObjs.map(function (obj) {
+    return { data: dalPaRowObjectToSheetArray_(obj, hdr.header, hdr.map) };
+  });
+  var intendedObjects = commitObjs;
+
   // Drop _meta first so live UI closes before the slower row drain finishes.
   firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
   // Sheet write under its own short lock — caller must not hold ScriptLock across Firestore UrlFetch.
@@ -332,6 +521,22 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
   if (!snap) {
     firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
     return;
+  }
+  var tlSize = dalStateSizeReport_({
+    payload: {
+      shifts: snap.shifts || [],
+      phases: snap.phases || [],
+      overrides: snap.overrides || {}
+    },
+    count: (snap.shifts || []).length + (snap.phases || []).length +
+      Object.keys(snap.overrides || {}).length
+  });
+  if (tlSize.overMax) {
+    throw new Error(
+      'TIMELINE_STATE_TOO_LARGE: collab state is ' + tlSize.bytes + ' bytes / ' + tlSize.count +
+      ' entities (max ' + DAL_STATE_MAX_BYTES + ' bytes or ' + DAL_STATE_MAX_COUNT +
+      '). Reduce shifts/phases before END COLLAB.'
+    );
   }
   // Status is "committing" — Sheets path allowed. saveTimelineDataSheets_ takes its own short lock.
   saveTimelineDataSheets_(

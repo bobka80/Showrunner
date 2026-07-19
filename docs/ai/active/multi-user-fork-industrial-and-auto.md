@@ -7,9 +7,9 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Active** — Gap 1 (A3) shipping. Prior: **A0 + H1 + H5** complete; side-feature pause lifted.  
+**Opened:** 2026-07-18 · **Status:** **Active** — **A4/H4 done**; next **A5/H3**. Prior: **A0 + H1 + H5 + Gap 1**.  
 **Production / prep live rollback:** GAS **v656** (shortage sig + hasArrow `open`) · hosting `host-boot.js?v=655` · prior sync baseline **v654** · Prep banner **`live sync (patch)`**  
-**Latest side ships:** working/paste dept + `override_dept` (v658+) · overrideDept refresh fix **v663**.  
+**Latest side ships:** working/paste dept + `override_dept` · overrideDept refresh **v663** · Gap 1 **v664**.  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
@@ -171,10 +171,12 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v654"** (pr
 
 Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) / FRAGILE — mechanical guard replaces “don’t” alone.
 
-### A4 — H4 State size + END mirror check
+### A4 — H4 State size + END mirror check ✅
 
-- [ ] Warn/cap huge `fixturesJson` / timeline state — **concrete threshold** before claim done  
-- [ ] END PREP / END COLLAB: verify collection (or commit payload) mirrors state before Sheets write; alert on mismatch  
+- [x] Warn/cap huge `fixturesJson` / timeline state — **WARN 512 KiB / 1,500 rows; MAX 900 KiB / 4,000** (Firestore ~1 MiB doc limit)  
+- [x] END PREP: mirror state vs collection fixtures; alert/pocket on mismatch; commit **state SSOT + collection autos**  
+- [x] END COLLAB: refuse oversized timeline state  
+- [x] Case S in `dal-pa-live-sync-test.js`; client toast + host write refuse at MAX  
 
 ### A5 — H3 Same-row conflict visibility
 
@@ -295,6 +297,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **A2 / H5 shipped @ v655:** PA notes on location/shortage/formula rewrite/cancel; timeline notes on note/arrow/crew override; timeline inventory gate; crew DONE/CANCEL single flush; ALLOWLIST overrideDept (not in FS schema). |
 | 2026-07-19 | **Campaign paused** for side feature: PA **working dept** (new-add stamp) + **green selected dept** (paste target) + `override_dept` Sheets/FS live sync. Resume → **Gap 1 (A3)**. |
 | 2026-07-19 | **A3 / Gap 1 shipped:** `scripts/dal-sync-mode-lint.js` in pre-ship; FRAGILE #10/#11 mechanical; post-END timeline hydrate allowlisted. **Next: A4 / H4** (state size + END mirror). |
+| 2026-07-19 | **A4 / H4 shipped:** state size WARN/MAX; END PREP mirror alert + state SSOT commit; Case S; hosting host-boot size refuse. **Next: A5 / H3**. |
 
 ---
 
