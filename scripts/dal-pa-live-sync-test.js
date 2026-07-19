@@ -286,9 +286,45 @@ assert(mirrorAutoIgnored.ok, 'auto rows excluded from mirror');
 var tlSize = sizeCore.timelineStateSizeReport([{ id: 1 }], [], {});
 assert(tlSize.ok, 'small timeline state ok');
 
+console.log('\n--- Case T: H3 non-combining LWW loss visibility ---');
+var lww = require('./lib/dal-lww-conflict-core.js');
+var sigA = lww.paNonCombiningSig({ location: 'A', formula: 'Standalone', qty: 1 });
+var sigB = lww.paNonCombiningSig({ location: 'B', formula: 'Standalone', qty: 99 });
+assert(sigA !== sigB, 'location change alters non-combining sig');
+assert(
+  lww.paNonCombiningSig({ location: 'A', formula: 'Standalone', qty: 1 }) ===
+    lww.paNonCombiningSig({ location: 'A', formula: 'Standalone', qty: 50 }),
+  'qty-only change must NOT alter non-combining sig'
+);
+var watch = {
+  u1: { sig: lww.paNonCombiningSig({ location: 'Mine', formula: 'Standalone' }), until: Date.now() + 10000 }
+};
+var remoteBy = {
+  u1: { uid: 'u1', location: 'Peer', formula: 'Standalone', qty: 1 }
+};
+var lost = lww.detectWatchedLwwLosses(watch, remoteBy, Date.now(), {});
+assert(lost.indexOf('u1') >= 0, 'peer location overwrite detected');
+var lostProtected = lww.detectWatchedLwwLosses(watch, remoteBy, Date.now(), { u1: 1 });
+assert(lostProtected.length === 0, 'held/touched uid not reported as loss');
+var lostQtyOnly = lww.detectWatchedLwwLosses(
+  { u1: { sig: lww.paNonCombiningSig({ location: 'A', formula: 'Standalone', qty: 1 }), until: Date.now() + 9999 } },
+  { u1: { uid: 'u1', location: 'A', formula: 'Standalone', qty: 9 } },
+  Date.now(),
+  {}
+);
+assert(lostQtyOnly.length === 0, 'qty-only remote change is not an H3 conflict');
+var shiftLost = lww.detectWatchedLwwLosses(
+  { s1: { sig: lww.shiftNonCombiningSig({ role: 'FOH', start: 1 }), until: Date.now() + 9999 } },
+  { s1: { id: 's1', role: 'MON', start: 1 } },
+  Date.now(),
+  {},
+  lww.shiftNonCombiningSig
+);
+assert(shiftLost.indexOf('s1') >= 0, 'timeline shift role overwrite detected');
+
 if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–S + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–T + units)');
 process.exit(0);

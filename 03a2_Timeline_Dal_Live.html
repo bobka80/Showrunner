@@ -49,6 +49,11 @@ window.dalTlDeletedOverrides_ = {};
 window.dalTlEntityHoldUntil_ = {}; // id -> ms — keep local strip during hold (stops A↔B yank)
 window.dalTlLastWriteSeq_ = 0;
 window.dalTlEntityHoldMs_ = 2000;
+/** H3 — id → { sig, until } for strip LWW loss toasts (not qty-combine) */
+window.dalTlLwwWatchShifts_ = window.dalTlLwwWatchShifts_ || {};
+window.dalTlLwwWatchPhases_ = window.dalTlLwwWatchPhases_ || {};
+window.dalTlLwwWatchOverrides_ = window.dalTlLwwWatchOverrides_ || {};
+window.dalTlLwwToastAt_ = 0;
 
 window.dalTimelineLayerOpen_ = function() {
   var layer = document.getElementById('shift-layer');
@@ -148,6 +153,9 @@ window.dalTlNoteShiftTouch_ = function(id) {
   window.dalTlTouchedShifts_[id] = 1;
   delete window.dalTlDeletedShifts_[id];
   window.dalTlHoldEntity_(id);
+  if (typeof window.dalTlArmLwwWatchFromLocal_ === 'function') {
+    window.dalTlArmLwwWatchFromLocal_('shift', [id], 12000);
+  }
 };
 
 window.dalTlNoteShiftDelete_ = function(id) {
@@ -164,6 +172,9 @@ window.dalTlNotePhaseTouch_ = function(id) {
   window.dalTlTouchedPhases_[id] = 1;
   delete window.dalTlDeletedPhases_[id];
   window.dalTlHoldEntity_(id);
+  if (typeof window.dalTlArmLwwWatchFromLocal_ === 'function') {
+    window.dalTlArmLwwWatchFromLocal_('phase', [id], 12000);
+  }
 };
 
 window.dalTlNotePhaseDelete_ = function(id) {
@@ -180,6 +191,9 @@ window.dalTlNoteOverrideTouch_ = function(uid) {
   window.dalTlTouchedOverrides_[uid] = 1;
   delete window.dalTlDeletedOverrides_[uid];
   window.dalTlHoldEntity_(uid);
+  if (typeof window.dalTlArmLwwWatchFromLocal_ === 'function') {
+    window.dalTlArmLwwWatchFromLocal_('override', [uid], 12000);
+  }
 };
 
 window.dalTlHoldEntity_ = function(id) {
@@ -194,6 +208,135 @@ window.dalTlClearExpiredHolds_ = function() {
   Object.keys(hold).forEach(function(id) {
     if (!hold[id] || hold[id] <= now) delete hold[id];
   });
+};
+
+window.dalTlShiftNonCombiningSig_ = function(s) {
+  s = s || {};
+  return [
+    String(s.user_uid || s.userUid || ''),
+    String(s.role || ''),
+    String(s.Start != null ? s.Start : (s.start != null ? s.start : '')),
+    String(s.Duration != null ? s.Duration : (s.duration != null ? s.duration : '')),
+    String(s.Note != null ? s.Note : (s.note || '')),
+    s.Has_Arrow || s.hasArrow ? '1' : '0'
+  ].join('\t');
+};
+
+window.dalTlPhaseNonCombiningSig_ = function(p) {
+  p = p || {};
+  return [
+    String(p.Phase_Name || p.name || ''),
+    String(p.Start != null ? p.Start : (p.start != null ? p.start : '')),
+    String(p.Duration != null ? p.Duration : (p.duration != null ? p.duration : '')),
+    String(p.Note != null ? p.Note : (p.note || ''))
+  ].join('\t');
+};
+
+window.dalTlOverrideSig_ = function(v) {
+  return String(v == null ? '' : v);
+};
+
+window.dalTlArmLwwWatch_ = function(kind, ids, fromMap, ttlMs) {
+  ttlMs = ttlMs || 12000;
+  var until = Date.now() + ttlMs;
+  var watch = kind === 'phase' ? window.dalTlLwwWatchPhases_
+    : (kind === 'override' ? window.dalTlLwwWatchOverrides_ : window.dalTlLwwWatchShifts_);
+  var sigFn = kind === 'phase' ? window.dalTlPhaseNonCombiningSig_
+    : (kind === 'override' ? window.dalTlOverrideSig_ : window.dalTlShiftNonCombiningSig_);
+  fromMap = fromMap || {};
+  (ids || []).forEach(function(id) {
+    if (!id) return;
+    id = String(id);
+    if (kind === 'override') {
+      if (!Object.prototype.hasOwnProperty.call(fromMap, id)) return;
+      watch[id] = { sig: sigFn(fromMap[id]), until: until };
+      return;
+    }
+    var ent = fromMap[id];
+    if (!ent) return;
+    watch[id] = { sig: sigFn(ent), until: until };
+  });
+};
+
+window.dalTlArmLwwWatchFromLocal_ = function(kind, ids, ttlMs) {
+  var local = typeof window.dalTlCaptureLocalState_ === 'function'
+    ? window.dalTlCaptureLocalState_()
+    : { shifts: [], phases: [], overrides: {} };
+  var by = {};
+  if (kind === 'override') {
+    by = local.overrides || {};
+  } else {
+    (kind === 'phase' ? local.phases : local.shifts).forEach(function(e) {
+      if (e && e.id) by[String(e.id)] = e;
+    });
+  }
+  window.dalTlArmLwwWatch_(kind, ids, by, ttlMs);
+};
+
+window.dalTlNotifyLwwLosses_ = function(lostCount) {
+  if (!lostCount) return;
+  if (Date.now() < (window.dalTlLwwToastAt_ || 0)) return;
+  window.dalTlLwwToastAt_ = Date.now() + 3500;
+  var msg = lostCount === 1
+    ? 'Another editor overwrote your timeline change.'
+    : ('Another editor overwrote your timeline changes (' + lostCount + ').');
+  try {
+    if (typeof showToast === 'function') showToast(msg);
+    else if (typeof showNotification === 'function') showNotification(msg);
+    else console.warn('[DAL TL H3]', msg);
+  } catch (eT) { /* ignore */ }
+};
+
+window.dalTlCheckLwwLossesAgainstRemote_ = function(remoteState) {
+  remoteState = remoteState || {};
+  var now = Date.now();
+  var protectedMap = {};
+  Object.keys(window.dalTlTouchedShifts_ || {}).forEach(function(id) { protectedMap[id] = 1; });
+  Object.keys(window.dalTlTouchedPhases_ || {}).forEach(function(id) { protectedMap[id] = 1; });
+  Object.keys(window.dalTlTouchedOverrides_ || {}).forEach(function(id) { protectedMap[id] = 1; });
+  Object.keys(window.dalTlEntityHoldUntil_ || {}).forEach(function(id) {
+    if ((window.dalTlEntityHoldUntil_[id] || 0) > now) protectedMap[id] = 1;
+  });
+  var shiftBy = {};
+  (remoteState.shifts || []).forEach(function(s) { if (s && s.id) shiftBy[String(s.id)] = s; });
+  var phaseBy = {};
+  (remoteState.phases || []).forEach(function(p) { if (p && p.id) phaseBy[String(p.id)] = p; });
+  var ovBy = remoteState.overrides || {};
+  var lost = 0;
+
+  function sweep(watch, remoteBy, sigFn, isOverride) {
+    Object.keys(watch || {}).forEach(function(id) {
+      var w = watch[id];
+      if (!w || !w.sig) return;
+      if (w.until && now > w.until) { delete watch[id]; return; }
+      if (protectedMap[id]) return;
+      if (isOverride) {
+        if (!Object.prototype.hasOwnProperty.call(remoteBy, id)) return;
+        if (sigFn(remoteBy[id]) !== w.sig) { delete watch[id]; lost++; }
+        return;
+      }
+      var remote = remoteBy[id];
+      if (!remote) return;
+      if (sigFn(remote) !== w.sig) { delete watch[id]; lost++; }
+    });
+  }
+
+  sweep(window.dalTlLwwWatchShifts_, shiftBy, window.dalTlShiftNonCombiningSig_, false);
+  sweep(window.dalTlLwwWatchPhases_, phaseBy, window.dalTlPhaseNonCombiningSig_, false);
+  sweep(window.dalTlLwwWatchOverrides_, ovBy, window.dalTlOverrideSig_, true);
+  window.dalTlNotifyLwwLosses_(lost);
+};
+
+window.dalTlArmLwwAfterFlush_ = function(mutations, localState) {
+  mutations = mutations || {};
+  localState = localState || { shifts: [], phases: [], overrides: {} };
+  var shiftBy = {};
+  (localState.shifts || []).forEach(function(s) { if (s && s.id) shiftBy[String(s.id)] = s; });
+  var phaseBy = {};
+  (localState.phases || []).forEach(function(p) { if (p && p.id) phaseBy[String(p.id)] = p; });
+  window.dalTlArmLwwWatch_('shift', Object.keys(mutations.touchedShifts || {}), shiftBy, 14000);
+  window.dalTlArmLwwWatch_('phase', Object.keys(mutations.touchedPhases || {}), phaseBy, 14000);
+  window.dalTlArmLwwWatch_('override', Object.keys(mutations.touchedOverrides || {}), localState.overrides || {}, 14000);
 };
 
 /**
@@ -596,6 +739,9 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
           delete window.dalTlDeletedOverrides_[id];
           window.dalTlHoldEntity_(id);
         });
+        if (typeof window.dalTlArmLwwAfterFlush_ === 'function') {
+          window.dalTlArmLwwAfterFlush_(mutations, localState);
+        }
         window.isTimelineDirty = window.dalTlHasPendingMutations_();
         window.dalTlPendingRemote = null;
         window.dalTlRemotePending = false;
@@ -669,6 +815,9 @@ window.dalWriteTimelineForkToFirestore_ = function(done) {
         delete window.dalTlDeletedOverrides_[id];
         window.dalTlHoldEntity_(id);
       });
+      if (typeof window.dalTlArmLwwAfterFlush_ === 'function') {
+        window.dalTlArmLwwAfterFlush_(mutations, localState);
+      }
 
       window.isTimelineDirty = window.dalTlHasPendingMutations_();
       window.dalTlPendingRemote = null;
@@ -947,6 +1096,9 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
 
   window.dalTlApplyingRemote = true;
   try {
+    if (typeof window.dalTlCheckLwwLossesAgainstRemote_ === 'function') {
+      window.dalTlCheckLwwLossesAgainstRemote_(remoteState);
+    }
     var localState = window.dalTlCaptureLocalState_();
     var mutations = window.dalTlSnapshotMutations_();
     var hasMut = window.dalTlHasPendingMutations_();

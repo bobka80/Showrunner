@@ -63,7 +63,7 @@ If a future proposal conflicts with the campaign **floor scope** section or this
 | **H0** | **Testing pipeline** | Green sims without documented scope caused false confidence (v628–v638). | Scope comments on every Case; mutation gate script; mode-seam sims; incident “attempts” field — see bulletproof Phase H0 |
 | **H1** | **Fail closed on weak sync** | Multi-user prep must not silently run on GAS `live sync (server)` poll (2.5s lag + no txn). Banner must be **`patch`**, or show a hard warning / block edits. | **Done (v648):** `blocked` mode + Case K; timeline twin |
 | **H2** | **Cheaper remote apply** | Full PA rebuild every snap causes stutter (same class as timeline strip thrash). Diff/merge then targeted redraw. | Remote qty/delete updates without full-list flash storms + measurable pass condition |
-| **H3** | **Same-row conflict visibility** | Non-qty fields (and timeline strips) are still LWW — one edit can lose. Qty floor +/- **combines** (v653); toast is for **lost non-qty / strip** races, not for combined qty. | User sees when their **non-combining** field lost — **both** PA and timeline |
+| **H3** | **Same-row conflict visibility** | Non-qty fields (and timeline strips) are still LWW — one edit can lose. Qty floor +/- **combines** (v653); toast is for **lost non-qty / strip** races, not for combined qty. | **Done** — PA + timeline watch/toast; Case T; qty-only ignored |
 | **H4** | **State size + END PREP mirror check** | Large `fixturesJson` + collection drift = silent commit wrongness. Cap/warn; verify mirror before Sheets write. | **Done:** WARN 512KiB/1500 · MAX 900KiB/4000; END PREP mirror alert + state SSOT; Case S |
 | **H5** | **Mutation-path inventory gate** | Every UI path that mutates `currentProjectAssets` during prep must note touch/delete. Silent splice = peer never sees change + resurrection later. | Mechanical gate in pre-ship (not only a manual table) |
 | **H6** | **N-client + twin sims** | One browser + hope is not a proof. | **Absorbed into H0** on the hub — do not open a rival forever-checklist |
@@ -161,4 +161,4 @@ If a path mutates without note → **bug**, not “edge case.”
 
 Incidents closed into FRAGILE: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md).  
 
-**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **A0 + H1 + H5 + Gap 1 + H4 done → H3 next → H2 → Part A exit → Part B**. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).
+**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **A0 + H1 + H5 + Gap 1 + H4 + H3 done → H2 next → Part A exit → Part B**. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).

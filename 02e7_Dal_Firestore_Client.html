@@ -24,6 +24,80 @@ window.dalPaTouchedUids_ = window.dalPaTouchedUids_ || {};
 window.dalPaDeletedUids_ = window.dalPaDeletedUids_ || {};
 window.dalPaLastAppliedSeq_ = window.dalPaLastAppliedSeq_ || {};
 window.dalPaLastDocWriteSeq_ = window.dalPaLastDocWriteSeq_ || 0;
+/** H3 — uid → { sig, until } for non-combining field LWW loss toasts */
+window.dalPaLwwWatch_ = window.dalPaLwwWatch_ || {};
+window.dalPaLwwToastAt_ = 0;
+
+window.dalPaNonCombiningSig_ = function(pa) {
+  pa = pa || {};
+  var short = (pa.isShortage === true || pa.isShortage === 'true' ||
+    String(pa.formula || '').indexOf('[SHORT] ') === 0) ? '1' : '0';
+  return [
+    String(pa.assetId || ''),
+    String(pa.location || 'General'),
+    String(pa.formula || 'Standalone').replace(/^\[SHORT\]\s*/, ''),
+    short,
+    String(pa.overrideDept || ''),
+    String(pa.containerUid || '')
+  ].join('\t');
+};
+
+window.dalPaArmLwwWatch_ = function(uids, ttlMs) {
+  ttlMs = ttlMs || 12000;
+  var until = Date.now() + ttlMs;
+  var byUid = {};
+  (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).forEach(function(pa) {
+    if (pa && pa.uid) byUid[String(pa.uid)] = pa;
+  });
+  (uids || []).forEach(function(uid) {
+    if (!uid) return;
+    uid = String(uid);
+    var pa = byUid[uid];
+    if (!pa || window.dalPaIsAutoRow_(pa)) return;
+    window.dalPaLwwWatch_[uid] = { sig: window.dalPaNonCombiningSig_(pa), until: until };
+  });
+};
+
+window.dalPaNotifyLwwLosses_ = function(lostUids) {
+  if (!lostUids || !lostUids.length) return;
+  lostUids.forEach(function(uid) { delete window.dalPaLwwWatch_[uid]; });
+  if (Date.now() < (window.dalPaLwwToastAt_ || 0)) return;
+  window.dalPaLwwToastAt_ = Date.now() + 3500;
+  var msg = lostUids.length === 1
+    ? 'Another editor overwrote your equipment change on this item.'
+    : ('Another editor overwrote your equipment changes (' + lostUids.length + ' items).');
+  try {
+    if (typeof showToast === 'function') showToast(msg);
+    else if (typeof window.showMobilePaToast === 'function') window.showMobilePaToast('Conflict', msg);
+    else console.warn('[DAL PA H3]', msg);
+  } catch (eT) { /* ignore */ }
+};
+
+window.dalPaCheckLwwLossesAgainstRemote_ = function(remoteFixtures) {
+  var watch = window.dalPaLwwWatch_ || {};
+  if (!Object.keys(watch).length) return;
+  var remoteBy = {};
+  (remoteFixtures || []).forEach(function(pa) {
+    if (pa && pa.uid) remoteBy[String(pa.uid)] = pa;
+  });
+  var now = Date.now();
+  var protectedMap = {};
+  Object.keys(window.dalPaTouchedUids_ || {}).forEach(function(u) { protectedMap[u] = 1; });
+  Object.keys(window.dalPaHoldUntil_ || {}).forEach(function(u) {
+    if ((window.dalPaHoldUntil_[u] || 0) > now) protectedMap[u] = 1;
+  });
+  var lost = [];
+  Object.keys(watch).forEach(function(uid) {
+    var w = watch[uid];
+    if (!w || !w.sig) return;
+    if (w.until && now > w.until) { delete watch[uid]; return; }
+    if (protectedMap[uid]) return;
+    var remote = remoteBy[uid];
+    if (!remote) return;
+    if (window.dalPaNonCombiningSig_(remote) !== w.sig) lost.push(uid);
+  });
+  window.dalPaNotifyLwwLosses_(lost);
+};
 
 /** H4 — keep aligned with scripts/lib/dal-state-size-mirror-core.js / Dal_Firebase.js */
 window.DAL_STATE_WARN_BYTES = 512 * 1024;
@@ -146,6 +220,7 @@ window.dalPaNoteTouch_ = function(uid) {
   window.dalPaTouchedUids_[uid] = 1;
   delete window.dalPaDeletedUids_[uid];
   window.dalPaHoldEntities_([uid], 3000);
+  if (typeof window.dalPaArmLwwWatch_ === 'function') window.dalPaArmLwwWatch_([uid], 12000);
 };
 
 window.dalPaNoteDelete_ = function(uid) {
@@ -718,6 +793,9 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   window.dalPaRemotePending = hasTouches;
   window.dalPaApplyingRemote = true;
   try {
+    if (typeof window.dalPaCheckLwwLossesAgainstRemote_ === 'function') {
+      window.dalPaCheckLwwLossesAgainstRemote_(remoteFixtures);
+    }
     currentProjectAssets = JSON.parse(JSON.stringify(mergedFixtures));
     if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
       window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
@@ -1828,6 +1906,15 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
             return; // keep touch
           }
           delete window.dalPaTouchedUids_[uid];
+        });
+        // H3: watch what we committed (not mid-flight local) for peer LWW overwrite.
+        Object.keys(touched).forEach(function(uid) {
+          var sent = sentBy[uid];
+          if (!sent) return;
+          window.dalPaLwwWatch_[uid] = {
+            sig: window.dalPaNonCombiningSig_(sent),
+            until: Date.now() + 14000
+          };
         });
         Object.keys(deleted).forEach(function(uid) {
           if (nowBy[uid]) {

@@ -7,9 +7,9 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Active** — **A4/H4 done**; next **A5/H3**. Prior: **A0 + H1 + H5 + Gap 1**.  
-**Production / prep live rollback:** GAS **v656** (shortage sig + hasArrow `open`) · hosting `host-boot.js?v=655` · prior sync baseline **v654** · Prep banner **`live sync (patch)`**  
-**Latest side ships:** working/paste dept + `override_dept` · overrideDept refresh **v663** · Gap 1 **v664**.  
+**Opened:** 2026-07-18 · **Status:** **Active** — **A5/H3 done** @ GAS **v666** (pending ship); next **A6/H2**. Prior: **A0 + H1 + H5 + Gap 1 + H4**.  
+**Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
+**Latest:** H3 same-row conflict toast (PA + timeline) — ship notes below.  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
@@ -180,8 +180,8 @@ Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync
 
 ### A5 — H3 Same-row conflict visibility
 
-- [ ] Toast or clear cue when same UID loses to peer **LWW on non-combining fields** (location/notes/flags; timeline strips). **Not** for floor qty +/- — those **combine** (v653 Case O).  
-- [ ] **Both** prep fixtures **and** timeline entities in the **same** milestone — no “as practical” hedge; if timeline slips, open an explicit follow-up checkbox here  
+- [x] Toast or clear cue when same UID loses to peer **LWW on non-combining fields** (location/notes/flags; timeline strips). **Not** for floor qty +/- — those **combine** (v653 Case O).  
+- [x] **Both** prep fixtures **and** timeline entities in the **same** milestone — no “as practical” hedge; if timeline slips, open an explicit follow-up checkbox here  
 
 ### A6 — H2 Cheaper remote apply
 
@@ -298,6 +298,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **Campaign paused** for side feature: PA **working dept** (new-add stamp) + **green selected dept** (paste target) + `override_dept` Sheets/FS live sync. Resume → **Gap 1 (A3)**. |
 | 2026-07-19 | **A3 / Gap 1 shipped:** `scripts/dal-sync-mode-lint.js` in pre-ship; FRAGILE #10/#11 mechanical; post-END timeline hydrate allowlisted. **Next: A4 / H4** (state size + END mirror). |
 | 2026-07-19 | **A4 / H4 shipped:** state size WARN/MAX; END PREP mirror alert + state SSOT commit; Case S; hosting host-boot size refuse. **Next: A5 / H3**. |
+| 2026-07-19 | **A5 / H3 shipped:** PA + timeline toast on non-combining LWW loss; qty-only ignored; Case T; `scripts/lib/dal-lww-conflict-core.js`. **Next: A6 / H2**. |
 
 ---
 
