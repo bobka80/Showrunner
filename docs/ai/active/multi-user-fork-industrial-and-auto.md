@@ -8,7 +8,7 @@
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
 **Opened:** 2026-07-18 · **Status:** **A1/H1 shipped** — next recommend **H5** (mutation ALLOWLIST + timeline twin). Fresh agents: read this file first for multi-user fork work.  
-**Production:** GAS **v648** (pending ship) · hosting `host-boot.js?v=635` · Prep banner must say **`live sync (patch)`** (or **LIVE SYNC DOWN — edits blocked** if Auth fails)
+**Production:** GAS **v648** · hosting `host-boot.js?v=635` · Prep banner must say **`live sync (patch)`** (or **LIVE SYNC DOWN — edits blocked** if Auth fails)
 
 ---
 

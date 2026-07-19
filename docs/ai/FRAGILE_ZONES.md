@@ -512,6 +512,8 @@ After END — reopen rules
 4. **Put `*/` inside a `Dal_Sessions.js` block comment** — GAS syntax death (**v577** class).
 5. **Hold ScriptLock across Firestore UrlFetch** on open/close.
 6. **Edit fixtures while treating banner-off as “still in collab.”** Banner off = live sync off. Local edits will not reach peers.
+7. **Fall back to silent GAS `live sync (server)` multi-edit when Auth/listen fails.** H1: enter **blocked** (hard banner + edits locked). Read-only poll OK; patch writes only.
+8. **Drop peer state snaps during FlushGuard / flush-in-flight** because fixture sig ≠ expected. That silently loses the only delivery of a peer edit. Re-queue or apply; FlushGuard may drop only older `writeSeq`.
 
 ### Safe rules (locked)
 
@@ -640,7 +642,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 | Concern | Rule |
 |---------|------|
 | Write | **Touch-only fixtures** — `dalPaNoteTouch_` / `dalPaNoteDelete_` then flush those UIDs only. Stamp `writeSeq`+`clientId` on host. Never live-write autos. |
-| Apply | Coalesce ~300ms; re-queue if hold active. Timeline-parity: own clientId echo, stale seq ignore, hold/touch keep local, never resurrect deletes. Local `recalcAutoContainers` after fixture merge (not written live). |
+| Apply | Coalesce ~300ms; **re-queue** (never drop) if hold / flush-in-flight / ignore window. FlushGuard drops only **older** `writeSeq` — never drop peer snaps on fixture-sig mismatch. |
 | Loop break | Never flush from apply. Render-end flush only when touches pending. |
 | Load race | During prep+firestore: ongoing snaps must not apply unstamped GAS lists. **Exception:** if local PA is still empty (join mid-fork / no `assets/state` yet), one-shot hydrate from `getProjectAssets` then `dalPaSeedStateFromLocal_` **once**. Never re-seed after remote `writeSeq > 0`. Never apply empty state over an unloaded UI. |
 | Delete | Every UI remove path notes `dalPaNoteDelete_(uid)` before render/flush. Absence on remote state = gone (unless hold). |

@@ -463,22 +463,35 @@ window.dalApplyRemotePaAssets_ = function(assets, fromCacheEmpty, snapMeta) {
   }, 300);
 };
 
+/** Never drop a peer snap — re-queue until hold / flush / ignore window clears. */
+window.dalPaRequeueRemoteApply_ = function(assets, snapMeta, delayMs) {
+  window.dalPaPendingApply_ = {
+    assets: JSON.parse(JSON.stringify(assets || [])),
+    snapMeta: snapMeta || {}
+  };
+  if (window.dalPaApplyTimer_) return;
+  var wait = Math.max(50, Number(delayMs) || 350);
+  window.dalPaApplyTimer_ = setTimeout(function() {
+    window.dalPaApplyTimer_ = null;
+    var pending = window.dalPaPendingApply_;
+    window.dalPaPendingApply_ = null;
+    if (pending) window.dalApplyRemotePaAssetsNow_(pending.assets, pending.snapMeta);
+  }, wait);
+};
+
 window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   snapMeta = snapMeta || {};
-  if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) return;
-  if (window.dalPaFlushInFlight) return;
+  if (Date.now() < (window.dalPaIgnoreListenerUntil || 0)) {
+    window.dalPaRequeueRemoteApply_(assets, snapMeta, (window.dalPaIgnoreListenerUntil - Date.now()) + 50);
+    return;
+  }
+  if (window.dalPaFlushInFlight) {
+    window.dalPaRequeueRemoteApply_(assets, snapMeta, 200);
+    return;
+  }
   if (!window.dalPrepUiOpen) return;
   if (window.dalPaAnyHoldActive_()) {
-    // Re-queue — do not drop the latest snap while local hold is active.
-    window.dalPaPendingApply_ = { assets: JSON.parse(JSON.stringify(assets || [])), snapMeta: snapMeta };
-    if (!window.dalPaApplyTimer_) {
-      window.dalPaApplyTimer_ = setTimeout(function() {
-        window.dalPaApplyTimer_ = null;
-        var pending = window.dalPaPendingApply_;
-        window.dalPaPendingApply_ = null;
-        if (pending) window.dalApplyRemotePaAssetsNow_(pending.assets, pending.snapMeta);
-      }, 350);
-    }
+    window.dalPaRequeueRemoteApply_(assets, snapMeta, 350);
     return;
   }
 
@@ -490,9 +503,13 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
 
   var fixtureSig = window.dalPaFixturesSig_(serverAssets);
   if (fixtureSig === window.dalPaLastRemoteSig) return;
-  // After local flush, ignore lagging snaps that do not yet show our fixture state.
+  // After local flush: drop only strictly older state docs. Do NOT compare fixture
+  // signatures here — lastDocWriteSeq is bumped when the snap arrives (before apply),
+  // so a peer write at the new seq looks "equal" and was wrongly discarded (missed updates).
   if (window.dalPaFlushGuardUntil_ && Date.now() < window.dalPaFlushGuardUntil_) {
-    if (window.dalPaExpectedFixtureSig_ && fixtureSig !== window.dalPaExpectedFixtureSig_) return;
+    var remoteSeq = Number(snapMeta.docWriteSeq || 0) || 0;
+    var lastSeq = Number(window.dalPaLastDocWriteSeq_ || 0) || 0;
+    if (remoteSeq && lastSeq && remoteSeq < lastSeq) return;
   }
 
   var hasTouches = window.dalPaHasPendingTouches_();
@@ -1644,8 +1661,7 @@ window.dalFlushPaIfPrepOpen_ = function() {
           finish(true);
           return;
         }
-        try { console.warn('Direct PA Firestore write failed — blocking further edits (H1):', writeErr); } catch (e2) { /* ignore */ }
-        window.enterDalPaLiveSyncBlocked_(projectId, 'write failed');
+        try { console.warn('Direct PA Firestore write failed (touches kept for retry):', writeErr); } catch (e2) { /* ignore */ }
         finish(false);
       });
       return;

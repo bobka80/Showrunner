@@ -123,6 +123,34 @@ var mid = core.simulateAuthFailMidEdit();
 console.log('  mode=%s store %s→%s local=%s', mid.mode, mid.storeBefore, mid.storeAfter, mid.localQty);
 assert(mid.ok, 'mid-edit auth fail: store stays at 5, local may be 9, flush denied');
 
+// Case L: FlushGuard must not drop peer snaps (missed update class).
+// Does NOT cover: host bridge delivery; fromCache; hold re-queue timing.
+console.log('\n--- Case L: FlushGuard must not drop peer update ---');
+assert(!core.shouldApplyDuringFlushGuard({
+  mode: 'buggy',
+  guardActive: true,
+  fixtureSig: 'peer-changed',
+  expectedSig: 'my-flush',
+  remoteSeq: 6,
+  lastSeq: 6
+}), 'buggy: sig mismatch drops peer (bug proof)');
+assert(core.shouldApplyDuringFlushGuard({
+  mode: 'fixed',
+  guardActive: true,
+  fixtureSig: 'peer-changed',
+  expectedSig: 'my-flush',
+  remoteSeq: 6,
+  lastSeq: 6
+}), 'fixed: equal/newer seq applies peer');
+assert(!core.shouldApplyDuringFlushGuard({
+  mode: 'fixed',
+  guardActive: true,
+  fixtureSig: 'stale',
+  expectedSig: 'my-flush',
+  remoteSeq: 4,
+  lastSeq: 6
+}), 'fixed: older seq still dropped');
+
 console.log('\n--- Unit: patchMergeFixtures only applies touches ---');
 var merged = core.patchMergeFixtures(
   [{ uid: 'u1', qty: 5 }, { uid: 'u2', qty: 1 }],
@@ -155,5 +183,5 @@ if (process.exitCode) {
   console.error('\nDAL PA live-sync TEST FAILED');
   process.exit(1);
 }
-console.log('\nDAL PA live-sync TEST PASSED (Cases A–K + units)');
+console.log('\nDAL PA live-sync TEST PASSED (Cases A–L + units)');
 process.exit(0);

@@ -659,6 +659,28 @@ module.exports = {
       ok: !allowAfter && storeBefore === 5 && storeAfter === 5 && Number(row.qty) === 9
     };
   },
+  /**
+   * Case L: after local flush, FlushGuard must not drop a peer's newer/equal-seq state
+   * that differs from expected local sig (production miss).
+   * mode 'buggy' = old sig-mismatch drop; 'fixed' = only drop remoteSeq < lastSeq.
+   */
+  shouldApplyDuringFlushGuard: function(opts) {
+    opts = opts || {};
+    var mode = opts.mode || 'fixed';
+    var guardActive = !!opts.guardActive;
+    var fixtureSig = String(opts.fixtureSig || '');
+    var expectedSig = String(opts.expectedSig || '');
+    var remoteSeq = Number(opts.remoteSeq || 0) || 0;
+    var lastSeq = Number(opts.lastSeq || 0) || 0;
+    if (!guardActive) return true;
+    if (mode === 'buggy') {
+      if (expectedSig && fixtureSig !== expectedSig) return false;
+      return true;
+    }
+    // fixed: only strictly older docs
+    if (remoteSeq && lastSeq && remoteSeq < lastSeq) return false;
+    return true;
+  },
   /** After END, refuse reopen for the same sessionUid. */
   shouldAllowRemotePrepOpen: function(opts) {
     opts = opts || {};

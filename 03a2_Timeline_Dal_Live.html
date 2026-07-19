@@ -723,9 +723,7 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
           finish();
           return;
         }
-        try { console.warn('Timeline Firestore patch failed — blocking edits (H1):', writeErr); } catch (e1) { /* ignore */ }
-        var pid = window.dalTlWatchProjectId || '';
-        if (pid) window.enterDalTlLiveSyncBlocked_(pid, 'write failed');
+        try { console.warn('Timeline Firestore patch failed (mutations kept for retry):', writeErr); } catch (e1) { /* ignore */ }
         finish();
       });
       return;
