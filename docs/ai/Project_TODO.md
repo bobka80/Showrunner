@@ -16,13 +16,15 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-19)
 
-**Primary next campaign:** Multi-user fork — **(1) testing pipeline H0 → (2) bulletproof multi-user → (3) auto fork** — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md). **Point new agents at that file.** Process depth: [active/bulletproof-multiuser-live-editors-2026-07-18.md](active/bulletproof-multiuser-live-editors-2026-07-18.md).
+**Primary campaign:** Multi-user fork — **A0 + H1 + H5 done**; sync rework @ **v654** (prep live rollback until H5 pin). **Next: Gap 1 (A3)** — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md). Process: [active/bulletproof-multiuser-live-editors-2026-07-18.md](active/bulletproof-multiuser-live-editors-2026-07-18.md).
 
 | Stage | What | Gate |
 |-------|------|------|
-| **A0** | Testing pipeline (sim scope, mutation gate, mode-seam) | Before product H-items |
-| **A1** | Bulletproof multi-user (H1–H5 + Gap 1 lint) | Before auto fork |
-| **B** | Auto fork + pull-in + idle eject | After Part A; milestone try/revert |
+| **A0** | Testing pipeline | **Done** (director smoke) |
+| **A1 / H1** | Fail closed weak sync | **Done** (v648) |
+| **A2 / H5** | Mutation inventory + timeline twin | **Done** |
+| **A3–A6** | Gap 1 → H4 → H3 → H2 | **Next: Gap 1** |
+| **B** | Auto fork + pull-in + idle eject | After Part A exit |
 
 Also on the board (do not mix into the fork campaign without director pick):
 
@@ -39,9 +41,9 @@ Also on the board (do not mix into the fork campaign without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Multi-user fork: test pipeline → bulletproof → auto fork** | **NEXT — A0 testing first** | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **Multi-user fork: test pipeline → bulletproof → auto fork** | **NEXT — Gap 1 (A3)** (H5 done; prep live rollback **v654** until pin) | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | Near-complete — prep live **v645** · sync approach = batch upsert SSOT · rollback **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
+| **Data access layer (DAL + router)** | Near-complete — prep live rollback **v654** · DAL-era **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
 
 ---
 
@@ -66,7 +68,7 @@ Also on the board (do not mix into the fork campaign without director pick):
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
 | Session fork platform | Backlog — Firebase buffer + router | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
 | Unified data cache engine **+ data access layer (backend abstraction)** | **Phase 6B + Hub atomic live** — [active/data-access-layer.md](active/data-access-layer.md) | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
-| Warehouse prep session | Partial — PA fork live **stable**; auto-fork = campaign **Part B** (after A0+A1) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| Warehouse prep session | Partial — PA fork live rollback **v654**; auto-fork = campaign **Part B** (after Part A) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
 | Timeline collab session | Live sync stable; **auto fork** = campaign **Part B** | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
 

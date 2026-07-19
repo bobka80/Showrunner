@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Deploy:** [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md)
 
-**Production:** GAS v575 per `RELEASES.md` · **Last swept:** 2026-07-15
+**Production:** see `RELEASES.md` tip (GAS **v654**) · **Last swept:** 2026-07-19
 
 Showrunner ships through a **PWA wrapper** (Firebase `web.app` → `host-boot.js` → GAS iframe). Pre-ship runs **only the layers that match your changes** — not a full audit every time.
 

@@ -160,8 +160,21 @@ function openNoteModal(id, type, e) {
     const commitNote = () => {
         if (!document.body.contains(input)) return; 
         let noteTxt = input.value.trim();
-        if (type === 'shift') { let s = shifts.find(x => x.id === id); if (s) s.note = noteTxt; drawShifts(); } 
-        else { let p = activePhases.find(x => x.id === id); if (p) p.note = noteTxt; renderPhases(); }
+        if (type === 'shift') {
+          let s = shifts.find(x => x.id === id);
+          if (s) {
+            s.note = noteTxt;
+            if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(s.id);
+          }
+          drawShifts();
+        } else {
+          let p = activePhases.find(x => x.id === id);
+          if (p) {
+            p.note = noteTxt;
+            if (typeof window.dalTlNotePhaseTouch_ === 'function') window.dalTlNotePhaseTouch_(p.id);
+          }
+          renderPhases();
+        }
         window.isTimelineDirty = true;
         if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
     };
@@ -214,9 +227,15 @@ function toggleIndicatorState(id, newState) {
   if(!targetShift || isTruck(targetShift.user_uid || targetShift.email)) return;
   
   if(selectedIds.has(id) && selectedIds.size > 1) {
-    shifts.forEach(s => { if(selectedIds.has(s.id) && !isTruck(s.user_uid || s.email)) s.hasArrow = newState; });
+    shifts.forEach(s => {
+      if(selectedIds.has(s.id) && !isTruck(s.user_uid || s.email)) {
+        s.hasArrow = newState;
+        if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(s.id);
+      }
+    });
   } else {
     targetShift.hasArrow = newState;
+    if (typeof window.dalTlNoteShiftTouch_ === 'function') window.dalTlNoteShiftTouch_(targetShift.id);
   }
   drawShifts();
   window.isTimelineDirty = true;

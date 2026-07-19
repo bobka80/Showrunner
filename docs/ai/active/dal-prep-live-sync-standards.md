@@ -8,7 +8,7 @@
 
 **Purpose:** Durable campaign doctrine for **warehouse prep multi-user live sync**. Not an incident log. Fresh agents read this **before** another prep live sync code change.
 
-**Locked:** 2026-07-18 (industry harden + process) · **Session UI baseline:** GAS **v645**. **Floor workflow (director 2026-07-19):** [multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](multi-user-fork-industrial-and-auto.md) — search/formula batch absolute upserts are **primary**; floor +/- combine (v653) is **secondary**. Hosting `host-boot.js?v=652`.
+**Locked:** 2026-07-18 (industry harden + process) · **Prep live rollback / production (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. **Floor workflow:** [multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](multi-user-fork-industrial-and-auto.md) — search/formula batch absolute upserts **primary**; floor +/- combine **secondary**.
 
 **Canonical “how it works” (session + fixtures):** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep / timeline session UI · § DAL prep PA fork live sync.
 
@@ -153,10 +153,12 @@ If a path mutates without note → **bug**, not “edge case.”
 
 ## 6. Stable baseline (director-confirmed)
 
-**GAS v645** (2026-07-18) — prep session banner + fixture live sync stable in director multi-user smoke.
+**GAS v654** (2026-07-19) + hosting **`host-boot.js?v=653`** — **prep live rollback**. Floor scope + batch absolute upsert SSOT + no flash-then-revert (Case P) + noteTouch pack/CLI paths. Director: this is the known-good to restore if later ships break prep multi-user.
 
-**GAS v653** (2026-07-19) + hosting **`host-boot.js?v=652`** — heal + optional same-row +/- deltas (Case O). **Floor scope lock** (same day): campaign § **Warehouse prep — real multi-user scope** — batch search/formula upserts are primary.
+**History (do not use as rollback unless director says so):**
+- **v645** — session banner + early fixture live smoke  
+- **v653** — heal + same-row +/- deltas (Case O)  
 
-Incidents closed into FRAGILE definition: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md).  
+Incidents closed into FRAGILE: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md).  
 
-**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **H0 testing → bulletproof H1–H5 + Gap 1 → Part B auto fork**. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).
+**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **A0 + H1 done → H5 next → Gap 1 → H4 → H3 → H2 → Part A exit → Part B**. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).

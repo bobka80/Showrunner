@@ -33,25 +33,23 @@ var MUST_NOTE = [
   'removePa',
   'addPa',
   'addPaGroup',
-  'addSelectedVaultPa'
+  'addSelectedVaultPa',
+  'updateLocationName',
+  'toggleGroupShortage',
+  'updateFormulaInline',
+  'cancelFormulaEdit'
 ];
 
 /**
- * Mutators that change the array but are not live fixture qty/delete paths yet.
- * H5 (hub A2) should shrink this list — each entry needs a product decision.
+ * Mutators that change the array but are not live fixture paths (or local shells).
+ * Keep this list small — each entry needs a product reason.
  */
 var ALLOWLIST = {
   createNewSublistPa: 'local DUMMY empty-group shell — no uid until real fixtures added',
-  syncFormulaToItems: 'renames formula strings on items — metadata; H5 may add touch',
-  modifyFormulaText: 'formula label string rewrite — not fixture qty live path',
-  updateFormulaDept: 'dept override metadata — H5 may add touch',
-  cancelFormulaEdit: 'local formula-edit restore from backup — not live flush path',
-  updateFormulaInline: 'formula rewrite rebuild — notes via insert/remove paths TBD H5',
-  updateLocationName: 'location string rename on group — H5 may add touch',
-  toggleGroupShortage: 'shortage flag on group — H5 may add touch'
+  updateFormulaDept: 'overrideDept not in live FS fixture schema/sigs yet — Sheets-only until field added'
 };
 
-var MUTATE_RE = /currentProjectAssets\s*=|currentProjectAssets\.(push|splice|unshift|pop|shift)\s*\(/;
+var MUTATE_RE = /currentProjectAssets\s*=|currentProjectAssets\.(push|splice|unshift|pop|shift)\s*\(|currentProjectAssets\.forEach\s*\(/;
 /** Direct notes, insert helper (notes), or wrappers that only call addPa (which inserts). */
 var NOTE_RE = /dalPaNote(Touch|Delete)_|insertIntoProjectAssets\s*\(|\baddPa\s*\(/;
 
@@ -93,7 +91,7 @@ function main() {
     }
     var mutatesOrChains = MUTATE_RE.test(f.body) || /insertIntoProjectAssets\s*\(|\baddPa\s*\(/.test(f.body);
     if (!mutatesOrChains) {
-      errors.push(name + ': listed MUST_NOTE but no currentProjectAssets mutate / insert / addPa call found');
+      errors.push(name + ': listed MUST_NOTE but no currentProjectAssets mutate / forEach / insert / addPa call found');
     }
     if (!NOTE_RE.test(f.body)) {
       errors.push(name + ': mutates fixtures but no dalPaNoteTouch_/dalPaNoteDelete_/insertIntoProjectAssets/addPa');
@@ -134,7 +132,6 @@ function main() {
     process.exit(1);
   }
   console.log('Mutation inventory OK (PA)');
-  console.log('Note: timeline mutators (03b/03c/03e) enforced under hub A2 / H5 twin pass.');
   process.exit(0);
 }
 

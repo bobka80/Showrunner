@@ -50,8 +50,9 @@ function runDalGates({ forDeploy }) {
   });
   // Timeline-parity PA live sync regression (pure sim — no Firebase credentials required).
   runNode('scripts/dal-pa-live-sync-test.js', [], 'PA live sync timeline-parity test');
-  // H0: every PA mutator notes touch/delete (or explicit allowlist debt for H5).
+  // H0/H5: every PA + timeline mutator notes touch/delete (or explicit allowlist).
   runNode('scripts/dal-mutation-inventory-check.js', [], 'PA mutation inventory (touch/delete notes)');
+  runNode('scripts/dal-tl-mutation-inventory-check.js', [], 'timeline mutation inventory (dalTlNote*)');
   console.log('  → DAL gates OK');
   return {
     ok: true,
@@ -60,7 +61,8 @@ function runDalGates({ forDeploy }) {
       'dal-client-inventory',
       'dal-phase3-gate',
       'dal-pa-live-sync-test',
-      'dal-mutation-inventory-check'
+      'dal-mutation-inventory-check',
+      'dal-tl-mutation-inventory-check'
     ]
   };
 }

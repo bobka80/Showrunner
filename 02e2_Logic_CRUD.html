@@ -713,11 +713,20 @@ function cancelFormulaEdit() {
         currentProjectAssets = currentProjectAssets.filter(pa => {
             let pLoc = pa.location || "General";
             let pForm = pa.formula || "Standalone";
-            return !(pLoc === loc && pForm === form);
+            let kill = (pLoc === loc && pForm === form);
+            if (kill && typeof window.dalPaNoteDelete_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                window.dalPaNoteDelete_(pa.uid);
+            }
+            return !kill;
         });
         
         if (window.backupFormulaGroup && window.backupFormulaGroup.length > 0) {
             currentProjectAssets.push(...window.backupFormulaGroup);
+            window.backupFormulaGroup.forEach(pa => {
+                if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                    window.dalPaNoteTouch_(pa.uid);
+                }
+            });
         }
     }
     window.backupFormulaGroup = [];
@@ -773,7 +782,11 @@ function updateFormulaInline(loc, oldForm, newForm) {
     currentProjectAssets = currentProjectAssets.filter(pa => {
         let pLoc = pa.location || "General";
         let pForm = pa.formula || "Standalone";
-        return !(pLoc === loc && pForm === oldForm);
+        let kill = (pLoc === loc && pForm === oldForm);
+        if (kill && typeof window.dalPaNoteDelete_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+            window.dalPaNoteDelete_(pa.uid);
+        }
+        return !kill;
     });
 
     let cliInput = document.getElementById('pa-search-cli');
@@ -785,6 +798,11 @@ function updateFormulaInline(loc, oldForm, newForm) {
             if (typeof commitSyntaxCommand === 'function') commitSyntaxCommand();
         } else {
             currentProjectAssets.push(...backup);
+            backup.forEach(pa => {
+                if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                    window.dalPaNoteTouch_(pa.uid);
+                }
+            });
             alert("Invalid formula. Edit reverted.");
             cliInput.value = '';
             if (typeof executeSyntaxLive === 'function') executeSyntaxLive('');
@@ -807,6 +825,9 @@ window.updateLocationName = function(oldLoc, form, newLoc) {
         if (pLoc === oldLoc && pForm === form) {
             pa.location = newLoc;
             pa.formula = newForm;
+            if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                window.dalPaNoteTouch_(pa.uid);
+            }
         }
     });
 
@@ -825,6 +846,9 @@ window.toggleGroupShortage = function(loc, form, isShort) {
         let pForm = pa.formula || "Standalone";
         if (pLoc === loc && pForm === form) {
             pa.isShortage = isShort;
+            if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
+                window.dalPaNoteTouch_(pa.uid);
+            }
         }
     });
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();

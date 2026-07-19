@@ -451,7 +451,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Slice D:** [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) · **Design lock:** [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) · **Prep live doctrine:** [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md)
 
-**Stable baseline (director-confirmed 2026-07-18):** Behavior locked at GAS **v645**; docs lock milestone **v646**. Hosting `host-boot.js?v=635` for PA patch. Do not “simplify” the session-UI rules below without a new failing test + director OK.
+**Stable baseline (director-confirmed 2026-07-19):** Prep live **rollback = GAS v654** + hosting `host-boot.js?v=653` (sync rework + floor scope). Do not “simplify” the session-UI rules below without a new failing test + director OK. (Historical smoke: v645 session banner lock.)
 
 **Plain language:** Prep and timeline collab can both be open on one project (independent forks). The **banner** means “live sync is on.” Turning the banner off **stops** fixture live sync (`stopDalPaLiveSync_`). Session open/close must be rock-solid so the equipment list does not silently diverge.
 
@@ -539,7 +539,7 @@ Hard-refresh **two browsers** on web.app (banner must say **live sync (patch)**)
 5. START PREP again on A → B gets a **new** banner.  
 6. Optional: timeline collab both sides stays independent of prep.
 
-**AI rule:** Before editing these files, re-read this section + § prep PA fork live sync + campaign **floor scope**. Prefer one root-cause ship. Session UI known-good: **GAS v645**.
+**AI rule:** Before editing these files, re-read this section + § prep PA fork live sync + campaign **floor scope**. Prefer one root-cause ship. Prep live rollback: **GAS v654** + `host-boot.js?v=653`.
 
 ---
 ## DAL timeline fork live sync (collab strips)
@@ -667,7 +667,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 
 ### Smoke (prep PA live)
 
-Hard-refresh browsers on web.app (banner **live sync (patch)**). Floor scope: campaign § Warehouse prep. Session UI **v645**.
+Hard-refresh browsers on web.app (banner **live sync (patch)**). Floor scope: campaign § Warehouse prep. Prep live rollback **v654** + `host-boot.js?v=653`.
 
 1. A **search/formula batch-add** many rows; B idle — B shows full batch; **no** flip-back.  
 2. A and B add into **different** sublists near-simultaneously — both batches stick.  
@@ -736,7 +736,7 @@ CAUSE: Incomplete touch/delete notes + seed-from-local; meta dual-missing-snap /
 FRAGILE ZONE: DAL prep / timeline session UI; DAL prep PA fork live sync
 FILES TOUCHED: 02e2_Logic_CRUD.html, 02e6_Dal_Session.html, 02e7_Dal_Firestore_Client.html, host-boot PA_PATCH (earlier), scripts/dal-pa-live-sync-*.js, FRAGILE, dal-prep-live-sync-standards.md
 ATTEMPTS BEFORE THIS HELD: ~7 ships (v639–v645) after earlier false-green sims (v628–v638); lasting behavior at sticky ended sessionUid (v645), docs lock v646.
-LESSON: Banner off = sync off. Close only meta+Sheets agree (or meta-end timeout). After END block same sessionUid. Fixture writes = touch/delete maps + txn state doc only. Stable baseline GAS v645. See FRAGILE § session UI "How prep session UI works now".
+LESSON: Banner off = sync off. Close only meta+Sheets agree (or meta-end timeout). After END block same sessionUid. Fixture writes = touch/delete maps + txn state doc only. **Current prep live rollback GAS v654** (this incident closed at v645 era). See FRAGILE § session UI "How prep session UI works now".
 ```
 
 #### 2026-07-16 — Dual-domain session UI + prep latch sync (fixed v604–v606)

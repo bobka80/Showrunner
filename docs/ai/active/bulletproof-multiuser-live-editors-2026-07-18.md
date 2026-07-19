@@ -94,7 +94,7 @@ Sequences Parts 1–2 with hub H-items. **Checkbox progress lives only on the hu
 ### Phase H0 — Testing infrastructure upgrade (**do this first**) ✅ 2026-07-19
 
 - [x] Add scope/non-coverage comments to every existing sim case (1.1) — Cases A–J
-- [x] Build `dal-mutation-inventory-check.js` as a permanent gate (1.3) — PA in `pre-ship/dal.js`; timeline twin = hub A2
+- [x] Build `dal-mutation-inventory-check.js` as a permanent gate (1.3) — PA + timeline twin in `pre-ship/dal.js` (hub A2/H5)
 - [x] Add mode-switch-seam sim cases (1.4) — Case H backs Gap 1
 - [x] Add "attempts before fix held" field to incident log template (1.5)
 - [x] Absorb former **H6** intent — Case I (3-client), Case J (sticky ended sessionUid)

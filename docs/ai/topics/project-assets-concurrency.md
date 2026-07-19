@@ -3,7 +3,18 @@
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Related:** [logistics-warehouse.md](logistics-warehouse.md) · [warehouse-prep-session.md](warehouse-prep-session.md) · [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Last swept:** 2026-07-02 · **Status:** Backlog — checkout ledger shared; list editing still single-editor semantics (mobile auto-save shipped v368)
+**Last swept:** 2026-07-19 · **Status:** Split — **prep multi-user live** is canonical on the fork campaign; this file = **normal-day Sheets** + checkout digest backlog
+
+---
+
+## Where multi-user truth lives (locked 2026-07-19)
+
+| Mode | Canonical doc |
+|------|----------------|
+| **START PREP open** (Firebase PA fork, live patch, search/formula batch adds, pack, floor +/-) | [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md) · [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md) · FRAGILE prep PA |
+| **Normal day** (no prep session — Sheets `saveProjectAssetsDelta`, mobile auto-save, collision gaps) | **This file** (below) |
+
+Do **not** treat the backlog below as the prep-floor sync model. Prep live rollback: GAS **v654** + `host-boot.js?v=653`.
 
 ---
 
@@ -23,15 +34,17 @@ Project Assets is the **hot zone** during load-out and recovery: many people on 
 - [x] Multi-scanner checkout batch queue (~1.5s) + resume from ledger
 - [x] Department **view** filters in packing (`packingDeptFilters`) — UI only, not server isolation
 - [x] Mobile compact PA (`01h_Mobile_Assets.html`) — limited surface; **debounced auto-save** (explicit-save mode off since v368)
+- [x] **Prep multi-user live** (START PREP) — Firebase `assets/state` + patch sync — see campaign (not this backlog)
 
-## Known gaps (honest assessment)
+## Known gaps — normal-day Sheets only (honest assessment)
+
+These apply when prep is **not** open (or to checkout UI / digests). Prep live list sync is **not** “single-editor.”
 
 - [ ] **No collision/version check** on `saveProjectAssetsDelta` (unlike `saveProjectData` `COLLISION_DETECTED`)
-- [ ] **Sparse auto-save** on desktop — pack/unpack/add often local until SAVE or design→packing switch
-- [ ] **Merge favors local** for matching `uid` rows — risky when two editors touch the same row
+- [ ] **Sparse auto-save** on desktop outside prep — pack/unpack/add often local until SAVE
+- [ ] **Merge favors local** on Sheets save for matching `uid` rows
 - [ ] **Checkout UI not live across clients** — ledger is shared; per-screen `scannedQty` can drift until resume/reload
 - [ ] **Presence not wired to PA** — `reportProjectPresence` used for Timeline lock only
-- [ ] **No pull while PA modal open** — list stale until save/reopen/sync
 - [ ] **Finalize checkout** does not yet write `scan_status` / vault location (TODOs in `Operations.js`)
 
 ---
@@ -70,7 +83,7 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 
 ---
 
-## Planned — concurrency hardening (desktop + mobile)
+## Planned — concurrency hardening (desktop + mobile, normal-day)
 
 **Phase 1 — stop silent data loss**
 - [ ] `Last_Updated` or revision check on `saveProjectAssetsDelta`
@@ -95,10 +108,11 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 4. Desktop auto-save + merge improvements  
 5. Checkout/list status closure  
 
-**Floor / prep mode (multi-user at scale):** When **Start preparation** ships, PA + expanded ledger move to the Firebase fork — see [warehouse-prep-session.md](warehouse-prep-session.md). **Prerequisite:** [active/data-access-layer.md](../active/data-access-layer.md) (repos + router before Firebase). **Cache policies** flip to `session-live` backend — [data-cache-engine.md](data-cache-engine.md). This doc stays authoritative for **normal-day** Sheets concurrency until then.
+**Floor / prep mode:** Live multi-user list = [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md). Prep session UX shell: [warehouse-prep-session.md](warehouse-prep-session.md).
 
 ---
 
-## Alerts
+## Related
 
-Warehouse logistics alerts (transit, etc.): [notifications-catalog.md](notifications-catalog.md).
+- Equipment model / two packing engines: [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
+- Warehouse RFID / gate: [logistics-warehouse.md](logistics-warehouse.md)

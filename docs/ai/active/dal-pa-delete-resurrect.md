@@ -1,11 +1,11 @@
 # Prep PA live sync — delete / resurrect failure (2026-07-18)
 
-**Status:** **Stable** — director-confirmed with session UI at GAS **v645**. Delete notes + seed-once + Cases E–G. Canonical how-it-works: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § session UI + § prep PA.  
-**Campaign:** [data-access-layer.md](data-access-layer.md)  
+**Status:** **Closed into FRAGILE** — delete notes + seed-once + Cases E–G. **Current prep live rollback:** GAS **v654**. Canonical: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § session UI + § prep PA. Floor scope: [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).  
+**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) · [data-access-layer.md](data-access-layer.md)  
 **Prior science:** [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md) · [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ timeline / prep PA / session UI  
-**Industry + process (canonical):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — Figma/Linear-class entity patch; harden H1–H6; prove-with-sim before ship.
+**Industry + process (canonical):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md)
 
-**Production at report:** GAS **v638** + hosting `host-boot.js?v=635` · Rollback baseline **v576**
+**Historical production at report:** GAS **v638** + hosting `host-boot.js?v=635` · DAL-era rollback **v576**
 
 ---
 

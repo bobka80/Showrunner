@@ -4,7 +4,7 @@
 
 This doc maps **Cursor IDE features** (rules, skills, subagents, review agents) onto the doctrine you already use. It does not replace `AI_DOCTRINE.md` — it is the stable reference for *how to run sessions in Cursor*.
 
-`Last swept:` 2026-07-15 · `Production:` GAS v575 per `RELEASES.md`
+`Last swept:` 2026-07-19 · `Production:` see `RELEASES.md` tip (GAS **v654**)
 
 ---
 

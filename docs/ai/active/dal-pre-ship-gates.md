@@ -68,7 +68,8 @@ Wired from `pre-ship/layers.js` → `runDalGates()`:
 2. scripts/dal-client-inventory.js --check
 3. scripts/dal-phase3-gate.js [--deploy]
 4. scripts/dal-pa-live-sync-test.js          # Cases A–J (scope + mode seam + 3-client)
-5. scripts/dal-mutation-inventory-check.js  # PA touch/delete notes (ALLOWLIST = H5 debt)
+5. scripts/dal-mutation-inventory-check.js     # PA touch/delete notes
+6. scripts/dal-tl-mutation-inventory-check.js  # timeline dalTlNote* (H5 twin)
 ```
 
 ---
@@ -219,7 +220,7 @@ All scripts are **Node-only** (`gas-node-only.js`) — never deployed to GAS.
 - Flag `saveProjectAssets(` / `saveTimelineData(` reachable from Firestore-mode code paths unless allowlisted with reason comment  
 - Flag GAS response objects fed into live apply helpers without confirming `writeSeq` presence  
 
-**Also shipped (hub A0):** `scripts/dal-mutation-inventory-check.js` — PA mutators note touch/delete (or explicit ALLOWLIST debt for A2/H5). Wired in `pre-ship/dal.js`. Timeline twin still A2.
+**Also shipped (hub A0 + A2/H5):** `scripts/dal-mutation-inventory-check.js` (PA) + `scripts/dal-tl-mutation-inventory-check.js` (timeline twin). Wired in `pre-ship/dal.js`.
 
 **Other domains (RBAC, FCM, truck, financials):** [pre-ship-pipeline-expansion-2026-07-18.md](pre-ship-pipeline-expansion-2026-07-18.md) — parallel board, not this Gap 1.
 

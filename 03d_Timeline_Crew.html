@@ -15,8 +15,18 @@ function openCrewManager() {
 }
 
 function cancelCrewManager() {
+    var beforeOverrides = localDeptOverrides || {};
     globalAssignedArr = [...backupGlobalAssignedArr];
     localDeptOverrides = JSON.parse(JSON.stringify(backupLocalDeptOverrides));
+    var changed = false;
+    var noteUids = {};
+    Object.keys(beforeOverrides).forEach(function(u) { noteUids[u] = 1; });
+    Object.keys(localDeptOverrides || {}).forEach(function(u) { noteUids[u] = 1; });
+    Object.keys(noteUids).forEach(function(uid) {
+      if ((beforeOverrides[uid] || '') === (localDeptOverrides[uid] || '')) return;
+      changed = true;
+      if (typeof window.dalTlNoteOverrideTouch_ === 'function') window.dalTlNoteOverrideTouch_(uid);
+    });
     
     document.querySelectorAll('.internal-cb').forEach(cb => {
         cb.checked = globalAssignedArr.includes(cb.value);
@@ -24,6 +34,19 @@ function cancelCrewManager() {
     
     rebuildTimelineGrid();
     document.getElementById('crew-manager-modal').style.display = 'none';
+    if (changed) {
+      window.isTimelineDirty = true;
+      if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
+    }
+}
+
+/** DONE — keep modal edits; flush any pending override touches once. */
+function doneCrewManager() {
+    document.getElementById('crew-manager-modal').style.display = 'none';
+    if (typeof window.dalTlHasPendingMutations_ === 'function' && window.dalTlHasPendingMutations_()) {
+      window.isTimelineDirty = true;
+      if (typeof dalFlushTimelineIfCollabOpen_ === 'function') dalFlushTimelineIfCollabOpen_();
+    }
 }
 
 function renderCrewManagerBody() {
@@ -85,9 +108,12 @@ function toggleCrewModalAssign(uid, isChecked) {
 
 function changeCrewModalDept(uid, newDept) {
     localDeptOverrides[uid] = newDept;
+    if (typeof window.dalTlNoteOverrideTouch_ === 'function') window.dalTlNoteOverrideTouch_(uid);
     let hiddenCb = document.querySelector(`.crew-cb[value="${uid}"]`);
     if (hiddenCb) hiddenCb.dataset.dept = newDept;
     renderCrewManagerBody(); 
     if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+    window.isTimelineDirty = true;
+    // Defer flush to DONE/CANCEL so mid-modal cancel cannot race an in-flight write clear.
 }
 </script>

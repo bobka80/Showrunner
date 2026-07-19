@@ -8,7 +8,7 @@
 
 **Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. **Blocked items** remain on [../active/data-access-layer.md](../active/data-access-layer.md).
 
-**Live sync:** Session UI baseline GAS **v645**; hosting `host-boot.js?v=652`. **Floor scope (locked):** search/formula batch absolute adds are primary; packing + RFID checkout run in parallel; floor +/- secondary — [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
+**Live sync:** Production / prep live rollback GAS **v654** + `host-boot.js?v=653`. **Floor scope (locked):** search/formula batch absolute adds primary; packing + RFID checkout parallel; floor +/- secondary — [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
 
 **Last swept:** 2026-07-19
 

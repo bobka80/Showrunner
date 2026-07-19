@@ -1,14 +1,15 @@
 # Active — Multi-user fork: industrial harden → auto fork (timeline + PA)
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Predecessor:** [data-access-layer.md](data-access-layer.md) — prep/timeline forks **stable** at GAS **v645** (docs **v646**). Rollback DAL era: **v576**.  
+**Predecessor:** [data-access-layer.md](data-access-layer.md) — prep/timeline forks. **Prep live rollback (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. DAL-era catastrophic rollback: **v576**.  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ DAL prep / timeline session UI · prep PA fork live sync · timeline fork live sync  
 **How live works today:** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) · FRAGILE “How prep session UI works now”  
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** Floor scope locked; sync rework in flight (batch upsert SSOT + no flash-then-revert). Next also **H5**. Fresh agents: read § floor scope first.  
-**Production:** GAS **v653** · hosting `host-boot.js?v=652` (bump on this ship) · Prep banner **`live sync (patch)`**  
+**Opened:** 2026-07-18 · **Status:** **A0 complete** · **H1 shipped** · **H5 shipped** (PA + timeline mutation inventory). Next: **Gap 1 (A3)** or director pick. Fresh agents: read § floor scope first.  
+**Production / prep live rollback:** GAS **v654** · hosting `host-boot.js?v=653` · Prep banner **`live sync (patch)`** — update pins after H5 milestone  
+  
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
 ---
@@ -28,7 +29,7 @@
 
 ## Warehouse prep — real multi-user scope (locked 2026-07-19)
 
-**Director lock.** Explained in session; agents must not divert back to an “increments are the product” mental model. Equipment model: [../EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md). Prep session: [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md). Concurrency intent: [../topics/project-assets-concurrency.md](../topics/project-assets-concurrency.md).
+**Director lock.** Explained in session; agents must not divert back to an “increments are the product” mental model. Equipment model: [../EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md). Prep session: [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md). **Prep multi-user list = this campaign (floor scope).** Normal-day Sheets backlog only: [../topics/project-assets-concurrency.md](../topics/project-assets-concurrency.md).
 
 ### What prep actually is
 
@@ -109,20 +110,20 @@ Technical merge rules and never-dos stay in [dal-prep-live-sync-standards.md](da
 
 ## Baseline (do not regress)
 
-Director-confirmed **manual** multi-user prep (and timeline twin):
+Director-confirmed **manual** multi-user prep (and timeline twin) — **rollback = GAS v654** + `host-boot.js?v=653`:
 
 - Live list = `projects/{id}/assets/state` (or `timeline/state`) + transactional touch/delete patch  
 - Banner **`live sync (patch)`** while open; banner off = live sync off  
 - END: `_meta` + Sheets agree (or meta-end timeout); after END block **same `sessionUid`** reopen  
 - Deletes note `dalPaNoteDelete_`; seed-from-local only before remote `writeSeq`  
 - **Floor scope:** § **Warehouse prep — real multi-user scope** — search/formula **batch absolute upserts** are primary; packing + delete concurrent; floor +/- secondary  
-- **Prep qty (secondary path):** same-row multi-window +/- may **combine** via deltas (v653 Case O) — must not redefine the product as increments  
+- **Prep qty (secondary path):** same-row multi-window +/- may **combine** via deltas (Case O) — must not redefine the product as increments  
 - Apply `result.merged` / heal so UI cannot stick behind server or **flash then revert** after peer/batch applies  
-- Sim: `node scripts/dal-pa-live-sync-test.js` (Cases **A–O**) green; extend sims for **batch add** thrash when fixing revert class  
+- Sim: `node scripts/dal-pa-live-sync-test.js` (Cases **A–P**) must stay green  
 - Doctrine: this file § floor scope + [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md)  
 - Gate: `node scripts/dal-mutation-inventory-check.js` (wired in `pre-ship/dal.js`)  
 
-Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v645"** (last known good behavior) or the **Part B try-baseline** milestone named when Part B starts.
+Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v654"** (prep live known-good). DAL-era Sheets-only catastrophic rollback remains **v576**.
 
 ---
 
@@ -132,17 +133,17 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v645"** (la
 **Process depth:** [bulletproof](bulletproof-multiuser-live-editors-2026-07-18.md).  
 **This section = only checkbox list + locked order.** Do not invent a rival order in other files.
 
-### A0 — Testing pipeline (H0) — **first** ✅ harness done 2026-07-19
+### A0 — Testing pipeline (H0) — **complete** ✅ 2026-07-19
 
 - [x] Re-read FRAGILE session UI + prep PA + timeline live sections  
-- [ ] Confirm production banner **`live sync (patch)`** on web.app (two browsers) — **director smoke**  
-- [ ] Note GAS + hosting versions after next product ship (still v646 / host-boot?v=635 at A0)  
-- [x] Scope/non-coverage comments on every sim Case (A–J)  
-- [x] `scripts/dal-mutation-inventory-check.js` + wired into `pre-ship/dal.js` (PA; timeline twin = hub A2)  
+- [x] Confirm production banner **`live sync (patch)`** on web.app (two browsers) — **director smoke done**  
+- [x] Note GAS + hosting versions — **v654** / `host-boot.js?v=653` (prep live rollback)  
+- [x] Scope/non-coverage comments on every sim Case (A–J; later K–P added)  
+- [x] `scripts/dal-mutation-inventory-check.js` + `dal-tl-mutation-inventory-check.js` wired into `pre-ship/dal.js`  
 - [x] Mode-switch-seam sim cases (Case H — stale GAS while Firestore mode → reject)  
 - [x] Incident template: “How many prior attempts before this held?” (`ATTEMPTS BEFORE THIS HELD` in FRAGILE)  
 - [x] Former **H6** stronger sims absorbed: Case I (3-client delete), Case J (sticky ended sessionUid)  
-- [ ] Summarize → wait for **OK go** on first product H-item (recommend **H1** then **H5**)
+- [x] First product H-item shipped (**H1**); **H5** mutation inventory shipped (PA + timeline twin)  
 
 ### A1 — H1 Fail closed on weak sync ✅ 2026-07-19
 
@@ -153,9 +154,11 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v645"** (la
 
 ### A2 — H5 Mutation-path inventory gate
 
-- [ ] Every prep mutator of `currentProjectAssets` notes touch/delete (and timeline twin)  
-- [ ] Gate script from A0 enforced in [dal-pre-ship-gates.md](dal-pre-ship-gates.md)  
-- [ ] Prefer ship **paired with H1** (one theme: don’t silently corrupt on hot path)  
+- [x] Every prep mutator of `currentProjectAssets` notes touch/delete (and timeline twin)  
+- [x] Gate scripts enforced in [dal-pre-ship-gates.md](dal-pre-ship-gates.md): `dal-mutation-inventory-check.js` (PA) + `dal-tl-mutation-inventory-check.js` (timeline)  
+- [x] Shipped after H1 (same theme: don’t silently corrupt on hot path)  
+- [x] PA ALLOWLIST shrunk to DUMMY shell only; timeline mid-drag / sub-event ALLOWLIST documented in gate script  
+
 
 ### A3 — Gap 1 Firestore / GAS mode structural lint
 
@@ -290,6 +293,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **Order locked:** H0 testing → bulletproof H1–H5 + Gap 1 → Part B. Process → bulletproof brief. Gap 1 folded into hub (no parallel gap-closure novel). Pre-ship expansion brief filed separately. |
 | 2026-07-19 | **A0 / H0 shipped:** Cases A–J + scope comments; mutation inventory gate; FRAGILE `ATTEMPTS BEFORE THIS HELD`; ready for director OK on **H1**. |
 | 2026-07-19 | **A1 / H1 shipped:** Auth/listen/write fail → blocked mode (hard banner + edits locked); no silent GAS multi-edit; Case K mid-edit sim; timeline twin. |
+| 2026-07-19 | **A2 / H5 shipped:** PA notes on dept/location/shortage/formula rewrite/cancel; timeline notes on note/arrow/crew override; timeline inventory gate; ALLOWLIST shrunk. |
 
 ---
 
