@@ -4,11 +4,36 @@
  * Domain: Cut, Copy, and Paste Engine for bulk asset manipulation.
  */
 
+window.dalPaMarkGroupCutCopy_ = function(flag, qtyField) {
+    if (!window.selectedPaGroups || window.selectedPaGroups.size === 0) return false;
+    var any = false;
+    window.selectedPaGroups.forEach(function(key) {
+        var g = window.dalPaParseGroupKey_(key);
+        currentProjectAssets.forEach(function(pa) {
+            var pLoc = pa.location || 'General';
+            var pForm = pa.formula || 'Standalone';
+            if (pLoc === g.location && pForm === g.formula) {
+                pa[flag] = true;
+                delete pa[qtyField];
+                any = true;
+            }
+        });
+    });
+    window.selectedPaGroups.clear();
+    return any;
+};
+
 // @INDEX: PA_LOGIC -> Cut/Copy/Paste Engine
 window.cutSelectedPa = function() {
     try {
     let anyCut = false;
     currentProjectAssets.forEach(pa => { pa.isCopied = false; pa.isCut = false; delete pa.cutQty; delete pa.copiedQty; });
+
+    // Header-selected sublists: cut every fixture in those groups.
+    if (typeof window.dalPaMarkGroupCutCopy_ === 'function') {
+        if (window.dalPaMarkGroupCutCopy_('isCut', 'cutQty')) anyCut = true;
+    }
+
     if (window.selectedPaIndices.size > 0) {
         let indices = Array.from(window.selectedPaIndices);
         for (let idx of indices) {
@@ -27,14 +52,6 @@ window.cutSelectedPa = function() {
                 anyCut = true;
             }
         }
-            // --- FIX: Handle sublist group selection ---
-            if (indices.length > 0 && currentProjectAssets[indices[0]]) {
-                let pa = currentProjectAssets[indices[0]];
-                let groupItems = currentProjectAssets.filter(p => p.location === pa.location && p.formula === pa.formula);
-                if (groupItems.length > 1) {
-                    groupItems.forEach(item => { if (!item.isCut) { item.isCut = true; anyCut = true; } });
-                }
-            }
         window.selectedPaIndices.clear();
     }
     if (window.selectedSummedIds.size > 0) {
@@ -63,6 +80,7 @@ window.cutSelectedPa = function() {
     }
     window.lastSelectedPaIndex = null;
     window.lastSelectedSummedId = null;
+    window.paPasteSublistTarget = null;
     if (anyCut) renderProjectAssetsUI();
     } catch(err) { console.error("cutSelectedPa Error:", err); alert("Error cutting items: " + err.message); }
 }
@@ -71,6 +89,11 @@ window.copySelectedPa = function() {
     try {
     let anyCopied = false;
     currentProjectAssets.forEach(pa => { pa.isCut = false; pa.isCopied = false; delete pa.cutQty; delete pa.copiedQty; });
+
+    if (typeof window.dalPaMarkGroupCutCopy_ === 'function') {
+        if (window.dalPaMarkGroupCutCopy_('isCopied', 'copiedQty')) anyCopied = true;
+    }
+
     if (window.selectedPaIndices.size > 0) {
         let indices = Array.from(window.selectedPaIndices);
         for (let idx of indices) {
@@ -89,14 +112,6 @@ window.copySelectedPa = function() {
                 anyCopied = true;
             }
         }
-            // --- FIX: Handle sublist group selection ---
-            if (indices.length > 0 && currentProjectAssets[indices[0]]) {
-                let pa = currentProjectAssets[indices[0]];
-                let groupItems = currentProjectAssets.filter(p => p.location === pa.location && p.formula === pa.formula);
-                if (groupItems.length > 1) {
-                    groupItems.forEach(item => { if (!item.isCopied) { item.isCopied = true; anyCopied = true; } });
-                }
-            }
         window.selectedPaIndices.clear();
     }
     if (window.selectedSummedIds.size > 0) {
@@ -125,26 +140,57 @@ window.copySelectedPa = function() {
     }
     window.lastSelectedPaIndex = null;
     window.lastSelectedSummedId = null;
+    window.paPasteSublistTarget = null;
     if (anyCopied) renderProjectAssetsUI();
     } catch(err) { console.error("copySelectedPa Error:", err); alert("Error copying items: " + err.message); }
 }
 
+window.dalPaResolvePasteDest_ = function() {
+    if (window.paPasteSublistTarget && window.paPasteSublistTarget.location != null) {
+        return {
+            location: window.paPasteSublistTarget.location || 'General',
+            formula: window.paPasteSublistTarget.formula || 'Standalone'
+        };
+    }
+    if (window.activePaTarget) {
+        return {
+            location: window.activePaTarget.location || 'General',
+            formula: window.activePaTarget.formula || 'Standalone'
+        };
+    }
+    return null;
+};
+
+window.dalPaResolvePasteDept_ = function(dest) {
+    if (window.paSelectedDept) return window.paSelectedDept;
+    if (dest) {
+        var sample = (currentProjectAssets || []).find(function(pa) {
+            return (pa.location || 'General') === dest.location &&
+                (pa.formula || 'Standalone') === dest.formula &&
+                pa.overrideDept;
+        });
+        if (sample) return sample.overrideDept;
+    }
+    if (typeof window.dalPaEnsureWorkingDept_ === 'function') return window.dalPaEnsureWorkingDept_();
+    return '';
+};
+
 window.pasteClipboardPa = function() {
     try {
-    let targetLoc = window.activePaTarget ? window.activePaTarget.location : null;
-    let targetForm = window.activePaTarget ? window.activePaTarget.formula : null;
-
     let toPasteCuts = currentProjectAssets.filter(pa => pa.isCut);
     let toPasteCopies = currentProjectAssets.filter(pa => pa.isCopied);
     let toPaste = [...toPasteCuts, ...toPasteCopies];
     if (toPaste.length === 0) return;
 
-    let pasteDept = window.paSelectedDept;
-    if (!pasteDept) {
+    let dest = typeof window.dalPaResolvePasteDest_ === 'function' ? window.dalPaResolvePasteDest_() : null;
+    let pasteDept = typeof window.dalPaResolvePasteDept_ === 'function' ? window.dalPaResolvePasteDept_(dest) : (window.paSelectedDept || '');
+
+    // Need a place to land: sublist/item click, EDIT target, or green department (dept-only move).
+    if (!dest && !window.paSelectedDept) {
         if (typeof window.showMobilePaToast === 'function') {
-            window.showMobilePaToast('Select a department', 'Click a department header (green) to set the paste target.');
+            window.showMobilePaToast('Pick paste destination', 'Click a sublist header or item, or a green department header.');
         } else {
-            alert('Select a department first — click a department header (turns green) to set the paste target.');
+            alert('Pick a paste destination — click a sublist header/item, or a department header (green).');
         }
         return;
     }
@@ -184,20 +230,20 @@ window.pasteClipboardPa = function() {
     });
 
     itemsToInsert.forEach(pa => {
-        pa.overrideDept = pasteDept;
+        if (pasteDept) pa.overrideDept = pasteDept;
         if (!pa.uid && typeof window.dalNewUid_ === 'function') pa.uid = window.dalNewUid_();
         if (typeof window.dalPaNoteTouch_ === 'function' && pa.uid && !pa.isAuto && !pa.isGenericAuto) {
             window.dalPaNoteTouch_(pa.uid);
         }
     });
 
-    if (targetLoc !== null) {
+    if (dest) {
         itemsToInsert.forEach(pa => {
-            pa.location = targetLoc;
-            pa.formula = targetForm;
+            pa.location = dest.location;
+            pa.formula = dest.formula;
         });
         remainingAssets.push(...itemsToInsert);
-    } else { // Paste as new group(s)
+    } else { // Dept-only move (green header) — keep location/formula, reorder insert
         let isCopyOperation = toPasteCopies.length > 0;
 
         if (isCopyOperation) {
@@ -247,11 +293,13 @@ window.pasteClipboardPa = function() {
                     if (qtyToPaste > 0) {
                         let clone = JSON.parse(JSON.stringify(item));
                         clone.qty = qtyToPaste; clone.location = newLoc; clone.formula = newForm;
+                        if (pasteDept) clone.overrideDept = pasteDept;
                         regularPasteItems.push(clone);
                     }
                     if (shortQty > 0) {
                         let shortClone = JSON.parse(JSON.stringify(item));
                         shortClone.qty = shortQty; shortClone.location = newShortageLoc; shortClone.formula = newShortageForm; shortClone.isShortage = true;
+                        if (pasteDept) shortClone.overrideDept = pasteDept;
                         shortagePasteItems.push(shortClone);
                     }
                 });
@@ -272,9 +320,12 @@ window.pasteClipboardPa = function() {
 
     let merged = [];
     remainingAssets.forEach(pa => {
-        let existing = merged.find(m => m.assetId === pa.assetId && m.location === pa.location && m.formula === pa.formula && m.isAuto === pa.isAuto && m.isShortage === pa.isShortage);
+        let existing = merged.find(m => m.assetId === pa.assetId && m.location === pa.location && m.formula === pa.formula && m.isAuto === pa.isAuto && m.isShortage === pa.isShortage && String(m.overrideDept || '') === String(pa.overrideDept || ''));
         if (existing && existing !== pa) {
             existing.qty = parseInt(existing.qty, 10) + parseInt(pa.qty, 10);
+            if (typeof window.dalPaNoteTouch_ === 'function' && existing.uid && !existing.isAuto && !existing.isGenericAuto) {
+                window.dalPaNoteTouch_(existing.uid);
+            }
         } else if (!merged.includes(pa)) {
             merged.push(pa);
         }
@@ -285,6 +336,7 @@ window.pasteClipboardPa = function() {
 
     window.selectedPaIndices.clear();
     window.selectedSummedIds.clear();
+    if (window.selectedPaGroups) window.selectedPaGroups.clear();
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
     renderProjectAssetsUI();
     } catch(err) { console.error("pasteClipboardPa Error:", err); alert("Error pasting items: " + err.message); }
@@ -299,6 +351,7 @@ window.cancelCutPa = function() {
     });
     window.selectedPaIndices.clear();
     window.selectedSummedIds.clear();
+    if (window.selectedPaGroups) window.selectedPaGroups.clear();
     renderProjectAssetsUI();
 };
 </script>

@@ -261,8 +261,8 @@ function executeTogglePaMode(targetMode) {
     window.currentPaMode = targetMode;
     
     window.selectedPaIndices.clear();
-    
-    let toggleBtn = document.getElementById('mode-toggle-btn');
+    if (window.selectedPaGroups) window.selectedPaGroups.clear();
+    window.paPasteSublistTarget = null;
     let btnSub = document.getElementById('pa-new-sublist-btn');
     let btnAdd = document.getElementById('pa-add-container-btn');
     let clipActions = document.getElementById('pa-clipboard-actions');
@@ -349,6 +349,15 @@ window.togglePackingDept = function(dept, noRender = false) {
     if (!noRender && typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
 };
 
+window.dalPaGroupKey_ = function(loc, form) {
+    return String(loc || 'General') + '|||' + String(form || 'Standalone');
+};
+
+window.dalPaParseGroupKey_ = function(key) {
+    var parts = String(key || '').split('|||');
+    return { location: parts[0] || 'General', formula: parts.slice(1).join('|||') || 'Standalone' };
+};
+
 // @INDEX: PA_LOGIC -> Group Targeting & UI Selection
 function setPaTarget(loc, form) {
     window.backupFormulaGroup = currentProjectAssets.filter(pa => { 
@@ -358,6 +367,7 @@ function setPaTarget(loc, form) {
     }).map(pa => ({...pa})); 
     
     window.activePaTarget = { location: loc, formula: form };
+    window.paPasteSublistTarget = { location: loc, formula: form };
     
     let safeId = 'fg_' + (loc + form).replace(/[^a-zA-Z0-9]/g, '_');
     expandedPaGroups.delete(safeId);
@@ -371,22 +381,29 @@ function clearPaTarget() {
     renderProjectAssetsUI();
 }
 
-window.selectFormulaGroup = function(id) {
-    let container = document.getElementById(id);
-    if (container) {
-        let children = container.querySelectorAll('.asset-row[data-paindex]');
-        let allSelected = true;
-        children.forEach(c => {
-            if (!window.selectedPaIndices.has(parseInt(c.dataset.paindex, 10))) allSelected = false;
-        });
-        if (allSelected) {
-            children.forEach(c => window.selectedPaIndices.delete(parseInt(c.dataset.paindex, 10)));
-        } else {
-            children.forEach(c => window.selectedPaIndices.add(parseInt(c.dataset.paindex, 10)));
+/** Header click: select the sublist (header highlight only) + set paste destination. */
+window.selectFormulaGroup = function(safeId, loc, form) {
+    if (!window.selectedPaGroups) window.selectedPaGroups = new Set();
+    var key = window.dalPaGroupKey_(loc, form);
+    window.paPasteSublistTarget = { location: loc || 'General', formula: form || 'Standalone' };
+
+    var clipboardArmed = (currentProjectAssets || []).some(function(pa) { return pa.isCut || pa.isCopied; });
+    if (!clipboardArmed) {
+        // Header select is independent of row select — never paint child rows green.
+        window.selectedPaIndices.clear();
+        window.selectedSummedIds.clear();
+        window.lastSelectedPaIndex = null;
+        window.lastSelectedSummedId = null;
+
+        if (window.selectedPaGroups.has(key)) window.selectedPaGroups.delete(key);
+        else {
+            window.selectedPaGroups.clear();
+            window.selectedPaGroups.add(key);
         }
-        if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
-        if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
     }
+
+    if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
+    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
 };
 
 window.handlePaRowClick = function(e, mode, idOrIndex) {
@@ -398,6 +415,21 @@ window.handlePaRowClick = function(e, mode, idOrIndex) {
     let lastId = isAssigned ? window.lastSelectedPaIndex : (isSummed ? window.lastSelectedSummedId : window.lastSelectedVaultPaId);
     let currentId = isAssigned ? parseInt(idOrIndex, 10) : idOrIndex;
     
+    var clipboardArmed = (currentProjectAssets || []).some(function(pa) { return pa.isCut || pa.isCopied; });
+    if (isAssigned && currentProjectAssets[currentId]) {
+        var rowPa = currentProjectAssets[currentId];
+        window.paPasteSublistTarget = {
+            location: rowPa.location || 'General',
+            formula: rowPa.formula || 'Standalone'
+        };
+        // After cut/copy, an item click only sets paste destination (don't steal the cut selection).
+        if (clipboardArmed) {
+            if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
+            return;
+        }
+    }
+    if (isAssigned && window.selectedPaGroups) window.selectedPaGroups.clear();
+
     if (e.shiftKey && lastId !== null) {
         let selector = isAssigned ? '.asset-row[data-paindex]' : (isSummed ? '.asset-row[data-sumid]' : '.asset-row[data-vaultid]');
         let allVisual = Array.from(document.querySelectorAll(selector)).map(el => isAssigned ? parseInt(el.dataset.paindex, 10) : (isSummed ? el.dataset.sumid : el.dataset.vaultid));
@@ -450,6 +482,12 @@ window.updatePaSelectionUI = function() {
         else row.classList.remove('row-selected');
     });
 
+    document.querySelectorAll('.asset-row.parent-row[data-pagroup]').forEach(row => {
+        let key = row.dataset.pagroup;
+        if (window.selectedPaGroups && window.selectedPaGroups.has(key)) row.classList.add('row-selected');
+        else row.classList.remove('row-selected');
+    });
+
     let addSelBtn = document.getElementById('pa-add-sel-btn');
     if (addSelBtn) {
         addSelBtn.style.display = window.selectedVaultPaIds.size > 0 ? 'inline-flex' : 'none';
@@ -457,7 +495,8 @@ window.updatePaSelectionUI = function() {
     }
 
     let isDesign = window.currentPaMode !== 'operation';
-    let hasSelection = window.selectedPaIndices.size > 0 || window.selectedSummedIds.size > 0;
+    let hasSelection = window.selectedPaIndices.size > 0 || window.selectedSummedIds.size > 0 ||
+        (window.selectedPaGroups && window.selectedPaGroups.size > 0);
 
     let cutBtn = document.getElementById('pa-cut-btn');
     if (cutBtn) {

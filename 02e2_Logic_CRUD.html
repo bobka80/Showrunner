@@ -57,8 +57,17 @@ window.addSelectedVaultPa = function() {
 window.deleteSelectedPa = function() {
     let hasIndices = window.selectedPaIndices.size > 0;
     let hasSummed = window.selectedSummedIds.size > 0;
-    if (!hasIndices && !hasSummed) return;
+    let hasGroups = window.selectedPaGroups && window.selectedPaGroups.size > 0;
+    if (!hasIndices && !hasSummed && !hasGroups) return;
     let total = window.selectedPaIndices.size + window.selectedSummedIds.size;
+    if (hasGroups) {
+        window.selectedPaGroups.forEach(function(key) {
+            var g = window.dalPaParseGroupKey_(key);
+            currentProjectAssets.forEach(function(pa) {
+                if ((pa.location || 'General') === g.location && (pa.formula || 'Standalone') === g.formula) total++;
+            });
+        });
+    }
     if (!confirm(`Remove ${total} selected item(s) from the project?`)) return;
     
     let toDelete = [];
@@ -75,6 +84,17 @@ window.deleteSelectedPa = function() {
             });
         });
     }
+
+    if (hasGroups) {
+        window.selectedPaGroups.forEach(function(key) {
+            var g = window.dalPaParseGroupKey_(key);
+            currentProjectAssets.forEach(function(pa) {
+                if ((pa.location || 'General') === g.location && (pa.formula || 'Standalone') === g.formula && !toDelete.includes(pa)) {
+                    toDelete.push(pa);
+                }
+            });
+        });
+    }
     
     currentProjectAssets = currentProjectAssets.filter(pa => !toDelete.includes(pa));
     toDelete.forEach(function(pa) {
@@ -84,6 +104,7 @@ window.deleteSelectedPa = function() {
     });
     window.selectedPaIndices.clear(); window.lastSelectedPaIndex = null;
     window.selectedSummedIds.clear(); window.lastSelectedSummedId = null;
+    if (window.selectedPaGroups) window.selectedPaGroups.clear();
     if (typeof recalcAutoContainers === 'function') recalcAutoContainers();
     renderProjectAssetsUI();
 };

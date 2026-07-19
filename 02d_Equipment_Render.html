@@ -15,20 +15,23 @@ function renderProjectAssetsUI() {
     
     window.togglePaSort = function(e, mode, col) {
         let sortArr = mode === 'vault' ? window.paVaultSort : window.paAssignedSort;
-        if (!Array.isArray(sortArr)) sortArr = [{ col: sortArr.col || 'tags', asc: sortArr.asc !== false }];
+        if (!Array.isArray(sortArr)) {
+            sortArr = [{ col: (sortArr && sortArr.col) || 'tags', asc: !sortArr || sortArr.asc !== false }];
+        } else {
+            sortArr = sortArr.slice();
+        }
         if (e && e.shiftKey) {
             let existing = sortArr.find(s => s.col === col);
             if (existing) existing.asc = !existing.asc;
             else sortArr.push({ col: col, asc: true });
+        } else if (sortArr.length > 0 && sortArr[0].col === col) {
+            sortArr[0].asc = !sortArr[0].asc;
+            sortArr = [{ col: col, asc: sortArr[0].asc }];
         } else {
-            if (sortArr.length > 0 && sortArr[0].col === col) {
-                sortArr[0].asc = !sortArr[0].asc;
-                sortArr.length = 1;
-            } else {
-                if (mode === 'vault') window.paVaultSort = [{ col: col, asc: true }];
-                else window.paAssignedSort = [{ col: col, asc: true }];
-            }
+            sortArr = [{ col: col, asc: true }];
         }
+        if (mode === 'vault') window.paVaultSort = sortArr;
+        else window.paAssignedSort = sortArr;
         renderProjectAssetsUI();
     };
     
@@ -945,8 +948,7 @@ function renderProjectAssetsUI() {
         let derivedRaw = fForm === "Standalone" ? "Standalone Gear" : (typeof generateFormulaFromItems === 'function' ? generateFormulaFromItems(fLoc, fg.items.map(x => x.pa)) : fForm);
         let colorizedForm = fForm === "Standalone" ? "STANDALONE GEAR" : (typeof colorizeFormula === 'function' ? colorizeFormula(derivedRaw) : (typeof escapeHTML === 'function' ? escapeHTML(derivedRaw) : derivedRaw));
 
-        let isGroupSelected = true;
-        if (fg.items.length > 0) { isGroupSelected = fg.items.every(item => item.originalIndex !== -1 && window.selectedPaIndices.has(item.originalIndex)); } else { isGroupSelected = false; }
+        let isGroupSelected = !!(window.selectedPaGroups && window.selectedPaGroups.has(window.dalPaGroupKey_(fLoc, fForm)));
         let groupSelClass = isGroupSelected ? 'row-selected' : '';
         let isGroupCut = fg.items.length > 0 && fg.items.every(item => item.pa.isCut);
         let isGroupCopied = fg.items.length > 0 && fg.items.every(item => item.pa.isCopied);
@@ -975,19 +977,20 @@ function renderProjectAssetsUI() {
             }
         }
 
-        let rowClickHtml = isTarget ? '' : `onclick="if(typeof window.selectFormulaGroup === 'function') window.selectFormulaGroup('${safeId}');"`;
+        let groupKeyAttr = window.dalPaGroupKey_(fLoc, fForm).replace(/"/g, '&quot;');
+        let rowClickHtml = isTarget ? '' : `onclick="if(typeof window.selectFormulaGroup === 'function') window.selectFormulaGroup('${safeId}', '${jsSafeLoc}', '${jsSafeForm}');"`;
         let rowCursor = isTarget ? 'default' : 'pointer';
 
         if (isMobPa) {
             assignedHtml += `
-        <div class="asset-row parent-row ${groupSelClass}" ${rowClickHtml} style="display:flex; gap:8px; align-items:center; padding:${pad}px 12px; ${borderStyle} background: #151518; font-size: ${fs}px; width: 100%; box-sizing: border-box; cursor:${rowCursor}; margin-top: 4px; border-radius: 4px; ${cutCopyStyle}">
+        <div class="asset-row parent-row ${groupSelClass}" data-pagroup="${groupKeyAttr}" ${rowClickHtml} style="display:flex; gap:8px; align-items:center; padding:${pad}px 12px; ${borderStyle} background: #151518; font-size: ${fs}px; width: 100%; box-sizing: border-box; cursor:${rowCursor}; margin-top: 4px; border-radius: 4px; ${cutCopyStyle}">
             <span id="pa-icon-${safeId}" onclick="event.stopPropagation(); toggleFormulaGroup(event, '${safeId}')" style="display:inline-block; width:24px; height:24px; line-height:24px; text-align:center; color:#e4e4e7; background:rgba(255,255,255,0.05); border-radius:4px; margin-right:4px; cursor:pointer; flex-shrink:0;" title="Expand/Collapse">${iconText}</span>
             <div style="flex:1; min-width:0; color:#d8b4fe; font-weight:900; font-size:${fs + 2}px; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${isTarget ? locHtml : (isShortageGrp ? locHtml : `<span>${safeLocDisp}</span>`)}</div>
             <div style="display:flex; gap:4px; flex-shrink:0;">${(window.currentPaMode === 'packing' || window.currentPaMode === 'operation') ? btnHtml : ''}</div>
         </div>`;
         } else {
         assignedHtml += `
-        <div class="asset-row parent-row ${groupSelClass}" ${rowClickHtml} style="display:flex; gap:10px; align-items:center; padding:${pad}px 15px; ${borderStyle} background: #151518; font-size: ${fs}px; width: 100%; box-sizing: border-box; cursor:${rowCursor}; margin-top: 4px; border-radius: 4px; ${cutCopyStyle}">
+        <div class="asset-row parent-row ${groupSelClass}" data-pagroup="${groupKeyAttr}" ${rowClickHtml} style="display:flex; gap:10px; align-items:center; padding:${pad}px 15px; ${borderStyle} background: #151518; font-size: ${fs}px; width: 100%; box-sizing: border-box; cursor:${rowCursor}; margin-top: 4px; border-radius: 4px; ${cutCopyStyle}">
             <div style="flex:1; display:flex; align-items:center; overflow:hidden;">
                 <span id="pa-icon-${safeId}" onclick="event.stopPropagation(); toggleFormulaGroup(event, '${safeId}')" style="display:inline-block; width:24px; height:24px; line-height:24px; text-align:center; color:#e4e4e7; background:rgba(255,255,255,0.05); border-radius:4px; margin-right:8px; cursor:pointer; flex-shrink:0;" title="Expand/Collapse">${iconText}</span>
                 ${locHtml}

@@ -9,6 +9,7 @@
 
 **Opened:** 2026-07-18 · **Status:** **PAUSED** (director 2026-07-19) for cross-dept working/paste target ship — resume at **Gap 1 (A3)**. Prior: **A0 + H1 + H5** complete.  
 **Production / prep live rollback:** GAS **v656** (shortage sig + hasArrow `open`) · hosting `host-boot.js?v=655` · prior sync baseline **v654** · Prep banner **`live sync (patch)`**  
+**Side feature (this pause):** GAS **v658** · hosting `host-boot.js?v=658` — working/paste dept + `override_dept` live sync.  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 

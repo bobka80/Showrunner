@@ -368,8 +368,8 @@ updateGlobals: function(gridId) {
 
     triggerSort: function(gridId, key) {
         if (gridId === 'vault') { if(typeof toggleAssetSort==='function') toggleAssetSort(null, key); }
-        if (gridId === 'project_vault') { if(typeof togglePaSort==='function') togglePaSort(null, 'vault', key); }
-        if (gridId === 'project_assigned') { if(typeof togglePaSort==='function') togglePaSort(null, 'assigned', key); }
+        if (gridId === 'project_vault') { if(typeof window.togglePaSort==='function') window.togglePaSort(null, 'vault', key); }
+        if (gridId === 'project_assigned') { if(typeof window.togglePaSort==='function') window.togglePaSort(null, 'assigned', key); }
     }
 };
 </script>
