@@ -466,31 +466,33 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 ### How prep session UI works now (locked definition)
 
+**UI surface (2026-07-19):** No full-width top banner. While prep is open, an **orange panel** covers the **bottom ~⅓ of the vault list** (`#pa-prep-live-panel`) — title **PREPARATION LIVE SYNC**, sync status line, roster (presence + PA mode: Editing / Packing / Check-out|in). Internal latch is still `dalPrepUiOpen` / `dalPrepLatched` (docs may say “banner on” for that latch).
+
 ```
 START PREP (local)
   → Sheets domain status = open + new sessionUid
   → Firestore assets/_meta written (sessionType prep, sessionUid)
   → Snapshot fixtures → assets/* collection + assets/state
-  → Banner on · live sync (patch) · dalPrepEndedSessionUid_ cleared
+  → Vault prep panel on · live sync (patch) · dalPrepEndedSessionUid_ cleared
 
 Peer joins
   → Sees server _meta (fromMeta, new sessionUid) OR (first join) Sheets open if not blocked
-  → Banner on · listens to assets/state
+  → Vault prep panel on · listens to assets/state
 
-While banner ON
+While prep UI open (dalPrepUiOpen)
   → Healthy: live sync (patch) · fixture edits flush via PA_PATCH_WRITE
-  → Auth/listen/write fail (H1): banner **LIVE SYNC DOWN — edits blocked** · no silent GAS multi-edit
-  → Peer applies by writeSeq (banner must stay on *and* mode=firestore or sync stops)
+  → Auth/listen/write fail (H1): panel status **LIVE SYNC DOWN — edits blocked** · no silent GAS multi-edit
+  → Peer applies by writeSeq (prep UI must stay on *and* mode=firestore or sync stops)
 
 END PREP (local or peer)
   → Sheets → committing → commit → clear domain
   → _meta deleted early in commit
-  → Peer: meta missing → dalPrepMetaEndPending_ (do NOT drop banner yet)
+  → Peer: meta missing → dalPrepMetaEndPending_ (do NOT drop prep UI yet)
   → Confirm END when Sheets committing/closed OR meta missing ≥ ~8s
-  → dalPrepMarkSessionEnded_: remember dalPrepEndedSessionUid_, SheetsOpenBlocked, banner OFF, stop live sync
+  → dalPrepMarkSessionEnded_: remember dalPrepEndedSessionUid_, SheetsOpenBlocked, panel OFF, stop live sync
 
 After END — reopen rules
-  → Same sessionUid on stale _meta → IGNORE (no banner)  ← kills ~1 min on/off loop
+  → Same sessionUid on stale _meta → IGNORE (no panel)  ← kills ~1 min on/off loop
   → Sheets still saying "open" → IGNORE (blocked)
   → New START only: localOpen OR _meta with a *new* sessionUid
 ```

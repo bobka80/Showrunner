@@ -92,7 +92,7 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 
 **Phase 2 — awareness**
 - [ ] PA presence: anonymous active count via `reportProjectPresence` + `activePresenceModule === 'assets'`
-- [ ] Sub-mode in presence optional: design / packing / checkout (no names in UI)
+- [x] Sub-mode in presence (prep): design / packing / checkout|check-in — vault orange panel roster (names + mode)
 
 **Phase 3 — checkout ↔ list**
 - [ ] Poll or digest ledger counts across checkout screens

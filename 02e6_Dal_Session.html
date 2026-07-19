@@ -191,6 +191,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     if (banner) banner.style.display = 'none';
     if (startBtn) startBtn.style.display = 'none';
     if (endBtn) endBtn.style.display = 'none';
+    var hidePanel = document.getElementById('pa-prep-live-panel');
+    if (hidePanel) hidePanel.style.display = 'none';
     return;
   }
 
@@ -200,11 +202,13 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   var changed = window.dalPrepUiOpen !== isPrepOpen;
   window.dalPrepUiOpen = isPrepOpen;
 
+  // Top banner retired — vault orange panel is the prep status surface.
   if (banner) {
-    banner.style.display = isPrepOpen ? 'block' : 'none';
-    if (isPrepOpen && typeof window.dalUpdateRemotePendingBanner_ === 'function') {
-      window.dalUpdateRemotePendingBanner_();
-    }
+    banner.style.display = 'none';
+    banner.textContent = '';
+  }
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    window.dalUpdateRemotePendingBanner_();
   }
   if (startBtn) startBtn.style.display = isPrepOpen ? 'none' : 'inline-flex';
   if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
@@ -235,9 +239,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     window.dalPrepMetaEndPendingSince_ = 0;
     // Leaving prep UI → do not let lagging Sheets "open" flip the banner back on.
     if (changed) window.dalPrepSheetsOpenBlocked_ = true;
-    if (banner && !isPrepOpen) {
-      banner.style.display = 'none';
-      banner.textContent = '';
+    if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+      window.dalUpdateRemotePendingBanner_();
     }
   }
 };

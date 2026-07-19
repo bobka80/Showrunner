@@ -26,7 +26,8 @@
 - While prep is active: **project-wide mode** — everyone sees **IN PREPARATION**; rules differ (like timeline lock, but **shared** busy mode, not one editor).
 - **No casual exit** — crew cannot turn off prep; only manager **End preparation** after checkout/check-in commit.
 - **Fork right (PA):** Project Assets route to **Firebase** while prep open — **no direct Sheets** for PA until session closes. (Hub/ledger: see design lock — not forked via `Dal_Session_*`.)
-- **Working vs selected department (shipped):** Design-mode **WORKING** picker (same slot as packing FILTER) stamps `overrideDept` on new adds. Click department **header** → green **PASTE** target (independent of WORKING). Expand/collapse = **arrow only**. Persist: `Project_Assets.override_dept` + live FS fixtures/sigs.
+- **Working vs selected department (shipped):** Design-mode **WORKING** picker (same slot as packing FILTER) stamps `overrideDept` on new adds. Click department **header** → green **PASTE** target (independent of WORKING). Expand/collapse = **arrow only**. Persist: `Project_Assets.override_dept` + live FS fixtures/sigs. Empty department folders stay hidden.
+- **Prep room board (shipped):** No top prep banner. Orange panel covers bottom ~⅓ of the **vault** list while prep is open — title **PREPARATION LIVE SYNC**, sync status line, roster of users in PA with mode (Editing / Packing / Check-out|Check-in) via presence `subMode`.
 
 ---
 
@@ -47,7 +48,8 @@ Today `Operations_Ledger` is mostly checkout/check-in scans. During prep the led
 - [ ] Manager: **Start preparation** / **End preparation** (permission: manager+ TBD)
 - [ ] Banner + lock styling on project editor, PA, logistics — `🔒 PREPARATION` / `IN PREPARATION`
 - [ ] Opening project while prep active → auto-enter prep rules (no bypass to slow Sheets path)
-- [ ] Roster: who is in prep room
+- [x] Roster: who is in prep room — vault orange panel (presence + PA mode); names + Editing/Packing/Check-out|in
+- [ ] Richer action feed (what they changed) — deferred; mode-only for now
 - [ ] Activity feed: visible actions (who scanned, added, packed)
 - [ ] FCM: prep started / ending / committed
 

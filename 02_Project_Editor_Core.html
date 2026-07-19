@@ -141,8 +141,35 @@ window.isProjectDirty = false;
 let presenceTimer = null;
 let activePresenceProject = null;
 window.activePresenceModule = 'main'; // Tracks if user is in 'main', 'timeline', etc.
+window.activePresencePaMode = '';     // design | packing | operation (when module === assets)
 window.isTimelineOccupiedBy = null;   // Legacy: first other user in timeline (informational only — no door lock)
 window.timelineOccupants = [];        // Other users currently in timeline module
+window.paPrepOccupants = [];          // Other users in assets module during prep [{name, mode}]
+
+window.dalPaPresenceModeLabel_ = function(mode, opType) {
+  mode = String(mode || '').toLowerCase();
+  if (mode === 'packing') return 'Packing';
+  if (mode === 'operation') {
+    var op = String(opType || window.currentOperationType || 'CHECK-OUT').toUpperCase();
+    if (op.indexOf('IN') >= 0) return 'Check-in';
+    return 'Check-out';
+  }
+  return 'Editing';
+};
+
+window.dalPaSyncPresencePaMode_ = function() {
+  if (window.activePresenceModule !== 'assets') {
+    window.activePresencePaMode = '';
+    return;
+  }
+  if (window.currentOperationType || window.currentPaMode === 'operation') {
+    window.activePresencePaMode = 'operation';
+  } else if (window.currentPaMode === 'packing') {
+    window.activePresencePaMode = 'packing';
+  } else {
+    window.activePresencePaMode = 'design';
+  }
+};
 
 function startPresencePing(projectId) {
     stopPresencePing();
@@ -159,6 +186,7 @@ function startPresencePing(projectId) {
     const ping = () => {
         if (!activePresenceProject) return;
         let userAlias = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown';
+        if (typeof window.dalPaSyncPresencePaMode_ === 'function') window.dalPaSyncPresencePaMode_();
         google.script.run
         .withFailureHandler(err => {
             let tlBtn = document.getElementById('master-timeline-btn');
@@ -171,11 +199,19 @@ function startPresencePing(projectId) {
         .withSuccessHandler(othersObj => {
             window.isTimelineOccupiedBy = null;
             window.timelineOccupants = [];
+            window.paPrepOccupants = [];
             othersObj = othersObj || {};
             for (let name in othersObj) {
-                if (othersObj[name] && othersObj[name].module === 'timeline') {
+                if (!othersObj[name]) continue;
+                if (othersObj[name].module === 'timeline') {
                     window.timelineOccupants.push(name);
                     if (!window.isTimelineOccupiedBy) window.isTimelineOccupiedBy = name;
+                }
+                if (othersObj[name].module === 'assets') {
+                    window.paPrepOccupants.push({
+                        name: name,
+                        mode: othersObj[name].subMode || 'design'
+                    });
                 }
             }
 
@@ -195,7 +231,8 @@ function startPresencePing(projectId) {
                     tlBtn.title = '';
                 }
             }
-        }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule);
+            if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
+        }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule, window.activePresencePaMode || '');
     };
     
     ping(); 

@@ -832,19 +832,7 @@ function renderProjectAssetsUI() {
         assignedByDept[fg.department].formulas.push(fg);
     });
 
-    // Empty SYSTEM depts stay visible so paste can target them (green select).
-    if (typeof SYSTEM_DEPARTMENTS !== 'undefined') {
-        SYSTEM_DEPARTMENTS.forEach(d => {
-            if (d && d.uid && !assignedByDept[d.uid]) assignedByDept[d.uid] = { formulas: [] };
-        });
-    }
-    if (window.paWorkingDept && !assignedByDept[window.paWorkingDept]) {
-        assignedByDept[window.paWorkingDept] = { formulas: [] };
-    }
-    if (window.paSelectedDept && !assignedByDept[window.paSelectedDept]) {
-        assignedByDept[window.paSelectedDept] = { formulas: [] };
-    }
-
+    // Only departments that currently have assigned gear — no empty folders.
     let sortedDepts = Object.keys(assignedByDept).sort((a,b) => getDeptObj(a).name.localeCompare(getDeptObj(b).name));
 
     window.togglePaDeptAssigned = function(safeDept) {
@@ -860,6 +848,8 @@ function renderProjectAssetsUI() {
 
     for (let deptUid of sortedDepts) {
         let deptFormulas = assignedByDept[deptUid].formulas || [];
+
+        if (deptFormulas.length === 0) continue;
 
         let safeDept = deptUid.replace(/\s+/g, '-');
         let deptObj = getDeptObj(deptUid);
@@ -888,10 +878,6 @@ function renderProjectAssetsUI() {
                             </label>
                          </div>
                          <div id="${groupId}" style="display: ${displayStyleDept}; width: 100%; box-sizing: border-box;">`;
-
-        if (deptFormulas.length === 0) {
-            assignedHtml += `<div style="padding:10px 15px; color:#555; font-size:11px; font-style:italic; border-bottom:1px solid #222;">Empty — select header (green) to paste here</div>`;
-        }
 
         deptFormulas.forEach(fg => {
         let fLoc = fg.location || "General";

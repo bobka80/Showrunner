@@ -471,24 +471,80 @@ window.dalPaApplyRemoteFixturesTimeline_ = function(remoteFixtures, localFixture
 };
 
 window.dalUpdateRemotePendingBanner_ = function() {
+  // Top banner retired — prep status lives in #pa-prep-live-panel (vault bottom ⅓).
   var banner = document.getElementById('dal-session-banner');
-  if (!banner || !window.dalPrepUiOpen) return;
+  if (banner) {
+    banner.style.display = 'none';
+    banner.textContent = '';
+  }
+
+  var panel = document.getElementById('pa-prep-live-panel');
+  var statusEl = document.getElementById('pa-prep-live-status');
+  var rosterEl = document.getElementById('pa-prep-live-roster');
+  var vaultList = document.getElementById('pa-vault-list');
+
+  if (!window.dalPrepUiOpen) {
+    if (panel) panel.style.display = 'none';
+    if (vaultList) vaultList.style.paddingBottom = '';
+    window.dalPaBannerLastText_ = '';
+    return;
+  }
+
+  if (panel) {
+    panel.style.display = 'flex';
+    if (vaultList) vaultList.style.paddingBottom = 'calc(33% + 12px)';
+  }
+
   var text;
   if (window.dalPaLiveSyncMode === 'blocked' || window.dalPaLiveSyncMode === 'gas') {
     var why = window.dalPaLiveSyncFailReason_ ? (' — ' + window.dalPaLiveSyncFailReason_) : '';
-    text = '🔒 IN PREPARATION — LIVE SYNC DOWN — edits blocked' + why;
+    text = 'LIVE SYNC DOWN — edits blocked' + why;
   } else if (window.dalPaLiveSyncMode === 'connecting') {
-    text = '🔒 IN PREPARATION — connecting live sync…';
+    text = 'Connecting live sync…';
   } else if (window.dalPaRemotePending) {
-    text = '🔒 IN PREPARATION — remote updates available (save or reload to sync)';
+    text = 'Remote updates available (save or reload to sync)';
   } else if (window.dalPaLiveSyncMode === 'firestore') {
-    text = '🔒 IN PREPARATION — live sync (patch)';
+    text = 'live sync (patch)';
   } else {
-    text = '🔒 IN PREPARATION';
+    text = 'In preparation';
   }
-  if (text === window.dalPaBannerLastText_) return;
-  window.dalPaBannerLastText_ = text;
-  banner.textContent = text;
+
+  if (statusEl && text !== window.dalPaBannerLastText_) {
+    window.dalPaBannerLastText_ = text;
+    statusEl.textContent = text;
+  } else if (statusEl && !statusEl.textContent) {
+    statusEl.textContent = text;
+  }
+
+  if (rosterEl) {
+    if (typeof window.dalPaSyncPresencePaMode_ === 'function') window.dalPaSyncPresencePaMode_();
+    var me = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'You';
+    var meMode = window.activePresencePaMode || 'design';
+    var rows = [];
+    rows.push({
+      name: me,
+      mode: meMode,
+      self: true
+    });
+    (window.paPrepOccupants || []).forEach(function(o) {
+      if (!o || !o.name) return;
+      if (String(o.name) === String(me)) return;
+      rows.push({ name: o.name, mode: o.mode || 'design', self: false });
+    });
+    var html = rows.map(function(r) {
+      var label = typeof window.dalPaPresenceModeLabel_ === 'function'
+        ? window.dalPaPresenceModeLabel_(r.mode)
+        : r.mode;
+      var whoRaw = r.self ? (r.name + ' (you)') : r.name;
+      var who = (typeof escapeHTML === 'function') ? escapeHTML(whoRaw) : String(whoRaw).replace(/</g, '&lt;');
+      var lab = (typeof escapeHTML === 'function') ? escapeHTML(label) : String(label).replace(/</g, '&lt;');
+      return '<div style="display:flex; justify-content:space-between; gap:8px; padding:3px 0; border-bottom:1px solid rgba(255,255,255,0.12);">' +
+        '<span style="font-weight:800; color:#fff7ed; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + who + '</span>' +
+        '<span style="font-weight:700; color:#fde68a; flex-shrink:0;">' + lab + '</span></div>';
+    }).join('');
+    if (!html) html = '<div style="color:#fed7aa; font-style:italic;">Waiting for roommates…</div>';
+    rosterEl.innerHTML = html;
+  }
 };
 
 /**

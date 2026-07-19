@@ -337,6 +337,8 @@ function executeTogglePaMode(targetMode) {
         window.activePaTarget = null;
     }
     applyPaHeaderChrome_();
+    if (typeof window.dalPaSyncPresencePaMode_ === 'function') window.dalPaSyncPresencePaMode_();
+    if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
     if (typeof window.updatePaSelectionUI === 'function') window.updatePaSelectionUI();
     if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
     if (typeof applyMobilePaChrome === 'function') applyMobilePaChrome();

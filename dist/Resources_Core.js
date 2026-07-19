@@ -754,7 +754,7 @@ function executeWithRetry(operation, maxRetries = 5) {
 // ==========================================
 // --- REAL-TIME PRESENCE ENGINE (CACHE) ---
 // ==========================================
-function reportProjectPresence(projectId, userName, action, activeModule) {
+function reportProjectPresence(projectId, userName, action, activeModule, subMode) {
   try {
     let cache = CacheService.getScriptCache();
     let key = 'PRESENCE_' + projectId;
@@ -768,8 +768,13 @@ function reportProjectPresence(projectId, userName, action, activeModule) {
             let activeUsers = activeStr ? JSON.parse(activeStr) : {};
             let now = Date.now();
             
-            if (action === 'join' || action === 'ping') activeUsers[userName] = { time: now, module: activeModule || 'main' };
-            else if (action === 'leave') delete activeUsers[userName];
+            if (action === 'join' || action === 'ping') {
+              activeUsers[userName] = {
+                time: now,
+                module: activeModule || 'main',
+                subMode: subMode != null ? String(subMode) : ''
+              };
+            } else if (action === 'leave') delete activeUsers[userName];
             
             // Cleanup disconnected users (no ping in last 90 seconds)
             let activeList = {};
