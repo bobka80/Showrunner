@@ -266,7 +266,7 @@ function refreshTasksAndNotifs(opts) {
 
 window.refreshTasksAndNotifs = refreshTasksAndNotifs;
 
-function showPushToast(title, body) {
+function showPushToast(title, body, durationMs) {
     let container = document.getElementById('push-toast-container');
     if (!container) return;
     let toast = document.createElement('div');
@@ -276,12 +276,14 @@ function showPushToast(title, body) {
     toast.innerHTML = '<div class="push-toast-brand">SHOWRUNNER</div><div class="push-toast-title">' + safeTitle + '</div>' +
         (safeBody ? '<div class="push-toast-body">' + safeBody + '</div>' : '');
     container.appendChild(toast);
+    let holdMs = Number(durationMs);
+    if (!isFinite(holdMs) || holdMs < 1000) holdMs = 5000;
     setTimeout(function() {
         toast.classList.add('push-toast--out');
         setTimeout(function() {
             if (toast.parentNode) toast.parentNode.removeChild(toast);
         }, 280);
-    }, 5000);
+    }, holdMs);
 }
 
 function handleForegroundPush(data) {

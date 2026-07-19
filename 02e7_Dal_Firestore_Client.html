@@ -80,16 +80,23 @@ window.dalPaShowConflictToast_ = function(title, body) {
     if (oldBan) oldBan.style.display = 'none';
   } catch (eOld) { /* ignore */ }
   // One expiring toast only (host shell when available — sits above PA modal).
+  // Conflict cues stay ~2s longer than normal push toasts (7s).
+  var holdMs = 7000;
   try {
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'SHOWRUNNER_HOST_TOAST', title: title, body: body }, '*');
+      window.parent.postMessage({
+        type: 'SHOWRUNNER_HOST_TOAST',
+        title: title,
+        body: body,
+        durationMs: holdMs
+      }, '*');
       return;
     }
   } catch (eHost) { /* fall through */ }
   try {
     var c = document.getElementById('push-toast-container');
     if (c) c.style.zIndex = '2147483646';
-    if (typeof showPushToast === 'function') showPushToast(title, body);
+    if (typeof showPushToast === 'function') showPushToast(title, body, holdMs);
     else if (typeof window.showMobilePaToast === 'function') window.showMobilePaToast(title, body);
   } catch (eT) { /* ignore */ }
 };
@@ -845,18 +852,19 @@ window.dalUpdateRemotePendingBanner_ = function() {
           if (String(k).toLowerCase() === String(r.name).toLowerCase()) noteObj = notes[k];
         });
       }
-      var noteHtml = '';
+      var noteSpan = '';
       if (noteObj && noteObj.text && !r.self) {
         var nt = (typeof escapeHTML === 'function') ? escapeHTML(noteObj.text) : String(noteObj.text).replace(/</g, '&lt;');
-        noteHtml = '<div style="font-size:10px; font-weight:700; color:#fb7185; margin-top:2px; line-height:1.35;">' + nt + '</div>';
+        noteSpan = '<span style="font-size:10px; font-weight:700; color:#fb7185; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">' + nt + '</span>';
       }
-      return '<div style="padding:4px 0; border-bottom:1px solid #222;">' +
-        '<div style="display:flex; justify-content:space-between; gap:8px;">' +
-        '<span style="font-weight:800; color:#e4e4e7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + who + '</span>' +
-        '<span style="font-weight:700; color:#f59e0b; flex-shrink:0;">' + lab + '</span></div>' +
-        noteHtml + '</div>';
+      return '<div style="display:flex; justify-content:space-between; gap:8px; align-items:baseline; padding:4px 0; border-bottom:1px solid #222;">' +
+        '<span style="display:flex; gap:8px; align-items:baseline; min-width:0; overflow:hidden; flex:1;">' +
+        '<span style="font-weight:800; color:#e4e4e7; flex-shrink:0;">' + who + '</span>' +
+        noteSpan +
+        '</span>' +
+        '<span style="font-weight:700; color:#f59e0b; flex-shrink:0;">' + lab + '</span></div>';
     }).join('');
-    // Orphan note (actor not in occupants yet) — still show under roster.
+    // Orphan note (actor not in occupants yet) — same-row layout.
     var orphanNotes = window.dalPaPeerRosterNotes_ || {};
     Object.keys(orphanNotes).forEach(function(k) {
       if (!orphanNotes[k] || !orphanNotes[k].text) return;
@@ -866,9 +874,9 @@ window.dalUpdateRemotePendingBanner_ = function() {
       if (already) return;
       var ok = (typeof escapeHTML === 'function') ? escapeHTML(k) : String(k).replace(/</g, '&lt;');
       var ot = (typeof escapeHTML === 'function') ? escapeHTML(orphanNotes[k].text) : String(orphanNotes[k].text).replace(/</g, '&lt;');
-      html += '<div style="padding:4px 0; border-bottom:1px solid #222;">' +
-        '<div style="font-weight:800; color:#e4e4e7;">' + ok + '</div>' +
-        '<div style="font-size:10px; font-weight:700; color:#fb7185; margin-top:2px; line-height:1.35;">' + ot + '</div></div>';
+      html += '<div style="display:flex; gap:8px; align-items:baseline; padding:4px 0; border-bottom:1px solid #222;">' +
+        '<span style="font-weight:800; color:#e4e4e7; flex-shrink:0;">' + ok + '</span>' +
+        '<span style="font-size:10px; font-weight:700; color:#fb7185; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">' + ot + '</span></div>';
     });
     if (!html) html = '<div style="color:#71717a; font-style:italic;">Waiting for roommates…</div>';
     rosterEl.innerHTML = html;

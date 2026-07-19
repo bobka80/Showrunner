@@ -7,9 +7,9 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Active** — **A5/H3 done** @ GAS **v672** + `host-boot.js?v=666`; next **A6/H2**. Prior: **A0 + H1 + H5 + Gap 1 + H4**.  
+**Opened:** 2026-07-18 · **Status:** **Active** — **A5/H3 done** @ GAS **v673** + `host-boot.js?v=666`; next **A6/H2**. Prior: **A0 + H1 + H5 + Gap 1 + H4**.  
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
-**Latest:** Visible conflict toast (in-modal + host) **v672** / hosting **v666**.  
+**Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 

@@ -1474,7 +1474,7 @@
     return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  function showHostPushToast(title, body) {
+  function showHostPushToast(title, body, durationMs) {
     var container = document.getElementById('host-push-toast-container');
     if (!container) {
       container = document.createElement('div');
@@ -1489,12 +1489,14 @@
     toast.innerHTML = '<div class="host-push-toast-brand">SHOWRUNNER</div><div class="host-push-toast-title">' + safeTitle + '</div>' +
       (safeBody ? '<div class="host-push-toast-body">' + safeBody + '</div>' : '');
     container.appendChild(toast);
+    var holdMs = Number(durationMs);
+    if (!isFinite(holdMs) || holdMs < 1000) holdMs = 5000;
     setTimeout(function() {
       toast.classList.add('host-push-toast--out');
       setTimeout(function() {
         if (toast.parentNode) toast.parentNode.removeChild(toast);
       }, 300);
-    }, 5000);
+    }, holdMs);
   }
 
   function handleForegroundPushPayload(payload) {
@@ -3138,7 +3140,7 @@
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_HOST_TOAST') {
-      showHostPushToast(ev.data.title || 'Showrunner', ev.data.body || '');
+      showHostPushToast(ev.data.title || 'Showrunner', ev.data.body || '', ev.data.durationMs);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_AUTH') {
