@@ -119,7 +119,16 @@ window.finishMobilePaClose = function(opts) {
     if (opts.revertChanges && typeof currentProjectAssets !== 'undefined' && window.originalProjectAssets) {
         currentProjectAssets = JSON.parse(JSON.stringify(window.originalProjectAssets));
     }
+    // Part B4 — mobile/station leave must commit when alone in live prep (desktop CANCEL already did).
+    if (typeof window.dalMaybeLastLeaveClosePrep_ === 'function') {
+        window.dalMaybeLastLeaveClosePrep_();
+    }
     window.activePresenceModule = 'main';
+    // While last-leave/idle close runs, leave watcher lifecycle to closeDalPrepSession
+    // (it restarts after commit). Stopping here would race a second teardown and leave the tab blind.
+    if (!window.dalPrepClosing && typeof stopDalPaSessionWatcher === 'function') {
+        stopDalPaSessionWatcher({ clearLatch: true });
+    }
     const overlay = document.getElementById('project-assets-modal-overlay');
     if (overlay) overlay.style.display = 'none';
     if (window.mobilePaCompactActive) {

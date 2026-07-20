@@ -616,6 +616,18 @@
   };
 
   function stationDockBackToProjectsTeardown_() {
+    // Station Back often skips cancelProjectAssetsModal — still commit if alone in live prep.
+    // Do not stop the watcher while close is in flight or after it already ended (close success
+    // restarts the watcher; a second teardown from stationDockWatchPaExit_ must not kill it).
+    if (window.dalPrepUiOpen || window.dalPrepLatched) {
+      if (typeof window.dalMaybeLastLeaveClosePrep_ === 'function') {
+        window.dalMaybeLastLeaveClosePrep_();
+      }
+      if (!window.dalPrepClosing && typeof stopDalPaSessionWatcher === 'function') {
+        stopDalPaSessionWatcher({ clearLatch: true });
+      }
+    }
+    window.activePresenceModule = 'main';
     if (typeof window.stationCloseSettings === 'function') {
       try { window.stationCloseSettings(); } catch (e) { /* ignore */ }
     }

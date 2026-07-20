@@ -328,6 +328,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | **B3 shipped @ GAS v697:** live pull-in joining cue + soft-switch; phone auto-join; no calendar yank. Director: thorough Opening/pull-in + **auto-close (B4)** at end of Part B. **Next: B5** cue redesign (or B4 when ready). |
 | 2026-07-20 | **B5 shipped @ GAS v700:** SYNC phase copy Normal/Opening/Live/Closing + frozen vs editable + joining; idle warn stub for B4. **Next: B4** auto-close/idle (end). |
 | 2026-07-20 | **B4 shipped @ GAS v703:** idle eject 45m TL / 75m prep + T−5 keep-open + last-leave commit + 45s presence; station blocks prep idle. **Next: B6/B7** floor exit. |
+| 2026-07-20 | **B4 fix:** last-leave was desktop CANCEL only — mobile close + station Back left Firebase rooms open. Wired `dalMaybeLastLeaveClosePrep_` into `finishMobilePaClose` + station teardown. |
 
 ---
 

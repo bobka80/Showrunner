@@ -360,9 +360,8 @@ function cancelShifts() {
   }
   window.isTimelineDirty = false;
   // Part B4 — last person leaving live timeline commits the fork.
-  if (window.dalTimelineSessionOpen && !(window.timelineOccupants || []).length &&
-      typeof window.closeDalTimelineCollabSession === 'function') {
-    window.closeDalTimelineCollabSession({ auto: true, reason: 'last-leave' });
+  if (typeof window.dalMaybeLastLeaveCloseTimeline_ === 'function') {
+    window.dalMaybeLastLeaveCloseTimeline_();
   }
   document.getElementById('shift-layer').style.display = 'none';
   if (typeof window.stopDalTimelineSessionWatcher === 'function') window.stopDalTimelineSessionWatcher();

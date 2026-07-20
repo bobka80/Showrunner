@@ -751,13 +751,7 @@ window.closeDalPrepSession = function(opts) {
   if (overlay) overlay.style.cursor = 'wait';
 
   var doneMsg_ = function() {
-    if (opts.reason === 'idle') {
-      alert('Live preparation closed — room idle (committed to Sheets).');
-    } else if (opts.reason === 'last-leave') {
-      alert('Live preparation closed — last person left (committed to Sheets).');
-    } else if (!opts.auto) {
-      alert('Preparation ended — committed to Sheets.');
-    }
+    // Success toast retired — ending prep is silent (errors still alert).
   };
 
   var runClose_ = function() {

@@ -309,13 +309,7 @@ window.closeDalTimelineCollabSession = function(opts) {
   if (layer) layer.style.cursor = 'wait';
   var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
   var doneMsg_ = function() {
-    if (opts.reason === 'idle') {
-      alert('Timeline collaboration closed — room idle (committed to Sheets).');
-    } else if (opts.reason === 'last-leave') {
-      alert('Timeline collaboration closed — last person left (committed to Sheets).');
-    } else if (!opts.auto) {
-      alert('Timeline collaboration ended — committed to Sheets.');
-    }
+    // Success toast retired — ending timeline collab is silent (errors still alert).
   };
   google.script.run
     .withFailureHandler(function(err) {
