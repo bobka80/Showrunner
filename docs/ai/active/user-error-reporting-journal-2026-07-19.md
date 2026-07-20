@@ -1,13 +1,13 @@
 # Active — Error reports, markdown journal & day bug-fix campaigns
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Status:** **NEXT campaign** (middle before multi-user Part B). **Phase 1 complete** — `Error_Reports` tab + writer in `Resources_Audit.js`. **Next:** Phase 2 — Report button (ask director UI first).  
+**Status:** **NEXT campaign** (middle before multi-user Part B). **Phase 2 complete** @ GAS **v682** — global lip drawer. **Next:** Phase 3 — ERROR LOGS tab + Hand over.  
 **Point agents here:** `docs/ai/active/user-error-reporting-journal-2026-07-19.md`  
 **Journal stub:** [error-journal/README.md](error-journal/README.md)
 
 **Related:** Multi-user fork Part B floor debugging — [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).
 
-**Director lock (2026-07-20):** Before Phase 2 (Report button / bug-report UI), **ask the director how** — do not invent placement or chrome.
+**UI lock (Phase 2 shipped):** Top-center ~2mm lip; desktop hover opens; touch tap lip toggles; text + Send; freeze diag on open; everyone (web / mobile / station via Index).
 
 ---
 
@@ -139,8 +139,8 @@ Existing: **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS** → add **ERROR LOGS**.
 | Phase | What | Gate |
 |-------|------|------|
 | **0** | This campaign + SCHEMA (reports only) + DRIVE_LAYOUT + error-journal folder stub + TODO as Next | **Done** 2026-07-20 |
-| **1** | Sheet `Error_Reports` + writer (`verifyErrorReportsSchema` / `submitErrorReport` / `TEST_ErrorReport`) | **Done** — see status log for GAS |
-| **2** | Report button + freeze + submit | **Ask director UI first**; then web.app smoke |
+| **1** | Sheet `Error_Reports` + writer (`verifyErrorReportsSchema` / `submitErrorReport` / `TEST_ErrorReport`) | **Done** @ v681 |
+| **2** | Report lip drawer + freeze + submit (web / mobile / station) | **Done** @ v682 |
 | **3** | ERROR LOGS tab + **Hand over** (copy + delete from Sheet) | ROOT exports pack; handed rows gone from UI |
 | **4** | Cursor playbook; first real pack → day campaign + journal md | Director likes the day-campaign shape |
 | **5** | Live use (esp. Part B) | Packs → day campaigns → OK go → journal updated |
@@ -208,4 +208,5 @@ PACK FOLLOWS BELOW:
 | 2026-07-19 | Campaign drafted. Journal + day campaigns = **markdown only**; Sheet = raw `Error_Reports` only. |
 | 2026-07-19 | **Handoff clears inbox:** Hand over to Cursor = copy pack + **delete** those rows from Sheet so already-handed logs do not stay visible. |
 | 2026-07-20 | Director: this is the **middle / NEXT** campaign. **Phase 0 shipped** (SCHEMA + DRIVE_LAYOUT + journal stub + TODO). Phase 2 UI: ask director. **Next slice: Phase 1.** |
-| 2026-07-20 | **Phase 1 shipped:** `verifyErrorReportsSchema` + `submitErrorReport` + `TEST_ErrorReport` in `Resources_Audit.js`. Tab `Error_Reports` on `SM_Showrunner_LOGS`; `Audit_Logs` untouched. Oversized diag → Drive + `Diag_Ref`. |
+| 2026-07-20 | **Phase 1 shipped @ GAS v681:** `verifyErrorReportsSchema` + `submitErrorReport` + `TEST_ErrorReport` in `Resources_Audit.js`. Tab `Error_Reports` on `SM_Showrunner_LOGS`; `Audit_Logs` untouched. Oversized diag → Drive + `Diag_Ref`. |
+| 2026-07-20 | **Phase 2 shipped @ GAS v682:** `00f_Error_Report.html` — top-center 2mm lip; hover (fine pointer) / tap lip (touch); freeze snapshot on open; `submitErrorReport`. Wired in `Index.html` (web + mobile + station). Escape stops at drawer (Bugbot). Styles `#sr-error-report-*`. |
