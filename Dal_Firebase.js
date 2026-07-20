@@ -667,11 +667,51 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
       '). Reduce shifts/phases before END COLLAB.'
     );
   }
-  // Status is "committing" — Sheets path allowed. saveTimelineDataSheets_ takes its own short lock.
-  // B: keep Firebase meta/collection until Sheets write + reconcile succeed.
+  var mode = snap.mode || 'main';
+  var previousSnap = null;
+  var backupPath = 'dal_commit_backups/' + String(projectId) + '__timeline__' + String(sessionUid || 'unknown');
+  try {
+    var bakDoc = firestoreFetch_('get', backupPath);
+    if (bakDoc && bakDoc.fields) {
+      var bak = firestoreDecodeFields_(bakDoc.fields);
+      if (bak.previousJson) {
+        try { previousSnap = JSON.parse(bak.previousJson); } catch (eParse) { previousSnap = null; }
+      }
+    }
+  } catch (eBakRead) { /* ignore */ }
+  if (!previousSnap) {
+    try {
+      previousSnap = getTimelineDataSheets_(projectId, mode);
+    } catch (ePrev) {
+      previousSnap = null;
+    }
+    if (previousSnap) {
+      try {
+        firestoreWriteDocument_(backupPath, {
+          projectId: String(projectId),
+          sessionUid: String(sessionUid || ''),
+          actor: String(actor || 'System'),
+          savedAt: new Date().toISOString(),
+          previousJson: JSON.stringify({
+            mode: previousSnap.mode || mode,
+            shifts: previousSnap.shifts || [],
+            phases: previousSnap.phases || [],
+            overrides: previousSnap.overrides || {}
+          }),
+          intendedJson: JSON.stringify({
+            mode: mode,
+            shifts: snap.shifts || [],
+            phases: snap.phases || [],
+            overrides: snap.overrides || {}
+          })
+        });
+      } catch (eBakWrite) { /* continue — restore may be weaker */ }
+    }
+  }
+
   saveTimelineDataSheets_(
     projectId,
-    snap.mode || 'main',
+    mode,
     snap.shifts || [],
     null,
     snap.phases || [],
@@ -702,8 +742,43 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
     } catch (pocketErr) { /* already failing */ }
   }
   if (!reconOk) {
+    if (previousSnap) {
+      try {
+        saveTimelineDataSheets_(
+          projectId,
+          previousSnap.mode || mode,
+          previousSnap.shifts || [],
+          null,
+          previousSnap.phases || [],
+          previousSnap.overrides || {},
+          null,
+          actor || 'System UI',
+          null
+        );
+        try { flushCache(); } catch (eF2) { /* ignore */ }
+      } catch (restoreErr) {
+        try {
+          dalAlertFailedWrite_(projectId, 'timeline', actor,
+            'Timeline reconcile failed AND Sheets restore failed. Fork kept. ' + (restoreErr.message || restoreErr));
+        } catch (eA) { /* ignore */ }
+        throw new Error(
+          'TIMELINE_COMMIT_RECONCILE_FAILED: Sheets restore failed; Firebase fork kept for retry.'
+        );
+      }
+      try {
+        dalAlertFailedWrite_(projectId, 'timeline', actor,
+          'Timeline reconcile mismatch — restored previous Sheets; Firebase fork kept for retry.');
+      } catch (eA2) { /* ignore */ }
+      throw new Error(
+        'TIMELINE_COMMIT_RECONCILE_FAILED: previous Sheets restored; Firebase fork kept for retry.'
+      );
+    }
+    try {
+      dalAlertFailedWrite_(projectId, 'timeline', actor,
+        'Timeline reconcile mismatch — no pre-commit Sheets snapshot available; Firebase fork kept. Check Sheets manually.');
+    } catch (eA3) { /* ignore */ }
     throw new Error(
-      'TIMELINE_COMMIT_RECONCILE_FAILED: Firebase collab fork kept for retry — Sheets may need manual check.'
+      'TIMELINE_COMMIT_RECONCILE_FAILED: no Sheets snapshot to restore; Firebase fork kept for retry.'
     );
   }
   try { firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta'); } catch (eMeta) { /* ignore */ }

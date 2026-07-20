@@ -564,7 +564,14 @@ function closeDalSession(projectId, actor, sessionType) {
       return { abortOpening: true, type: sessionType };
     }
 
-    if (curStatus !== 'open') throw new Error('No open ' + sessionType + ' session on this project.');
+    if (curStatus !== 'open') {
+      throw new Error(
+        curStatus === 'committing'
+          ? ('Commit already in progress for this ' + sessionType +
+            ' session — wait for it to finish. If stuck, wait ~5 minutes for reclaim or contact support.')
+          : ('No open ' + sessionType + ' session on this project.')
+      );
+    }
 
     if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
       assertActorCanEditTimeline(actor);
@@ -602,21 +609,26 @@ function closeDalSession(projectId, actor, sessionType) {
     }
   } catch (commitErr) {
     // B fail-safe: reopen domain so floor can retry; fork/backup retained by commit helpers.
-    try {
-      executeWithRetry(function () {
-        var sheets = verifyDatabaseSchema();
-        var row = dalGetProjectIndexRow_(projectId, sheets);
-        if (!row) return;
-        var cur = dalReadDomainSession_(row, closingType);
-        dalWriteDomainSession_(sheets.index, row.rowNum, row.map, closingType, {
-          status: 'open',
-          sessionUid: cur.sessionUid || closingUid,
-          openedAt: cur.openedAt || new Date().toISOString(),
-          openedBy: cur.openedBy || actor
+    var reopened = false;
+    var attempt;
+    for (attempt = 0; attempt < 3 && !reopened; attempt++) {
+      try {
+        executeWithRetry(function () {
+          var sheets = verifyDatabaseSchema();
+          var row = dalGetProjectIndexRow_(projectId, sheets);
+          if (!row) return;
+          var cur = dalReadDomainSession_(row, closingType);
+          dalWriteDomainSession_(sheets.index, row.rowNum, row.map, closingType, {
+            status: 'open',
+            sessionUid: cur.sessionUid || closingUid,
+            openedAt: cur.openedAt || new Date().toISOString(),
+            openedBy: cur.openedBy || actor
+          });
+          dalFlushDomainCache_(projectId, closingType);
         });
-        dalFlushDomainCache_(projectId, closingType);
-      });
-    } catch (eReopen) { /* still throw original */ }
+        reopened = true;
+      } catch (eReopen) { /* retry */ }
+    }
     throw commitErr;
   }
 
