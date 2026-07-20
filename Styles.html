@@ -280,7 +280,7 @@
         pointer-events: none;
     }
 
-    /* --- Global error-report drawer — short bottom lip under bookmarks; slides down --- */
+    /* --- Global error-report drawer — trapezoid pull-tab; slides down --- */
     #sr-error-report-root {
         position: fixed;
         top: calc(env(safe-area-inset-top, 0px) + 12px);
@@ -292,16 +292,17 @@
         font-family: inherit;
     }
     #sr-error-report-drawer {
+        --sr-err-lip-h: 15px;
+        --sr-err-lip-peek: 10px; /* ~2/3 of lip height visible when closed */
         pointer-events: auto;
         display: flex;
         flex-direction: column;
         align-items: center;
-        background: #18181b;
-        border: 1px solid #3f3f46;
-        border-radius: 0 0 10px 10px;
-        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
-        /* Closed: only the short bottom lip peeks; open: full rectangle slides down */
-        transform: translateY(calc(-100% + 7px));
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        /* Closed: only ~2/3 of the trapezoid peeks; open: slides down */
+        transform: translateY(calc(-100% + var(--sr-err-lip-peek)));
         transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
         will-change: transform;
     }
@@ -312,44 +313,51 @@
         #sr-error-report-root:hover #sr-error-report-drawer {
             transform: translateY(0);
         }
-        #sr-error-report-root:hover #sr-error-report-lip,
-        #sr-error-report-root.is-open #sr-error-report-lip {
-            background: #f43f5e;
-            border-color: #fb7185;
+        #sr-error-report-root:hover #sr-error-report-lip {
+            background: #18181b;
+            opacity: 1;
         }
     }
     #sr-error-report-panel {
         box-sizing: border-box;
         width: 100%;
-        padding: 14px 14px 10px;
+        padding: 14px 14px 12px;
+        background: #18181b;
+        border: 1px solid #3f3f46;
+        border-bottom: none;
+        border-radius: 0;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
     }
-    /* Short centered tab = lower edge of the rectangle (not full-width) */
+    /* Trapezoid pull-tab — wider at body, narrower at tip; same fill = one shape */
     #sr-error-report-lip {
         position: relative;
-        width: 44px;
-        height: 7px;
-        margin: 0 0 -1px;
+        width: 56px;
+        height: var(--sr-err-lip-h);
+        margin: 0;
         padding: 0;
-        border: 1px solid #3f3f46;
-        border-top: none;
-        border-radius: 0 0 6px 6px;
-        background: #27272a;
-        box-shadow: none;
+        border: none;
+        border-radius: 0;
+        background: #3f3f46;
+        opacity: 0.72;
         cursor: pointer;
         flex-shrink: 0;
+        clip-path: polygon(0 0, 100% 0, 70% 100%, 30% 100%);
+        filter: drop-shadow(0 1px 0 rgba(63, 63, 70, 0.9));
+        transition: background 0.2s ease, opacity 0.2s ease;
     }
     #sr-error-report-root.is-open #sr-error-report-lip {
-        background: #f43f5e;
-        border-color: #fb7185;
+        background: #18181b;
+        opacity: 1;
+        filter: drop-shadow(0 1px 0 #3f3f46);
     }
-    /* Fat-finger hit pad under the lip (touch / station / mobile) */
+    /* Fat-finger hit pad under the tab (touch / station / mobile) */
     #sr-error-report-lip::after {
         content: '';
         position: absolute;
-        left: -18px;
-        right: -18px;
-        top: -4px;
-        height: 32px;
+        left: -20px;
+        right: -20px;
+        top: -6px;
+        height: 36px;
     }
     #sr-error-report-panel .input-label {
         margin-top: 0;

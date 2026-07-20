@@ -210,3 +210,4 @@ PACK FOLLOWS BELOW:
 | 2026-07-20 | Director: this is the **middle / NEXT** campaign. **Phase 0 shipped** (SCHEMA + DRIVE_LAYOUT + journal stub + TODO). Phase 2 UI: ask director. **Next slice: Phase 1.** |
 | 2026-07-20 | **Phase 1 shipped @ GAS v681:** `verifyErrorReportsSchema` + `submitErrorReport` + `TEST_ErrorReport` in `Resources_Audit.js`. Tab `Error_Reports` on `SM_Showrunner_LOGS`; `Audit_Logs` untouched. Oversized diag → Drive + `Diag_Ref`. |
 | 2026-07-20 | **Phase 2 shipped @ GAS v684:** `00f_Error_Report.html` — top-center 2mm lip; hover (fine pointer) / tap lip (touch); freeze snapshot on open; `submitErrorReport`. Wired in `Index.html` (web + mobile + station). Escape stops at drawer (Bugbot). Re-pushed after Drive sync wiped local `00f`. Styles `#sr-error-report-*`. |
+| 2026-07-20 | **Drawer polish @ GAS v685:** short bottom lip (not full-width) sits under bookmarks offset; whole rectangle **slides down** on hover/open. |
