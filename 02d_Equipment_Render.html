@@ -512,12 +512,26 @@ function renderProjectAssetsUI() {
         }
         packFiltersEl.innerHTML = `<div style="display:inline-flex; align-items:center; gap:8px;">
             <span style="color:#ffffff; font-size:10px; font-weight:900; letter-spacing:0.04em;">WORKING</span>
-            <select id="pa-working-dept-select" onchange="setPaWorkingDept(this.value)" title="New adds go into this department"
-                style="padding:5px 8px; height:28px; font-size:11px; font-weight:bold; background:#111; color:#e4e4e7; border:2px solid #ffffff; border-radius:4px; outline:none; min-width:120px;">
+            <select id="pa-working-dept-select" class="pa-working-dept-select" onchange="setPaWorkingDept(this.value)" title="New adds go into this department">
                 ${workOpts}
             </select>
         </div>`;
         packFiltersEl.style.setProperty('display', 'flex', 'important');
+        var workSel = document.getElementById('pa-working-dept-select');
+        if (workSel) {
+            workSel.style.setProperty('border', '2px solid #ffffff', 'important');
+            workSel.style.setProperty('border-color', '#ffffff', 'important');
+            workSel.style.setProperty('background', '#111', 'important');
+            workSel.style.setProperty('color', '#e4e4e7', 'important');
+            workSel.style.setProperty('padding', '5px 8px', 'important');
+            workSel.style.setProperty('height', '28px', 'important');
+            workSel.style.setProperty('font-size', '11px', 'important');
+            workSel.style.setProperty('font-weight', 'bold', 'important');
+            workSel.style.setProperty('border-radius', '4px', 'important');
+            workSel.style.setProperty('outline', 'none', 'important');
+            workSel.style.setProperty('min-width', '120px', 'important');
+            workSel.style.setProperty('width', 'auto', 'important');
+        }
     }
 
     if (window.currentPaMode === 'packing' || window.currentPaMode === 'operation') {
