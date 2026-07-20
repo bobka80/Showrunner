@@ -564,6 +564,59 @@ function dalPrepAlreadyClosedErr_(err) {
   return msg.indexOf('No open') !== -1 && msg.indexOf('session') !== -1;
 }
 
+function dalPrepCommitInProgressErr_(err) {
+  var msg = dalPrepErrMsg_(err);
+  return msg.indexOf('Commit already in progress') !== -1;
+}
+
+/** Domain finished (or never open) — not open/opening/committing. */
+function dalPrepCloseDomainDone_(info) {
+  var st = window.dalPrepStatusFromInfo_(info);
+  return !st || st === 'normal' || (st !== 'open' && st !== 'opening' && st !== 'committing');
+}
+
+/** Prefer signed-in crew name (matches presence); station host badge is a fallback. */
+function dalPrepCloseActor_() {
+  if (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) return String(ACTIVE_USER_NAME);
+  if (typeof assetOpsActor === 'function') return assetOpsActor();
+  return 'System';
+}
+
+/**
+ * Peer/prior close still committing — poll until domain clears (~30s), then succeed.
+ * Only call onStuck if still committing after the wait.
+ */
+function dalPrepWaitCommitThen_(projectId, onDone, onStuck) {
+  var attempts = 0;
+  var maxAttempts = 15;
+  var tick = function() {
+    google.script.run
+      .withFailureHandler(function() {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          if (typeof onStuck === 'function') onStuck();
+          return;
+        }
+        setTimeout(tick, 2000);
+      })
+      .withSuccessHandler(function(info) {
+        var st = window.dalPrepStatusFromInfo_(info);
+        if (st !== 'committing') {
+          if (typeof onDone === 'function') onDone(info);
+          return;
+        }
+        attempts++;
+        if (attempts >= maxAttempts) {
+          if (typeof onStuck === 'function') onStuck();
+          return;
+        }
+        setTimeout(tick, 2000);
+      })
+      .getDalSessionInfo(projectId);
+  };
+  tick();
+}
+
 window.openDalPrepSession = function(opts) {
   opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
@@ -773,6 +826,18 @@ window.closeDalPrepSession = function(opts) {
     // Success toast retired — ending prep is silent (errors still alert).
   };
 
+  var failCloseAlert_ = function(errOrMsg) {
+    window.dalPrepClosing = false;
+    window.dalPrepClosingUi_ = false;
+    if (overlay) overlay.style.cursor = '';
+    if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+      window.dalUpdateRemotePendingBanner_();
+    }
+    if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
+    var msg = (errOrMsg && errOrMsg.message) ? dalPrepErrMsg_(errOrMsg) : String(errOrMsg || 'Unknown error');
+    alert(opts.auto ? ('Auto-close prep failed:\n\n' + msg) : ('End prep failed:\n\n' + msg));
+  };
+
   var finishCloseOk_ = function() {
     if (overlay) overlay.style.cursor = '';
     window.dalPrepLeaveIntent_ = false;
@@ -788,28 +853,60 @@ window.closeDalPrepSession = function(opts) {
     doneMsg_();
   };
 
-  var runClose_ = function() {
+  var waitCommitOrFinish_ = function(stuckMsg) {
+    dalPrepWaitCommitThen_(projectId, function(info) {
+      if (dalPrepCloseDomainDone_(info) || window.dalPrepStatusFromInfo_(info) !== 'open') {
+        finishCloseOk_();
+        return;
+      }
+      // Unexpectedly back to open after wait — treat as done latch clear only if auto
+      if (opts.auto) finishCloseOk_();
+      else failCloseAlert_(stuckMsg || 'Commit already in progress for this prep session — wait for it to finish.');
+    }, function() {
+      failCloseAlert_(stuckMsg ||
+        'Commit already in progress for this prep session — wait for it to finish. If stuck, wait ~5 minutes for reclaim or contact support.');
+    });
+  };
+
+  /** After any close/write race: re-probe before scaring the floor. */
+  var resolveCloseFailure_ = function(err) {
+    if (dalPrepAlreadyClosedErr_(err)) {
+      finishCloseOk_();
+      return;
+    }
     google.script.run
-      .withFailureHandler(function(err) {
-        // Stale latch / double leave after peer or prior commit already closed Sheets.
-        if (dalPrepAlreadyClosedErr_(err)) {
+      .withFailureHandler(function() {
+        if (dalPrepCommitInProgressErr_(err) || opts.auto) {
+          waitCommitOrFinish_(dalPrepErrMsg_(err));
+          return;
+        }
+        failCloseAlert_(err);
+      })
+      .withSuccessHandler(function(info) {
+        var st = window.dalPrepStatusFromInfo_(info);
+        if (dalPrepCloseDomainDone_(info)) {
           finishCloseOk_();
           return;
         }
-        window.dalPrepClosing = false;
-        window.dalPrepClosingUi_ = false;
-        if (overlay) overlay.style.cursor = '';
-        if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
-          window.dalUpdateRemotePendingBanner_();
+        if (st === 'committing' || dalPrepCommitInProgressErr_(err)) {
+          waitCommitOrFinish_(dalPrepErrMsg_(err));
+          return;
         }
-        if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
-        if (!opts.auto) alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
-        else alert('Auto-close prep failed:\n\n' + dalPrepErrMsg_(err));
+        // Still open — real failure
+        failCloseAlert_(err);
+      })
+      .getDalSessionInfo(projectId);
+  };
+
+  var runClose_ = function() {
+    google.script.run
+      .withFailureHandler(function(err) {
+        resolveCloseFailure_(err);
       })
       .withSuccessHandler(function() {
         finishCloseOk_();
       })
-      .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'prep');
+      .closeDalSession(projectId, dalPrepCloseActor_(), 'prep');
   };
 
   var writeThenClose_ = function() {
@@ -817,16 +914,34 @@ window.closeDalPrepSession = function(opts) {
     if (typeof window.dalWritePaForkFullToFirestore_ === 'function' && window.dalPaLiveSyncMode === 'firestore') {
       window.dalWritePaForkFullToFirestore_(projectId, function(writeErr) {
         if (writeErr) {
-          window.dalPrepClosing = false;
-          window.dalPrepClosingUi_ = false;
-          if (overlay) overlay.style.cursor = '';
-          if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
-            window.dalUpdateRemotePendingBanner_();
+          // Auto: peer may already have committed — re-probe before alert.
+          if (opts.auto) {
+            google.script.run
+              .withFailureHandler(function() {
+                resolveCloseFailure_(writeErr);
+              })
+              .withSuccessHandler(function(info) {
+                var st = window.dalPrepStatusFromInfo_(info);
+                if (dalPrepCloseDomainDone_(info)) {
+                  finishCloseOk_();
+                  return;
+                }
+                if (st === 'committing') {
+                  waitCommitOrFinish_();
+                  return;
+                }
+                var msg = 'Could not sync live equipment to Firebase before commit.\n\n' +
+                  (writeErr.message || writeErr) +
+                  '\n\nEnd Prep cancelled — fork left intact (no Sheets wipe).';
+                failCloseAlert_(msg);
+              })
+              .getDalSessionInfo(projectId);
+            return;
           }
-          var msg = 'Could not sync live equipment to Firebase before commit.\n\n' +
+          var msgManual = 'Could not sync live equipment to Firebase before commit.\n\n' +
             (writeErr.message || writeErr) +
             '\n\nEnd Prep cancelled — fork left intact (no Sheets wipe).';
-          alert(opts.auto ? ('Auto-close prep failed:\n\n' + msg) : ('End prep failed:\n\n' + msg));
+          failCloseAlert_(msgManual);
           return;
         }
         window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
@@ -837,32 +952,36 @@ window.closeDalPrepSession = function(opts) {
     runClose_();
   };
 
+  var onProbeInfo_ = function(info) {
+    var st = window.dalPrepStatusFromInfo_(info);
+    if (st === 'open') {
+      writeThenClose_();
+      return;
+    }
+    if (st === 'committing') {
+      waitCommitOrFinish_();
+      return;
+    }
+    // normal / empty / opening aborted elsewhere — clear local latch, no Firebase write
+    finishCloseOk_();
+  };
+
+  var probeSession_ = function(retry) {
+    google.script.run
+      .withFailureHandler(function() {
+        if (!retry) {
+          setTimeout(function() { probeSession_(true); }, 800);
+          return;
+        }
+        // Probe still failing — try close without Firebase reseed (server decides).
+        runClose_();
+      })
+      .withSuccessHandler(onProbeInfo_)
+      .getDalSessionInfo(projectId);
+  };
+
   // Probe Sheets first — do not reseed Firebase when the domain is already closed
   // (stale latch / double last-leave after a successful peer or prior commit).
-  google.script.run
-    .withFailureHandler(function() {
-      writeThenClose_();
-    })
-    .withSuccessHandler(function(info) {
-      var st = window.dalPrepStatusFromInfo_(info);
-      if (st === 'open') {
-        writeThenClose_();
-        return;
-      }
-      if (st === 'committing') {
-        window.dalPrepClosing = false;
-        window.dalPrepClosingUi_ = false;
-        if (overlay) overlay.style.cursor = '';
-        if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
-          window.dalUpdateRemotePendingBanner_();
-        }
-        var busy = 'Commit already in progress for this prep session — wait for it to finish.';
-        alert(opts.auto ? ('Auto-close prep failed:\n\n' + busy) : ('End prep failed:\n\n' + busy));
-        return;
-      }
-      // normal / empty / opening aborted elsewhere — clear local latch, no Firebase write
-      finishCloseOk_();
-    })
-    .getDalSessionInfo(projectId);
+  probeSession_(false);
 };
 </script>

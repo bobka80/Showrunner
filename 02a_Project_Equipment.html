@@ -238,7 +238,7 @@ window.cancelProjectAssetsModal = function() {
       window.dalMaybeLastLeaveClosePrep_();
     }
     window.activePresenceModule = 'main';
-    if (!window.dalPrepClosing && !window.dalPrepLastLeavePending_ &&
+    if (!window.dalPrepClosing && !window.dalPrepLastLeavePending_ && !window.dalPrepLeaveIntent_ &&
         typeof stopDalPaSessionWatcher === 'function') {
       stopDalPaSessionWatcher({ clearLatch: true });
     }

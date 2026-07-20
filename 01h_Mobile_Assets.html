@@ -125,7 +125,7 @@ window.finishMobilePaClose = function(opts) {
     }
     window.activePresenceModule = 'main';
     // While last-leave (async presence) or close runs, leave watcher to that path.
-    if (!window.dalPrepClosing && !window.dalPrepLastLeavePending_ &&
+    if (!window.dalPrepClosing && !window.dalPrepLastLeavePending_ && !window.dalPrepLeaveIntent_ &&
         typeof stopDalPaSessionWatcher === 'function') {
         stopDalPaSessionWatcher({ clearLatch: true });
     }

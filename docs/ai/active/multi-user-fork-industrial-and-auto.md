@@ -334,6 +334,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | **Commit fail-safe B @ GAS v711–v712:** refuse empty PA wipe; `dal_commit_backups/` snapshot; restore Sheets on fail; clear fork only after reconcile; timeline flush/restore; no mid-flight double commit. **Next C:** red-dot + retry UI. |
 | 2026-07-20 | **Auto-close `no_project` @ GAS v713:** station/mobile leave cleared `edit-folder-id` before async last-leave → sync aborted with fail-safe intact. Resolve projectId from watcher/session/hub/presence; pass into close + idle. |
 | 2026-07-20 | **Auto-close already-closed @ GAS v715:** stale latch double-leave → `No open prep session` wrapped as Database Lockout (retry filter missed "prep"). Idempotent close + probe before Firebase write. |
+| 2026-07-21 | **False auto-close alerts:** wait/poll on `committing`; re-probe on close/write fail; probe fail ≠ assume open; station teardown skip re-arm last-leave; close actor = ACTIVE_USER_NAME. |
 
 ---
 

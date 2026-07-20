@@ -619,11 +619,14 @@
     // Station Back often skips cancelProjectAssetsModal — still commit if alone in live prep.
     // Do not stop the watcher while close is in flight or after it already ended (close success
     // restarts the watcher; a second teardown from stationDockWatchPaExit_ must not kill it).
+    // finishMobilePaClose / prior teardown may already have armed last-leave — do not re-arm.
+    var leaveAlreadyArmed = !!(window.dalPrepLastLeavePending_ || window.dalPrepClosing ||
+      window.dalPrepLeaveIntent_);
     if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepLastLeavePending_) {
-      if (typeof window.dalMaybeLastLeaveClosePrep_ === 'function') {
+      if (!leaveAlreadyArmed && typeof window.dalMaybeLastLeaveClosePrep_ === 'function') {
         window.dalMaybeLastLeaveClosePrep_();
       }
-      if (!window.dalPrepClosing && !window.dalPrepLastLeavePending_ &&
+      if (!window.dalPrepClosing && !window.dalPrepLastLeavePending_ && !window.dalPrepLeaveIntent_ &&
           typeof stopDalPaSessionWatcher === 'function') {
         stopDalPaSessionWatcher({ clearLatch: true });
       }
