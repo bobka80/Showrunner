@@ -7,7 +7,7 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Part B in progress** — **B0 @ v693** · **B1 @ v694** · **B2 @ v695** · **B3 @ v697**. **Next: B4** close/idle eject (deferred to end of Part B per director). Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
+**Opened:** 2026-07-18 · **Status:** **Part B in progress** — **B0–B3 + B5 done** (B5 @ **v700**). **Next: B4** close/idle eject (end of Part B) → then B6/B7 exit. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
 **Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
@@ -326,6 +326,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | **B1 shipped @ GAS v694:** who-may-start matrix + freelancer exclude (incl. station host flags). Bugbot High/Med fixed. **Next: B2** opening warm-up. |
 | 2026-07-20 | **B2 shipped @ GAS v695:** Opening warm-up (starter-only, peer freeze, hang Retry/Cancel/take-over, entry delta). **Next: B3** live pull-in. |
 | 2026-07-20 | **B3 shipped @ GAS v697:** live pull-in joining cue + soft-switch; phone auto-join; no calendar yank. Director: thorough Opening/pull-in + **auto-close (B4)** at end of Part B. **Next: B5** cue redesign (or B4 when ready). |
+| 2026-07-20 | **B5 shipped @ GAS v700:** SYNC phase copy Normal/Opening/Live/Closing + frozen vs editable + joining; idle warn stub for B4. **Next: B4** auto-close/idle (end). |
 
 ---
 
