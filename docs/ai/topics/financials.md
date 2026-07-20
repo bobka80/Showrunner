@@ -4,6 +4,8 @@
 
 **Last swept:** 2026-06-28 · **Status:** Partial — offer tab + print studio shipped; labor/fleet/ROI pending
 
+**Future campaign (locked design, not active):** [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — crew snapshot pull, invoice conversion, transport line, quote naming, company block, labor tiers, handover print. Queued after multi-user Part B.
+
 ---
 
 ## Shipped

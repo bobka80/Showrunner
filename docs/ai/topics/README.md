@@ -17,6 +17,7 @@ One file per feature area. **Read only the topic you need.**
 - [mobile-crew.md](mobile-crew.md) — mobile crew UX
 - [database-ops.md](database-ops.md) — backup/restore + push admin
 - [financials.md](financials.md) — financials & quoting
+- [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — future campaign: offer/invoice, crew swap, availability conflicts (after Part B)
 - [logistics-warehouse.md](logistics-warehouse.md) — warehouse RFID, station gun, gate
 - [project-assets-concurrency.md](project-assets-concurrency.md) — multi-user Project Assets
 - [compliance.md](compliance.md) — compliance & H&S

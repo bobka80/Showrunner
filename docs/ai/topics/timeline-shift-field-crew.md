@@ -2,12 +2,13 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Related:** [notifications-catalog.md](notifications-catalog.md) · [mobile-crew.md](mobile-crew.md) · [timeline-collab-session.md](timeline-collab-session.md) · [beta-prep.md](beta-prep.md)
+**Related:** [notifications-catalog.md](notifications-catalog.md) · [mobile-crew.md](mobile-crew.md) · [timeline-collab-session.md](timeline-collab-session.md) · [beta-prep.md](beta-prep.md) · [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) (§2 manager-side person swap on timeline — future campaign)
 
 **Status:** Backlog — planned roster vs what happened on site
 
 **Last swept:** 2026-06-30
 
+**Note:** Manager **timeline name-click swap** (same department, preserve slot/hours/role/rate) is locked under the future offer/availability campaign §2 — distinct from field actuals substitutions below.
 ---
 
 ## Director intent

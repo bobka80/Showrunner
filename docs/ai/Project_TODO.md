@@ -51,6 +51,7 @@ Also on the board (do not mix without director pick):
 | Mobile crew UX | Shipped v314+; **phone QR scan shipped v474** (see topic) | [topics/mobile-crew.md](topics/mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [topics/financials.md](topics/financials.md) |
+| **Offer / invoice · crew swap · availability conflicts** | Future campaign — locked 2026-07-20; **after** multi-user Part B; not active | [topics/offer-invoice-crew-availability-2026-07-20.md](topics/offer-invoice-crew-availability-2026-07-20.md) · companion [logistics-ledger-schema-2026-07-20.md](topics/logistics-ledger-schema-2026-07-20.md) |
 | Logistics & warehouse RFID | Active campaign — station BLE reconnect UI-restart solved (APK 0.1.36); phone QR shipped → mobile-crew | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |

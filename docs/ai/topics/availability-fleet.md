@@ -4,6 +4,8 @@
 
 **Last swept:** 2026-06-28 · **Status:** Partial — equipment tracker matrix shipped; truck envelopes + TRANSFER UI pending
 
+**Future campaign (locked design, not active):** [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — soft/hard conflicts, day-view truck journey, false single-event badge bug. Conflicts build against [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) (companion). Queued after multi-user Part B.
+
 ---
 
 ## Shipped

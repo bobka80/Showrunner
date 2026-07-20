@@ -296,11 +296,35 @@ function startPresencePing(projectId) {
             if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
             if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
             if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
-        }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule, window.activePresencePaMode || '');
+            // Part B4 — peers in the live room reset idle (room not empty).
+            if (window.dalPrepUiOpen && (window.paPrepOccupants || []).length > 0 &&
+                typeof window.dalTouchRoomIdle_ === 'function') {
+              window.dalTouchRoomIdle_('prep');
+            }
+            if (window.dalTimelineSessionOpen && (window.timelineOccupants || []).length > 0 &&
+                typeof window.dalTouchRoomIdle_ === 'function') {
+              window.dalTouchRoomIdle_('timeline');
+            }
+        }).reportProjectPresence(
+          activePresenceProject,
+          userAlias,
+          'ping',
+          window.activePresenceModule,
+          (function() {
+            var sub = window.activePresencePaMode || '';
+            if (window.IS_STATION_DEVICE) {
+              sub = sub ? (sub + '|station') : 'station';
+            }
+            return sub;
+          })()
+        );
     };
     
     ping(); 
-    presenceTimer = setInterval(ping, 5000); 
+    var pingMs = (typeof window.DAL_PRESENCE_PING_MS_ === 'number' && window.DAL_PRESENCE_PING_MS_ > 0)
+      ? window.DAL_PRESENCE_PING_MS_
+      : 45000;
+    presenceTimer = setInterval(ping, pingMs); 
 }
 
 function stopPresencePing() {

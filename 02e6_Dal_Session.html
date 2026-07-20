@@ -297,6 +297,12 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   if (!isPrepOpen && (changed || opts.allowClose)) {
     window.dalClearPrepPullInJoining_();
   }
+  if (isPrepOpen && changed) {
+    if (typeof window.dalTouchRoomIdle_ === 'function') window.dalTouchRoomIdle_('prep');
+  }
+  if (!isPrepOpen && (changed || opts.allowClose)) {
+    if (typeof window.dalClearRoomIdle_ === 'function') window.dalClearRoomIdle_('prep');
+  }
 
   // Top banner retired — vault orange panel is the prep status surface.
   if (banner) {
@@ -708,9 +714,11 @@ window.dalPrepOnOpenSuccess_ = function(projectId, opts, joined) {
   if (!opts.auto) alert(joined ? 'Joined preparation.' : 'Preparation started.');
 };
 
-window.closeDalPrepSession = function() {
+window.closeDalPrepSession = function(opts) {
+  opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
   if (window.dalPrepOpeningUi_ && !window.dalPrepUiOpen) {
+    if (opts.auto) return;
     if (!confirm('Abort opening and stay on normal equipment list?')) return;
     var actorAbort = typeof assetOpsActor === 'function'
       ? assetOpsActor()
@@ -718,7 +726,12 @@ window.closeDalPrepSession = function() {
     window.dalAbortPrepOpening_(projectId, actorAbort);
     return;
   }
-  if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
+  if (!window.dalPrepUiOpen && !opts.auto) return;
+  if (!opts.auto) {
+    if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
+  }
+  if (window.dalPrepClosing) return;
+  window.dalClearRoomIdle_('prep');
   window.dalPrepClosing = true;
   window.dalPrepClosingUi_ = true;
   if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
@@ -731,6 +744,16 @@ window.closeDalPrepSession = function() {
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
 
+  var doneMsg_ = function() {
+    if (opts.reason === 'idle') {
+      alert('Live preparation closed — room idle (committed to Sheets).');
+    } else if (opts.reason === 'last-leave') {
+      alert('Live preparation closed — last person left (committed to Sheets).');
+    } else if (!opts.auto) {
+      alert('Preparation ended — committed to Sheets.');
+    }
+  };
+
   var runClose_ = function() {
     google.script.run
       .withFailureHandler(function(err) {
@@ -741,7 +764,8 @@ window.closeDalPrepSession = function() {
           window.dalUpdateRemotePendingBanner_();
         }
         if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
-        alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
+        if (!opts.auto) alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
+        else alert('Auto-close prep failed:\n\n' + dalPrepErrMsg_(err));
       })
       .withSuccessHandler(function() {
         if (overlay) overlay.style.cursor = '';
@@ -753,7 +777,7 @@ window.closeDalPrepSession = function() {
         else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
         window.dalPrepClosing = false;
         window.dalPrepClosingUi_ = false;
-        alert('Preparation ended — committed to Sheets.');
+        doneMsg_();
       })
       .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'prep');
   };

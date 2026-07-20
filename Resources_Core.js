@@ -776,10 +776,11 @@ function reportProjectPresence(projectId, userName, action, activeModule, subMod
               };
             } else if (action === 'leave') delete activeUsers[userName];
             
-            // Cleanup disconnected users (no ping in last 90 seconds)
+            // Cleanup disconnected users (Part B4: ~150s stale with ~45s client ping)
+            var staleMs = 150000;
             let activeList = {};
             for (let user in activeUsers) {
-                if (now - activeUsers[user].time > 90000) delete activeUsers[user];
+                if (now - activeUsers[user].time > staleMs) delete activeUsers[user];
                 else if (user !== userName) activeList[user] = activeUsers[user]; // Keep track of OTHERS and their modules
             }
             

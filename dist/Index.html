@@ -1053,7 +1053,7 @@
     
     .shift-block { position: absolute; height: 36px; top: 12px; border-radius: 4px; cursor: grab; box-shadow: 0 4px 6px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); user-select: none; transition: box-shadow 0.1s; overflow: hidden;}
     .shift-block:active { cursor: grabbing; }
-    .shift-block.selected { border: 2px solid #d4d4d8; box-shadow: 0 4px 6px rgba(0,0,0,0.5); z-index: 100;}
+    .shift-block.selected { border: 2px solid #d4d4d8 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.5) !important; z-index: 100;}
     
     .shift-label { position: absolute; left: 66px; top: 10px; font-size: 13px; font-weight: 800; pointer-events: none; white-space: nowrap;}
     .shift-arrow-indicator { position: absolute; right: 16px; top: 8px; font-size: 18px; font-weight: 900; pointer-events: none; line-height: 1;}
@@ -1183,7 +1183,7 @@
     
     .phase-block { position: absolute; height: 14px; top: 2px; border-radius: 4px; color: #fff; font-size: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; overflow: hidden; white-space: nowrap; cursor: grab; user-select: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); box-sizing: border-box; transition: box-shadow 0.1s;}
     .phase-block:active { cursor: grabbing; }
-    .phase-block.selected { border: 2px solid #d4d4d8; box-shadow: 0 4px 6px rgba(0,0,0,0.5); z-index: 100;}
+    .phase-block.selected { border: 2px solid #d4d4d8 !important; box-shadow: 0 4px 6px rgba(0,0,0,0.5) !important; z-index: 100;}
     
     .phase-handle { position: absolute; top: 0; width: 12px; height: 100%; cursor: ew-resize; background: transparent; z-index: 5;}
     .phase-handle-left { left: 0; }
@@ -1203,6 +1203,12 @@
     /* ========================================================= */
     
     .shift-block { height: 38px !important; top: 11px !important; border: 1px solid rgba(255,255,255,0.15) !important; }
+    /* Selection frame must beat the border !important above (glow was the only prior cue). */
+    .shift-block.selected {
+        border: 2px solid #d4d4d8 !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5) !important;
+        z-index: 100 !important;
+    }
 
     .shift-handle { position: absolute; top: 0; width: 12px; height: 100%; cursor: ew-resize; background: transparent; z-index: 5; }
     .shift-handle-left { left: 0; border-radius: 4px 0 0 4px; }

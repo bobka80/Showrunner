@@ -1452,6 +1452,12 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
   if (!isOpen && !isOpening) {
     window.dalClearTlPullInJoining_();
   }
+  if (isOpen && !wasOpenBefore) {
+    if (typeof window.dalTouchRoomIdle_ === 'function') window.dalTouchRoomIdle_('timeline');
+  }
+  if (!isOpen && !isOpening) {
+    if (typeof window.dalClearRoomIdle_ === 'function') window.dalClearRoomIdle_('timeline');
+  }
 
   if (window.dalTlOpeningUi_) {
     var openedBy = info.openedBy || info.timelineOpenedBy || window.dalTlOpeningBy_ || '';

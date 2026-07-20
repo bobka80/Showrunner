@@ -233,6 +233,11 @@ window.cancelProjectAssetsModal = function() {
     if (typeof currentProjectAssets !== 'undefined' && window.originalProjectAssets) {
         currentProjectAssets = JSON.parse(JSON.stringify(window.originalProjectAssets));
     }
+    // Part B4 — last person leaving live PA commits the fork.
+    if (window.dalPrepUiOpen && !(window.paPrepOccupants || []).length &&
+        typeof window.closeDalPrepSession === 'function') {
+      window.closeDalPrepSession({ auto: true, reason: 'last-leave' });
+    }
     window.activePresenceModule = 'main';
     if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
     document.getElementById('project-assets-modal-overlay').style.display = 'none';

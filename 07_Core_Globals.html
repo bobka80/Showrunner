@@ -264,6 +264,178 @@ window.dalForkPhaseStatusText_ = function(opts) {
   return 'Live';
 };
 
+/** Part B4 — room idle eject (timeline 45m / prep 75m; warn at T−5). */
+window.DAL_IDLE_TL_MS_ = 45 * 60 * 1000;
+window.DAL_IDLE_PREP_MS_ = 75 * 60 * 1000;
+window.DAL_IDLE_WARN_BEFORE_MS_ = 5 * 60 * 1000;
+window.DAL_PRESENCE_PING_MS_ = 45 * 1000;
+window.DAL_PRESENCE_STALE_MS_ = 150 * 1000;
+window.DAL_IDLE_TICK_MS_ = 15 * 1000;
+
+window.dalRoomIdleState_ = {
+  prep: { lastTouch: 0, timer: null, ejecting: false },
+  timeline: { lastTouch: 0, timer: null, ejecting: false }
+};
+
+window.dalPrepIdleBlockedByStation_ = function() {
+  if (window.IS_STATION_DEVICE) {
+    if (typeof window.stationHostActive_ === 'function' && window.stationHostActive_()) return true;
+    if (window.dalPrepUiOpen) return true;
+  }
+  var list = window.paPrepOccupants || [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] && /station/i.test(String(list[i].mode || ''))) return true;
+  }
+  return false;
+};
+
+window.dalClearRoomIdle_ = function(domain) {
+  var d = domain === 'timeline' ? 'timeline' : 'prep';
+  var st = window.dalRoomIdleState_[d];
+  if (st.timer) {
+    try { clearInterval(st.timer); } catch (e0) { /* ignore */ }
+    st.timer = null;
+  }
+  st.lastTouch = 0;
+  st.ejecting = false;
+  if (d === 'prep') window.dalPrepIdleWarn_ = false;
+  else window.dalTlIdleWarn_ = false;
+};
+
+window.dalTouchRoomIdle_ = function(domain) {
+  var d = domain === 'timeline' ? 'timeline' : 'prep';
+  var live = d === 'prep' ? !!window.dalPrepUiOpen : !!window.dalTimelineSessionOpen;
+  if (!live) return;
+  var st = window.dalRoomIdleState_[d];
+  st.lastTouch = Date.now();
+  if (d === 'prep') window.dalPrepIdleWarn_ = false;
+  else window.dalTlIdleWarn_ = false;
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function' && d === 'prep') {
+    window.dalUpdateRemotePendingBanner_();
+  }
+  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function' && d === 'timeline') {
+    window.dalUpdateTimelineLiveBanner_();
+  }
+  window.dalArmRoomIdle_(d);
+};
+
+window.dalKeepOpenRoomIdle_ = function(domain) {
+  window.dalTouchRoomIdle_(domain);
+};
+
+window.dalArmRoomIdle_ = function(domain) {
+  var d = domain === 'timeline' ? 'timeline' : 'prep';
+  var live = d === 'prep' ? !!window.dalPrepUiOpen : !!window.dalTimelineSessionOpen;
+  if (!live) {
+    window.dalClearRoomIdle_(d);
+    return;
+  }
+  var st = window.dalRoomIdleState_[d];
+  if (!st.lastTouch) st.lastTouch = Date.now();
+  if (st.timer) return;
+  st.timer = setInterval(function() {
+    window.dalTickRoomIdle_(d);
+  }, window.DAL_IDLE_TICK_MS_ || 15000);
+  window.dalBindForkIdleKeepOpenClicks_();
+};
+
+window.dalTickRoomIdle_ = function(domain) {
+  var d = domain === 'timeline' ? 'timeline' : 'prep';
+  var live = d === 'prep' ? !!window.dalPrepUiOpen : !!window.dalTimelineSessionOpen;
+  if (!live) {
+    window.dalClearRoomIdle_(d);
+    return;
+  }
+  // Peers still in the room → not idle.
+  if (d === 'prep' && (window.paPrepOccupants || []).length > 0) {
+    window.dalTouchRoomIdle_('prep');
+    return;
+  }
+  if (d === 'timeline' && (window.timelineOccupants || []).length > 0) {
+    window.dalTouchRoomIdle_('timeline');
+    return;
+  }
+  if (d === 'prep' && window.dalPrepIdleBlockedByStation_()) {
+    window.dalTouchRoomIdle_('prep');
+    return;
+  }
+  var st = window.dalRoomIdleState_[d];
+  if (!st.lastTouch || st.ejecting) return;
+  var limit = d === 'prep'
+    ? (window.DAL_IDLE_PREP_MS_ || (75 * 60 * 1000))
+    : (window.DAL_IDLE_TL_MS_ || (45 * 60 * 1000));
+  var warnBefore = window.DAL_IDLE_WARN_BEFORE_MS_ || (5 * 60 * 1000);
+  var age = Date.now() - st.lastTouch;
+  if (age >= limit) {
+    st.ejecting = true;
+    if (d === 'prep') {
+      window.dalPrepIdleWarn_ = false;
+      if (typeof window.closeDalPrepSession === 'function') {
+        window.closeDalPrepSession({ auto: true, reason: 'idle' });
+      }
+    } else {
+      window.dalTlIdleWarn_ = false;
+      if (typeof window.closeDalTimelineCollabSession === 'function') {
+        window.closeDalTimelineCollabSession({ auto: true, reason: 'idle' });
+      }
+    }
+    return;
+  }
+  if (age >= (limit - warnBefore)) {
+    if (d === 'prep' && !window.dalPrepIdleWarn_) {
+      window.dalPrepIdleWarn_ = true;
+      if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+        window.dalUpdateRemotePendingBanner_();
+      }
+    }
+    if (d === 'timeline' && !window.dalTlIdleWarn_) {
+      window.dalTlIdleWarn_ = true;
+      if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+        window.dalUpdateTimelineLiveBanner_();
+      }
+    }
+  }
+};
+
+window.dalBindForkIdleKeepOpenClicks_ = function() {
+  var bind = function(el, domain) {
+    if (!el || el.getAttribute('data-dal-idle-bound') === '1') return;
+    el.setAttribute('data-dal-idle-bound', '1');
+    el.addEventListener('click', function() {
+      var warn = domain === 'prep' ? window.dalPrepIdleWarn_ : window.dalTlIdleWarn_;
+      if (!warn) return;
+      window.dalKeepOpenRoomIdle_(domain);
+    });
+  };
+  bind(document.getElementById('pa-prep-live-status'), 'prep');
+  bind(document.getElementById('tl-sync-status'), 'timeline');
+  bind(document.getElementById('surface-fork-sync-status'), 'prep');
+  var surf = document.getElementById('surface-fork-sync-status');
+  if (surf && surf.getAttribute('data-dal-idle-bound-tl') !== '1') {
+    surf.setAttribute('data-dal-idle-bound-tl', '1');
+    surf.addEventListener('click', function() {
+      if (window.dalTlIdleWarn_) window.dalKeepOpenRoomIdle_('timeline');
+      else if (window.dalPrepIdleWarn_) window.dalKeepOpenRoomIdle_('prep');
+    });
+  }
+};
+
+window.dalMaybeLastLeaveClosePrep_ = function() {
+  if (!window.dalPrepUiOpen || window.dalPrepClosing || window.dalPrepOpeningUi_) return;
+  if ((window.paPrepOccupants || []).length > 0) return;
+  if (typeof window.closeDalPrepSession === 'function') {
+    window.closeDalPrepSession({ auto: true, reason: 'last-leave' });
+  }
+};
+
+window.dalMaybeLastLeaveCloseTimeline_ = function() {
+  if (!window.dalTimelineSessionOpen || window.dalTlClosingUi_ || window.dalTlOpeningUi_) return;
+  if ((window.timelineOccupants || []).length > 0) return;
+  if (typeof window.closeDalTimelineCollabSession === 'function') {
+    window.closeDalTimelineCollabSession({ auto: true, reason: 'last-leave' });
+  }
+};
+
 /** Part B2 — hang threshold for Opening warm-up (45–60s band). */
 window.DAL_OPENING_HANG_MS_ = 50000;
 
