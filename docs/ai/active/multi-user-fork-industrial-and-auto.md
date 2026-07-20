@@ -251,8 +251,9 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 ### B5 — Cue redesign (same ship as behavior)
 
-- [ ] Clear Normal / Opening / Live / Closing  
-- [ ] Frozen vs editable; idle warning; “joining…” pull-in  
+- [x] Clear Normal / Opening / Live / Closing  
+- [x] Frozen vs editable; idle warning; “joining…” pull-in  
+*(Idle warning copy stubbed — timers/eject land in B4 at end of Part B.)*
 
 ### B6 — Part B checklist (from topic — leave until built)
 

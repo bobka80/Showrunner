@@ -470,9 +470,11 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Phone / station (2026-07-20):** Vault/crew SYNC is not visible (PA left panel hidden; timeline crew column cramped). Show fixed bottom `#surface-fork-sync-bar` instead — **orange** in PA when prep fork live, **blue** in timeline when collab fork live (`dalPaintSurfaceForkSyncBar_`). Desktop unchanged.
 
-**Opening warm-up (Part B2 @ v695+):** Sheets `opening` is **not** Live. Starter may edit; peers freeze + SYNC text **Starting live session…**. Do **not** live-latch from `_meta` or `refreshDalSessionBanner` while status is `opening`. Hang ~50s → Retry / Abort; credentialed desktop may `beginDalSession(..., { takeOver: true })`. Live latch only when status is `open`.
+**Opening warm-up (Part B2 @ v695+):** Sheets `opening` is **not** Live. Starter may edit; peers freeze + SYNC text **Opening — frozen** / starter **Opening — you can edit**. Do **not** live-latch from `_meta` or `refreshDalSessionBanner` while status is `opening`. Hang ~50s → Retry / Abort; credentialed desktop may `beginDalSession(..., { takeOver: true })`. Live latch only when status is `open`.
 
-**Live pull-in (Part B3):** Watchers run only while PA modal / timeline layer is open — never yank from calendar. Peer soft-switch → SYNC **Live session started — joining…** then `live (patch)`. Phone PA: no auto-start; same watcher auto-joins.
+**Live pull-in (Part B3):** Watchers run only while PA modal / timeline layer is open — never yank from calendar. Peer soft-switch → SYNC **Live — joining…** then **Live**. Phone PA: no auto-start; same watcher auto-joins.
+
+**Cue phases (Part B5):** SYNC status uses `dalForkPhaseStatusText_` — Normal (hide) / Opening / Live / Closing — committing…; idle T−5 copy stubbed for B4 (`dalPrepIdleWarn_` / `dalTlIdleWarn_`).
 
 ```
 START PREP (local)

@@ -1019,7 +1019,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
   var rosterEl = document.getElementById('pa-prep-live-roster');
   var vaultList = document.getElementById('pa-vault-list');
 
-  if (!window.dalPrepUiOpen && !window.dalPrepOpeningUi_) {
+  if (!window.dalPrepUiOpen && !window.dalPrepOpeningUi_ && !window.dalPrepClosingUi_) {
     if (panel) panel.style.display = 'none';
     if (vaultList) vaultList.style.paddingBottom = '';
     window.dalPaBannerLastText_ = '';
@@ -1037,27 +1037,30 @@ window.dalUpdateRemotePendingBanner_ = function() {
     window.dalApplyPaSyncPanelLayout_();
   }
 
+  var joiningActive = !!(window.dalPrepPullInJoining_ &&
+    Date.now() < (window.dalPrepPullInJoiningUntil_ || 0) &&
+    window.dalPaLiveSyncMode !== 'firestore');
+  if (window.dalPrepPullInJoining_ && !joiningActive) {
+    window.dalClearPrepPullInJoining_();
+  }
+
   var text;
-  if (window.dalPrepOpeningUi_) {
-    text = 'Starting live session…';
-  } else if (window.dalPrepPullInJoining_) {
-    if (window.dalPaLiveSyncMode === 'firestore' || Date.now() >= (window.dalPrepPullInJoiningUntil_ || 0)) {
-      window.dalClearPrepPullInJoining_();
-      text = window.dalPaLiveSyncMode === 'firestore' ? 'live (patch)' : 'on';
-    } else {
-      text = 'Live session started — joining…';
-    }
-  } else if (window.dalPaLiveSyncMode === 'blocked' || window.dalPaLiveSyncMode === 'gas') {
-    var why = window.dalPaLiveSyncFailReason_ ? (' — ' + window.dalPaLiveSyncFailReason_) : '';
-    text = 'DOWN' + why;
-  } else if (window.dalPaLiveSyncMode === 'connecting') {
-    text = 'connecting…';
-  } else if (window.dalPaRemotePending) {
-    text = 'pending…';
-  } else if (window.dalPaLiveSyncMode === 'firestore') {
-    text = 'live (patch)';
+  if (typeof window.dalForkPhaseStatusText_ === 'function') {
+    text = window.dalForkPhaseStatusText_({
+      idleWarn: !!window.dalPrepIdleWarn_,
+      closing: !!(window.dalPrepClosing || window.dalPrepClosingUi_),
+      opening: !!window.dalPrepOpeningUi_,
+      openingFrozen: !!window.dalPrepOpeningPeerFrozen_,
+      joining: joiningActive,
+      mode: window.dalPaLiveSyncMode,
+      pending: !!window.dalPaRemotePending,
+      failReason: window.dalPaLiveSyncFailReason_,
+      connecting: window.dalPaLiveSyncMode === 'connecting'
+    });
+  } else if (window.dalPrepOpeningUi_) {
+    text = 'Opening…';
   } else {
-    text = 'on';
+    text = 'Live';
   }
 
   if (statusEl && text !== window.dalPaBannerLastText_) {

@@ -1244,7 +1244,7 @@ window.dalUpdateTimelineLiveBanner_ = function() {
   var panel = document.getElementById('tl-sync-panel');
   var statusEl = document.getElementById('tl-sync-status');
   var rosterEl = document.getElementById('tl-sync-roster');
-  var open = !!window.dalTimelineSessionOpen || !!window.dalTlOpeningUi_;
+  var open = !!window.dalTimelineSessionOpen || !!window.dalTlOpeningUi_ || !!window.dalTlClosingUi_;
 
   if (!open) {
     if (panel) panel.style.display = 'none';
@@ -1258,27 +1258,30 @@ window.dalUpdateTimelineLiveBanner_ = function() {
     window.dalApplyTlSyncPanelLayout_();
   }
 
+  var joiningActive = !!(window.dalTlPullInJoining_ &&
+    Date.now() < (window.dalTlPullInJoiningUntil_ || 0) &&
+    window.dalTlLiveSyncMode !== 'firestore');
+  if (window.dalTlPullInJoining_ && !joiningActive) {
+    window.dalClearTlPullInJoining_();
+  }
+
   var text = '';
-  if (window.dalTlOpeningUi_) {
-    text = 'Starting live session…';
-  } else if (window.dalTlPullInJoining_) {
-    if (window.dalTlLiveSyncMode === 'firestore' || Date.now() >= (window.dalTlPullInJoiningUntil_ || 0)) {
-      window.dalClearTlPullInJoining_();
-      text = window.dalTlLiveSyncMode === 'firestore' ? 'live (patch)' : 'on';
-    } else {
-      text = 'Live session started — joining…';
-    }
-  } else if (window.dalTlLiveSyncMode === 'blocked' || window.dalTlLiveSyncMode === 'gas') {
-    var whyB = window.dalTlLiveSyncFailReason_ ? (' — ' + window.dalTlLiveSyncFailReason_) : '';
-    text = 'DOWN' + whyB;
-  } else if (window.dalTlRemotePending) {
-    text = 'pending…';
-  } else if (window.dalTlLiveSyncMode === 'firestore') {
-    text = 'live (patch)';
-  } else if (window.dalTlLiveSyncMode === 'connecting' || window.dalTlConnecting_) {
-    text = 'connecting…';
+  if (typeof window.dalForkPhaseStatusText_ === 'function') {
+    text = window.dalForkPhaseStatusText_({
+      idleWarn: !!window.dalTlIdleWarn_,
+      closing: !!window.dalTlClosingUi_,
+      opening: !!window.dalTlOpeningUi_,
+      openingFrozen: !!window.dalTlOpeningPeerFrozen_,
+      joining: joiningActive,
+      mode: window.dalTlLiveSyncMode,
+      pending: !!window.dalTlRemotePending,
+      failReason: window.dalTlLiveSyncFailReason_,
+      connecting: window.dalTlLiveSyncMode === 'connecting' || !!window.dalTlConnecting_
+    });
+  } else if (window.dalTlOpeningUi_) {
+    text = 'Opening…';
   } else {
-    text = 'on';
+    text = 'Live';
   }
   if (statusEl) statusEl.textContent = text;
 
@@ -1700,7 +1703,17 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
   var st = tl ? String(tl.status).toLowerCase() : '';
   var isOpen = st === 'open';
   var isOpening = st === 'opening';
+  var isClosing = st === 'committing';
   var wasOpen = !!window.dalTlWasSessionOpen;
+
+  if (isClosing && (window.dalTimelineSessionOpen || wasOpen)) {
+    window.dalTlClosingUi_ = true;
+    if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+      window.dalUpdateTimelineLiveBanner_();
+    }
+  } else if (!isClosing && window.dalTlClosingUi_ && !isOpen) {
+    window.dalTlClosingUi_ = false;
+  }
 
   window.dalApplyTimelineSessionUi_(isOpen, isOpening, tl);
 

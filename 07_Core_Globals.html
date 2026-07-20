@@ -178,16 +178,14 @@ window.dalPaintSurfaceForkSyncBar_ = function() {
 
   var mode = '';
   var text = '';
-  if (paView && (window.dalPrepUiOpen || window.dalPrepOpeningUi_)) {
+  if (paView && (window.dalPrepUiOpen || window.dalPrepOpeningUi_ || window.dalPrepClosingUi_)) {
     mode = 'pa';
     var paSrc = document.getElementById('pa-prep-live-status');
-    text = (paSrc && String(paSrc.textContent || '').trim())
-      || (window.dalPrepOpeningUi_ ? 'Starting live session…' : 'on');
-  } else if (tlView && (window.dalTimelineSessionOpen || window.dalTlOpeningUi_)) {
+    text = (paSrc && String(paSrc.textContent || '').trim()) || 'Live';
+  } else if (tlView && (window.dalTimelineSessionOpen || window.dalTlOpeningUi_ || window.dalTlClosingUi_)) {
     mode = 'tl';
     var tlSrc = document.getElementById('tl-sync-status');
-    text = (tlSrc && String(tlSrc.textContent || '').trim())
-      || (window.dalTlOpeningUi_ ? 'Starting live session…' : 'on');
+    text = (tlSrc && String(tlSrc.textContent || '').trim()) || 'Live';
   }
 
   if (!mode) {
