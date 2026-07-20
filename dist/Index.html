@@ -291,7 +291,7 @@
         pointer-events: none;
     }
 
-    /* --- Global error-report drawer — trapezoid pull-tab; slides down --- */
+    /* --- Global error-report drawer — mild filleted trapezoid tab; slides down --- */
     #sr-error-report-root {
         position: fixed;
         top: calc(env(safe-area-inset-top, 0px) + 12px);
@@ -303,8 +303,8 @@
         font-family: inherit;
     }
     #sr-error-report-drawer {
-        --sr-err-lip-h: 15px;
-        --sr-err-lip-peek: 10px; /* ~2/3 of lip height visible when closed */
+        --sr-err-lip-h: 16px;
+        --sr-err-lip-peek: 8px; /* 1/2 of lip height visible when closed */
         pointer-events: auto;
         display: flex;
         flex-direction: column;
@@ -312,7 +312,6 @@
         background: transparent;
         border: none;
         box-shadow: none;
-        /* Closed: only ~2/3 of the trapezoid peeks; open: slides down */
         transform: translateY(calc(-100% + var(--sr-err-lip-peek)));
         transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
         will-change: transform;
@@ -324,8 +323,9 @@
         #sr-error-report-root:hover #sr-error-report-drawer {
             transform: translateY(0);
         }
-        #sr-error-report-root:hover #sr-error-report-lip {
-            background: #18181b;
+        #sr-error-report-root:hover .sr-error-report-lip-fill {
+            fill: #18181b;
+            stroke: #52525b;
             opacity: 1;
         }
     }
@@ -339,27 +339,37 @@
         border-radius: 0;
         box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
     }
-    /* Trapezoid pull-tab — wider at body, narrower at tip; same fill = one shape */
+    /* Mild trapezoid pull-tab — SVG frame + fillets; peeks at half height */
     #sr-error-report-lip {
         position: relative;
-        width: 56px;
+        display: block;
+        width: 52px;
         height: var(--sr-err-lip-h);
-        margin: 0;
+        margin: -1px 0 0;
         padding: 0;
         border: none;
-        border-radius: 0;
-        background: #3f3f46;
-        opacity: 0.72;
+        background: transparent;
         cursor: pointer;
         flex-shrink: 0;
-        clip-path: polygon(0 0, 100% 0, 70% 100%, 30% 100%);
-        filter: drop-shadow(0 1px 0 rgba(63, 63, 70, 0.9));
-        transition: background 0.2s ease, opacity 0.2s ease;
+        line-height: 0;
     }
-    #sr-error-report-root.is-open #sr-error-report-lip {
-        background: #18181b;
+    .sr-error-report-lip-shape {
+        display: block;
+        width: 52px;
+        height: 16px;
+        overflow: visible;
+    }
+    .sr-error-report-lip-fill {
+        fill: #27272a;
+        stroke: #3f3f46;
+        stroke-width: 1;
+        opacity: 0.82;
+        transition: fill 0.2s ease, stroke 0.2s ease, opacity 0.2s ease;
+    }
+    #sr-error-report-root.is-open .sr-error-report-lip-fill {
+        fill: #18181b;
+        stroke: #3f3f46;
         opacity: 1;
-        filter: drop-shadow(0 1px 0 #3f3f46);
     }
     /* Fat-finger hit pad under the tab (touch / station / mobile) */
     #sr-error-report-lip::after {
@@ -9429,7 +9439,19 @@ body.station-dock-screensaver-active #station-dock-shell {
       </div>
       <div id="sr-error-report-status" class="sr-error-report-status" aria-live="polite"></div>
     </div>
-    <button type="button" id="sr-error-report-lip" aria-label="Open error report" aria-expanded="false" title="Error report"></button>
+    <button type="button" id="sr-error-report-lip" aria-label="Open error report" aria-expanded="false" title="Error report">
+      <svg class="sr-error-report-lip-shape" viewBox="0 0 52 16" width="52" height="16" aria-hidden="true" focusable="false">
+        <path class="sr-error-report-lip-fill"
+          d="M3.5 0.5 H48.5
+             C49.6 0.5 50.2 1.4 49.9 2.4
+             L46.2 13.6
+             C45.7 15.1 44.3 15.5 42.8 15.5
+             H9.2
+             C7.7 15.5 6.3 15.1 5.8 13.6
+             L2.1 2.4
+             C1.8 1.4 2.4 0.5 3.5 0.5 Z" />
+      </svg>
+    </button>
   </div>
 </div>
 
