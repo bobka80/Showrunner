@@ -558,6 +558,12 @@ function dalPrepErrMsg_(err) {
   return msg;
 }
 
+/** Sheets domain already normal / closed — last-leave & END PREP are idempotent. */
+function dalPrepAlreadyClosedErr_(err) {
+  var msg = dalPrepErrMsg_(err);
+  return msg.indexOf('No open') !== -1 && msg.indexOf('session') !== -1;
+}
+
 window.openDalPrepSession = function(opts) {
   opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
@@ -767,9 +773,29 @@ window.closeDalPrepSession = function(opts) {
     // Success toast retired — ending prep is silent (errors still alert).
   };
 
+  var finishCloseOk_ = function() {
+    if (overlay) overlay.style.cursor = '';
+    window.dalPrepLeaveIntent_ = false;
+    window.dalPrepLastLeavePending_ = false;
+    window.dalPrepMarkSessionEnded_(projectId);
+    window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
+    if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
+    if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+    if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
+    else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+    window.dalPrepClosing = false;
+    window.dalPrepClosingUi_ = false;
+    doneMsg_();
+  };
+
   var runClose_ = function() {
     google.script.run
       .withFailureHandler(function(err) {
+        // Stale latch / double leave after peer or prior commit already closed Sheets.
+        if (dalPrepAlreadyClosedErr_(err)) {
+          finishCloseOk_();
+          return;
+        }
         window.dalPrepClosing = false;
         window.dalPrepClosingUi_ = false;
         if (overlay) overlay.style.cursor = '';
@@ -781,41 +807,62 @@ window.closeDalPrepSession = function(opts) {
         else alert('Auto-close prep failed:\n\n' + dalPrepErrMsg_(err));
       })
       .withSuccessHandler(function() {
-        if (overlay) overlay.style.cursor = '';
-        window.dalPrepMarkSessionEnded_(projectId);
-        window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
-        if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
-        if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
-        if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
-        else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
-        window.dalPrepClosing = false;
-        window.dalPrepClosingUi_ = false;
-        doneMsg_();
+        finishCloseOk_();
       })
       .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'prep');
   };
 
-  // Live sync writes fixtures only — push autos too before Sheets commit.
-  if (typeof window.dalWritePaForkFullToFirestore_ === 'function' && window.dalPaLiveSyncMode === 'firestore') {
-    window.dalWritePaForkFullToFirestore_(projectId, function(writeErr) {
-      if (writeErr) {
+  var writeThenClose_ = function() {
+    // Live sync writes fixtures only — push autos too before Sheets commit.
+    if (typeof window.dalWritePaForkFullToFirestore_ === 'function' && window.dalPaLiveSyncMode === 'firestore') {
+      window.dalWritePaForkFullToFirestore_(projectId, function(writeErr) {
+        if (writeErr) {
+          window.dalPrepClosing = false;
+          window.dalPrepClosingUi_ = false;
+          if (overlay) overlay.style.cursor = '';
+          if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+            window.dalUpdateRemotePendingBanner_();
+          }
+          var msg = 'Could not sync live equipment to Firebase before commit.\n\n' +
+            (writeErr.message || writeErr) +
+            '\n\nEnd Prep cancelled — fork left intact (no Sheets wipe).';
+          alert(opts.auto ? ('Auto-close prep failed:\n\n' + msg) : ('End prep failed:\n\n' + msg));
+          return;
+        }
+        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+        runClose_();
+      });
+      return;
+    }
+    runClose_();
+  };
+
+  // Probe Sheets first — do not reseed Firebase when the domain is already closed
+  // (stale latch / double last-leave after a successful peer or prior commit).
+  google.script.run
+    .withFailureHandler(function() {
+      writeThenClose_();
+    })
+    .withSuccessHandler(function(info) {
+      var st = window.dalPrepStatusFromInfo_(info);
+      if (st === 'open') {
+        writeThenClose_();
+        return;
+      }
+      if (st === 'committing') {
         window.dalPrepClosing = false;
         window.dalPrepClosingUi_ = false;
         if (overlay) overlay.style.cursor = '';
         if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
           window.dalUpdateRemotePendingBanner_();
         }
-        var msg = 'Could not sync live equipment to Firebase before commit.\n\n' +
-          (writeErr.message || writeErr) +
-          '\n\nEnd Prep cancelled — fork left intact (no Sheets wipe).';
-        alert(opts.auto ? ('Auto-close prep failed:\n\n' + msg) : ('End prep failed:\n\n' + msg));
+        var busy = 'Commit already in progress for this prep session — wait for it to finish.';
+        alert(opts.auto ? ('Auto-close prep failed:\n\n' + busy) : ('End prep failed:\n\n' + busy));
         return;
       }
-      window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
-      runClose_();
-    });
-    return;
-  }
-  runClose_();
+      // normal / empty / opening aborted elsewhere — clear local latch, no Firebase write
+      finishCloseOk_();
+    })
+    .getDalSessionInfo(projectId);
 };
 </script>

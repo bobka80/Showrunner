@@ -731,7 +731,9 @@ function executeWithRetry(operation, maxRetries = 5) {
         e.message.includes("Preparation is still active") ||
         e.message.includes("Timeline collab is still active") ||
         e.message.includes("session is already") ||
-        e.message.includes("No open session") ||
+        // "No open prep session" / "No open timelineCollab session" (not the old "No open session" wording)
+        (e.message.includes("No open") && e.message.includes("session")) ||
+        e.message.includes("Commit already in progress") ||
         e.message.includes("Session open raced") ||
         e.message.includes("Session is not opening") ||
         e.message.includes("Project not found") ||

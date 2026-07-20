@@ -17,6 +17,7 @@ Smoke day archived: [../archive/error-day-2026-07-20.md](../archive/error-day-20
 | Thread file | Kind | State | Summary |
 |-------------|------|-------|---------|
 | [ERR-2026-07-20-pipeline-smoke.md](ERR-2026-07-20-pipeline-smoke.md) | single | Fixed | ROOT test presses (4 Report_IDs) — pipeline smoke closed; day [../archive/error-day-2026-07-20.md](../archive/error-day-2026-07-20.md) |
+| [ERR-2026-07-20-cal-hover-strips.md](ERR-2026-07-20-cal-hover-strips.md) | single | Open | Main calendar hover phase strips vanish after prep/timeline; day [days/error-day-2026-07-20.md](days/error-day-2026-07-20.md) |
 
 ---
 
@@ -38,3 +39,4 @@ Smoke day archived: [../archive/error-day-2026-07-20.md](../archive/error-day-20
 | 2026-07-20 | Pack 1: pipeline smoke thread opened; day campaign archived later. |
 | 2026-07-20 | Build campaign archived; journal left in `active/` temporarily. |
 | 2026-07-20 | **Moved to `docs/ai/error-journal/`** — operational log, not a campaign. |
+| 2026-07-20 | Pack: calendar hover strips regression → [ERR-2026-07-20-cal-hover-strips.md](ERR-2026-07-20-cal-hover-strips.md); day [days/error-day-2026-07-20.md](days/error-day-2026-07-20.md). |
