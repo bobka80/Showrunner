@@ -595,14 +595,9 @@ window.openDalPrepSession = function(opts) {
             return;
           }
           if (st === 'opening') {
+            // Healthy race: someone else is Opening — join frozen UI and wait.
+            // Take-over only after hang (~50s), not immediately.
             window.dalApplyPrepOpeningUi_(true, info);
-            if (typeof window.dalMayTakeOverOpening_ === 'function' && window.dalMayTakeOverOpening_('prep')) {
-              if (confirm('Preparation is already opening. Take over and restart?')) {
-                window.openDalPrepSession({ auto: true, takeOver: true });
-              }
-            } else {
-              alert('Preparation is still opening. Wait, or End Prep to abort.');
-            }
             return;
           }
           alert('Start prep failed:\n\n' + dalPrepErrMsg_(err));

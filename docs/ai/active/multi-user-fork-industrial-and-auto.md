@@ -329,6 +329,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | **B5 shipped @ GAS v700:** SYNC phase copy Normal/Opening/Live/Closing + frozen vs editable + joining; idle warn stub for B4. **Next: B4** auto-close/idle (end). |
 | 2026-07-20 | **B4 shipped @ GAS v703:** idle eject 45m TL / 75m prep + T−5 keep-open + last-leave commit + 45s presence; station blocks prep idle. **Next: B6/B7** floor exit. |
 | 2026-07-20 | **B4 fix @ GAS v705:** last-leave was desktop CANCEL only — mobile close + station Back left Firebase rooms open. Wired leave-path commit; watcher not killed mid-close. **Next: B6/B7** floor exit. |
+| 2026-07-20 | **B2 UX:** drop immediate “already opening / take over” on healthy race — peer joins frozen Opening; take-over only after hang (~50s). |
 
 ---
 

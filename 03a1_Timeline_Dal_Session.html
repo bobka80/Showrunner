@@ -242,15 +242,13 @@ window.openDalTimelineCollabSession = function(opts) {
             return;
           }
           if (String(tl.status).toLowerCase() === 'opening') {
+            // Healthy race: join Opening (peer freeze). Take-over only after hang (~50s).
             if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
               window.dalApplyTimelineSessionUi_(false, true, tl);
             }
-            if (typeof window.dalMayTakeOverOpening_ === 'function' && window.dalMayTakeOverOpening_('timeline')) {
-              if (confirm('Timeline collab is already opening. Take over and restart?')) {
-                window.openDalTimelineCollabSession({ auto: true, takeOver: true });
-              }
-            } else {
-              alert('Timeline collab is still opening. Wait, or End Collab to abort.');
+            if (typeof window.dalArmTlOpeningHang_ === 'function' && !window.dalTlOpeningHangTimer_) {
+              var hangActor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+              window.dalArmTlOpeningHang_(projectId, tl.sessionUid || '', hangActor);
             }
             return;
           }
