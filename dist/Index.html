@@ -291,29 +291,34 @@
         pointer-events: none;
     }
 
-    /* --- Global error-report drawer — ONE silhouette (body + mild tab) --- */
+    /* --- Global error-report drawer — top-anchored, text-box frame, stable hover --- */
     #sr-error-report-root {
+        --sr-err-lip-h: 14px;
+        --sr-err-lip-peek: 7px; /* 1/2 of lip height */
+        --sr-err-open-h: min(340px, 72vh);
         position: fixed;
-        top: calc(env(safe-area-inset-top, 0px) + 12px);
+        top: env(safe-area-inset-top, 0px); /* stay under bookmarks — do not float free */
         left: 50%;
         transform: translateX(-50%);
         z-index: 70000;
         width: min(360px, 90vw);
-        pointer-events: none;
+        height: var(--sr-err-lip-peek);
+        overflow: visible;
+        pointer-events: auto; /* root owns hover so open doesn't drop the pointer */
         font-family: inherit;
     }
+    #sr-error-report-root.is-open {
+        height: var(--sr-err-open-h);
+    }
     #sr-error-report-drawer {
-        --sr-err-lip-h: 14px;
-        --sr-err-lip-peek: 7px; /* 1/2 of lip height visible when closed */
         pointer-events: auto;
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        background: #18181b;
+        background: #09090b; /* same field color as text box */
         border: none;
-        /* Single frame follows the clipped silhouette */
-        filter: drop-shadow(0 0 0.65px #52525b) drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
-        /* Mild trapezoid tab under the body (gentle taper + soft tip corners) */
+        /* One frame = same as text box border (#3f3f46) */
+        filter: drop-shadow(0 0 0.45px #3f3f46) drop-shadow(0 0 0.45px #3f3f46);
         clip-path: polygon(
             0% 0%,
             100% 0%,
@@ -331,9 +336,12 @@
         will-change: transform;
     }
     #sr-error-report-root.is-open #sr-error-report-drawer {
-        transform: translateY(0);
+        transform: translateY(0); /* top edge stays at bookmarks line */
     }
     @media (hover: hover) and (pointer: fine) {
+        #sr-error-report-root:hover {
+            height: var(--sr-err-open-h); /* expand hit area with open — no hover gap */
+        }
         #sr-error-report-root:hover #sr-error-report-drawer {
             transform: translateY(0);
         }
@@ -346,7 +354,7 @@
         border: none;
         box-shadow: none;
     }
-    /* Hit target only — no second shape / no fill (drawer paint is the tab) */
+    /* Hit target only — paint comes from the single drawer silhouette */
     #sr-error-report-lip {
         position: relative;
         align-self: center;
@@ -359,7 +367,6 @@
         cursor: pointer;
         flex-shrink: 0;
     }
-    /* Fat-finger hit pad under the tab (touch / station / mobile) */
     #sr-error-report-lip::after {
         content: '';
         position: absolute;

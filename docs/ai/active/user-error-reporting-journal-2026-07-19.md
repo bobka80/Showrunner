@@ -213,3 +213,4 @@ PACK FOLLOWS BELOW:
 | 2026-07-20 | **Drawer polish @ GAS v685:** short bottom lip (not full-width) sits under bookmarks offset; whole rectangle **slides down** on hover/open. |
 | 2026-07-20 | **Trapezoid tab @ GAS v687:** muted pull-tab (peek ~⅔ height); open = one unified shape with body (no seam). |
 | 2026-07-20 | **Lip polish @ GAS v688:** peek **½** height; milder filleted trapezoid SVG with frame stroke. |
+| 2026-07-20 | **Unified silhouette @ GAS v689:** one clipped drawer shape (no second SVG figure); lip = hit target only; peek ½. |
