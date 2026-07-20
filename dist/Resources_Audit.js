@@ -66,6 +66,152 @@ function TEST_AuditLogger() {
   return "Test log injected successfully!";
 }
 
+// ==========================================
+// --- USER ERROR REPORTS (Sheet inbox only) ---
+// ==========================================
+// @INDEX: ERROR_REPORTS -> User error report inbox (Error_Reports tab)
+// Campaign: docs/ai/active/user-error-reporting-journal-2026-07-19.md
+// Do NOT write lasting journal here. Do NOT touch Audit_Logs.
+
+var ERROR_REPORTS_HEADERS_ = [
+  "Report_ID",
+  "Timestamp",
+  "User_ID",
+  "User_Name",
+  "Role_Dept",
+  "View",
+  "Project_ID",
+  "Fork_ID",
+  "Main_Session_ID",
+  "Sync_Mode",
+  "Surface",
+  "App_Version",
+  "Description",
+  "Diag_JSON",
+  "Diag_Ref"
+];
+
+/** Soft cell cap — Sheets ~50k; overflow goes to Drive + Diag_Ref. */
+var ERROR_REPORT_DIAG_CELL_MAX_ = 45000;
+
+/**
+ * Ensure SM_Showrunner_LOGS has tab Error_Reports with locked headers.
+ * Does not modify Audit_Logs.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet}
+ */
+function verifyErrorReportsSchema() {
+  const ss = SpreadsheetApp.openById(getAuditLogSheetId());
+  const headers = ERROR_REPORTS_HEADERS_;
+  let sheet = ss.getSheetByName("Error_Reports");
+
+  if (!sheet) {
+    sheet = ss.insertSheet("Error_Reports");
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#991b1b").setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+  } else {
+    if (sheet.getMaxColumns() < headers.length) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
+    }
+    let firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+    if (String(firstRow[0] || "").trim() !== "Report_ID") {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+        .setFontWeight("bold").setBackground("#991b1b").setFontColor("#ffffff");
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}
+
+/**
+ * Append one raw error report to Error_Reports (inbox).
+ * @param {Object} payload
+ * @returns {{ok:boolean, reportId?:string, error?:string, diagRef?:string}}
+ */
+function submitErrorReport(payload) {
+  try {
+    payload = payload || {};
+    const sheet = verifyErrorReportsSchema();
+    const reportId = String(payload.reportId || payload.Report_ID || Utilities.getUuid()).trim();
+    const timestamp = payload.timestamp || payload.Timestamp || new Date().toISOString();
+
+    let diagJson = payload.diagJson != null ? payload.diagJson
+      : (payload.Diag_JSON != null ? payload.Diag_JSON : "");
+    if (typeof diagJson !== "string") {
+      try { diagJson = JSON.stringify(diagJson); } catch (e) { diagJson = String(diagJson); }
+    }
+    let diagRef = String(payload.diagRef || payload.Diag_Ref || "").trim();
+
+    if (diagJson && diagJson.length > ERROR_REPORT_DIAG_CELL_MAX_) {
+      diagRef = storeErrorReportDiagOverflow_(reportId, diagJson) || diagRef;
+      diagJson = JSON.stringify({
+        truncated: true,
+        originalChars: diagJson.length,
+        note: "Full diag in Drive — see Diag_Ref"
+      });
+    }
+
+    const row = [
+      reportId,
+      timestamp,
+      String(payload.userId || payload.User_ID || "").trim(),
+      String(payload.userName || payload.User_Name || "").trim(),
+      String(payload.roleDept || payload.Role_Dept || "").trim(),
+      String(payload.view || payload.View || "").trim(),
+      String(payload.projectId || payload.Project_ID || "").trim(),
+      String(payload.forkId || payload.Fork_ID || "").trim(),
+      String(payload.mainSessionId || payload.Main_Session_ID || "").trim(),
+      String(payload.syncMode || payload.Sync_Mode || "").trim(),
+      String(payload.surface || payload.Surface || "").trim(),
+      String(payload.appVersion || payload.App_Version || "").trim(),
+      String(payload.description || payload.Description || "").trim(),
+      diagJson,
+      diagRef
+    ];
+    sheet.appendRow(row);
+    return { ok: true, reportId: reportId, diagRef: diagRef || undefined };
+  } catch (e) {
+    console.error("submitErrorReport failed: ", e);
+    return { ok: false, error: String(e && e.message ? e.message : e) };
+  }
+}
+
+/** Put oversized diag JSON next to the live LOGS workbook; return file URL. */
+function storeErrorReportDiagOverflow_(reportId, diagJson) {
+  try {
+    const logFile = DriveApp.getFileById(getAuditLogSheetId());
+    const parents = logFile.getParents();
+    const folder = parents.hasNext() ? parents.next() : DriveApp.getFolderById(LIVE_DATABASE_FOLDER_ID);
+    const name = "Error_Report_Diag_" + reportId + ".json";
+    const blob = Utilities.newBlob(diagJson, "application/json", name);
+    const file = folder.createFile(blob);
+    return file.getUrl();
+  } catch (e) {
+    console.error("storeErrorReportDiagOverflow_ failed: ", e);
+    return "";
+  }
+}
+
+/** Phase 1 gate: create Error_Reports tab + inject one test row. Audit_Logs untouched. */
+function TEST_ErrorReport() {
+  const res = submitErrorReport({
+    userId: "SYSTEM_TEST",
+    userName: "Phase 1 Schema Test",
+    roleDept: "ROOT",
+    view: "TEST",
+    projectId: "",
+    forkId: "",
+    mainSessionId: "phase1-schema",
+    syncMode: "none",
+    surface: "web",
+    appVersion: "TEST_ErrorReport",
+    description: "Phase 1 test row — safe to delete after handoff UI exists.",
+    diagJson: { phase: 1, purpose: "verify Error_Reports tab + writer" }
+  });
+  if (!res.ok) return "TEST_ErrorReport FAILED: " + res.error;
+  return "Error_Reports ready. Test Report_ID=" + res.reportId;
+}
+
 function getEntityAuditHistory(targetUid) {
   return executeWithRetry(() => {
     if (!targetUid || targetUid === 'NEW') return [];

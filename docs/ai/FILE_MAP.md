@@ -400,6 +400,7 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 - `OPS_BACKEND -> Ledger Committer`
 ### Resources_Audit.js
 - `AUDIT_LOG -> Enterprise Audit Logger`
+- `ERROR_REPORTS -> User error report inbox (Error_Reports tab)`
 - `AUDIT_DB -> External Audit & Merge Engine`
 - `AUDIT_REVIEW -> Bulk Review Status Engine`
 ### Resources_Core.js
