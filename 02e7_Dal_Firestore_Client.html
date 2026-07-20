@@ -1069,6 +1069,11 @@ window.dalUpdateRemotePendingBanner_ = function() {
   } else if (statusEl && !statusEl.textContent) {
     statusEl.textContent = text;
   }
+  if (window.dalPrepIdleWarn_ && statusEl) statusEl.style.cursor = 'pointer';
+  else if (statusEl && !window.dalPrepIdleWarn_) statusEl.style.cursor = '';
+  if (typeof window.dalBindForkIdleKeepOpenClicks_ === 'function') {
+    window.dalBindForkIdleKeepOpenClicks_();
+  }
 
   if (rosterEl) {
     if (typeof window.dalPaSyncPresencePaMode_ === 'function') window.dalPaSyncPresencePaMode_();
@@ -2669,6 +2674,7 @@ window.dalFlushPaIfPrepOpen_ = function() {
     var finish = function(ok) {
       window.dalPaFlushInFlight = false;
       if (ok) {
+        if (typeof window.dalTouchRoomIdle_ === 'function') window.dalTouchRoomIdle_('prep');
         // Do not stamp mid-flight pending edits into originals (zeros next delta).
         if (!window.dalPaHasPendingTouches_()) {
           window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));

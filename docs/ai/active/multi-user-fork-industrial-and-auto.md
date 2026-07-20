@@ -244,10 +244,10 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 ### B4 — Close / idle eject
 
-- [ ] Close + **always commit**: End ∪ last leave ∪ idle  
-- [ ] Idle: timeline **45m** / prep **75m**; T−5 keep-open; station heartbeat blocks prep idle close  
-- [ ] Presence heartbeat ~30–60s  
-*(Director 2026-07-20: do thorough Opening/pull-in check + auto-close at **end** of Part B update.)*
+- [x] Close + **always commit**: End ∪ last leave ∪ idle  
+- [x] Idle: timeline **45m** / prep **75m**; T−5 keep-open; station heartbeat blocks prep idle close  
+- [x] Presence heartbeat ~30–60s (~45s)  
+*(Director 2026-07-20: thorough Opening/pull-in check still optional at floor smoke.)*
 
 ### B5 — Cue redesign (same ship as behavior)
 

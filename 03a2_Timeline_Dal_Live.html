@@ -1197,6 +1197,7 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
     if (window.dalTlLiveSyncMode === 'firestore') {
       window.dalWriteTimelineForkToFirestore_(function(writeErr) {
         if (!writeErr) {
+          if (typeof window.dalTouchRoomIdle_ === 'function') window.dalTouchRoomIdle_('timeline');
           finish();
           return;
         }
@@ -1284,6 +1285,11 @@ window.dalUpdateTimelineLiveBanner_ = function() {
     text = 'Live';
   }
   if (statusEl) statusEl.textContent = text;
+  if (window.dalTlIdleWarn_ && statusEl) statusEl.style.cursor = 'pointer';
+  else if (statusEl && !window.dalTlIdleWarn_) statusEl.style.cursor = '';
+  if (typeof window.dalBindForkIdleKeepOpenClicks_ === 'function') {
+    window.dalBindForkIdleKeepOpenClicks_();
+  }
 
   if (rosterEl && window.dalTlSyncPanelExpanded_) {
     var me = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? ACTIVE_USER_NAME : 'You';
