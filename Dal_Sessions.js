@@ -271,6 +271,42 @@ function getDalSessionInfo(projectId) {
   }, 3, true);
 }
 
+/** True when domain session status means the fork is on Firebase (live or in transition). */
+function dalStatusIsForkLive_(status) {
+  var st = String(status || '').toLowerCase();
+  return st === 'open' || st === 'opening' || st === 'committing';
+}
+
+/**
+ * Lightweight map of projects with an active prep and/or timeline fork (calendar chrome).
+ * Returns { [projectId]: { prep: boolean, timeline: boolean } } — only entries with at least one true.
+ */
+function getOpenDalForkMap() {
+  return executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema(true);
+    var indexData = sheets.index.getDataRange().getValues();
+    if (!indexData.length) return {};
+    var iMap = {};
+    (indexData[0] || []).forEach(function (h, idx) {
+      iMap[String(h || '').trim()] = idx;
+    });
+    var out = {};
+    var prepCol = iMap['Dal_Prep_Session_Status'];
+    var tlCol = iMap['Dal_Timeline_Session_Status'];
+    var uidCol = iMap['uid'];
+    for (var i = 1; i < indexData.length; i++) {
+      var pid = uidCol !== undefined ? String(indexData[i][uidCol] || '') : '';
+      if (!pid || pid === 'uid') continue;
+      var prep = prepCol !== undefined && dalStatusIsForkLive_(indexData[i][prepCol]);
+      var timeline = tlCol !== undefined && dalStatusIsForkLive_(indexData[i][tlCol]);
+      if (prep || timeline) {
+        out[pid] = { prep: !!prep, timeline: !!timeline };
+      }
+    }
+    return out;
+  }, 3, true);
+}
+
 function resolveDalSessionStatus_(projectId, domain) {
   try {
     var sheets = verifyDatabaseSchema(true);

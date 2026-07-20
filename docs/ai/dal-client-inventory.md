@@ -15,6 +15,7 @@
 | `submitErrorReport` | `00f_Error_Report.html` |
 | `getBootPayload` | `01a_Calendar_Core.html` |
 | `getClientsVault` | `01a_Calendar_Core.html` |
+| `getOpenDalForkMap` | `01a_Calendar_Core.html` |
 | `getRefreshPayload` | `01a_Calendar_Core.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html`, `11h_Station_Project_Logic_2.html` |
 | `getVehiclesVault` | `01a_Calendar_Core.html`, `06d_Admin_Fleet.html` |
 | `clearAllNotifications` | `01b_Calendar_Tasks.html` |
@@ -177,7 +178,7 @@
 | 00d_UI_Visuals.html | 0 | 0 |
 | 00e_UI_Modals.html | 0 | 0 |
 | 00f_Error_Report.html | 1 | 1 |
-| 01a_Calendar_Core.html | 4 | 3 |
+| 01a_Calendar_Core.html | 5 | 3 |
 | 01b_Calendar_Tasks.html | 7 | 2 |
 | 01c_Calendar_Mini.html | 0 | 0 |
 | 01d_Calendar_Mobile.html | 2 | 0 |

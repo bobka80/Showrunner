@@ -179,6 +179,29 @@ document.addEventListener('DOMContentLoaded', function() {
 
           let safeTitle = typeof escapeHTML === 'function' ? escapeHTML(arg.event.title) : String(arg.event.title).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+          // Fork chrome: orange (PA) on top, blue (timeline) underneath — after the name
+          let forkFlags = (window.calForkFlags_ && window.calForkFlags_[arg.event.id]) || null;
+          if (!forkFlags) {
+            let raw = arg.event.extendedProps.rawDbData || {};
+            forkFlags = { prep: !!raw.dalPrepFork, timeline: !!raw.dalTimelineFork };
+          }
+          let forkDotsHtml = '';
+          if (forkFlags.prep || forkFlags.timeline) {
+            forkDotsHtml =
+              '<span class="cal-fork-dots" title="' +
+              (forkFlags.prep && forkFlags.timeline
+                ? 'PA + Timeline forks on Firebase'
+                : (forkFlags.prep ? 'PA fork on Firebase' : 'Timeline fork on Firebase')) +
+              '" style="display:inline-flex;flex-direction:column;justify-content:center;gap:2px;margin-left:6px;flex-shrink:0;">' +
+              (forkFlags.prep
+                ? '<span style="width:6px;height:6px;border-radius:50%;background:#f97316;box-shadow:0 0 3px #f97316;"></span>'
+                : '<span style="width:6px;height:6px;visibility:hidden;"></span>') +
+              (forkFlags.timeline
+                ? '<span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;box-shadow:0 0 3px #3b82f6;"></span>'
+                : '<span style="width:6px;height:6px;visibility:hidden;"></span>') +
+              '</span>';
+          }
+
           return { html: `
             <div class="event-custom-frame" style="--event-border-color: ${borderVar}; --bg-hex: ${bgHex}; --text-col: ${textCol}; position: relative; width: 100%; height: var(--cal-event-height, 42px); border-radius: 4px; overflow: hidden; cursor: pointer; box-sizing: border-box;">
                
@@ -188,7 +211,8 @@ document.addEventListener('DOMContentLoaded', function() {
                
                <div class="event-custom-title" style="position: absolute; left: 6px; right: ${rightBound}; top: 0; bottom: 0; display: flex; align-items: center; font-size: var(--cal-font-size, 12px); font-weight: 900; z-index: 10; white-space: nowrap; pointer-events: none;">
                    <div style="width:8px; height:8px; border-radius:50%; background:${ledColor}; margin-right:6px; box-shadow: 0 0 4px ${ledColor}; flex-shrink:0;"></div>
-                   <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;">${safeTitle}</span>
+                   <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; min-width:0;">${safeTitle}</span>
+                   ${forkDotsHtml}
                </div>
                ${pbHtml}
                ${badgesHtml}
@@ -707,6 +731,52 @@ document.addEventListener('DOMContentLoaded', function() {
  * opts.quiet / default when events already painted: stale-while-revalidate — no opacity "sing".
  * opts.forceDim: old blocking dim (rare; hard reload).
  */
+window.calForkFlags_ = window.calForkFlags_ || {};
+window.calForkFlagsPollTimer_ = null;
+window.calForkFlagsSig_ = '';
+
+window.calForkFlagsFromProjects_ = function(projects) {
+  var map = {};
+  (projects || []).forEach(function(p) {
+    if (!p || !p.id) return;
+    if (p.dalPrepFork || p.dalTimelineFork) {
+      map[String(p.id)] = { prep: !!p.dalPrepFork, timeline: !!p.dalTimelineFork };
+    }
+  });
+  window.calForkFlags_ = map;
+  try { window.calForkFlagsSig_ = JSON.stringify(map); } catch (e0) { window.calForkFlagsSig_ = ''; }
+};
+
+window.calApplyForkFlagsMap_ = function(map) {
+  map = map || {};
+  var sig = '';
+  try { sig = JSON.stringify(map); } catch (e1) { sig = ''; }
+  if (sig === window.calForkFlagsSig_) return false;
+  window.calForkFlags_ = map;
+  window.calForkFlagsSig_ = sig;
+  try {
+    if (typeof calendar !== 'undefined' && calendar && typeof calendar.render === 'function') {
+      calendar.render();
+    }
+  } catch (e2) { /* ignore */ }
+  return true;
+};
+
+window.startCalForkFlagsPoll_ = function() {
+  if (window.calForkFlagsPollTimer_) return;
+  var tick = function() {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+    google.script.run
+      .withFailureHandler(function() { /* keep last */ })
+      .withSuccessHandler(function(map) {
+        if (typeof window.calApplyForkFlagsMap_ === 'function') window.calApplyForkFlagsMap_(map || {});
+      })
+      .getOpenDalForkMap();
+  };
+  tick();
+  window.calForkFlagsPollTimer_ = setInterval(tick, 15000);
+};
+
 function refreshData(opts) {
   opts = opts || {};
   var cal = document.getElementById('calendar-container');
@@ -749,6 +819,12 @@ function refreshData(opts) {
 function applyRefreshPayload(payload) {
   try {
   if (!payload) return;
+  if (typeof window.calForkFlagsFromProjects_ === 'function') {
+    window.calForkFlagsFromProjects_(payload.projects);
+  }
+  if (typeof window.startCalForkFlagsPoll_ === 'function') {
+    window.startCalForkFlagsPoll_();
+  }
   if (payload.monthData && Array.isArray(payload.monthData.shifts)) {
     window.globalMonthShifts = payload.monthData.shifts;
   }

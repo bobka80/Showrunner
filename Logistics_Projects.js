@@ -184,10 +184,26 @@ function getExistingProjects() {
       difficultyMultiplier: parseFloat(indexData[i][iMap['Difficulty_Multiplier']]) || 1.0,
       checklistState: {},
       readinessState: {},
-      start: null, end: null, fragments: []
+      start: null, end: null, fragments: [],
+      dalPrepFork: false,
+      dalTimelineFork: false
     };
     
     try { if (indexData[i][iMap['Readiness_State']]) projectMap[pId].readinessState = JSON.parse(indexData[i][iMap['Readiness_State']]); } catch(e) {}
+    // Calendar chrome: orange/blue fork dots (read-only session columns; no open/close side effects)
+    try {
+      var prepSt = (iMap['Dal_Prep_Session_Status'] !== undefined)
+        ? String(indexData[i][iMap['Dal_Prep_Session_Status']] || '') : '';
+      var tlSt = (iMap['Dal_Timeline_Session_Status'] !== undefined)
+        ? String(indexData[i][iMap['Dal_Timeline_Session_Status']] || '') : '';
+      var liveFn = (typeof dalStatusIsForkLive_ === 'function') ? dalStatusIsForkLive_ : null;
+      projectMap[pId].dalPrepFork = liveFn
+        ? liveFn(prepSt)
+        : (prepSt.toLowerCase() === 'open' || prepSt.toLowerCase() === 'opening' || prepSt.toLowerCase() === 'committing');
+      projectMap[pId].dalTimelineFork = liveFn
+        ? liveFn(tlSt)
+        : (tlSt.toLowerCase() === 'open' || tlSt.toLowerCase() === 'opening' || tlSt.toLowerCase() === 'committing');
+    } catch (eFork) { /* ignore */ }
   }
   
   // 1.5 Map Relational Checklists
