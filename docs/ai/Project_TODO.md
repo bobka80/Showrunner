@@ -14,25 +14,26 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ---
 
-## Next up (director, 2026-07-19)
+## Next up (director, 2026-07-20)
 
-**Primary campaign:** Multi-user fork — **Part A complete** @ v678; **next = middle campaign** (director names) → then Part B. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
+**Primary campaign (NEXT):** Error reports + daily journal triage — [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). **Phase 0 done** → next **Phase 1** (Sheet `Error_Reports` + writer). Phase 2 Report UI: **ask director how**.
+
+**Paused / after this middle campaign:** Multi-user fork **Part B** (auto fork) — Part A complete @ v678. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
 
 | Stage | What | Gate |
 |-------|------|------|
-| **A0** | Testing pipeline | **Done** (director smoke) |
-| **A1 / H1** | Fail closed weak sync | **Done** (v648) |
-| **A2 / H5** | Mutation inventory + timeline twin | **Done** |
-| **A3–A6** | Gap 1 → H4 → H3 → H2 | **Done** |
-| **A7** | Part A exit | **Done** (director wrap) |
-| **Middle** | (TBD — director) | Before Part B |
-| **B** | Auto fork + pull-in + idle eject | After middle campaign |
+| **0** | Docs + SCHEMA + DRIVE_LAYOUT + journal stub | **Done** (2026-07-20) |
+| **1** | Sheet `Error_Reports` + writer | Test row; Audit untouched |
+| **2** | Report button + freeze + submit | **Ask director UI**; then web.app smoke |
+| **3** | ERROR LOGS tab + Hand over | ROOT exports pack |
+| **4** | Cursor playbook + first real pack | Director likes day-campaign shape |
+| **5** | Live use (esp. before Part B) | Packs → day campaigns → journal |
 
-Also on the board (do not mix into the fork campaign without director pick):
+Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Error reports + daily journal triage** | Campaign opened — after Part A for capture/UI; use in Part B | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) |
+| **Multi-user fork Part B** | Waiting — after error-reporting middle campaign | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog — OK go per domain | [active/pre-ship-pipeline-expansion-2026-07-18.md](active/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
 | **Phone app** | In-flight mobile (parallel) | [topics/mobile-crew.md](topics/mobile-crew.md) |
@@ -44,8 +45,8 @@ Also on the board (do not mix into the fork campaign without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Multi-user fork: test pipeline → bulletproof → auto fork** | **Part A complete** — next middle campaign → Part B | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
-| **Error reports + daily journal triage** | Opened — Phase 0; capture after Part A | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) |
+| **Error reports + daily journal triage** | **NEXT** — Phase 0 done; next Phase 1 Sheet + writer | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) · [error-journal/](active/error-journal/) |
+| **Multi-user fork: test pipeline → bulletproof → auto fork** | **Part A complete** — middle = error-reporting → then Part B | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | Near-complete — prep live rollback **v654** · DAL-era **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
 

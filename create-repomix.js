@@ -10,8 +10,9 @@
  *   node create-repomix.js --split 2mb     # split into numbered parts (~2 MiB each; config uses bytes)
  *   node create-repomix.js --stdout        # print summary paths only after pack
  *
- * Output: claude-pack/repomix-output.md (or repomix-output_001.md, … when split)
- * Upload the file(s) to your Claude project knowledge tab.
+ * Output: claude-pack/repomix-output.md (or repomix-output_001.md, … when split).
+ * Default (no --split) deletes leftover split parts so only one mix remains.
+ * Also run automatically at the end of milestone.js (unless --no-repomix).
  */
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -153,6 +154,21 @@ function listOutputs() {
     .sort();
 }
 
+/** When not splitting: keep only the single curated file; delete leftover split parts. */
+function pruneToSingleOutput() {
+  if (!fs.existsSync(OUT_DIR)) return;
+  for (const f of fs.readdirSync(OUT_DIR)) {
+    if (!f.startsWith('repomix-output')) continue;
+    if (f === 'repomix-output.md' || f === 'repomix-output.xml') continue;
+    try {
+      fs.unlinkSync(path.join(OUT_DIR, f));
+      console.log(`Removed stale pack part: ${f}`);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
 function printSummary(files) {
   console.log('\n=== DRAG & DROP → Claude / quote.ai project knowledge ===\n');
   for (const f of files) {
@@ -173,6 +189,7 @@ function main() {
     console.log('Note: --full includes vendor reference trees (~10M+ tokens). Prefer curated for Claude.\n');
   }
   runRepomix(opts);
+  if (!opts.split) pruneToSingleOutput();
   const outputs = listOutputs();
   if (!outputs.length) {
     console.error('Repomix finished but no output files found in claude-pack/.');

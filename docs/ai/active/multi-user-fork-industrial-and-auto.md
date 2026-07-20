@@ -7,7 +7,7 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Part A complete** @ GAS **v678** (exit wrap). **Next:** middle campaign (director names) → then Part B auto fork. Rollback pin still **v654** / `host-boot.js?v=653`.  
+**Opened:** 2026-07-18 · **Status:** **Part A complete** @ GAS **v678** (exit wrap). **Middle / NEXT:** [user-error-reporting-journal-2026-07-19.md](user-error-reporting-journal-2026-07-19.md) → then Part B auto fork. Rollback pin still **v654** / `host-boot.js?v=653`.  
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
 **Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
@@ -315,6 +315,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **H2 follow-up:** qty patch also updates +/- control span (`data-pa-qty`); fixes peer “one step behind” on multi-qty bumps. |
 | 2026-07-19 | **Conflict UX:** no toast / no auto-expand; compact SYNC roster + hover peer → ops popover. Working dept: white label/frame, select border = dept color, white rails +1px. |
 | 2026-07-19 | **A7 / Part A exit:** director wrap — Part A industrial harden complete. Next = middle campaign (not Part B yet). |
+| 2026-07-20 | Middle campaign named: **error reports + journal** ([user-error-reporting-journal-2026-07-19.md](user-error-reporting-journal-2026-07-19.md)). Part B waits. |
 
 ---
 

@@ -49,7 +49,7 @@ STAGE_MASTERS_SYSTEM_ROOT/
 └── 05_DATABASE/
     ├── SM_Showrunner_ENGINE       ← live transactional DB
     ├── SM_Showrunner_VAULT        ← live master data DB
-    ├── SM_Showrunner_LOGS         ← live audit log workbook
+    ├── SM_Showrunner_LOGS         ← live audit log workbook (+ Error_Reports inbox)
     ├── SM_Showrunner_AUDIT        ← live audit studio DB
     ├── BACKUPS/
     ├── REPLACED/
@@ -68,10 +68,17 @@ All four live spreadsheets sit **directly in `05_DATABASE`** (not in subfolders)
 |---------------------|----------|-----------------|---------------------|
 | **`SM_Showrunner_ENGINE`** | Transactional DB (projects, timeline, tasks, logistics sheets) | `ACTIVE_ENGINE_SHEET_ID` | `1AIa5GuEq4J4mDUqfI2Sp5RkAt6RW-aUd3VG0anB-PFk` |
 | **`SM_Showrunner_VAULT`** | Master data (crew, assets, IAM, `System_Config`) | `ACTIVE_VAULT_SHEET_ID` | `1EzqvZQM5VanEB1_XxZT7lRd8YfXSTMcBVRVx3mGElz8` |
-| **`SM_Showrunner_LOGS`** | Enterprise audit log (`writeToAuditLog`) | `ACTIVE_AUDIT_LOG_SHEET_ID` | `1gR70dun6Xc4Q_njxd2PXrT9rty_1X_4qiZby8V4RyOA` |
+| **`SM_Showrunner_LOGS`** | Enterprise audit log (`writeToAuditLog` → `Audit_Logs`) **+** user error inbox (`Error_Reports`) | `ACTIVE_AUDIT_LOG_SHEET_ID` | `1gR70dun6Xc4Q_njxd2PXrT9rty_1X_4qiZby8V4RyOA` |
 | **`SM_Showrunner_AUDIT`** | External audit / duplicate-scan DB | `ACTIVE_AUDIT_DB_SHEET_ID` | `1UdEONWScrTQSoa_spIEjfN3lJdMcxu9zLCXVZZcJbG8` |
 
 **Registry:** App uses **file ID** in Script Properties (`getEngineSheetId()`, etc.). Fallback IDs apply only when a property is unset.
+
+**`SM_Showrunner_LOGS` tabs (do not mix):**
+
+| Tab | Role |
+|-----|------|
+| **`Audit_Logs`** | Enterprise audit (`writeToAuditLog`) — **do not change** for user bug reports |
+| **`Error_Reports`** | User Report inbox (raw presses only). Schema: [SCHEMA.md §6](SCHEMA.md). Campaign: [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). Handoff deletes handed rows; lasting memory is markdown (`docs/ai/active/error-journal/`), not a Sheet journal tab. |
 
 **v354–355 mistake (resolved):** Repair/restore code once renamed Engine/Vault to bare `ENGINE` / `VAULT`. Director layout requires **`SM_Showrunner_ENGINE`** and **`SM_Showrunner_VAULT`** — code is now **aligned** (`LIVE_ENGINE_FILE_NAME = 'SM_Showrunner_ENGINE'` in `Resources_Core.js`; see *Known code drift* below).
 

@@ -68,7 +68,7 @@ This document describes how the **Software Director** (project owner) collaborat
    - **Primary:** `claude-pack/repomix-output.md` (~1M tokens)
    - **Optional:** `claude-pack/instructions.md`
 3. If upload fails on size, re-run with **`node create-repomix.js --split 2mb`** and list all part files.
-4. Plain-language: what the file contains, that packing is free (local), and when to regenerate (after major releases).
+4. Plain-language: what the file contains, that packing is free (local), and that **every GAS milestone** also refreshes this file automatically (see [CLAUDE_PACK.md](CLAUDE_PACK.md)).
 
 **Director:** Open File Explorer → `claude-pack` folder in the repo → drag `repomix-output.md` into the project tab. You do not run terminal commands.
 

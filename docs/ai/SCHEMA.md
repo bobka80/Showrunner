@@ -106,3 +106,31 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 **Planned financial columns (Phase 1 — not in schema builder yet):** `Projects_Index.rental_days`, `Projects_Index.global_discount` — see [topics/financials.md](topics/financials.md).
 
 Backend modules: `Resources_*.js` (Vault), `Logistics_*.js` (Engine). Full rules in [ENGINEERING_RULES.md](ENGINEERING_RULES.md).
+
+## 6. Error report row (`Error_Reports` tab)
+
+**Workbook:** `SM_Showrunner_LOGS` (same file as enterprise audit). **Tab:** `Error_Reports` only.  
+**Not a journal:** lasting bug memory is markdown (`docs/ai/active/error-journal/` + day campaigns). Do **not** add an `Error_Journal` Sheet tab. **`Audit_Logs` stays untouched.**
+
+**Campaign:** [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md).  
+**Planned writers (Phase 1+):** `verifyErrorReportsSchema` + `submitErrorReport` in `Resources_Audit.js`.
+
+| Column | Purpose |
+|--------|---------|
+| `Report_ID` | UUID |
+| `Timestamp` | Button-press time (snapshot freeze moment) |
+| `User_ID` | Who reported |
+| `User_Name` | Display name |
+| `Role_Dept` | Context |
+| `View` | Screen/module stamp |
+| `Project_ID` | If known |
+| `Fork_ID` | If in prep/timeline fork |
+| `Main_Session_ID` | App session |
+| `Sync_Mode` | `firestore` / `gas` / `none` |
+| `Surface` | `web` / `mobile` / `station` / `desktop` |
+| `App_Version` | GAS / host / APK |
+| `Description` | User text |
+| `Diag_JSON` | Frozen snapshot (or slim) |
+| `Diag_Ref` | Drive link if cell too big |
+
+**Inbox rule:** ROOT **Hand over to Cursor** copies a pack then **deletes** those `Report_ID`s from this tab. Sheet = inbox; markdown = filing cabinet.

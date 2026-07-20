@@ -4,7 +4,7 @@
 
 Pack the repo for **Claude project knowledge** (brainstorm on the go with full code + doctrine context).
 
-`Last swept:` 2026-07-13
+`Last swept:` 2026-07-20
 
 ---
 
@@ -17,12 +17,25 @@ node create-repomix.js
 | Flag | Effect |
 |------|--------|
 | *(default)* | Curated pack ~**1M tokens** / ~4 MB — source, `docs/ai/`, hosting, APK scripts |
-| `--split 2mb` | Numbered parts for Claude upload limits |
+| `--split 2mb` | Numbered parts for Claude upload limits (manual / size-limit only) |
 | `--full` | Includes `station-android/CW referense/` vendor docs (~**11M tokens** — avoid) |
 
-**Output:** `claude-pack/repomix-output.md` (+ `instructions.md` with navigation and live `Project_TODO` excerpt).
+**Output:** one fresh file — `claude-pack/repomix-output.md` (+ `instructions.md` with navigation and live `Project_TODO` excerpt). Default mode deletes leftover split parts so the folder stays a single mix.
 
 **Not deployed to GAS** — PC-only (`gas-node-only.js`).
+
+---
+
+## Automatic refresh on GAS ship
+
+Every successful **`node milestone.js "…"`** regenerates the curated single-file pack after deploy + `RELEASES.md`.
+
+| Flag on milestone | Effect |
+|-------------------|--------|
+| *(default)* | Refresh `claude-pack/repomix-output.md` (soft-fail: pack errors do not undo the GAS ship) |
+| `--no-repomix` | Skip pack refresh (faster ship) |
+
+Upload to Claude / quote.ai project knowledge remains **manual** (drag the file) — Anthropic has no official project-knowledge API/MCP upload.
 
 ---
 
@@ -42,8 +55,8 @@ node create-repomix.js
 
 ## Upload workflow
 
-1. Run `node create-repomix.js` after meaningful doc or pipeline changes.
-2. Upload output file(s) to Claude **project knowledge**.
+1. Pack is refreshed automatically after each GAS milestone (or run `node create-repomix.js` / say **create repo mix**).
+2. Upload **`claude-pack/repomix-output.md`** to Claude **project knowledge** (replace the previous file).
 3. Brainstorm there; bring **OK go** tasks back to Cursor for implementation.
 
 ---

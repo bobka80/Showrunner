@@ -22,6 +22,7 @@
 
 ## Remaining
 
+- [ ] **ERROR LOGS** third sub-tab + Hand over to Cursor — [../active/user-error-reporting-journal-2026-07-19.md](../active/user-error-reporting-journal-2026-07-19.md) Phase 3
 - [ ] **Paired restore UI** — single date dropdown + restore Engine+Vault together
 - [ ] **Archive column tools** — UI placeholder only (“Log archiver, engine cold-archive…” in `06g_Admin_Database.html`)
 - [ ] **Software Log Hub** — placeholder in Ops tab

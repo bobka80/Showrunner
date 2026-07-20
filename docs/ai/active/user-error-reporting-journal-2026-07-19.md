@@ -1,10 +1,13 @@
 # Active — Error reports, markdown journal & day bug-fix campaigns
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Status:** Draft locked intent 2026-07-19 — **awaiting director OK** to become **Next campaign** on [Project_TODO.md](../Project_TODO.md).  
-**Point agents here:** `docs/ai/active/user-error-reporting-journal-2026-07-19.md`
+**Status:** **NEXT campaign** (middle before multi-user Part B). **Phase 0 complete** 2026-07-20. **Next:** Phase 1 — Sheet `Error_Reports` + writer.  
+**Point agents here:** `docs/ai/active/user-error-reporting-journal-2026-07-19.md`  
+**Journal stub:** [error-journal/README.md](error-journal/README.md)
 
-**Related:** Multi-user fork Part B floor debugging — [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md). Do not block Part A H-items unless director says so.
+**Related:** Multi-user fork Part B floor debugging — [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).
+
+**Director lock (2026-07-20):** Before Phase 2 (Report button / bug-report UI), **ask the director how** — do not invent placement or chrome.
 
 ---
 
@@ -83,9 +86,9 @@ Code: `verifyErrorReportsSchema` + `submitErrorReport` in `Resources_Audit.js`.
 ## Markdown system — journal & day campaigns
 
 ### Journal (long memory)
-Folder (proposed): `docs/ai/active/error-journal/`
+Folder: `docs/ai/active/error-journal/` (stub shipped Phase 0)
 
-- Index: `docs/ai/active/error-journal/README.md` — table of open / fixed / came_back threads  
+- Index: [error-journal/README.md](error-journal/README.md) — table of open / fixed / came_back threads  
 - One file per lasting problem thread, e.g. `ERR-2026-07-19-timeline-thrash.md`  
   - Title, kind (`single` | `race`), state, member `Report_ID`s, views, notes  
   - `Fixed_In_GAS`, links to day campaign(s), came-back history  
@@ -135,9 +138,9 @@ Existing: **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS** → add **ERROR LOGS**.
 
 | Phase | What | Gate |
 |-------|------|------|
-| **0** | This campaign + SCHEMA (reports only) + DRIVE_LAYOUT + error-journal folder stub + TODO as Next | Director **OK go** on this draft |
+| **0** | This campaign + SCHEMA (reports only) + DRIVE_LAYOUT + error-journal folder stub + TODO as Next | **Done** 2026-07-20 |
 | **1** | Sheet `Error_Reports` + writer | Test row; Audit untouched |
-| **2** | Report button + freeze + submit | web.app smoke |
+| **2** | Report button + freeze + submit | **Ask director UI first**; then web.app smoke |
 | **3** | ERROR LOGS tab + **Hand over** (copy + delete from Sheet) | ROOT exports pack; handed rows gone from UI |
 | **4** | Cursor playbook; first real pack → day campaign + journal md | Director likes the day-campaign shape |
 | **5** | Live use (esp. Part B) | Packs → day campaigns → OK go → journal updated |
@@ -204,3 +207,4 @@ PACK FOLLOWS BELOW:
 |------|------|
 | 2026-07-19 | Campaign drafted. Journal + day campaigns = **markdown only**; Sheet = raw `Error_Reports` only. |
 | 2026-07-19 | **Handoff clears inbox:** Hand over to Cursor = copy pack + **delete** those rows from Sheet so already-handed logs do not stay visible. |
+| 2026-07-20 | Director: this is the **middle / NEXT** campaign. **Phase 0 shipped** (SCHEMA + DRIVE_LAYOUT + journal stub + TODO). Phase 2 UI: ask director. **Next slice: Phase 1.** |

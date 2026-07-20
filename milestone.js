@@ -1,12 +1,15 @@
 /**
- * Production milestone — Apps Script version + deploy + RELEASES.md + Git commit.
+ * Production milestone — Apps Script version + deploy + RELEASES.md + Git commit
+ * + refresh `claude-pack/repomix-output.md` (curated single file; soft-fail).
  *
  * Director logic:
  *   1. Read latest GAS version (e.g. 265)
  *   2. Push current code → create NEXT version with a proper name (e.g. 266)
  *   3. Deploy that new version to the web app
+ *   4. Regenerate Claude / quote.ai repo mix (unless --no-repomix)
  *
  * Usage: node milestone.js "Pre database operations panel — IAM baseline"
+ *        node milestone.js "note" --no-repomix   # skip pack refresh (faster ship)
  *
  * deploy-config.json is optional:
  *   - If productionDeploymentId is set → update that same production URL
@@ -23,7 +26,37 @@ const MAX_MILESTONE_LOG = 50;
 const LOG_PATH = path.join(__dirname, 'RELEASES.md');
 const CONFIG_PATH = path.join(__dirname, 'deploy-config.json');
 const EXAMPLE_CONFIG_PATH = path.join(__dirname, 'deploy-config.example.json');
-const note = process.argv.slice(2).join(' ').trim() || 'Milestone';
+
+function parseMilestoneArgs(argv) {
+  let skipRepomix = false;
+  const noteParts = [];
+  for (const a of argv) {
+    if (a === '--no-repomix') skipRepomix = true;
+    else noteParts.push(a);
+  }
+  return {
+    skipRepomix,
+    note: noteParts.join(' ').trim() || 'Milestone',
+  };
+}
+
+const { skipRepomix, note } = parseMilestoneArgs(process.argv.slice(2));
+
+function refreshRepoMixSoft() {
+  console.log('\n=== Refreshing Claude / quote.ai repo mix (curated, single file) ===\n');
+  try {
+    execSync('node create-repomix.js', {
+      cwd: __dirname,
+      stdio: 'inherit',
+      shell: true,
+    });
+  } catch (e) {
+    console.warn('\nWARNING: Repo mix refresh failed — GAS milestone still succeeded.');
+    console.warn('Regenerate later with: node create-repomix.js');
+    console.warn('(or say "create repo mix" in Cursor)\n');
+    if (e && e.message) console.warn(e.message);
+  }
+}
 
 function run(cmd) {
   return execSync(cmd, { cwd: __dirname, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
@@ -222,5 +255,12 @@ if (before) {
     console.log('Production web app URL updated to this version.');
   } else {
     console.log('New deployment created. Bookmark the web app URL from Apps Script → Deploy → Manage deployments.');
+  }
+
+  // Fresh single-file pack for Claude / quote.ai (does not fail the ship).
+  if (skipRepomix) {
+    console.log('\nSkipped repo mix refresh (--no-repomix).');
+  } else {
+    refreshRepoMixSoft();
   }
 })();
