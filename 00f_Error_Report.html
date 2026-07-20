@@ -1,0 +1,341 @@
+<!-- @INDEX: ERROR_REPORT -> Top lip drawer (global bug report) -->
+<!-- Campaign: docs/ai/active/user-error-reporting-journal-2026-07-19.md Phase 2 -->
+<div id="sr-error-report-root" aria-live="polite">
+  <button type="button" id="sr-error-report-lip" aria-label="Open error report" aria-expanded="false" title="Error report"></button>
+  <div id="sr-error-report-panel" role="dialog" aria-label="Send error report">
+    <div class="input-label">Describe the bug</div>
+    <textarea id="sr-error-report-text" rows="4" placeholder="What went wrong? What were you doing?" maxlength="4000"></textarea>
+    <div class="sr-error-report-actions">
+      <button type="button" class="btn-main" id="sr-error-report-send">Send error report</button>
+    </div>
+    <div id="sr-error-report-status" class="sr-error-report-status" aria-live="polite"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var root = document.getElementById('sr-error-report-root');
+  var lip = document.getElementById('sr-error-report-lip');
+  var panel = document.getElementById('sr-error-report-panel');
+  var textEl = document.getElementById('sr-error-report-text');
+  var sendBtn = document.getElementById('sr-error-report-send');
+  var statusEl = document.getElementById('sr-error-report-status');
+  if (!root || !lip || !panel || !textEl || !sendBtn) return;
+
+  var frozen = null;
+  var sending = false;
+  var closeTimer = null;
+
+  function isFineHover() {
+    try {
+      return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setStatus(msg, isErr) {
+    if (!statusEl) return;
+    statusEl.textContent = msg || '';
+    statusEl.classList.toggle('is-err', !!isErr);
+  }
+
+  function setOpen(open) {
+    root.classList.toggle('is-open', !!open);
+    lip.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (open) {
+      freezeDiagIfNeeded_();
+      setTimeout(function () {
+        try { textEl.focus(); } catch (e) { /* ignore */ }
+      }, 50);
+    } else {
+      frozen = null;
+      if (!sending) {
+        textEl.value = '';
+        setStatus('');
+      }
+    }
+  }
+
+  function isOpen() {
+    return root.classList.contains('is-open');
+  }
+
+  function safeStr(v) {
+    if (v == null) return '';
+    return String(v).trim();
+  }
+
+  function layerVisible(id) {
+    var el = document.getElementById(id);
+    if (!el) return false;
+    var d = (el.style && el.style.display) || '';
+    if (d === 'none') return false;
+    try {
+      return window.getComputedStyle(el).display !== 'none';
+    } catch (e) {
+      return d !== 'none';
+    }
+  }
+
+  function detectSurface_() {
+    if (window.IS_STATION_DEVICE || /ShowrunnerStation/i.test(navigator.userAgent || '')) {
+      return 'station';
+    }
+    var mob = document.getElementById('mobile-dashboard');
+    if (mob) {
+      try {
+        if (window.getComputedStyle(mob).display !== 'none') return 'mobile';
+      } catch (e) {
+        if (mob.style.display !== 'none') return 'mobile';
+      }
+    }
+    if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return 'mobile';
+    return 'web';
+  }
+
+  function detectView_() {
+    var parts = [];
+    if (window.IS_STATION_DEVICE) parts.push('station');
+    if (layerVisible('master-settings-overlay')) parts.push('master-settings');
+    if (layerVisible('shift-layer')) parts.push('timeline');
+    if (layerVisible('month-roster-layer')) parts.push('month-roster');
+    if (layerVisible('tracker-layer') || layerVisible('equipment-tracker-layer')) parts.push('tracker');
+    var pa = document.getElementById('pa-modal-overlay') || document.getElementById('project-assets-overlay');
+    if (pa && layerVisible(pa.id)) parts.push('assets');
+    if (window.activePresenceModule) parts.push(String(window.activePresenceModule));
+    if (window.activePresencePaMode) parts.push('pa:' + String(window.activePresencePaMode));
+    var mobTitle = document.getElementById('mobile-title');
+    if (mobTitle && safeStr(mobTitle.textContent)) parts.push('mobile:' + safeStr(mobTitle.textContent));
+    var navActive = document.querySelector('#left-nav-bar .nav-active, #left-nav-bar button.nav-active');
+    if (navActive && navActive.id) parts.push(navActive.id);
+    if (!parts.length) parts.push('calendar');
+    return parts.join('|');
+  }
+
+  function detectProjectId_() {
+    var folder = document.getElementById('edit-folder-id');
+    if (folder && folder.value) return safeStr(folder.value);
+    if (window.activePresenceProject) return safeStr(window.activePresenceProject);
+    return '';
+  }
+
+  function detectForkId_() {
+    try {
+      if (window.dalSessionState) {
+        var s = window.dalSessionState;
+        if (s.sessionUid) return safeStr(s.sessionUid);
+        if (s.prepUid) return safeStr(s.prepUid);
+      }
+    } catch (e) { /* ignore */ }
+    if (window.dalPrepActiveSessionUid_) return safeStr(window.dalPrepActiveSessionUid_);
+    try {
+      if (window.dalTlSessionState && window.dalTlSessionState.sessionUid) {
+        return safeStr(window.dalTlSessionState.sessionUid);
+      }
+    } catch (e2) { /* ignore */ }
+    return '';
+  }
+
+  function detectSyncMode_() {
+    var pa = safeStr(window.dalPaLiveSyncMode || '');
+    var tl = safeStr(window.dalTlLiveSyncMode || '');
+    var mode = pa || tl;
+    if (!mode) return 'none';
+    if (mode === 'firestore' || mode === 'connecting') return 'firestore';
+    if (mode === 'blocked' || mode === 'gas' || mode === 'server') return 'gas';
+    return mode;
+  }
+
+  function detectMainSessionId_() {
+    try {
+      var ls = localStorage.getItem('sm_session_token');
+      if (ls) return safeStr(ls).slice(0, 64);
+    } catch (e) { /* ignore */ }
+    var meta = document.querySelector('meta[name="session-token"]');
+    if (meta && meta.content) return safeStr(meta.content).slice(0, 64);
+    return '';
+  }
+
+  function detectAppVersion_() {
+    var bits = [];
+    var metaGas = document.querySelector('meta[name="gas-version"]');
+    if (metaGas && metaGas.content) bits.push('gas:' + safeStr(metaGas.content));
+    bits.push('err-ui:2');
+    bits.push('surface:' + detectSurface_());
+    return bits.join(';');
+  }
+
+  function freezeDiagIfNeeded_() {
+    if (frozen) return frozen;
+    var userName = '';
+    try {
+      if (typeof ACTIVE_USER_NAME !== 'undefined') userName = safeStr(ACTIVE_USER_NAME);
+    } catch (e) { /* ignore */ }
+    if (!userName) {
+      var mn = document.querySelector('meta[name="user-name"]');
+      if (mn) userName = safeStr(mn.content);
+    }
+    var userId = '';
+    try {
+      if (typeof ACTIVE_USER_UID !== 'undefined') userId = safeStr(ACTIVE_USER_UID);
+      else if (window.ACTIVE_USER_UID) userId = safeStr(window.ACTIVE_USER_UID);
+    } catch (e2) { /* ignore */ }
+    if (!userId) {
+      var mu = document.querySelector('meta[name="user-uid"]');
+      if (mu) userId = safeStr(mu.content);
+    }
+    var roleDept = '';
+    try {
+      if (typeof USER_ACCESS !== 'undefined') roleDept = safeStr(USER_ACCESS);
+    } catch (e3) { /* ignore */ }
+    if (!roleDept) {
+      var ma = document.querySelector('meta[name="user-access"]');
+      if (ma) roleDept = safeStr(ma.content);
+    }
+
+    var view = detectView_();
+    var projectId = detectProjectId_();
+    var forkId = detectForkId_();
+    var syncMode = detectSyncMode_();
+    var surface = detectSurface_();
+    var mainSessionId = detectMainSessionId_();
+    var appVersion = detectAppVersion_();
+
+    frozen = {
+      frozenAt: new Date().toISOString(),
+      userId: userId,
+      userName: userName,
+      roleDept: roleDept,
+      view: view,
+      projectId: projectId,
+      forkId: forkId,
+      mainSessionId: mainSessionId,
+      syncMode: syncMode,
+      surface: surface,
+      appVersion: appVersion,
+      diagJson: {
+        frozenAt: new Date().toISOString(),
+        href: (function () { try { return String(location.href || '').slice(0, 500); } catch (e) { return ''; } })(),
+        userAgent: (navigator.userAgent || '').slice(0, 300),
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+        view: view,
+        projectId: projectId,
+        forkId: forkId,
+        syncMode: syncMode,
+        surface: surface,
+        presenceModule: window.activePresenceModule || null,
+        presencePaMode: window.activePresencePaMode || null,
+        dalPaLiveSyncMode: window.dalPaLiveSyncMode || null,
+        dalTlLiveSyncMode: window.dalTlLiveSyncMode || null,
+        dalPrepUiOpen: !!window.dalPrepUiOpen,
+        stationDevice: !!window.IS_STATION_DEVICE
+      }
+    };
+    return frozen;
+  }
+
+  function openFromLip_(ev) {
+    if (ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+    }
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    setOpen(!isOpen());
+  }
+
+  lip.addEventListener('click', openFromLip_);
+
+  root.addEventListener('mouseenter', function () {
+    if (!isFineHover()) return;
+    if (closeTimer) {
+      clearTimeout(closeTimer);
+      closeTimer = null;
+    }
+    freezeDiagIfNeeded_();
+  });
+
+  root.addEventListener('mouseleave', function () {
+    if (!isFineHover()) return;
+    if (root.classList.contains('is-open')) return;
+    closeTimer = setTimeout(function () {
+      if (!root.matches(':hover') && !isOpen()) frozen = null;
+    }, 400);
+  });
+
+  sendBtn.addEventListener('click', function () {
+    if (sending) return;
+    var desc = safeStr(textEl.value);
+    if (!desc) {
+      setStatus('Please describe the bug first.', true);
+      textEl.focus();
+      return;
+    }
+    var snap = freezeDiagIfNeeded_();
+    sending = true;
+    sendBtn.disabled = true;
+    setStatus('Sending…');
+
+    var payload = {
+      userId: snap.userId,
+      userName: snap.userName,
+      roleDept: snap.roleDept,
+      view: snap.view,
+      projectId: snap.projectId,
+      forkId: snap.forkId,
+      mainSessionId: snap.mainSessionId,
+      syncMode: snap.syncMode,
+      surface: snap.surface,
+      appVersion: snap.appVersion,
+      description: desc,
+      diagJson: snap.diagJson,
+      timestamp: snap.frozenAt
+    };
+
+    if (!google || !google.script || !google.script.run) {
+      sending = false;
+      sendBtn.disabled = false;
+      setStatus('Cannot reach server.', true);
+      return;
+    }
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        sending = false;
+        sendBtn.disabled = false;
+        if (res && res.ok) {
+          setStatus('Sent. Thank you.');
+          textEl.value = '';
+          frozen = null;
+          if (typeof showPushToast === 'function') {
+            showPushToast('Error report sent', 'Logged for review.');
+          }
+          setTimeout(function () {
+            setOpen(false);
+            setStatus('');
+          }, 900);
+        } else {
+          setStatus((res && res.error) ? res.error : 'Send failed.', true);
+        }
+      })
+      .withFailureHandler(function (err) {
+        sending = false;
+        sendBtn.disabled = false;
+        setStatus(String(err && err.message ? err.message : err || 'Send failed.'), true);
+      })
+      .submitErrorReport(payload);
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if (!isOpen() && !(isFineHover() && root.matches(':hover'))) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+    setOpen(false);
+  }, true);
+})();
+</script>
