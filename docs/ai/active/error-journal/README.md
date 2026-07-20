@@ -13,7 +13,7 @@ Day work orders live beside this folder as `docs/ai/active/error-day-YYYY-MM-DD.
 
 | Thread file | Kind | State | Summary |
 |-------------|------|-------|---------|
-| *(none yet — Phase 0 stub)* | — | — | First threads appear after Phase 4 / first real pack |
+| [ERR-2026-07-20-pipeline-smoke.md](ERR-2026-07-20-pipeline-smoke.md) | single | Open | ROOT “test log” — first pack / pipeline smoke (day [../error-day-2026-07-20.md](../error-day-2026-07-20.md)) |
 
 **States:** `Open` · `Fixed` · `Came_back`
 
@@ -32,6 +32,9 @@ One file per lasting problem, e.g. `ERR-2026-07-20-timeline-thrash.md`:
 
 ---
 
-## Stub note
+## History
 
-Created **2026-07-20** as Phase 0 of the error-reporting campaign. Do not invent Sheet journal columns here.
+| Date | Note |
+|------|------|
+| 2026-07-20 | Folder stub (Phase 0). |
+| 2026-07-20 | First pack: pipeline smoke thread opened; day campaign [../error-day-2026-07-20.md](../error-day-2026-07-20.md). |

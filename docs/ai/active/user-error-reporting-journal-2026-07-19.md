@@ -113,7 +113,9 @@ Same discipline as multi-user fork / DAL campaigns — director-driven.
 
 Existing: **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS** → add **ERROR LOGS**.
 
-- Filters + selectable Sheet reports + detail  
+- Thin ticket rows: **person · view · platform**; scrollable left list  
+- Explorer multi-select: click / Ctrl+click / Shift+click; **SELECT ALL** = full inbox  
+- Detail pane + filters  
 - **Hand over to Cursor:** copy pack → **then delete** those `Report_ID`s from `Error_Reports`  
 - Optional: links reminding where markdown journal / day campaigns live  
 
@@ -207,6 +209,7 @@ PACK FOLLOWS BELOW:
 |------|------|
 | 2026-07-19 | Campaign drafted. Journal + day campaigns = **markdown only**; Sheet = raw `Error_Reports` only. |
 | 2026-07-19 | **Handoff clears inbox:** Hand over to Cursor = copy pack + **delete** those rows from Sheet so already-handed logs do not stay visible. |
+| 2026-07-20 | **First pack triaged:** 1× ROOT “test log” → [error-day-2026-07-20.md](error-day-2026-07-20.md) + journal [error-journal/ERR-2026-07-20-pipeline-smoke.md](error-journal/ERR-2026-07-20-pipeline-smoke.md). No product bug. Awaiting director OK go to close smoke thread (docs only). |
 | 2026-07-20 | Director: this is the **middle / NEXT** campaign. **Phase 0 shipped** (SCHEMA + DRIVE_LAYOUT + journal stub + TODO). Phase 2 UI: ask director. **Next slice: Phase 1.** |
 | 2026-07-20 | **Phase 1 shipped @ GAS v681:** `verifyErrorReportsSchema` + `submitErrorReport` + `TEST_ErrorReport` in `Resources_Audit.js`. Tab `Error_Reports` on `SM_Showrunner_LOGS`; `Audit_Logs` untouched. Oversized diag → Drive + `Diag_Ref`. |
 | 2026-07-20 | **Phase 2 shipped @ GAS v684:** `00f_Error_Report.html` — top-center 2mm lip; hover (fine pointer) / tap lip (touch); freeze snapshot on open; `submitErrorReport`. Wired in `Index.html` (web + mobile + station). Escape stops at drawer (Bugbot). Re-pushed after Drive sync wiped local `00f`. Styles `#sr-error-report-*`. |
@@ -215,4 +218,4 @@ PACK FOLLOWS BELOW:
 | 2026-07-20 | **Lip polish @ GAS v688:** peek **½** height; milder filleted trapezoid SVG with frame stroke. |
 | 2026-07-20 | **Unified silhouette @ GAS v689:** one clipped drawer shape (no second SVG figure); lip = hit target only; peek ½. |
 | 2026-07-20 | **Frame + hover @ GAS v690:** drawer fill/frame match text box (`#09090b` / `#3f3f46`); top-anchored under bookmarks; root hit area expands on hover so it doesn’t snap shut. |
-| 2026-07-20 | **Phase 3 shipped:** Database Ops → **ERROR LOGS** sub-tab; `listErrorReports` + `handoverErrorReports` (ROOT); Hand over = copy pack then delete inbox rows. |
+| 2026-07-20 | **Phase 3 shipped @ GAS v691:** Database Ops → **ERROR LOGS** sub-tab; `listErrorReports` + `handoverErrorReports` (ROOT); Hand over = copy pack then delete inbox rows. |
