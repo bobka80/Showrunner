@@ -1,14 +1,16 @@
 <!-- @INDEX: ERROR_REPORT -> Top lip drawer (global bug report) -->
 <!-- Campaign: docs/ai/active/user-error-reporting-journal-2026-07-19.md Phase 2 -->
 <div id="sr-error-report-root" aria-live="polite">
-  <button type="button" id="sr-error-report-lip" aria-label="Open error report" aria-expanded="false" title="Error report"></button>
-  <div id="sr-error-report-panel" role="dialog" aria-label="Send error report">
-    <div class="input-label">Describe the bug</div>
-    <textarea id="sr-error-report-text" rows="4" placeholder="What went wrong? What were you doing?" maxlength="4000"></textarea>
-    <div class="sr-error-report-actions">
-      <button type="button" class="btn-main" id="sr-error-report-send">Send error report</button>
+  <div id="sr-error-report-drawer">
+    <div id="sr-error-report-panel" role="dialog" aria-label="Send error report">
+      <div class="input-label">Describe the bug</div>
+      <textarea id="sr-error-report-text" rows="4" placeholder="What went wrong? What were you doing?" maxlength="4000"></textarea>
+      <div class="sr-error-report-actions">
+        <button type="button" class="btn-main" id="sr-error-report-send">Send error report</button>
+      </div>
+      <div id="sr-error-report-status" class="sr-error-report-status" aria-live="polite"></div>
     </div>
-    <div id="sr-error-report-status" class="sr-error-report-status" aria-live="polite"></div>
+    <button type="button" id="sr-error-report-lip" aria-label="Open error report" aria-expanded="false" title="Error report"></button>
   </div>
 </div>
 

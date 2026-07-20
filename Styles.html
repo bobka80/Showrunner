@@ -280,98 +280,100 @@
         pointer-events: none;
     }
 
-    /* --- Global error-report lip (Phase 2) — top center, all surfaces --- */
+    /* --- Global error-report drawer — short bottom lip under bookmarks; slides down --- */
     #sr-error-report-root {
         position: fixed;
-        top: env(safe-area-inset-top, 0px);
+        top: calc(env(safe-area-inset-top, 0px) + 12px);
         left: 50%;
         transform: translateX(-50%);
         z-index: 70000;
-        width: min(380px, 92vw);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+        width: min(360px, 90vw);
         pointer-events: none;
         font-family: inherit;
     }
-    #sr-error-report-lip {
+    #sr-error-report-drawer {
         pointer-events: auto;
-        position: relative;
-        width: 56px;
-        height: 2mm;
-        min-height: 2px;
-        max-height: 3mm;
-        margin: 0;
-        padding: 0;
-        border: none;
-        border-radius: 0 0 5px 5px;
-        background: #71717a;
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-        cursor: pointer;
-        flex-shrink: 0;
-    }
-    /* Fat-finger hit pad under the 2mm lip (touch / station / mobile) */
-    #sr-error-report-lip::after {
-        content: '';
-        position: absolute;
-        left: -16px;
-        right: -16px;
-        top: 0;
-        height: 28px;
-    }
-    #sr-error-report-panel {
-        pointer-events: none;
-        box-sizing: border-box;
-        width: 100%;
-        max-height: 0;
-        overflow: hidden;
-        opacity: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         background: #18181b;
         border: 1px solid #3f3f46;
-        border-top: none;
         border-radius: 0 0 10px 10px;
-        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
-        padding: 0 12px;
-        transition: max-height 0.22s ease, opacity 0.18s ease, padding 0.18s ease;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+        /* Closed: only the short bottom lip peeks; open: full rectangle slides down */
+        transform: translateY(calc(-100% + 7px));
+        transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+        will-change: transform;
     }
-    #sr-error-report-root.is-open #sr-error-report-panel {
-        pointer-events: auto;
-        max-height: 320px;
-        opacity: 1;
-        padding: 12px;
+    #sr-error-report-root.is-open #sr-error-report-drawer {
+        transform: translateY(0);
     }
     @media (hover: hover) and (pointer: fine) {
-        #sr-error-report-root:hover #sr-error-report-panel {
-            pointer-events: auto;
-            max-height: 320px;
-            opacity: 1;
-            padding: 12px;
+        #sr-error-report-root:hover #sr-error-report-drawer {
+            transform: translateY(0);
         }
         #sr-error-report-root:hover #sr-error-report-lip,
         #sr-error-report-root.is-open #sr-error-report-lip {
             background: #f43f5e;
+            border-color: #fb7185;
         }
+    }
+    #sr-error-report-panel {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 14px 14px 10px;
+    }
+    /* Short centered tab = lower edge of the rectangle (not full-width) */
+    #sr-error-report-lip {
+        position: relative;
+        width: 44px;
+        height: 7px;
+        margin: 0 0 -1px;
+        padding: 0;
+        border: 1px solid #3f3f46;
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        background: #27272a;
+        box-shadow: none;
+        cursor: pointer;
+        flex-shrink: 0;
     }
     #sr-error-report-root.is-open #sr-error-report-lip {
         background: #f43f5e;
+        border-color: #fb7185;
+    }
+    /* Fat-finger hit pad under the lip (touch / station / mobile) */
+    #sr-error-report-lip::after {
+        content: '';
+        position: absolute;
+        left: -18px;
+        right: -18px;
+        top: -4px;
+        height: 32px;
     }
     #sr-error-report-panel .input-label {
         margin-top: 0;
+        letter-spacing: 0.04em;
+        color: #a1a1aa;
     }
     #sr-error-report-text {
         width: 100%;
         box-sizing: border-box;
-        margin: 6px 0 10px;
-        padding: 10px;
-        min-height: 88px;
+        margin: 8px 0 12px;
+        padding: 10px 12px;
+        min-height: 96px;
         resize: vertical;
-        background: #27272a;
-        border: 1px solid #333;
-        color: #fff;
-        border-radius: 6px;
+        background: #09090b;
+        border: 1px solid #3f3f46;
+        color: #fafafa;
+        border-radius: 8px;
         font-family: inherit;
         font-size: 13px;
-        line-height: 1.35;
+        line-height: 1.4;
+    }
+    #sr-error-report-text:focus {
+        outline: none;
+        border-color: #f43f5e;
     }
     .sr-error-report-actions {
         display: flex;
@@ -382,6 +384,7 @@
         margin: 0;
         min-height: 44px;
         padding: 10px 16px !important;
+        border-radius: 8px;
     }
     .sr-error-report-status {
         margin-top: 8px;

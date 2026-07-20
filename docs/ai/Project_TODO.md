@@ -16,7 +16,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-20)
 
-**Primary campaign (NEXT):** Error reports + daily journal triage — [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). **Phase 2 done** @ v682 → next **Phase 3** (ERROR LOGS + Hand over).
+**Primary campaign (NEXT):** Error reports + daily journal triage — [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). **Phase 2 done** @ v684 → next **Phase 3** (ERROR LOGS + Hand over).
 
 **Paused / after this middle campaign:** Multi-user fork **Part B** (auto fork) — Part A complete @ v678. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
 
@@ -24,7 +24,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 |-------|------|------|
 | **0** | Docs + SCHEMA + DRIVE_LAYOUT + journal stub | **Done** (2026-07-20) |
 | **1** | Sheet `Error_Reports` + writer | **Done** (v681) |
-| **2** | Report lip + freeze + submit | **Done** (v682) |
+| **2** | Report lip + freeze + submit | **Done** (v684) |
 | **3** | ERROR LOGS tab + Hand over | ROOT exports pack |
 | **4** | Cursor playbook + first real pack | Director likes day-campaign shape |
 | **5** | Live use (esp. before Part B) | Packs → day campaigns → journal |
@@ -45,7 +45,7 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Error reports + daily journal triage** | **NEXT** — Phase 2 done @ v682; next Phase 3 ERROR LOGS + Hand over | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) · [error-journal/](active/error-journal/) |
+| **Error reports + daily journal triage** | **NEXT** — Phase 2 done @ v684; next Phase 3 ERROR LOGS + Hand over | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) · [error-journal/](active/error-journal/) |
 | **Multi-user fork: test pipeline → bulletproof → auto fork** | **Part A complete** — middle = error-reporting → then Part B | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **Data access layer (DAL + router)** | Near-complete — prep live rollback **v654** · DAL-era **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
