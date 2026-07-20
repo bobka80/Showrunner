@@ -468,15 +468,18 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **UI surface (2026-07-19):** No full-width top banner. While prep is open, a **SYNC** mini-header sits at the bottom of the vault (`#pa-prep-live-panel`) — orange strip + orange frame; click expands ~⅓ (black body, roster with modes). Collapsed by default. Timeline collab uses the same pattern: blue **SYNC** mini-header at the bottom of the crew-name column (`#tl-sync-panel`); expand shows names only. Internal latch is still `dalPrepUiOpen` / `dalPrepLatched` / `dalTimelineSessionOpen` (docs may say “banner on” for that latch).
 
+**Opening warm-up (Part B2 @ v695+):** Sheets `opening` is **not** Live. Starter may edit; peers freeze + SYNC text **Starting live session…**. Do **not** live-latch from `_meta` or `refreshDalSessionBanner` while status is `opening`. Hang ~50s → Retry / Abort; credentialed desktop may `beginDalSession(..., { takeOver: true })`. Live latch only when status is `open`.
+
 ```
 START PREP (local)
-  → Sheets domain status = open + new sessionUid
+  → Sheets domain status = opening (reserve) → snapshot → open + new sessionUid
   → Firestore assets/_meta written (sessionType prep, sessionUid)
   → Snapshot fixtures → assets/* collection + assets/state
   → Vault prep panel on · live sync (patch) · dalPrepEndedSessionUid_ cleared
 
 Peer joins
-  → Sees server _meta (fromMeta, new sessionUid) OR (first join) Sheets open if not blocked
+  → During opening: freeze + Starting live session… (no Firestore live yet)
+  → At open: Sees server _meta (fromMeta, new sessionUid) OR Sheets open if not blocked
   → Vault prep panel on · listens to assets/state
 
 While prep UI open (dalPrepUiOpen)

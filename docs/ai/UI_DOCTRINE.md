@@ -99,7 +99,8 @@ All buttons use the unified base in `Styles.html` (12px, 800, uppercase, 6px rad
 | `.btn-main` | Save, confirm, calculate, authenticate |
 | `.btn-outline` | Secondary navigation, open, filter |
 | `.btn-outline-purple` | Timeline-related actions (gray fill + purple border) |
-| `.btn-outline-orange` | Project assets / warehouse actions (gray fill + orange border) |
+| `.btn-outline-orange` | Project assets / warehouse actions (gray fill + orange border) — also **PROJECT ASSETS** when prep fork is on Firebase |
+| `.btn-outline-blue` | Timeline fork / occupants chrome (gray fill + blue border) |
 | `.btn-close` | Cancel (red tint) |
 | `.btn-delete` | Destructive (stronger red) |
 | `.btn-add` | Additive secondary (gray) |
@@ -166,14 +167,14 @@ Use `.crew-cb` for IAM and structural forms. Timeline grid uses `.crew-cb.small-
 
 ## 8. Project editor footer (canonical actions)
 
-| Button | Class |
-|--------|-------|
-| OPEN TIMELINE | `btn-outline btn-outline-purple` |
-| PROJECT ASSETS | `btn-outline btn-outline-orange` |
-| SAVE & SYNC | `btn-main` |
-| CANCEL | `btn-close` |
+| Button | Idle (no fork) | Fork on Firebase |
+|--------|----------------|------------------|
+| OPEN TIMELINE (`#master-timeline-btn`) | `btn-outline` (gray) | `btn-outline btn-outline-blue` |
+| PROJECT ASSETS (`#master-assets-btn`) | `btn-outline` (gray) | `btn-outline btn-outline-orange` (no green) |
+| SAVE & SYNC | `btn-main` | — |
+| CANCEL | `btn-close` | — |
 
-When timeline is locked by another user: `btn-outline` with red border (presence ping in `02_Project_Editor_Core.html`).
+Presence still updates OPEN TIMELINE label when others are inside (`👥 … IN TIMELINE`) but **never disables** the button. Paint lives in `paintProjectEditorModuleBtns_` / `refreshProjectEditorForkChrome_` (`02_Project_Editor_Core.html`).
 
 ---
 

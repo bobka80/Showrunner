@@ -113,8 +113,8 @@
 
     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
       <div style="display:flex; gap:12px; align-items:center;">
-         <button id="master-timeline-btn" class="btn-outline btn-outline-purple" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
-         <button class="btn-outline btn-outline-orange" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
+         <button id="master-timeline-btn" class="btn-outline" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
+         <button id="master-assets-btn" class="btn-outline" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
       </div>
       <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
@@ -145,6 +145,80 @@ window.activePresencePaMode = '';     // design | packing | operation (when modu
 window.isTimelineOccupiedBy = null;   // Legacy: first other user in timeline (informational only — no door lock)
 window.timelineOccupants = [];        // Other users currently in timeline module
 window.paPrepOccupants = [];          // Other users in assets module during prep [{name, mode}]
+window.peForkPrepActive_ = false;     // Project editor chrome: prep fork on Firebase
+window.peForkTimelineActive_ = false; // Project editor chrome: timeline fork on Firebase
+
+/** Paint OPEN TIMELINE / PROJECT ASSETS chrome from fork + presence flags (never disables click). */
+window.paintProjectEditorModuleBtns_ = function() {
+  var tlBtn = document.getElementById('master-timeline-btn');
+  var paBtn = document.getElementById('master-assets-btn');
+  var occupants = window.timelineOccupants || [];
+  var tlFork = !!window.peForkTimelineActive_;
+  var paFork = !!window.peForkPrepActive_;
+
+  if (tlBtn) {
+    tlBtn.disabled = false;
+    tlBtn.style.borderColor = '';
+    tlBtn.style.color = '';
+    if (occupants.length > 0) {
+      var n = occupants.length;
+      tlBtn.innerText = n === 1
+        ? ('👥 ' + String(occupants[0]).toUpperCase() + ' IN TIMELINE')
+        : ('👥 ' + n + ' IN TIMELINE');
+      tlBtn.className = 'btn-outline btn-outline-blue';
+      tlBtn.title = 'Open timeline — others already inside: ' + occupants.join(', ');
+    } else if (tlFork) {
+      tlBtn.innerText = 'OPEN TIMELINE';
+      tlBtn.className = 'btn-outline btn-outline-blue';
+      tlBtn.title = 'Timeline fork is on Firebase';
+    } else {
+      tlBtn.innerText = 'OPEN TIMELINE';
+      tlBtn.className = 'btn-outline';
+      tlBtn.title = '';
+    }
+  }
+
+  if (paBtn) {
+    paBtn.disabled = false;
+    paBtn.style.borderColor = '';
+    paBtn.style.color = '';
+    if (paFork) {
+      paBtn.className = 'btn-outline btn-outline-orange';
+      paBtn.title = 'Project Assets fork is on Firebase';
+    } else {
+      paBtn.className = 'btn-outline';
+      paBtn.title = '';
+    }
+  }
+};
+
+window.refreshProjectEditorForkChrome_ = function(projectId) {
+  projectId = projectId || activePresenceProject ||
+    (document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '');
+  if (!projectId || projectId === 'NEW') {
+    window.peForkPrepActive_ = false;
+    window.peForkTimelineActive_ = false;
+    if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
+    return;
+  }
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+  google.script.run
+    .withFailureHandler(function() { /* keep last chrome */ })
+    .withSuccessHandler(function(info) {
+      var prepOpen = (typeof window.dalIsPrepOpenFromInfo_ === 'function')
+        ? window.dalIsPrepOpenFromInfo_(info)
+        : false;
+      var tl = (typeof window.dalTimelineInfoFromSession_ === 'function')
+        ? window.dalTimelineInfoFromSession_(info)
+        : null;
+      var tlSt = tl ? String(tl.status || '').toLowerCase() : '';
+      var tlOpen = (tlSt === 'open' || tlSt === 'opening' || tlSt === 'committing');
+      window.peForkPrepActive_ = !!prepOpen;
+      window.peForkTimelineActive_ = !!tlOpen;
+      if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
+    })
+    .getDalSessionInfo(projectId);
+};
 
 window.dalPaPresenceModeLabel_ = function(mode, opType) {
   mode = String(mode || '').toLowerCase();
@@ -175,26 +249,29 @@ function startPresencePing(projectId) {
     stopPresencePing();
     if (!projectId || projectId === 'NEW') return;
     activePresenceProject = projectId;
-    
-    let tlBtn = document.getElementById('master-timeline-btn');
-    if (tlBtn) {
-        tlBtn.innerText = `⏳ CHECKING...`;
-        tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#a1a1aa"; tlBtn.style.color = "#a1a1aa";
-        tlBtn.disabled = true;
+
+    // Clickable immediately — presence + fork chrome refresh in background.
+    window.timelineOccupants = [];
+    window.isTimelineOccupiedBy = null;
+    window.paPrepOccupants = [];
+    window.peForkPrepActive_ = false;
+    window.peForkTimelineActive_ = false;
+    if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
+    if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+      window.refreshProjectEditorForkChrome_(projectId);
     }
 
     const ping = () => {
         if (!activePresenceProject) return;
         let userAlias = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown';
         if (typeof window.dalPaSyncPresencePaMode_ === 'function') window.dalPaSyncPresencePaMode_();
+        if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+          window.refreshProjectEditorForkChrome_(activePresenceProject);
+        }
         google.script.run
-        .withFailureHandler(err => {
-            let tlBtn = document.getElementById('master-timeline-btn');
-            if (tlBtn) {
-                tlBtn.disabled = false;
-                tlBtn.innerText = `OPEN TIMELINE`;
-                tlBtn.className = "btn-outline btn-outline-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
-            }
+        .withFailureHandler(function() {
+            // Keep last known chrome; never leave the button disabled.
+            if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
         })
         .withSuccessHandler(othersObj => {
             window.isTimelineOccupiedBy = null;
@@ -215,22 +292,8 @@ function startPresencePing(projectId) {
                 }
             }
 
-            if (tlBtn) {
-                tlBtn.disabled = false;
-                // Presence is informational only — never blocks opening (timeline collab).
-                if (window.timelineOccupants.length > 0) {
-                    let n = window.timelineOccupants.length;
-                    tlBtn.innerText = n === 1
-                        ? `👥 ${window.timelineOccupants[0].toUpperCase()} IN TIMELINE`
-                        : `👥 ${n} IN TIMELINE`;
-                    tlBtn.className = "btn-outline"; tlBtn.style.borderColor = "#3b82f6"; tlBtn.style.color = "#3b82f6";
-                    tlBtn.title = 'Open timeline — others already inside: ' + window.timelineOccupants.join(', ');
-                } else {
-                    tlBtn.innerText = `OPEN TIMELINE`;
-                    tlBtn.className = "btn-outline btn-outline-purple"; tlBtn.style.borderColor = ""; tlBtn.style.color = "";
-                    tlBtn.title = '';
-                }
-            }
+            // Presence is informational only — never blocks opening (timeline collab).
+            if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
             if (typeof window.dalUpdateRemotePendingBanner_ === 'function') window.dalUpdateRemotePendingBanner_();
             if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
         }).reportProjectPresence(activePresenceProject, userAlias, 'ping', window.activePresenceModule, window.activePresencePaMode || '');
@@ -243,6 +306,12 @@ function startPresencePing(projectId) {
 function stopPresencePing() {
     if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
     if (activePresenceProject) { google.script.run.reportProjectPresence(activePresenceProject, ACTIVE_USER_NAME, 'leave'); activePresenceProject = null; }
+    window.peForkPrepActive_ = false;
+    window.peForkTimelineActive_ = false;
+    window.timelineOccupants = [];
+    window.isTimelineOccupiedBy = null;
+    window.paPrepOccupants = [];
+    if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
 }
 
 function triggerPrint() {
