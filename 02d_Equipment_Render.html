@@ -513,7 +513,7 @@ function renderProjectAssetsUI() {
         packFiltersEl.innerHTML = `<div style="display:inline-flex; align-items:center; gap:8px;">
             <span style="color:#ffffff; font-size:10px; font-weight:900; letter-spacing:0.04em;">WORKING</span>
             <select id="pa-working-dept-select" onchange="setPaWorkingDept(this.value)" title="New adds go into this department"
-                style="padding:5px 8px; height:28px; font-size:11px; font-weight:bold; background:#111; color:#e4e4e7; border:2px solid ${(typeof getDeptObj === 'function' ? getDeptObj(workUid).color : null) || '#ffffff'}; border-radius:4px; outline:none; min-width:120px;">
+                style="padding:5px 8px; height:28px; font-size:11px; font-weight:bold; background:#111; color:#e4e4e7; border:2px solid #ffffff; border-radius:4px; outline:none; min-width:120px;">
                 ${workOpts}
             </select>
         </div>`;
