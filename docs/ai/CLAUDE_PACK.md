@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Cursor:** [CURSOR_WORKFLOW.md](CURSOR_WORKFLOW.md)
 
-Pack the repo for **Claude project knowledge** (brainstorm on the go with full code + doctrine context).
+Pack the repo for **Claude / quote.ai project knowledge** (brainstorm on the go with full code + doctrine context).
 
 `Last swept:` 2026-07-20
 
@@ -16,11 +16,12 @@ node create-repomix.js
 
 | Flag | Effect |
 |------|--------|
-| *(default)* | Curated pack ~**1M tokens** / ~4 MB — source, `docs/ai/`, hosting, APK scripts |
-| `--split 2mb` | Numbered parts for Claude upload limits (manual / size-limit only) |
+| *(default)* | Curated pack, **split into ~2 MiB parts** — fits project-knowledge upload limits |
+| `--split 1mb` | Custom part size |
+| `--no-split` | Single monolith (~5 MB) — often too large for project UIs |
 | `--full` | Includes `station-android/CW referense/` vendor docs (~**11M tokens** — avoid) |
 
-**Output:** one fresh file — `claude-pack/repomix-output.md` (+ `instructions.md` with navigation and live `Project_TODO` excerpt). Default mode deletes leftover split parts so the folder stays a single mix.
+**Output:** `claude-pack/repomix-output.1.md`, `.2.md`, … (+ `instructions.md` with navigation and live `Project_TODO` excerpt). Each run clears previous pack files so stale parts do not linger.
 
 **Not deployed to GAS** — PC-only (`gas-node-only.js`).
 
@@ -28,14 +29,14 @@ node create-repomix.js
 
 ## Automatic refresh on GAS ship
 
-Every successful **`node milestone.js "…"`** kicks off the curated single-file pack **in the background** after deploy + `RELEASES.md` — the ship exits as soon as GAS is done; you do not wait for the mix.
+Every successful **`node milestone.js "…"`** kicks off this curated **split** pack **in the background** after deploy + `RELEASES.md` — the ship exits as soon as GAS is done; you do not wait for the mix.
 
 | Flag on milestone | Effect |
 |-------------------|--------|
-| *(default)* | Start background refresh of `claude-pack/repomix-output.md` (log: `claude-pack/repomix-last-run.log`; pack errors do not undo the GAS ship) |
+| *(default)* | Start background refresh → `claude-pack/repomix-output.*.md` parts (log: `claude-pack/repomix-last-run.log`) |
 | `--no-repomix` | Skip pack refresh |
 
-Upload to Claude / quote.ai project knowledge remains **manual** (drag the file) — Anthropic has no official project-knowledge API/MCP upload.
+Upload to Claude / quote.ai project knowledge remains **manual** — drag **all** parts (+ optional `instructions.md`). Anthropic has no official project-knowledge API/MCP upload.
 
 ---
 
@@ -55,8 +56,8 @@ Upload to Claude / quote.ai project knowledge remains **manual** (drag the file)
 
 ## Upload workflow
 
-1. Pack is refreshed automatically after each GAS milestone (or run `node create-repomix.js` / say **create repo mix**).
-2. Upload **`claude-pack/repomix-output.md`** to Claude **project knowledge** (replace the previous file).
+1. Pack refreshes automatically after each GAS milestone (or run `node create-repomix.js` / say **create repo mix**).
+2. In File Explorer open `claude-pack/` → upload **every** `repomix-output.*.md` part into project knowledge (replace old parts). Optionally add `instructions.md`.
 3. Brainstorm there; bring **OK go** tasks back to Cursor for implementation.
 
 ---
@@ -65,7 +66,7 @@ Upload to Claude / quote.ai project knowledge remains **manual** (drag the file)
 
 | Profile | Tokens | Use |
 |---------|--------|-----|
-| Curated | ~1.0M | **Recommended** for Claude project |
+| Curated (split) | ~1.0M total across parts | **Recommended** for project knowledge |
 | Full (naive) | ~11.3M | Too large — mostly vendor Javadoc |
 
 Packing burns **zero** Claude API tokens (local Repomix via `npx`).

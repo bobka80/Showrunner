@@ -65,10 +65,10 @@ This document describes how the **Software Director** (project owner) collaborat
 **AI behavior:**
 1. Run **`node create-repomix.js`** immediately (no **OK go** required — this is tooling, not app code).
 2. Reply with the **full Windows paths** to drag into your **quote.ai / Claude project knowledge** tab:
-   - **Primary:** `claude-pack/repomix-output.md` (~1M tokens)
+   - **All parts:** `claude-pack/repomix-output.1.md`, `.2.md`, … (~2 MiB each)
    - **Optional:** `claude-pack/instructions.md`
-3. If upload fails on size, re-run with **`node create-repomix.js --split 2mb`** and list all part files.
-4. Plain-language: what the file contains, that packing is free (local), and that **every GAS milestone** also refreshes this file automatically (see [CLAUDE_PACK.md](CLAUDE_PACK.md)).
+3. If a UI still rejects a part, re-run with **`node create-repomix.js --split 1mb`** and list all part files.
+4. Plain-language: what the files contain, that packing is free (local), and that **every GAS milestone** refreshes these parts automatically in the background (see [CLAUDE_PACK.md](CLAUDE_PACK.md)).
 
 **Director:** Open File Explorer → `claude-pack` folder in the repo → drag `repomix-output.md` into the project tab. You do not run terminal commands.
 

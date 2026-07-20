@@ -1,17 +1,17 @@
 /**
- * Pack the Showrunner repo for Claude project knowledge (Repomix).
+ * Pack the Showrunner repo for Claude / quote.ai project knowledge (Repomix).
  *
  * Curated pack (~1M tokens): source, docs/ai, deploy/APK/hosting tooling.
  * Excludes vendor Javadoc, clasp pull scratch, build bin/obj, binaries.
  *
  * Usage:
- *   node create-repomix.js
- *   node create-repomix.js --full          # include vendor reference trees (much larger)
- *   node create-repomix.js --split 2mb     # split into numbered parts (~2 MiB each; config uses bytes)
- *   node create-repomix.js --stdout        # print summary paths only after pack
+ *   node create-repomix.js                 # curated, split into ~2 MiB parts (default)
+ *   node create-repomix.js --split 1mb      # custom part size
+ *   node create-repomix.js --no-split       # single monolith (too large for many project UIs)
+ *   node create-repomix.js --full           # include vendor reference trees (much larger)
+ *   node create-repomix.js --stdout         # print summary paths only after pack
  *
- * Output: claude-pack/repomix-output.md (or repomix-output_001.md, … when split).
- * Default (no --split) deletes leftover split parts so only one mix remains.
+ * Output (default): claude-pack/repomix-output.1.md, .2.md, … + instructions.md
  * Also started automatically in the background at the end of milestone.js (unless --no-repomix).
  */
 const { execSync } = require('child_process');
@@ -21,11 +21,11 @@ const path = require('path');
 const ROOT = __dirname;
 const OUT_DIR = path.join(ROOT, 'claude-pack');
 const INSTRUCTIONS_PATH = path.join(OUT_DIR, 'instructions.md');
-const OUTPUT_FILE = path.join(OUT_DIR, 'repomix-output.md');
+const DEFAULT_SPLIT = '2mb';
 
 /** Parse human size (2mb / 500kb / bare number) → bytes for Repomix splitOutput. */
 function parseSplitBytes(raw) {
-  const s = String(raw == null ? '2mb' : raw).trim().toLowerCase();
+  const s = String(raw == null ? DEFAULT_SPLIT : raw).trim().toLowerCase();
   const m = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/.exec(s);
   if (!m) {
     throw new Error(`Invalid --split size "${raw}". Use e.g. 2mb, 500kb, or byte count.`);
@@ -37,13 +37,14 @@ function parseSplitBytes(raw) {
 }
 
 function parseArgs(argv) {
-  const opts = { full: false, split: null, stdout: false };
+  const opts = { full: false, split: parseSplitBytes(DEFAULT_SPLIT), stdout: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--full') opts.full = true;
     else if (a === '--stdout') opts.stdout = true;
+    else if (a === '--no-split') opts.split = null;
     else if (a === '--split') {
-      opts.split = parseSplitBytes(argv[i + 1] || '2mb');
+      opts.split = parseSplitBytes(argv[i + 1] || DEFAULT_SPLIT);
       i++;
     }
   }
@@ -64,9 +65,9 @@ function latestReleaseLine() {
 
 function buildInstructions() {
   const todoExcerpt = readSnippet(path.join(ROOT, 'docs', 'ai', 'Project_TODO.md'), 45);
-  return `# Showrunner — Claude project instructions
+  return `# Showrunner — Claude / quote.ai project instructions
 
-Upload this pack to a **Claude project knowledge** tab (persistent context). Use for brainstorming, architecture review, and tracing code paths. **Implementation ships from Cursor** after the director says **OK go**.
+Upload **all** \`repomix-output.*.md\` parts plus this file into the **project knowledge** tab (persistent context). Parts are ~2 MiB each so they fit project upload limits. Use for brainstorming, architecture review, and tracing code paths. **Implementation ships from Cursor** after the director says **OK go**.
 
 ## How to navigate
 
@@ -107,7 +108,7 @@ ${latestReleaseLine()}
 ${todoExcerpt}
 \`\`\`
 
-*Regenerate this pack after major releases: \`node create-repomix.js\`*
+*Regenerate this pack after every GAS milestone (automatic) or: \`node create-repomix.js\`*
 `;
 }
 
@@ -130,13 +131,31 @@ function writeRepomixConfig(opts) {
   return runConfigPath;
 }
 
+/** Remove previous pack outputs so stale part counts cannot linger. */
+function clearPreviousOutputs() {
+  if (!fs.existsSync(OUT_DIR)) return;
+  for (const f of fs.readdirSync(OUT_DIR)) {
+    if (!f.startsWith('repomix-output')) continue;
+    try {
+      fs.unlinkSync(path.join(OUT_DIR, f));
+      console.log(`Removed previous pack file: ${f}`);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
 function runRepomix(opts) {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   fs.writeFileSync(INSTRUCTIONS_PATH, buildInstructions(), 'utf8');
+  clearPreviousOutputs();
 
   const runConfigPath = writeRepomixConfig(opts);
+  const splitNote = opts.split
+    ? `split ~${(opts.split / (1024 * 1024)).toFixed(2)} MiB parts`
+    : 'single file (no split)';
+  console.log(`Running Repomix (curated Showrunner pack, ${splitNote})…\n`);
   const cmd = `npx --yes repomix@latest --config "${runConfigPath}"`;
-  console.log('Running Repomix (curated Showrunner pack)…\n');
   execSync(cmd, { cwd: ROOT, stdio: 'inherit', shell: true });
   try {
     fs.unlinkSync(runConfigPath);
@@ -151,34 +170,20 @@ function listOutputs() {
     .readdirSync(OUT_DIR)
     .filter((f) => f.startsWith('repomix-output') && (f.endsWith('.md') || f.endsWith('.xml')))
     .map((f) => path.join(OUT_DIR, f))
-    .sort();
-}
-
-/** When not splitting: keep only the single curated file; delete leftover split parts. */
-function pruneToSingleOutput() {
-  if (!fs.existsSync(OUT_DIR)) return;
-  for (const f of fs.readdirSync(OUT_DIR)) {
-    if (!f.startsWith('repomix-output')) continue;
-    if (f === 'repomix-output.md' || f === 'repomix-output.xml') continue;
-    try {
-      fs.unlinkSync(path.join(OUT_DIR, f));
-      console.log(`Removed stale pack part: ${f}`);
-    } catch (_) {
-      /* ignore */
-    }
-  }
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 }
 
 function printSummary(files) {
   console.log('\n=== DRAG & DROP → Claude / quote.ai project knowledge ===\n');
-  for (const f of files) {
+  console.log('Upload ALL of these parts (replace previous pack files):\n');
+  files.forEach((f, i) => {
     const stat = fs.statSync(f);
     const mb = (stat.size / (1024 * 1024)).toFixed(2);
-    console.log(`  PRIMARY: ${f}`);
-    console.log(`           (${mb} MB)\n`);
-  }
-  console.log(`  OPTIONAL: ${INSTRUCTIONS_PATH}`);
-  console.log('           (navigation + current priorities)\n');
+    console.log(`  PART ${i + 1}/${files.length}: ${f}`);
+    console.log(`               (${mb} MB)\n`);
+  });
+  console.log(`  ALSO: ${INSTRUCTIONS_PATH}`);
+  console.log('        (navigation + current priorities)\n');
   console.log('Folder: ' + OUT_DIR);
   console.log('\nSay "create repo mix" in Cursor anytime to regenerate.\n');
 }
@@ -188,8 +193,10 @@ function main() {
   if (opts.full) {
     console.log('Note: --full includes vendor reference trees (~10M+ tokens). Prefer curated for Claude.\n');
   }
+  if (!opts.split) {
+    console.log('Note: --no-split builds one monolith (~5 MB). Many project UIs need the default split parts.\n');
+  }
   runRepomix(opts);
-  if (!opts.split) pruneToSingleOutput();
   const outputs = listOutputs();
   if (!outputs.length) {
     console.error('Repomix finished but no output files found in claude-pack/.');

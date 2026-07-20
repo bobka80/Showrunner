@@ -71,7 +71,8 @@ function refreshRepoMixBackground() {
     child.unref();
 
     console.log('\nRepo mix: refreshing in the background (GAS ship is already done).');
-    console.log(`  Output when ready: ${path.join(outDir, 'repomix-output.md')}`);
+    console.log(`  Parts when ready: ${path.join(outDir, 'repomix-output.*.md')} (~2 MiB each)`);
+    console.log(`  Also: ${path.join(outDir, 'instructions.md')}`);
     console.log(`  Log: ${REPOMIX_LOG_PATH}`);
     if (child.pid) console.log(`  PID: ${child.pid}`);
     console.log('');

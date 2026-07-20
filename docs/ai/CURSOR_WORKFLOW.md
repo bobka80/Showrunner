@@ -125,14 +125,14 @@ Full reference: **[CLAUDE_PACK.md](CLAUDE_PACK.md)**.
 
 **Director says:** **create repo mix** (aliases: create repomix, repo mix)
 
-**Agent runs:** `node create-repomix.js` → reply with full paths:
+**Agent runs:** `node create-repomix.js` → reply with full paths to **every** part:
 
-- `…/claude-pack/repomix-output.md` — **drag this** into quote.ai / Claude project knowledge
+- `…/claude-pack/repomix-output.1.md`, `.2.md`, … — **drag all** into quote.ai / Claude project knowledge
 - `…/claude-pack/instructions.md` — optional
 
 ```bash
-node create-repomix.js              # curated ~1M tokens
-node create-repomix.js --split 2mb  # if upload size limit
+node create-repomix.js              # curated, ~2 MiB parts
+node create-repomix.js --split 1mb  # if a UI still rejects 2 MiB
 ```
 
 Regenerate after major pipeline or doc changes, or rely on the automatic **background** refresh at the end of every **`milestone.js`** ship (you do not wait for the pack). Packing is local (no API cost).
