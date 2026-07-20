@@ -277,6 +277,64 @@ window.dalRoomIdleState_ = {
   timeline: { lastTouch: 0, timer: null, ejecting: false }
 };
 
+window.dalPrepLastLeavePending_ = false;
+window.dalTlLastLeavePending_ = false;
+window.dalPrepLastLeaveSeq_ = 0;
+window.dalTlLastLeaveSeq_ = 0;
+window.dalPrepLeaveIntent_ = false;
+window.dalTlLeaveIntent_ = false;
+
+window.dalPresenceProjectId_ = function() {
+  if (typeof activePresenceProject !== 'undefined' && activePresenceProject) {
+    return String(activePresenceProject);
+  }
+  var el = document.getElementById('edit-folder-id');
+  return el && el.value && el.value !== 'NEW' ? String(el.value) : '';
+};
+
+/** Presence identity must match startPresencePing (ACTIVE_USER_NAME), not station host actor. */
+window.dalPresenceActor_ = function() {
+  return (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME)
+    : 'Unknown';
+};
+
+window.dalPresenceSubMode_ = function() {
+  var sub = window.activePresencePaMode || '';
+  if (window.IS_STATION_DEVICE) sub = sub ? (sub + '|station') : 'station';
+  return sub;
+};
+
+/** Start presence only if not already pinging this project (restart wipes occupants sync). */
+window.dalEnsurePresencePing_ = function(projectId) {
+  if (!projectId || typeof startPresencePing !== 'function') return;
+  if (typeof activePresenceProject !== 'undefined' && activePresenceProject &&
+      String(activePresenceProject) === String(projectId)) {
+    return;
+  }
+  startPresencePing(projectId);
+};
+
+/** Count peers still in a live module from a fresh presence payload. */
+window.dalCountFreshModulePeers_ = function(othersObj, moduleName) {
+  othersObj = othersObj || {};
+  var me = String(window.dalPresenceActor_() || '').toLowerCase();
+  var hosted = '';
+  if (typeof window.dalActorName_ === 'function') {
+    try { hosted = String(window.dalActorName_() || '').toLowerCase(); } catch (e0) { /* ignore */ }
+  }
+  var count = 0;
+  var list = [];
+  for (var name in othersObj) {
+    if (!othersObj[name] || othersObj[name].module !== moduleName) continue;
+    var n = String(name || '').toLowerCase();
+    if (n && (n === me || (hosted && n === hosted))) continue;
+    count++;
+    list.push({ name: name, mode: othersObj[name].subMode || 'design' });
+  }
+  return { count: count, list: list };
+};
+
 window.dalPrepIdleBlockedByStation_ = function() {
   if (window.IS_STATION_DEVICE) {
     if (typeof window.stationHostActive_ === 'function' && window.stationHostActive_()) return true;
@@ -420,20 +478,167 @@ window.dalBindForkIdleKeepOpenClicks_ = function() {
   }
 };
 
+/**
+ * Part B4 last-leave — do not trust the cached roster (up to ~45s stale).
+ * Ping self as `main` first, then commit only when no fresh peers remain in that module.
+ * null presence payload = lock miss (not an empty room).
+ */
 window.dalMaybeLastLeaveClosePrep_ = function() {
   if (!window.dalPrepUiOpen || window.dalPrepClosing || window.dalPrepOpeningUi_) return;
-  if ((window.paPrepOccupants || []).length > 0) return;
-  if (typeof window.closeDalPrepSession === 'function') {
-    window.closeDalPrepSession({ auto: true, reason: 'last-leave' });
-  }
+  if (window.dalPrepLastLeavePending_) return;
+  var projectId = window.dalPresenceProjectId_();
+  if (!projectId) return;
+
+  window.dalPrepLastLeavePending_ = true;
+  window.dalPrepLeaveIntent_ = true;
+  window.dalPrepLastLeaveSeq_ = (window.dalPrepLastLeaveSeq_ || 0) + 1;
+  var leaveSeq = window.dalPrepLastLeaveSeq_;
+  window.activePresenceModule = 'main';
+
+  var ensureLeftAssetsModule_ = function() {
+    try {
+      google.script.run.reportProjectPresence(
+        projectId,
+        window.dalPresenceActor_(),
+        'ping',
+        'main',
+        window.dalPresenceSubMode_()
+      );
+    } catch (eBump) { /* ignore */ }
+  };
+
+  var leaveStillWanted_ = function() {
+    return leaveSeq === window.dalPrepLastLeaveSeq_ && !!window.dalPrepLeaveIntent_;
+  };
+
+  var fallbackPresenceUnknown_ = function() {
+    if (!leaveStillWanted_()) {
+      window.dalPrepLastLeavePending_ = false;
+      return;
+    }
+    // Lock miss / RPC fail — do NOT guess-close, and do NOT clearLatch (keeps idle eject alive).
+    ensureLeftAssetsModule_();
+    if (typeof window.stopDalPaLiveSync_ === 'function') window.stopDalPaLiveSync_();
+    window.dalPrepLeaveIntent_ = false;
+    window.dalEnsurePresencePing_(projectId);
+  };
+
+  var decide_ = function(othersObj) {
+    window.dalPrepLastLeavePending_ = false;
+    if (!leaveStillWanted_()) return;
+    if (othersObj == null) {
+      fallbackPresenceUnknown_();
+      return;
+    }
+    var peers = window.dalCountFreshModulePeers_(othersObj, 'assets');
+    window.paPrepOccupants = peers.list;
+    if (peers.count > 0) {
+      // Real peer or presence ghost — detach live sync only. Keep dalPrepUiOpen so idle
+      // eject can still commit after ghosts expire (clearLatch would orphan the fork).
+      if (typeof window.stopDalPaLiveSync_ === 'function') window.stopDalPaLiveSync_();
+      window.dalPrepLeaveIntent_ = false;
+      window.dalEnsurePresencePing_(projectId);
+      return;
+    }
+    if (window.dalPrepClosing) return;
+    if (typeof window.closeDalPrepSession === 'function') {
+      window.closeDalPrepSession({ auto: true, reason: 'last-leave' });
+    }
+  };
+
+  google.script.run
+    .withFailureHandler(function() {
+      window.dalPrepLastLeavePending_ = false;
+      fallbackPresenceUnknown_();
+    })
+    .withSuccessHandler(decide_)
+    .reportProjectPresence(
+      projectId,
+      window.dalPresenceActor_(),
+      'ping',
+      'main',
+      window.dalPresenceSubMode_()
+    );
 };
 
 window.dalMaybeLastLeaveCloseTimeline_ = function() {
   if (!window.dalTimelineSessionOpen || window.dalTlClosingUi_ || window.dalTlOpeningUi_) return;
-  if ((window.timelineOccupants || []).length > 0) return;
-  if (typeof window.closeDalTimelineCollabSession === 'function') {
-    window.closeDalTimelineCollabSession({ auto: true, reason: 'last-leave' });
-  }
+  if (window.dalTlLastLeavePending_) return;
+  var projectId = window.dalPresenceProjectId_() ||
+    (typeof targetFolderId !== 'undefined' ? String(targetFolderId || '') : '');
+  if (!projectId) return;
+
+  window.dalTlLastLeavePending_ = true;
+  window.dalTlLeaveIntent_ = true;
+  window.dalTlLastLeaveSeq_ = (window.dalTlLastLeaveSeq_ || 0) + 1;
+  var leaveSeq = window.dalTlLastLeaveSeq_;
+  window.activePresenceModule = 'main';
+
+  var ensureLeftTimelineModule_ = function() {
+    try {
+      google.script.run.reportProjectPresence(
+        projectId,
+        window.dalPresenceActor_(),
+        'ping',
+        'main',
+        window.dalPresenceSubMode_()
+      );
+    } catch (eBump) { /* ignore */ }
+  };
+
+  var leaveStillWanted_ = function() {
+    return leaveSeq === window.dalTlLastLeaveSeq_ && !!window.dalTlLeaveIntent_;
+  };
+
+  var fallbackPresenceUnknown_ = function() {
+    if (!leaveStillWanted_()) {
+      window.dalTlLastLeavePending_ = false;
+      return;
+    }
+    // Lock miss / RPC fail — do NOT guess empty from stale local roster.
+    ensureLeftTimelineModule_();
+    if (typeof window.stopDalTimelineSessionWatcher === 'function') {
+      window.stopDalTimelineSessionWatcher();
+    }
+    window.dalEnsurePresencePing_(projectId);
+  };
+
+  var decide_ = function(othersObj) {
+    window.dalTlLastLeavePending_ = false;
+    if (!leaveStillWanted_()) return;
+    if (othersObj == null) {
+      fallbackPresenceUnknown_();
+      return;
+    }
+    var peers = window.dalCountFreshModulePeers_(othersObj, 'timeline');
+    window.timelineOccupants = peers.list.map(function(p) { return p.name; });
+    if (peers.count > 0) {
+      if (typeof window.stopDalTimelineSessionWatcher === 'function') {
+        window.stopDalTimelineSessionWatcher();
+      }
+      window.dalTlLeaveIntent_ = false;
+      window.dalEnsurePresencePing_(projectId);
+      return;
+    }
+    if (window.dalTlClosingUi_) return;
+    if (typeof window.closeDalTimelineCollabSession === 'function') {
+      window.closeDalTimelineCollabSession({ auto: true, reason: 'last-leave' });
+    }
+  };
+
+  google.script.run
+    .withFailureHandler(function() {
+      window.dalTlLastLeavePending_ = false;
+      fallbackPresenceUnknown_();
+    })
+    .withSuccessHandler(decide_)
+    .reportProjectPresence(
+      projectId,
+      window.dalPresenceActor_(),
+      'ping',
+      'main',
+      window.dalPresenceSubMode_()
+    );
 };
 
 /** Part B2 — hang threshold for Opening warm-up (45–60s band). */

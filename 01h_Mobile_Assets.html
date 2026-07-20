@@ -124,9 +124,9 @@ window.finishMobilePaClose = function(opts) {
         window.dalMaybeLastLeaveClosePrep_();
     }
     window.activePresenceModule = 'main';
-    // While last-leave/idle close runs, leave watcher lifecycle to closeDalPrepSession
-    // (it restarts after commit). Stopping here would race a second teardown and leave the tab blind.
-    if (!window.dalPrepClosing && typeof stopDalPaSessionWatcher === 'function') {
+    // While last-leave (async presence) or close runs, leave watcher to that path.
+    if (!window.dalPrepClosing && !window.dalPrepLastLeavePending_ &&
+        typeof stopDalPaSessionWatcher === 'function') {
         stopDalPaSessionWatcher({ clearLatch: true });
     }
     const overlay = document.getElementById('project-assets-modal-overlay');

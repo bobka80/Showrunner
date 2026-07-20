@@ -274,6 +274,11 @@ function startPresencePing(projectId) {
             if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
         })
         .withSuccessHandler(othersObj => {
+            // null = presence lock miss — keep last known roster (do not pretend room emptied).
+            if (othersObj == null) {
+              if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
+              return;
+            }
             window.isTimelineOccupiedBy = null;
             window.timelineOccupants = [];
             window.paPrepOccupants = [];

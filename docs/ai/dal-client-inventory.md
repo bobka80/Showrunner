@@ -48,7 +48,7 @@
 | `deleteProjectFull` | `02_Project_Editor_Core.html` |
 | `generateProjectFolders` | `02_Project_Editor_Core.html` |
 | `printEquipmentList` | `02_Project_Editor_Core.html` |
-| `reportProjectPresence` | `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html` |
+| `reportProjectPresence` | `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`, `07_Core_Globals.html` |
 | `restoreProjectWithConflictCheck` | `02_Project_Editor_Core.html` |
 | `saveEventFromUI` | `02_Project_Editor_Core.html` |
 | `setProjectStatus` | `02_Project_Editor_Core.html` |
@@ -228,7 +228,7 @@
 | 06f_Admin_Audit.html | 4 | 0 |
 | 06g_Admin_Database.html | 7 | 0 |
 | 06h_Admin_Station_Profiles.html | 3 | 0 |
-| 07_Core_Globals.html | 7 | 2 |
+| 07_Core_Globals.html | 8 | 2 |
 | 07b_Grid_Engine.html | 0 | 0 |
 | 07c_Generalization_Engine.html | 0 | 0 |
 | 07d_Cache_Coordinator.html | 0 | 0 |

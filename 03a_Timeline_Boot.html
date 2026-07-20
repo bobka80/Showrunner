@@ -191,6 +191,10 @@ function openShiftLayout(mode, isReadOnly = false) {
   }
   
   window.isTimelineDirty = false;
+  // User is back in timeline — cancel any in-flight last-leave from a prior close.
+  window.dalTlLeaveIntent_ = false;
+  window.dalTlLastLeaveSeq_ = (window.dalTlLastLeaveSeq_ || 0) + 1;
+  window.dalTlLastLeavePending_ = false;
   document.getElementById('shift-layer').style.display = 'flex';
   document.getElementById('tt-x-days').innerHTML = '';
   document.getElementById('tt-x-hours').innerHTML = '';
@@ -364,14 +368,18 @@ function cancelShifts() {
     window.dalMaybeLastLeaveCloseTimeline_();
   }
   document.getElementById('shift-layer').style.display = 'none';
-  if (typeof window.stopDalTimelineSessionWatcher === 'function') window.stopDalTimelineSessionWatcher();
+  // Keep watcher until async last-leave decides (or close owns it).
+  if (!window.dalTlLastLeavePending_ && !window.dalTlClosingUi_ &&
+      typeof window.stopDalTimelineSessionWatcher === 'function') {
+    window.stopDalTimelineSessionWatcher();
+  }
   
   window.activePresenceModule = 'main'; // Unlock the door
   window.isTimelineOccupiedBy = null;
   var leavePid = targetFolderId || (document.getElementById('edit-folder-id') && document.getElementById('edit-folder-id').value);
   var leaveUser = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown';
-  // Explicit leave clears a stuck "timeline" module if prior pings lost the ScriptLock.
-  if (leavePid) {
+  // Explicit leave — skip when last-leave pending (that path already pinged main).
+  if (leavePid && !window.dalTlLastLeavePending_) {
     try { google.script.run.reportProjectPresence(leavePid, leaveUser, 'leave'); } catch (eLeave) {}
     if (typeof startPresencePing === 'function') startPresencePing(leavePid);
   }

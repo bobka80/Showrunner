@@ -791,9 +791,10 @@ function reportProjectPresence(projectId, userName, action, activeModule, subMod
             lock.releaseLock();
         }
     }
-    return {};
+    // Lock miss — must not look like "nobody else here" (empty {}).
+    return null;
   } catch (e) {
-    return {};
+    return null;
   }
 }
 
