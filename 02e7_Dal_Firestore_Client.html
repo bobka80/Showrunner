@@ -2097,6 +2097,7 @@ window.startDalPaSessionWatcher = function(projectId) {
           prepStatus: 'open'
         };
         if (!window.dalPrepUiOpen && typeof dalApplyDalPrepUiState_ === 'function') {
+          if (typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) return;
           dalApplyDalPrepUiState_(true, projectId, {
             invalidateCache: true,
             fromMeta: true,

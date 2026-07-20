@@ -24,6 +24,8 @@
   <meta name="pending-mobile-scan-b64" content="<?= typeof pendingMobileScanB64 !== 'undefined' ? pendingMobileScanB64 : '' ?>">
   <meta name="station-device" content="<?= typeof isStationDevice !== 'undefined' ? isStationDevice : '0' ?>">
   <meta name="station-device-layout" content="<?= typeof stationDeviceLayout !== 'undefined' ? stationDeviceLayout : '' ?>">
+  <meta name="is-freelancer" content="<?= typeof isFreelancer !== 'undefined' ? isFreelancer : '0' ?>">
+  <meta name="tunneling-active" content="<?= typeof tunnelingActive !== 'undefined' ? tunnelingActive : '0' ?>">
   <script>
   (function() {
     var SESSION_MS = 30 * 24 * 60 * 60 * 1000;
@@ -519,6 +521,8 @@
   const IS_STATION_DEVICE = window.stationEnsureDeviceMode_();
   const STATION_DEVICE_LAYOUT = (document.querySelector('meta[name="station-device-layout"]') || {}).content || 'chainway_handheld';
   window.STATION_DEVICE_LAYOUT = STATION_DEVICE_LAYOUT;
+  window.IS_FREELANCER = ((document.querySelector('meta[name="is-freelancer"]') || {}).content || '0') === '1';
+  window.IS_TUNNELING = ((document.querySelector('meta[name="tunneling-active"]') || {}).content || '0') === '1';
   window.ACTIVE_USER_UID = ACTIVE_USER_UID;
   window.ACTIVE_USER_EMAIL = ACTIVE_USER_EMAIL;
   

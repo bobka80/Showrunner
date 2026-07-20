@@ -341,6 +341,9 @@ function openShiftLayout(mode, isReadOnly = false) {
           if (typeof window.startDalTimelineSessionWatcher === 'function') {
             window.startDalTimelineSessionWatcher(targetFolderId);
           }
+          if (typeof window.maybeAutoOpenDalTimeline_ === 'function') {
+            window.maybeAutoOpenDalTimeline_();
+          }
           
       } catch (err) {
           document.getElementById('tt-rows-container').innerHTML = `<div style="color:#ef4444; padding:20px; font-weight:bold;">Client Error: ${err.message}</div>`;

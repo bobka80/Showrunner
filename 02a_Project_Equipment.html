@@ -201,7 +201,14 @@ window.evalDalPrepButtons = function() {
     var startBtn = document.getElementById('dal-prep-start-btn');
     var endBtn = document.getElementById('dal-prep-end-btn');
     if (!startBtn && !endBtn) return;
-    if (window.projectAssetsReadOnly || (typeof canOpenDalPrep === 'function' && !canOpenDalPrep())) {
+    // Use dalCanShowPrepButtons (station-host aware) — do not hide END solely via canOpenDalPrep.
+    if (typeof window.dalCanShowPrepButtons === 'function') {
+        if (!window.dalCanShowPrepButtons()) {
+            if (startBtn) startBtn.style.display = 'none';
+            if (endBtn) endBtn.style.display = 'none';
+            return;
+        }
+    } else if (window.projectAssetsReadOnly || (typeof canOpenDalPrep === 'function' && !canOpenDalPrep())) {
         if (startBtn) startBtn.style.display = 'none';
         if (endBtn) endBtn.style.display = 'none';
         return;
@@ -317,6 +324,7 @@ function openProjectAssetsModal() {
     if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
     document.getElementById('project-assets-modal-overlay').style.display = 'flex';
     if (typeof applyProjectAssetsReadOnly === 'function') applyProjectAssetsReadOnly(assetsReadOnly);
+    if (typeof window.maybeAutoOpenDalPrep_ === 'function') window.maybeAutoOpenDalPrep_();
     
     if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
         try {

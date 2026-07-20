@@ -1376,6 +1376,10 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
   var banner = document.getElementById('dal-timeline-session-banner');
   var startBtn = document.getElementById('dal-timeline-start-btn');
   var endBtn = document.getElementById('dal-timeline-end-btn');
+  if (typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) {
+    isOpen = false;
+    isOpening = false;
+  }
   window.dalTimelineSessionOpen = !!isOpen;
   window.dalTlOpeningUi_ = !!isOpening && !isOpen;
 
@@ -1387,8 +1391,10 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
     window.dalUpdateTimelineLiveBanner_();
   }
   if (startBtn) {
-    startBtn.style.display = (isOpen || isOpening || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly))
-      ? 'none' : 'inline-flex';
+    var mayManual = typeof window.dalMayManualStartFork_ === 'function'
+      ? window.dalMayManualStartFork_('timeline')
+      : !(typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly);
+    startBtn.style.display = (isOpen || isOpening || !mayManual) ? 'none' : 'inline-flex';
   }
   if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
 
@@ -1583,6 +1589,10 @@ window.stopDalTimelineSessionWatcher = function() {
 };
 
 window.dalHandleTimelineSessionInfo_ = function(info) {
+  if (typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) {
+    window.dalApplyTimelineSessionUi_(false, false);
+    return;
+  }
   var tl = window.dalTimelineInfoFromSession_(info);
   var st = tl ? String(tl.status).toLowerCase() : '';
   var isOpen = st === 'open';

@@ -7,7 +7,7 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Part B in progress** — director OK go 2026-07-20. **Next slice: B0** try/revert baseline. Part A complete @ v678. Middle archived. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.  
+**Opened:** 2026-07-18 · **Status:** **Part B in progress** — **B0 @ v693** · **B1 shipping**. **Next after B1: B2** opening warm-up. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
 **Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
@@ -214,10 +214,10 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 ### B0 — Try / revert baseline (mandatory)
 
-- [ ] `node milestone.js "AUTO-FORK TRY BASELINE — revert here if floor dislikes"`  
-- [ ] Record GAS version here: **v____** ← fill at B0  
+- [x] `node milestone.js "AUTO-FORK TRY BASELINE — revert here if floor dislikes"`  
+- [x] Record GAS version here: **v693** ← B0 2026-07-20  
 - [ ] Implement behavior **and** redesigned visual cues in **same** later milestone(s)  
-- [ ] Floor dislike → **"Rollback production to v____"** (B0 version)
+- [ ] Floor dislike → **"Rollback production to v693"** (B0 version)
 
 ### B1 — Who may start (surface × domain)
 
@@ -226,8 +226,10 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | Timeline | Auto-start if **timeline edit** creds | Join only | Never starts timeline |
 | PA / prep | Auto-start if **PA/prep** creds | **Button only** (never auto) | **Always** start or join |
 
-- [ ] Freelancers: **never** start, join, pull-in, or see live fork UI  
-- [ ] Join if already open = no second snapshot  
+- [x] Freelancers: **never** start, join, pull-in, or see live fork UI  
+- [x] Join if already open = no second snapshot (server `joined` path unchanged)  
+- [x] Client surface helper + auto-start hooks (desktop TL/PA, station PA)  
+- [x] Auth exposes `isFreelancer` / tunneling to client; server rejects excluded actors on begin  
 
 ### B2 — Opening warm-up
 
@@ -318,6 +320,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | Middle campaign named: **error reports + journal**. Part B waits. |
 | 2026-07-20 | Middle build archived → [../archive/user-error-reporting-journal-2026-07-19.md](../archive/user-error-reporting-journal-2026-07-19.md). **NEXT = Part B.** Bug log moved to [../error-journal/](../error-journal/) (not a campaign). |
 | 2026-07-20 | **Part B OK go** — next = **B0** AUTO-FORK TRY BASELINE milestone, then B1 who-may-start. |
+| 2026-07-20 | **B0 shipped @ GAS v693:** AUTO-FORK TRY BASELINE. Floor dislike → rollback to **v693**. **Next: B1** who may start. |
 
 ---
 

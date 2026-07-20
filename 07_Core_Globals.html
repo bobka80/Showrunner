@@ -107,6 +107,106 @@ window.canOpenDalPrep = function() {
   return typeof userHasPerm === 'function' && userHasPerm('view_logistics');
 };
 
+/** Part B — freelancer/tunneling never see live forks (Sheets path only). */
+window.dalIsLiveForkExcluded_ = function() {
+  if (window.IS_FREELANCER || window.IS_TUNNELING) return true;
+  // Station page-load flags are the device login — use the hosted crew member's flags.
+  if (window.IS_STATION_DEVICE && typeof window.stationHostActive_ === 'function'
+      && window.stationHostActive_() && window.stationHostSession) {
+    var h = window.stationHostSession;
+    if (h.isFreelancer || h.tunneling) return true;
+  }
+  return false;
+};
+
+/**
+ * Part B surface: station | phone (incl. tablet) | desktop.
+ * Tablets follow phone rules (PA button-only; timeline join-only).
+ */
+window.dalSessionSurface_ = function() {
+  if (window.IS_STATION_DEVICE) return 'station';
+  try {
+    if (typeof isMobileViewport === 'function' && isMobileViewport()) return 'phone';
+  } catch (e0) { /* ignore */ }
+  try {
+    var ua = navigator.userAgent || '';
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return 'phone';
+    if (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) return 'phone';
+  } catch (e1) { /* ignore */ }
+  return 'desktop';
+};
+
+/** Manual START button allowed (creds ∩ surface ∩ not freelancer). */
+window.dalMayManualStartFork_ = function(domain) {
+  if (window.dalIsLiveForkExcluded_()) return false;
+  var surface = window.dalSessionSurface_();
+  var d = String(domain || '');
+  if (d === 'timeline' || d === 'timelineCollab') {
+    if (surface !== 'desktop') return false;
+    if (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly) return false;
+    return typeof canDrawPhases === 'function' && canDrawPhases();
+  }
+  if (d === 'prep') {
+    if (surface === 'station') {
+      if (typeof window.stationHostActive_ === 'function' && window.stationHostActive_()) return true;
+      return typeof canOpenDalPrep === 'function' && canOpenDalPrep();
+    }
+    return typeof canOpenDalPrep === 'function' && canOpenDalPrep();
+  }
+  return false;
+};
+
+/** Auto-start when entering the view (never phone PA; never phone/station timeline). */
+window.dalMayAutoStartFork_ = function(domain) {
+  if (!window.dalMayManualStartFork_(domain)) return false;
+  var surface = window.dalSessionSurface_();
+  var d = String(domain || '');
+  if (d === 'timeline' || d === 'timelineCollab') return surface === 'desktop';
+  if (d === 'prep') return surface === 'desktop' || surface === 'station';
+  return false;
+};
+
+/** Soft-join / pull-in latch allowed (not freelancer). */
+window.dalMayJoinLiveFork_ = function() {
+  return !window.dalIsLiveForkExcluded_();
+};
+
+window.maybeAutoOpenDalPrep_ = function() {
+  if (!window.dalMayAutoStartFork_('prep')) return;
+  if (window.dalPrepUiOpen || window.dalPrepLatched) return;
+  if (window.dalPrepAutoStartPending_) return;
+  var projectId = document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '';
+  if (!projectId || projectId === 'NEW') return;
+  window.dalPrepAutoStartPending_ = true;
+  setTimeout(function() {
+    window.dalPrepAutoStartPending_ = false;
+    if (window.dalPrepUiOpen || window.dalPrepLatched) return;
+    if (!window.dalMayAutoStartFork_('prep')) return;
+    if (typeof window.openDalPrepSession === 'function') {
+      window.openDalPrepSession({ auto: true });
+    }
+  }, 400);
+};
+
+window.maybeAutoOpenDalTimeline_ = function() {
+  if (!window.dalMayAutoStartFork_('timeline')) return;
+  if (window.dalTimelineSessionOpen || window.dalTlOpeningUi_) return;
+  if (window.dalTlAutoStartPending_) return;
+  var projectId = document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '';
+  if (!projectId || projectId === 'NEW') return;
+  window.dalTlAutoStartPending_ = true;
+  setTimeout(function() {
+    window.dalTlAutoStartPending_ = false;
+    if (window.dalTimelineSessionOpen || window.dalTlOpeningUi_) return;
+    if (!window.dalMayAutoStartFork_('timeline')) return;
+    if (typeof window.openDalTimelineCollabSession === 'function') {
+      window.openDalTimelineCollabSession({ auto: true });
+    }
+  }, 400);
+};
+
 /**
  * Actor to send with asset-operation / project-assets writes. On a station device the web app runs
  * as the low-tier DEVICE account, so passing ACTIVE_USER_NAME makes the backend deny edits. While a

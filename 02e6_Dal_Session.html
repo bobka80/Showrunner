@@ -161,6 +161,10 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   var banner = document.getElementById('dal-session-banner');
   var startBtn = document.getElementById('dal-prep-start-btn');
   var endBtn = document.getElementById('dal-prep-end-btn');
+  // Freelancers never latch onto live fork UI (stay Sheets-normal).
+  if (isPrepOpen && opts.fromMeta && typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) {
+    isPrepOpen = false;
+  }
   var canShow = window.dalCanShowPrepButtons();
   isPrepOpen = !!isPrepOpen;
 
@@ -210,7 +214,12 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
     window.dalUpdateRemotePendingBanner_();
   }
-  if (startBtn) startBtn.style.display = isPrepOpen ? 'none' : 'inline-flex';
+  if (startBtn) {
+    var mayManual = typeof window.dalMayManualStartFork_ === 'function'
+      ? window.dalMayManualStartFork_('prep')
+      : canShow;
+    startBtn.style.display = (!isPrepOpen && mayManual) ? 'inline-flex' : 'none';
+  }
   if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
 
   if (isPrepOpen && projectId) {
@@ -246,7 +255,13 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
 };
 
 window.dalCanShowPrepButtons = function() {
-  if (typeof canOpenDalPrep === 'function' && !canOpenDalPrep()) return false;
+  if (typeof window.dalIsLiveForkExcluded_ === 'function' && window.dalIsLiveForkExcluded_()) return false;
+  if (typeof canOpenDalPrep === 'function' && !canOpenDalPrep()) {
+    // Station host can still END/START via hosted actor even if device role lacks view_logistics.
+    if (!(window.IS_STATION_DEVICE && typeof window.stationHostActive_ === 'function' && window.stationHostActive_())) {
+      return false;
+    }
+  }
   if (window.projectAssetsReadOnly) return false;
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
   return !!(projectId && projectId !== 'NEW');
@@ -298,10 +313,19 @@ function dalPrepErrMsg_(err) {
   return msg;
 }
 
-window.openDalPrepSession = function() {
+window.openDalPrepSession = function(opts) {
+  opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
   if (!projectId || projectId === 'NEW') return alert('Save the project first.');
-  if (!confirm('Start preparation? Equipment saves fork to Firebase until End Prep.')) return;
+  if (typeof window.dalIsLiveForkExcluded_ === 'function' && window.dalIsLiveForkExcluded_()) {
+    return alert('Live preparation is not available for freelancer accounts.');
+  }
+  if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('prep')) {
+    return alert('You cannot start preparation on this device.');
+  }
+  if (!opts.auto) {
+    if (!confirm('Start preparation? Equipment saves fork to Firebase until End Prep.')) return;
+  }
   window.dalPrepClosing = false;
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
@@ -326,7 +350,7 @@ window.openDalPrepSession = function() {
       window.dalPrepIgnoreOpenUntil = 0;
       window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
       if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
-      alert('Preparation started.');
+      if (!opts.auto) alert('Preparation started.');
     })
     .openDalSession(projectId, 'prep', typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));
 };

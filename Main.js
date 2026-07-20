@@ -263,6 +263,8 @@ function renderIndexForAuth_(authResult, sessionToken, pendingScan) {
   template.sessionToken = sessionToken || '';
   template.isStationDevice = authResult.isStationDevice ? '1' : '0';
   template.stationDeviceLayout = authResult.stationDeviceLayout || '';
+  template.isFreelancer = authResult.isFreelancer ? '1' : '0';
+  template.tunnelingActive = authResult.tunnelingActive ? '1' : '0';
   const scanRaw = String(pendingScan || '').trim();
   template.pendingMobileScanB64 = scanRaw ? Utilities.base64Encode(scanRaw) : '';
   return template.evaluate()

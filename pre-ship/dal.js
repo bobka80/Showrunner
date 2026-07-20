@@ -18,6 +18,8 @@ const DAL_HOT_PATTERNS = [
   /^02c_Project_Operations/i,
   /^03a_Timeline/i,
   /^docs\/ai\/active\/dal-/i,
+  /^docs\/ai\/archive\/dal-/i,
+  /^docs\/ai\/dal-client-inventory\.md$/i,
 ];
 
 function norm(p) {

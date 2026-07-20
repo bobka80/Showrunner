@@ -508,7 +508,9 @@ function buildCrewHostRosterFromSheets_(sheets) {
       rfidTag: epc,
       rfidTid: tid,
       access: rbac.access || 'CREW',
-      permissions: rbac.permissions || {}
+      permissions: rbac.permissions || {},
+      isFreelancer: !!rbac.isFreelancer,
+      tunneling: !!rbac.tunneling
     });
   }
   return roster;
@@ -1196,7 +1198,7 @@ function recordStationAssetRfid(deviceActor, hostName, assetId, rfidTag, force) 
  * host (they're rejected upstream), so this is always a real person.
  */
 function resolveHostRbacBundle_(crewName, crewData, cMap) {
-  const fallback = { access: 'CREW', permissions: {} };
+  const fallback = { access: 'CREW', permissions: {}, isFreelancer: false, tunneling: false };
   try {
     const sheets = verifyVaultSchema(true);
     const roleData = getSheetData(sheets.roles);
@@ -1207,7 +1209,30 @@ function resolveHostRbacBundle_(crewName, crewData, cMap) {
     const permissions = (typeof resolveCrewPermissionBundle === 'function')
       ? (resolveCrewPermissionBundle(crewName, crewData, roleData, cMap, rMap) || {})
       : {};
-    return { access: access, permissions: permissions };
+    // Live-fork exclude flags for the hosted person (not the device login).
+    let isFreelancer = false;
+    let tunneling = false;
+    let roleId = '';
+    const want = String(crewName || '').toLowerCase().trim();
+    for (let i = 1; i < crewData.length; i++) {
+      const nm = crewData[i][cMap['Name']] ? crewData[i][cMap['Name']].toString().toLowerCase().trim() : '';
+      if (nm !== want) continue;
+      if (cMap['IsFreelancer'] !== undefined) {
+        isFreelancer = isTruthyCell(crewData[i][cMap['IsFreelancer']]);
+      }
+      roleId = cMap['Role_ID'] !== undefined && crewData[i][cMap['Role_ID']]
+        ? crewData[i][cMap['Role_ID']].toString().trim() : '';
+      break;
+    }
+    if (roleId && rMap['Is_Tunneling'] !== undefined) {
+      for (let r = 1; r < roleData.length; r++) {
+        if (typeof crewRoleRefMatchesRow === 'function' && crewRoleRefMatchesRow(roleId, roleData[r], rMap)) {
+          tunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
+          break;
+        }
+      }
+    }
+    return { access: access, permissions: permissions, isFreelancer: isFreelancer, tunneling: tunneling };
   } catch (e) {
     return fallback;
   }
@@ -1258,7 +1283,9 @@ function processStationRfidScan(deviceActor, rfidTag, options) {
           rfidTag: crew.rfidTag,
           rfidTid: crew.rfidTid || '',
           access: rbac.access,
-          permissions: rbac.permissions
+          permissions: rbac.permissions,
+          isFreelancer: !!rbac.isFreelancer,
+          tunneling: !!rbac.tunneling
         }
       };
     }

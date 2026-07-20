@@ -136,10 +136,19 @@ function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
     .finishDalSession(projectId, sessionUid, actor);
 }
 
-window.openDalTimelineCollabSession = function() {
+window.openDalTimelineCollabSession = function(opts) {
+  opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
   if (!projectId || projectId === 'NEW') return alert('Save the project first.');
-  if (!confirm('Start timeline collaboration? Timeline saves fork to Firebase until End Collab.')) return;
+  if (typeof window.dalIsLiveForkExcluded_ === 'function' && window.dalIsLiveForkExcluded_()) {
+    return alert('Live timeline collaboration is not available for freelancer accounts.');
+  }
+  if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('timeline')) {
+    return alert('You cannot start timeline collaboration on this device.');
+  }
+  if (!opts.auto) {
+    if (!confirm('Start timeline collaboration? Timeline saves fork to Firebase until End Collab.')) return;
+  }
   var layer = document.getElementById('shift-layer');
   if (layer) layer.style.cursor = 'wait';
   var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';

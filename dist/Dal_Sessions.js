@@ -331,6 +331,7 @@ function dalReclaimStaleDomainSession_(indexSheet, row, sessionType) {
 }
 
 function dalAssertCanOpenSessionType_(sessionType, actor) {
+  dalAssertNotLiveForkExcluded_(actor);
   if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
     assertActorCanEditTimeline(actor);
   } else if (sessionType === DAL_SESSION_TYPE.PREP) {
@@ -340,6 +341,16 @@ function dalAssertCanOpenSessionType_(sessionType, actor) {
   }
   if (!dalFirestoreIsConfigured_()) {
     throw new Error('Firebase service account not configured — cannot open session.');
+  }
+}
+
+/** Freelancer / tunneling crew stay on Sheets — never open or join live forks. */
+function dalAssertNotLiveForkExcluded_(actor) {
+  if (typeof getUserSecurityProfile !== 'function') return;
+  var profile = getUserSecurityProfile(actor);
+  if (!profile) return;
+  if (profile.isFreelancer || profile.tunneling) {
+    throw new Error('Live collaboration is not available for freelancer accounts.');
   }
 }
 
