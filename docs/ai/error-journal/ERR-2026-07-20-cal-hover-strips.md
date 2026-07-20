@@ -1,7 +1,7 @@
 # ERR-2026-07-20 — Calendar hover phase strips vanish after prep/timeline
 
 **Kind:** `single`  
-**State:** `Open`  
+**State:** `Open` → shipping fix  
 **Day:** [days/error-day-2026-07-20.md](days/error-day-2026-07-20.md) · item `E2026-07-20-B`
 
 ---
@@ -27,9 +27,8 @@ Main calendar event **hover snapshots** (colored phase strips inside the event b
 ## Notes
 
 - Not a multi-user race (single reporter, sync idle at freeze).  
-- Strong link to `calRepaintForkDots_` / fork clear+poll after END PREP / END COLLAB (v698–v704 era).  
-- Strips painted in `eventDidMount` only; `eventContent` ships empty `.bars-wrapper`.  
-- **Director 2026-07-20:** Likely when **Firebase fails to commit to Google Apps Script** on fork close (not necessarily every leave). Tie to commit fail-safe B (v711–v712) close/restore path + calendar refresh.
+- Root cause: `calRepaintForkDots_` → `setExtendedProp` rebuilds rollup `eventContent` with empty `.bars-wrapper`; `eventDidMount` does not re-fire. Triggered on END PREP / END COLLAB (including Firebase→GAS commit-fail close cleanup).  
+- Fix: shared `calPaintRollupPhaseBars_` + `calRepaintVisiblePhaseBars_` after fork-dot rebuild.
 
 ---
 
@@ -37,7 +36,7 @@ Main calendar event **hover snapshots** (colored phase strips inside the event b
 
 | Field | Value |
 |-------|--------|
-| Fixed_In_GAS | — |
+| Fixed_In_GAS | *(pending milestone)* |
 | Came_back | — |
 
 ---

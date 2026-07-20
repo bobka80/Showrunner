@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           return { html: `
-            <div class="event-custom-frame" style="--event-border-color: ${borderVar}; --bg-hex: ${bgHex}; --text-col: ${textCol}; position: relative; width: 100%; height: var(--cal-event-height, 42px); border-radius: 4px; overflow: hidden; cursor: pointer; box-sizing: border-box;">
+            <div class="event-custom-frame" data-cal-event-id="${arg.event.id}" style="--event-border-color: ${borderVar}; --bg-hex: ${bgHex}; --text-col: ${textCol}; position: relative; width: 100%; height: var(--cal-event-height, 42px); border-radius: 4px; overflow: hidden; cursor: pointer; box-sizing: border-box;">
                
                <div class="solid-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${borderVar}; z-index:0;"></div>
                <div class="hover-bg" style="position:absolute; top:0; left:0; width:100%; height:100%; background: ${bgHex}; z-index:0;"></div>
@@ -226,117 +226,10 @@ document.addEventListener('DOMContentLoaded', function() {
       
       eventDidMount: function(info) {
         if (info.event.extendedProps.isRollup && info.view.type === 'dayGridMonth') {
-           requestAnimationFrame(() => {
-           try {
-               let row = info.el.closest('tr, .fc-daygrid-row');
-               if (!row) return; 
-               
-               let days = Array.from(row.querySelectorAll('[data-date]'));
-               if (days.length === 0 && row.previousElementSibling) {
-                   days = Array.from(row.previousElementSibling.querySelectorAll('[data-date]'));
-               }
-               if (days.length === 0) return;
-
-               const parseD = (str) => {
-                   if (!str) return null;
-                   let cleanStr = typeof str === 'string' ? str.split('T')[0] : String(str).split('T')[0];
-                   let pts = cleanStr.split('-');
-                   if (pts.length === 3) {
-                       let d = new Date(Date.UTC(pts[0], pts[1]-1, pts[2]));
-                       if (!isNaN(d.getTime())) return d;
-                   }
-                   let fallback = new Date(cleanStr);
-                   if (!isNaN(fallback.getTime())) return fallback;
-                   return null;
-               };
-
-               let pFirst = parseD(days[0].getAttribute('data-date'));
-               let pLast = parseD(days[days.length - 1].getAttribute('data-date'));
-               if (!pFirst || !pLast) return;
-
-               let rowStartEpoch = pFirst.getTime();
-               let rowEndEpoch = pLast.getTime();
-
-               let minD = parseD(info.event.startStr);
-               if (!minD) return;
-               let minEpoch = minD.getTime(); 
-               
-               let maxEpoch = minEpoch;
-               if (info.event.endStr) {
-                   let maxD = parseD(info.event.endStr);
-                   if (maxD) maxEpoch = maxD.getTime() - 86400000;
-               }
-
-               let segStartEpoch = Math.max(minEpoch, rowStartEpoch);
-               let segEndEpoch = Math.min(maxEpoch, rowEndEpoch);
-               if (segStartEpoch > segEndEpoch) return;
-               
-               let segTotalDays = Math.round((segEndEpoch - segStartEpoch) / 86400000) + 1;
-               if (segTotalDays <= 0) segTotalDays = 1;
-
-               const getPct = (dStartStr, dEndStr, sHr, eHr) => {
-                   let phaseStartD = parseD(dStartStr);
-                   if (!phaseStartD) return null;
-                   
-                   let phaseStart = phaseStartD.getTime() + (sHr * 3600000);
-                   let phaseEnd = phaseStartD.getTime() + (eHr * 3600000);
-                   if (dEndStr) {
-                       let phaseEndD = parseD(dEndStr);
-                       if (phaseEndD) phaseEnd = phaseEndD.getTime() - 86400000 + (eHr * 3600000);
-                   }
-                   
-                   if (phaseEnd <= segStartEpoch || phaseStart >= segEndEpoch + 86400000) return null;
-                   
-                   let visibleStart = Math.max(phaseStart, segStartEpoch);
-                   let visibleEnd = Math.min(phaseEnd, segEndEpoch + 86400000);
-                   
-                   let totalMs = (segTotalDays * 86400000);
-                   let leftPct = Math.max(0, ((visibleStart - segStartEpoch) / totalMs) * 100);
-                   let widthPct = Math.min(100 - leftPct, ((visibleEnd - visibleStart) / totalMs) * 100);
-                   
-                   return { left: leftPct, width: widthPct };
-               };
-
-               let p = info.event.extendedProps.phases;
-               if (!Array.isArray(p)) return;
-               
-               let mainC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['main'] ? PAINT_COLORS['main'].color : '#3b82f6';
-               let whC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['wh'] ? PAINT_COLORS['wh'].color : '#f97316';
-               let showC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['show'] ? PAINT_COLORS['show'].color : '#10b981';
-               let recoveryC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['recovery'] ? PAINT_COLORS['recovery'].color : '#a855f7';
-               let transitC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['transit'] ? PAINT_COLORS['transit'].color : '#06b6d4';
-               
-               let rawDbStatus = String(info.event.extendedProps.rawDbData.status || 'Draft').toUpperCase();
-               if (rawDbStatus === 'CANCELLED') {
-                   mainC = '#3f3f46';
-                   whC = '#27272a';
-                   showC = '#18181b';
-                   recoveryC = '#18181b';
-                   transitC = '#18181b';
-               }
-
-               let html = '';
-               p.forEach(block => {
-                   let pct = getPct(block.start, block.end, block.sHr, block.eHr);
-                   if (pct) {
-                       let bgHex = block.type === 'wh' ? whC : block.type === 'main' ? mainC : block.type === 'show' ? showC : block.type === 'transit' ? transitC : recoveryC;
-                       let top = '0', height = '20%';
-                       if (block.type === 'wh') { top = '0'; height = '20%'; }
-                       else if (block.type === 'transit') { top = '20%'; height = '20%'; }
-                       else if (block.type === 'main') { top = '40%'; height = '20%'; }
-                       else if (block.type === 'show') { top = '60%'; height = '20%'; }
-                       else if (block.type === 'recovery') { top = '80%'; height = '20%'; }
-                       
-                       html += `<div style="position: absolute; left: ${pct.left}%; width: ${pct.width}%; top: ${top}; height: ${height}; background: ${bgHex}; border-radius: 1px; z-index: 1;"></div>`;
-                   }
-               });
-
-               let wrapper = info.el.querySelector('.bars-wrapper');
-               if (wrapper) wrapper.innerHTML = html;
-               
-           } catch (err) {
-               console.error("DOM Rendering Blocked:", err);
-           }
+           requestAnimationFrame(function() {
+             if (typeof window.calPaintRollupPhaseBars_ === 'function') {
+               window.calPaintRollupPhaseBars_(info.el, info.event, info.view);
+             }
            });
         }
       },
@@ -740,6 +633,155 @@ window.calForkFlagsSig_ = '';
 window.calForkFlagsReady_ = false; // after first map, missing id = no dots (do not fall back to stale rawDbData)
 window.calForkFlagsPollInFlight_ = false;
 
+/**
+ * Fill .bars-wrapper phase strips for a month-view rollup event.
+ * Needs live DOM row geometry — not safe inside eventContent alone.
+ */
+window.calPaintRollupPhaseBars_ = function(el, event, view) {
+  if (!el || !event || !event.extendedProps || !event.extendedProps.isRollup) return;
+  var viewType = (view && view.type) || '';
+  if (!viewType && typeof calendar !== 'undefined' && calendar && calendar.view) {
+    viewType = calendar.view.type || '';
+  }
+  if (viewType && viewType !== 'dayGridMonth') return;
+  try {
+    var row = el.closest('tr, .fc-daygrid-row');
+    if (!row) return;
+
+    var days = Array.from(row.querySelectorAll('[data-date]'));
+    if (days.length === 0 && row.previousElementSibling) {
+      days = Array.from(row.previousElementSibling.querySelectorAll('[data-date]'));
+    }
+    if (days.length === 0) return;
+
+    var parseD = function(str) {
+      if (!str) return null;
+      var cleanStr = typeof str === 'string' ? str.split('T')[0] : String(str).split('T')[0];
+      var pts = cleanStr.split('-');
+      if (pts.length === 3) {
+        var d = new Date(Date.UTC(pts[0], pts[1] - 1, pts[2]));
+        if (!isNaN(d.getTime())) return d;
+      }
+      var fallback = new Date(cleanStr);
+      if (!isNaN(fallback.getTime())) return fallback;
+      return null;
+    };
+
+    var pFirst = parseD(days[0].getAttribute('data-date'));
+    var pLast = parseD(days[days.length - 1].getAttribute('data-date'));
+    if (!pFirst || !pLast) return;
+
+    var rowStartEpoch = pFirst.getTime();
+    var rowEndEpoch = pLast.getTime();
+
+    var minD = parseD(event.startStr);
+    if (!minD) return;
+    var minEpoch = minD.getTime();
+
+    var maxEpoch = minEpoch;
+    if (event.endStr) {
+      var maxD = parseD(event.endStr);
+      if (maxD) maxEpoch = maxD.getTime() - 86400000;
+    }
+
+    var segStartEpoch = Math.max(minEpoch, rowStartEpoch);
+    var segEndEpoch = Math.min(maxEpoch, rowEndEpoch);
+    if (segStartEpoch > segEndEpoch) return;
+
+    var segTotalDays = Math.round((segEndEpoch - segStartEpoch) / 86400000) + 1;
+    if (segTotalDays <= 0) segTotalDays = 1;
+
+    var getPct = function(dStartStr, dEndStr, sHr, eHr) {
+      var phaseStartD = parseD(dStartStr);
+      if (!phaseStartD) return null;
+
+      var phaseStart = phaseStartD.getTime() + (sHr * 3600000);
+      var phaseEnd = phaseStartD.getTime() + (eHr * 3600000);
+      if (dEndStr) {
+        var phaseEndD = parseD(dEndStr);
+        if (phaseEndD) phaseEnd = phaseEndD.getTime() - 86400000 + (eHr * 3600000);
+      }
+
+      if (phaseEnd <= segStartEpoch || phaseStart >= segEndEpoch + 86400000) return null;
+
+      var visibleStart = Math.max(phaseStart, segStartEpoch);
+      var visibleEnd = Math.min(phaseEnd, segEndEpoch + 86400000);
+
+      var totalMs = (segTotalDays * 86400000);
+      var leftPct = Math.max(0, ((visibleStart - segStartEpoch) / totalMs) * 100);
+      var widthPct = Math.min(100 - leftPct, ((visibleEnd - visibleStart) / totalMs) * 100);
+
+      return { left: leftPct, width: widthPct };
+    };
+
+    var p = event.extendedProps.phases;
+    if (!Array.isArray(p)) return;
+
+    var mainC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['main'] ? PAINT_COLORS['main'].color : '#3b82f6';
+    var whC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['wh'] ? PAINT_COLORS['wh'].color : '#f97316';
+    var showC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['show'] ? PAINT_COLORS['show'].color : '#10b981';
+    var recoveryC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['recovery'] ? PAINT_COLORS['recovery'].color : '#a855f7';
+    var transitC = typeof PAINT_COLORS !== 'undefined' && PAINT_COLORS['transit'] ? PAINT_COLORS['transit'].color : '#06b6d4';
+
+    var rawDb = event.extendedProps.rawDbData || {};
+    var rawDbStatus = String(rawDb.status || 'Draft').toUpperCase();
+    if (rawDbStatus === 'CANCELLED') {
+      mainC = '#3f3f46';
+      whC = '#27272a';
+      showC = '#18181b';
+      recoveryC = '#18181b';
+      transitC = '#18181b';
+    }
+
+    var html = '';
+    p.forEach(function(block) {
+      var pct = getPct(block.start, block.end, block.sHr, block.eHr);
+      if (pct) {
+        var bgHex = block.type === 'wh' ? whC : block.type === 'main' ? mainC : block.type === 'show' ? showC : block.type === 'transit' ? transitC : recoveryC;
+        var top = '0';
+        var height = '20%';
+        if (block.type === 'wh') { top = '0'; height = '20%'; }
+        else if (block.type === 'transit') { top = '20%'; height = '20%'; }
+        else if (block.type === 'main') { top = '40%'; height = '20%'; }
+        else if (block.type === 'show') { top = '60%'; height = '20%'; }
+        else if (block.type === 'recovery') { top = '80%'; height = '20%'; }
+
+        html += '<div style="position: absolute; left: ' + pct.left + '%; width: ' + pct.width + '%; top: ' + top + '; height: ' + height + '; background: ' + bgHex + '; border-radius: 1px; z-index: 1;"></div>';
+      }
+    });
+
+    var wrapper = el.querySelector('.bars-wrapper');
+    if (wrapper) wrapper.innerHTML = html;
+  } catch (err) {
+    console.error('DOM Rendering Blocked:', err);
+  }
+};
+
+/** Re-fill phase strips after fork-dot setExtendedProp rebuilds empty .bars-wrapper. */
+window.calRepaintVisiblePhaseBars_ = function() {
+  try {
+    if (typeof calendar === 'undefined' || !calendar || !calendar.view) return;
+    if (calendar.view.type !== 'dayGridMonth') return;
+    var root = calendar.el || document.getElementById('calendar');
+    if (!root) return;
+    var run = function() {
+      var frames = root.querySelectorAll('.event-custom-frame[data-cal-event-id]');
+      for (var i = 0; i < frames.length; i++) {
+        var frame = frames[i];
+        var id = frame.getAttribute('data-cal-event-id');
+        if (!id) continue;
+        var ev = calendar.getEventById(id);
+        if (!ev) continue;
+        window.calPaintRollupPhaseBars_(frame, ev, calendar.view);
+      }
+    };
+    // Double rAF: wait for FC to swap eventContent DOM after setExtendedProp.
+    requestAnimationFrame(function() {
+      requestAnimationFrame(run);
+    });
+  } catch (ePaint) { /* ignore */ }
+};
+
 window.calForkFlagsFromProjects_ = function(projects) {
   var map = {};
   (projects || []).forEach(function(p) {
@@ -781,6 +823,8 @@ window.calRepaintForkDots_ = function() {
       if (calendar && typeof calendar.render === 'function') calendar.render();
     } catch (e3) { /* ignore */ }
   }
+  // setExtendedProp rebuilds eventContent with empty .bars-wrapper; eventDidMount does not re-fire.
+  if (typeof window.calRepaintVisiblePhaseBars_ === 'function') window.calRepaintVisiblePhaseBars_();
 };
 
 window.calApplyForkFlagsMap_ = function(map) {
