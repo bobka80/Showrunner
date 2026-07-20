@@ -39,10 +39,9 @@
 | `processRfidScan` | `02c_Project_Operations.html` |
 | `saveProjectAssetsDelta` | `02c_Project_Operations.html`, `02e5_Logic_Sync.html` |
 | `startEventOperation` | `02c_Project_Operations.html` |
-| `beginDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `closeDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
-| `finishDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `getDalSessionInfo` | `02_Project_Editor_Core.html`, `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html` |
+| `openDalSession` | `02e6_Dal_Session.html` |
 | `getDalFirebaseClientAuth` | `02e7_Dal_Firestore_Client.html` |
 | `deleteProjectFull` | `02_Project_Editor_Core.html` |
 | `generateProjectFolders` | `02_Project_Editor_Core.html` |
@@ -56,6 +55,8 @@
 | `getTimelineData` | `02_Project_Editor_Logistics.html`, `03a2_Timeline_Dal_Live.html`, `03a_Timeline_Boot.html` |
 | `saveTimelineData` | `02_Project_Editor_Logistics.html`, `03a_Timeline_Boot.html` |
 | `saveTruckArrangementAPI` | `02_Project_Editor_Logistics.html`, `05a_Truck_Arrangement.html` |
+| `beginDalSession` | `03a1_Timeline_Dal_Session.html` |
+| `finishDalSession` | `03a1_Timeline_Dal_Session.html` |
 | `getGlobalMonthData` | `04b_Equipment_Tracker.html` |
 | `getUnifiedTrackerData` | `04b_Equipment_Tracker.html` |
 | `deleteLeave` | `04_Month_Roster.html`, `07_Core_Globals.html` |
@@ -199,7 +200,7 @@
 | 02e3_Logic_Clipboard.html | 0 | 0 |
 | 02e4_Logic_Containers.html | 0 | 0 |
 | 02e5_Logic_Sync.html | 2 | 0 |
-| 02e6_Dal_Session.html | 4 | 0 |
+| 02e6_Dal_Session.html | 3 | 0 |
 | 02e7_Dal_Firestore_Client.html | 2 | 0 |
 | 02g_Project_Reports.html | 0 | 2 |
 | 03a_Timeline_Boot.html | 4 | 0 |

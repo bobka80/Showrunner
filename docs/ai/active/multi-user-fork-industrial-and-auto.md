@@ -7,7 +7,7 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Part B in progress** — **B0 @ v693** · **B1 shipping**. **Next after B1: B2** opening warm-up. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
+**Opened:** 2026-07-18 · **Status:** **Part B in progress** — **B0 @ v693** · **B1 @ v694** · **B2 @ v695**. **Next: B3** live pull-in. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
 **Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
@@ -233,9 +233,9 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 ### B2 — Opening warm-up
 
-- [ ] Starter-only edits; entry delta = starter’s pending local  
-- [ ] Others: freeze + “Starting live session…”  
-- [ ] Hang ~45–60s → Retry / Cancel; credentialed desktop may take over  
+- [x] Starter-only edits; entry delta = starter’s pending local  
+- [x] Others: freeze + “Starting live session…”  
+- [x] Hang ~45–60s → Retry / Cancel; credentialed desktop may take over  
 
 ### B3 — Live pull-in
 
@@ -321,6 +321,8 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | Middle build archived → [../archive/user-error-reporting-journal-2026-07-19.md](../archive/user-error-reporting-journal-2026-07-19.md). **NEXT = Part B.** Bug log moved to [../error-journal/](../error-journal/) (not a campaign). |
 | 2026-07-20 | **Part B OK go** — next = **B0** AUTO-FORK TRY BASELINE milestone, then B1 who-may-start. |
 | 2026-07-20 | **B0 shipped @ GAS v693:** AUTO-FORK TRY BASELINE. Floor dislike → rollback to **v693**. **Next: B1** who may start. |
+| 2026-07-20 | **B1 shipped @ GAS v694:** who-may-start matrix + freelancer exclude (incl. station host flags). **Next: B2** opening warm-up. |
+| 2026-07-20 | **B2 shipped @ GAS v695:** Opening warm-up (starter-only, peer freeze, hang Retry/Cancel/take-over, entry delta). **Next: B3** live pull-in. |
 
 ---
 
