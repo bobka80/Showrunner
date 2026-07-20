@@ -601,6 +601,22 @@ function closeDalSession(projectId, actor, sessionType) {
       throw new Error('Close not implemented for session type: ' + closingType);
     }
   } catch (commitErr) {
+    // B fail-safe: reopen domain so floor can retry; fork/backup retained by commit helpers.
+    try {
+      executeWithRetry(function () {
+        var sheets = verifyDatabaseSchema();
+        var row = dalGetProjectIndexRow_(projectId, sheets);
+        if (!row) return;
+        var cur = dalReadDomainSession_(row, closingType);
+        dalWriteDomainSession_(sheets.index, row.rowNum, row.map, closingType, {
+          status: 'open',
+          sessionUid: cur.sessionUid || closingUid,
+          openedAt: cur.openedAt || new Date().toISOString(),
+          openedBy: cur.openedBy || actor
+        });
+        dalFlushDomainCache_(projectId, closingType);
+      });
+    } catch (eReopen) { /* still throw original */ }
     throw commitErr;
   }
 

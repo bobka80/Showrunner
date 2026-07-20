@@ -406,24 +406,64 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
     commitObjs.push(dalPaSheetRowToObject_(r.data, hdr.map));
   });
 
+  // B fail-safe: snapshot current Sheets BEFORE mutate; refuse empty wipe.
+  var previousSheetRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId) || [];
+  var previousObjects = previousSheetRows.map(function (r) {
+    return dalPaSheetRowToObject_(r.data, hdr.map);
+  });
+  if ((!commitObjs || !commitObjs.length) && previousObjects.length > 0) {
+    throw new Error(
+      'PREP_COMMIT_EMPTY_REFUSED: Firebase fork has 0 rows but Sheets has ' +
+      previousObjects.length +
+      ' for this project. Fork left intact — fix live list or restore, then End Prep again.'
+    );
+  }
+
+  var intendedObjects = commitObjs;
+  dalWritePaCommitBackup_(projectId, sessionUid, actor, previousObjects, intendedObjects);
+
   var projectRows = commitObjs.map(function (obj) {
     return { data: dalPaRowObjectToSheetArray_(obj, hdr.header, hdr.map) };
   });
-  var intendedObjects = commitObjs;
 
-  // Drop _meta first so live UI closes before the slower row drain finishes.
-  firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
-  // Sheet write under its own short lock — caller must not hold ScriptLock across Firestore UrlFetch.
-  executeWithRetry(function () {
-    dalDeleteRowsByColumn_(hdr.sheet, 'project_uid', projectId);
-    var rows = projectRows.map(function (r) { return r.data; });
-    dalAppendRows_(hdr.sheet, rows);
-    flushCache();
-  });
-  // Phase 5A — reconcile before wiping the fork collection (pocket needs intended rows).
   try {
-    dalReconcilePaCommit_(projectId, sessionUid, intendedObjects, actor);
+    // Sheet write under its own short lock — do NOT delete Firebase _meta/collection yet.
+    executeWithRetry(function () {
+      dalDeleteRowsByColumn_(hdr.sheet, 'project_uid', projectId);
+      var rows = projectRows.map(function (r) { return r.data; });
+      dalAppendRows_(hdr.sheet, rows);
+      flushCache();
+    });
+  } catch (sheetErr) {
+    try {
+      dalRestorePaSheetFromObjects_(projectId, previousObjects);
+    } catch (restoreErr) {
+      try {
+        dalAlertFailedWrite_(projectId, 'assets', actor,
+          'Sheets commit failed AND restore failed. Backup at assets/_commit_backup. ' +
+          (sheetErr.message || sheetErr) + ' / restore: ' + (restoreErr.message || restoreErr));
+      } catch (eA) { /* ignore */ }
+      throw new Error(
+        'PREP_COMMIT_SHEETS_FAILED: ' + (sheetErr.message || sheetErr) +
+        ' — restore also failed; Firebase fork + _commit_backup kept.'
+      );
+    }
+    try {
+      dalAlertFailedWrite_(projectId, 'assets', actor,
+        'Sheets commit failed; restored previous Sheets rows. Fork kept. ' + (sheetErr.message || sheetErr));
+    } catch (eA2) { /* ignore */ }
+    throw new Error(
+      'PREP_COMMIT_SHEETS_FAILED: ' + (sheetErr.message || sheetErr) +
+      ' — previous Sheets restored; Firebase fork kept for retry.'
+    );
+  }
+
+  var reconOk = true;
+  try {
+    var recon = dalReconcilePaCommit_(projectId, sessionUid, intendedObjects, actor);
+    if (recon && recon.ok === false) reconOk = false;
   } catch (reconErr) {
+    reconOk = false;
     try {
       dalPocketFailedWrite_({
         projectId: projectId,
@@ -436,7 +476,95 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
       dalAlertFailedWrite_(projectId, 'assets', actor, 'Reconcile threw: ' + (reconErr.message || reconErr));
     } catch (pocketErr) { /* already failing */ }
   }
-  firestoreDeleteCollection_(dalFirestorePaCollection_(projectId));
+
+  if (!reconOk) {
+    try {
+      dalRestorePaSheetFromObjects_(projectId, previousObjects);
+    } catch (restoreErr2) {
+      try {
+        dalAlertFailedWrite_(projectId, 'assets', actor,
+          'Reconcile mismatch; Sheets restore failed. Backup kept. ' + (restoreErr2.message || restoreErr2));
+      } catch (eA3) { /* ignore */ }
+      throw new Error(
+        'PREP_COMMIT_RECONCILE_FAILED: Sheets may be wrong; Firebase fork + _commit_backup kept.'
+      );
+    }
+    try {
+      dalAlertFailedWrite_(projectId, 'assets', actor,
+        'Reconcile mismatch after commit — restored previous Sheets; Firebase fork kept for retry.');
+    } catch (eA4) { /* ignore */ }
+    throw new Error(
+      'PREP_COMMIT_RECONCILE_FAILED: previous Sheets restored; Firebase fork kept for retry.'
+    );
+  }
+
+  // Verified — only now clear live fork. Backup stays under dal_commit_backups/ for recovery (C).
+  try {
+    firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
+  } catch (eMeta) { /* continue */ }
+  try {
+    firestoreDeleteCollection_(dalFirestorePaCollection_(projectId));
+  } catch (eCol) {
+    try {
+      dalAlertFailedWrite_(projectId, 'assets', actor,
+        'Sheets committed OK but fork cleanup failed — clear assets collection manually if needed.');
+    } catch (eA5) { /* ignore */ }
+  }
+}
+
+/** Commit backup — outside assets/ so fork cleanup cannot wipe the safety net. */
+function dalPaCommitBackupPath_(projectId, sessionUid) {
+  return 'dal_commit_backups/' + String(projectId) + '__prep__' + String(sessionUid || 'unknown');
+}
+
+function dalWritePaCommitBackup_(projectId, sessionUid, actor, previousObjects, intendedObjects) {
+  var prevJson = JSON.stringify(previousObjects || []);
+  var intJson = JSON.stringify(intendedObjects || []);
+  var doc = {
+    projectId: String(projectId || ''),
+    sessionUid: String(sessionUid || ''),
+    actor: String(actor || 'System'),
+    savedAt: new Date().toISOString(),
+    previousCount: (previousObjects || []).length,
+    intendedCount: (intendedObjects || []).length,
+    pocketed: false,
+    previousJson: prevJson,
+    intendedJson: intJson
+  };
+  if (prevJson.length + intJson.length > 800000) {
+    try {
+      dalPocketFailedWrite_({
+        projectId: projectId,
+        domain: 'assets',
+        sessionUid: sessionUid,
+        actor: actor,
+        mismatchNote: 'PRE_COMMIT_BACKUP_OVERSIZE',
+        payload: { previous: previousObjects || [], intended: intendedObjects || [] }
+      });
+      doc.pocketed = true;
+      doc.previousJson = '[]';
+      doc.intendedJson = '[]';
+      doc.note = 'Payload in failed_writes pocket (oversized for single backup doc).';
+    } catch (ePocket) {
+      throw new Error(
+        'PREP_COMMIT_BACKUP_TOO_LARGE: cannot snapshot Sheets before commit (' +
+        (ePocket.message || ePocket) + '). Fork left intact.'
+      );
+    }
+  }
+  firestoreWriteDocument_(dalPaCommitBackupPath_(projectId, sessionUid), doc);
+}
+
+function dalRestorePaSheetFromObjects_(projectId, rowObjects) {
+  var hdr = dalGetProjectAssetsHeaderAndMap_();
+  executeWithRetry(function () {
+    dalDeleteRowsByColumn_(hdr.sheet, 'project_uid', projectId);
+    var rows = (rowObjects || []).map(function (obj) {
+      return dalPaRowObjectToSheetArray_(obj, hdr.header, hdr.map);
+    });
+    dalAppendRows_(hdr.sheet, rows);
+    flushCache();
+  });
 }
 
 function dalFirestoreTimelineCollection_(projectId) {
@@ -517,9 +645,10 @@ function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode) {
 
 function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
   var snap = dalReadTimelineStateFromFirestore_(projectId);
-  firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta');
   if (!snap) {
-    firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
+    // Empty fork — do not touch Sheets; clear orphan meta/collection only.
+    try { firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta'); } catch (e0) { /* ignore */ }
+    try { firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId)); } catch (e1) { /* ignore */ }
     return;
   }
   var tlSize = dalStateSizeReport_({
@@ -539,6 +668,7 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
     );
   }
   // Status is "committing" — Sheets path allowed. saveTimelineDataSheets_ takes its own short lock.
+  // B: keep Firebase meta/collection until Sheets write + reconcile succeed.
   saveTimelineDataSheets_(
     projectId,
     snap.mode || 'main',
@@ -553,9 +683,12 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
   try {
     flushCache();
   } catch (eFlush) { /* continue */ }
+  var reconOk = true;
   try {
-    dalReconcileTimelineCommit_(projectId, sessionUid, snap, actor);
+    var recon = dalReconcileTimelineCommit_(projectId, sessionUid, snap, actor);
+    if (recon && recon.ok === false) reconOk = false;
   } catch (reconErr) {
+    reconOk = false;
     try {
       dalPocketFailedWrite_({
         projectId: projectId,
@@ -568,7 +701,13 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
       dalAlertFailedWrite_(projectId, 'timeline', actor, 'Reconcile threw: ' + (reconErr.message || reconErr));
     } catch (pocketErr) { /* already failing */ }
   }
-  firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId));
+  if (!reconOk) {
+    throw new Error(
+      'TIMELINE_COMMIT_RECONCILE_FAILED: Firebase collab fork kept for retry — Sheets may need manual check.'
+    );
+  }
+  try { firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta'); } catch (eMeta) { /* ignore */ }
+  try { firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId)); } catch (eCol) { /* ignore */ }
 }
 
 function getTimelineDataFirestore_(folderId, mode) {

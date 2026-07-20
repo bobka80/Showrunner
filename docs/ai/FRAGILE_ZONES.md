@@ -496,8 +496,10 @@ While prep UI open (dalPrepUiOpen)
   → Peer applies by writeSeq (prep UI must stay on *and* mode=firestore or sync stops)
 
 END PREP (local or peer)
-  → Sheets → committing → commit → clear domain
-  → _meta deleted early in commit
+  → Sheets → committing → **backup Sheets snapshot to `dal_commit_backups/`** → write Sheets → reconcile
+  → On empty Firebase vs non-empty Sheets: **refuse** (fork intact)
+  → On Sheets/reconcile fail: **restore previous Sheets**, reopen session, keep fork + backup, alert managers
+  → Only after verify OK: delete `_meta` + assets collection (backup retained for recovery window)
   → Peer: meta missing → dalPrepMetaEndPending_ (do NOT drop prep UI yet)
   → Confirm END when Sheets committing/closed OR meta missing ≥ ~8s
   → dalPrepMarkSessionEnded_: remember dalPrepEndedSessionUid_, SheetsOpenBlocked, panel OFF, stop live sync

@@ -2320,6 +2320,13 @@ window.dalWritePaForkFullToFirestore_ = function(projectId, done) {
         var oldUid = prev[i] && prev[i].uid ? String(prev[i].uid) : '';
         if (oldUid && oldUid !== '_meta' && !currentByUid[oldUid]) toDelete.push(oldUid);
       }
+      // B fail-safe: never full-rewrite an empty local list over a known non-empty fork/original.
+      if (Object.keys(currentByUid).length === 0 && (prev.length > 0 || toDelete.length > 0)) {
+        done(new Error(
+          'REFUSE_EMPTY_FORK_WRITE: local equipment list is empty but prior list had rows — End Prep blocked.'
+        ));
+        return;
+      }
       var sets = Object.keys(currentByUid).map(function(uid) {
         return { uid: uid, doc: window.dalPaAssetToFsDoc_(currentByUid[uid], projectId) };
       });
