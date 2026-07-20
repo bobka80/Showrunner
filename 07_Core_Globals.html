@@ -288,8 +288,27 @@ window.dalPresenceProjectId_ = function() {
   if (typeof activePresenceProject !== 'undefined' && activePresenceProject) {
     return String(activePresenceProject);
   }
+  if (window.dalPaSessionWatchProjectId) return String(window.dalPaSessionWatchProjectId);
+  if (window.mobileCrewHubProjectId) return String(window.mobileCrewHubProjectId);
   var el = document.getElementById('edit-folder-id');
   return el && el.value && el.value !== 'NEW' ? String(el.value) : '';
+};
+
+/** Best-effort project id for prep close / last-leave (station teardown may clear edit-folder-id). */
+window.dalResolvePrepProjectId_ = function(explicitId) {
+  var id = explicitId != null ? String(explicitId) : '';
+  if (id && id !== 'NEW') return id;
+  var el = document.getElementById('edit-folder-id');
+  if (el && el.value && el.value !== 'NEW') return String(el.value);
+  if (window.dalPaSessionWatchProjectId) return String(window.dalPaSessionWatchProjectId);
+  if (window.dalSessionState && window.dalSessionState.projectId) {
+    return String(window.dalSessionState.projectId);
+  }
+  if (window.mobileCrewHubProjectId) return String(window.mobileCrewHubProjectId);
+  if (typeof window.dalPresenceProjectId_ === 'function') {
+    return String(window.dalPresenceProjectId_() || '');
+  }
+  return '';
 };
 
 /** Presence identity must match startPresencePing (ACTIVE_USER_NAME), not station host actor. */
@@ -429,7 +448,10 @@ window.dalTickRoomIdle_ = function(domain) {
     if (d === 'prep') {
       window.dalPrepIdleWarn_ = false;
       if (typeof window.closeDalPrepSession === 'function') {
-        window.closeDalPrepSession({ auto: true, reason: 'idle' });
+        var idlePid = typeof window.dalResolvePrepProjectId_ === 'function'
+          ? window.dalResolvePrepProjectId_()
+          : '';
+        window.closeDalPrepSession({ auto: true, reason: 'idle', projectId: idlePid });
       }
     } else {
       window.dalTlIdleWarn_ = false;
@@ -542,7 +564,7 @@ window.dalMaybeLastLeaveClosePrep_ = function() {
     }
     if (window.dalPrepClosing) return;
     if (typeof window.closeDalPrepSession === 'function') {
-      window.closeDalPrepSession({ auto: true, reason: 'last-leave' });
+      window.closeDalPrepSession({ auto: true, reason: 'last-leave', projectId: projectId });
     }
   };
 

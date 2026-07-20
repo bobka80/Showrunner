@@ -717,7 +717,25 @@ window.dalPrepOnOpenSuccess_ = function(projectId, opts, joined) {
 
 window.closeDalPrepSession = function(opts) {
   opts = opts || {};
-  var projectId = document.getElementById('edit-folder-id').value;
+  var projectId = typeof window.dalResolvePrepProjectId_ === 'function'
+    ? window.dalResolvePrepProjectId_(opts.projectId)
+    : String(opts.projectId || (document.getElementById('edit-folder-id')
+      ? document.getElementById('edit-folder-id').value : '') || '');
+  if (!projectId || projectId === 'NEW') {
+    if (opts.auto) {
+      window.dalPrepClosing = false;
+      window.dalPrepClosingUi_ = false;
+      alert('Auto-close prep failed:\n\nMissing project id — End Prep cancelled (fork left intact).');
+      return;
+    }
+    alert('End prep failed:\n\nMissing project id.');
+    return;
+  }
+  // Keep hidden field in sync so later watchers/polls still resolve the same project.
+  try {
+    var fid = document.getElementById('edit-folder-id');
+    if (fid && (!fid.value || fid.value === 'NEW')) fid.value = projectId;
+  } catch (eFid) { /* ignore */ }
   if (window.dalPrepOpeningUi_ && !window.dalPrepUiOpen) {
     if (opts.auto) return;
     if (!confirm('Abort opening and stay on normal equipment list?')) return;

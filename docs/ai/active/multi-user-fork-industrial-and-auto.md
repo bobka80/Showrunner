@@ -331,7 +331,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | **B4 fix @ GAS v705:** last-leave was desktop CANCEL only — mobile close + station Back left Firebase rooms open. Wired leave-path commit; watcher not killed mid-close. **Next: B6/B7** floor exit. |
 | 2026-07-20 | **B2 UX @ GAS v708:** drop immediate “already opening / take over” on healthy race — peer joins frozen Opening; take-over only after hang (~50s). |
 | 2026-07-20 | **B4 last-leave @ GAS v710:** fresh presence ping (self→main) before commit; lock-miss≠empty; leave-intent guard; keep latch when peers/ghosts so idle can finish. |
-| 2026-07-20 | **Commit fail-safe B:** refuse empty PA wipe; pre-commit Firebase backup (`dal_commit_backups/`); restore Sheets on fail; clear fork only after reconcile; no client commit-anyway. Next **C** = red-dot + retry UI. |
+| 2026-07-20 | **Commit fail-safe B @ GAS v711–v712:** refuse empty PA wipe; `dal_commit_backups/` snapshot; restore Sheets on fail; clear fork only after reconcile; timeline flush/restore; no mid-flight double commit. **Next C:** red-dot + retry UI. |
 
 ---
 
