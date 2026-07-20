@@ -1028,6 +1028,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
     window.dalPaPeerOpsLog_ = {};
     window.dalPaSyncHoverWho_ = '';
     window.dalPaHidePeerOpsPopover_ && window.dalPaHidePeerOpsPopover_();
+    if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') window.dalPaintSurfaceForkSyncBar_();
     return;
   }
 
@@ -1136,6 +1137,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
     if (!html) html = '<div style="color:#71717a; font-style:italic;">Waiting for roommates…</div>';
     rosterEl.innerHTML = html;
   }
+  if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') window.dalPaintSurfaceForkSyncBar_();
 };
 
 window.dalPaOnPeerOpsEnter_ = function(ev) {

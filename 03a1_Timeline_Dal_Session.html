@@ -294,12 +294,20 @@ window.closeDalTimelineCollabSession = function() {
     return;
   }
   if (!confirm('End timeline collaboration and commit shifts/phases back to Google Sheets?')) return;
+  window.dalTlClosingUi_ = true;
+  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+    window.dalUpdateTimelineLiveBanner_();
+  }
   var layer = document.getElementById('shift-layer');
   if (layer) layer.style.cursor = 'wait';
   var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
   google.script.run
     .withFailureHandler(function(err) {
+      window.dalTlClosingUi_ = false;
       if (layer) layer.style.cursor = '';
+      if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+        window.dalUpdateTimelineLiveBanner_();
+      }
       google.script.run
         .withFailureHandler(function() {
           alert('End timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
@@ -309,6 +317,7 @@ window.closeDalTimelineCollabSession = function() {
           var status = tl ? String(tl.status).toLowerCase() : '';
           if (!status || status === 'normal' || status === '') {
             window.dalTimelineSessionOpen = false;
+            window.dalTlClosingUi_ = false;
             window.refreshTimelineDalBanner();
             alert('Timeline collaboration ended (server finished after the client wait).');
             return;
@@ -321,6 +330,7 @@ window.closeDalTimelineCollabSession = function() {
       if (layer) layer.style.cursor = '';
       window.dalTimelineSessionOpen = false;
       window.dalTlWasSessionOpen = false;
+      window.dalTlClosingUi_ = false;
       if (typeof window.stopDalTimelineStateSync_ === 'function') window.stopDalTimelineStateSync_();
       if (typeof window.dalCacheInvalidateTimeline_ === 'function') window.dalCacheInvalidateTimeline_(projectId);
       window.refreshTimelineDalBanner();

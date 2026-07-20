@@ -136,6 +136,78 @@ window.dalSessionSurface_ = function() {
   return 'desktop';
 };
 
+/** Phone / station: fixed bottom SYNC bar (desktop keeps in-vault / crew-column panels). */
+window.dalEnsureSurfaceForkSyncBar_ = function() {
+  var bar = document.getElementById('surface-fork-sync-bar');
+  if (bar) return bar;
+  bar = document.createElement('div');
+  bar.id = 'surface-fork-sync-bar';
+  bar.className = 'surface-fork-sync-bar';
+  bar.setAttribute('aria-live', 'polite');
+  bar.innerHTML =
+    '<span class="surface-fork-sync-bar__label">SYNC</span>' +
+    '<span id="surface-fork-sync-status" class="surface-fork-sync-bar__status"></span>';
+  document.body.appendChild(bar);
+  return bar;
+};
+
+window.dalPaintSurfaceForkSyncBar_ = function() {
+  var surface = typeof window.dalSessionSurface_ === 'function' ? window.dalSessionSurface_() : 'desktop';
+  var bar = window.dalEnsureSurfaceForkSyncBar_();
+  var statusEl = document.getElementById('surface-fork-sync-status');
+  var hide = function() {
+    bar.classList.remove('surface-fork-sync-bar--visible', 'surface-fork-sync-bar--pa', 'surface-fork-sync-bar--tl');
+    document.body.classList.remove('surface-fork-sync-bar-pad');
+  };
+  if (surface === 'desktop') {
+    hide();
+    return;
+  }
+
+  var paOv = document.getElementById('project-assets-modal-overlay');
+  var paView = false;
+  try {
+    paView = !!(paOv && (paOv.style.display === 'flex' || window.getComputedStyle(paOv).display === 'flex'));
+  } catch (e0) { paView = !!(paOv && paOv.style.display === 'flex'); }
+
+  var tlLayer = document.getElementById('shift-layer');
+  var tlView = false;
+  try {
+    tlView = !!(tlLayer && (tlLayer.style.display === 'flex' || window.getComputedStyle(tlLayer).display === 'flex'));
+  } catch (e1) { tlView = !!(tlLayer && tlLayer.style.display === 'flex'); }
+
+  var mode = '';
+  var text = '';
+  if (paView && (window.dalPrepUiOpen || window.dalPrepOpeningUi_)) {
+    mode = 'pa';
+    var paSrc = document.getElementById('pa-prep-live-status');
+    text = (paSrc && String(paSrc.textContent || '').trim())
+      || (window.dalPrepOpeningUi_ ? 'Starting live session…' : 'on');
+  } else if (tlView && (window.dalTimelineSessionOpen || window.dalTlOpeningUi_)) {
+    mode = 'tl';
+    var tlSrc = document.getElementById('tl-sync-status');
+    text = (tlSrc && String(tlSrc.textContent || '').trim())
+      || (window.dalTlOpeningUi_ ? 'Starting live session…' : 'on');
+  }
+
+  if (!mode) {
+    hide();
+    return;
+  }
+
+  // Hide cramped in-panel SYNC on phone/station — screen-bottom bar is the surface.
+  var paPanel = document.getElementById('pa-prep-live-panel');
+  var tlPanel = document.getElementById('tl-sync-panel');
+  if (mode === 'pa' && paPanel) paPanel.style.display = 'none';
+  if (mode === 'tl' && tlPanel) tlPanel.style.display = 'none';
+
+  bar.classList.add('surface-fork-sync-bar--visible');
+  bar.classList.toggle('surface-fork-sync-bar--pa', mode === 'pa');
+  bar.classList.toggle('surface-fork-sync-bar--tl', mode === 'tl');
+  if (statusEl) statusEl.textContent = text;
+  document.body.classList.add('surface-fork-sync-bar-pad');
+};
+
 /** Manual START button allowed (creds ∩ surface ∩ not freelancer). */
 window.dalMayManualStartFork_ = function(domain) {
   if (window.dalIsLiveForkExcluded_()) return false;
@@ -169,6 +241,29 @@ window.dalMayAutoStartFork_ = function(domain) {
 /** Soft-join / pull-in latch allowed (not freelancer). */
 window.dalMayJoinLiveFork_ = function() {
   return !window.dalIsLiveForkExcluded_();
+};
+
+/**
+ * Part B5 — shared fork lifecycle status copy (PA + timeline SYNC strips).
+ * opts: closing, opening, openingFrozen, joining, idleWarn, mode, pending, failReason, connecting
+ */
+window.dalForkPhaseStatusText_ = function(opts) {
+  opts = opts || {};
+  if (opts.idleWarn) return 'Session closing — tap to keep open';
+  if (opts.closing) return 'Closing — committing…';
+  if (opts.opening) {
+    return opts.openingFrozen ? 'Opening — frozen' : 'Opening — you can edit';
+  }
+  if (opts.joining) return 'Live — joining…';
+  var mode = String(opts.mode || '');
+  if (mode === 'blocked' || mode === 'gas') {
+    var why = opts.failReason ? (' — ' + String(opts.failReason).slice(0, 60)) : '';
+    return 'Live — DOWN' + why;
+  }
+  if (opts.connecting || mode === 'connecting') return 'Live — connecting…';
+  if (opts.pending) return 'Live — pending…';
+  if (mode === 'firestore') return 'Live';
+  return 'Live';
 };
 
 /** Part B2 — hang threshold for Opening warm-up (45–60s band). */

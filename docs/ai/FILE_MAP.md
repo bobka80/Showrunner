@@ -91,7 +91,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Logistics_Timeline.js`**: Project timeline backend CRUD.
 - **`Dal_Repos.js`**: DAL Phase 1–3 — `SheetsAdapter` + domain repos + scoped row write helpers.
 - **`Dal_Router.js`**: DAL Phase 4 — `projectDataRouter(domain, sessionStatus)`; Firebase when session-open.
-- **`Dal_Sessions.js`**: DAL Phase 4 — dual-domain session registry (`Dal_Prep_Session_*` / `Dal_Timeline_Session_*`); `getDalSessionInfo` returns `prepStatus` / `timelineStatus`.
+- **`Dal_Sessions.js`**: DAL Phase 4 — dual-domain session registry (`Dal_Prep_Session_*` / `Dal_Timeline_Session_*`); `getDalSessionInfo` returns `prepStatus` / `timelineStatus`; `getOpenDalForkMap` for calendar fork-dot chrome.
 - **`Dal_Firestore.js`**: DAL Phase 4 — Firestore REST (GAS service account) for prep + timeline forks.
 - **`Dal_Firebase.js`**: DAL Phase 4 — FirebaseAdapter; snapshot/commit; wires Phase 5A reconcile after commit.
 - **`Dal_Cache.js`**: DAL Phase 6A — `dalInvalidateCacheTags_(tags)`; domain tags `project:{id}:pa` / `project:{id}:timeline` (selective, not global `flushCache`).

@@ -19,6 +19,10 @@ window.dalTlReadOnlyBeforeOpening_ = null;
 // Part B3 — peer pull-in joining cue
 window.dalTlPullInJoining_ = false;
 window.dalTlPullInJoiningUntil_ = 0;
+// Part B5 — Closing cue
+window.dalTlClosingUi_ = false;
+// Part B4 stub — idle T−5
+window.dalTlIdleWarn_ = false;
 
 window.dalMarkTlPullInJoining_ = function() {
   window.dalTlPullInJoining_ = true;
@@ -1245,6 +1249,7 @@ window.dalUpdateTimelineLiveBanner_ = function() {
   if (!open) {
     if (panel) panel.style.display = 'none';
     window.dalTlSyncPanelExpanded_ = false;
+    if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') window.dalPaintSurfaceForkSyncBar_();
     return;
   }
 
@@ -1292,6 +1297,7 @@ window.dalUpdateTimelineLiveBanner_ = function() {
     if (!html) html = '<div style="color:#71717a; font-style:italic;">Only you</div>';
     rosterEl.innerHTML = html;
   }
+  if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') window.dalPaintSurfaceForkSyncBar_();
 };
 
 window.dalColorTimelineShifts_ = function(list) {

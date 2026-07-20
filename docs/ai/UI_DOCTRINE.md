@@ -178,6 +178,8 @@ Presence still updates OPEN TIMELINE label when others are inside (`👥 … IN 
 
 **Main calendar rollup strips:** after the event name, stacked fork dots (orange on top = PA / prep on Firebase; blue underneath = timeline on Firebase). Source: `dalPrepFork` / `dalTimelineFork` on projects + `getOpenDalForkMap` poll (`01a_Calendar_Core.html`).
 
+**Phone / station:** fixed bottom `#surface-fork-sync-bar` — orange in PA when prep fork live, blue in timeline when collab fork live (`dalPaintSurfaceForkSyncBar_`). Desktop keeps vault / crew-column SYNC panels.
+
 ---
 
 ## 9. Adding new UI — checklist

@@ -468,6 +468,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **UI surface (2026-07-19):** No full-width top banner. While prep is open, a **SYNC** mini-header sits at the bottom of the vault (`#pa-prep-live-panel`) — orange strip + orange frame; click expands ~⅓ (black body, roster with modes). Collapsed by default. Timeline collab uses the same pattern: blue **SYNC** mini-header at the bottom of the crew-name column (`#tl-sync-panel`); expand shows names only. Internal latch is still `dalPrepUiOpen` / `dalPrepLatched` / `dalTimelineSessionOpen` (docs may say “banner on” for that latch).
 
+**Phone / station (2026-07-20):** Vault/crew SYNC is not visible (PA left panel hidden; timeline crew column cramped). Show fixed bottom `#surface-fork-sync-bar` instead — **orange** in PA when prep fork live, **blue** in timeline when collab fork live (`dalPaintSurfaceForkSyncBar_`). Desktop unchanged.
+
 **Opening warm-up (Part B2 @ v695+):** Sheets `opening` is **not** Live. Starter may edit; peers freeze + SYNC text **Starting live session…**. Do **not** live-latch from `_meta` or `refreshDalSessionBanner` while status is `opening`. Hang ~50s → Retry / Abort; credentialed desktop may `beginDalSession(..., { takeOver: true })`. Live latch only when status is `open`.
 
 **Live pull-in (Part B3):** Watchers run only while PA modal / timeline layer is open — never yank from calendar. Peer soft-switch → SYNC **Live session started — joining…** then `live (patch)`. Phone PA: no auto-start; same watcher auto-joins.

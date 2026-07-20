@@ -1583,6 +1583,54 @@
     .pa-sync-blocked-mode #pa-search-cli,
     .pa-sync-blocked-mode #pa-new-sublist-btn,
     .pa-sync-blocked-mode #pa-add-container-btn { pointer-events: none !important; opacity: 0.72; }
+
+    /* Phone / station — fixed bottom SYNC when Firebase fork is live for the open view */
+    .surface-fork-sync-bar {
+        display: none;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 9200;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        box-sizing: border-box;
+        pointer-events: none;
+        font-family: 'Inter', sans-serif;
+    }
+    .surface-fork-sync-bar--visible { display: flex !important; }
+    .surface-fork-sync-bar--pa {
+        background: #c2410c;
+        color: #fffbeb;
+        border-top: 1px solid #f97316;
+    }
+    .surface-fork-sync-bar--tl {
+        background: #1d4ed8;
+        color: #dbeafe;
+        border-top: 1px solid #3b82f6;
+    }
+    .surface-fork-sync-bar__label {
+        font-weight: 900;
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        flex-shrink: 0;
+    }
+    .surface-fork-sync-bar__status {
+        font-weight: 700;
+        font-size: 10px;
+        opacity: 0.92;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+    body.surface-fork-sync-bar-pad #project-assets-modal-overlay .modal,
+    body.surface-fork-sync-bar-pad #shift-layer {
+        padding-bottom: 42px !important;
+        box-sizing: border-box;
+    }
+
     .tt-readonly-mode #tt-save-btn,
     .tt-readonly-mode #tt-crew-finished-wrap,
     .tt-readonly-mode .tt-bottom-actions button[onclick="openCrewManager()"] { display: none !important; }

@@ -37,6 +37,10 @@ window.dalPrepOpeningWasStarter_ = false;
 // Part B3 — peer pull-in joining cue
 window.dalPrepPullInJoining_ = false;
 window.dalPrepPullInJoiningUntil_ = 0;
+// Part B5 — Closing cue (local END or peer Sheets committing)
+window.dalPrepClosingUi_ = false;
+// Part B4 stub — set true when idle T−5 fires
+window.dalPrepIdleWarn_ = false;
 
 window.dalMarkPrepPullInJoining_ = function() {
   window.dalPrepPullInJoining_ = true;
@@ -82,6 +86,9 @@ window.dalPrepMarkSessionEnded_ = function(projectId) {
   window.dalPrepIgnoreOpenUntil = Date.now() + 24 * 60 * 60 * 1000;
   window.dalMetaConfirmedOpen_ = false;
   window.dalMetaSeenOpen_ = false;
+  window.dalPrepClosingUi_ = false;
+  window.dalPrepClosing = false;
+  window.dalClearPrepPullInJoining_();
   if (typeof dalApplyDalPrepUiState_ === 'function') {
     dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
   }
@@ -139,6 +146,10 @@ window.startDalPrepSessionPoll_ = function(projectId) {
           var stOpen = window.dalPrepStatusFromInfo_(info);
           // Peer END: _meta already gone (pending) and/or Sheets committing.
           if (stOpen === 'committing' && (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepMetaEndPending_)) {
+            window.dalPrepClosingUi_ = true;
+            if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+              window.dalUpdateRemotePendingBanner_();
+            }
             if (Date.now() < (window.dalPrepIgnoreCloseUntil || 0) && !window.dalPrepMetaEndPending_) return;
             window.dalPrepClosedPollStreak = (window.dalPrepClosedPollStreak || 0) + 1;
             if (window.dalPrepClosedPollStreak < 2 && !window.dalPrepMetaEndPending_) return;
@@ -709,6 +720,10 @@ window.closeDalPrepSession = function() {
   }
   if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
   window.dalPrepClosing = true;
+  window.dalPrepClosingUi_ = true;
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    window.dalUpdateRemotePendingBanner_();
+  }
   window.dalPrepSheetsPollGen++;
   window.dalPrepIgnoreCloseUntil = 0;
   // Local END — also block lagging Sheets from re-opening this tab during commit.
@@ -720,7 +735,11 @@ window.closeDalPrepSession = function() {
     google.script.run
       .withFailureHandler(function(err) {
         window.dalPrepClosing = false;
+        window.dalPrepClosingUi_ = false;
         if (overlay) overlay.style.cursor = '';
+        if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+          window.dalUpdateRemotePendingBanner_();
+        }
         if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
         alert('End prep failed:\n\n' + dalPrepErrMsg_(err));
       })
@@ -733,6 +752,7 @@ window.closeDalPrepSession = function() {
         if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
         else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
         window.dalPrepClosing = false;
+        window.dalPrepClosingUi_ = false;
         alert('Preparation ended — committed to Sheets.');
       })
       .closeDalSession(projectId, typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'prep');
