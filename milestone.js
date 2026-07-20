@@ -6,16 +6,16 @@
  *   1. Read latest GAS version (e.g. 265)
  *   2. Push current code → create NEXT version with a proper name (e.g. 266)
  *   3. Deploy that new version to the web app
- *   4. Regenerate Claude / quote.ai repo mix (unless --no-repomix)
+ *   4. Kick off Claude / quote.ai repo mix in the background (unless --no-repomix)
  *
  * Usage: node milestone.js "Pre database operations panel — IAM baseline"
- *        node milestone.js "note" --no-repomix   # skip pack refresh (faster ship)
+ *        node milestone.js "note" --no-repomix   # skip pack refresh
  *
  * deploy-config.json is optional:
  *   - If productionDeploymentId is set → update that same production URL
  *   - If missing → clasp creates a new deployment; ID is saved to deploy-config.json
  */
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const build = require('./build');
@@ -26,6 +26,7 @@ const MAX_MILESTONE_LOG = 50;
 const LOG_PATH = path.join(__dirname, 'RELEASES.md');
 const CONFIG_PATH = path.join(__dirname, 'deploy-config.json');
 const EXAMPLE_CONFIG_PATH = path.join(__dirname, 'deploy-config.example.json');
+const REPOMIX_LOG_PATH = path.join(__dirname, 'claude-pack', 'repomix-last-run.log');
 
 function parseMilestoneArgs(argv) {
   let skipRepomix = false;
@@ -42,16 +43,40 @@ function parseMilestoneArgs(argv) {
 
 const { skipRepomix, note } = parseMilestoneArgs(process.argv.slice(2));
 
-function refreshRepoMixSoft() {
-  console.log('\n=== Refreshing Claude / quote.ai repo mix (curated, single file) ===\n');
+/**
+ * Start curated pack in the background so the GAS ship can exit immediately.
+ * Failures do not undo the milestone; see claude-pack/repomix-last-run.log.
+ */
+function refreshRepoMixBackground() {
+  const outDir = path.join(__dirname, 'claude-pack');
+  const scriptPath = path.join(__dirname, 'create-repomix.js');
   try {
-    execSync('node create-repomix.js', {
+    fs.mkdirSync(outDir, { recursive: true });
+    const header =
+      `\n===== Repo mix start ${new Date().toISOString()} (background after milestone) =====\n`;
+    fs.appendFileSync(REPOMIX_LOG_PATH, header, 'utf8');
+
+    // Shell redirect keeps a log without blocking the parent on Windows.
+    const quotedNode = JSON.stringify(process.execPath);
+    const quotedScript = JSON.stringify(scriptPath);
+    const quotedLog = JSON.stringify(REPOMIX_LOG_PATH);
+    const cmdline = `${quotedNode} ${quotedScript} >> ${quotedLog} 2>&1`;
+    const child = spawn(cmdline, {
       cwd: __dirname,
-      stdio: 'inherit',
       shell: true,
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
     });
+    child.unref();
+
+    console.log('\nRepo mix: refreshing in the background (GAS ship is already done).');
+    console.log(`  Output when ready: ${path.join(outDir, 'repomix-output.md')}`);
+    console.log(`  Log: ${REPOMIX_LOG_PATH}`);
+    if (child.pid) console.log(`  PID: ${child.pid}`);
+    console.log('');
   } catch (e) {
-    console.warn('\nWARNING: Repo mix refresh failed — GAS milestone still succeeded.');
+    console.warn('\nWARNING: Could not start background repo mix — GAS milestone still succeeded.');
     console.warn('Regenerate later with: node create-repomix.js');
     console.warn('(or say "create repo mix" in Cursor)\n');
     if (e && e.message) console.warn(e.message);
@@ -257,10 +282,10 @@ if (before) {
     console.log('New deployment created. Bookmark the web app URL from Apps Script → Deploy → Manage deployments.');
   }
 
-  // Fresh single-file pack for Claude / quote.ai (does not fail the ship).
+  // Fresh pack for Claude / quote.ai — background so the ship does not wait.
   if (skipRepomix) {
     console.log('\nSkipped repo mix refresh (--no-repomix).');
   } else {
-    refreshRepoMixSoft();
+    refreshRepoMixBackground();
   }
 })();

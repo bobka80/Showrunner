@@ -12,7 +12,7 @@
  *
  * Output: claude-pack/repomix-output.md (or repomix-output_001.md, … when split).
  * Default (no --split) deletes leftover split parts so only one mix remains.
- * Also run automatically at the end of milestone.js (unless --no-repomix).
+ * Also started automatically in the background at the end of milestone.js (unless --no-repomix).
  */
 const { execSync } = require('child_process');
 const fs = require('fs');

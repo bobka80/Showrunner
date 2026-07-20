@@ -135,7 +135,7 @@ node create-repomix.js              # curated ~1M tokens
 node create-repomix.js --split 2mb  # if upload size limit
 ```
 
-Regenerate after major pipeline or doc changes, or rely on the automatic refresh at the end of every **`milestone.js`** ship. Packing is local (no API cost).
+Regenerate after major pipeline or doc changes, or rely on the automatic **background** refresh at the end of every **`milestone.js`** ship (you do not wait for the pack). Packing is local (no API cost).
 
 ---
 

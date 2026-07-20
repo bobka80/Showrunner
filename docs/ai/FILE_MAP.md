@@ -25,7 +25,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Main.js`**: GAS backend entry point. Handles HTTP GET/POST routing and the high-speed boot payload.
 - **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits. Copies backend `.js` + `Login.html` to `dist/`; excludes Node tooling via **`gas-node-only.js`**.
 - **`gas-node-only.js`**: Canonical list of root `.js` files that must **never** ship to Apps Script (PC-only / `require`). Shared by `build.js` and `check-google-account.js`.
-- **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md` + refreshes curated `claude-pack/repomix-output.md` (soft-fail; `--no-repomix` to skip).
+- **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md` + starts curated `claude-pack/repomix-output.md` refresh **in the background** (`--no-repomix` to skip).
 - **`create-repomix.js`**: PC-only. Packs repo via Repomix (`npx repomix`) into `claude-pack/repomix-output.md` for Claude project knowledge. Curated ~1M tokens; default keeps a **single** fresh file. `npm run create-repomix`. See [CLAUDE_PACK.md](CLAUDE_PACK.md).
 - **`check-google-account.js`**: Node-only (not deployed to GAS). Three checks: (1) clasp login, (2) email matches `google-account.json` + project reachable, (3) **no PC-only scripts on live GAS** (white-screen guard). Run: `node check-google-account.js` or `npm run check-google`.
 - **`pre-ship.js`** + **`pre-ship/`**: Scoped pre-ship pipeline — auto-detects layers from git diff; hooked into `milestone.js`, `deploy-hosting.js`, `build-station-desktop.js`, `build-station-apk.js`. **Bugbot gate:** `pre-ship/bugbot-policy.js`. **DAL gates:** `pre-ship/dal.js` when hot paths change. Docs: [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md) · [dal-pre-ship-gates.md](docs/ai/active/dal-pre-ship-gates.md). Run: `node pre-ship.js` or `npm run pre-ship`.
@@ -49,6 +49,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`00c_UI_Forms.html`**: Universal form renderers (Provisioning, Warehouse Roots, Clients, Vehicles).
 - **`00d_UI_Visuals.html`**: Settings drawers and data manager modals (Colors, Depts, Meals, Tags).
 - **`00e_UI_Modals.html`**: Universal popups (Global Tasks, Pickers, Checklists, Backup).
+- **`00f_Error_Report.html`**: Global top-center **error-report lip** (~2mm) + drawer — hover open (desktop), tap lip (touch/mobile/station); `submitErrorReport`. Campaign: [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). Styles: `Styles.html` `#sr-error-report-*`.
 
 ## 3. Operations & Integrations
 - **`Operations.js`**: Core backend execution (RFID processing, ledger commits, starting sessions).
@@ -225,6 +226,8 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 - `MODALS -> Crew Leave / Managers`
 - `MODALS -> Logistics Hub Engine`
 - `MODALS -> Database Backup`
+### 00f_Error_Report.html
+- `ERROR_REPORT -> Top lip drawer (global bug report)`
 ### 01a_Calendar_Core.html
 - `BOOT -> System Boot Sequence`
 - `CALENDAR -> Main Dashboard Calendar Config`

@@ -38,7 +38,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 4. `clasp deploy` that new version (updates saved production URL if `deploy-config.json` exists; otherwise creates a new deployment and saves the ID)
 5. Git commit + row in root **`RELEASES.md`**
 6. **`git push`** to **`origin`** (GitHub) — same commit as step 5
-7. **Refresh Claude / quote.ai repo mix** — `node create-repomix.js` → single fresh `claude-pack/repomix-output.md` (soft-fail; skip with `--no-repomix`). Upload to project knowledge is still manual — see [CLAUDE_PACK.md](CLAUDE_PACK.md).
+7. **Kick off Claude / quote.ai repo mix in the background** — `node create-repomix.js` starts after the ship finishes so you do **not** wait; single fresh `claude-pack/repomix-output.md` (log: `claude-pack/repomix-last-run.log`; skip with `--no-repomix`). Upload to project knowledge is still manual — see [CLAUDE_PACK.md](CLAUDE_PACK.md).
 
 **Does NOT:** Run on **"This works"** alone.
 

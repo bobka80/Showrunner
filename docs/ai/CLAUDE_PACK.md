@@ -28,12 +28,12 @@ node create-repomix.js
 
 ## Automatic refresh on GAS ship
 
-Every successful **`node milestone.js "…"`** regenerates the curated single-file pack after deploy + `RELEASES.md`.
+Every successful **`node milestone.js "…"`** kicks off the curated single-file pack **in the background** after deploy + `RELEASES.md` — the ship exits as soon as GAS is done; you do not wait for the mix.
 
 | Flag on milestone | Effect |
 |-------------------|--------|
-| *(default)* | Refresh `claude-pack/repomix-output.md` (soft-fail: pack errors do not undo the GAS ship) |
-| `--no-repomix` | Skip pack refresh (faster ship) |
+| *(default)* | Start background refresh of `claude-pack/repomix-output.md` (log: `claude-pack/repomix-last-run.log`; pack errors do not undo the GAS ship) |
+| `--no-repomix` | Skip pack refresh |
 
 Upload to Claude / quote.ai project knowledge remains **manual** (drag the file) — Anthropic has no official project-knowledge API/MCP upload.
 
