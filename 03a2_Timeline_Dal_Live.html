@@ -1529,6 +1529,13 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
       if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
     }
   }
+  if ((isOpen !== wasOpenBefore || (!isOpen && !isOpening)) &&
+      typeof window.refreshCalForkFlagsNow_ === 'function') {
+    if (!isOpen && !isOpening && typeof window.calOptimisticClearFork_ === 'function') {
+      window.calOptimisticClearFork_(projectId, 'timeline');
+    }
+    window.refreshCalForkFlagsNow_();
+  }
 };
 
 window.stopDalTimelineStateSync_ = function() {

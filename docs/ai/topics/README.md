@@ -18,6 +18,7 @@ One file per feature area. **Read only the topic you need.**
 - [database-ops.md](database-ops.md) — backup/restore + push admin
 - [financials.md](financials.md) — financials & quoting
 - [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — future campaign: offer/invoice, crew swap, availability conflicts (after Part B)
+- [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — future campaign: Logistics_Ledger SoT + PA truck-column migration (after Part B + offer)
 - [logistics-warehouse.md](logistics-warehouse.md) — warehouse RFID, station gun, gate
 - [project-assets-concurrency.md](project-assets-concurrency.md) — multi-user Project Assets
 - [compliance.md](compliance.md) — compliance & H&S

@@ -40,7 +40,7 @@ Today `Operations_Ledger` is mostly checkout/check-in scans. During prep the led
 - [ ] Add asset to project list
 - [ ] Pack / unpack / qty changes
 - [ ] Checkout scans
-- [ ] Truck placement (which truck, XYZ slot) — phased
+- [ ] Truck placement (which truck, XYZ slot) — phased; **target SoT when ledger ships:** [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) (not `Operations_Ledger`)
 - [ ] Check-in / recovery (symmetric session type later)
 
 ---
@@ -64,7 +64,7 @@ Today `Operations_Ledger` is mostly checkout/check-in scans. During prep the led
 | Project Assets rows | Firebase | `Project_Assets` sheet |
 | Operations ledger events | Firebase | `Operations_Ledger` |
 | Checkout session state | Firebase | `Projects_Index` + ledger |
-| Truck arrangement | Firebase (phased) | truck/load tables + PA refs |
+| Truck arrangement | Firebase (phased) | **Future:** `Logistics_Ledger` ([logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md)); today still PA outbound_/inbound_ cols |
 | Logistics hub (auto-pack / arrange) | Firebase-backed UI (phased) | PA + containers per EQUIPMENT_MODEL |
 
 **Not on fork:** timeline, global tasks, crew roster, vault master data, financials.

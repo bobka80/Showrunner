@@ -474,7 +474,9 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Live pull-in (Part B3):** Watchers run only while PA modal / timeline layer is open — never yank from calendar. Peer soft-switch → SYNC **Live — joining…** then **Live**. Phone PA: no auto-start; same watcher auto-joins.
 
-**Cue phases (Part B5):** SYNC status uses `dalForkPhaseStatusText_` — Normal (hide) / Opening / Live / Closing — committing…; idle T−5 copy stubbed for B4 (`dalPrepIdleWarn_` / `dalTlIdleWarn_`).
+**Cue phases (Part B5):** SYNC status uses `dalForkPhaseStatusText_` — Normal (hide) / Opening / Live / Closing — committing…; idle T−5 via B4.
+
+**Idle / auto-close (Part B4 @ v703+):** Timeline idle **45m** / prep **75m**; T−5 SYNC **Session closing — tap to keep open**; last leave + idle call same `closeDalSession` commit path; station presence blocks prep idle eject; presence ping ~**45s**, server stale **150s**.
 
 ```
 START PREP (local)

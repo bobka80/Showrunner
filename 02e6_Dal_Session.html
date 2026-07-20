@@ -351,6 +351,12 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
       window.dalUpdateRemotePendingBanner_();
     }
   }
+  if (changed && typeof window.refreshCalForkFlagsNow_ === 'function') {
+    if (!isPrepOpen && typeof window.calOptimisticClearFork_ === 'function') {
+      window.calOptimisticClearFork_(projectId, 'prep');
+    }
+    window.refreshCalForkFlagsNow_();
+  }
 };
 
 window.dalCanShowPrepButtons = function() {

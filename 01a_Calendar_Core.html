@@ -180,8 +180,11 @@ document.addEventListener('DOMContentLoaded', function() {
           let safeTitle = typeof escapeHTML === 'function' ? escapeHTML(arg.event.title) : String(arg.event.title).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
           // Fork chrome: orange (PA) on top, blue (timeline) underneath — after the name
-          let forkFlags = (window.calForkFlags_ && window.calForkFlags_[arg.event.id]) || null;
-          if (!forkFlags) {
+          let forkFlags;
+          if (window.calForkFlagsReady_) {
+            forkFlags = (window.calForkFlags_ && window.calForkFlags_[arg.event.id])
+              || { prep: false, timeline: false };
+          } else {
             let raw = arg.event.extendedProps.rawDbData || {};
             forkFlags = { prep: !!raw.dalPrepFork, timeline: !!raw.dalTimelineFork };
           }
@@ -734,6 +737,8 @@ document.addEventListener('DOMContentLoaded', function() {
 window.calForkFlags_ = window.calForkFlags_ || {};
 window.calForkFlagsPollTimer_ = null;
 window.calForkFlagsSig_ = '';
+window.calForkFlagsReady_ = false; // after first map, missing id = no dots (do not fall back to stale rawDbData)
+window.calForkFlagsPollInFlight_ = false;
 
 window.calForkFlagsFromProjects_ = function(projects) {
   var map = {};
@@ -744,34 +749,89 @@ window.calForkFlagsFromProjects_ = function(projects) {
     }
   });
   window.calForkFlags_ = map;
+  window.calForkFlagsReady_ = true;
   try { window.calForkFlagsSig_ = JSON.stringify(map); } catch (e0) { window.calForkFlagsSig_ = ''; }
+};
+
+/** Force FullCalendar to rebuild rollup event HTML (render() alone may keep stale eventContent). */
+window.calRepaintForkDots_ = function() {
+  try {
+    if (typeof calendar === 'undefined' || !calendar || typeof calendar.getEvents !== 'function') return;
+    var map = window.calForkFlags_ || {};
+    calendar.getEvents().forEach(function(ev) {
+      if (!ev || !ev.extendedProps || !ev.extendedProps.isRollup) return;
+      var id = String(ev.id || '');
+      var flags = map[id] || { prep: false, timeline: false };
+      var raw = ev.extendedProps.rawDbData || {};
+      var nextPrep = !!flags.prep;
+      var nextTl = !!flags.timeline;
+      var sig = (nextPrep ? '1' : '0') + (nextTl ? '1' : '0');
+      // New object required — mutating raw in place may not trigger FullCalendar eventContent.
+      var next = {};
+      for (var k in raw) {
+        if (Object.prototype.hasOwnProperty.call(raw, k)) next[k] = raw[k];
+      }
+      next.dalPrepFork = nextPrep;
+      next.dalTimelineFork = nextTl;
+      ev.setExtendedProp('rawDbData', next);
+      ev.setExtendedProp('forkDotSig', sig);
+    });
+  } catch (e2) {
+    try {
+      if (calendar && typeof calendar.render === 'function') calendar.render();
+    } catch (e3) { /* ignore */ }
+  }
 };
 
 window.calApplyForkFlagsMap_ = function(map) {
   map = map || {};
   var sig = '';
   try { sig = JSON.stringify(map); } catch (e1) { sig = ''; }
+  window.calForkFlagsReady_ = true;
   if (sig === window.calForkFlagsSig_) return false;
   window.calForkFlags_ = map;
   window.calForkFlagsSig_ = sig;
-  try {
-    if (typeof calendar !== 'undefined' && calendar && typeof calendar.render === 'function') {
-      calendar.render();
-    }
-  } catch (e2) { /* ignore */ }
+  if (typeof window.calRepaintForkDots_ === 'function') window.calRepaintForkDots_();
   return true;
+};
+
+window.refreshCalForkFlagsNow_ = function() {
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+  if (window.calForkFlagsPollInFlight_) return;
+  window.calForkFlagsPollInFlight_ = true;
+  google.script.run
+    .withFailureHandler(function() {
+      window.calForkFlagsPollInFlight_ = false;
+    })
+    .withSuccessHandler(function(map) {
+      window.calForkFlagsPollInFlight_ = false;
+      if (typeof window.calApplyForkFlagsMap_ === 'function') window.calApplyForkFlagsMap_(map || {});
+    })
+    .getOpenDalForkMap();
+};
+
+/** Instant local clear (END PREP / END COLLAB) before Sheets poll catches up. */
+window.calOptimisticClearFork_ = function(projectId, domain) {
+  var id = String(projectId || '');
+  if (!id) return;
+  window.calForkFlagsReady_ = true;
+  var map = {};
+  var src = window.calForkFlags_ || {};
+  Object.keys(src).forEach(function(k) {
+    map[k] = { prep: !!src[k].prep, timeline: !!src[k].timeline };
+  });
+  var cur = map[id] || { prep: false, timeline: false };
+  if (domain === 'prep' || domain === 'pa') cur.prep = false;
+  if (domain === 'timeline' || domain === 'timelineCollab') cur.timeline = false;
+  if (cur.prep || cur.timeline) map[id] = cur;
+  else delete map[id];
+  if (typeof window.calApplyForkFlagsMap_ === 'function') window.calApplyForkFlagsMap_(map);
 };
 
 window.startCalForkFlagsPoll_ = function() {
   if (window.calForkFlagsPollTimer_) return;
   var tick = function() {
-    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
-    google.script.run
-      .withFailureHandler(function() { /* keep last */ })
-      .withSuccessHandler(function(map) {
-        if (typeof window.calApplyForkFlagsMap_ === 'function') window.calApplyForkFlagsMap_(map || {});
-      })
-      .getOpenDalForkMap();
+    if (typeof window.refreshCalForkFlagsNow_ === 'function') window.refreshCalForkFlagsNow_();
   };
   tick();
   window.calForkFlagsPollTimer_ = setInterval(tick, 15000);

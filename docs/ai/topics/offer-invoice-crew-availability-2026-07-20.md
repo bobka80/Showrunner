@@ -1,11 +1,11 @@
 # Offer / Invoice · Crew Timeline Swap · Availability Conflicts
 
 **Status:** Future campaign — **locked brainstorm** filed 2026-07-20. **Not active.** Do **not** implement until the director confirms sequencing has reached this campaign.  
-**Sequencing:** Queued **behind** Multi-user fork **Part A** (done) and **Part B** (auto fork) — [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).  
+**Sequencing:** Queued **behind** Multi-user fork **Part A** (done) and **Part B** (auto fork) — [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md). Soft/hard **detection implementation** further depends on the Logistics Ledger campaign (queued **after** this offer work).  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Related area topics:** [financials.md](financials.md) · [availability-fleet.md](availability-fleet.md) · [timeline-shift-field-crew.md](timeline-shift-field-crew.md)
 
-**Companion (conflicts / soft-hard detection):** [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — ledger is the source of truth for conflict detection (**supersedes** timeline-walking in §3.4 below). If that file is missing, file it before building soft/hard conflicts.
+**Companion (movement SoT / conflict schema):** [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — schema homework locked; ledger is the source of truth for conflict detection (**supersedes** timeline-walking in §3.4 below). Do not implement soft/hard against PA truck columns or timeline-walk.
 
 ---
 
@@ -142,7 +142,7 @@ Earlier finding: Project_Assets lacked dedicated load/unload timestamp fields; l
 | Doc | Role |
 |-----|------|
 | This file | Locked product decisions + campaign checklist |
-| [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) | Ledger schema enabling precise soft-conflict detection |
+| [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) | Full campaign: Logistics_Ledger fields, PA migration, Conflicts cutover |
 | [financials.md](financials.md) | Existing offer/print shipped surface |
 | [availability-fleet.md](availability-fleet.md) | Existing tracker matrix surface |
 
@@ -154,7 +154,7 @@ Earlier finding: Project_Assets lacked dedicated load/unload timestamp fields; l
 
 - [ ] Director confirms sequencing has reached this campaign (after Part B / as directed)
 - [ ] **Web research:** same-company offer vs invoice example — legal/formatting differences (§1.2) — before final invoice field lock
-- [ ] Companion [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) filed and agreed (if not already)
+- [ ] Logistics Ledger campaign sequenced (schema locked in companion; implement **after** this offer campaign unless director reorders)
 
 ### Investigations (may run as early slices if director OK go)
 
@@ -172,7 +172,7 @@ Earlier finding: Project_Assets lacked dedicated load/unload timestamp fields; l
 - [ ] **Create Invoice from this Offer** + invoice-only fields (§1.2) — after research
 - [ ] Handover print signature blocks (§1.7)
 - [ ] Timeline crew name click → same-department swap, preserve slot/hours/role/rate (§2)
-- [ ] Soft vs hard conflict detection against **Logistics_Ledger** (§3.3 + companion)
+- [ ] Soft vs hard conflict detection against **Logistics_Ledger** (§3.3) — **blocked on** [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) campaign
 - [ ] Day-view equipment / event / truck journey UI per §3.2
 
 ### Explicitly deferred
