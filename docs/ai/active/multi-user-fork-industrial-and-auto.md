@@ -7,9 +7,9 @@
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Part B behavior complete** — B0–B5 @ through **v703** (B4 idle). **Next: B6 checklist + B7 floor smoke / exit**. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
+**Opened:** 2026-07-18 · **Status:** **B6 checklist verified** — Part B behavior matches topic matrix (station PA start = host/`canOpenDalPrep` gate, intentional). **Next: B7 floor smoke** (director) → archive when agreed. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
-**Latest:** One toast + sticky peer note in live-sync roster **v673**.  
+**Latest shipped:** False auto-close alerts **GAS v717** · commit fail-safe B **v711–v712** · B0 baseline **v693**.  
   
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md).
 
@@ -255,19 +255,41 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 - [x] Frozen vs editable; idle warning; “joining…” pull-in  
 *(Idle warning copy stubbed — timers/eject land in B4 at end of Part B.)*
 
-### B6 — Part B checklist (from topic — leave until built)
+### B6 — Part B checklist (from topic — verified 2026-07-21)
 
-- [ ] Timeline: desktop+edit auto-start; others join-only; station never starts timeline  
-- [ ] PA: desktop auto-start; phone button-only; station always start/join  
-- [ ] Opening / pull-in / freelancer exclusion / idle / cues  
-- [ ] Baseline → try → keep or rollback  
+- [x] Timeline: desktop+edit auto-start; others join-only; station never starts timeline  
+- [x] PA: desktop auto-start; phone button-only; station start/join when host active or `canOpenDalPrep` (not unconditional DEVICE — intentional)  
+- [x] Opening / pull-in / freelancer exclusion / idle / cues  
+- [x] Baseline → try → keep or rollback (B0 @ v693 still floor rollback pin for Part B dislike)
 
 ### B7 — Part B exit
 
-- [ ] Director floor smoke both domains  
+- [ ] Director floor smoke both domains — use **§ B7 floor smoke card** below  
 - [ ] Update topic checklists; FRAGILE if lifecycle rules changed  
 - [ ] Campaign status → complete → archive when director agrees  
 
+### B7 floor smoke card (director)
+
+Hard refresh web.app (GAS **v717+**). Use a **test** project only.
+
+**Prep (PA)**
+
+1. Desktop LO: open PA → prep auto-starts (or Start) → Live cue; change qty; peer phone opens same PA → joins (no phone auto-start from hub alone).  
+2. Station: open project PA → start/join; Back as last person → **silent** commit (no false auto-close alert); reopen PA → list matches.  
+3. Two desktops: A opens prep; B already on PA → pull-in / joining → both Live.  
+4. Idle (optional): leave prep open alone ~warn at T−5 of 75m — or skip and trust unit. Station must **not** idle-eject while docked.  
+5. Freelancer account: no live prep latch / no begin.
+
+**Timeline**
+
+1. Desktop+edit: open timeline → collab auto-starts; station must **not** start timeline.  
+2. Peer joins; Opening freeze if you catch it; Live edits; End or last-leave → commit.  
+3. Idle 45m path optional.
+
+**Pass:** no false “Auto-close prep failed”; Sheets match last Live list; no orphan open room after last leave.  
+**Fail:** note exact alert text + surface (station/desktop/phone) → stay on campaign; do not archive.
+
+**Still deferred (not B7 blockers):** none for commit C — **C shipped** (see changelog).
 ---
 
 ## Primary code touchpoints (expect)
@@ -334,7 +356,9 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | **Commit fail-safe B @ GAS v711–v712:** refuse empty PA wipe; `dal_commit_backups/` snapshot; restore Sheets on fail; clear fork only after reconcile; timeline flush/restore; no mid-flight double commit. **Next C:** red-dot + retry UI. |
 | 2026-07-20 | **Auto-close `no_project` @ GAS v713:** station/mobile leave cleared `edit-folder-id` before async last-leave → sync aborted with fail-safe intact. Resolve projectId from watcher/session/hub/presence; pass into close + idle. |
 | 2026-07-20 | **Auto-close already-closed @ GAS v715:** stale latch double-leave → `No open prep session` wrapped as Database Lockout (retry filter missed "prep"). Idempotent close + probe before Firebase write. |
-| 2026-07-21 | **False auto-close alerts:** wait/poll on `committing`; re-probe on close/write fail; probe fail ≠ assume open; station teardown skip re-arm last-leave; close actor = ACTIVE_USER_NAME. |
+| 2026-07-21 | **False auto-close alerts @ GAS v717:** wait/poll on `committing`; re-probe on close/write fail; probe fail ≠ assume open; station teardown skip re-arm last-leave; close actor = ACTIVE_USER_NAME. |
+| 2026-07-21 | **B6 verified:** Part B checklist vs code — 7 PASS, station PA “always” = PARTIAL (host/`canOpenDalPrep` gate, intentional). **Next: B7** floor smoke (card in hub). |
+| 2026-07-21 | **Commit fail-safe C:** `dal_commit_retry/{projectId}` pointer only on real Sheets/reconcile fail; PA/TL Retry UI; idempotent (no fork → alreadyOk). False auto-close alerts do **not** set the pointer. |
 
 ---
 

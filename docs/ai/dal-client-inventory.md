@@ -43,7 +43,9 @@
 | `beginDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `closeDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `finishDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
+| `getDalCommitRetryStatus` | `02e6_Dal_Session.html` |
 | `getDalSessionInfo` | `02_Project_Editor_Core.html`, `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html` |
+| `retryDalFailedCommit` | `02e6_Dal_Session.html` |
 | `getDalFirebaseClientAuth` | `02e7_Dal_Firestore_Client.html` |
 | `deleteProjectFull` | `02_Project_Editor_Core.html` |
 | `generateProjectFolders` | `02_Project_Editor_Core.html` |
@@ -200,7 +202,7 @@
 | 02e3_Logic_Clipboard.html | 0 | 0 |
 | 02e4_Logic_Containers.html | 0 | 0 |
 | 02e5_Logic_Sync.html | 2 | 0 |
-| 02e6_Dal_Session.html | 4 | 0 |
+| 02e6_Dal_Session.html | 6 | 0 |
 | 02e7_Dal_Firestore_Client.html | 2 | 0 |
 | 02g_Project_Reports.html | 0 | 2 |
 | 03a_Timeline_Boot.html | 4 | 0 |

@@ -145,18 +145,19 @@ Exact art/copy TBD at build; behavior above is locked.
 - Auto-starting timeline from station.
 - Phone auto-starting PA without the button.
 
-### 10. Checklist (when building — leave unchecked until then)
+### 10. Checklist (Part B — verified in hub B6 @ 2026-07-21)
 
-- [ ] Timeline: desktop+edit auto-start; others join-only; station never starts timeline
-- [ ] PA: desktop auto-start; phone button-only start; station always start/join
-- [ ] Opening: starter-only + entry delta; freeze+sign for others; timeout + take over
-- [ ] Live pull-in for early watchers on same view (soft switch + banner)
-- [ ] Freelancers excluded from all live fork visibility/join
-- [ ] Close: last leave ∪ End ∪ idle; always commit
-- [ ] Idle: 45m timeline / 75m prep; T−5 keep-open; station heartbeat blocks idle close
-- [ ] Redesigned visual cues same milestone
-- [ ] Baseline milestone → try → keep or rollback
+- [x] Timeline: desktop+edit auto-start; others join-only; station never starts timeline
+- [x] PA: desktop auto-start; phone button-only start; station start/join when host/`canOpenDalPrep`
+- [x] Opening: starter-only + entry delta; freeze+sign for others; timeout + take over
+- [x] Live pull-in for early watchers on same view (soft switch + banner)
+- [x] Freelancers excluded from all live fork visibility/join
+- [x] Close: last leave ∪ End ∪ idle; always commit
+- [x] Idle: 45m timeline / 75m prep; T−5 keep-open; station heartbeat blocks idle close
+- [x] Redesigned visual cues same milestone
+- [x] Baseline milestone → try → keep or rollback (B0 @ v693)
 
+Floor exit: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) § B7.
 ---
 
 
@@ -222,16 +223,15 @@ Exact art/copy TBD at build; behavior above is locked.
 - [ ] Grace period, force-close, session history export to `SM_Showrunner_LOGS` optional
 
 ### After campaign — optional UX → **active campaign Part B**
-- [ ] Auto fork + live pull-in + Opening warm-up + idle eject (timeline **and** PA) — see [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) Part B; milestone-before-try / revert-if-disliked; freelancers excluded from live
-
+- [x] Auto fork + live pull-in + Opening warm-up + idle eject (timeline **and** PA) — code complete; **B7 floor smoke** pending — [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md)
 ---
 
 ## Comparison to prep session
 
 | | Prep session | Timeline session |
 |--|--------------|------------------|
-| **Ends when** | Last leave ∪ End ∪ idle eject (optional post-campaign — see § above); today still manager **End preparation** | Last leave ∪ End ∪ idle eject (optional post-campaign) |
-| **Who starts (optional post-campaign)** | Desktop+creds / station always / phone button only | Desktop + timeline **edit** creds only |
+| **Ends when** | Last leave ∪ End ∪ idle eject | Last leave ∪ End ∪ idle eject |
+| **Who starts** | Desktop+creds / station host-or-creds / phone button only | Desktop + timeline **edit** creds only |
 | **Data** | PA + ledger + trucks | Shifts / phases |
 
 Both use [session-fork-platform.md](session-fork-platform.md).

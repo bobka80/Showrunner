@@ -348,6 +348,9 @@ function openShiftLayout(mode, isReadOnly = false) {
           if (typeof window.maybeAutoOpenDalTimeline_ === 'function') {
             window.maybeAutoOpenDalTimeline_();
           }
+          if (typeof window.dalRefreshCommitRetryCue_ === 'function') {
+            window.dalRefreshCommitRetryCue_(typeof targetFolderId !== 'undefined' ? targetFolderId : '');
+          }
           
       } catch (err) {
           document.getElementById('tt-rows-container').innerHTML = `<div style="color:#ef4444; padding:20px; font-weight:bold;">Client Error: ${err.message}</div>`;

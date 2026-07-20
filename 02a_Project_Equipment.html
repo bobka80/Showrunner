@@ -40,6 +40,10 @@
       </div>
     </div>
     <div id="dal-session-banner" style="display:none !important;" aria-hidden="true"></div>
+    <div id="dal-commit-retry-banner" class="req-view_logistics" style="display:none; padding:8px 14px; background:#450a0a; border-bottom:1px solid #ef4444; color:#fecaca; font-size:12px; font-weight:700; flex-shrink:0; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+      <span id="dal-commit-retry-msg" style="flex:1; min-width:0;">Commit not finished — Sheets were protected. Retry when ready.</span>
+      <button type="button" id="dal-commit-retry-btn" class="btn-outline btn-sm" style="border-color:#fca5a5; color:#fecaca; margin:0; flex-shrink:0;" onclick="window.dalRetryFailedCommitUi_ && window.dalRetryFailedCommitUi_('prep')">RETRY COMMIT</button>
+    </div>
 
     <div id="pa-mobile-mode-bar" style="display:none; padding:8px 10px; background:#111; border-bottom:1px solid #333; align-items:center; gap:8px; flex-wrap:wrap; flex-shrink:0;"></div>
     <div id="mobile-pa-unsaved-bar" style="display:none; padding:8px 12px; background:#422006; border-bottom:1px solid #f59e0b; color:#fcd34d; font-size:11px; font-weight:800; letter-spacing:0.04em; flex-shrink:0; align-items:center; justify-content:space-between; gap:10px;">
@@ -336,6 +340,7 @@ function openProjectAssetsModal() {
     document.getElementById('project-assets-modal-overlay').style.display = 'flex';
     if (typeof applyProjectAssetsReadOnly === 'function') applyProjectAssetsReadOnly(assetsReadOnly);
     if (typeof window.maybeAutoOpenDalPrep_ === 'function') window.maybeAutoOpenDalPrep_();
+    if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);
     
     if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
         try {

@@ -6,7 +6,7 @@
 
 **Related:** [project-assets-concurrency.md](project-assets-concurrency.md) · [logistics-warehouse.md](logistics-warehouse.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Status:** Partial — prep PA fork via DAL Phase 4 Slice B live; fuller floor UX still open. Auto-fork = multi-user **Part B**.
+**Status:** Partial — prep PA fork live; **Part B auto-fork code complete** (B6 verified); **B7 floor smoke** pending — [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).
 
 **Live sync:** Production / prep live rollback GAS **v654** + `host-boot.js?v=653`. **Floor scope (locked):** search/formula batch absolute adds primary; packing + RFID checkout parallel; floor +/- secondary — [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
 

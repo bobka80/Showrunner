@@ -16,7 +16,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-20)
 
-**Primary campaign (NEXT):** Multi-user fork **Part B** (auto fork) — Part A complete @ v678. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
+**Primary campaign (NEXT):** Multi-user fork **Part B** — B6 verified; **B7 floor smoke** then archive. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
 
 **Operational logs:** Bug journal [error-journal/](error-journal/) · root `RELEASES.md` / `WORKS_LOG.md`.
 
@@ -24,7 +24,7 @@ Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Multi-user fork Part B** | **NEXT** — auto fork + live pull-in + idle eject | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| **Multi-user fork Part B** | **B7 floor smoke** — B6 checklist verified; then archive | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog brief — OK go per domain | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
 | **Phone app** | In-flight mobile (parallel) | [topics/mobile-crew.md](topics/mobile-crew.md) |
@@ -35,7 +35,7 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Multi-user fork: test pipeline → bulletproof → auto fork** | **NEXT Part B** — Part A complete @ v678 | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **Multi-user fork: test pipeline → bulletproof → auto fork** | **B7 floor smoke** — B6 verified 2026-07-21 | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 
 **Operational log (not a campaign):** [error-journal/](error-journal/) — lasting bug memory from Report → Hand over packs. Day files: [error-journal/days/](error-journal/days/).

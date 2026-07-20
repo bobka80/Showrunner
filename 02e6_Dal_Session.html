@@ -834,6 +834,7 @@ window.closeDalPrepSession = function(opts) {
       window.dalUpdateRemotePendingBanner_();
     }
     if (typeof window.startDalPrepSessionPoll_ === 'function') window.startDalPrepSessionPoll_(projectId);
+    if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);
     var msg = (errOrMsg && errOrMsg.message) ? dalPrepErrMsg_(errOrMsg) : String(errOrMsg || 'Unknown error');
     alert(opts.auto ? ('Auto-close prep failed:\n\n' + msg) : ('End prep failed:\n\n' + msg));
   };
@@ -850,6 +851,7 @@ window.closeDalPrepSession = function(opts) {
     else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
     window.dalPrepClosing = false;
     window.dalPrepClosingUi_ = false;
+    if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);
     doneMsg_();
   };
 
@@ -983,5 +985,120 @@ window.closeDalPrepSession = function(opts) {
   // Probe Sheets first — do not reseed Firebase when the domain is already closed
   // (stale latch / double last-leave after a successful peer or prior commit).
   probeSession_(false);
+};
+
+/**
+ * Fail-safe C — red-dot / Retry from server pointer only (dal_commit_retry/{projectId}).
+ * False auto-close alerts never set that pointer, so they never show this cue.
+ */
+window.dalCommitRetryStatus_ = null;
+
+window.dalPaintCommitRetryCue_ = function(status) {
+  status = status || { prep: null, timeline: null };
+  window.dalCommitRetryStatus_ = status;
+
+  var paBanner = document.getElementById('dal-commit-retry-banner');
+  var paMsg = document.getElementById('dal-commit-retry-msg');
+  if (paBanner) {
+    if (status.prep && status.prep.needsRetry) {
+      paBanner.style.display = 'flex';
+      if (paMsg) {
+        paMsg.textContent = 'Equipment commit did not finish — Sheets were left safe. Retry commit when ready.' +
+          (status.prep.reason ? (' (' + String(status.prep.reason).slice(0, 80) + ')') : '');
+      }
+    } else {
+      paBanner.style.display = 'none';
+    }
+  }
+
+  var tlBanner = document.getElementById('dal-timeline-commit-retry-banner');
+  var tlMsg = document.getElementById('dal-timeline-commit-retry-msg');
+  if (tlBanner) {
+    if (status.timeline && status.timeline.needsRetry) {
+      tlBanner.style.display = 'flex';
+      if (tlMsg) {
+        tlMsg.textContent = 'Timeline commit did not finish — Sheets were left safe. Retry when ready.';
+      }
+    } else {
+      tlBanner.style.display = 'none';
+    }
+  }
+
+  // Small red cue on END PREP / END COLLAB labels when pending (does not force-show buttons).
+  try {
+    var endPrep = document.getElementById('dal-prep-end-btn');
+    if (endPrep) {
+      if (status.prep && status.prep.needsRetry) endPrep.setAttribute('data-commit-retry', '1');
+      else endPrep.removeAttribute('data-commit-retry');
+    }
+    var endTl = document.getElementById('dal-timeline-end-btn');
+    if (endTl) {
+      if (status.timeline && status.timeline.needsRetry) endTl.setAttribute('data-commit-retry', '1');
+      else endTl.removeAttribute('data-commit-retry');
+    }
+  } catch (eCue) { /* ignore */ }
+};
+
+window.dalRefreshCommitRetryCue_ = function(projectId) {
+  projectId = projectId || (typeof window.dalResolvePrepProjectId_ === 'function'
+    ? window.dalResolvePrepProjectId_()
+    : '');
+  if (!projectId || projectId === 'NEW') {
+    window.dalPaintCommitRetryCue_({ prep: null, timeline: null });
+    return;
+  }
+  google.script.run
+    .withFailureHandler(function() { /* keep last cue */ })
+    .withSuccessHandler(function(status) {
+      window.dalPaintCommitRetryCue_(status || { prep: null, timeline: null });
+    })
+    .getDalCommitRetryStatus(projectId);
+};
+
+window.dalRetryFailedCommitUi_ = function(domain) {
+  domain = domain === 'timeline' ? 'timeline' : 'prep';
+  var projectId = typeof window.dalResolvePrepProjectId_ === 'function'
+    ? window.dalResolvePrepProjectId_()
+    : (document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '');
+  if (!projectId || projectId === 'NEW') {
+    alert('Missing project id.');
+    return;
+  }
+  var label = domain === 'timeline' ? 'timeline' : 'equipment';
+  if (!confirm('Retry ' + label + ' commit to Google Sheets?\n\nOnly runs if the server still has a failed-commit record (not a false leave alert).')) {
+    return;
+  }
+  var actor = typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME
+    ? String(ACTIVE_USER_NAME)
+    : (typeof assetOpsActor === 'function' ? assetOpsActor() : 'System');
+  var btn = document.getElementById(domain === 'timeline' ? 'dal-timeline-commit-retry-btn' : 'dal-commit-retry-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'RETRYING…'; }
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'RETRY COMMIT';
+      }
+      window.dalRefreshCommitRetryCue_(projectId);
+      alert('Retry commit failed:\n\n' + dalPrepErrMsg_(err));
+    })
+    .withSuccessHandler(function(res) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'RETRY COMMIT';
+      }
+      window.dalRefreshCommitRetryCue_(projectId);
+      if (res && res.alreadyOk) {
+        // Silent — nothing to do; cue cleared by server.
+        return;
+      }
+      if (typeof window.dalCacheInvalidatePa_ === 'function' && domain === 'prep') {
+        window.dalCacheInvalidatePa_(projectId);
+      }
+      if (typeof window.dalCacheInvalidateTimeline_ === 'function' && domain === 'timeline') {
+        window.dalCacheInvalidateTimeline_(projectId);
+      }
+    })
+    .retryDalFailedCommit(projectId, domain, actor);
 };
 </script>

@@ -1619,6 +1619,18 @@
         font-family: 'Inter', sans-serif;
     }
     .surface-fork-sync-bar--visible { display: flex !important; }
+    #dal-prep-end-btn[data-commit-retry="1"]::after,
+    #dal-timeline-end-btn[data-commit-retry="1"]::after {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-left: 6px;
+        border-radius: 50%;
+        background: #ef4444;
+        box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.35);
+        vertical-align: middle;
+    }
     .surface-fork-sync-bar--pa {
         background: #c2410c;
         color: #fffbeb;

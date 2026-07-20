@@ -440,18 +440,22 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
     } catch (restoreErr) {
       try {
         dalAlertFailedWrite_(projectId, 'assets', actor,
-          'Sheets commit failed AND restore failed. Backup at assets/_commit_backup. ' +
+          'Sheets commit failed AND restore failed. Backup at dal_commit_backups. ' +
           (sheetErr.message || sheetErr) + ' / restore: ' + (restoreErr.message || restoreErr));
       } catch (eA) { /* ignore */ }
+      dalMarkCommitRetryNeeded_(projectId, 'prep', sessionUid,
+        'PREP_COMMIT_SHEETS_FAILED (restore also failed): ' + (sheetErr.message || sheetErr));
       throw new Error(
         'PREP_COMMIT_SHEETS_FAILED: ' + (sheetErr.message || sheetErr) +
-        ' — restore also failed; Firebase fork + _commit_backup kept.'
+        ' — restore also failed; Firebase fork + backup kept for retry.'
       );
     }
     try {
       dalAlertFailedWrite_(projectId, 'assets', actor,
         'Sheets commit failed; restored previous Sheets rows. Fork kept. ' + (sheetErr.message || sheetErr));
     } catch (eA2) { /* ignore */ }
+    dalMarkCommitRetryNeeded_(projectId, 'prep', sessionUid,
+      'PREP_COMMIT_SHEETS_FAILED: ' + (sheetErr.message || sheetErr));
     throw new Error(
       'PREP_COMMIT_SHEETS_FAILED: ' + (sheetErr.message || sheetErr) +
       ' — previous Sheets restored; Firebase fork kept for retry.'
@@ -485,20 +489,23 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
         dalAlertFailedWrite_(projectId, 'assets', actor,
           'Reconcile mismatch; Sheets restore failed. Backup kept. ' + (restoreErr2.message || restoreErr2));
       } catch (eA3) { /* ignore */ }
+      dalMarkCommitRetryNeeded_(projectId, 'prep', sessionUid, 'PREP_COMMIT_RECONCILE_FAILED (restore also failed)');
       throw new Error(
-        'PREP_COMMIT_RECONCILE_FAILED: Sheets may be wrong; Firebase fork + _commit_backup kept.'
+        'PREP_COMMIT_RECONCILE_FAILED: Sheets may be wrong; Firebase fork + backup kept for retry.'
       );
     }
     try {
       dalAlertFailedWrite_(projectId, 'assets', actor,
         'Reconcile mismatch after commit — restored previous Sheets; Firebase fork kept for retry.');
     } catch (eA4) { /* ignore */ }
+    dalMarkCommitRetryNeeded_(projectId, 'prep', sessionUid, 'PREP_COMMIT_RECONCILE_FAILED');
     throw new Error(
       'PREP_COMMIT_RECONCILE_FAILED: previous Sheets restored; Firebase fork kept for retry.'
     );
   }
 
-  // Verified — only now clear live fork. Backup stays under dal_commit_backups/ for recovery (C).
+  // Verified — only now clear live fork + retry cue. Backup retained with needsRetry=false.
+  dalClearCommitRetryNeeded_(projectId, 'prep');
   try {
     firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
   } catch (eMeta) { /* continue */ }
@@ -528,6 +535,8 @@ function dalWritePaCommitBackup_(projectId, sessionUid, actor, previousObjects, 
     previousCount: (previousObjects || []).length,
     intendedCount: (intendedObjects || []).length,
     pocketed: false,
+    needsRetry: false,
+    status: 'pre_commit',
     previousJson: prevJson,
     intendedJson: intJson
   };
@@ -553,6 +562,207 @@ function dalWritePaCommitBackup_(projectId, sessionUid, actor, previousObjects, 
     }
   }
   firestoreWriteDocument_(dalPaCommitBackupPath_(projectId, sessionUid), doc);
+}
+
+/** Fail-safe C — pointer doc; red-dot only when needsRetry is true (not on every backup). */
+function dalCommitRetryDocPath_(projectId) {
+  return 'dal_commit_retry/' + String(projectId || '');
+}
+
+function dalMarkCommitRetryNeeded_(projectId, domain, sessionUid, reason) {
+  projectId = String(projectId || '');
+  if (!projectId) return;
+  var kind = (domain === 'timeline' || domain === 'timelineCollab') ? 'timeline' : 'prep';
+  var path = dalCommitRetryDocPath_(projectId);
+  var existing = { projectId: projectId };
+  try {
+    var doc = firestoreFetch_('get', path);
+    if (doc && doc.fields) existing = firestoreDecodeFields_(doc.fields) || existing;
+  } catch (eRead) { /* new */ }
+  var entry = {
+    needsRetry: true,
+    sessionUid: String(sessionUid || ''),
+    reason: String(reason || '').slice(0, 500),
+    at: new Date().toISOString()
+  };
+  if (kind === 'prep') existing.prep = entry;
+  else existing.timeline = entry;
+  existing.projectId = projectId;
+  existing.updatedAt = entry.at;
+  try {
+    firestoreWriteDocument_(path, existing);
+  } catch (eWrite) { /* best effort */ }
+  try {
+    var bakPath = kind === 'prep'
+      ? dalPaCommitBackupPath_(projectId, sessionUid)
+      : ('dal_commit_backups/' + projectId + '__timeline__' + String(sessionUid || 'unknown'));
+    var bak = {};
+    try {
+      var bdoc = firestoreFetch_('get', bakPath);
+      if (bdoc && bdoc.fields) bak = firestoreDecodeFields_(bdoc.fields) || {};
+    } catch (eBak) { /* ignore */ }
+    bak.needsRetry = true;
+    bak.status = 'failed';
+    bak.failReason = entry.reason;
+    bak.failedAt = entry.at;
+    bak.projectId = projectId;
+    bak.sessionUid = String(sessionUid || '');
+    firestoreWriteDocument_(bakPath, bak);
+  } catch (eStamp) { /* ignore */ }
+}
+
+function dalClearCommitRetryNeeded_(projectId, domain) {
+  projectId = String(projectId || '');
+  if (!projectId) return;
+  var kind = (domain === 'timeline' || domain === 'timelineCollab') ? 'timeline' : 'prep';
+  var path = dalCommitRetryDocPath_(projectId);
+  var existing = null;
+  try {
+    var doc = firestoreFetch_('get', path);
+    if (doc && doc.fields) existing = firestoreDecodeFields_(doc.fields);
+  } catch (eRead) { existing = null; }
+  if (!existing) return;
+  if (kind === 'prep') {
+    if (existing.prep) {
+      existing.prep.needsRetry = false;
+      existing.prep.clearedAt = new Date().toISOString();
+      existing.prep.status = 'ok';
+    }
+  } else if (existing.timeline) {
+    existing.timeline.needsRetry = false;
+    existing.timeline.clearedAt = new Date().toISOString();
+    existing.timeline.status = 'ok';
+  }
+  existing.updatedAt = new Date().toISOString();
+  var prepActive = existing.prep && existing.prep.needsRetry;
+  var tlActive = existing.timeline && existing.timeline.needsRetry;
+  try {
+    if (!prepActive && !tlActive) {
+      firestoreDeleteDocument_(path);
+    } else {
+      firestoreWriteDocument_(path, existing);
+    }
+  } catch (eWrite) { /* ignore */ }
+}
+
+/**
+ * Client cue — only returns domains with needsRetry:true (server truth).
+ * False auto-close alerts never set this pointer.
+ */
+function getDalCommitRetryStatus(projectId) {
+  projectId = String(projectId || '');
+  var empty = { projectId: projectId, prep: null, timeline: null };
+  if (!projectId || projectId === 'NEW') return empty;
+  try {
+    var doc = firestoreFetch_('get', dalCommitRetryDocPath_(projectId));
+    if (!doc || !doc.fields) return empty;
+    var data = firestoreDecodeFields_(doc.fields) || {};
+    var prep = (data.prep && data.prep.needsRetry) ? data.prep : null;
+    var timeline = (data.timeline && data.timeline.needsRetry) ? data.timeline : null;
+    return { projectId: projectId, prep: prep, timeline: timeline };
+  } catch (e) {
+    return empty;
+  }
+}
+
+function dalPrepForkStillAlive_(projectId) {
+  try {
+    var meta = firestoreFetch_('get', 'projects/' + projectId + '/assets/_meta');
+    if (meta && meta.fields) return true;
+  } catch (e0) { /* ignore */ }
+  try {
+    var state = firestoreFetch_('get', 'projects/' + projectId + '/assets/state');
+    if (state && state.fields) {
+      var decoded = firestoreDecodeFields_(state.fields) || {};
+      var fixtures = [];
+      try { fixtures = JSON.parse(decoded.fixturesJson || '[]'); } catch (eP) { fixtures = []; }
+      if (fixtures && fixtures.length) return true;
+      if (Number(decoded.writeSeq || 0) > 0) return true;
+    }
+  } catch (e1) { /* ignore */ }
+  return false;
+}
+
+function dalTimelineForkStillAlive_(projectId) {
+  try {
+    var meta = firestoreFetch_('get', 'projects/' + projectId + '/timeline/_meta');
+    if (meta && meta.fields) return true;
+  } catch (e0) { /* ignore */ }
+  try {
+    var state = firestoreFetch_('get', dalFirestoreTimelineCollection_(projectId) + '/state');
+    if (state && state.fields) return true;
+  } catch (e1) { /* ignore */ }
+  return false;
+}
+
+/**
+ * Fail-safe C — manual Retry only. Idempotent: no pointer / no fork → alreadyOk (no Sheets write).
+ */
+function retryDalFailedCommit(projectId, domain, actor) {
+  projectId = String(projectId || '');
+  if (!projectId || projectId === 'NEW') throw new Error('Missing project id.');
+  var kind = (domain === 'timeline' || domain === 'timelineCollab') ? 'timeline' : 'prep';
+  var sessionType = kind === 'timeline' ? DAL_SESSION_TYPE.TIMELINE_COLLAB : DAL_SESSION_TYPE.PREP;
+  actor = actor || 'System';
+  if (kind === 'prep') assertActorCanManageDalPrepSession(actor);
+  else assertActorCanEditTimeline(actor);
+
+  var st = getDalCommitRetryStatus(projectId);
+  var entry = kind === 'prep' ? st.prep : st.timeline;
+  if (!entry || !entry.needsRetry) {
+    return { ok: true, alreadyOk: true, message: 'No failed commit pending — nothing to retry.' };
+  }
+
+  var info = getDalSessionInfo(projectId) || {};
+  var curStatus = '';
+  if (kind === 'prep') {
+    curStatus = String(info.prepStatus || (info.prep && info.prep.status) || '').toLowerCase();
+  } else {
+    curStatus = String(info.timelineStatus || (info.timeline && info.timeline.status) || '').toLowerCase();
+  }
+
+  if (curStatus === 'committing') {
+    throw new Error('Commit already in progress — wait for it to finish, then refresh.');
+  }
+
+  var forkAlive = kind === 'prep'
+    ? dalPrepForkStillAlive_(projectId)
+    : dalTimelineForkStillAlive_(projectId);
+
+  if (!forkAlive && curStatus !== 'open' && curStatus !== 'opening') {
+    dalClearCommitRetryNeeded_(projectId, kind);
+    return {
+      ok: true,
+      alreadyOk: true,
+      message: 'Commit already finished (no live fork) — cleared retry cue.'
+    };
+  }
+
+  if (curStatus === 'opening') {
+    throw new Error('Preparation/timeline is still opening — wait, then retry.');
+  }
+
+  if (curStatus !== 'open') {
+    // Domain cleared but fork kept — reopen so closeDalSession can commit.
+    executeWithRetry(function () {
+      var sheets = verifyDatabaseSchema();
+      var row = dalGetProjectIndexRow_(projectId, sheets);
+      if (!row) throw new Error('Project not found.');
+      dalMigrateLegacySessionToDomain_(sheets.index, row);
+      dalWriteDomainSession_(sheets.index, row.rowNum, row.map, sessionType, {
+        status: 'open',
+        sessionUid: entry.sessionUid || Utilities.getUuid(),
+        openedAt: new Date().toISOString(),
+        openedBy: actor
+      });
+      dalFlushDomainCache_(projectId, sessionType);
+    });
+  }
+
+  closeDalSession(projectId, actor, sessionType);
+  // Successful close clears retry inside commit helpers; belt-and-suspenders:
+  try { dalClearCommitRetryNeeded_(projectId, kind); } catch (eClr) { /* ignore */ }
+  return { ok: true, retried: true, message: 'Commit retry completed.' };
 }
 
 function dalRestorePaSheetFromObjects_(projectId, rowObjects) {
@@ -692,6 +902,8 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
           sessionUid: String(sessionUid || ''),
           actor: String(actor || 'System'),
           savedAt: new Date().toISOString(),
+          needsRetry: false,
+          status: 'pre_commit',
           previousJson: JSON.stringify({
             mode: previousSnap.mode || mode,
             shifts: previousSnap.shifts || [],
@@ -709,17 +921,41 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
     }
   }
 
-  saveTimelineDataSheets_(
-    projectId,
-    mode,
-    snap.shifts || [],
-    null,
-    snap.phases || [],
-    snap.overrides || {},
-    null,
-    actor || 'System UI',
-    null
-  );
+  try {
+    saveTimelineDataSheets_(
+      projectId,
+      mode,
+      snap.shifts || [],
+      null,
+      snap.phases || [],
+      snap.overrides || {},
+      null,
+      actor || 'System UI',
+      null
+    );
+  } catch (sheetErr) {
+    if (previousSnap) {
+      try {
+        saveTimelineDataSheets_(
+          projectId,
+          previousSnap.mode || mode,
+          previousSnap.shifts || [],
+          null,
+          previousSnap.phases || [],
+          previousSnap.overrides || {},
+          null,
+          actor || 'System UI',
+          null
+        );
+      } catch (eRest) { /* ignore */ }
+    }
+    dalMarkCommitRetryNeeded_(projectId, 'timeline', sessionUid,
+      'TIMELINE_COMMIT_SHEETS_FAILED: ' + (sheetErr.message || sheetErr));
+    throw new Error(
+      'TIMELINE_COMMIT_SHEETS_FAILED: ' + (sheetErr.message || sheetErr) +
+      ' — Firebase fork kept for retry.'
+    );
+  }
   try {
     flushCache();
   } catch (eFlush) { /* continue */ }
@@ -761,6 +997,8 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
           dalAlertFailedWrite_(projectId, 'timeline', actor,
             'Timeline reconcile failed AND Sheets restore failed. Fork kept. ' + (restoreErr.message || restoreErr));
         } catch (eA) { /* ignore */ }
+        dalMarkCommitRetryNeeded_(projectId, 'timeline', sessionUid,
+          'TIMELINE_COMMIT_RECONCILE_FAILED (restore also failed)');
         throw new Error(
           'TIMELINE_COMMIT_RECONCILE_FAILED: Sheets restore failed; Firebase fork kept for retry.'
         );
@@ -769,6 +1007,7 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
         dalAlertFailedWrite_(projectId, 'timeline', actor,
           'Timeline reconcile mismatch — restored previous Sheets; Firebase fork kept for retry.');
       } catch (eA2) { /* ignore */ }
+      dalMarkCommitRetryNeeded_(projectId, 'timeline', sessionUid, 'TIMELINE_COMMIT_RECONCILE_FAILED');
       throw new Error(
         'TIMELINE_COMMIT_RECONCILE_FAILED: previous Sheets restored; Firebase fork kept for retry.'
       );
@@ -777,10 +1016,13 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
       dalAlertFailedWrite_(projectId, 'timeline', actor,
         'Timeline reconcile mismatch — no pre-commit Sheets snapshot available; Firebase fork kept. Check Sheets manually.');
     } catch (eA3) { /* ignore */ }
+    dalMarkCommitRetryNeeded_(projectId, 'timeline', sessionUid,
+      'TIMELINE_COMMIT_RECONCILE_FAILED (no snapshot)');
     throw new Error(
       'TIMELINE_COMMIT_RECONCILE_FAILED: no Sheets snapshot to restore; Firebase fork kept for retry.'
     );
   }
+  dalClearCommitRetryNeeded_(projectId, 'timeline');
   try { firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta'); } catch (eMeta) { /* ignore */ }
   try { firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId)); } catch (eCol) { /* ignore */ }
 }
