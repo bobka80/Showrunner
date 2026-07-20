@@ -1,11 +1,11 @@
-# Active — Error reports, markdown journal & day bug-fix campaigns
+# Archive — Error reports, markdown journal & day bug-fix campaigns
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Status:** **NEXT campaign** (middle before multi-user Part B). **Phase 3 complete** — ERROR LOGS + Hand over. **Next:** Phase 4 — first real pack → day campaign + journal.  
-**Point agents here:** `docs/ai/active/user-error-reporting-journal-2026-07-19.md`  
-**Journal stub:** [error-journal/README.md](error-journal/README.md)
+**Status:** **ARCHIVED** 2026-07-20 — Phases 0–4 build complete. Bug log (not a campaign): [../error-journal/](../error-journal/).  
+**Point agents (live):** `docs/ai/error-journal/` · this file = build history only.  
+**Journal:** [../error-journal/README.md](../error-journal/README.md)
 
-**Related:** Multi-user fork Part B floor debugging — [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).
+**Related:** Multi-user fork Part B — [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).
 
 **UI lock (Phase 2):** Top lip drawer; freeze on open; everyone. **Phase 3:** Database → ERROR LOGS → Hand over to Cursor (copy pack + delete inbox rows).
 
@@ -86,16 +86,16 @@ Code: `verifyErrorReportsSchema` + `submitErrorReport` in `Resources_Audit.js`.
 ## Markdown system — journal & day campaigns
 
 ### Journal (long memory)
-Folder: `docs/ai/active/error-journal/` (stub shipped Phase 0)
+Folder: `docs/ai/error-journal/` (operational log — not a campaign)
 
-- Index: [error-journal/README.md](error-journal/README.md) — table of open / fixed / came_back threads  
+- Index: [../error-journal/README.md](../error-journal/README.md) — table of open / fixed / came_back threads  
 - One file per lasting problem thread, e.g. `ERR-2026-07-19-timeline-thrash.md`  
   - Title, kind (`single` | `race`), state, member `Report_ID`s, views, notes  
   - `Fixed_In_GAS`, links to day campaign(s), came-back history  
   - **Test suggestions** that stayed true after the fix  
 
 ### Day bug-fix campaign (day’s work order)
-`docs/ai/active/error-day-YYYY-MM-DD.md`
+`docs/ai/error-journal/days/error-day-YYYY-MM-DD.md` (smoke example archived: [error-day-2026-07-20.md](error-day-2026-07-20.md))
 
 Must include:
 - Pack summary (counts, views)  
@@ -144,7 +144,7 @@ Existing: **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS** → add **ERROR LOGS**.
 | **1** | Sheet `Error_Reports` + writer (`verifyErrorReportsSchema` / `submitErrorReport` / `TEST_ErrorReport`) | **Done** @ v681 |
 | **2** | Report lip drawer + freeze + submit (web / mobile / station) | **Done** @ v684+ polish |
 | **3** | ERROR LOGS tab + **Hand over** (copy + delete from Sheet) | **Done** — see status log |
-| **4** | Cursor playbook; first real pack → day campaign + journal md | Director likes the day-campaign shape |
+| **4** | Cursor playbook; first real pack → day campaign + journal md | **Done** (smoke packs → day + journal; closed E2026-07-20-A) |
 | **5** | Live use (esp. Part B) | Packs → day campaigns → OK go → journal updated |
 
 **Out of scope:** auto-ship, Sheet-based journal, Slack/email, screenshots.
@@ -167,9 +167,9 @@ Director pastes this **first**, then the pack from **Hand over to Cursor**.
 You are the Error Report Orchestrator for Showrunner.
 
 Campaign (read first):
-docs/ai/active/user-error-reporting-journal-2026-07-19.md
-Also read: AI_DOCTRINE.md, then docs/ai/active/error-journal/README.md if it exists,
-and any recent docs/ai/active/error-day-*.md files.
+docs/ai/archive/user-error-reporting-journal-2026-07-19.md (build history)
+Also read: AI_DOCTRINE.md, then docs/ai/error-journal/README.md,
+and any recent docs/ai/error-journal/days/error-day-*.md files.
 
 I am handing you an error-log PACK from Database Operations → ERROR LOGS.
 Those rows were deleted from the Sheet inbox after handoff. Memory is markdown only.
@@ -184,8 +184,8 @@ YOUR JOB (this turn):
 3. Use sub-agents as needed (sorter, race analyst, homework writer, journal writer).
    You own the final day campaign — do not leave me with only raw sub-agent chatter.
 4. Write or update:
-   - docs/ai/active/error-day-YYYY-MM-DD.md (today’s bug-fix campaign)
-   - docs/ai/active/error-journal/ threads + README index
+   - docs/ai/error-journal/days/error-day-YYYY-MM-DD.md (today’s bug-fix checklist)
+   - docs/ai/error-journal/ threads + README index
 5. For each prioritized item include: plain-language problem, likely files,
    hypothesis, and concrete TEST SUGGESTIONS (smoke steps like our other campaigns).
 
@@ -209,7 +209,7 @@ PACK FOLLOWS BELOW:
 |------|------|
 | 2026-07-19 | Campaign drafted. Journal + day campaigns = **markdown only**; Sheet = raw `Error_Reports` only. |
 | 2026-07-19 | **Handoff clears inbox:** Hand over to Cursor = copy pack + **delete** those rows from Sheet so already-handed logs do not stay visible. |
-| 2026-07-20 | **First pack triaged:** 1× ROOT “test log” → [error-day-2026-07-20.md](error-day-2026-07-20.md) + journal [error-journal/ERR-2026-07-20-pipeline-smoke.md](error-journal/ERR-2026-07-20-pipeline-smoke.md). No product bug. Awaiting director OK go to close smoke thread (docs only). |
+| 2026-07-20 | **First pack triaged:** 1× ROOT “test log” → [error-day-2026-07-20.md](error-day-2026-07-20.md) + journal [../error-journal/ERR-2026-07-20-pipeline-smoke.md](../error-journal/ERR-2026-07-20-pipeline-smoke.md). No product bug. Awaiting director OK go to close smoke thread (docs only). |
 | 2026-07-20 | Director: this is the **middle / NEXT** campaign. **Phase 0 shipped** (SCHEMA + DRIVE_LAYOUT + journal stub + TODO). Phase 2 UI: ask director. **Next slice: Phase 1.** |
 | 2026-07-20 | **Phase 1 shipped @ GAS v681:** `verifyErrorReportsSchema` + `submitErrorReport` + `TEST_ErrorReport` in `Resources_Audit.js`. Tab `Error_Reports` on `SM_Showrunner_LOGS`; `Audit_Logs` untouched. Oversized diag → Drive + `Diag_Ref`. |
 | 2026-07-20 | **Phase 2 shipped @ GAS v684:** `00f_Error_Report.html` — top-center 2mm lip; hover (fine pointer) / tap lip (touch); freeze snapshot on open; `submitErrorReport`. Wired in `Index.html` (web + mobile + station). Escape stops at drawer (Bugbot). Re-pushed after Drive sync wiped local `00f`. Styles `#sr-error-report-*`. |
@@ -219,3 +219,8 @@ PACK FOLLOWS BELOW:
 | 2026-07-20 | **Unified silhouette @ GAS v689:** one clipped drawer shape (no second SVG figure); lip = hit target only; peek ½. |
 | 2026-07-20 | **Frame + hover @ GAS v690:** drawer fill/frame match text box (`#09090b` / `#3f3f46`); top-anchored under bookmarks; root hit area expands on hover so it doesn’t snap shut. |
 | 2026-07-20 | **Phase 3 shipped @ GAS v691:** Database Ops → **ERROR LOGS** sub-tab; `listErrorReports` + `handoverErrorReports` (ROOT); Hand over = copy pack then delete inbox rows. |
+| 2026-07-20 | **ERROR LOGS ticket polish @ GAS v692:** thin one-line rows (person · view · platform); scrollable left list; Explorer multi-select (click / Ctrl / Shift); SELECT ALL = full inbox. |
+| 2026-07-20 | **Pack 2 triaged:** 3× ROOT tests (“test only/2/3”) → same smoke thread + updated [error-day-2026-07-20.md](error-day-2026-07-20.md). No product bug. Freeze fields OK on PA design (#3). Awaiting **OK go E2026-07-20-A** to close smoke (docs only). |
+| 2026-07-20 | **OK go E2026-07-20-A:** smoke thread Fixed (docs only). Pipeline validated. **Next:** Phase 5 live use / real symptom packs. |
+| 2026-07-20 | **Archived** (hygiene): build campaign + smoke day → `docs/ai/archive/`. Bug log later moved to `docs/ai/error-journal/` (not a campaign). |
+| 2026-07-20 | **Journal relocated:** `docs/ai/error-journal/` — operational log beside topics/active/archive; day files under `error-journal/days/`. |

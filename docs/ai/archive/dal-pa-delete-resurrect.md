@@ -1,7 +1,7 @@
 # Prep PA live sync — delete / resurrect failure (2026-07-18)
 
-**Status:** **Closed into FRAGILE** — delete notes + seed-once + Cases E–G. **Current prep live rollback:** GAS **v654**. Canonical: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § session UI + § prep PA. Floor scope: [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).  
-**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) · [data-access-layer.md](data-access-layer.md)  
+**Status:** **ARCHIVED** — closed into FRAGILE. Delete notes + seed-once + Cases E–G. **Current prep live rollback:** GAS **v654**. Canonical: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § session UI + § prep PA. Floor scope: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).  
+**Campaign:** [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) · [data-access-layer.md](data-access-layer.md)  
 **Prior science:** [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md) · [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ timeline / prep PA / session UI  
 **Industry + process (canonical):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md)
 
@@ -136,9 +136,9 @@ Architecture direction is correct (industry agrees). **Operational holes** (dele
 
 | Concern | Canonical doc / code |
 |---------|----------------------|
-| Design lock (Sheets vs Firebase fork) | `docs/ai/active/dal-firebase-design-lock-2026-07-13.md` |
+| Design lock (Sheets vs Firebase fork) | `docs/ai/archive/dal-firebase-design-lock-2026-07-13.md` |
 | Never-do live sync | `docs/ai/FRAGILE_ZONES.md` §§ timeline + prep PA |
-| Qty thrash Cases A–D | `docs/ai/active/dal-pa-live-sync-thrash.md` + `scripts/dal-pa-live-sync-test.js` |
+| Qty thrash Cases A–D | `docs/ai/archive/dal-pa-live-sync-thrash.md` + `scripts/dal-pa-live-sync-test.js` |
 | **This delete/resurrect incident** | **This file** |
 | Hardening backlog (H1–H6) + process | [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) |
 | Live write | `02e7_Dal_Firestore_Client.html`, `host-boot.js` `PA_PATCH_WRITE` |

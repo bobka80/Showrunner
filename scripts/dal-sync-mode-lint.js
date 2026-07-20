@@ -198,7 +198,7 @@ function main() {
 
   if (failures) {
     console.error('\nSync-mode lint FAILED (' + failures + ' finding(s)).');
-    console.error('See docs/ai/active/dal-pre-ship-gates.md § Gap 1 · FRAGILE #10/#11.');
+    console.error('See docs/ai/archive/dal-pre-ship-gates.md § Gap 1 · FRAGILE #10/#11.');
     process.exit(1);
   }
   console.log('OK: live clients ban Sheets save; GAS→apply paths guarded; Case H helper intact.');

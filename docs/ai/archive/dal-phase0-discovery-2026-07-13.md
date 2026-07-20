@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-13  
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md)  
-**Mode:** Read-only sweep — **no code changes**
+**Mode:** Read-only sweep — **no code changes** · **Status:** **ARCHIVED** (Phase 0 complete)
 
 ---
 
@@ -159,7 +159,7 @@ Repos should wrap **`verifyDatabaseSchema` / `verifyVaultSchema` + range operati
 | Ledger / ops | `batchProcessOperations`, `processRfidScan`, `startEventOperation`, `finalizeEventOperation` | `02c_Project_Operations.html` |
 | Projects | `saveProjectData`, `getExistingProjects`, … | Calendar / project editor modules |
 
-*Full client inventory (2026-07-15):* [dal-client-inventory.md](dal-client-inventory.md) — regenerate with `node scripts/dal-client-inventory.js`. Pre-ship: [dal-pre-ship-gates.md](dal-pre-ship-gates.md).
+*Full client inventory (2026-07-15):* [../dal-client-inventory.md](../dal-client-inventory.md) — regenerate with `node scripts/dal-client-inventory.js`. Pre-ship: [dal-pre-ship-gates.md](dal-pre-ship-gates.md).
 
 ---
 

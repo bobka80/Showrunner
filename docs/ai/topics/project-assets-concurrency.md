@@ -11,7 +11,7 @@
 
 | Mode | Canonical doc |
 |------|----------------|
-| **START PREP open** (Firebase PA fork, live patch, search/formula batch adds, pack, floor +/-) | [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md) · [../active/dal-prep-live-sync-standards.md](../active/dal-prep-live-sync-standards.md) · FRAGILE prep PA |
+| **START PREP open** (Firebase PA fork, live patch, search/formula batch adds, pack, floor +/-) | [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md) · [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) · FRAGILE prep PA |
 | **Normal day** (no prep session — Sheets `saveProjectAssetsDelta`, mobile auto-save, collision gaps) | **This file** (below) |
 
 Do **not** treat the backlog below as the prep-floor sync model. Prep live rollback: GAS **v654** + `host-boot.js?v=653`.

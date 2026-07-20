@@ -6,13 +6,14 @@ Do not begin implementation until you have read the doctrine and opened the draw
 
 | Drawer | Path | When |
 |--------|------|------|
-| **Active campaigns** | [docs/ai/active/](docs/ai/active/) | Work in flight now — **NEXT error reports + journal** ([user-error-reporting-journal-2026-07-19.md](docs/ai/active/user-error-reporting-journal-2026-07-19.md); journal stub [error-journal/](docs/ai/active/error-journal/)); **Multi-user fork** Part A done → Part B after middle ([multi-user-fork-industrial-and-auto.md](docs/ai/active/multi-user-fork-industrial-and-auto.md); process [bulletproof-multiuser-live-editors-2026-07-18.md](docs/ai/active/bulletproof-multiuser-live-editors-2026-07-18.md)); **RFID station** ([rfid-station-profiles.md](docs/ai/active/rfid-station-profiles.md), **TSL desktop:** [tsl-desktop-handoff.md](docs/ai/active/tsl-desktop-handoff.md)); **DAL/router** (near-complete) — [data-access-layer.md](docs/ai/active/data-access-layer.md) · pre-ship gates: [dal-pre-ship-gates.md](docs/ai/active/dal-pre-ship-gates.md) · expansion board: [pre-ship-pipeline-expansion-2026-07-18.md](docs/ai/active/pre-ship-pipeline-expansion-2026-07-18.md) · **Fragile:** [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge · § Desktop WebView2 before `host-boot.js` / `station-desktop/` |
+| **Active campaigns** | [docs/ai/active/](docs/ai/active/) | Work in flight now — **NEXT Multi-user fork Part B** ([multi-user-fork-industrial-and-auto.md](docs/ai/active/multi-user-fork-industrial-and-auto.md); process [bulletproof-multiuser-live-editors-2026-07-18.md](docs/ai/active/bulletproof-multiuser-live-editors-2026-07-18.md)); **RFID station** ([rfid-station-profiles.md](docs/ai/active/rfid-station-profiles.md), **TSL desktop:** [tsl-desktop-handoff.md](docs/ai/active/tsl-desktop-handoff.md)) · **Fragile:** [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge · § Desktop WebView2 before `host-boot.js` / `station-desktop/` |
 | **Topic backlogs** | [docs/ai/topics/](docs/ai/topics/) | Feature area checklists (read one topic, not the whole roadmap) |
+| **Bug journal (log)** | [docs/ai/error-journal/](docs/ai/error-journal/) | Lasting bug memory from Report → Hand over — **not a campaign** · build archive: [user-error-reporting-journal-2026-07-19.md](docs/ai/archive/user-error-reporting-journal-2026-07-19.md) |
 | **Stable reference** | [docs/ai/README.md](docs/ai/README.md) | Architecture, schema, file map, deploy, **[Drive layout](docs/ai/DRIVE_LAYOUT.md)** |
 | **Equipment / PA / warehouse** | [docs/ai/EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) | Bulk vs unique, two packing engines — **before** packing/checkout/cable work |
-| **Archive** | [docs/ai/archive/](docs/ai/archive/) | Finished plans — reference only |
+| **Archive** | [docs/ai/archive/](docs/ai/archive/) | Finished plans — reference only · **DAL campaign** [data-access-layer.md](docs/ai/archive/data-access-layer.md) |
 
-Operational logs (not doctrine): root **`RELEASES.md`**, **`WORKS_LOG.md`**.
+Operational logs: root **`RELEASES.md`**, **`WORKS_LOG.md`** · bug memory **[docs/ai/error-journal/](docs/ai/error-journal/)**.
 
 **Cursor IDE:** File-scoped rules in [`.cursor/rules/`](.cursor/rules/) · full routine in [docs/ai/CURSOR_WORKFLOW.md](docs/ai/CURSOR_WORKFLOW.md).
 

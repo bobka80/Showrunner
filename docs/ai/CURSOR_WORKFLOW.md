@@ -69,7 +69,7 @@ One clear outcome per build session (e.g. scan panel camera, not camera + notifi
 | **recommend** | Run Bugbot when diff is non-trivial; OK to skip on tiny fixes — say so in handoff |
 | **skip** | No Bugbot — save tokens |
 
-**DAL gates** (when Logistics / PA / timeline hot paths change): persistence lint, client inventory freshness, Phase 3 concurrency ack on delta-only deploy. **Handbook:** [active/dal-pre-ship-gates.md](active/dal-pre-ship-gates.md). Planned: Gap 1 sync-mode lint + mutation inventory (hub A0/A3). **Other domains (not built):** [active/pre-ship-pipeline-expansion-2026-07-18.md](active/pre-ship-pipeline-expansion-2026-07-18.md). After client `google.script.run` changes: `node scripts/dal-client-inventory.js`. Phase 3 deploy: `PRE_SHIP_DAL_CONCURRENCY_OK=1`.
+**DAL gates** (when Logistics / PA / timeline hot paths change): persistence lint, client inventory freshness, Phase 3 concurrency ack on delta-only deploy. **Handbook:** [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md). Gap 1 sync-mode lint + mutation inventory shipped with Part A. **Other domains (not built):** [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md). After client `google.script.run` changes: `node scripts/dal-client-inventory.js`. Phase 3 deploy: `PRE_SHIP_DAL_CONCURRENCY_OK=1`.
 
 | Also (manual director phrase) | When |
 |------|----------------|

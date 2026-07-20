@@ -1,13 +1,13 @@
 # Pre-Ship Gate Pipeline — Expansion to Other Domains
 
-**Status:** Design brief, not yet actioned — hold until director says **OK go** on a named domain.  
+**Status:** Backlog design brief (moved out of active 2026-07-20) — hold until director says **OK go** on a named domain.  
 **Written:** 2026-07-18 (Claude) · **Injected:** 2026-07-19  
 **Source pattern:** `pre-ship/dal.js`, `scripts/dal-persistence-lint.js`, `scripts/dal-phase3-gate.js` — the only domain currently covered by automated pre-ship gates  
-**DAL handbook (shipped today):** [dal-pre-ship-gates.md](dal-pre-ship-gates.md) · General pipeline: [../PRE_SHIP_PIPELINE.md](../PRE_SHIP_PIPELINE.md)
+**DAL handbook (archived):** [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md) · General pipeline: [../PRE_SHIP_PIPELINE.md](../PRE_SHIP_PIPELINE.md)
 
 **Do not start any domain below without an explicit director OK go on that domain.**
 
-**Not this file:** DAL live-sync Gap 1 (Firestore/GAS mode lint) — that stays under [dal-pre-ship-gates.md](dal-pre-ship-gates.md) and the multi-user fork hub. This brief is **other domains only**.
+**Not this file:** DAL live-sync Gap 1 (Firestore/GAS mode lint) — that stays under [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md) and the multi-user fork hub. This brief is **other domains only**.
 
 ---
 
@@ -105,7 +105,7 @@ any file matching /verifyBackendPrivilege|verifyBackendPermission/ in diff
 ```
 Context: pre-ship/dal.js, scripts/dal-persistence-lint.js, and
 scripts/dal-phase3-gate.js are the reference pattern for this work —
-read all three before starting. docs/ai/active/dal-pre-ship-gates.md
+read all three before starting. docs/ai/archive/dal-pre-ship-gates.md
 documents how DAL gates are wired into pre-ship/layers.js and when
 they run.
 
@@ -126,7 +126,7 @@ Rules:
   checklist, no auto-approval.
 - New gate must be scoped (only runs when its domain's hot-path
   files are touched) — never a blanket check on every diff.
-- Document the new gate in docs/ai/active/dal-pre-ship-gates.md
+- Document the new gate in docs/ai/archive/dal-pre-ship-gates.md
   or a sibling handbook so it isn't DAL-specific in name only.
 ```
 

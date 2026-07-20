@@ -1,22 +1,24 @@
-# Active — Data access layer (DAL) + router
+# Archive — Data access layer (DAL) + router
 
-**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
+**Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic:** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** Prep multi-user live **production = GAS v655** (H5); sync rework rollback **v654** + `host-boot.js?v=653`. Docs: floor scope on [multi-user-fork](multi-user-fork-industrial-and-auto.md). **Next campaign work:** **A5 / H3** (same-row conflict visibility) on that hub. How it works: [FRAGILE § session UI](../FRAGILE_ZONES.md) · [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md). **DAL-era catastrophic rollback:** **v576**.
+**Opened:** 2026-07-05 · **Status:** **ARCHIVED** 2026-07-20 — Phases 0–6 complete enough to close. Prep live rollback **v654** + `host-boot.js?v=653`. Floor multi-user work continues on [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md). **DAL-era catastrophic rollback:** **v576**.
+
+**Living docs after close:** topic [data-cache-engine.md](../topics/data-cache-engine.md) · never-dos [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) · prep live standards (this archive) [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) · gates handbook [dal-pre-ship-gates.md](dal-pre-ship-gates.md) · generated inventory [../dal-client-inventory.md](../dal-client-inventory.md).
 
 **Major rollback point (2026-07-15):** Before any DAL code landed on production, milestone **v576** — *"MAJOR ROLLBACK POINT — pre-DAL Phase 1 (Sheets-only baseline; no repo layer)"*. If DAL work breaks saves, checkout, or timeline: tell the AI **"Rollback production to v576"**. **v577 regression (2026-07-15):** `Dal_Repos.js` block comment contained the sequence `*/` (in `persist*/fetch*`), which terminated the comment early and caused a **GAS syntax error** — broke the whole script project including PA save; rolled back to v576; fixed in v578+ (comment + adapter rename).
 
 **Design lock (canonical spec):** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) — architecture, session lifecycles, reconciliation, cache API, execution order, Phase 0 checklist.
 
-**Phase 0 discovery (2026-07-13):** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md) — **complete** (read-only). Confirms full-sheet rewrite on PA, timeline, and ledger.
+**Phase 0 discovery (2026-07-13):** [../archive/dal-phase0-discovery-2026-07-13.md](../archive/dal-phase0-discovery-2026-07-13.md) — **complete** (read-only). Confirms full-sheet rewrite on PA, timeline, and ledger.
 
 **Pre-ship gates (2026-07-15):** [dal-pre-ship-gates.md](dal-pre-ship-gates.md) — client inventory, persistence lint, Phase 3 concurrency deploy ack. **Canonical agent handbook** for DAL mechanical gates.
 
 **Phase safety playbook (for fresh chats):** [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md) — phase-by-phase preflight/postflight sweeps + security guardrails.
 
-**Slice D (dual-domain sessions):** [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md) — prep + timeline concurrent; **gate before Phase 5**.
+**Slice D (dual-domain sessions):** [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) — prep + timeline concurrent; **gate before Phase 5** (shipped).
 
-**Prep PA live sync (industry standards + investigation process):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — entity patch (not CRDT); **batch absolute upserts primary** (search/formula); floor +/- deltas secondary; hardening H1–H5; prove-with-sim + mutation inventory before another prep live ship. Floor scope: [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md). Never-dos: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md).
+**Prep PA live sync (industry standards + investigation process):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — entity patch (not CRDT); **batch absolute upserts primary** (search/formula); floor +/- deltas secondary; hardening H1–H5; prove-with-sim + mutation inventory before another prep live ship. Floor scope: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md). Never-dos: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md).
 
 This is the **live campaign file** for the single database layer.
 
@@ -101,20 +103,20 @@ Storage
 
 **Purpose:** Single truth of how the system communicates with storage today. Output feeds Phase 1 inventory tables in this file.
 
-- [x] **`clearContents()` / `setValues()` inventory** — [dal-phase0-discovery-2026-07-13.md §1](dal-phase0-discovery-2026-07-13.md#1-clearcontents--full-rewrite-inventory-engine)
-- [x] **Trace `saveProjectAssetsDelta`** — [§2](dal-phase0-discovery-2026-07-13.md#2-saveprojectassetsdelta--end-to-end-trace) — **full tab rewrite confirmed**
-- [x] **Trace `saveTimelineData`** — [§3](dal-phase0-discovery-2026-07-13.md#3-savetimelinedata--end-to-end-trace) — **full tab rewrite confirmed**
-- [x] **Trace `Operations.js` ledger** — [§4](dal-phase0-discovery-2026-07-13.md#4-operationsjs-ledger-path) — full ledger tab rewrite per batch
-- [x] **GAS spreadsheet gateways** — [§5](dal-phase0-discovery-2026-07-13.md#5-spreadsheet-access-model-no-dal-today) (`verifyDatabaseSchema`, `verifyVaultSchema`, `getSheetData`)
+- [x] **`clearContents()` / `setValues()` inventory** — [dal-phase0-discovery-2026-07-13.md §1](../archive/dal-phase0-discovery-2026-07-13.md#1-clearcontents--full-rewrite-inventory-engine)
+- [x] **Trace `saveProjectAssetsDelta`** — [§2](../archive/dal-phase0-discovery-2026-07-13.md#2-saveprojectassetsdelta--end-to-end-trace) — **full tab rewrite confirmed**
+- [x] **Trace `saveTimelineData`** — [§3](../archive/dal-phase0-discovery-2026-07-13.md#3-savetimelinedata--end-to-end-trace) — **full tab rewrite confirmed**
+- [x] **Trace `Operations.js` ledger** — [§4](../archive/dal-phase0-discovery-2026-07-13.md#4-operationsjs-ledger-path) — full ledger tab rewrite per batch
+- [x] **GAS spreadsheet gateways** — [§5](../archive/dal-phase0-discovery-2026-07-13.md#5-spreadsheet-access-model-no-dal-today) (`verifyDatabaseSchema`, `verifyVaultSchema`, `getSheetData`)
 - [x] **Client inventory** — [dal-client-inventory.md](dal-client-inventory.md) (generated; `node scripts/dal-client-inventory.js`)
 - [x] **Client cache inventory** — same file (`localStorage` keys section)
 - [x] **PA save pipeline map** — § Phase 1 preflight below
 - [x] **Ledger pipeline map** — § Phase 1 preflight below
 - [x] **Schema cross-check** — § Phase 1 preflight below
 - [x] **Doc/code inconsistency report** — § Phase 1 preflight below
-- [x] **Fragile boundary list** — § Phase 1 preflight below (canonical detail: [dal-phase0-discovery-2026-07-13.md §6](dal-phase0-discovery-2026-07-13.md#6-mandatory-write-boundaries-repos-first))
+- [x] **Fragile boundary list** — § Phase 1 preflight below (canonical detail: [dal-phase0-discovery-2026-07-13.md §6](../archive/dal-phase0-discovery-2026-07-13.md#6-mandatory-write-boundaries-repos-first))
 
-*Phase 0 core sweep complete 2026-07-13 → [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md). Client inventory + pre-ship gates complete 2026-07-15 → [dal-pre-ship-gates.md](dal-pre-ship-gates.md). Phase 1 preflight complete 2026-07-15 — Slice A awaits director **OK go**.*
+*Phase 0 core sweep complete 2026-07-13 → [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md). Client inventory + pre-ship gates complete 2026-07-15 → [dal-pre-ship-gates.md](dal-pre-ship-gates.md). Phase 1+ shipped in campaign (see checklists below).*
 
 ---
 
@@ -362,7 +364,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - [x] **Hotfix** — timeline stutter v2: per-entity **local hold** (~2s after touch); monotonic **`writeSeq`** on fork doc; never re-install UI from own write result
 - [x] **Hotfix** — `openDalSession` / `closeDalSession` release ScriptLock during Firestore UrlFetch (was starving presence → stuck 🔒 door + client timeout on START COLLAB)
 - [x] **Hotfix** — timeline START COLLAB: `beginDalSession` + `finishDalSession` (join if open, reclaim stale opening ~90s, faster Firestore upsert)
-- [x] **Slice D — Dual-domain sessions** — prep + timelineCollab **concurrent** on one project (design lock: per project + per domain). Spec: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
+- [x] **Slice D — Dual-domain sessions** — prep + timelineCollab **concurrent** on one project (design lock: per project + per domain). Spec: [dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md).
   - [x] Independent prep + timeline lifecycle columns on `Projects_Index` (migrate off singleton `Dal_Session_*`)
   - [x] Domain-specific begin/finish/close / stale reclaim / `getDalSessionInfo`
   - [x] Close prep must not touch timeline fork; close timeline must not touch prep fork
@@ -410,10 +412,11 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - **2026-07-05:** Campaign file created from director brainstorm. Execution **deferred** — finish phone app work first.
 - **2026-07-15:** Pre-ship DAL gates shipped — [dal-pre-ship-gates.md](dal-pre-ship-gates.md). Phase 1 repos still await **OK go**.
 - **2026-07-13:** Director design lock imported → [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md). Phase 3 (delta-only) explicit gate before Firebase.
-- **2026-07-15:** **Slice D documented** — dual-domain concurrent prep + timeline — [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md). **Shipped v603.**
+- **2026-07-15:** **Slice D documented** — dual-domain concurrent prep + timeline — [dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md). **Shipped v603.**
 - **2026-07-16:** Post-campaign **optional** timeline UX (auto room on enter + idle commit) documented — do **not** build during this campaign.
 - **2026-07-18:** Optional UX **expanded & locked** (auto fork + live pull-in + idle eject; timeline **and** PA; freelancer exclusion) — [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject); prep cross-link in [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md). Build only as multi-user fork **Part B** after harden.
-- **2026-07-19:** Multi-user fork **order locked** — H0 testing pipeline → bulletproof H1–H5 + Gap 1 → Part B auto fork. Process brief [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md); Gap 1 folded into hub + [dal-pre-ship-gates.md](dal-pre-ship-gates.md) (no parallel gap-closure novel); other-domain gates [pre-ship-pipeline-expansion-2026-07-18.md](pre-ship-pipeline-expansion-2026-07-18.md).
+- **2026-07-19:** Multi-user fork **order locked** — H0 testing pipeline → bulletproof H1–H5 + Gap 1 → Part B auto fork. Process brief [../active/bulletproof-multiuser-live-editors-2026-07-18.md](../active/bulletproof-multiuser-live-editors-2026-07-18.md); Gap 1 folded into hub + [dal-pre-ship-gates.md](dal-pre-ship-gates.md) (no parallel gap-closure novel); other-domain gates [../topics/pre-ship-pipeline-expansion-2026-07-18.md](../topics/pre-ship-pipeline-expansion-2026-07-18.md).
+- **2026-07-20:** **Campaign archived** — hub + satellites → `docs/ai/archive/`. Living: topic cache engine, FRAGILE, inventory at `docs/ai/dal-client-inventory.md`.
 - **2026-07-16:** Director clarified close bar — **not** “absolutely every DB path through DAL.” Documented out-of-campaign inventory below.
 
 ## What DAL must NOT do
@@ -480,6 +483,6 @@ Phase 6 migrated **some** client cache keys behind `CacheCoordinator`. That does
 
 ---
 
-## When this campaign closes
+## When this campaign closed
 
-Move this file to [../archive/](../archive/), update [Project_TODO.md](../Project_TODO.md) **Active campaigns** row, and leave long-term reference in [data-cache-engine.md](../topics/data-cache-engine.md) (+ optional stable `docs/ai/DATA_ACCESS.md` once Phase 1 ships). Carry the **[§ Out of this campaign](#out-of-this-campaign--not-routed-through-dal)** list into that stable doc so “what still bypasses repos” stays visible.
+Moved to [archive/](.) 2026-07-20. Long-term reference: [../topics/data-cache-engine.md](../topics/data-cache-engine.md). Deferred “out of campaign” list stays in this file above — migrate those domains when next touched.

@@ -67,10 +67,10 @@ Gaps closed 2026-07-15 — full detail in [dal-pre-ship-gates.md](dal-pre-ship-g
 
 Read, in order:
 
-1. `docs/ai/active/data-access-layer.md`
-2. `docs/ai/active/dal-firebase-design-lock-2026-07-13.md`
-3. `docs/ai/active/dal-phase0-discovery-2026-07-13.md`
-4. `docs/ai/active/dal-pre-ship-gates.md` (if touching hot paths or shipping DAL work)
+1. `docs/ai/archive/data-access-layer.md`
+2. `docs/ai/archive/dal-firebase-design-lock-2026-07-13.md`
+3. `docs/ai/archive/dal-phase0-discovery-2026-07-13.md`
+4. `docs/ai/archive/dal-pre-ship-gates.md` (if touching hot paths or shipping DAL work)
 5. `docs/ai/FRAGILE_ZONES.md` (relevant zones)
 6. `docs/ai/ARCHITECTURE.md` (deploy pipeline + optimistic healing)
 7. `docs/ai/FILE_MAP.md` (where functions live)
@@ -99,7 +99,7 @@ For the files in scope:
 - Confirm the touched functions still exist and are called from the same client entry points.
 - Confirm **no new** full-tab rewrites were introduced outside the known boundaries.
 - Update docs:
-  - `docs/ai/active/data-access-layer.md` checklist
+  - `docs/ai/archive/data-access-layer.md` checklist
   - relevant topic stubs (session fork / cache) if the interface moved
   - `FILE_MAP.md` only if a new module/file is created
 
@@ -162,7 +162,7 @@ For the files in scope:
 
 **Slice D — Dual-domain sessions (prep + timeline concurrent):**
 
-- Spec: [dal-phase4-slice-d-dual-domain-sessions.md](dal-phase4-slice-d-dual-domain-sessions.md).
+- Spec: [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md).
 - **Do not start Phase 5** until Slice D is shipped (or director explicitly waives with accepted cross-domain close risk).
 - **Must not:** close one domain’s session columns/Firestore path when ending the other; restore full-tab Sheet writes; fold Logistics Hub into the session registry as a fork.
 - **Must:** independent `Projects_Index` lifecycle per domain; smoke both open → end either → other stays live.

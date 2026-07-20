@@ -449,7 +449,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 ## DAL prep / timeline session UI (dual-domain) (Critical)
 
-**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Slice D:** [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) · **Design lock:** [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) · **Prep live doctrine:** [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md)
+**Campaign (archived):** [archive/data-access-layer.md](archive/data-access-layer.md) · **Slice D:** [archive/dal-phase4-slice-d-dual-domain-sessions.md](archive/dal-phase4-slice-d-dual-domain-sessions.md) · **Design lock:** [archive/dal-firebase-design-lock-2026-07-13.md](archive/dal-firebase-design-lock-2026-07-13.md) · **Prep live doctrine:** [archive/dal-prep-live-sync-standards.md](archive/dal-prep-live-sync-standards.md)
 
 **Stable baseline (director-confirmed 2026-07-19):** Prep live **rollback = GAS v654** + hosting `host-boot.js?v=653` (sync rework + floor scope). Do not “simplify” the session-UI rules below without a new failing test + director OK. (Historical smoke: v645 session banner lock.)
 
@@ -546,7 +546,7 @@ Hard-refresh **two browsers** on web.app (banner must say **live sync (patch)**)
 ---
 ## DAL timeline fork live sync (collab strips)
 
-**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · Design lock: Sheets = long-term DB; Firebase = **session buffer** while collab/prep is open.
+**Campaign (archived):** [archive/data-access-layer.md](archive/data-access-layer.md) · Design lock: Sheets = long-term DB; Firebase = **session buffer** while collab/prep is open.
 
 **Plain language:** While START COLLAB is open, everyone edits one Firestore doc (`projects/{id}/timeline/state`). If two browsers rewrite the whole grid from stale local copies, strips **stutter left↔right**. Live sync must be **touch/patch** (only what you moved), with ordering guards — not last-full-document-wins.
 
@@ -596,7 +596,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 
 ## DAL prep PA fork live sync (equipment list)
 
-**Campaign:** [active/data-access-layer.md](active/data-access-layer.md) · **Doctrine (industry + process):** [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md) · Live shape matches timeline (**one** `assets/state` doc); collection under `projects/{id}/assets/*` is the END PREP commit mirror.
+**Campaign (archived):** [archive/data-access-layer.md](archive/data-access-layer.md) · **Doctrine (industry + process):** [archive/dal-prep-live-sync-standards.md](archive/dal-prep-live-sync-standards.md) · Live shape matches timeline (**one** `assets/state` doc); collection under `projects/{id}/assets/*` is the END PREP commit mirror.
 
 ### Timeline vs prep PA (same bug class)
 
@@ -642,7 +642,7 @@ Hard-refresh **two browsers** on web.app (banner must say **patch**, not server 
 9. **Flush Firebase from `renderProjectAssetsUI` without `dalPaApplyingRemote` guard** (and without patch-only writes) — remote apply re-render becomes a counter-write.
 10. **Apply GAS `getProjectAssets` fixtures while `dalPaLiveSyncMode === 'firestore'`.** GAS strips `writeSeq`/`clientId` → listener↔GAS qty oscillation (confirmed still broken after v633).
 11. **Fall back live flush to `saveProjectAssets` in firestore mode.** GAS full-document PATCH wiped host `writeSeq` stamps.
-12. **Remove a fixture without `dalPaNoteDelete_`.** Local splice alone leaves the row in `assets/state` → peer never drops it; later snaps **resurrect** on the deleter (“one step behind”). UI **DEL** on unique rows calls `removePa(idx)` — that path must note delete (incident 2026-07-18: [dal-pa-delete-resurrect.md](active/dal-pa-delete-resurrect.md)).
+12. **Remove a fixture without `dalPaNoteDelete_`.** Local splice alone leaves the row in `assets/state` → peer never drops it; later snaps **resurrect** on the deleter (“one step behind”). UI **DEL** on unique rows calls `removePa(idx)` — that path must note delete (incident 2026-07-18: [dal-pa-delete-resurrect.md](archive/dal-pa-delete-resurrect.md)).
 13. **Re-seed full local list into live state after peers have written.** `dalPaSeedStateFromLocal_` touches every local UID; empty/lagging snaps must not trigger that once `writeSeq > 0` — a stale browser re-inserts deleted rows.
 14. **Clear all touch maps on flush OK while the user kept editing mid-flight.** That wipes batch/search clicks that arrived during the write. Clear only the flushed snapshot; arm FlushAgain for the rest.
 15. **Apply a requeued snap with `docWriteSeq < lastDocWriteSeq`.** Fall-through when local ≠ older sig causes flash-then-revert. Always drop older seq (Case L / production).
@@ -679,7 +679,7 @@ Hard-refresh browsers on web.app (banner **live sync (patch)**). Floor scope: ca
 6. DEL / remove on A → gone on B; B’s later edit does not resurrect.  
 7. END PREP on A → B banner off once and stays off; START again → B rejoins.
 
-**AI rule:** Before editing prep live flush/apply, re-read this section, § DAL prep / timeline session UI, § DAL timeline fork live sync, and [active/dal-prep-live-sync-standards.md](active/dal-prep-live-sync-standards.md). Ship GAS; also `deploy-hosting.js` if host-boot message types change.
+**AI rule:** Before editing prep live flush/apply, re-read this section, § DAL prep / timeline session UI, § DAL timeline fork live sync, and [archive/dal-prep-live-sync-standards.md](archive/dal-prep-live-sync-standards.md). Ship GAS; also `deploy-hosting.js` if host-boot message types change.
 
 ---
 

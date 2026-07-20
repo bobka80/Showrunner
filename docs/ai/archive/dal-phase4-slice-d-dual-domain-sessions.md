@@ -2,7 +2,7 @@
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) · **Platform:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Safety:** [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md)
 
-**Status:** **Shipped** (2026-07-16, GAS v603). Prep + timeline concurrent on one project. **Hotfix v604:** dual-domain UI must read `timelineStatus` / `prepStatus` (not legacy flat `sessionType`) — flat fields preferred prep and cleared the collab banner when both were open.
+**Status:** **ARCHIVED** — shipped 2026-07-16, GAS v603. Prep + timeline concurrent on one project. **Hotfix v604:** dual-domain UI must read `timelineStatus` / `prepStatus` (not legacy flat `sessionType`) — flat fields preferred prep and cleared the collab banner when both were open.
 
 ---
 

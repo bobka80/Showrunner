@@ -1,6 +1,6 @@
 # Project roadmap — index only
 
-**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Topic drawers:** [topics/](topics/) · **Active campaigns:** [active/](active/)
+**Entry:** [AI_DOCTRINE.md](../../AI_DOCTRINE.md) · **Topic drawers:** [topics/](topics/) · **Active campaigns:** [active/](active/) · **Bug journal:** [error-journal/](error-journal/)
 
 Read **one topic file** for the area you are working on — not this whole page.
 
@@ -16,28 +16,18 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-20)
 
-**Primary campaign (NEXT):** Error reports + daily journal triage — [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). **Phase 3 done** → next **Phase 4** (first pack → day campaign).
+**Primary campaign (NEXT):** Multi-user fork **Part B** (auto fork) — Part A complete @ v678. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
 
-**Paused / after this middle campaign:** Multi-user fork **Part B** (auto fork) — Part A complete @ v678. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
-
-| Stage | What | Gate |
-|-------|------|------|
-| **0** | Docs + SCHEMA + DRIVE_LAYOUT + journal stub | **Done** (2026-07-20) |
-| **1** | Sheet `Error_Reports` + writer | **Done** (v681) |
-| **2** | Report lip + freeze + submit | **Done** (v684+) |
-| **3** | ERROR LOGS tab + Hand over | **Done** (see campaign) |
-| **4** | Cursor playbook + first real pack | Director likes day-campaign shape |
-| **5** | Live use (esp. before Part B) | Packs → day campaigns → journal |
+**Operational logs:** Bug journal [error-journal/](error-journal/) · root `RELEASES.md` / `WORKS_LOG.md`.
 
 Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Multi-user fork Part B** | Waiting — after error-reporting middle campaign | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
-| **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog — OK go per domain | [active/pre-ship-pipeline-expansion-2026-07-18.md](active/pre-ship-pipeline-expansion-2026-07-18.md) |
+| **Multi-user fork Part B** | **NEXT** — auto fork + live pull-in + idle eject | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog brief — OK go per domain | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
 | **Phone app** | In-flight mobile (parallel) | [topics/mobile-crew.md](topics/mobile-crew.md) |
-| **DAL campaign close** | Near-complete — archive paperwork when ready | [active/data-access-layer.md](active/data-access-layer.md) |
 
 ---
 
@@ -45,10 +35,10 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Error reports + daily journal triage** | **NEXT** — Phase 3 done; next Phase 4 first pack → day campaign | [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) · [error-journal/](active/error-journal/) |
-| **Multi-user fork: test pipeline → bulletproof → auto fork** | **Part A complete** — middle = error-reporting → then Part B | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **Multi-user fork: test pipeline → bulletproof → auto fork** | **NEXT Part B** — Part A complete @ v678 | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
-| **Data access layer (DAL + router)** | Near-complete — prep live rollback **v654** · DAL-era **v576** | [active/data-access-layer.md](active/data-access-layer.md) · [prep live standards](active/dal-prep-live-sync-standards.md) · [floor scope](active/multi-user-fork-industrial-and-auto.md) |
+
+**Operational log (not a campaign):** [error-journal/](error-journal/) — lasting bug memory from Report → Hand over packs. Day files: [error-journal/days/](error-journal/days/).
 
 ---
 
@@ -69,15 +59,16 @@ Also on the board (do not mix without director pick):
 | Beta prep (payroll, transport, audit) | Partial — RBAC 1–5, fin globals | [topics/beta-prep.md](topics/beta-prep.md) |
 | **Pre-beta hardening (full debug sweeps)** | Backlog — **runs last** (see Final section below) | [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md) |
 | Training manuals | Backlog | [topics/training-manuals.md](topics/training-manuals.md) |
-| Google Workspace migration | Done — in-place host upgrade verified | [topics/workspace-migration.md](topics/workspace-migration.md) |
+| Google Workspace migration | **Done** — in-place host upgrade verified (NAS backlog separate) | [topics/workspace-migration.md](topics/workspace-migration.md) |
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
-| Session fork platform | Backlog — Firebase buffer + router | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
-| Unified data cache engine **+ data access layer (backend abstraction)** | **Phase 6B + Hub atomic live** — [active/data-access-layer.md](active/data-access-layer.md) | [topics/data-cache-engine.md](topics/data-cache-engine.md) |
-| Warehouse prep session | Partial — PA fork live rollback **v654**; auto-fork = campaign **Part B** (after Part A) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
-| Timeline collab session | Live sync stable; **auto fork** = campaign **Part B** | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| Session fork platform | Live — dual-domain shipped; see topic | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
+| Unified data cache engine **+ DAL** | **Campaign archived** — Phase 6B live; lasting ref in topic | [topics/data-cache-engine.md](topics/data-cache-engine.md) · [archive/data-access-layer.md](archive/data-access-layer.md) |
+| Warehouse prep session | Partial — PA fork live rollback **v654**; auto-fork = campaign **Part B** (NEXT) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| Timeline collab session | Live sync stable; **auto fork** = campaign **Part B** (NEXT) | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
+| Pre-ship expansion (other domains) | Backlog brief | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 
-**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → **DAL campaign** (Phase 0 sweep → repos/router → **Phase 3 delta-only gate** → Firebase → reconciliation → cache) — [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) → **warehouse prep** → **timeline collab** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. Do **not** start Firebase prep/timeline fork before DAL Phase 3 (delta saves) + Phase 4 shell. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).
+**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → ~~DAL campaign~~ ✓ (archived) → **warehouse prep / timeline collab Part B** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).
 
 ---
 
@@ -114,8 +105,12 @@ Product beta features (payroll, transport, RBAC QA) stay in [topics/beta-prep.md
 
 | Plan | File |
 |------|------|
-| Post-v330 recovery (closed) | [archive/recovery-after-v330.md](archive/recovery-after-v330.md) |
-| RBAC & event access (Phases 1–5 done) | [archive/rbac-event-access-plan.md](archive/rbac-event-access-plan.md) |
+| Post-v330 recovery (closed) | [archive/recovery-after-v330.md](archive/recovery-after-v330.md) · stub [RECOVERY_AFTER_v330.md](RECOVERY_AFTER_v330.md) |
+| RBAC & event access (Phases 1–5 done) | [archive/rbac-event-access-plan.md](archive/rbac-event-access-plan.md) · stub [RBAC_EVENT_ACCESS_PLAN.md](RBAC_EVENT_ACCESS_PLAN.md) |
+| Error reports + journal **build** (Phases 0–4) | [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md) · smoke day [archive/error-day-2026-07-20.md](archive/error-day-2026-07-20.md) |
+| Prep PA thrash / delete-resurrect incidents | [archive/dal-pa-live-sync-thrash.md](archive/dal-pa-live-sync-thrash.md) · [archive/dal-pa-delete-resurrect.md](archive/dal-pa-delete-resurrect.md) |
+| DAL Phase 0 + Slice D | [archive/dal-phase0-discovery-2026-07-13.md](archive/dal-phase0-discovery-2026-07-13.md) · [archive/dal-phase4-slice-d-dual-domain-sessions.md](archive/dal-phase4-slice-d-dual-domain-sessions.md) |
+| **Data access layer (full campaign)** | [archive/data-access-layer.md](archive/data-access-layer.md) · design lock · safety · gates · prep-live standards |
 
 ---
 

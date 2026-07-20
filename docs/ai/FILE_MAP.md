@@ -28,8 +28,8 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md` + starts curated **split** `claude-pack/repomix-output.*.md` refresh **in the background** (`--no-repomix` to skip).
 - **`create-repomix.js`**: PC-only. Packs repo via Repomix (`npx repomix`) into `claude-pack/repomix-output.*.md` (~2 MiB parts by default) for Claude / quote.ai project knowledge. `npm run create-repomix`. See [CLAUDE_PACK.md](CLAUDE_PACK.md).
 - **`check-google-account.js`**: Node-only (not deployed to GAS). Three checks: (1) clasp login, (2) email matches `google-account.json` + project reachable, (3) **no PC-only scripts on live GAS** (white-screen guard). Run: `node check-google-account.js` or `npm run check-google`.
-- **`pre-ship.js`** + **`pre-ship/`**: Scoped pre-ship pipeline — auto-detects layers from git diff; hooked into `milestone.js`, `deploy-hosting.js`, `build-station-desktop.js`, `build-station-apk.js`. **Bugbot gate:** `pre-ship/bugbot-policy.js`. **DAL gates:** `pre-ship/dal.js` when hot paths change. Docs: [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md) · [dal-pre-ship-gates.md](docs/ai/active/dal-pre-ship-gates.md). Run: `node pre-ship.js` or `npm run pre-ship`.
-- **`scripts/dal-client-inventory.js`**: Node-only. Scans root `*.html` for `google.script.run` + `localStorage`; writes [dal-client-inventory.md](docs/ai/active/dal-client-inventory.md). `--check` on pre-ship when DAL hot paths change.
+- **`pre-ship.js`** + **`pre-ship/`**: Scoped pre-ship pipeline — auto-detects layers from git diff; hooked into `milestone.js`, `deploy-hosting.js`, `build-station-desktop.js`, `build-station-apk.js`. **Bugbot gate:** `pre-ship/bugbot-policy.js`. **DAL gates:** `pre-ship/dal.js` when hot paths change. Docs: [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md) · [dal-pre-ship-gates.md](docs/ai/archive/dal-pre-ship-gates.md). Run: `node pre-ship.js` or `npm run pre-ship`.
+- **`scripts/dal-client-inventory.js`**: Node-only. Scans root `*.html` for `google.script.run` + `localStorage`; writes [dal-client-inventory.md](docs/ai/dal-client-inventory.md). `--check` on pre-ship when DAL hot paths change.
 - **`scripts/dal-persistence-lint.js`**: Node-only. Bans `SpreadsheetApp` / `clearContents` in client HTML; server `clearContents` allowlist.
 - **`scripts/dal-phase3-gate.js`**: Node-only. Blocks deploy when delta-only saves ship without `PRE_SHIP_DAL_CONCURRENCY_OK=1`. `--deploy` flag from pre-ship.
 - **`scripts/dal-pa-live-sync-test.js`** + **`scripts/lib/dal-*-core.js`**: Node-only PA/timeline live-sync sims (Cases A–V). Includes `dal-remote-apply-diff-core.js` (H2 targeted redraw gate).
@@ -49,7 +49,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`00c_UI_Forms.html`**: Universal form renderers (Provisioning, Warehouse Roots, Clients, Vehicles).
 - **`00d_UI_Visuals.html`**: Settings drawers and data manager modals (Colors, Depts, Meals, Tags).
 - **`00e_UI_Modals.html`**: Universal popups (Global Tasks, Pickers, Checklists, Backup).
-- **`00f_Error_Report.html`**: Global top-center **error-report lip** (~2mm) + drawer — hover open (desktop), tap lip (touch/mobile/station); `submitErrorReport`. Campaign: [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). Styles: `Styles.html` `#sr-error-report-*`.
+- **`00f_Error_Report.html`**: Global top-center **error-report lip** (~2mm) + drawer — hover open (desktop), tap lip (touch/mobile/station); `submitErrorReport`. Build: [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md). Styles: `Styles.html` `#sr-error-report-*`.
 
 ## 3. Operations & Integrations
 - **`Operations.js`**: Core backend execution (RFID processing, ledger commits, starting sessions).

@@ -2,11 +2,11 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Status:** Backlog — shared architecture for branched session types below. **Do not implement fork until [active/data-access-layer.md](../active/data-access-layer.md) Phase 4** (router + **Phase 3 delta saves** complete).
+**Status:** Shared architecture for branched session types — dual-domain live @ v603+. Design lock: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md).
 
-**Design lock (2026-07-13):** [../active/dal-firebase-design-lock-2026-07-13.md](../active/dal-firebase-design-lock-2026-07-13.md) — reconciliation engine, failed-writes pocket, Logistics Hub atomic ops (no fork), PA/Timeline fork lifecycle.
+**Design lock (2026-07-13):** [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) — reconciliation engine, failed-writes pocket, Logistics Hub atomic ops (no fork), PA/Timeline fork lifecycle.
 
-**Prerequisite campaign:** [../active/data-access-layer.md](../active/data-access-layer.md)
+**Prerequisite campaign (archived):** [../archive/data-access-layer.md](../archive/data-access-layer.md)
 
 **Branches:**
 
@@ -17,9 +17,9 @@
 
 **Last swept:** 2026-07-15
 
-**Firestore paths (canonical):** `projects/{projectId}/assets/` and `projects/{projectId}/timeline/` per [design lock](../active/dal-firebase-design-lock-2026-07-13.md). The older `sessions/{projectId}/{sessionType}/` sketch is historical only.
+**Firestore paths (canonical):** `projects/{projectId}/assets/` and `projects/{projectId}/timeline/` per [design lock](../archive/dal-firebase-design-lock-2026-07-13.md). The older `sessions/{projectId}/{sessionType}/` sketch is historical only.
 
-**Dual-domain (Phase 4 Slice D):** prep + timeline must be allowed **concurrent** on one project — [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md). Until that ships, `Dal_Sessions.js` has one slot and mutually excludes them.
+**Dual-domain (Phase 4 Slice D):** prep + timeline may both be open **concurrent** on one project — [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) (shipped @ v603).
 
 ---
 
@@ -49,12 +49,12 @@ SESSION CLOSED (fork left)
 - [x] Session metadata: `projectId`, `sessionType`, `openedAt`, `openedBy`, `status` (open | committing | closed) — **singleton row today**
 - [x] Store session flag on `Projects_Index` (authoritative for “is fork active?”) + Firebase `_meta` for live UI
 - [x] Hard block: while session open, **no direct** PA / timeline Sheets path for that domain (from adapter asserts)
-- [ ] **Slice D:** independent prep + timeline lifecycle on `Projects_Index` — concurrent open — [../active/dal-phase4-slice-d-dual-domain-sessions.md](../active/dal-phase4-slice-d-dual-domain-sessions.md)
+- [x] **Slice D:** independent prep + timeline lifecycle on `Projects_Index` — concurrent open — [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) (v603)
 - [ ] Hard block remains **per domain** after Slice D (prep open must not block timeline Sheets when timeline is normal, and vice versa)
 
 ### Firebase (Firestore)
 
-- [x] Project-scoped paths — canonical `projects/{projectId}/assets|timeline/` ([design lock](../active/dal-firebase-design-lock-2026-07-13.md))
+- [x] Project-scoped paths — canonical `projects/{projectId}/assets|timeline/` ([design lock](../archive/dal-firebase-design-lock-2026-07-13.md))
 - [ ] **Lean read model** — avoid “subscribe to 500 rows” per client (session summary doc + targeted subcollections)
 - [ ] Write on **meaning** only (scan, drag end, add row) — debounce pack/qty 300–500 ms
 - [ ] Unsubscribe listeners when user leaves room / closes modal
@@ -64,11 +64,11 @@ SESSION CLOSED (fork left)
 - [ ] **Open:** GAS validates → snapshot Sheets → bulk write Firebase → set session flag → FCM “session opened”
 - [ ] **During:** clients read/write Firebase only for session slice
 - [ ] **Close:** GAS validates buffer → bulk commit Sheets → **reconciliation engine** (cell-by-cell) → clear session → delete or archive Firebase session → FCM “session closed”
-- [ ] **Failed commit:** queue in `failed_writes/{projectId}/{timestamp}/{deltaId}` — retry backoff, manager alert — see [design lock §2](../active/dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
+- [x] **Failed commit:** queue in `failed_writes/{projectId}/{timestamp}/{deltaId}` — retry backoff, manager alert — see [design lock §2](../archive/dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
 
 ### Logistics Hub (not a fork)
 
-- [ ] **Atomic per-operation** path — no session fork, immediate Sheets verify after each op — [design lock §2](../active/dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
+- [x] **Atomic per-operation** path — no session fork, immediate Sheets verify after each op — [design lock §2](../archive/dal-firebase-design-lock-2026-07-13.md#2-session-lifecycle-by-domain)
 
 ### Presence & activity
 

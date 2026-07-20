@@ -13,11 +13,13 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 | **Map** | [docs/ai/README.md](docs/ai/README.md) | "Where is X?" |
 | **Active work** | [docs/ai/active/](docs/ai/active/) | "Active drawer" / current recovery |
 | **Topic backlog** | [docs/ai/topics/](docs/ai/topics/) | "Notifications topic" — read **one** file |
+| **Bug journal (log)** | [docs/ai/error-journal/](docs/ai/error-journal/) | Report packs → lasting bug memory — **not a campaign** |
 | **Roadmap index** | [docs/ai/Project_TODO.md](docs/ai/Project_TODO.md) | Status table only — not full checklists |
 | **Archive** | [docs/ai/archive/](docs/ai/archive/) | Historical plans |
 | **Stable reference** | See [docs/ai/README.md](docs/ai/README.md) | Architecture, schema, file map |
 
-**Operational logs (machine-written):** root **`RELEASES.md`**, **`WORKS_LOG.md`**.
+**Operational logs (machine-written):** root **`RELEASES.md`**, **`WORKS_LOG.md`**.  
+**Bug memory log (agent-written):** [docs/ai/error-journal/](docs/ai/error-journal/) — not a campaign.
 
 ---
 
@@ -27,10 +29,10 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 |----------------------|------------------------|
 | Project Assets, packing, checkout, cables, containers, RFID/QR | [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) → [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) |
 | Formula / CLI / equipment list sync | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (Triangle of Truth) |
-| DAL, Firebase session fork, data router | [active/dal-firebase-design-lock-2026-07-13.md](docs/ai/active/dal-firebase-design-lock-2026-07-13.md) → [active/data-access-layer.md](docs/ai/active/data-access-layer.md) → [active/dal-pre-ship-gates.md](docs/ai/active/dal-pre-ship-gates.md) · **session banners / dual-domain UI:** [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § DAL prep/timeline session UI |
+| DAL, Firebase session fork, data router | [archive/dal-firebase-design-lock-2026-07-13.md](docs/ai/archive/dal-firebase-design-lock-2026-07-13.md) → [archive/data-access-layer.md](docs/ai/archive/data-access-layer.md) → [archive/dal-pre-ship-gates.md](docs/ai/archive/dal-pre-ship-gates.md) · lasting: [topics/data-cache-engine.md](docs/ai/topics/data-cache-engine.md) · **session banners / dual-domain UI:** [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § DAL prep/timeline session UI |
 | Multi-user fork harden / auto fork (prep + timeline) | [active/multi-user-fork-industrial-and-auto.md](docs/ai/active/multi-user-fork-industrial-and-auto.md) — **read § Warehouse prep — real multi-user scope** · **H0 testing → H1–H5 + Gap 1 → Part B** · process [active/bulletproof-multiuser-live-editors-2026-07-18.md](docs/ai/active/bulletproof-multiuser-live-editors-2026-07-18.md) · UX: [topics/timeline-collab-session.md](docs/ai/topics/timeline-collab-session.md) § Optional update |
-| In-app error reports / daily journal triage | [active/user-error-reporting-journal-2026-07-19.md](docs/ai/active/user-error-reporting-journal-2026-07-19.md) — Report → ERROR LOGS pack → agents → journal |
-| Prep PA multi-user live sync (batch add, pack, delete/resurrect, START/END banner) | [active/multi-user-fork-industrial-and-auto.md](docs/ai/active/multi-user-fork-industrial-and-auto.md) § floor scope → [active/dal-prep-live-sync-standards.md](docs/ai/active/dal-prep-live-sync-standards.md) → [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § prep PA fork live sync · open incident if any |
+| In-app error reports / bug journal triage | Log: [error-journal/](docs/ai/error-journal/) · build archive: [archive/user-error-reporting-journal-2026-07-19.md](docs/ai/archive/user-error-reporting-journal-2026-07-19.md) — Report → ERROR LOGS pack → agents → journal |
+| Prep PA multi-user live sync (batch add, pack, delete/resurrect, START/END banner) | [active/multi-user-fork-industrial-and-auto.md](docs/ai/active/multi-user-fork-industrial-and-auto.md) § floor scope → [archive/dal-prep-live-sync-standards.md](docs/ai/archive/dal-prep-live-sync-standards.md) → [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § prep PA fork live sync · open incident if any |
 | Deploy, mobile black screen, session | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) (boot) → [DEPLOY_AND_ROLLBACK.md](docs/ai/DEPLOY_AND_ROLLBACK.md) → [PRE_SHIP_PIPELINE.md](docs/ai/PRE_SHIP_PIPELINE.md) |
 | Phone QR scan panel, shell camera, `host-boot.js` mobile paths | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Mobile QR handoff |
 | Station gun scans, `RfidManager`, `showrunnerStationDeliverScan` | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Station RFID delivery |
@@ -173,7 +175,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
    - **When `require`:** AI **must** launch Bugbot (`subagent_type: bugbot`, `Diff: branch changes`) **before** the ship script completes. Use `Custom Instructions` from `pre-ship/last-report.json` → `bugbot.customInstructions`. Fix **Critical/High** findings or get director override; then re-run ship with `PRE_SHIP_BUGBOT_OK=1`.
    - **When `recommend`:** AI runs Bugbot if the diff is non-trivial; may ship without if mechanical GREEN and change is tiny — note in handoff.
    - **When `skip`:** Do not spend tokens on Bugbot (docs-only, cosmetic desktop icon, etc.).
-   - **DAL hot paths** (Logistics, PA save, timeline, Operations): mechanical **DAL gates** also run inside gas pre-ship — see [dal-pre-ship-gates.md](docs/ai/active/dal-pre-ship-gates.md). Regenerate client inventory after `google.script.run` changes; Phase 3 delta-only deploy needs `PRE_SHIP_DAL_CONCURRENCY_OK=1`.
+   - **DAL hot paths** (Logistics, PA save, timeline, Operations): mechanical **DAL gates** also run inside gas pre-ship — see [dal-pre-ship-gates.md](docs/ai/archive/dal-pre-ship-gates.md). Regenerate client inventory after `google.script.run` changes; Phase 3 delta-only deploy needs `PRE_SHIP_DAL_CONCURRENCY_OK=1`.
    - **AI checks policy early:** `node pre-ship.js --dry-run` or `--bugbot-policy` before coding the ship command.
    - **Never** bypass `BUGBOT REQUIRED` on fragile/multi-layer ships without director saying so explicitly.
 

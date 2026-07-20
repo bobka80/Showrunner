@@ -78,7 +78,7 @@ All four live spreadsheets sit **directly in `05_DATABASE`** (not in subfolders)
 | Tab | Role |
 |-----|------|
 | **`Audit_Logs`** | Enterprise audit (`writeToAuditLog`) — **do not change** for user bug reports |
-| **`Error_Reports`** | User Report inbox (raw presses only). Schema: [SCHEMA.md §6](SCHEMA.md). Campaign: [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md). Handoff deletes handed rows; lasting memory is markdown (`docs/ai/active/error-journal/`), not a Sheet journal tab. |
+| **`Error_Reports`** | User Report inbox (raw presses only). Schema: [SCHEMA.md §6](SCHEMA.md). Build archive: [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md). Handoff deletes handed rows; lasting memory is markdown (`docs/ai/error-journal/`), not a Sheet journal tab. |
 
 **v354–355 mistake (resolved):** Repair/restore code once renamed Engine/Vault to bare `ENGINE` / `VAULT`. Director layout requires **`SM_Showrunner_ENGINE`** and **`SM_Showrunner_VAULT`** — code is now **aligned** (`LIVE_ENGINE_FILE_NAME = 'SM_Showrunner_ENGINE'` in `Resources_Core.js`; see *Known code drift* below).
 

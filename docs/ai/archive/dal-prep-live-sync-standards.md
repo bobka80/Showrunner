@@ -1,14 +1,14 @@
 # Prep PA live sync — industry standards + how we work (locked)
 
-**Campaign hub (checkboxes + floor scope):** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md)  
-**DAL era hub:** [data-access-layer.md](data-access-layer.md)  
+**Campaign hub (checkboxes + floor scope):** [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md)  
+**DAL era hub (archived):** [data-access-layer.md](data-access-layer.md)  
 **Never-dos (code):** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ timeline + prep PA + session UI  
 **Incident science:** [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md) · [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md)  
 **Sim:** `node scripts/dal-pa-live-sync-test.js` · core `scripts/lib/dal-pa-live-sync-core.js`
 
-**Purpose:** Durable campaign doctrine for **warehouse prep multi-user live sync**. Not an incident log. Fresh agents read this **before** another prep live sync code change.
+**Purpose:** Durable doctrine for **warehouse prep multi-user live sync** (archived with DAL; floor work continues on multi-user hub). Not an incident log. Fresh agents read this **before** another prep live sync code change.
 
-**Locked:** 2026-07-18 (industry harden + process) · **Prep live rollback / production (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. **Floor workflow:** [multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](multi-user-fork-industrial-and-auto.md) — search/formula batch absolute upserts **primary**; floor +/- combine **secondary**.
+**Locked:** 2026-07-18 (industry harden + process) · **Prep live rollback / production (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. **Floor workflow:** [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md) — search/formula batch absolute upserts **primary**; floor +/- combine **secondary**.
 
 **Canonical “how it works” (session + fixtures):** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep / timeline session UI · § DAL prep PA fork live sync.
 
@@ -141,7 +141,7 @@ If a path mutates without note → **bug**, not “edge case.”
 | **Floor workflow (product)** | [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) § Warehouse prep — real multi-user scope | Search/formula batch adds, pack, RFID, delete — do not divert |
 | **Process depth** | [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md) | Testing pipeline, fix approach, harden phases |
 | **Campaign checklist** | [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) | Part A/B checkboxes + locked build order |
-| **Incident science** | [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) | What broke this week, hypotheses, proposed fix — archive when stable |
+| **Incident science** | [../archive/dal-pa-live-sync-thrash.md](../archive/dal-pa-live-sync-thrash.md), [../archive/dal-pa-delete-resurrect.md](../archive/dal-pa-delete-resurrect.md) | What broke this week, hypotheses, proposed fix — archive when stable |
 | **Campaign hub (DAL era)** | [data-access-layer.md](data-access-layer.md) | Status line + link to doctrine/incident |
 | **Phase gate** | [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md) | Fresh-chat stop rule before touching prep live |
 | **Production log** | root `RELEASES.md` | **Only when a milestone ships** — one plain note + GAS version (what fixed, smoke) |
@@ -159,6 +159,6 @@ If a path mutates without note → **bug**, not “edge case.”
 - **v645** — session banner + early fixture live smoke  
 - **v653** — heal + same-row +/- deltas (Case O)  
 
-Incidents closed into FRAGILE: [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md), [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md).  
+Incidents closed into FRAGILE: [../archive/dal-pa-live-sync-thrash.md](../archive/dal-pa-live-sync-thrash.md), [../archive/dal-pa-delete-resurrect.md](../archive/dal-pa-delete-resurrect.md).  
 
 **Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **Part A complete** (H0–H5 + Gap 1 + A7) → **middle campaign** → Part B. Process: [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md).

@@ -4,13 +4,15 @@
 
 **Related:** [session-fork-platform.md](session-fork-platform.md) · [project-assets-concurrency.md](project-assets-concurrency.md) · [ARCHITECTURE.md](../ARCHITECTURE.md)
 
-**Status:** **Phase 6B live** — client CacheCoordinator covers PA + calendar/vault/tracker/fleet/clients/warehouse; GAS `getSheetData` cache re-enabled with tag-aware purge. See [active/data-access-layer.md](../active/data-access-layer.md).
+**Status:** **Phase 6B live** — client CacheCoordinator covers PA + calendar/vault/tracker/fleet/clients/warehouse; GAS `getSheetData` cache re-enabled with tag-aware purge. DAL campaign **archived** — [../archive/data-access-layer.md](../archive/data-access-layer.md).
 
-**Last swept:** 2026-07-17
+**Last swept:** 2026-07-20
 
-**Design lock — Cache Coordinator public API:** [../active/dal-firebase-design-lock-2026-07-13.md §4](../active/dal-firebase-design-lock-2026-07-13.md#4-caching-strategy-cache-coordinator) — `check`, `set`, `invalidate`, `registerPolicy`; UI → coordinator → repos (never UI → repos directly).
+**Design lock — Cache Coordinator public API:** [../archive/dal-firebase-design-lock-2026-07-13.md §4](../archive/dal-firebase-design-lock-2026-07-13.md#4-caching-strategy-cache-coordinator) — `check`, `set`, `invalidate`, `registerPolicy`; UI → coordinator → repos (never UI → repos directly).
 
-**Active campaign:** [../active/data-access-layer.md](../active/data-access-layer.md) · **Design locked 2026-07-13**
+**Archived campaign:** [../archive/data-access-layer.md](../archive/data-access-layer.md) · **Design locked 2026-07-13**
+
+**Still not repo-routed (deferred after close):** see archive hub § *Out of this campaign* — vault/crew/directory/config/etc. migrate when next touched. New feature writes go through a repo (create one if missing).
 
 ### Calendar refresh (contour)
 
@@ -77,7 +79,7 @@ Stores (layered — not one bucket)
 
 **Intent (director, 2026-07-03):** every feature talks to **domain repositories** (`AssetsRepo.getForProject(id)`, `CrewRepo.setRfid(...)`, `LedgerRepo.append(...)`), never directly to `SpreadsheetApp` / raw sheets / Firebase. Behind the repository interface sits one active **adapter**: `SheetsAdapter` today; tomorrow `PostgresAdapter`, `SqlAdapter`, or `FirebasePaidAdapter`. Swap the adapter in **one registration point** → the whole app reroutes.
 
-**Campaign close bar (2026-07-16):** the live DAL campaign does **not** migrate every domain before close. Inventory of what stays outside repos until as-needed: [active/data-access-layer.md § Out of this campaign](../active/data-access-layer.md#out-of-this-campaign--not-routed-through-dal).
+**Campaign close bar (2026-07-16):** the DAL campaign does **not** migrate every domain before close. Inventory of what stays outside repos until as-needed: [archive/data-access-layer.md § Out of this campaign](../archive/data-access-layer.md#out-of-this-campaign--not-routed-through-dal).
 
 ```text
 Feature code (GAS + client)

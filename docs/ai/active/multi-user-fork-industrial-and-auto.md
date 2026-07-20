@@ -1,17 +1,17 @@
 # Active — Multi-user fork: industrial harden → auto fork (timeline + PA)
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Predecessor:** [data-access-layer.md](data-access-layer.md) — prep/timeline forks. **Prep live rollback (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. DAL-era catastrophic rollback: **v576**.  
+**Predecessor:** [../archive/data-access-layer.md](../archive/data-access-layer.md) — prep/timeline forks. **Prep live rollback (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. DAL-era catastrophic rollback: **v576**.  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ DAL prep / timeline session UI · prep PA fork live sync · timeline fork live sync  
-**How live works today:** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) · FRAGILE “How prep session UI works now”  
+**How live works today:** [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) · FRAGILE “How prep session UI works now”  
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **Part A complete** @ GAS **v678** (exit wrap). **Middle / NEXT:** [user-error-reporting-journal-2026-07-19.md](user-error-reporting-journal-2026-07-19.md) → then Part B auto fork. Rollback pin still **v654** / `host-boot.js?v=653`.  
+**Opened:** 2026-07-18 · **Status:** **Part B in progress** — director OK go 2026-07-20. **Next slice: B0** try/revert baseline. Part A complete @ v678. Middle archived. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.  
 **Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
 **Latest:** One toast + sticky peer note in live-sync roster **v673**.  
   
-**Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
+**Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md).
 
 ---
 
@@ -19,8 +19,8 @@
 
 1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → **this file** (especially § **Warehouse prep — real multi-user scope**) → [bulletproof](bulletproof-multiuser-live-editors-2026-07-18.md) → FRAGILE §§ above.  
 2. **Build order (locked 2026-07-19):** **(1) testing pipeline H0** → **(2) bulletproof multi-user H1–H5 + Gap 1** → **(3) Part B auto fork**.  
-3. **Do not** start Part B until Part A exit is director-confirmed.  
-4. **No code** until director says **OK go** (or names a Part A slice).  
+3. **Part B:** director OK go 2026-07-20 — start at **B0** try baseline, then B1–B5 per hub.  
+4. **No code** on B1+ until B0 GAS version is recorded (or director waives).  
 5. After any implementation: `node milestone.js "…"`; hosting only if `host-boot.js` changes.
 
 **Point the new agent here:**  
@@ -91,7 +91,7 @@ Live sync’s job is **not** “combine +1 forever.” It is: every real list mu
 | **3 — secondary** | Floor +/- on an existing UID | May use delta-combine so concurrent taps don’t erase each other; **byproduct**, not the product model |
 | **Never** | Treat prep as a CRDT text editor or as “increment API only” | Wrong workflow |
 
-Technical merge rules and never-dos stay in [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) + [FRAGILE_ZONES.md](../FRAGILE_ZONES.md). If a proposal conflicts with **this section**, **stop and ask the director**.
+Technical merge rules and never-dos stay in [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) + [FRAGILE_ZONES.md](../FRAGILE_ZONES.md). If a proposal conflicts with **this section**, **stop and ask the director**.
 
 ---
 
@@ -105,7 +105,7 @@ Technical merge rules and never-dos stay in [dal-prep-live-sync-standards.md](da
 
 **Why this order:** Auto-start / pull-in / idle eject **amplifies** any remaining live-sync fragility. Trust the harness first; harden the patch+session model; then automate lifecycle.
 
-**Not in this campaign:** Station UI rework, phone-app backlog, vault/crew repo migration, CRDT rewrite, Logistics Hub atomic path changes, [pre-ship expansion to other domains](pre-ship-pipeline-expansion-2026-07-18.md) (parallel board).
+**Not in this campaign:** Station UI rework, phone-app backlog, vault/crew repo migration, CRDT rewrite, Logistics Hub atomic path changes, [pre-ship expansion to other domains](../topics/pre-ship-pipeline-expansion-2026-07-18.md) (parallel board).
 
 ---
 
@@ -121,7 +121,7 @@ Director-confirmed **manual** multi-user prep (and timeline twin) — **rollback
 - **Prep qty (secondary path):** same-row multi-window +/- may **combine** via deltas (Case O) — must not redefine the product as increments  
 - Apply `result.merged` / heal so UI cannot stick behind server or **flash then revert** after peer/batch applies  
 - Sim: `node scripts/dal-pa-live-sync-test.js` (Cases **A–P**) must stay green  
-- Doctrine: this file § floor scope + [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md)  
+- Doctrine: this file § floor scope + [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md)  
 - Gate: `node scripts/dal-mutation-inventory-check.js` (wired in `pre-ship/dal.js`)  
 
 Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v654"** (prep live known-good). DAL-era Sheets-only catastrophic rollback remains **v576**.
@@ -130,7 +130,7 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v654"** (pr
 
 ## Part A — Testing pipeline → industrial harden (first)
 
-**H definitions:** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) §2.  
+**H definitions:** [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) §2.  
 **Process depth:** [bulletproof](bulletproof-multiuser-live-editors-2026-07-18.md).  
 **This section = only checkbox list + locked order.** Do not invent a rival order in other files.
 
@@ -156,7 +156,7 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v654"** (pr
 ### A2 — H5 Mutation-path inventory gate
 
 - [x] Every prep mutator of `currentProjectAssets` notes touch/delete (and timeline twin)  
-- [x] Gate scripts enforced in [dal-pre-ship-gates.md](dal-pre-ship-gates.md): `dal-mutation-inventory-check.js` (PA) + `dal-tl-mutation-inventory-check.js` (timeline)  
+- [x] Gate scripts enforced in [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md): `dal-mutation-inventory-check.js` (PA) + `dal-tl-mutation-inventory-check.js` (timeline)  
 - [x] Shipped after H1 (same theme: don’t silently corrupt on hot path)  
 - [x] PA ALLOWLIST shrunk to DUMMY shell only; timeline mid-drag / sub-event ALLOWLIST documented in gate script  
 
@@ -166,10 +166,10 @@ Rollback if Part A/B wrecks floor: tell AI **"Rollback production to v654"** (pr
 - [x] After A0 mode-seam sims exist: add `scripts/dal-sync-mode-lint.js` (wired in `pre-ship/dal.js`)  
 - [x] Fail diffs that call `saveProjectAssets` / `saveTimelineData` from live client modules without allowlist  
 - [x] Fail applying GAS responses into live apply without firestore-mode guard or `writeSeq` presence  
-- [x] Document in [dal-pre-ship-gates.md](dal-pre-ship-gates.md)  
+- [x] Document in [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md)  
 - [x] Detection only — no runtime behavior change required for the gate itself  
 
-Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) / FRAGILE — mechanical guard replaces “don’t” alone.
+Forbidden patterns #10/#11: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) / FRAGILE — mechanical guard replaces “don’t” alone.
 
 ### A4 — H4 State size + END mirror check ✅
 
@@ -207,7 +207,7 @@ Forbidden patterns #10/#11: [dal-prep-live-sync-standards.md](dal-prep-live-sync
 
 **Do not start until Part A exit is checked and director says OK go for Part B.**
 
-**Floor debugging channel (recommended before/during Part B smoke):** [user-error-reporting-journal-2026-07-19.md](user-error-reporting-journal-2026-07-19.md) — daily error-log packs → agent triage → journal.
+**Floor debugging channel (recommended before/during Part B smoke):** [../error-journal/](../error-journal/) — daily error-log packs → agent triage → journal. Build playbook: [../archive/user-error-reporting-journal-2026-07-19.md](../archive/user-error-reporting-journal-2026-07-19.md).
 
 **Canonical UX (do not reinvent):** [timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject)  
 Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md)
@@ -275,7 +275,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | Timeline live | `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html` |
 | Host bridge | `push-hosting/public/host-boot.js` (`SHOWRUNNER_DAL_FS_*`) |
 | Sessions / commit | `Dal_Sessions.js`, `Dal_Firebase.js` |
-| Sims / gates | `scripts/dal-pa-live-sync-*.js` (Cases A–J), `scripts/dal-mutation-inventory-check.js` (in `pre-ship/dal.js`), [dal-pre-ship-gates.md](dal-pre-ship-gates.md) |
+| Sims / gates | `scripts/dal-pa-live-sync-*.js` (Cases A–J), `scripts/dal-mutation-inventory-check.js` (in `pre-ship/dal.js`), [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md) |
 
 ---
 
@@ -283,9 +283,9 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 | Campaign | Relationship |
 |----------|----------------|
-| [data-access-layer.md](data-access-layer.md) | Predecessor — near-complete; archive separately when director closes DAL paperwork |
+| [../archive/data-access-layer.md](../archive/data-access-layer.md) | Predecessor — **archived** 2026-07-20 |
 | [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md) | Process + Phase H0–H3 depth; hub owns checkboxes |
-| [pre-ship-pipeline-expansion-2026-07-18.md](pre-ship-pipeline-expansion-2026-07-18.md) | Parallel board — RBAC/FCM/truck/fin gates; not Part A |
+| [../topics/pre-ship-pipeline-expansion-2026-07-18.md](../topics/pre-ship-pipeline-expansion-2026-07-18.md) | Parallel board — RBAC/FCM/truck/fin gates; not Part A |
 | Station UI / RFID | Parallel — do not mix into this campaign |
 | Phone app | Parallel — Part B phone button for PA start may touch mobile; keep scope tight |
 
@@ -315,7 +315,9 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-19 | **H2 follow-up:** qty patch also updates +/- control span (`data-pa-qty`); fixes peer “one step behind” on multi-qty bumps. |
 | 2026-07-19 | **Conflict UX:** no toast / no auto-expand; compact SYNC roster + hover peer → ops popover. Working dept: white label/frame, select border = dept color, white rails +1px. |
 | 2026-07-19 | **A7 / Part A exit:** director wrap — Part A industrial harden complete. Next = middle campaign (not Part B yet). |
-| 2026-07-20 | Middle campaign named: **error reports + journal** ([user-error-reporting-journal-2026-07-19.md](user-error-reporting-journal-2026-07-19.md)). Part B waits. |
+| 2026-07-20 | Middle campaign named: **error reports + journal**. Part B waits. |
+| 2026-07-20 | Middle build archived → [../archive/user-error-reporting-journal-2026-07-19.md](../archive/user-error-reporting-journal-2026-07-19.md). **NEXT = Part B.** Bug log moved to [../error-journal/](../error-journal/) (not a campaign). |
+| 2026-07-20 | **Part B OK go** — next = **B0** AUTO-FORK TRY BASELINE milestone, then B1 who-may-start. |
 
 ---
 

@@ -56,7 +56,7 @@ Pull **what the software does** and **how docs say it should work**, then list *
 |--------|---------|
 | [FILE_MAP.md](../FILE_MAP.md), topics, [Project_TODO.md](../Project_TODO.md) | Domains + intended behavior |
 | [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) | “Looks wrong but may be intentional” |
-| [active/dal-client-inventory.md](../active/dal-client-inventory.md), phase-0 / DAL discovery | Write paths + call graph |
+| [../dal-client-inventory.md](../dal-client-inventory.md), phase-0 / DAL discovery | Write paths + call graph |
 | Known topic gaps (e.g. [project-assets-concurrency.md](project-assets-concurrency.md)) | Already-named patterns |
 
 Cap to **S0/S1 first**, then FRAGILE / write paths / public APIs. Batch by domain so the survey is finishable.
@@ -109,7 +109,7 @@ Optional note field for each row (one sentence).
 
 After **every** phase: re-evaluate registry, ripple list, intent survey (any new gaps?), and whether the freeze pin needs a new pin.
 
-**Seed maps from existing drawers** — do not cold-start from repomix alone: [FILE_MAP.md](../FILE_MAP.md), topics, [FRAGILE_ZONES.md](../FRAGILE_ZONES.md), [active/dal-client-inventory.md](../active/dal-client-inventory.md), [active/dal-phase0-discovery-2026-07-13.md](../active/dal-phase0-discovery-2026-07-13.md).
+**Seed maps from existing drawers** — do not cold-start from repomix alone: [FILE_MAP.md](../FILE_MAP.md), topics, [FRAGILE_ZONES.md](../FRAGILE_ZONES.md), [dal-client-inventory.md](../dal-client-inventory.md), [archive/dal-phase0-discovery-2026-07-13.md](../archive/dal-phase0-discovery-2026-07-13.md).
 
 ---
 

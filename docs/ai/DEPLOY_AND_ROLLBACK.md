@@ -31,7 +31,7 @@ ShowRider uses **two separate buffers**. The director does not run Git or clasp 
 **"Milestone now" (before new work):** AI runs **`milestone.js` first**, then continues with any other instructions in the same message (e.g. start a new feature). Full protocol: **[MILESTONE_NOW.md](MILESTONE_NOW.md)**.
 
 **What happens (automatic via `node milestone.js "note"`):**
-0. **`pre-ship` GAS layer** — build, parse, station verify (if needed), **DAL gates** (if hot paths touched), dist orphan scan, clasp account check (see [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) · [dal-pre-ship-gates.md](active/dal-pre-ship-gates.md))
+0. **`pre-ship` GAS layer** — build, parse, station verify (if needed), **DAL gates** (if hot paths touched), dist orphan scan, clasp account check (see [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) · [dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md))
 1. Reads latest GAS version (e.g. 410) — next will be 411
 2. **`gas-push-sync.js`** (full replace of GAS files from `dist/` — removes orphans; plain `clasp push` does not delete removed files)
 3. `clasp version "<note>"` — frozen snapshot with your name on Google

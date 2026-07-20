@@ -12,6 +12,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 |--------|------|----------|
 | **Active** | [active/](active/) | Current campaigns, URGENT fixes, recovery steps |
 | **Topics** | [topics/](topics/) | Feature backlog — one file per area |
+| **Bug journal (log)** | [error-journal/](error-journal/) | Lasting bug memory from Report packs — **not a campaign** |
 | **Archive** | [archive/](archive/) | Finished plans — reference only |
 | **Index** | [Project_TODO.md](Project_TODO.md) | Topic + campaign status table only |
 
@@ -36,13 +37,14 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [File_Splitting_Guide.md](File_Splitting_Guide.md) | Safe file splits |
 | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) | This works / milestone / rollback |
 | [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) | Google Drive — `STAGE_MASTERS_SYSTEM_ROOT`, `05_DATABASE`, Showrunner Sync |
-| [active/dal-firebase-design-lock-2026-07-13.md](active/dal-firebase-design-lock-2026-07-13.md) | DAL + Firebase design lock (2026-07-13) |
-| [active/dal-phase4-slice-d-dual-domain-sessions.md](active/dal-phase4-slice-d-dual-domain-sessions.md) | Phase 4 Slice D — prep∥timeline concurrent sessions (before Phase 5) |
-| [active/dal-pre-ship-gates.md](active/dal-pre-ship-gates.md) | DAL mechanical gates (inventory, persistence lint, Phase 3 deploy ack) — **read before DAL hot-path ships** |
-| [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md) | **NEXT** — in-app error reports + daily pack → agent triage → lasting journal |
-| [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) | Part A complete → middle = error-reporting → Part B auto fork |
+| [archive/dal-firebase-design-lock-2026-07-13.md](archive/dal-firebase-design-lock-2026-07-13.md) | DAL + Firebase design lock (archived with campaign) |
+| [archive/dal-phase4-slice-d-dual-domain-sessions.md](archive/dal-phase4-slice-d-dual-domain-sessions.md) | Phase 4 Slice D — prep∥timeline concurrent (shipped; archive) |
+| [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md) | DAL mechanical gates handbook — **read before DAL hot-path ships** |
+| [dal-client-inventory.md](dal-client-inventory.md) | Generated client call inventory (pre-ship `--check`) |
+| [error-journal/](error-journal/) | **Operational log** — bug memory from Report → Hand over · build: [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md) |
+| [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) | **NEXT Part B** — Part A complete; middle archived |
 | [active/bulletproof-multiuser-live-editors-2026-07-18.md](active/bulletproof-multiuser-live-editors-2026-07-18.md) | Process depth for live-sync harden (testing + fix approach) |
-| [active/pre-ship-pipeline-expansion-2026-07-18.md](active/pre-ship-pipeline-expansion-2026-07-18.md) | Future pre-ship gates: RBAC / FCM / truck / financials |
+| [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) | Future pre-ship gates: RBAC / FCM / truck / financials |
 | [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) | Scoped pre-ship + Bugbot gate (all layers) |
 | [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now **full protocol** (the root `../../MILESTONE_NOW.md` is the director's quick card that points here) |
 

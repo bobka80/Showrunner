@@ -1,8 +1,8 @@
 # DAL client inventory (generated)
 
-**Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [dal-pre-ship-gates.md](dal-pre-ship-gates.md)
+**Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md)
 
-**Generated:** 2026-07-19 · **Root HTML modules scanned:** 94
+**Generated:** 2026-07-20 · **Root HTML modules scanned:** 95
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 
@@ -12,6 +12,7 @@
 
 | Server function | Client files |
 |-----------------|--------------|
+| `submitErrorReport` | `00f_Error_Report.html` |
 | `getBootPayload` | `01a_Calendar_Core.html` |
 | `getClientsVault` | `01a_Calendar_Core.html` |
 | `getRefreshPayload` | `01a_Calendar_Core.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html`, `11h_Station_Project_Logic_2.html` |
@@ -97,6 +98,8 @@
 | `saveSystemTags` | `06e_Admin_Automation.html` |
 | `backupDatabaseFile` | `06g_Admin_Database.html` |
 | `getLiveDatabaseStatus` | `06g_Admin_Database.html` |
+| `handoverErrorReports` | `06g_Admin_Database.html` |
+| `listErrorReports` | `06g_Admin_Database.html` |
 | `repairLiveDatabaseLayout` | `06g_Admin_Database.html` |
 | `restoreDatabaseFromBackup` | `06g_Admin_Database.html` |
 | `revertDatabaseOperation` | `06g_Admin_Database.html` |
@@ -143,6 +146,7 @@
 
 | Key | Client files |
 |-----------------|--------------|
+| `sm_session_token` | `00f_Error_Report.html`, `01j_Mobile_Scan.html`, `07_Core_Globals.html`, `Index.html`, `Login.html` |
 | `sm_clients_cache` | `01a_Calendar_Core.html`, `06_System_Admin.html` |
 | `sm_fleet_cache` | `01a_Calendar_Core.html`, `06d_Admin_Fleet.html` |
 | `sm_phantom_payload` | `01a_Calendar_Core.html`, `01b_Calendar_Tasks.html`, `01e_Mobile_Crew_Hub.html`, `08_Conflict_Manager.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html`, `11h_Station_Project_Logic_2.html`, `11m_Station_Dock_Logic.html` |
@@ -151,7 +155,6 @@
 | `sm_lock_idle_min_` | `01i_Desktop_Lock.html` |
 | `sm_mobile_qr_pending` | `01j_Mobile_Scan.html` |
 | `sm_mobile_scan_reopen_panel` | `01j_Mobile_Scan.html` |
-| `sm_session_token` | `01j_Mobile_Scan.html`, `07_Core_Globals.html`, `Index.html`, `Login.html` |
 | `sm_vault_cache` | `02a_Project_Equipment.html`, `06b1_Admin_Assets_Core.html`, `06b2_Admin_Assets_Form.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html` |
 | `sm_offer_lang` | `02d_Equipment_Render.html`, `02g_Project_Reports.html` |
 | `sm_company_name` | `02g_Project_Reports.html` |
@@ -174,6 +177,7 @@
 | 00c_UI_Forms.html | 0 | 0 |
 | 00d_UI_Visuals.html | 0 | 0 |
 | 00e_UI_Modals.html | 0 | 0 |
+| 00f_Error_Report.html | 1 | 1 |
 | 01a_Calendar_Core.html | 4 | 3 |
 | 01b_Calendar_Tasks.html | 7 | 2 |
 | 01c_Calendar_Mini.html | 0 | 0 |
@@ -222,7 +226,7 @@
 | 06d_Admin_Fleet.html | 3 | 1 |
 | 06e_Admin_Automation.html | 10 | 0 |
 | 06f_Admin_Audit.html | 4 | 0 |
-| 06g_Admin_Database.html | 5 | 0 |
+| 06g_Admin_Database.html | 7 | 0 |
 | 06h_Admin_Station_Profiles.html | 3 | 0 |
 | 07_Core_Globals.html | 7 | 2 |
 | 07b_Grid_Engine.html | 0 | 0 |

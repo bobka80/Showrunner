@@ -71,7 +71,7 @@ See [STATION_UI.md](STATION_UI.md) · [active/rfid-station-profiles.md](active/r
 
 ## Pre-ship gate environment variables
 
-Set in PowerShell before `node milestone.js` (or in the shell session). Full detail: [dal-pre-ship-gates.md](active/dal-pre-ship-gates.md) · [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md).
+Set in PowerShell before `node milestone.js` (or in the shell session). Full detail: [dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md) · [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md).
 
 | Variable | When to set |
 |----------|-------------|

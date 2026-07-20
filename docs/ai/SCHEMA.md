@@ -110,9 +110,9 @@ Backend modules: `Resources_*.js` (Vault), `Logistics_*.js` (Engine). Full rules
 ## 6. Error report row (`Error_Reports` tab)
 
 **Workbook:** `SM_Showrunner_LOGS` (same file as enterprise audit). **Tab:** `Error_Reports` only.  
-**Not a journal:** lasting bug memory is markdown (`docs/ai/active/error-journal/` + day campaigns). Do **not** add an `Error_Journal` Sheet tab. **`Audit_Logs` stays untouched.**
+**Not a journal Sheet:** lasting bug memory is markdown (`docs/ai/error-journal/` + `days/`). Do **not** add an `Error_Journal` Sheet tab. **`Audit_Logs` stays untouched.**
 
-**Campaign:** [active/user-error-reporting-journal-2026-07-19.md](active/user-error-reporting-journal-2026-07-19.md).  
+**Build (archived):** [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md). Live log: [error-journal/](error-journal/).  
 **Planned writers (Phase 1+):** `verifyErrorReportsSchema` + `submitErrorReport` in `Resources_Audit.js`.
 
 | Column | Purpose |

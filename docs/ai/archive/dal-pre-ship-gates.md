@@ -4,7 +4,7 @@
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Phase safety:** [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 
-**Opened:** 2026-07-15 · **Status:** **Active** — gates shipped with pre-ship; Phase 1 repos still await director **OK go**.
+**Opened:** 2026-07-15 · **Status:** **ARCHIVED** with DAL campaign — gates still run in pre-ship; this file is the handbook. Inventory: [../dal-client-inventory.md](../dal-client-inventory.md).
 
 ---
 
@@ -40,7 +40,7 @@ DAL gates are **scoped** — they run inside the **gas** pre-ship layer only whe
 | `02e*_Logic*` | PA sync, state, save callers |
 | `02c_Project_Operations` | Checkout / `batchProcessOperations` client |
 | `03a_Timeline*` | Timeline boot + save callers |
-| `docs/ai/active/dal-*` | Campaign docs (inventory must stay fresh) |
+| `docs/ai/archive/dal-*` · `docs/ai/dal-client-inventory.md` | Campaign docs + generated inventory |
 
 **Skipped when:** diff is docs-only outside `dal-*`, cosmetic UI with no hot paths, station-only work, etc.
 
@@ -114,7 +114,7 @@ Wired from `pre-ship/layers.js` → `runDalGates()`:
 **Agent workflow when pre-ship fails on inventory:**
 
 1. Run `node scripts/dal-client-inventory.js`
-2. Commit `docs/ai/active/dal-client-inventory.md` with the code change (if director asked for commit)
+2. Commit `docs/ai/dal-client-inventory.md` with the code change (if director asked for commit)
 3. Re-run ship / pre-ship
 
 **Use inventory for:** Phase 1 touchpoint tables, finding all callers of `saveProjectAssetsDelta`, `batchProcessOperations`, `saveTimelineData`, cache key migration (Phase 6).
@@ -204,7 +204,7 @@ When Logistics / Operations hot paths change, `pre-ship/bugbot-policy.js` adds a
 | `scripts/dal-mutation-inventory-check.js` | PA mutators must note touch/delete |
 | `scripts/dal-tl-mutation-inventory-check.js` | Timeline mutators must note dalTlNote* |
 | `scripts/dal-sync-mode-lint.js` | Gap 1 — Firestore vs GAS mode structural lint |
-| `docs/ai/active/dal-client-inventory.md` | Generated inventory artifact |
+| `docs/ai/dal-client-inventory.md` | Generated inventory artifact |
 
 All scripts are **Node-only** (`gas-node-only.js`) — never deployed to GAS.
 
@@ -243,7 +243,7 @@ All scripts are **Node-only** (`gas-node-only.js`) — never deployed to GAS.
 
 1. [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md)
 2. [data-access-layer.md](data-access-layer.md)
-3. [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
+3. [../archive/dal-phase0-discovery-2026-07-13.md](../archive/dal-phase0-discovery-2026-07-13.md)
 4. **This file** — pre-ship mechanics
 5. [dal-phase-safety-playbook.md](dal-phase-safety-playbook.md) — phase preflight/postflight
 6. [PRE_SHIP_PIPELINE.md](../PRE_SHIP_PIPELINE.md) — full ship pipeline + Bugbot

@@ -8,7 +8,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const ROOT = path.join(__dirname, '..');
-const OUT = path.join(ROOT, 'docs/ai/active/dal-client-inventory.md');
+const OUT = path.join(ROOT, 'docs/ai/dal-client-inventory.md');
 
 const HTML_GLOB_SKIP = new Set(['dist', 'node_modules', '_clasp_pull_check', 'claude-pack', 'cursor-project-template']);
 
@@ -118,7 +118,7 @@ function renderMarkdown(inv) {
   const lines = [
     '# DAL client inventory (generated)',
     '',
-    '**Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [dal-pre-ship-gates.md](dal-pre-ship-gates.md)',
+    '**Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md)',
     '',
     `**Generated:** ${date} · **Root HTML modules scanned:** ${inv.fileCount}`,
     '',

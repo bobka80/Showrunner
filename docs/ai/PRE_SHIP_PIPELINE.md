@@ -42,14 +42,14 @@ Auto-detects layers from `git diff` (staged + unstaged vs `HEAD`).
 
 ## DAL gates (scoped — when hot paths change)
 
-**Canonical agent handbook:** [dal-pre-ship-gates.md](active/dal-pre-ship-gates.md) — hot-path patterns, failure fixes, agent checklist. Summary below.
+**Canonical agent handbook:** [dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md) — hot-path patterns, failure fixes, agent checklist. Summary below.
 
-When the change set touches **DAL hot paths** (`Logistics_*.js`, `Operations.js`, `02*_Project*`, `02e*_Logic*`, `03a_Timeline*`, or `docs/ai/active/dal-*`), the **gas** layer also runs:
+When the change set touches **DAL hot paths** (`Logistics_*.js`, `Operations.js`, `02*_Project*`, `02e*_Logic*`, `03a_Timeline*`, or `docs/ai/archive/dal-*` / `docs/ai/dal-client-inventory.md`), the **gas** layer also runs:
 
 | Gate | Script | What it enforces |
 |------|--------|------------------|
 | Persistence lint | `scripts/dal-persistence-lint.js` | No `SpreadsheetApp` / `clearContents()` in client HTML; server `clearContents` only in allowlist |
-| Client inventory | `scripts/dal-client-inventory.js --check` | Generated [dal-client-inventory.md](active/dal-client-inventory.md) matches current `google.script.run` + `localStorage` scan |
+| Client inventory | `scripts/dal-client-inventory.js --check` | Generated [dal-client-inventory.md](dal-client-inventory.md) matches current `google.script.run` + `localStorage` scan |
 | Phase 3 concurrency | `scripts/dal-phase3-gate.js` | When delta-only saves ship on **deploy**, requires director concurrency smoke + `PRE_SHIP_DAL_CONCURRENCY_OK=1` |
 
 **Regenerate inventory** after client call changes:
@@ -64,11 +64,11 @@ node scripts/dal-client-inventory.js
 $env:PRE_SHIP_DAL_CONCURRENCY_OK=1; node milestone.js "…"
 ```
 
-**Gap 3 (reconciliation / failed-writes)** remains **Phase 5 product work** — not closed by pre-ship; see [dal-phase-safety-playbook.md](active/dal-phase-safety-playbook.md).
+**Gap 3 (reconciliation / failed-writes)** remains **Phase 5 product work** — shipped in DAL campaign; see [dal-phase-safety-playbook.md](archive/dal-phase-safety-playbook.md).
 
-**Planned DAL live-sync gates (not built):** Gap 1 sync-mode lint + mutation inventory — [dal-pre-ship-gates.md](active/dal-pre-ship-gates.md) § Planned · hub [multi-user-fork](active/multi-user-fork-industrial-and-auto.md) A0/A3.
+**Planned DAL live-sync gates (Gap 1 shipped with Part A):** sync-mode lint — [dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md) · hub [multi-user-fork](active/multi-user-fork-industrial-and-auto.md).
 
-**Future domain gates (RBAC / notifications / truck / financials):** [active/pre-ship-pipeline-expansion-2026-07-18.md](active/pre-ship-pipeline-expansion-2026-07-18.md) — board item; director OK go per domain.
+**Future domain gates (RBAC / notifications / truck / financials):** [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) — board item; director OK go per domain.
 
 **Policy code:** `pre-ship/dal.js` · wired from `pre-ship/layers.js`
 
@@ -76,7 +76,7 @@ $env:PRE_SHIP_DAL_CONCURRENCY_OK=1; node milestone.js "…"
 
 | Error | Fix |
 |-------|-----|
-| `DAL client inventory STALE` | `node scripts/dal-client-inventory.js` — commit [dal-client-inventory.md](active/dal-client-inventory.md) with the code change |
+| `DAL client inventory STALE` | `node scripts/dal-client-inventory.js` — commit [dal-client-inventory.md](dal-client-inventory.md) with the code change |
 | `DAL persistence lint FAILED` (client) | Remove `SpreadsheetApp` / `clearContents` from HTML — use `google.script.run` → server only |
 | `DAL persistence lint FAILED` (server) | New `clearContents` in non-allowlisted file — refactor or get director approval to extend allowlist in `dal-persistence-lint.js` |
 | `DAL Phase 3 gate BLOCKED` | Director runs concurrency smoke → `PRE_SHIP_DAL_CONCURRENCY_OK=1` + `node milestone.js` |

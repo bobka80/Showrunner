@@ -6,7 +6,7 @@
 
 **Replaces/enhances:** current timeline **single-editor** presence lock (`reportProjectPresence`, `🔒 NAME EDITING` in `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`).
 
-**Status:** Phase A + live edit sync. On **web.app host**, Firestore Auth/listen/write run in the **shell** (not the GAS iframe) so collab shows `live sync (patch)` after reload while the room stays open. See [../active/data-access-layer.md](../active/data-access-layer.md).
+**Status:** Phase A + live edit sync. On **web.app host**, Firestore Auth/listen/write run in the **shell** (not the GAS iframe) so collab shows `live sync (patch)` after reload while the room stays open. See [../archive/data-access-layer.md](../archive/data-access-layer.md).
 
 **Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed**. ~~forgotten / disappearing concurrent edits~~ **Fixed** — touch/patch merge (editing crew B cannot rewrite crew A’s untouched strip).
 

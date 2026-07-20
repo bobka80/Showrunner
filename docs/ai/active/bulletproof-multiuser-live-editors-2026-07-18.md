@@ -1,9 +1,9 @@
 # Bulletproof Multi-User Live Editors — Testing, Fix Approach & Hardening Plan
 
-**Status:** Design brief — **process + order authority** for Part A of [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md). Hold code until director says **OK go** on a named phase/item.  
+**Status:** Process brief for Part A of [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — **Part A complete** @ v678. Keep as depth reference for Part B / future live-sync harden. Hold new code until director **OK go** on a named Part B item.  
 **Written:** 2026-07-18 (Claude) · **Injected:** 2026-07-19  
 **Scope:** Timeline collab + Project Assets (prep) live sync — the two structured-entity-patch editors  
-**Trigger:** Incident history (`dal-pa-live-sync-thrash.md`, `dal-pa-delete-resurrect.md`) — four fix rounds (v628→v638) each closed one bug while leaving a sibling open; one regression passed green while production still failed (test did not model the real race).
+**Trigger:** Incident history (`../archive/dal-pa-live-sync-thrash.md`, `../archive/dal-pa-delete-resurrect.md`) — four fix rounds (v628→v638) each closed one bug while leaving a sibling open; one regression passed green while production still failed (test did not model the real race).
 
 **Campaign build order (director lock 2026-07-19):**
 
@@ -12,8 +12,8 @@
 3. **Part B — Auto fork** — [multi-user-fork](multi-user-fork-industrial-and-auto.md) Part B · UX: [timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject)
 
 **Hub checklist (single checkbox list):** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) — do not maintain a second Part A order elsewhere.  
-**H definitions (what each H means):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) §2.  
-**Gap 1 (Firestore/GAS mode lint):** tracked on hub + [dal-pre-ship-gates.md](dal-pre-ship-gates.md) — **not** a separate gap-closure novel; ships after H0 mode-seam sims exist.
+**H definitions (what each H means):** [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) §2.
+**Gap 1 (Firestore/GAS mode lint):** tracked on hub + [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md) — **not** a separate gap-closure novel; ships after H0 mode-seam sims exist.
 
 **Do not start any item below without an explicit director OK go on that item.**
 
@@ -38,11 +38,11 @@ The current sim (`dal-pa-live-sync-test.js` / `dal-pa-live-sync-core.js`) is goo
 
 **The pattern to break:** a fix is written, then a test is written to confirm the fix works. This only tests the scenario the fixer already had in mind.
 
-**Fix:** Before writing the fix, write the failing case first (already partially true per `dal-phase-safety-playbook.md`'s "prove with sim" rule — make it universal, not just for prep PA). Then, **before shipping**, spend one deliberate pass trying to break the fix with a *different* timing/ordering than the one that motivated it — same bug class, adjacent scenario.
+**Fix:** Before writing the fix, write the failing case first (already partially true per `../archive/dal-phase-safety-playbook.md`'s "prove with sim" rule — make it universal, not just for prep PA). Then, **before shipping**, spend one deliberate pass trying to break the fix with a *different* timing/ordering than the one that motivated it — same bug class, adjacent scenario.
 
 ### 1.3 Add a mutation-completeness gate, not just a checklist
 
-**The gap:** H5's mutation inventory (`dal-prep-live-sync-standards.md` §4.4 / mutation table) is currently a manual table a human fills in.
+**The gap:** H5's mutation inventory (`../archive/dal-prep-live-sync-standards.md` §4.4 / mutation table) is currently a manual table a human fills in.
 
 **Fix:** Build `scripts/dal-mutation-inventory-check.js` — statically scan `02e2_Logic_CRUD.html` (and the timeline equivalent) for every function that mutates `currentProjectAssets` / timeline state, and assert each one calls `dalPaNoteTouch_` / `dalPaNoteDelete_` (or the timeline equivalent) somewhere in its body or call chain. Fail the pre-ship gate if a new mutator is added without the note call.
 
@@ -60,7 +60,7 @@ Add one line to the incident-log template: **"How many prior attempts before thi
 
 ## Part 2 — The approach to fixing bugs in this hot path
 
-Process between "director reports a bug" and "milestone ships." **Canonical depth lives here;** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) §4 points here.
+Process between "director reports a bug" and "milestone ships." **Canonical depth lives here;** [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) §4 points here.
 
 ### 2.1 Root-cause-cluster-first, not symptom-first
 
@@ -105,7 +105,7 @@ Sequences Parts 1–2 with hub H-items. **Checkbox progress lives only on the hu
 
 1. **H1** — Fail closed on weak sync + adversarial sim (Auth fails *mid-edit*).  
 2. **H5** — Mutation-path inventory — convert to gate per 1.3 (pair with H1).  
-3. **Gap 1** — `pre-ship/dal-sync-mode-lint.js` (after H0 seam sims exist). See [dal-pre-ship-gates.md](dal-pre-ship-gates.md).  
+3. **Gap 1** — `pre-ship/dal-sync-mode-lint.js` (after H0 seam sims exist). See [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md).  
 4. **H4** — State size cap + END mirror check (concrete threshold).  
 5. **H3** — Same-row conflict visibility — **both** timeline and PA same milestone (no “as practical” hedge); if timeline slips, explicit tracked follow-up.  
 6. **H2** — Cheaper remote apply — measurable pass condition before start.
@@ -136,8 +136,8 @@ Unchanged product UX — hub Part B + timeline topic. **Do not start** until Pha
 ## Cursor-ready prompt (Phase H0 — recommended start)
 
 ```
-Context: docs/ai/active/dal-pa-live-sync-thrash.md and
-docs/ai/active/dal-pa-delete-resurrect.md document the incident history
+Context: docs/ai/archive/dal-pa-live-sync-thrash.md and
+docs/ai/archive/dal-pa-delete-resurrect.md document the incident history
 of this hot path. scripts/dal-pa-live-sync-test.js and
 scripts/lib/dal-pa-live-sync-core.js are the existing sim. Read all
 four before starting. Hub: multi-user-fork-industrial-and-auto.md Part A0.
@@ -174,5 +174,5 @@ Rules:
 
 - Part B implementation details — hub Part B + timeline § Optional update  
 - Full vector-mapped root-cause audit pipeline — separate larger campaign  
-- RBAC/truck/notifications/financials pre-ship gates — [pre-ship-pipeline-expansion-2026-07-18.md](pre-ship-pipeline-expansion-2026-07-18.md)  
-- Restating H2–H4 as a separate “gap closure” novel — hub IDs only; Gap 1 on [dal-pre-ship-gates.md](dal-pre-ship-gates.md)
+- RBAC/truck/notifications/financials pre-ship gates — [../topics/pre-ship-pipeline-expansion-2026-07-18.md](../topics/pre-ship-pipeline-expansion-2026-07-18.md)
+- Restating H2–H4 as a separate “gap closure” novel — hub IDs only; Gap 1 on [../archive/dal-pre-ship-gates.md](../archive/dal-pre-ship-gates.md)

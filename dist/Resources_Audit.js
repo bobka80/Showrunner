@@ -70,7 +70,7 @@ function TEST_AuditLogger() {
 // --- USER ERROR REPORTS (Sheet inbox only) ---
 // ==========================================
 // @INDEX: ERROR_REPORTS -> User error report inbox (Error_Reports tab)
-// Campaign: docs/ai/active/user-error-reporting-journal-2026-07-19.md
+// Campaign (archived): docs/ai/archive/user-error-reporting-journal-2026-07-19.md
 // Do NOT write lasting journal here. Do NOT touch Audit_Logs.
 
 var ERROR_REPORTS_HEADERS_ = [
