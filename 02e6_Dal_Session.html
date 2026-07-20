@@ -23,6 +23,37 @@ window.dalPrepActiveSessionUid_ = '';
 // After END, refuse to reopen the *same* prep sessionUid (stale _meta / lag).
 // Time-only IgnoreOpenUntil (~30s) was letting the banner return → ~1 min on/off loop.
 window.dalPrepEndedSessionUid_ = '';
+// Part B2 — Opening warm-up (before Live latch)
+window.dalPrepOpeningUi_ = false;
+window.dalPrepOpeningIsStarter_ = false;
+window.dalPrepOpeningPeerFrozen_ = false;
+window.dalPrepOpeningUid_ = '';
+window.dalPrepOpeningBy_ = '';
+window.dalPrepOpeningHangTimer_ = null;
+window.dalPrepOpeningFinishInFlight_ = false;
+window.dalPaEntryDeltaPending_ = false;
+// Durable across Opening UI clear — used so poll/finish recovery still know who started.
+window.dalPrepOpeningWasStarter_ = false;
+// Part B3 — peer pull-in joining cue
+window.dalPrepPullInJoining_ = false;
+window.dalPrepPullInJoiningUntil_ = 0;
+
+window.dalMarkPrepPullInJoining_ = function() {
+  window.dalPrepPullInJoining_ = true;
+  window.dalPrepPullInJoiningUntil_ = Date.now() + 4500;
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    window.dalUpdateRemotePendingBanner_();
+  }
+};
+
+window.dalClearPrepPullInJoining_ = function() {
+  if (!window.dalPrepPullInJoining_) return;
+  window.dalPrepPullInJoining_ = false;
+  window.dalPrepPullInJoiningUntil_ = 0;
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    window.dalUpdateRemotePendingBanner_();
+  }
+};
 
 window.dalPrepAllowRemoteOpen_ = function(sessionUid) {
   sessionUid = String(sessionUid || '');
@@ -122,16 +153,57 @@ window.startDalPrepSessionPoll_ = function(projectId) {
             return;
           }
           window.dalPrepClosedPollStreak = 0;
+          window.dalPrepOpeningClosedStreak_ = 0;
           if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
           if (window.dalPrepSheetsOpenBlocked_) return;
           if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
-            if (stOpen === 'committing' || stOpen === 'opening') return;
-            window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
+            if (stOpen === 'committing') return;
+            if (stOpen === 'opening') {
+              window.dalApplyPrepOpeningUi_(true, info);
+              return;
+            }
+            var wasStarterLatch = !!window.dalPrepOpeningWasStarter_ || !!window.dalPrepOpeningIsStarter_;
+            if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
+            window.dalApplyDalPrepUiState_(true, projectId, {
+              invalidateCache: !wasStarterLatch,
+              localOpen: wasStarterLatch
+            });
+            if (wasStarterLatch) {
+              window.dalPaEntryDeltaPending_ = true;
+              setTimeout(function() {
+                if (typeof window.dalPaFlushStarterEntryDelta_ === 'function') {
+                  window.dalPaFlushStarterEntryDelta_();
+                }
+              }, 600);
+            }
+          } else if (window.dalPrepOpeningUi_ && stOpen === 'open') {
+            var wasStarterOpen = !!window.dalPrepOpeningWasStarter_ || !!window.dalPrepOpeningIsStarter_;
+            window.dalApplyPrepOpeningUi_(false);
+            if (!window.dalPrepUiOpen) {
+              window.dalApplyDalPrepUiState_(true, projectId, {
+                invalidateCache: !wasStarterOpen,
+                localOpen: wasStarterOpen
+              });
+              if (wasStarterOpen) {
+                window.dalPaEntryDeltaPending_ = true;
+                setTimeout(function() {
+                  if (typeof window.dalPaFlushStarterEntryDelta_ === 'function') {
+                    window.dalPaFlushStarterEntryDelta_();
+                  }
+                }, 600);
+              }
+            }
           }
           return;
         }
 
         // Sheets says closed.
+        if (window.dalPrepOpeningUi_) {
+          window.dalPrepOpeningClosedStreak_ = (window.dalPrepOpeningClosedStreak_ || 0) + 1;
+          if (window.dalPrepOpeningClosedStreak_ < 2) return;
+          window.dalPrepOpeningClosedStreak_ = 0;
+          window.dalApplyPrepOpeningUi_(false);
+        }
         if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
           window.dalPrepClosedPollStreak = 0;
           if (window.dalPrepMetaEndPending_) window.dalPrepMarkSessionEnded_(projectId);
@@ -162,7 +234,7 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   var startBtn = document.getElementById('dal-prep-start-btn');
   var endBtn = document.getElementById('dal-prep-end-btn');
   // Freelancers never latch onto live fork UI (stay Sheets-normal).
-  if (isPrepOpen && opts.fromMeta && typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) {
+  if (isPrepOpen && !opts.localOpen && typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) {
     isPrepOpen = false;
   }
   var canShow = window.dalCanShowPrepButtons();
@@ -206,6 +278,15 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
   var changed = window.dalPrepUiOpen !== isPrepOpen;
   window.dalPrepUiOpen = isPrepOpen;
 
+  // Part B3 — peer soft pull-in (already on PA, someone else opened Live).
+  if (isPrepOpen && changed && !opts.localOpen) {
+    opts.softPullIn = true;
+    window.dalMarkPrepPullInJoining_();
+  }
+  if (!isPrepOpen && (changed || opts.allowClose)) {
+    window.dalClearPrepPullInJoining_();
+  }
+
   // Top banner retired — vault orange panel is the prep status surface.
   if (banner) {
     banner.style.display = 'none';
@@ -231,7 +312,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
       window.dalMetaCloseStreak_ = 0;
       window.dalPrepIgnoreOpenUntil = 0;
     }
-    if (opts.invalidateCache || changed) {
+    // Soft pull-in: stay on current PA list — do not flash-invalidate cache.
+    if ((opts.invalidateCache || changed) && !opts.softPullIn) {
       if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
       else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
     }
@@ -267,6 +349,138 @@ window.dalCanShowPrepButtons = function() {
   return !!(projectId && projectId !== 'NEW');
 };
 
+window.dalPaApplyOpeningFreeze_ = function(frozen) {
+  if (typeof window.dalPaApplySyncBlockedUi_ === 'function') {
+    window.dalPaApplySyncBlockedUi_(!!frozen);
+  }
+};
+
+window.dalClearPrepOpeningHang_ = function() {
+  if (window.dalPrepOpeningHangTimer_) {
+    try { clearTimeout(window.dalPrepOpeningHangTimer_); } catch (eH) { /* ignore */ }
+    window.dalPrepOpeningHangTimer_ = null;
+  }
+};
+
+window.dalArmPrepOpeningHang_ = function(projectId, sessionUid, actor) {
+  window.dalClearPrepOpeningHang_();
+  var hangMs = Number(window.DAL_OPENING_HANG_MS_ || 50000);
+  window.dalPrepOpeningHangTimer_ = setTimeout(function() {
+    window.dalPrepOpeningHangTimer_ = null;
+    if (!window.dalPrepOpeningUi_) return;
+    if (window.dalPrepUiOpen) return;
+    window.dalHandlePrepOpeningHang_(projectId, sessionUid, actor);
+  }, hangMs);
+};
+
+window.dalHandlePrepOpeningHang_ = function(projectId, sessionUid, actor) {
+  if (!window.dalPrepOpeningUi_) return;
+  if (window.dalPrepOpeningIsStarter_) {
+    if (window.dalPrepOpeningFinishInFlight_) {
+      alert('Snapshot is still running — wait a moment, then retry if it stays stuck.');
+      window.dalArmPrepOpeningHang_(projectId, sessionUid, actor);
+      return;
+    }
+    var retry = confirm(
+      'Live session is still starting…\n\nOK = Retry snapshot\nCancel = Abort opening'
+    );
+    if (retry) {
+      window.dalPrepFinishOpen_(projectId, sessionUid, actor, null, { auto: true });
+    } else {
+      window.dalAbortPrepOpening_(projectId, actor);
+    }
+    return;
+  }
+  if (typeof window.dalMayTakeOverOpening_ === 'function' && window.dalMayTakeOverOpening_('prep')) {
+    if (confirm('Opening is stuck. Take over and restart live preparation?')) {
+      window.openDalPrepSession({ auto: true, takeOver: true });
+    }
+  }
+};
+
+window.dalAbortPrepOpening_ = function(projectId, actor) {
+  window.dalClearPrepOpeningHang_();
+  google.script.run
+    .withFailureHandler(function(err) {
+      window.dalApplyPrepOpeningUi_(false);
+      alert('Abort opening failed:\n\n' + dalPrepErrMsg_(err));
+    })
+    .withSuccessHandler(function() {
+      window.dalApplyPrepOpeningUi_(false);
+    })
+    .closeDalSession(
+      projectId,
+      actor || (typeof window.dalActorName_ === 'function' ? window.dalActorName_() : 'System'),
+      'prep'
+    );
+};
+
+/**
+ * Part B2 Opening warm-up — show "Starting live session…" without latching Live sync yet.
+ * Starter stays editable; peers freeze.
+ */
+window.dalApplyPrepOpeningUi_ = function(active, info) {
+  info = info || {};
+  if (active && typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) {
+    active = false;
+  }
+  var startBtn = document.getElementById('dal-prep-start-btn');
+  var endBtn = document.getElementById('dal-prep-end-btn');
+  if (!active) {
+    window.dalClearPrepOpeningHang_();
+    window.dalPrepOpeningUi_ = false;
+    window.dalPrepOpeningIsStarter_ = false;
+    window.dalPrepOpeningUid_ = '';
+    window.dalPrepOpeningBy_ = '';
+    if (window.dalPrepOpeningPeerFrozen_) {
+      window.dalPrepOpeningPeerFrozen_ = false;
+      window.dalPaApplyOpeningFreeze_(false);
+    }
+    if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+      window.dalUpdateRemotePendingBanner_();
+    }
+    return;
+  }
+
+  var openedBy = info.prepOpenedBy || info.openedBy || window.dalPrepOpeningBy_ || '';
+  var uid = info.prepUid || info.sessionUid || window.dalPrepOpeningUid_ || '';
+  var isStarter = typeof window.dalIsSessionStarter_ === 'function'
+    ? window.dalIsSessionStarter_(openedBy)
+    : false;
+  // Local begin before openedBy lands on poll — treat as starter.
+  if (!openedBy && window.dalPrepOpeningIsStarter_) isStarter = true;
+
+  window.dalPrepOpeningUi_ = true;
+  window.dalPrepOpeningBy_ = openedBy;
+  window.dalPrepOpeningUid_ = uid;
+  window.dalPrepOpeningIsStarter_ = isStarter;
+
+  if (startBtn) startBtn.style.display = 'none';
+  if (endBtn && window.dalCanShowPrepButtons()) endBtn.style.display = 'inline-flex';
+
+  if (!isStarter) {
+    if (!window.dalPrepOpeningPeerFrozen_) {
+      window.dalPrepOpeningPeerFrozen_ = true;
+      window.dalPaApplyOpeningFreeze_(true);
+    }
+  } else if (window.dalPrepOpeningPeerFrozen_) {
+    window.dalPrepOpeningPeerFrozen_ = false;
+    window.dalPaApplyOpeningFreeze_(false);
+  }
+
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    window.dalUpdateRemotePendingBanner_();
+  }
+  var projectId = document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '';
+  if (projectId) window.startDalPrepSessionPoll_(projectId);
+  // Peer hang / take-over — arm once.
+  if (!isStarter && !window.dalPrepOpeningHangTimer_ && projectId) {
+    var actorHang = typeof window.dalActorName_ === 'function' ? window.dalActorName_() : '';
+    window.dalArmPrepOpeningHang_(projectId, uid, actorHang);
+  }
+};
+
 /**
  * Sheets session check — open can latch ON; close only via allowClose paths (poll / meta / END PREP).
  */
@@ -293,8 +507,16 @@ window.refreshDalSessionBanner = function() {
       if (window.dalIsPrepOpenFromInfo_(info)) {
         if (window.dalPrepSheetsOpenBlocked_) return;
         if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
+        var stRefresh = window.dalPrepStatusFromInfo_(info);
+        if (stRefresh === 'opening') {
+          window.dalApplyPrepOpeningUi_(true, info);
+          return;
+        }
+        if (stRefresh === 'committing') return;
+        if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
         window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       } else if (!window.dalPrepLatched) {
+        if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
         window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       }
     })
@@ -323,40 +545,168 @@ window.openDalPrepSession = function(opts) {
   if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('prep')) {
     return alert('You cannot start preparation on this device.');
   }
-  if (!opts.auto) {
+  if (!opts.auto && !opts.takeOver) {
     if (!confirm('Start preparation? Equipment saves fork to Firebase until End Prep.')) return;
   }
   window.dalPrepClosing = false;
   var overlay = document.getElementById('project-assets-modal-overlay');
   if (overlay) overlay.style.cursor = 'wait';
+  var actor = typeof assetOpsActor === 'function'
+    ? assetOpsActor()
+    : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+  var beginOpts = opts.takeOver ? { takeOver: true } : {};
+
   google.script.run
     .withFailureHandler(function(err) {
       if (overlay) overlay.style.cursor = '';
-      alert('Start prep failed:\n\n' + dalPrepErrMsg_(err));
+      google.script.run
+        .withFailureHandler(function() {
+          alert('Start prep failed:\n\n' + dalPrepErrMsg_(err));
+        })
+        .withSuccessHandler(function(info) {
+          var st = window.dalPrepStatusFromInfo_(info);
+          if (st === 'open') {
+            if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
+            window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
+            if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+            return;
+          }
+          if (st === 'opening') {
+            window.dalApplyPrepOpeningUi_(true, info);
+            if (typeof window.dalMayTakeOverOpening_ === 'function' && window.dalMayTakeOverOpening_('prep')) {
+              if (confirm('Preparation is already opening. Take over and restart?')) {
+                window.openDalPrepSession({ auto: true, takeOver: true });
+              }
+            } else {
+              alert('Preparation is still opening. Wait, or End Prep to abort.');
+            }
+            return;
+          }
+          alert('Start prep failed:\n\n' + dalPrepErrMsg_(err));
+        })
+        .getDalSessionInfo(projectId);
     })
-    .withSuccessHandler(function() {
+    .withSuccessHandler(function(begin) {
+      if (begin && begin.joined) {
+        if (overlay) overlay.style.cursor = '';
+        if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
+        try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e0) {}
+        if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
+        window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
+        window.dalMetaConfirmedOpen_ = false;
+        window.dalMetaSeenOpen_ = false;
+        window.dalMetaCloseStreak_ = 0;
+        window.dalPrepMetaEndPending_ = false;
+        window.dalPrepMetaEndPendingSince_ = 0;
+        window.dalPrepEndedSessionUid_ = '';
+        window.dalPrepIgnoreOpenUntil = 0;
+        window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
+        if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+        if (!opts.auto) alert('Joined preparation.');
+        return;
+      }
+      if (!begin || !begin.sessionUid) {
+        if (overlay) overlay.style.cursor = '';
+        alert('Start prep failed:\n\nNo session reserved.');
+        return;
+      }
+      // Opening reserved — starter stays editable; peers freeze via poll.
+      window.dalPrepOpeningIsStarter_ = true;
+      window.dalPrepOpeningWasStarter_ = true;
+      window.dalPrepOpeningUid_ = begin.sessionUid;
+      window.dalPrepOpeningBy_ = begin.openedBy || actor;
+      window.dalApplyPrepOpeningUi_(true, {
+        prepStatus: 'opening',
+        prepUid: begin.sessionUid,
+        prepOpenedBy: begin.openedBy || actor
+      });
+      window.dalArmPrepOpeningHang_(projectId, begin.sessionUid, actor);
       if (overlay) overlay.style.cursor = '';
-      try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
-      if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
-      window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
-      // Do NOT set MetaSeenOpen/Confirmed here — _meta write is still in flight.
-      // Optimistic "seen" made empty _meta snaps END prep a few seconds later.
-      window.dalMetaConfirmedOpen_ = false;
-      window.dalMetaSeenOpen_ = false;
-      window.dalMetaCloseStreak_ = 0;
-      window.dalPrepMetaEndPending_ = false;
-      window.dalPrepMetaEndPendingSince_ = 0;
-      window.dalPrepEndedSessionUid_ = '';
-      window.dalPrepIgnoreOpenUntil = 0;
-      window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
-      if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
-      if (!opts.auto) alert('Preparation started.');
+      window.dalPrepFinishOpen_(projectId, begin.sessionUid, actor, overlay, opts);
     })
-    .openDalSession(projectId, 'prep', typeof assetOpsActor === 'function' ? assetOpsActor() : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'));
+    .beginDalSession(projectId, 'prep', actor, beginOpts);
+};
+
+window.dalPrepFinishOpen_ = function(projectId, sessionUid, actor, overlay, opts) {
+  opts = opts || {};
+  if (window.dalPrepOpeningFinishInFlight_) return;
+  window.dalPrepOpeningFinishInFlight_ = true;
+  if (overlay) overlay.style.cursor = 'wait';
+  google.script.run
+    .withFailureHandler(function(err) {
+      window.dalPrepOpeningFinishInFlight_ = false;
+      if (overlay) overlay.style.cursor = '';
+      google.script.run
+        .withFailureHandler(function() {
+          alert('Start prep failed:\n\n' + dalPrepErrMsg_(err));
+        })
+        .withSuccessHandler(function(info) {
+          var st = window.dalPrepStatusFromInfo_(info);
+          if (st === 'open') {
+            window.dalPrepOnOpenSuccess_(
+              projectId,
+              opts,
+              !(window.dalPrepOpeningWasStarter_ || window.dalPrepOpeningIsStarter_)
+            );
+            return;
+          }
+          if (st === 'opening') {
+            window.dalArmPrepOpeningHang_(projectId, sessionUid, actor);
+            return;
+          }
+          window.dalApplyPrepOpeningUi_(false);
+          alert('Start prep failed:\n\n' + dalPrepErrMsg_(err));
+        })
+        .getDalSessionInfo(projectId);
+    })
+    .withSuccessHandler(function(res) {
+      window.dalPrepOpeningFinishInFlight_ = false;
+      if (overlay) overlay.style.cursor = '';
+      window.dalPrepOnOpenSuccess_(projectId, opts, !!(res && res.joined));
+    })
+    .finishDalSession(projectId, sessionUid, actor);
+};
+
+window.dalPrepOnOpenSuccess_ = function(projectId, opts, joined) {
+  opts = opts || {};
+  window.dalClearPrepOpeningHang_();
+  window.dalApplyPrepOpeningUi_(false);
+  try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
+  if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
+  window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
+  window.dalMetaConfirmedOpen_ = false;
+  window.dalMetaSeenOpen_ = false;
+  window.dalMetaCloseStreak_ = 0;
+  window.dalPrepMetaEndPending_ = false;
+  window.dalPrepMetaEndPendingSince_ = 0;
+  window.dalPrepEndedSessionUid_ = '';
+  window.dalPrepIgnoreOpenUntil = 0;
+  // Starter entry delta only when we reserved the session (not join-already-open).
+  window.dalPaEntryDeltaPending_ = !joined;
+  if (window.dalPaEntryDeltaPending_) {
+    setTimeout(function() {
+      if (typeof window.dalPaFlushStarterEntryDelta_ === 'function') {
+        window.dalPaFlushStarterEntryDelta_();
+      }
+    }, 600);
+  }
+  window.dalPrepOpeningWasStarter_ = false;
+  window.dalPrepOpeningIsStarter_ = false;
+  window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
+  if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+  if (!opts.auto) alert(joined ? 'Joined preparation.' : 'Preparation started.');
 };
 
 window.closeDalPrepSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
+  if (window.dalPrepOpeningUi_ && !window.dalPrepUiOpen) {
+    if (!confirm('Abort opening and stay on normal equipment list?')) return;
+    var actorAbort = typeof assetOpsActor === 'function'
+      ? assetOpsActor()
+      : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+    window.dalAbortPrepOpening_(projectId, actorAbort);
+    return;
+  }
   if (!confirm('End preparation and commit equipment back to Google Sheets?')) return;
   window.dalPrepClosing = true;
   window.dalPrepSheetsPollGen++;

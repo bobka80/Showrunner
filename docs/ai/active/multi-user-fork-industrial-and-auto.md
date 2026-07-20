@@ -239,14 +239,15 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 ### B3 — Live pull-in
 
-- [ ] Early watcher on **same** view soft-switches at Live (no yank from calendar)  
-- [ ] Phone PA: no auto-start, **does** auto-join when others opened prep  
+- [x] Early watcher on **same** view soft-switches at Live (no yank from calendar)  
+- [x] Phone PA: no auto-start, **does** auto-join when others opened prep  
 
 ### B4 — Close / idle eject
 
 - [ ] Close + **always commit**: End ∪ last leave ∪ idle  
 - [ ] Idle: timeline **45m** / prep **75m**; T−5 keep-open; station heartbeat blocks prep idle close  
 - [ ] Presence heartbeat ~30–60s  
+*(Director 2026-07-20: do thorough Opening/pull-in check + auto-close at **end** of Part B update.)*
 
 ### B5 — Cue redesign (same ship as behavior)
 
@@ -321,7 +322,7 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 | 2026-07-20 | Middle build archived → [../archive/user-error-reporting-journal-2026-07-19.md](../archive/user-error-reporting-journal-2026-07-19.md). **NEXT = Part B.** Bug log moved to [../error-journal/](../error-journal/) (not a campaign). |
 | 2026-07-20 | **Part B OK go** — next = **B0** AUTO-FORK TRY BASELINE milestone, then B1 who-may-start. |
 | 2026-07-20 | **B0 shipped @ GAS v693:** AUTO-FORK TRY BASELINE. Floor dislike → rollback to **v693**. **Next: B1** who may start. |
-| 2026-07-20 | **B1 shipped @ GAS v694:** who-may-start matrix + freelancer exclude (incl. station host flags). **Next: B2** opening warm-up. |
+| 2026-07-20 | **B1 shipped @ GAS v694:** who-may-start matrix + freelancer exclude (incl. station host flags). Bugbot High/Med fixed. **Next: B2** opening warm-up. |
 | 2026-07-20 | **B2 shipped @ GAS v695:** Opening warm-up (starter-only, peer freeze, hang Retry/Cancel/take-over, entry delta). **Next: B3** live pull-in. |
 
 ---

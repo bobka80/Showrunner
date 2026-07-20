@@ -357,7 +357,12 @@ function dalAssertNotLiveForkExcluded_(actor) {
 /**
  * Phase 1 of open — join existing same-type session, or reserve "opening" on this domain only.
  */
-function beginDalSession(projectId, sessionType, actor) {
+/**
+ * Phase 1 of open — join existing same-type session, or reserve "opening" on this domain only.
+ * opts.takeOver: credentialed desktop may clear a stuck "opening" and reserve a new one (Part B2).
+ */
+function beginDalSession(projectId, sessionType, actor, opts) {
+  opts = opts || {};
   dalAssertCanOpenSessionType_(sessionType, actor);
   var sessionUid = Utilities.getUuid();
   var now = new Date().toISOString();
@@ -384,7 +389,16 @@ function beginDalSession(projectId, sessionType, actor) {
       };
     }
 
-    if (curStatus === 'committing' || curStatus === 'opening') {
+    if (curStatus === 'opening' && opts.takeOver) {
+      var colsTake = dalDomainSessionCols_(sessionType);
+      dalClearDomainSession_(sheets.index, row.rowNum, row.map, sessionType);
+      if (row.map[colsTake.status] !== undefined) row.data[row.map[colsTake.status]] = '';
+      if (row.map[colsTake.uid] !== undefined) row.data[row.map[colsTake.uid]] = '';
+      curStatus = '';
+      curUid = '';
+      writeToAuditLog(actor, 'TAKEOVER', 'DAL_SESSION', projectId, '',
+        'Took over stuck opening ' + sessionType + ' session.');
+    } else if (curStatus === 'committing' || curStatus === 'opening') {
       throw new Error(
         'A ' + sessionType + ' session is already ' + curStatus + ' on this project.' +
         (curStatus === 'opening' ? ' Wait ~90s if a prior start timed out, or End Collab / End Prep to abort.' : ' End that session first.')
@@ -403,7 +417,9 @@ function beginDalSession(projectId, sessionType, actor) {
       joined: false,
       sessionUid: sessionUid,
       sessionType: sessionType,
-      status: 'opening'
+      status: 'opening',
+      openedBy: actor,
+      openedAt: now
     };
   });
 }

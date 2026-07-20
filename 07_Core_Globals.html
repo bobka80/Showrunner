@@ -171,9 +171,31 @@ window.dalMayJoinLiveFork_ = function() {
   return !window.dalIsLiveForkExcluded_();
 };
 
+/** Part B2 — hang threshold for Opening warm-up (45–60s band). */
+window.DAL_OPENING_HANG_MS_ = 50000;
+
+window.dalActorName_ = function() {
+  if (typeof assetOpsActor === 'function') {
+    try { return String(assetOpsActor() || ''); } catch (e0) { /* ignore */ }
+  }
+  return (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME) ? String(ACTIVE_USER_NAME) : '';
+};
+
+window.dalIsSessionStarter_ = function(openedBy) {
+  var a = String(openedBy || '').toLowerCase().trim();
+  var me = String(window.dalActorName_() || '').toLowerCase().trim();
+  return !!(a && me && a === me);
+};
+
+/** Credentialed desktop may take over a stuck Opening. */
+window.dalMayTakeOverOpening_ = function(domain) {
+  if (window.dalSessionSurface_() !== 'desktop') return false;
+  return !!window.dalMayManualStartFork_(domain);
+};
+
 window.maybeAutoOpenDalPrep_ = function() {
   if (!window.dalMayAutoStartFork_('prep')) return;
-  if (window.dalPrepUiOpen || window.dalPrepLatched) return;
+  if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
   if (window.dalPrepAutoStartPending_) return;
   var projectId = document.getElementById('edit-folder-id')
     ? document.getElementById('edit-folder-id').value : '';
@@ -181,7 +203,7 @@ window.maybeAutoOpenDalPrep_ = function() {
   window.dalPrepAutoStartPending_ = true;
   setTimeout(function() {
     window.dalPrepAutoStartPending_ = false;
-    if (window.dalPrepUiOpen || window.dalPrepLatched) return;
+    if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
     if (!window.dalMayAutoStartFork_('prep')) return;
     if (typeof window.openDalPrepSession === 'function') {
       window.openDalPrepSession({ auto: true });

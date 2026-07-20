@@ -9,6 +9,48 @@ window.dalTlLastStateSig = '';
 window.dalTlRemotePending = false;
 window.dalTlLiveSyncMode = ''; // 'firestore' | 'connecting' | 'blocked' | '' (legacy 'gas' = blocked)
 window.dalTlStateSizeWarned_ = false;
+// Part B2 Opening warm-up
+window.dalTlOpeningIsStarter_ = false;
+window.dalTlOpeningPeerFrozen_ = false;
+window.dalTlOpeningBy_ = '';
+window.dalTlOpeningUid_ = '';
+window.dalTlOpeningHangTimer_ = null;
+window.dalTlReadOnlyBeforeOpening_ = null;
+// Part B3 — peer pull-in joining cue
+window.dalTlPullInJoining_ = false;
+window.dalTlPullInJoiningUntil_ = 0;
+
+window.dalMarkTlPullInJoining_ = function() {
+  window.dalTlPullInJoining_ = true;
+  window.dalTlPullInJoiningUntil_ = Date.now() + 4500;
+  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+    window.dalUpdateTimelineLiveBanner_();
+  }
+};
+
+window.dalClearTlPullInJoining_ = function() {
+  if (!window.dalTlPullInJoining_) return;
+  window.dalTlPullInJoining_ = false;
+  window.dalTlPullInJoiningUntil_ = 0;
+  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+    window.dalUpdateTimelineLiveBanner_();
+  }
+};
+
+window.dalTlMarkAllLocalAsEntryDelta_ = function() {
+  var local = typeof window.dalTlCaptureLocalState_ === 'function'
+    ? window.dalTlCaptureLocalState_()
+    : { shifts: [], phases: [], overrides: {} };
+  (local.shifts || []).forEach(function(s) {
+    if (s && s.id != null) window.dalTlTouchedShifts_[String(s.id)] = 1;
+  });
+  (local.phases || []).forEach(function(p) {
+    if (p && p.id != null) window.dalTlTouchedPhases_[String(p.id)] = 1;
+  });
+  Object.keys(local.overrides || {}).forEach(function(uid) {
+    window.dalTlTouchedOverrides_[String(uid)] = 1;
+  });
+};
 
 window.dalTlStateSizeReport_ = function(shifts, phases, overrides) {
   var payload = {
@@ -1213,7 +1255,14 @@ window.dalUpdateTimelineLiveBanner_ = function() {
 
   var text = '';
   if (window.dalTlOpeningUi_) {
-    text = 'opening…';
+    text = 'Starting live session…';
+  } else if (window.dalTlPullInJoining_) {
+    if (window.dalTlLiveSyncMode === 'firestore' || Date.now() >= (window.dalTlPullInJoiningUntil_ || 0)) {
+      window.dalClearTlPullInJoining_();
+      text = window.dalTlLiveSyncMode === 'firestore' ? 'live (patch)' : 'on';
+    } else {
+      text = 'Live session started — joining…';
+    }
   } else if (window.dalTlLiveSyncMode === 'blocked' || window.dalTlLiveSyncMode === 'gas') {
     var whyB = window.dalTlLiveSyncFailReason_ ? (' — ' + window.dalTlLiveSyncFailReason_) : '';
     text = 'DOWN' + whyB;
@@ -1371,7 +1420,8 @@ window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remot
   }
 };
 
-window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
+window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
+  info = info || {};
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
   var banner = document.getElementById('dal-timeline-session-banner');
   var startBtn = document.getElementById('dal-timeline-start-btn');
@@ -1382,6 +1432,50 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
   }
   window.dalTimelineSessionOpen = !!isOpen;
   window.dalTlOpeningUi_ = !!isOpening && !isOpen;
+
+  var wasOpenBefore = !!window.dalTlWasSessionOpenUi_;
+  window.dalTlWasSessionOpenUi_ = !!isOpen;
+
+  // Part B3 — peer soft pull-in when Live latches while already on timeline (not starter begin).
+  if (isOpen && !wasOpenBefore && !info.localOpen) {
+    window.dalMarkTlPullInJoining_();
+  }
+  if (!isOpen && !isOpening) {
+    window.dalClearTlPullInJoining_();
+  }
+
+  if (window.dalTlOpeningUi_) {
+    var openedBy = info.openedBy || info.timelineOpenedBy || window.dalTlOpeningBy_ || '';
+    if (openedBy) window.dalTlOpeningBy_ = openedBy;
+    if (info.sessionUid || info.timelineUid) {
+      window.dalTlOpeningUid_ = info.sessionUid || info.timelineUid;
+    }
+    var isStarter = window.dalTlOpeningIsStarter_ ||
+      (typeof window.dalIsSessionStarter_ === 'function' && window.dalIsSessionStarter_(openedBy));
+    window.dalTlOpeningIsStarter_ = !!isStarter;
+    // Peer freeze during Opening — starter keeps editing.
+    if (!isStarter) {
+      if (!window.dalTlOpeningPeerFrozen_) {
+        window.dalTlOpeningPeerFrozen_ = true;
+        if (typeof currentIsReadOnly !== 'undefined') {
+          window.dalTlReadOnlyBeforeOpening_ = !!currentIsReadOnly;
+          currentIsReadOnly = true;
+        }
+      }
+    } else if (window.dalTlOpeningPeerFrozen_) {
+      window.dalTlOpeningPeerFrozen_ = false;
+      if (typeof currentIsReadOnly !== 'undefined' && window.dalTlReadOnlyBeforeOpening_ !== null) {
+        currentIsReadOnly = !!window.dalTlReadOnlyBeforeOpening_;
+        window.dalTlReadOnlyBeforeOpening_ = null;
+      }
+    }
+  } else if (window.dalTlOpeningPeerFrozen_) {
+    window.dalTlOpeningPeerFrozen_ = false;
+    if (typeof currentIsReadOnly !== 'undefined' && window.dalTlReadOnlyBeforeOpening_ !== null) {
+      currentIsReadOnly = !!window.dalTlReadOnlyBeforeOpening_;
+      window.dalTlReadOnlyBeforeOpening_ = null;
+    }
+  }
 
   if (banner) {
     banner.style.display = 'none';
@@ -1404,10 +1498,13 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening) {
   } else {
     window.stopDalTimelineStateSync_();
     window.dalTlSyncBase_ = null;
-    window.dalTlClearMutations_();
+    // Keep mutations during Opening (starter entry delta). Clear only when fully idle.
     if (!isOpening) {
+      window.dalTlClearMutations_();
       window.dalTlOpeningUi_ = false;
+      window.dalTlOpeningIsStarter_ = false;
       window.dalTlSyncPanelExpanded_ = false;
+      if (typeof window.dalClearTlOpeningHang_ === 'function') window.dalClearTlOpeningHang_();
       if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') window.dalUpdateTimelineLiveBanner_();
     }
   }
@@ -1599,7 +1696,16 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
   var isOpening = st === 'opening';
   var wasOpen = !!window.dalTlWasSessionOpen;
 
-  window.dalApplyTimelineSessionUi_(isOpen, isOpening);
+  window.dalApplyTimelineSessionUi_(isOpen, isOpening, tl);
+
+  // Peer hang / take-over — arm once when Opening is first observed.
+  if (isOpening && !isOpen && !window.dalTlOpeningIsStarter_ &&
+      !window.dalTlOpeningHangTimer_ &&
+      typeof window.dalArmTlOpeningHang_ === 'function') {
+    var pid = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+    var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+    window.dalArmTlOpeningHang_(pid, tl.sessionUid || '', actor);
+  }
 
   if (wasOpen && !isOpen && !isOpening && window.dalTimelineLayerOpen_() && !window.isTimelineDirty) {
     var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';

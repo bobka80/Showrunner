@@ -470,6 +470,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Opening warm-up (Part B2 @ v695+):** Sheets `opening` is **not** Live. Starter may edit; peers freeze + SYNC text **Starting live session…**. Do **not** live-latch from `_meta` or `refreshDalSessionBanner` while status is `opening`. Hang ~50s → Retry / Abort; credentialed desktop may `beginDalSession(..., { takeOver: true })`. Live latch only when status is `open`.
 
+**Live pull-in (Part B3):** Watchers run only while PA modal / timeline layer is open — never yank from calendar. Peer soft-switch → SYNC **Live session started — joining…** then `live (patch)`. Phone PA: no auto-start; same watcher auto-joins.
+
 ```
 START PREP (local)
   → Sheets domain status = opening (reserve) → snapshot → open + new sessionUid

@@ -90,16 +90,31 @@ function dalTimelineErrMsg_(err) {
 }
 
 function dalTimelineCollabStarted_(joined) {
+  window.dalClearTlOpeningHang_();
+  var wasStarter = !!window.dalTlOpeningIsStarter_;
+  if (!joined && typeof window.dalTlMarkAllLocalAsEntryDelta_ === 'function') {
+    window.dalTlMarkAllLocalAsEntryDelta_();
+  }
   window.dalTimelineSessionOpen = true;
   window.dalTlWasSessionOpen = true;
   if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
-    window.dalApplyTimelineSessionUi_(true, false);
+    // localOpen: explicit START/join — not soft pull-in from watcher.
+    window.dalApplyTimelineSessionUi_(true, false, { localOpen: true, joined: !!joined, wasStarter: wasStarter });
   } else {
     window.refreshTimelineDalBanner();
   }
+  window.dalTlOpeningIsStarter_ = false;
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
   if (projectId && typeof window.startDalTimelineStateSync_ === 'function') {
     window.startDalTimelineStateSync_(projectId);
+  }
+  if (!joined) {
+    // Entry delta flush after first remote snap / when mutations pending.
+    setTimeout(function() {
+      if (typeof window.dalFlushTimelineIfCollabOpen_ === 'function') {
+        window.dalFlushTimelineIfCollabOpen_();
+      }
+    }, 800);
   }
   alert(joined
     ? 'Joined timeline collaboration — edits sync live to Firebase (SAVE optional).'
@@ -122,7 +137,7 @@ function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
             return;
           }
           if (String(tl.status).toLowerCase() === 'opening') {
-            alert('Timeline collab is still opening. Wait ~10 seconds, then click START COLLAB again.');
+            window.dalArmTlOpeningHang_(projectId, sessionUid, actor);
             return;
           }
           alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
@@ -136,6 +151,63 @@ function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
     .finishDalSession(projectId, sessionUid, actor);
 }
 
+window.dalClearTlOpeningHang_ = function() {
+  if (window.dalTlOpeningHangTimer_) {
+    try { clearTimeout(window.dalTlOpeningHangTimer_); } catch (eH) { /* ignore */ }
+    window.dalTlOpeningHangTimer_ = null;
+  }
+};
+
+window.dalArmTlOpeningHang_ = function(projectId, sessionUid, actor) {
+  window.dalClearTlOpeningHang_();
+  var hangMs = Number(window.DAL_OPENING_HANG_MS_ || 50000);
+  window.dalTlOpeningHangTimer_ = setTimeout(function() {
+    window.dalTlOpeningHangTimer_ = null;
+    if (!window.dalTlOpeningUi_ || window.dalTimelineSessionOpen) return;
+    window.dalHandleTlOpeningHang_(projectId, sessionUid, actor);
+  }, hangMs);
+};
+
+window.dalHandleTlOpeningHang_ = function(projectId, sessionUid, actor) {
+  if (!window.dalTlOpeningUi_ || window.dalTimelineSessionOpen) return;
+  if (window.dalTlOpeningIsStarter_) {
+    var retry = confirm(
+      'Live session is still starting…\n\nOK = Retry snapshot\nCancel = Abort opening'
+    );
+    if (retry) {
+      var layer = document.getElementById('shift-layer');
+      if (layer) layer.style.cursor = 'wait';
+      dalTimelineFinishOpen_(projectId, sessionUid, actor, layer);
+    } else {
+      window.dalAbortTlOpening_(projectId, actor);
+    }
+    return;
+  }
+  if (typeof window.dalMayTakeOverOpening_ === 'function' && window.dalMayTakeOverOpening_('timeline')) {
+    if (confirm('Opening is stuck. Take over and restart timeline collaboration?')) {
+      window.openDalTimelineCollabSession({ auto: true, takeOver: true });
+    }
+  }
+};
+
+window.dalAbortTlOpening_ = function(projectId, actor) {
+  window.dalClearTlOpeningHang_();
+  google.script.run
+    .withFailureHandler(function(err) {
+      if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+        window.dalApplyTimelineSessionUi_(false, false);
+      }
+      alert('Abort opening failed:\n\n' + dalTimelineErrMsg_(err));
+    })
+    .withSuccessHandler(function() {
+      window.dalTlOpeningIsStarter_ = false;
+      if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+        window.dalApplyTimelineSessionUi_(false, false);
+      }
+    })
+    .closeDalSession(projectId, actor || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'), 'timelineCollab');
+};
+
 window.openDalTimelineCollabSession = function(opts) {
   opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
@@ -146,12 +218,13 @@ window.openDalTimelineCollabSession = function(opts) {
   if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('timeline')) {
     return alert('You cannot start timeline collaboration on this device.');
   }
-  if (!opts.auto) {
+  if (!opts.auto && !opts.takeOver) {
     if (!confirm('Start timeline collaboration? Timeline saves fork to Firebase until End Collab.')) return;
   }
   var layer = document.getElementById('shift-layer');
   if (layer) layer.style.cursor = 'wait';
   var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+  var beginOpts = opts.takeOver ? { takeOver: true } : {};
 
   // Split begin/finish so each google.script.run stays under the ~30s client limit.
   google.script.run
@@ -166,6 +239,19 @@ window.openDalTimelineCollabSession = function(opts) {
           var tl = window.dalTimelineInfoFromSession_(info);
           if (String(tl.status).toLowerCase() === 'open') {
             dalTimelineCollabStarted_(true);
+            return;
+          }
+          if (String(tl.status).toLowerCase() === 'opening') {
+            if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+              window.dalApplyTimelineSessionUi_(false, true, tl);
+            }
+            if (typeof window.dalMayTakeOverOpening_ === 'function' && window.dalMayTakeOverOpening_('timeline')) {
+              if (confirm('Timeline collab is already opening. Take over and restart?')) {
+                window.openDalTimelineCollabSession({ auto: true, takeOver: true });
+              }
+            } else {
+              alert('Timeline collab is still opening. Wait, or End Collab to abort.');
+            }
             return;
           }
           alert('Start timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
@@ -183,13 +269,30 @@ window.openDalTimelineCollabSession = function(opts) {
         alert('Start timeline collab failed:\n\nNo session reserved.');
         return;
       }
+      window.dalTlOpeningIsStarter_ = true;
+      window.dalTlOpeningBy_ = begin.openedBy || actor;
+      window.dalTlOpeningUid_ = begin.sessionUid;
+      if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+        window.dalApplyTimelineSessionUi_(false, true, {
+          openedBy: begin.openedBy || actor,
+          sessionUid: begin.sessionUid
+        });
+      }
+      window.dalArmTlOpeningHang_(projectId, begin.sessionUid, actor);
+      if (layer) layer.style.cursor = '';
       dalTimelineFinishOpen_(projectId, begin.sessionUid, actor, layer);
     })
-    .beginDalSession(projectId, 'timelineCollab', actor);
+    .beginDalSession(projectId, 'timelineCollab', actor, beginOpts);
 };
 
 window.closeDalTimelineCollabSession = function() {
   var projectId = document.getElementById('edit-folder-id').value;
+  if (window.dalTlOpeningUi_ && !window.dalTimelineSessionOpen) {
+    if (!confirm('Abort opening and stay on normal timeline?')) return;
+    var actorAbort = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+    window.dalAbortTlOpening_(projectId, actorAbort);
+    return;
+  }
   if (!confirm('End timeline collaboration and commit shifts/phases back to Google Sheets?')) return;
   var layer = document.getElementById('shift-layer');
   if (layer) layer.style.cursor = 'wait';

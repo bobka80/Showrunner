@@ -1019,7 +1019,7 @@ window.dalUpdateRemotePendingBanner_ = function() {
   var rosterEl = document.getElementById('pa-prep-live-roster');
   var vaultList = document.getElementById('pa-vault-list');
 
-  if (!window.dalPrepUiOpen) {
+  if (!window.dalPrepUiOpen && !window.dalPrepOpeningUi_) {
     if (panel) panel.style.display = 'none';
     if (vaultList) vaultList.style.paddingBottom = '';
     window.dalPaBannerLastText_ = '';
@@ -1037,7 +1037,16 @@ window.dalUpdateRemotePendingBanner_ = function() {
   }
 
   var text;
-  if (window.dalPaLiveSyncMode === 'blocked' || window.dalPaLiveSyncMode === 'gas') {
+  if (window.dalPrepOpeningUi_) {
+    text = 'Starting live session…';
+  } else if (window.dalPrepPullInJoining_) {
+    if (window.dalPaLiveSyncMode === 'firestore' || Date.now() >= (window.dalPrepPullInJoiningUntil_ || 0)) {
+      window.dalClearPrepPullInJoining_();
+      text = window.dalPaLiveSyncMode === 'firestore' ? 'live (patch)' : 'on';
+    } else {
+      text = 'Live session started — joining…';
+    }
+  } else if (window.dalPaLiveSyncMode === 'blocked' || window.dalPaLiveSyncMode === 'gas') {
     var why = window.dalPaLiveSyncFailReason_ ? (' — ' + window.dalPaLiveSyncFailReason_) : '';
     text = 'DOWN' + why;
   } else if (window.dalPaLiveSyncMode === 'connecting') {
@@ -1908,6 +1917,44 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   // Remember last authoritative server list for heal ticker (stuck-UI recovery).
   window.dalPaLastServerFixtures_ = JSON.parse(JSON.stringify(fixtures));
   window.dalPaLastServerWriteSeq_ = writeSeq;
+  if (typeof window.dalPaFlushStarterEntryDelta_ === 'function') {
+    window.dalPaFlushStarterEntryDelta_();
+  }
+};
+
+/** Part B2 — after Sheets snapshot, push starter's local pending as the entry delta. */
+window.dalPaFlushStarterEntryDelta_ = function() {
+  if (!window.dalPaEntryDeltaPending_ || !window.dalPrepUiOpen) return;
+  if (window.dalPaLiveSyncMode !== 'firestore') return;
+  if (!Number(window.dalPaLastDocWriteSeq_ || 0)) return;
+  window.dalPaEntryDeltaPending_ = false;
+
+  var remote = window.dalPaLastServerFixtures_ || [];
+  var remoteBy = {};
+  (remote || []).forEach(function(pa) {
+    if (pa && pa.uid) remoteBy[String(pa.uid)] = pa;
+  });
+  var local = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
+    return pa && !window.dalPaIsAutoRow_(pa) && pa.uid;
+  });
+  var remoteSig = window.dalPaFixturesSig_(remote);
+  var localSig = window.dalPaFixturesSig_(local);
+  if (remoteSig && localSig && remoteSig === localSig) return;
+
+  var localBy = {};
+  local.forEach(function(pa) {
+    localBy[String(pa.uid)] = pa;
+    var r = remoteBy[String(pa.uid)];
+    if (!r || window.dalPaFixturesSig_([pa]) !== window.dalPaFixturesSig_([r])) {
+      if (typeof window.dalPaNoteTouch_ === 'function') window.dalPaNoteTouch_(pa.uid);
+    }
+  });
+  Object.keys(remoteBy).forEach(function(uid) {
+    if (!localBy[uid] && typeof window.dalPaNoteDelete_ === 'function') {
+      window.dalPaNoteDelete_(uid);
+    }
+  });
+  if (typeof window.dalFlushPaIfPrepOpen_ === 'function') window.dalFlushPaIfPrepOpen_();
 };
 
 window.startDalPaFirestoreListener = function(projectId) {
@@ -2098,6 +2145,8 @@ window.startDalPaSessionWatcher = function(projectId) {
         };
         if (!window.dalPrepUiOpen && typeof dalApplyDalPrepUiState_ === 'function') {
           if (typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) return;
+          // Part B2: _meta can appear during Opening — do not live-latch until Sheets is open.
+          if (window.dalPrepOpeningUi_) return;
           dalApplyDalPrepUiState_(true, projectId, {
             invalidateCache: true,
             fromMeta: true,
