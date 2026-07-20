@@ -212,6 +212,151 @@ function TEST_ErrorReport() {
   return "Error_Reports ready. Test Report_ID=" + res.reportId;
 }
 
+function assertErrorReportsRoot_(actor) {
+  if (typeof verifyBackendPrivilege === 'function' && !verifyBackendPrivilege(actor, 'ROOT')) {
+    throw new Error('Permission Denied: ROOT only.');
+  }
+}
+
+function errorReportRowToObject_(row, hMap) {
+  function cell(key) {
+    var i = hMap[key];
+    if (i === undefined || i === null) return '';
+    var v = row[i];
+    if (v instanceof Date) return v.toISOString();
+    return v == null ? '' : String(v);
+  }
+  return {
+    reportId: cell('Report_ID'),
+    timestamp: cell('Timestamp'),
+    userId: cell('User_ID'),
+    userName: cell('User_Name'),
+    roleDept: cell('Role_Dept'),
+    view: cell('View'),
+    projectId: cell('Project_ID'),
+    forkId: cell('Fork_ID'),
+    mainSessionId: cell('Main_Session_ID'),
+    syncMode: cell('Sync_Mode'),
+    surface: cell('Surface'),
+    appVersion: cell('App_Version'),
+    description: cell('Description'),
+    diagJson: cell('Diag_JSON'),
+    diagRef: cell('Diag_Ref')
+  };
+}
+
+/** ROOT: list inbox rows (newest first). Does not touch Audit_Logs. */
+function listErrorReports(actor) {
+  return executeWithRetry(function () {
+    assertErrorReportsRoot_(actor);
+    const sheet = verifyErrorReportsSchema();
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length <= 1) return { ok: true, reports: [], count: 0 };
+
+    const hMap = {};
+    data[0].forEach(function (h, i) { hMap[String(h || '').trim()] = i; });
+    const reports = [];
+    for (var i = 1; i < data.length; i++) {
+      var obj = errorReportRowToObject_(data[i], hMap);
+      if (!obj.reportId) continue;
+      reports.push(obj);
+    }
+    reports.reverse();
+    return { ok: true, reports: reports, count: reports.length };
+  });
+}
+
+function buildErrorReportPackText_(reports) {
+  var lines = [];
+  lines.push('# Showrunner Error Report Pack');
+  lines.push('Generated: ' + new Date().toISOString());
+  lines.push('Count: ' + reports.length);
+  lines.push('Sheet inbox rows below were deleted after this handoff. Memory = markdown journal only.');
+  lines.push('');
+  reports.forEach(function (r, idx) {
+    lines.push('## Report ' + (idx + 1) + ' — ' + (r.reportId || '(no id)'));
+    lines.push('- Timestamp: ' + (r.timestamp || ''));
+    lines.push('- User: ' + (r.userName || '') + ' (' + (r.userId || '') + ')');
+    lines.push('- Role_Dept: ' + (r.roleDept || ''));
+    lines.push('- View: ' + (r.view || ''));
+    lines.push('- Project_ID: ' + (r.projectId || ''));
+    lines.push('- Fork_ID: ' + (r.forkId || ''));
+    lines.push('- Main_Session_ID: ' + (r.mainSessionId || ''));
+    lines.push('- Sync_Mode: ' + (r.syncMode || ''));
+    lines.push('- Surface: ' + (r.surface || ''));
+    lines.push('- App_Version: ' + (r.appVersion || ''));
+    lines.push('- Description: ' + (r.description || ''));
+    if (r.diagRef) lines.push('- Diag_Ref: ' + r.diagRef);
+    lines.push('- Diag_JSON:');
+    lines.push('```json');
+    lines.push(r.diagJson || '{}');
+    lines.push('```');
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+/**
+ * ROOT: build pack text for selected Report_IDs, then delete those rows from Error_Reports.
+ * @returns {{ok:boolean, packText?:string, deletedCount?:number, error?:string}}
+ */
+function handoverErrorReports(actor, reportIds) {
+  return executeWithRetry(function () {
+    assertErrorReportsRoot_(actor);
+    var ids = [];
+    var seen = {};
+    (reportIds || []).forEach(function (id) {
+      var s = String(id || '').trim();
+      if (!s || seen[s]) return;
+      seen[s] = true;
+      ids.push(s);
+    });
+    if (!ids.length) {
+      return { ok: false, error: 'No Report_IDs selected.' };
+    }
+
+    const sheet = verifyErrorReportsSchema();
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length <= 1) {
+      return { ok: false, error: 'Error_Reports inbox is empty.' };
+    }
+
+    const hMap = {};
+    data[0].forEach(function (h, i) { hMap[String(h || '').trim()] = i; });
+    const idCol = hMap['Report_ID'];
+    if (idCol === undefined) throw new Error('Error_Reports missing Report_ID column.');
+
+    const want = {};
+    ids.forEach(function (id) { want[id] = true; });
+    const selected = [];
+    const deleteRowNumbers = []; // 1-based sheet rows
+    for (var i = 1; i < data.length; i++) {
+      var rid = data[i][idCol] == null ? '' : String(data[i][idCol]).trim();
+      if (!want[rid]) continue;
+      selected.push(errorReportRowToObject_(data[i], hMap));
+      deleteRowNumbers.push(i + 1);
+    }
+    if (!selected.length) {
+      return { ok: false, error: 'None of the selected Report_IDs were found in the inbox.' };
+    }
+
+    const packText = buildErrorReportPackText_(selected);
+
+    // Delete from bottom up so row numbers stay valid
+    deleteRowNumbers.sort(function (a, b) { return b - a; });
+    deleteRowNumbers.forEach(function (rowNum) {
+      sheet.deleteRow(rowNum);
+    });
+
+    try {
+      writeToAuditLog(actor, 'HANDOVER', 'ERROR_REPORTS', 'GLOBAL', String(selected.length),
+        'Handed ' + selected.length + ' error report(s) to Cursor; deleted from Error_Reports inbox.');
+    } catch (e) { /* ignore audit failure */ }
+
+    return { ok: true, packText: packText, deletedCount: selected.length, reportIds: selected.map(function (r) { return r.reportId; }) };
+  });
+}
+
 function getEntityAuditHistory(targetUid) {
   return executeWithRetry(() => {
     if (!targetUid || targetUid === 'NEW') return [];

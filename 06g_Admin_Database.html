@@ -2,23 +2,39 @@
 /**
  * 06g_Admin_Database.html
  * Root-only Database Operations — sub-tabs:
- *   BACKUP & ARCHIVE | OPS & NOTIFICATIONS
+ *   BACKUP & ARCHIVE | OPS & NOTIFICATIONS | ERROR LOGS
  */
 
 let _dbOpsCache = [];
 let _dbLiveStatus = null;
 let _dbActiveSubTab = 'backup';
+let _dbErrorReportsCache = [];
+let _dbErrorSelectedId = null;
+let _dbErrorCheckedIds = null; // null = default-select all visible once
 
 function switchDatabaseSubTab(tabId) {
-  _dbActiveSubTab = tabId === 'ops' ? 'ops' : 'backup';
+  if (tabId === 'ops') _dbActiveSubTab = 'ops';
+  else if (tabId === 'errors') _dbActiveSubTab = 'errors';
+  else _dbActiveSubTab = 'backup';
+
   const backupBtn = document.getElementById('db-subtab-btn-backup');
   const opsBtn = document.getElementById('db-subtab-btn-ops');
+  const errorsBtn = document.getElementById('db-subtab-btn-errors');
   const backupPane = document.getElementById('db-subtab-backup');
   const opsPane = document.getElementById('db-subtab-ops');
+  const errorsPane = document.getElementById('db-subtab-errors');
+
   if (backupBtn) backupBtn.classList.toggle('active', _dbActiveSubTab === 'backup');
   if (opsBtn) opsBtn.classList.toggle('active', _dbActiveSubTab === 'ops');
+  if (errorsBtn) errorsBtn.classList.toggle('active', _dbActiveSubTab === 'errors');
   if (backupPane) backupPane.style.display = _dbActiveSubTab === 'backup' ? 'flex' : 'none';
   if (opsPane) opsPane.style.display = _dbActiveSubTab === 'ops' ? 'flex' : 'none';
+  if (errorsPane) errorsPane.style.display = _dbActiveSubTab === 'errors' ? 'flex' : 'none';
+
+  if (_dbActiveSubTab === 'errors') {
+    loadErrorLogsPanel();
+    return;
+  }
   if (_dbLiveStatus) {
     if (_dbActiveSubTab === 'ops') renderDatabaseOpsTab(_dbLiveStatus);
     else renderDatabaseBackupArchiveTab(_dbLiveStatus);
@@ -28,6 +44,10 @@ function switchDatabaseSubTab(tabId) {
 }
 
 function refreshDatabasePanel() {
+  if (_dbActiveSubTab === 'errors') {
+    loadErrorLogsPanel();
+    return;
+  }
   loadDatabaseOpsPanel();
 }
 
@@ -53,7 +73,7 @@ function loadDatabaseOpsPanel() {
         _dbOpsCache = (res && res.operations) ? res.operations : [];
         if (_dbActiveSubTab === 'backup') {
           renderDatabaseBackupArchiveTab(res);
-        } else {
+        } else if (_dbActiveSubTab === 'ops') {
           renderDatabaseOpsTab(res);
         }
       } catch (err) {
@@ -336,12 +356,309 @@ function renderDatabaseOpsTab(res) {
   }
 }
 
+// ==========================================
+// --- ERROR LOGS (Sheet inbox → Cursor pack) ---
+// ==========================================
+
+function escErrHtml_(s) {
+  if (typeof escapePushHtml === 'function') return escapePushHtml(s);
+  if (typeof escapeHTML === 'function') return escapeHTML(s);
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function loadErrorLogsPanel() {
+  const panel = document.getElementById('db-error-logs-panel');
+  if (!panel) return;
+  panel.innerHTML = '<div style="color:#f43f5e; padding:40px; text-align:center; font-weight:bold;">Loading error logs inbox...</div>';
+
+  google.script.run
+    .withFailureHandler(function (err) {
+      panel.innerHTML = '<div style="color:#ef4444; padding:40px; text-align:center;">'
+        + escErrHtml_((err && err.message) ? err.message : String(err)) + '</div>';
+    })
+    .withSuccessHandler(function (res) {
+      _dbErrorReportsCache = (res && res.reports) ? res.reports : [];
+      _dbErrorCheckedIds = null;
+      if (!_dbErrorSelectedId && _dbErrorReportsCache.length) {
+        _dbErrorSelectedId = _dbErrorReportsCache[0].reportId;
+      } else if (_dbErrorSelectedId) {
+        var still = _dbErrorReportsCache.some(function (r) { return r.reportId === _dbErrorSelectedId; });
+        if (!still) _dbErrorSelectedId = _dbErrorReportsCache.length ? _dbErrorReportsCache[0].reportId : null;
+      }
+      renderErrorLogsPanel();
+    })
+    .listErrorReports(ACTIVE_USER_NAME);
+}
+
+function getErrorLogFilterValues_() {
+  const viewEl = document.getElementById('db-err-filter-view');
+  const surfaceEl = document.getElementById('db-err-filter-surface');
+  const qEl = document.getElementById('db-err-filter-q');
+  return {
+    view: viewEl ? String(viewEl.value || '').trim().toLowerCase() : '',
+    surface: surfaceEl ? String(surfaceEl.value || '').trim().toLowerCase() : '',
+    q: qEl ? String(qEl.value || '').trim().toLowerCase() : ''
+  };
+}
+
+function filteredErrorReports_() {
+  const f = getErrorLogFilterValues_();
+  return (_dbErrorReportsCache || []).filter(function (r) {
+    if (f.view && String(r.view || '').toLowerCase().indexOf(f.view) === -1) return false;
+    if (f.surface && String(r.surface || '').toLowerCase() !== f.surface) return false;
+    if (f.q) {
+      const blob = [
+        r.description, r.userName, r.view, r.projectId, r.forkId, r.reportId, r.appVersion
+      ].join(' ').toLowerCase();
+      if (blob.indexOf(f.q) === -1) return false;
+    }
+    return true;
+  });
+}
+
+function isErrorChecked_(reportId) {
+  if (_dbErrorCheckedIds === null) return true; // first paint: all visible
+  return !!_dbErrorCheckedIds[reportId];
+}
+
+function syncErrorCheckedFromDom_() {
+  if (!_dbErrorCheckedIds) _dbErrorCheckedIds = {};
+  document.querySelectorAll('.db-err-check').forEach(function (b) {
+    const id = b.getAttribute('data-id');
+    if (!id) return;
+    if (b.checked) _dbErrorCheckedIds[id] = true;
+    else delete _dbErrorCheckedIds[id];
+  });
+}
+
+function selectedErrorReportIds_() {
+  const ids = [];
+  document.querySelectorAll('.db-err-check:checked').forEach(function (b) {
+    const id = b.getAttribute('data-id');
+    if (id) ids.push(id);
+  });
+  return ids;
+}
+
+function renderErrorLogsPanel() {
+  const panel = document.getElementById('db-error-logs-panel');
+  if (!panel) return;
+
+  // Preserve checkbox state across re-renders when DOM already exists
+  if (document.querySelector('.db-err-check')) syncErrorCheckedFromDom_();
+
+  const fBefore = getErrorLogFilterValues_();
+  const rows = filteredErrorReports_();
+  const surfaces = {};
+  (_dbErrorReportsCache || []).forEach(function (r) {
+    const s = String(r.surface || '').trim();
+    if (s) surfaces[s] = true;
+  });
+
+  let surfaceOpts = '<option value="">All surfaces</option>';
+  Object.keys(surfaces).sort().forEach(function (s) {
+    const sel = (fBefore.surface === s.toLowerCase()) ? ' selected' : '';
+    surfaceOpts += '<option value="' + escErrHtml_(s) + '"' + sel + '>' + escErrHtml_(s) + '</option>';
+  });
+
+  let listHtml = '';
+  if (!rows.length) {
+    listHtml = '<div class="admin-panel-muted" style="padding:16px;">No error reports in the Sheet inbox'
+      + ((_dbErrorReportsCache && _dbErrorReportsCache.length) ? ' (filters hid all rows).' : '.')
+      + '</div>';
+  } else {
+    rows.forEach(function (r) {
+      const active = r.reportId === _dbErrorSelectedId;
+      const checked = isErrorChecked_(r.reportId);
+      listHtml += '<div class="admin-card db-err-row" data-id="' + escErrHtml_(r.reportId) + '" '
+        + 'style="display:flex; gap:10px; align-items:flex-start; margin:0 0 8px; padding:10px 12px; cursor:pointer;'
+        + (active ? ' border-color:#f43f5e;' : '') + '">'
+        + '<input type="checkbox" class="db-err-check" data-id="' + escErrHtml_(r.reportId) + '" '
+        + (checked ? 'checked ' : '')
+        + 'style="margin-top:3px;" onclick="event.stopPropagation(); syncErrorCheckedFromDom_(); updateErrorHandoverCount_();">'
+        + '<div style="flex:1; min-width:0;">'
+        + '<div style="display:flex; gap:8px; align-items:center;">'
+        + '<span class="admin-card-title" style="margin:0; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">'
+        + escErrHtml_((r.description || '(no description)').slice(0, 80)) + '</span>'
+        + '<span class="admin-panel-muted" style="font-size:10px; white-space:nowrap;">' + escErrHtml_(r.surface || '') + '</span>'
+        + '</div>'
+        + '<div class="admin-panel-muted" style="margin-top:4px; font-size:11px;">'
+        + escErrHtml_(r.timestamp || '') + ' · ' + escErrHtml_(r.userName || '') + ' · ' + escErrHtml_(r.view || '')
+        + '</div></div></div>';
+    });
+  }
+
+  const selected = (_dbErrorReportsCache || []).find(function (r) { return r.reportId === _dbErrorSelectedId; }) || null;
+  let detailHtml = '<div class="admin-panel-muted" style="padding:16px;">Select a report to inspect.</div>';
+  if (selected) {
+    detailHtml = ''
+      + '<div style="padding:12px 14px; border-bottom:1px solid #333; flex-shrink:0;">'
+      + '<div style="color:#f43f5e; font-weight:900; font-size:11px; letter-spacing:1px;">REPORT DETAIL</div>'
+      + '<div class="admin-panel-muted" style="margin-top:4px; font-size:11px;">' + escErrHtml_(selected.reportId) + '</div>'
+      + '</div>'
+      + '<div style="flex:1; overflow:auto; padding:12px 14px; font-size:12px; line-height:1.45; color:#e4e4e7;">'
+      + '<div><b>When</b> ' + escErrHtml_(selected.timestamp) + '</div>'
+      + '<div style="margin-top:6px;"><b>Who</b> ' + escErrHtml_(selected.userName) + ' (' + escErrHtml_(selected.userId) + ') · ' + escErrHtml_(selected.roleDept) + '</div>'
+      + '<div style="margin-top:6px;"><b>View</b> ' + escErrHtml_(selected.view) + '</div>'
+      + '<div style="margin-top:6px;"><b>Project / Fork</b> ' + escErrHtml_(selected.projectId || '—') + ' / ' + escErrHtml_(selected.forkId || '—') + '</div>'
+      + '<div style="margin-top:6px;"><b>Sync / Surface</b> ' + escErrHtml_(selected.syncMode || '—') + ' / ' + escErrHtml_(selected.surface || '—') + '</div>'
+      + '<div style="margin-top:6px;"><b>App</b> ' + escErrHtml_(selected.appVersion || '—') + '</div>'
+      + '<div style="margin-top:10px;"><b>Description</b><div style="margin-top:4px; white-space:pre-wrap;">' + escErrHtml_(selected.description || '') + '</div></div>'
+      + (selected.diagRef ? '<div style="margin-top:10px;"><b>Diag_Ref</b> <a href="' + escErrHtml_(selected.diagRef) + '" target="_blank" rel="noopener" style="color:#60a5fa;">Open Drive</a></div>' : '')
+      + '<div style="margin-top:10px;"><b>Diag_JSON</b><pre style="margin:6px 0 0; padding:10px; background:#09090b; border:1px solid #3f3f46; border-radius:8px; white-space:pre-wrap; word-break:break-word; max-height:220px; overflow:auto; color:#a1a1aa;">'
+      + escErrHtml_(selected.diagJson || '') + '</pre></div>'
+      + '</div>';
+  }
+
+  panel.innerHTML = ''
+    + '<div style="display:flex; flex-direction:column; flex:1; min-height:0; width:100%;">'
+    + '<div style="padding:12px 14px; border-bottom:1px solid #333; flex-shrink:0; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">'
+    + '<div style="color:#f43f5e; font-weight:900; font-size:11px; letter-spacing:1px; margin-right:6px;">ERROR LOGS INBOX</div>'
+    + '<input id="db-err-filter-q" type="text" placeholder="Search…" value="' + escErrHtml_(fBefore.q) + '" '
+    + 'style="width:160px; margin:0; padding:8px 10px; background:#09090b; border:1px solid #3f3f46; color:#fff; border-radius:6px; font-size:12px;" '
+    + 'oninput="renderErrorLogsPanel()">'
+    + '<input id="db-err-filter-view" type="text" placeholder="View contains…" value="' + escErrHtml_(fBefore.view) + '" '
+    + 'style="width:140px; margin:0; padding:8px 10px; background:#09090b; border:1px solid #3f3f46; color:#fff; border-radius:6px; font-size:12px;" '
+    + 'oninput="renderErrorLogsPanel()">'
+    + '<select id="db-err-filter-surface" style="margin:0; padding:8px 10px; background:#09090b; border:1px solid #3f3f46; color:#fff; border-radius:6px; font-size:12px;" '
+    + 'onchange="renderErrorLogsPanel()">' + surfaceOpts + '</select>'
+    + '<button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="selectAllVisibleErrorLogs_(true)">SELECT VISIBLE</button>'
+    + '<button type="button" class="btn-outline btn-sm" style="margin:0;" onclick="selectAllVisibleErrorLogs_(false)">CLEAR</button>'
+    + '<div style="flex:1;"></div>'
+    + '<button type="button" id="db-err-handover-btn" class="btn-main btn-sm" style="margin:0; background:#f43f5e !important; border-color:#f43f5e;" '
+    + 'onclick="handoverSelectedErrorLogs_()">HAND OVER TO CURSOR (<span id="db-err-handover-count">0</span>)</button>'
+    + '</div>'
+    + '<div class="admin-panel-muted" style="padding:8px 14px; border-bottom:1px solid #222; font-size:11px; flex-shrink:0;">'
+    + 'Sheet = inbox. Hand over copies a pack then <b>deletes</b> those rows. Markdown journal = filing cabinet '
+    + '(docs/ai/active/error-journal/ · error-day-*.md).'
+    + '</div>'
+    + '<div style="display:flex; flex:1; min-height:0;">'
+    + '<div id="db-err-list" style="flex:1.1; min-width:0; border-right:1px solid #333; overflow:auto; padding:10px 12px;">' + listHtml + '</div>'
+    + '<div style="flex:1; min-width:0; display:flex; flex-direction:column; min-height:0;">' + detailHtml + '</div>'
+    + '</div></div>';
+
+  const list = document.getElementById('db-err-list');
+  if (list) {
+    list.onclick = function (ev) {
+      var t = ev.target;
+      if (t && t.classList && t.classList.contains('db-err-check')) return;
+      var row = t && t.closest ? t.closest('.db-err-row') : null;
+      if (!row) return;
+      var id = row.getAttribute('data-id');
+      if (id) selectErrorLogRow_(id);
+    };
+  }
+
+  if (_dbErrorCheckedIds === null) {
+    _dbErrorCheckedIds = {};
+    rows.forEach(function (r) { _dbErrorCheckedIds[r.reportId] = true; });
+  }
+  updateErrorHandoverCount_();
+}
+
+function selectErrorLogRow_(reportId) {
+  _dbErrorSelectedId = reportId;
+  renderErrorLogsPanel();
+}
+
+function selectAllVisibleErrorLogs_(on) {
+  if (!_dbErrorCheckedIds) _dbErrorCheckedIds = {};
+  filteredErrorReports_().forEach(function (r) {
+    if (on) _dbErrorCheckedIds[r.reportId] = true;
+    else delete _dbErrorCheckedIds[r.reportId];
+  });
+  renderErrorLogsPanel();
+}
+
+function updateErrorHandoverCount_() {
+  const n = selectedErrorReportIds_().length;
+  const el = document.getElementById('db-err-handover-count');
+  if (el) el.textContent = String(n);
+  const btn = document.getElementById('db-err-handover-btn');
+  if (btn) btn.disabled = n < 1;
+}
+
+function copyTextToClipboard_(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise(function (resolve, reject) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      resolve();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+function handoverSelectedErrorLogs_() {
+  const ids = selectedErrorReportIds_();
+  if (!ids.length) {
+    alert('Select at least one error log.');
+    return;
+  }
+  if (!confirm('Hand over ' + ids.length + ' log(s) to Cursor?\n\nThis will copy the pack, then remove those rows from the Error_Reports inbox.')) {
+    return;
+  }
+
+  const btn = document.getElementById('db-err-handover-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'HANDING OVER…'; }
+
+  google.script.run
+    .withFailureHandler(function (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = 'HAND OVER TO CURSOR (<span id="db-err-handover-count">' + ids.length + '</span>)';
+      }
+      alert('Handover failed: ' + ((err && err.message) ? err.message : String(err)));
+    })
+    .withSuccessHandler(function (res) {
+      if (!res || !res.ok) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = 'HAND OVER TO CURSOR (<span id="db-err-handover-count">0</span>)';
+        }
+        alert((res && res.error) ? res.error : 'Handover failed.');
+        return;
+      }
+      copyTextToClipboard_(res.packText || '')
+        .then(function () {
+          if (typeof showPushToast === 'function') {
+            showPushToast('Error pack copied', (res.deletedCount || 0) + ' row(s) removed from inbox.');
+          } else {
+            alert('Pack copied to clipboard. Deleted ' + (res.deletedCount || 0) + ' row(s).');
+          }
+          _dbErrorSelectedId = null;
+          loadErrorLogsPanel();
+        })
+        .catch(function () {
+          // Pack was deleted server-side already — show pack for manual copy
+          prompt('Clipboard blocked. Copy this pack manually (already deleted from Sheet):', res.packText || '');
+          _dbErrorSelectedId = null;
+          loadErrorLogsPanel();
+        });
+    })
+    .handoverErrorReports(ACTIVE_USER_NAME, ids);
+}
+
 /** @deprecated use renderDatabaseBackupArchiveTab */
 function renderDatabaseOpsPanel(res) {
   _dbLiveStatus = res;
   _dbOpsCache = (res && res.operations) ? res.operations : [];
   if (_dbActiveSubTab === 'ops') {
     renderDatabaseOpsTab(res);
+  } else if (_dbActiveSubTab === 'errors') {
+    loadErrorLogsPanel();
   } else {
     renderDatabaseBackupArchiveTab(res);
   }

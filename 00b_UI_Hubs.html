@@ -130,6 +130,7 @@
             <div style="color:#f59e0b; font-weight:800; font-size:14px; letter-spacing:1px; white-space:nowrap;">DATABASE OPERATIONS (ROOT)</div>
             <button type="button" id="db-subtab-btn-backup" class="btn-tab active" style="margin:0;" onclick="switchDatabaseSubTab('backup')">BACKUP &amp; ARCHIVE</button>
             <button type="button" id="db-subtab-btn-ops" class="btn-tab" style="margin:0;" onclick="switchDatabaseSubTab('ops')">OPS &amp; NOTIFICATIONS</button>
+            <button type="button" id="db-subtab-btn-errors" class="btn-tab" style="margin:0;" onclick="switchDatabaseSubTab('errors')">ERROR LOGS</button>
             <div style="flex:1;"></div>
             <button type="button" class="btn-outline btn-sm" style="margin:0; border-color:#f59e0b; color:#f59e0b;" onclick="refreshDatabasePanel()">REFRESH</button>
         </div>
@@ -138,6 +139,9 @@
         </div>
         <div id="db-subtab-ops" style="flex:1; overflow:hidden; display:none; flex-direction:column; background:#0a0a0c; min-height:0;">
             <div id="db-ops-notifications-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;"></div>
+        </div>
+        <div id="db-subtab-errors" style="flex:1; overflow:hidden; display:none; flex-direction:column; background:#0a0a0c; min-height:0;">
+            <div id="db-error-logs-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:#0a0a0c; min-height:0;"></div>
         </div>
     </div>
 

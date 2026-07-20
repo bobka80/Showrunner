@@ -45,7 +45,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 
 ## 2. Shared UI Components
 - **`00a_UI_Layers.html`**: Z-index layer stack and overlay foundations for modals/drawers.
-- **`00b_UI_Hubs.html`**: Hub shells and navigation containers for major UI regions. Includes ROOT **DATABASE OPERATIONS** tab shell (`tab-content-database`, sub-tab panes for `06g_Admin_Database.html`).
+- **`00b_UI_Hubs.html`**: Hub shells and navigation containers for major UI regions. Includes ROOT **DATABASE OPERATIONS** tab shell (`tab-content-database`, sub-tab panes for `06g_Admin_Database.html`: BACKUP & ARCHIVE | OPS & NOTIFICATIONS | **ERROR LOGS**).
 - **`00c_UI_Forms.html`**: Universal form renderers (Provisioning, Warehouse Roots, Clients, Vehicles).
 - **`00d_UI_Visuals.html`**: Settings drawers and data manager modals (Colors, Depts, Meals, Tags).
 - **`00e_UI_Modals.html`**: Universal popups (Global Tasks, Pickers, Checklists, Backup).
@@ -140,7 +140,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`06d_Admin_Fleet.html`**: Vehicle database CRUD.
 - **`06e_Admin_Automation.html`**: Database archivers and manager rules.
 - **`06f_Admin_Audit.html`**: Database Audit Studio (duplicate merge + item-by-item review). **Wired** in `Index.html`. Entry: `openAuditStudio()` when linked from admin UI.
-- **`06g_Admin_Database.html`**: ROOT-only **Database Operations** — sub-tabs **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS**. Shell markup in `00b_UI_Hubs.html` (`tab-content-database`). Entry: Admin hub → DATABASE tab → `loadDatabaseOpsPanel()` (called from `06_System_Admin.html`). Backup pane: live file tickets, quick backup/restore, ops log. Ops pane: placeholder Software Log Hub (left) + **Push Notifications** (right) via `renderPushAdminPanel('push-admin-panel')`. *Quirk: push list styles inject into `document.head` (`ensurePushDeviceListStyles` in `10c`); device fetch is deferred inside try/catch.*
+- **`06g_Admin_Database.html`**: ROOT-only **Database Operations** — sub-tabs **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS** | **ERROR LOGS**. Shell markup in `00b_UI_Hubs.html` (`tab-content-database`). Entry: Admin hub → DATABASE tab → `loadDatabaseOpsPanel()` / `loadErrorLogsPanel()`. Backup pane: live file tickets, quick backup/restore, ops log. Ops pane: placeholder Software Log Hub (left) + **Push Notifications** (right) via `renderPushAdminPanel('push-admin-panel')`. Error Logs: list/filter Sheet inbox + **Hand over to Cursor** (`listErrorReports` / `handoverErrorReports` in `Resources_Audit.js` — copy pack then delete rows). *Quirk: push list styles inject into `document.head` (`ensurePushDeviceListStyles` in `10c`); device fetch is deferred inside try/catch.*
 - **`Resources_Core.js`**, **`Resources_Database.js`**, **`Resources_Audit.js`**, **`Resources_Migrations.js`**, **`Resources_System.js`**, **`Resources_Vault.js`**, **`Resources_Warehouse.js`**: Backend CRUD and schema engines. **Live DB registry & folder IDs:** [DRIVE_LAYOUT.md](DRIVE_LAYOUT.md) + `Resources_Core.js` constants.
 
 ## 9. The 09 Series: Financials

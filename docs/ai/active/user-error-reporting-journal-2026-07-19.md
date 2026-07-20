@@ -1,13 +1,13 @@
 # Active — Error reports, markdown journal & day bug-fix campaigns
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Status:** **NEXT campaign** (middle before multi-user Part B). **Phase 2 complete** @ GAS **v684** — global lip drawer. **Next:** Phase 3 — ERROR LOGS tab + Hand over.  
+**Status:** **NEXT campaign** (middle before multi-user Part B). **Phase 3 complete** — ERROR LOGS + Hand over. **Next:** Phase 4 — first real pack → day campaign + journal.  
 **Point agents here:** `docs/ai/active/user-error-reporting-journal-2026-07-19.md`  
 **Journal stub:** [error-journal/README.md](error-journal/README.md)
 
 **Related:** Multi-user fork Part B floor debugging — [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).
 
-**UI lock (Phase 2 shipped):** Top-center ~2mm lip; desktop hover opens; touch tap lip toggles; text + Send; freeze diag on open; everyone (web / mobile / station via Index).
+**UI lock (Phase 2):** Top lip drawer; freeze on open; everyone. **Phase 3:** Database → ERROR LOGS → Hand over to Cursor (copy pack + delete inbox rows).
 
 ---
 
@@ -140,8 +140,8 @@ Existing: **BACKUP & ARCHIVE** | **OPS & NOTIFICATIONS** → add **ERROR LOGS**.
 |-------|------|------|
 | **0** | This campaign + SCHEMA (reports only) + DRIVE_LAYOUT + error-journal folder stub + TODO as Next | **Done** 2026-07-20 |
 | **1** | Sheet `Error_Reports` + writer (`verifyErrorReportsSchema` / `submitErrorReport` / `TEST_ErrorReport`) | **Done** @ v681 |
-| **2** | Report lip drawer + freeze + submit (web / mobile / station) | **Done** @ v684 |
-| **3** | ERROR LOGS tab + **Hand over** (copy + delete from Sheet) | ROOT exports pack; handed rows gone from UI |
+| **2** | Report lip drawer + freeze + submit (web / mobile / station) | **Done** @ v684+ polish |
+| **3** | ERROR LOGS tab + **Hand over** (copy + delete from Sheet) | **Done** — see status log |
 | **4** | Cursor playbook; first real pack → day campaign + journal md | Director likes the day-campaign shape |
 | **5** | Live use (esp. Part B) | Packs → day campaigns → OK go → journal updated |
 
@@ -214,3 +214,5 @@ PACK FOLLOWS BELOW:
 | 2026-07-20 | **Trapezoid tab @ GAS v687:** muted pull-tab (peek ~⅔ height); open = one unified shape with body (no seam). |
 | 2026-07-20 | **Lip polish @ GAS v688:** peek **½** height; milder filleted trapezoid SVG with frame stroke. |
 | 2026-07-20 | **Unified silhouette @ GAS v689:** one clipped drawer shape (no second SVG figure); lip = hit target only; peek ½. |
+| 2026-07-20 | **Frame + hover @ GAS v690:** drawer fill/frame match text box (`#09090b` / `#3f3f46`); top-anchored under bookmarks; root hit area expands on hover so it doesn’t snap shut. |
+| 2026-07-20 | **Phase 3 shipped:** Database Ops → **ERROR LOGS** sub-tab; `listErrorReports` + `handoverErrorReports` (ROOT); Hand over = copy pack then delete inbox rows. |
