@@ -474,7 +474,9 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Live pull-in (Part B3):** Watchers run only while PA modal / timeline layer is open — never yank from calendar. Peer soft-switch → SYNC **Live — joining…** then **Live**. Phone PA: no auto-start; same watcher auto-joins.
 
-**Cue phases (Part B5):** SYNC status uses `dalForkPhaseStatusText_` — Normal (hide) / Opening / Live / Closing — committing…; idle T−5 via B4.
+**Cue phases (Part B5):** SYNC status uses `dalForkPhaseStatusText_` — Normal (hide) / Opening / Live / Closing. Closing copy: **Saving to Sheets — edits locked. Stay or come back in a moment.** Idle T−5 via B4.
+
+**Committing hard-freeze (2026-07-21):** While Sheets domain status is `committing`, **everyone** is frozen (no writes, no new START) — including someone who re-opens PA/timeline after last-leave. SYNC bar stays visible. After commit succeeds, auto-start opens a **new** room (`sessionUid`); toast **Live again — you're in a new prep/timeline room.** Do not treat post-commit re-enter as “same fork.”
 
 **Idle / auto-close (Part B4 @ v703+):** Timeline idle **45m** / prep **75m**; T−5 SYNC **Session closing — tap to keep open**; last leave + idle call same `closeDalSession` commit path; station presence blocks prep idle eject; presence ping ~**45s**, server stale **150s**.
 
@@ -509,6 +511,8 @@ END PREP (local or peer)
 After END — reopen rules
   → Same sessionUid on stale _meta → IGNORE (no panel)  ← kills ~1 min on/off loop
   → Sheets still saying "open" → IGNORE (blocked)
+  → Sheets still **committing** → freeze + SYNC Closing copy; block START; poll until normal
+  → After commit clears: auto-open (if allowed) starts a **new** sessionUid — not the ended one
   → New START only: localOpen OR _meta with a *new* sessionUid
 ```
 

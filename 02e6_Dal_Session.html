@@ -39,6 +39,10 @@ window.dalPrepPullInJoining_ = false;
 window.dalPrepPullInJoiningUntil_ = 0;
 // Part B5 — Closing cue (local END or peer Sheets committing)
 window.dalPrepClosingUi_ = false;
+// Hard freeze while Sheets status is committing (incl. re-entry after last-leave).
+window.dalPrepCommittingWait_ = false;
+// After successful commit, auto-open starts a *new* room — toast once.
+window.dalPrepPostCommitReenter_ = false;
 // Part B4 stub — set true when idle T−5 fires
 window.dalPrepIdleWarn_ = false;
 
@@ -86,7 +90,8 @@ window.dalPrepMarkSessionEnded_ = function(projectId) {
   window.dalPrepIgnoreOpenUntil = Date.now() + 24 * 60 * 60 * 1000;
   window.dalMetaConfirmedOpen_ = false;
   window.dalMetaSeenOpen_ = false;
-  window.dalPrepClosingUi_ = false;
+  // Keep Closing/committing cue if Sheets is still committing (re-entry freeze).
+  if (!window.dalPrepCommittingWait_) window.dalPrepClosingUi_ = false;
   window.dalPrepClosing = false;
   window.dalClearPrepPullInJoining_();
   if (typeof dalApplyDalPrepUiState_ === 'function') {
@@ -144,18 +149,23 @@ window.startDalPrepSessionPoll_ = function(projectId) {
 
         if (window.dalIsPrepOpenFromInfo_(info)) {
           var stOpen = window.dalPrepStatusFromInfo_(info);
-          // Peer END: _meta already gone (pending) and/or Sheets committing.
-          if (stOpen === 'committing' && (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepMetaEndPending_)) {
-            window.dalPrepClosingUi_ = true;
-            if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
-              window.dalUpdateRemotePendingBanner_();
+          // Committing — freeze everyone (including quick re-entry before Sheets clears).
+          if (stOpen === 'committing') {
+            window.dalApplyPrepCommittingUi_(true, projectId);
+            if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepMetaEndPending_) {
+              if (Date.now() < (window.dalPrepIgnoreCloseUntil || 0) && !window.dalPrepMetaEndPending_) return;
+              window.dalPrepClosedPollStreak = (window.dalPrepClosedPollStreak || 0) + 1;
+              if (window.dalPrepClosedPollStreak < 2 && !window.dalPrepMetaEndPending_) return;
+              window.dalPrepClosedPollStreak = 0;
+              window.dalPrepMarkSessionEnded_(projectId);
+              // Keep committing wait UI until Sheets leaves committing (next ticks).
+              window.dalApplyPrepCommittingUi_(true, projectId);
             }
-            if (Date.now() < (window.dalPrepIgnoreCloseUntil || 0) && !window.dalPrepMetaEndPending_) return;
-            window.dalPrepClosedPollStreak = (window.dalPrepClosedPollStreak || 0) + 1;
-            if (window.dalPrepClosedPollStreak < 2 && !window.dalPrepMetaEndPending_) return;
-            window.dalPrepClosedPollStreak = 0;
-            window.dalPrepMarkSessionEnded_(projectId);
             return;
+          }
+          // Left committing → normal/open path below; clear wait first if needed.
+          if (window.dalPrepCommittingWait_) {
+            window.dalApplyPrepCommittingUi_(false);
           }
           // Meta deleted but Sheets still lagging as "open" — end after short settle (real END).
           if (window.dalPrepMetaEndPending_ && window.dalPrepMetaEndPendingSince_ &&
@@ -168,7 +178,6 @@ window.startDalPrepSessionPoll_ = function(projectId) {
           if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
           if (window.dalPrepSheetsOpenBlocked_) return;
           if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
-            if (stOpen === 'committing') return;
             if (stOpen === 'opening') {
               window.dalApplyPrepOpeningUi_(true, info);
               return;
@@ -209,6 +218,13 @@ window.startDalPrepSessionPoll_ = function(projectId) {
         }
 
         // Sheets says closed.
+        if (window.dalPrepCommittingWait_) {
+          window.dalApplyPrepCommittingUi_(false);
+          window.dalPrepPostCommitReenter_ = true;
+          if (typeof window.maybeAutoOpenDalPrep_ === 'function') {
+            window.maybeAutoOpenDalPrep_();
+          }
+        }
         if (window.dalPrepOpeningUi_) {
           window.dalPrepOpeningClosedStreak_ = (window.dalPrepOpeningClosedStreak_ || 0) + 1;
           if (window.dalPrepOpeningClosedStreak_ < 2) return;
@@ -278,6 +294,13 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     if (banner) banner.style.display = 'none';
     if (startBtn) startBtn.style.display = 'none';
     if (endBtn) endBtn.style.display = 'none';
+    // Sync-block / committing freeze sets projectAssetsReadOnly via latch — still show SYNC bar.
+    if (window.dalPrepCommittingWait_ || window.dalPrepClosingUi_) {
+      if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+        window.dalUpdateRemotePendingBanner_();
+      }
+      return;
+    }
     var hidePanel = document.getElementById('pa-prep-live-panel');
     if (hidePanel) hidePanel.style.display = 'none';
     return;
@@ -316,7 +339,9 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     var mayManual = typeof window.dalMayManualStartFork_ === 'function'
       ? window.dalMayManualStartFork_('prep')
       : canShow;
-    startBtn.style.display = (!isPrepOpen && mayManual) ? 'inline-flex' : 'none';
+    var blockStart = !!window.dalPrepCommittingWait_ || !!window.dalPrepClosingUi_ ||
+      !!window.dalPrepOpeningUi_;
+    startBtn.style.display = (!isPrepOpen && mayManual && !blockStart) ? 'inline-flex' : 'none';
   }
   if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
 
@@ -366,7 +391,8 @@ window.dalCanShowPrepButtons = function() {
       return false;
     }
   }
-  if (window.projectAssetsReadOnly) return false;
+  // Opening/committing freeze latches read-only — still allow SYNC/buttons logic.
+  if (window.projectAssetsReadOnly && !window.dalPaSyncBlockedReadOnlyLatch_) return false;
   var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
   return !!(projectId && projectId !== 'NEW');
 };
@@ -375,6 +401,58 @@ window.dalPaApplyOpeningFreeze_ = function(frozen) {
   if (typeof window.dalPaApplySyncBlockedUi_ === 'function') {
     window.dalPaApplySyncBlockedUi_(!!frozen);
   }
+};
+
+/**
+ * Committing freeze — everyone locked (incl. re-entry while Sheets still committing).
+ * Orange SYNC bar stays visible with "Saving to Sheets…" copy.
+ */
+window.dalApplyPrepCommittingUi_ = function(active, projectId) {
+  var startBtn = document.getElementById('dal-prep-start-btn');
+  var endBtn = document.getElementById('dal-prep-end-btn');
+  if (active) {
+    window.dalPrepCommittingWait_ = true;
+    window.dalPrepClosingUi_ = true;
+    window.dalPaApplyOpeningFreeze_(true);
+    if (startBtn) startBtn.style.display = 'none';
+    if (endBtn) endBtn.style.display = 'none';
+    if (projectId) window.startDalPrepSessionPoll_(projectId);
+    if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+      window.dalUpdateRemotePendingBanner_();
+    }
+    if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') {
+      window.dalPaintSurfaceForkSyncBar_();
+    }
+    return;
+  }
+  var wasWait = !!window.dalPrepCommittingWait_;
+  window.dalPrepCommittingWait_ = false;
+  // Only clear closing UI if we are not mid local End Prep.
+  if (!window.dalPrepClosing) window.dalPrepClosingUi_ = false;
+  window.dalPaApplyOpeningFreeze_(false);
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    window.dalUpdateRemotePendingBanner_();
+  }
+  if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') {
+    window.dalPaintSurfaceForkSyncBar_();
+  }
+  return wasWait;
+};
+
+window.dalNotifyPrepLiveAgain_ = function() {
+  var msg = 'Live again — you\'re in a new prep room.';
+  try {
+    if (typeof showPushToast === 'function') showPushToast('Live again', msg);
+    else if (typeof showToast === 'function') showToast(msg);
+  } catch (e) { /* ignore */ }
+};
+
+window.dalNotifyTimelineLiveAgain_ = function() {
+  var msg = 'Live again — you\'re in a new timeline room.';
+  try {
+    if (typeof showPushToast === 'function') showPushToast('Live again', msg);
+    else if (typeof showToast === 'function') showToast(msg);
+  } catch (e) { /* ignore */ }
 };
 
 window.dalClearPrepOpeningHang_ = function() {
@@ -530,14 +608,26 @@ window.refreshDalSessionBanner = function() {
         if (window.dalPrepSheetsOpenBlocked_) return;
         if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
         var stRefresh = window.dalPrepStatusFromInfo_(info);
+        if (stRefresh === 'committing') {
+          window.dalApplyPrepCommittingUi_(true, projectId);
+          return;
+        }
+        if (window.dalPrepCommittingWait_) window.dalApplyPrepCommittingUi_(false);
         if (stRefresh === 'opening') {
           window.dalApplyPrepOpeningUi_(true, info);
           return;
         }
-        if (stRefresh === 'committing') return;
         if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
         window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       } else if (!window.dalPrepLatched) {
+        if (window.dalPrepCommittingWait_) {
+          window.dalApplyPrepCommittingUi_(false);
+          window.dalPrepPostCommitReenter_ = true;
+          if (typeof window.maybeAutoOpenDalPrep_ === 'function') {
+            window.maybeAutoOpenDalPrep_();
+          }
+          return;
+        }
         if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
         window.dalApplyDalPrepUiState_(false, projectId, { allowClose: true });
       }
@@ -626,6 +716,13 @@ window.openDalPrepSession = function(opts) {
   if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('prep')) {
     return alert('You cannot start preparation on this device.');
   }
+  if (window.dalPrepCommittingWait_ || (window.dalPrepClosingUi_ && !window.dalPrepUiOpen && !window.dalPrepOpeningUi_)) {
+    window.dalApplyPrepCommittingUi_(true, projectId);
+    if (!opts.auto) {
+      alert('Saving to Sheets — edits locked. Stay or come back in a moment.');
+    }
+    return;
+  }
   if (!opts.auto && !opts.takeOver) {
     if (!confirm('Start preparation? Equipment saves fork to Firebase until End Prep.')) return;
   }
@@ -646,10 +743,16 @@ window.openDalPrepSession = function(opts) {
         })
         .withSuccessHandler(function(info) {
           var st = window.dalPrepStatusFromInfo_(info);
+          if (st === 'committing') {
+            window.dalApplyPrepCommittingUi_(true, projectId);
+            if (!opts.auto) {
+              alert('Saving to Sheets — edits locked. Stay or come back in a moment.');
+            }
+            return;
+          }
           if (st === 'open') {
             if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
-            window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
-            if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+            window.dalPrepOnOpenSuccess_(projectId, opts, true);
             return;
           }
           if (st === 'opening') {
@@ -666,19 +769,7 @@ window.openDalPrepSession = function(opts) {
       if (begin && begin.joined) {
         if (overlay) overlay.style.cursor = '';
         if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
-        try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e0) {}
-        if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
-        window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
-        window.dalMetaConfirmedOpen_ = false;
-        window.dalMetaSeenOpen_ = false;
-        window.dalMetaCloseStreak_ = 0;
-        window.dalPrepMetaEndPending_ = false;
-        window.dalPrepMetaEndPendingSince_ = 0;
-        window.dalPrepEndedSessionUid_ = '';
-        window.dalPrepIgnoreOpenUntil = 0;
-        window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
-        if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
-        if (!opts.auto) alert('Joined preparation.');
+        window.dalPrepOnOpenSuccess_(projectId, opts, true);
         return;
       }
       if (!begin || !begin.sessionUid) {
@@ -747,6 +838,7 @@ window.dalPrepOnOpenSuccess_ = function(projectId, opts, joined) {
   opts = opts || {};
   window.dalClearPrepOpeningHang_();
   window.dalApplyPrepOpeningUi_(false);
+  if (window.dalPrepCommittingWait_) window.dalApplyPrepCommittingUi_(false);
   try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
   if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
   window.dalSessionState = { status: 'open', sessionType: 'prep', projectId: projectId, prepStatus: 'open' };
@@ -770,7 +862,13 @@ window.dalPrepOnOpenSuccess_ = function(projectId, opts, joined) {
   window.dalPrepOpeningIsStarter_ = false;
   window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true, localOpen: true });
   if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
-  if (!opts.auto) alert(joined ? 'Joined preparation.' : 'Preparation started.');
+  var postReenter = !!(opts.postCommitReenter || window.dalPrepPostCommitReenter_);
+  window.dalPrepPostCommitReenter_ = false;
+  if (postReenter) {
+    if (typeof window.dalNotifyPrepLiveAgain_ === 'function') window.dalNotifyPrepLiveAgain_();
+  } else if (!opts.auto) {
+    alert(joined ? 'Joined preparation.' : 'Preparation started.');
+  }
 };
 
 window.closeDalPrepSession = function(opts) {

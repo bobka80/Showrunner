@@ -270,21 +270,23 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 ### B7 floor smoke card (director)
 
-Hard refresh web.app (GAS **v717+**). Use a **test** project only.
+Hard refresh web.app (latest GAS — committing freeze @ **v721+**). Use a **test** project only.
 
 **Prep (PA)**
 
 1. Desktop LO: open PA → prep auto-starts (or Start) → Live cue; change qty; peer phone opens same PA → joins (no phone auto-start from hub alone).  
 2. Station: open project PA → start/join; Back as last person → **silent** commit (no false auto-close alert); reopen PA → list matches.  
 3. Two desktops: A opens prep; B already on PA → pull-in / joining → both Live.  
-4. Idle (optional): leave prep open alone ~warn at T−5 of 75m — or skip and trust unit. Station must **not** idle-eject while docked.  
-5. Freelancer account: no live prep latch / no begin.
+4. **Committing freeze:** last leave → immediately reopen PA while amber/committing → SYNC “Saving to Sheets…”, edits locked, no START; after clear → new Live room toast.  
+5. Idle (optional): leave prep open alone ~warn at T−5 of 75m — or skip and trust unit. Station must **not** idle-eject while docked.  
+6. Freelancer account: no live prep latch / no begin.
 
 **Timeline**
 
 1. Desktop+edit: open timeline → collab auto-starts; station must **not** start timeline.  
 2. Peer joins; Opening freeze if you catch it; Live edits; End or last-leave → commit.  
-3. Idle 45m path optional.
+3. **Committing freeze:** same as PA — re-enter during commit waits; then new timeline room.  
+4. Idle 45m path optional.
 
 **Pass:** no false “Auto-close prep failed”; Sheets match last Live list; no orphan open room after last leave.  
 **Fail:** note exact alert text + surface (station/desktop/phone) → stay on campaign; do not archive.
@@ -360,7 +362,8 @@ Hard refresh web.app (GAS **v717+**). Use a **test** project only.
 | 2026-07-21 | **B6 verified:** Part B checklist vs code — 7 PASS, station PA “always” = PARTIAL (host/`canOpenDalPrep` gate, intentional). **Next: B7** floor smoke (card in hub). |
 | 2026-07-21 | **Commit fail-safe C @ GAS v718:** `dal_commit_retry/{projectId}` pointer only on real Sheets/reconcile fail; PA/TL Retry UI; idempotent (no fork → alreadyOk). False auto-close alerts do **not** set the pointer. |
 | 2026-07-21 | **DAL commit toasts @ GAS v719:** push **ROOT only**; no repeat sweep toasts; mirror/fork-cleanup = audit-only (no push). |
-| 2026-07-21 | **DAL drawer + fork dots:** durable `dal_commit_fail` notif with COPY; calendar amber while committing; 4s poll while lit; no premature optimistic clear. |
+| 2026-07-21 | **DAL drawer + fork dots @ GAS v720:** durable `dal_commit_fail` notif with COPY; calendar amber while committing; 4s poll while lit; no premature optimistic clear. |
+| 2026-07-21 | **Committing hard-freeze:** while Sheets `committing`, freeze everyone (no writes/START) incl. re-entry; SYNC “Saving to Sheets…”; after clear auto-open **new** room + “Live again” toast. |
 
 ---
 

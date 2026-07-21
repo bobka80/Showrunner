@@ -21,6 +21,11 @@ window.dalTlPullInJoining_ = false;
 window.dalTlPullInJoiningUntil_ = 0;
 // Part B5 — Closing cue
 window.dalTlClosingUi_ = false;
+// Hard freeze while Sheets status is committing (incl. re-entry after last-leave).
+window.dalTlCommittingWait_ = false;
+window.dalTlCommittingFrozen_ = false;
+window.dalTlReadOnlyBeforeCommitting_ = null;
+window.dalTlPostCommitReenter_ = false;
 // Part B4 stub — idle T−5
 window.dalTlIdleWarn_ = false;
 
@@ -149,6 +154,8 @@ window.dalTlSnapshotMutations_ = function() {
 
 /** Record local edits — only these entities may overwrite remote on flush. */
 window.dalTlLiveWritesAllowed_ = function() {
+  if (window.dalTlCommittingWait_ || window.dalTlClosingUi_) return false;
+  if (window.dalTlOpeningUi_ && window.dalTlOpeningPeerFrozen_) return false;
   if (!window.dalTimelineSessionOpen) return true;
   return window.dalTlLiveSyncMode === 'firestore';
 };
@@ -1245,7 +1252,8 @@ window.dalUpdateTimelineLiveBanner_ = function() {
   var panel = document.getElementById('tl-sync-panel');
   var statusEl = document.getElementById('tl-sync-status');
   var rosterEl = document.getElementById('tl-sync-roster');
-  var open = !!window.dalTimelineSessionOpen || !!window.dalTlOpeningUi_ || !!window.dalTlClosingUi_;
+  var open = !!window.dalTimelineSessionOpen || !!window.dalTlOpeningUi_ ||
+    !!window.dalTlClosingUi_ || !!window.dalTlCommittingWait_;
 
   if (!open) {
     if (panel) panel.style.display = 'none';
@@ -1508,8 +1516,9 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
   if (startBtn) {
     var mayManual = typeof window.dalMayManualStartFork_ === 'function'
       ? window.dalMayManualStartFork_('timeline')
-      : !(typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly);
-    startBtn.style.display = (isOpen || isOpening || !mayManual) ? 'none' : 'inline-flex';
+      : true;
+    var blockStart = !!window.dalTlCommittingWait_ || !!window.dalTlClosingUi_ || !!isOpening;
+    startBtn.style.display = (isOpen || blockStart || !mayManual) ? 'none' : 'inline-flex';
   }
   if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
 
@@ -1722,14 +1731,27 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
   var isOpening = st === 'opening';
   var isClosing = st === 'committing';
   var wasOpen = !!window.dalTlWasSessionOpen;
+  var projectId = document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '';
 
-  if (isClosing && (window.dalTimelineSessionOpen || wasOpen)) {
-    window.dalTlClosingUi_ = true;
-    if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
-      window.dalUpdateTimelineLiveBanner_();
+  if (isClosing) {
+    window.dalApplyTlCommittingUi_(true, projectId);
+    if (window.dalTimelineSessionOpen || wasOpen) {
+      // End live UI while Sheets still commits — keep freeze + SYNC bar.
+      window.dalApplyTimelineSessionUi_(false, false, tl);
     }
-  } else if (!isClosing && window.dalTlClosingUi_ && !isOpen) {
-    window.dalTlClosingUi_ = false;
+    window.dalTlWasSessionOpen = false;
+    return;
+  }
+
+  if (window.dalTlCommittingWait_) {
+    window.dalApplyTlCommittingUi_(false);
+    if (!isOpen && !isOpening) {
+      window.dalTlPostCommitReenter_ = true;
+      if (typeof window.maybeAutoOpenDalTimeline_ === 'function') {
+        window.maybeAutoOpenDalTimeline_();
+      }
+    }
   }
 
   window.dalApplyTimelineSessionUi_(isOpen, isOpening, tl);
@@ -1738,13 +1760,11 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
   if (isOpening && !isOpen && !window.dalTlOpeningIsStarter_ &&
       !window.dalTlOpeningHangTimer_ &&
       typeof window.dalArmTlOpeningHang_ === 'function') {
-    var pid = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
     var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
-    window.dalArmTlOpeningHang_(pid, tl.sessionUid || '', actor);
+    window.dalArmTlOpeningHang_(projectId, tl.sessionUid || '', actor);
   }
 
   if (wasOpen && !isOpen && !isOpening && window.dalTimelineLayerOpen_() && !window.isTimelineDirty) {
-    var projectId = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
     var mode = typeof currentShiftMode !== 'undefined' ? currentShiftMode : 'main';
     if (projectId) {
       google.script.run
@@ -1760,6 +1780,63 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
     }
   }
   window.dalTlWasSessionOpen = isOpen;
+};
+
+/**
+ * Committing freeze — everyone locked (incl. re-entry while Sheets still committing).
+ * Blue SYNC bar stays visible with "Saving to Sheets…" copy.
+ */
+window.dalApplyTlCommittingUi_ = function(active, projectId) {
+  var startBtn = document.getElementById('dal-timeline-start-btn');
+  var endBtn = document.getElementById('dal-timeline-end-btn');
+  if (active) {
+    window.dalTlCommittingWait_ = true;
+    window.dalTlClosingUi_ = true;
+    if (!window.dalTlCommittingFrozen_) {
+      window.dalTlCommittingFrozen_ = true;
+      if (typeof currentIsReadOnly !== 'undefined') {
+        window.dalTlReadOnlyBeforeCommitting_ = !!currentIsReadOnly;
+        currentIsReadOnly = true;
+      }
+      var layer = document.getElementById('shift-layer');
+      if (layer) layer.classList.add('tt-readonly-mode');
+    }
+    if (startBtn) startBtn.style.display = 'none';
+    if (endBtn) endBtn.style.display = 'none';
+    if (projectId && typeof window.startDalTimelineSessionWatcher === 'function') {
+      window.startDalTimelineSessionWatcher(projectId);
+    }
+    if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+      window.dalUpdateTimelineLiveBanner_();
+    }
+    if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') {
+      window.dalPaintSurfaceForkSyncBar_();
+    }
+    return;
+  }
+  var wasWait = !!window.dalTlCommittingWait_;
+  window.dalTlCommittingWait_ = false;
+  if (!window.dalTimelineSessionOpen) window.dalTlClosingUi_ = false;
+  if (window.dalTlCommittingFrozen_) {
+    window.dalTlCommittingFrozen_ = false;
+    if (window.dalTlOpeningPeerFrozen_) {
+      if (typeof currentIsReadOnly !== 'undefined') currentIsReadOnly = true;
+    } else if (typeof currentIsReadOnly !== 'undefined') {
+      currentIsReadOnly = window.dalTlReadOnlyBeforeCommitting_ !== null
+        ? !!window.dalTlReadOnlyBeforeCommitting_
+        : false;
+      window.dalTlReadOnlyBeforeCommitting_ = null;
+      var layerClr = document.getElementById('shift-layer');
+      if (layerClr) layerClr.classList.toggle('tt-readonly-mode', !!currentIsReadOnly);
+    }
+  }
+  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+    window.dalUpdateTimelineLiveBanner_();
+  }
+  if (typeof window.dalPaintSurfaceForkSyncBar_ === 'function') {
+    window.dalPaintSurfaceForkSyncBar_();
+  }
+  return wasWait;
 };
 
 window.startDalTimelineSessionWatcher = function(projectId) {

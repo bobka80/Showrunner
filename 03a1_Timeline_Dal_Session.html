@@ -89,8 +89,12 @@ function dalTimelineErrMsg_(err) {
   return msg;
 }
 
-function dalTimelineCollabStarted_(joined) {
+function dalTimelineCollabStarted_(joined, opts) {
+  opts = opts || {};
   window.dalClearTlOpeningHang_();
+  if (window.dalTlCommittingWait_ && typeof window.dalApplyTlCommittingUi_ === 'function') {
+    window.dalApplyTlCommittingUi_(false);
+  }
   var wasStarter = !!window.dalTlOpeningIsStarter_;
   if (!joined && typeof window.dalTlMarkAllLocalAsEntryDelta_ === 'function') {
     window.dalTlMarkAllLocalAsEntryDelta_();
@@ -116,9 +120,15 @@ function dalTimelineCollabStarted_(joined) {
       }
     }, 800);
   }
+  var postReenter = !!(opts.postCommitReenter || window.dalTlPostCommitReenter_);
+  window.dalTlPostCommitReenter_ = false;
+  if (postReenter && typeof window.dalNotifyTimelineLiveAgain_ === 'function') {
+    window.dalNotifyTimelineLiveAgain_();
+  }
 }
 
-function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
+function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer, opts) {
+  opts = opts || {};
   google.script.run
     .withFailureHandler(function(err) {
       if (layer) layer.style.cursor = '';
@@ -130,7 +140,7 @@ function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
         .withSuccessHandler(function(info) {
           var tl = window.dalTimelineInfoFromSession_(info);
           if (String(tl.status).toLowerCase() === 'open') {
-            dalTimelineCollabStarted_(true);
+            dalTimelineCollabStarted_(true, opts);
             return;
           }
           if (String(tl.status).toLowerCase() === 'opening') {
@@ -143,7 +153,7 @@ function dalTimelineFinishOpen_(projectId, sessionUid, actor, layer) {
     })
     .withSuccessHandler(function(res) {
       if (layer) layer.style.cursor = '';
-      dalTimelineCollabStarted_(!!(res && res.joined));
+      dalTimelineCollabStarted_(!!(res && res.joined), opts);
     })
     .finishDalSession(projectId, sessionUid, actor);
 }
@@ -215,6 +225,15 @@ window.openDalTimelineCollabSession = function(opts) {
   if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('timeline')) {
     return alert('You cannot start timeline collaboration on this device.');
   }
+  if (window.dalTlCommittingWait_ || (window.dalTlClosingUi_ && !window.dalTimelineSessionOpen && !window.dalTlOpeningUi_)) {
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(true, projectId);
+    }
+    if (!opts.auto) {
+      alert('Saving to Sheets — edits locked. Stay or come back in a moment.');
+    }
+    return;
+  }
   if (!opts.auto && !opts.takeOver) {
     if (!confirm('Start timeline collaboration? Timeline saves fork to Firebase until End Collab.')) return;
   }
@@ -234,11 +253,21 @@ window.openDalTimelineCollabSession = function(opts) {
         })
         .withSuccessHandler(function(info) {
           var tl = window.dalTimelineInfoFromSession_(info);
-          if (String(tl.status).toLowerCase() === 'open') {
-            dalTimelineCollabStarted_(true);
+          var st = String(tl.status).toLowerCase();
+          if (st === 'committing') {
+            if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+              window.dalApplyTlCommittingUi_(true, projectId);
+            }
+            if (!opts.auto) {
+              alert('Saving to Sheets — edits locked. Stay or come back in a moment.');
+            }
             return;
           }
-          if (String(tl.status).toLowerCase() === 'opening') {
+          if (st === 'open') {
+            dalTimelineCollabStarted_(true, opts);
+            return;
+          }
+          if (st === 'opening') {
             // Healthy race: join Opening (peer freeze). Take-over only after hang (~50s).
             if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
               window.dalApplyTimelineSessionUi_(false, true, tl);
@@ -256,7 +285,7 @@ window.openDalTimelineCollabSession = function(opts) {
     .withSuccessHandler(function(begin) {
       if (begin && begin.joined) {
         if (layer) layer.style.cursor = '';
-        dalTimelineCollabStarted_(true);
+        dalTimelineCollabStarted_(true, opts);
         return;
       }
       if (!begin || !begin.sessionUid) {
@@ -275,7 +304,7 @@ window.openDalTimelineCollabSession = function(opts) {
       }
       window.dalArmTlOpeningHang_(projectId, begin.sessionUid, actor);
       if (layer) layer.style.cursor = '';
-      dalTimelineFinishOpen_(projectId, begin.sessionUid, actor, layer);
+      dalTimelineFinishOpen_(projectId, begin.sessionUid, actor, layer, opts);
     })
     .beginDalSession(projectId, 'timelineCollab', actor, beginOpts);
 };

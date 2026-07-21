@@ -386,6 +386,8 @@ window.dalPaWarnStateSizeOnce_ = function(report) {
 
 /** H1: live prep writes only while Firestore patch mode is healthy. */
 window.dalPaLiveWritesAllowed_ = function() {
+  if (window.dalPrepCommittingWait_ || window.dalPrepClosingUi_) return false;
+  if (window.dalPrepOpeningUi_ && window.dalPrepOpeningPeerFrozen_) return false;
   if (!window.dalPrepUiOpen) return true;
   return window.dalPaLiveSyncMode === 'firestore';
 };
@@ -1019,7 +1021,8 @@ window.dalUpdateRemotePendingBanner_ = function() {
   var rosterEl = document.getElementById('pa-prep-live-roster');
   var vaultList = document.getElementById('pa-vault-list');
 
-  if (!window.dalPrepUiOpen && !window.dalPrepOpeningUi_ && !window.dalPrepClosingUi_) {
+  if (!window.dalPrepUiOpen && !window.dalPrepOpeningUi_ && !window.dalPrepClosingUi_ &&
+      !window.dalPrepCommittingWait_) {
     if (panel) panel.style.display = 'none';
     if (vaultList) vaultList.style.paddingBottom = '';
     window.dalPaBannerLastText_ = '';

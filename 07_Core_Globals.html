@@ -178,11 +178,13 @@ window.dalPaintSurfaceForkSyncBar_ = function() {
 
   var mode = '';
   var text = '';
-  if (paView && (window.dalPrepUiOpen || window.dalPrepOpeningUi_ || window.dalPrepClosingUi_)) {
+  if (paView && (window.dalPrepUiOpen || window.dalPrepOpeningUi_ || window.dalPrepClosingUi_ ||
+      window.dalPrepCommittingWait_)) {
     mode = 'pa';
     var paSrc = document.getElementById('pa-prep-live-status');
     text = (paSrc && String(paSrc.textContent || '').trim()) || 'Live';
-  } else if (tlView && (window.dalTimelineSessionOpen || window.dalTlOpeningUi_ || window.dalTlClosingUi_)) {
+  } else if (tlView && (window.dalTimelineSessionOpen || window.dalTlOpeningUi_ || window.dalTlClosingUi_ ||
+      window.dalTlCommittingWait_)) {
     mode = 'tl';
     var tlSrc = document.getElementById('tl-sync-status');
     text = (tlSrc && String(tlSrc.textContent || '').trim()) || 'Live';
@@ -248,7 +250,9 @@ window.dalMayJoinLiveFork_ = function() {
 window.dalForkPhaseStatusText_ = function(opts) {
   opts = opts || {};
   if (opts.idleWarn) return 'Session closing — tap to keep open';
-  if (opts.closing) return 'Closing — committing…';
+  if (opts.closing) {
+    return 'Saving to Sheets — edits locked. Stay or come back in a moment.';
+  }
   if (opts.opening) {
     return opts.openingFrozen ? 'Opening — frozen' : 'Opening — you can edit';
   }
@@ -688,6 +692,7 @@ window.dalMayTakeOverOpening_ = function(domain) {
 window.maybeAutoOpenDalPrep_ = function() {
   if (!window.dalMayAutoStartFork_('prep')) return;
   if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
+  if (window.dalPrepClosingUi_ || window.dalPrepCommittingWait_) return;
   if (window.dalPrepAutoStartPending_) return;
   var projectId = document.getElementById('edit-folder-id')
     ? document.getElementById('edit-folder-id').value : '';
@@ -696,9 +701,13 @@ window.maybeAutoOpenDalPrep_ = function() {
   setTimeout(function() {
     window.dalPrepAutoStartPending_ = false;
     if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
+    if (window.dalPrepClosingUi_ || window.dalPrepCommittingWait_) return;
     if (!window.dalMayAutoStartFork_('prep')) return;
     if (typeof window.openDalPrepSession === 'function') {
-      window.openDalPrepSession({ auto: true });
+      window.openDalPrepSession({
+        auto: true,
+        postCommitReenter: !!window.dalPrepPostCommitReenter_
+      });
     }
   }, 400);
 };
@@ -706,6 +715,7 @@ window.maybeAutoOpenDalPrep_ = function() {
 window.maybeAutoOpenDalTimeline_ = function() {
   if (!window.dalMayAutoStartFork_('timeline')) return;
   if (window.dalTimelineSessionOpen || window.dalTlOpeningUi_) return;
+  if (window.dalTlClosingUi_ || window.dalTlCommittingWait_) return;
   if (window.dalTlAutoStartPending_) return;
   var projectId = document.getElementById('edit-folder-id')
     ? document.getElementById('edit-folder-id').value : '';
@@ -714,9 +724,13 @@ window.maybeAutoOpenDalTimeline_ = function() {
   setTimeout(function() {
     window.dalTlAutoStartPending_ = false;
     if (window.dalTimelineSessionOpen || window.dalTlOpeningUi_) return;
+    if (window.dalTlClosingUi_ || window.dalTlCommittingWait_) return;
     if (!window.dalMayAutoStartFork_('timeline')) return;
     if (typeof window.openDalTimelineCollabSession === 'function') {
-      window.openDalTimelineCollabSession({ auto: true });
+      window.openDalTimelineCollabSession({
+        auto: true,
+        postCommitReenter: !!window.dalTlPostCommitReenter_
+      });
     }
   }, 400);
 };
