@@ -44,7 +44,8 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [error-journal/](error-journal/) | **Operational log** — bug memory from Report → Hand over · build: [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md) |
 | [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) | Multi-user fork Part A+B — **archived 2026-07-21** |
 | [archive/bulletproof-multiuser-live-editors-2026-07-18.md](archive/bulletproof-multiuser-live-editors-2026-07-18.md) | Process depth for live-sync harden (archived with Part B) |
-| [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) | **NEXT** — Logistics Ledger M0–M5 |
+| [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) | **NEXT** — Logistics Ledger M0–M5 (**live forks paused** — Sheets-only) |
+| [topics/dal-live-forks-pause.md](topics/dal-live-forks-pause.md) | Live forks architecture + **CURRENT** pause / restore |
 | [topics/architecture-multi-campaign-pack-2026-07-21.md](topics/architecture-multi-campaign-pack-2026-07-21.md) | Sequenced pack: Ledger → Campaign Room → packet sync |
 | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) | Future pre-ship gates: RBAC / FCM / truck / financials |
 | [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) | Scoped pre-ship + Bugbot gate (all layers) |

@@ -365,6 +365,8 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
         var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
         try {
           logisticsLedgerDualWriteFromPaRows_(sheets, projectId, projectPaOnly, map, dualLegs, actor);
+          try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
+          try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
         } catch (eLl) {
           writeToAuditLog(actor, "WARN", "LOGISTICS_LEDGER", projectId, projectId, "Dual-write failed: " + (eLl && eLl.message ? eLl.message : eLl));
         }

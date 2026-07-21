@@ -13,8 +13,9 @@
 |------|----------------|
 | **START PREP open** (Firebase PA fork, live patch, search/formula batch adds, pack, floor +/-) | [../archive/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../archive/multi-user-fork-industrial-and-auto.md) · [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) · FRAGILE prep PA |
 | **Normal day** (no prep session — Sheets `saveProjectAssetsDelta`, mobile auto-save, collision gaps) | **This file** (below) |
+| **Forks paused (2026-07-21)** — Sheets-only PA + timeline | [dal-live-forks-pause.md](dal-live-forks-pause.md) |
 
-Do **not** treat the backlog below as the prep-floor sync model. Prep live rollback: GAS **v654** + `host-boot.js?v=653`.
+Do **not** treat the backlog below as the prep-floor sync model. Prep live rollback: GAS **v654** + `host-boot.js?v=653`. While [dal-live-forks-pause.md](dal-live-forks-pause.md) says paused, use **this file’s Sheets path** only.
 
 ---
 

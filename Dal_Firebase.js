@@ -412,6 +412,8 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
     try {
       var sheets = verifyDatabaseSchema();
       logisticsLedgerDualWriteFromPaRows_(sheets, projectId, resultRows, hdr.map, dualLegs, actor);
+      try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
+      try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
     } catch (eLl) {
       writeToAuditLog(actor, "WARN", "LOGISTICS_LEDGER", projectId, projectId,
         "Dual-write failed (Firebase truck path): " + (eLl && eLl.message ? eLl.message : eLl));

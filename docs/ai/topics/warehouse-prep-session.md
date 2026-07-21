@@ -6,7 +6,9 @@
 
 **Related:** [project-assets-concurrency.md](project-assets-concurrency.md) · [logistics-warehouse.md](logistics-warehouse.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Status:** Partial — prep PA fork live; auto-fork **shipped** (Part B archived 2026-07-21) — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md).
+**Status:** Partial — prep PA fork live **when not paused**; auto-fork **shipped** (Part B archived 2026-07-21) — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md).
+
+> **CURRENT:** Live prep fork is **PAUSED** (Sheets-only) during Logistics Ledger — [dal-live-forks-pause.md](dal-live-forks-pause.md).
 
 **Live sync:** Production / prep live rollback GAS **v654** + `host-boot.js?v=653`. **Floor scope (locked):** search/formula batch absolute adds primary; packing + RFID checkout parallel; floor +/- secondary — [../archive/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../archive/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
 

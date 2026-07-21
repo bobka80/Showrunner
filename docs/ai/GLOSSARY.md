@@ -20,6 +20,14 @@ The ShowRider Logistics system uses several string flags and constants to drive 
 
 See [topics/logistics-ledger-schema-2026-07-20.md](topics/logistics-ledger-schema-2026-07-20.md) · [topics/timeline-collab-session.md](topics/timeline-collab-session.md).
 
+## Live forks (DAL)
+
+| Flag / term | Meaning |
+|-------------|---------|
+| **`DAL_LIVE_FORKS_PAUSED`** | Server kill switch in `Dal_Sessions.js` — when `true`, prep + timeline stay **Sheets-only** (no Firebase live rooms). Keep in sync with `window.DAL_LIVE_FORKS_PAUSED` in `07_Core_Globals.html`. |
+| **`prep` / `timelineCollab`** | Session types on `Projects_Index` (`Dal_Prep_Session_*` / `Dal_Timeline_Session_*`). Open → that domain routes to Firebase. |
+| **NORMAL / SESSION_OPEN** | Router statuses from `resolveDalSessionStatus_` — see [topics/dal-live-forks-pause.md](topics/dal-live-forks-pause.md) · [topics/session-fork-platform.md](topics/session-fork-platform.md). |
+
 ## Vault types & nesting (see [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md))
 
 - **`type: "Bulk"`** — One vault row; quantity is a **count**. Not unique; **cannot** have per-piece RFID. Married to a level-3 case via `containerUid` for checkout.

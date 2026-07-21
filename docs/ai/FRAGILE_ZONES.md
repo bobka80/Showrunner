@@ -466,6 +466,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 ### How prep session UI works now (locked definition)
 
+> **CURRENT (2026-07-21):** Prep **and** timeline live forks are **PAUSED** — Sheets-only. Do not expect START PREP / START COLLAB / auto-start until restored. Ops: [topics/dal-live-forks-pause.md](topics/dal-live-forks-pause.md).
+
 **UI surface (2026-07-19):** No full-width top banner. While prep is open, a **SYNC** mini-header sits at the bottom of the vault (`#pa-prep-live-panel`) — orange strip + orange frame; click expands ~⅓ (black body, roster with modes). Collapsed by default. Timeline collab uses the same pattern: blue **SYNC** mini-header at the bottom of the crew-name column (`#tl-sync-panel`); expand shows names only. Internal latch is still `dalPrepUiOpen` / `dalPrepLatched` / `dalTimelineSessionOpen` (docs may say “banner on” for that latch).
 
 **Phone / station (2026-07-20):** Vault/crew SYNC is not visible (PA left panel hidden; timeline crew column cramped). Show fixed bottom `#surface-fork-sync-bar` instead — **orange** in PA when prep fork live, **blue** in timeline when collab fork live (`dalPaintSurfaceForkSyncBar_`). Desktop unchanged.

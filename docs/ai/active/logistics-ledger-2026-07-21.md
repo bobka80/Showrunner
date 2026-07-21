@@ -7,7 +7,7 @@
 **Predecessor:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
 **Next after this campaign:** Project Campaign Room — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)
 
-**Opened:** 2026-07-21 · **Status:** **Live forks PAUSED** (PA prep + timeline collab) — Sheets-only until ledger campaign green; then flip `DAL_LIVE_FORKS_PAUSED` false.  
+**Opened:** 2026-07-21 · **Status:** **M2 backfill shipped** — live forks still PAUSED (Sheets-only). Next: M3 readers.  
 **Production tip:** see status log. Prep live rollback pin still **v654**.
 
 ---
@@ -17,8 +17,8 @@
 1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → [GLOSSARY.md](../GLOSSARY.md) § sub-events vs phases → **this file** → schema topic → architecture pack §3 → locks.  
 2. Do **not** invent columns beyond the schema topic.  
 3. Do **not** start Campaign Room or Offer in this campaign.  
-4. **Live forks:** `DAL_LIVE_FORKS_PAUSED = true` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED` in `07_Core_Globals.html` — keep in sync.  
-5. **Next build:** M2 backfill (existing PA truck → ledger) after director OK go.  
+4. **Live forks:** **PAUSED** — read [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) before any prep/collab/Firebase PA work. Flags: `DAL_LIVE_FORKS_PAUSED` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED` in `07_Core_Globals.html`.  
+5. **Next build:** M3 reader cutover after M2 verified.  
 6. After any implementation: `node milestone.js "…"`; update this checklist same session.
 
 ---
@@ -36,7 +36,7 @@
 | Dual-write | Mandatory **M1–M3** |
 | M4 | Strip PA truck cols **and** Firebase mappers **and** `dalPaContentSig_` / `dalPaRowSignature_` together |
 | Ops ledger | Never merge with RFID `Operations_Ledger` |
-| Live forks | **Paused** for this campaign — Sheets-only PA + timeline |
+| Live forks | **Paused** — Sheets-only · [dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) |
 
 ---
 
@@ -82,9 +82,9 @@
 
 ### M2 — Backfill
 
-- [ ] PA outbound/inbound → ledger legs
-- [ ] Best-effort clocks from AUTO shifts (sheet); `phase_ref` when resolvable
-- [ ] Manager review list for blank times / missing phase_ref
+- [x] PA outbound/inbound → ledger legs — `backfillLogisticsLedgerFromPaAPI(projectIdOrNull, actor)`
+- [x] Best-effort clocks from AUTO shifts (sheet); `phase_ref` when exactly one RECOVERY sub-event
+- [x] Manager review list — return `review[]` from backfill + `reviewLogisticsLedgerGapsAPI`
 
 ### M3 — Reader cutover
 
@@ -120,4 +120,6 @@
 | 2026-07-21 | **M0+M1 code @ GAS v726:** `Logistics_Ledger` tab; dual-write; UID preserve; END PREP truck overlay (Sheets-first); AUTO clock stamp; Bugbot Highs fixed. Next: M2 backfill. |
 | 2026-07-21 | **Doc hygiene:** director terminology lock — **sub-events** (`Project_Timelines`) vs **phases** (`Phase_Blocks`); GLOSSARY + ledger/architecture/locks cleaned. Schema rename of `phase_ref` deferred. |
 | 2026-07-21 | **M1.1 @ GAS v727** (+ hosting host-boot **v668**): Prep-open truck → Firebase PA + state (truck fixtures) + ledger dual-write; flush/host mirror carry truck; End Prep overlay collection-first. |
-| 2026-07-21 | **Live forks PAUSED** (PA + timeline): Sheets-only until ledger work done. Flag `DAL_LIVE_FORKS_PAUSED`; mass abandon Index flags (no Firebase commit). |
+| 2026-07-21 | **Live forks PAUSED @ GAS v728–v729** (PA + timeline): Sheets-only until ledger work done. Flag `DAL_LIVE_FORKS_PAUSED`; one-shot abandon Index flags (no Firebase commit). |
+| 2026-07-21 | **Docs:** canonical agent note [dal-live-forks-pause.md](../topics/dal-live-forks-pause.md); wired from doctrine, AGENTS, session-fork-platform, prep/timeline topics, FRAGILE, GLOSSARY. |
+| 2026-07-21 | **M2 backfill:** `backfillLogisticsLedgerFromPaAPI` + sheet AUTO clocks + RECOVERY `phase_ref` (exact-one) + review list. Arrange save also stamps clocks/phase_ref when resolvable. |

@@ -3,7 +3,7 @@
  * Movement SoT tab; PA truck columns still written until M4.
  * Schema lock: docs/ai/topics/logistics-ledger-schema-2026-07-20.md
  */
-// @INDEX: LEDGER_ENGINE -> Logistics_Ledger dual-write + inventory
+// @INDEX: LEDGER_ENGINE -> Logistics_Ledger dual-write + M2 backfill
 
 var LOGISTICS_LEDGER_HEADERS_ = [
   'uid', 'project_uid', 'parent_uid', 'asset_uid', 'quantity', 'truck_uid',
@@ -154,6 +154,271 @@ function logisticsLedgerDualWriteFromPaRows_(sheets, projectId, paRows, paMap, l
     throw eWrite;
   }
   return { wrote: newRows.length, skipped: false };
+}
+
+/**
+ * Stamp load/unload from Shift_Assignments AUTO truck pairs (sheet SoT).
+ * Per truck + note: load = min(Start), unload = max(Start) among the pair.
+ * Link: outbound ↔ ⚠️ AUTO-OUTBOUND; inbound ↔ ⚠️ AUTO-INBOUND; same truck_uid.
+ */
+function logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId) {
+  if (!sheets || !sheets.logisticsLedger || !sheets.shifts) return { updated: 0 };
+  var shiftData = sheets.shifts.getDataRange().getValues();
+  if (shiftData.length < 2) return { updated: 0 };
+  var sMap = {};
+  shiftData[0].forEach(function (h, i) { sMap[String(h).trim()] = i; });
+  if (sMap['Note'] === undefined || sMap['Start'] === undefined || sMap['user_uid'] === undefined) {
+    return { updated: 0, skipped: true };
+  }
+
+  // truckUid -> { outbound: {load, unload}, inbound: {...} }
+  var byTruck = {};
+  for (var i = 1; i < shiftData.length; i++) {
+    var row = shiftData[i];
+    if (sMap['project_uid'] !== undefined && String(row[sMap['project_uid']] || '') !== String(projectId)) continue;
+    var note = String(row[sMap['Note']] || '');
+    var legId = '';
+    if (note.indexOf('AUTO-OUTBOUND') !== -1) legId = 'outbound';
+    else if (note.indexOf('AUTO-INBOUND') !== -1) legId = 'inbound';
+    else continue;
+    var truckUid = String(row[sMap['user_uid']] || '');
+    if (!truckUid) continue;
+    var start = Number(row[sMap['Start']]);
+    if (isNaN(start)) continue;
+    if (!byTruck[truckUid]) byTruck[truckUid] = {};
+    if (!byTruck[truckUid][legId]) byTruck[truckUid][legId] = { load: start, unload: start };
+    else {
+      if (start < byTruck[truckUid][legId].load) byTruck[truckUid][legId].load = start;
+      if (start > byTruck[truckUid][legId].unload) byTruck[truckUid][legId].unload = start;
+    }
+  }
+
+  var logData = { generateTimes: true, outTrucks: [], inTrucks: [], outStartHr: 0, outDur: 0, inStartHr: 0, inDur: 0 };
+  // Stamp one truck at a time via existing matcher (hours differ per truck)
+  var updated = 0;
+  Object.keys(byTruck).forEach(function (tUid) {
+    var legs = byTruck[tUid];
+    if (legs.outbound) {
+      var o = legs.outbound;
+      updated += logisticsLedgerStampClocksFromHub_(sheets, projectId, {
+        generateTimes: true,
+        outTrucks: [tUid],
+        inTrucks: [],
+        outStartHr: o.load,
+        outDur: (o.unload - o.load),
+        inStartHr: 0,
+        inDur: 0
+      }).updated || 0;
+    }
+    if (legs.inbound) {
+      var inn = legs.inbound;
+      updated += logisticsLedgerStampClocksFromHub_(sheets, projectId, {
+        generateTimes: true,
+        outTrucks: [],
+        inTrucks: [tUid],
+        outStartHr: 0,
+        outDur: 0,
+        inStartHr: inn.load,
+        inDur: (inn.unload - inn.load)
+      }).updated || 0;
+    }
+  });
+  return { updated: updated };
+}
+
+/**
+ * Best-effort phase_ref = Project_Timelines.uid for exactly one RECOVERY sub-event.
+ * Multiple / zero → leave blank (manager review). Does not invent outbound/inbound mapping.
+ */
+function logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId) {
+  if (!sheets || !sheets.logisticsLedger || !sheets.timelines) return { updated: 0, phaseRef: '' };
+  var tData = sheets.timelines.getDataRange().getValues();
+  if (tData.length < 2) return { updated: 0, phaseRef: '' };
+  var tMap = {};
+  tData[0].forEach(function (h, i) { tMap[String(h).trim()] = i; });
+  if (tMap['uid'] === undefined || tMap['Sub_Event_Type'] === undefined) {
+    return { updated: 0, phaseRef: '', skipped: true };
+  }
+
+  var recoveries = [];
+  for (var i = 1; i < tData.length; i++) {
+    var row = tData[i];
+    if (tMap['project_uid'] !== undefined && String(row[tMap['project_uid']] || '') !== String(projectId)) continue;
+    var typ = String(row[tMap['Sub_Event_Type']] || '').toUpperCase().replace(/\s+/g, '_');
+    if (typ === 'RECOVERY') {
+      recoveries.push({
+        uid: String(row[tMap['uid']] || ''),
+        date: tMap['Event_Date'] !== undefined ? row[tMap['Event_Date']] : ''
+      });
+    }
+  }
+  if (recoveries.length !== 1 || !recoveries[0].uid) {
+    return { updated: 0, phaseRef: '', recoveryCount: recoveries.length };
+  }
+  var phaseRef = recoveries[0].uid;
+
+  var llData = sheets.logisticsLedger.getDataRange().getValues();
+  if (llData.length < 2) return { updated: 0, phaseRef: phaseRef };
+  var llMap = {};
+  llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  if (llMap['phase_ref'] === undefined) return { updated: 0, phaseRef: phaseRef, skipped: true };
+
+  var updated = 0;
+  for (var r = 1; r < llData.length; r++) {
+    var llRow = llData[r];
+    if (String(llRow[llMap['project_uid']] || '') !== String(projectId)) continue;
+    if (String(llRow[llMap['parent_uid']] || '')) continue;
+    var leg = String(llRow[llMap['leg_id']] || '');
+    if (leg !== 'outbound' && leg !== 'inbound') continue;
+    var cur = String(llRow[llMap['phase_ref']] || '');
+    if (cur) continue;
+    llRow[llMap['phase_ref']] = phaseRef;
+    updated++;
+  }
+  if (updated > 0) {
+    sheets.logisticsLedger.getRange(1, 1, llData.length, llData[0].length).setValues(llData);
+  }
+  return { updated: updated, phaseRef: phaseRef, recoveryCount: 1 };
+}
+
+/** Build manager review rows for top-level legs missing clocks or phase_ref. */
+function logisticsLedgerBuildReviewList_(sheets, projectIdFilter) {
+  var review = [];
+  if (!sheets || !sheets.logisticsLedger) return review;
+  var llData = sheets.logisticsLedger.getDataRange().getValues();
+  if (llData.length < 2) return review;
+  var llMap = {};
+  llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  for (var i = 1; i < llData.length; i++) {
+    var row = llData[i];
+    var pid = llMap['project_uid'] !== undefined ? String(row[llMap['project_uid']] || '') : '';
+    if (projectIdFilter && pid !== String(projectIdFilter)) continue;
+    if (llMap['parent_uid'] !== undefined && String(row[llMap['parent_uid']] || '')) continue;
+    var leg = llMap['leg_id'] !== undefined ? String(row[llMap['leg_id']] || '') : '';
+    if (leg !== 'outbound' && leg !== 'inbound') continue;
+    var load = llMap['load_time'] !== undefined ? row[llMap['load_time']] : '';
+    var unload = llMap['unload_time'] !== undefined ? row[llMap['unload_time']] : '';
+    var phase = llMap['phase_ref'] !== undefined ? String(row[llMap['phase_ref']] || '') : '';
+    var missingLoad = load === '' || load === null || load === undefined;
+    var missingUnload = unload === '' || unload === null || unload === undefined;
+    var missingPhaseRef = !phase;
+    if (!missingLoad && !missingUnload && !missingPhaseRef) continue;
+    review.push({
+      project_uid: pid,
+      ledger_uid: llMap['uid'] !== undefined ? String(row[llMap['uid']] || '') : '',
+      asset_uid: llMap['asset_uid'] !== undefined ? String(row[llMap['asset_uid']] || '') : '',
+      leg_id: leg,
+      truck_uid: llMap['truck_uid'] !== undefined ? String(row[llMap['truck_uid']] || '') : '',
+      missingLoad: missingLoad,
+      missingUnload: missingUnload,
+      missingPhaseRef: missingPhaseRef
+    });
+  }
+  return review;
+}
+
+/**
+ * M2 — Backfill Logistics_Ledger from existing PA truck columns.
+ * @param {string|null} projectIdOrNull — one project, or null/'' for all projects that have PA truck fields
+ * @param {string} actor
+ */
+function backfillLogisticsLedgerFromPaAPI(projectIdOrNull, actor) {
+  actor = actor || 'System UI';
+  return executeWithRetry(function () {
+    assertActorCanEditProjectAssets(actor);
+    var sheets = verifyDatabaseSchema();
+    if (!sheets.projectAssets || !sheets.logisticsLedger) {
+      return { success: false, error: 'Missing Project_Assets or Logistics_Ledger' };
+    }
+
+    var paData = sheets.projectAssets.getDataRange().getValues();
+    if (paData.length < 2) {
+      return { success: true, projectsProcessed: 0, legsWrote: 0, clocksStamped: 0, phaseRefsStamped: 0, review: [] };
+    }
+    var paMap = {};
+    paData[0].forEach(function (h, i) { paMap[String(h).trim()] = i; });
+
+    var targetIds = {};
+    if (projectIdOrNull) {
+      targetIds[String(projectIdOrNull)] = true;
+    } else {
+      var truckCols = [
+        'outbound_truck_uid', 'outbound_x', 'outbound_y', 'outbound_z', 'outbound_rotated', 'outbound_staged',
+        'inbound_truck_uid', 'inbound_x', 'inbound_y', 'inbound_z', 'inbound_rotated', 'inbound_staged'
+      ].filter(function (c) { return paMap[c] !== undefined; });
+      for (var pi = 1; pi < paData.length; pi++) {
+        var pidScan = paMap['project_uid'] !== undefined ? String(paData[pi][paMap['project_uid']] || '') : '';
+        if (!pidScan || targetIds[pidScan]) continue;
+        var hit = false;
+        for (var c = 0; c < truckCols.length; c++) {
+          var v = paData[pi][paMap[truckCols[c]]];
+          if (v === true) { hit = true; break; }
+          if (v === false) continue;
+          if (v !== '' && v !== null && v !== undefined) { hit = true; break; }
+        }
+        if (hit) targetIds[pidScan] = true;
+      }
+    }
+
+    var projectsProcessed = 0;
+    var legsWrote = 0;
+    var clocksStamped = 0;
+    var phaseRefsStamped = 0;
+    var perProject = [];
+
+    Object.keys(targetIds).forEach(function (pid) {
+      var paRows = [];
+      for (var i = 1; i < paData.length; i++) {
+        if (String(paData[i][paMap['project_uid']] || '') === String(pid)) {
+          paRows.push(paData[i]);
+        }
+      }
+      var dw = logisticsLedgerDualWriteFromPaRows_(sheets, pid, paRows, paMap, ['outbound', 'inbound'], actor);
+      var clocks = { updated: 0 };
+      var phases = { updated: 0, phaseRef: '', recoveryCount: 0 };
+      try { clocks = logisticsLedgerStampClocksFromShiftSheet_(sheets, pid); } catch (eC) { clocks = { updated: 0, error: String(eC) }; }
+      try { phases = logisticsLedgerStampPhaseRefBestEffort_(sheets, pid); } catch (eP) { phases = { updated: 0, error: String(eP) }; }
+
+      projectsProcessed++;
+      legsWrote += dw.wrote || 0;
+      clocksStamped += clocks.updated || 0;
+      phaseRefsStamped += phases.updated || 0;
+      perProject.push({
+        projectId: pid,
+        legsWrote: dw.wrote || 0,
+        clocksStamped: clocks.updated || 0,
+        phaseRefsStamped: phases.updated || 0,
+        phaseRef: phases.phaseRef || '',
+        recoveryCount: phases.recoveryCount
+      });
+    });
+
+    var review = logisticsLedgerBuildReviewList_(sheets, projectIdOrNull || null);
+    writeToAuditLog(actor, 'UPDATE', 'LOGISTICS_LEDGER', projectIdOrNull || '', projectIdOrNull || '',
+      'M2 backfill: projects=' + projectsProcessed + ' legs=' + legsWrote +
+      ' clocks=' + clocksStamped + ' phaseRefs=' + phaseRefsStamped +
+      ' reviewGaps=' + review.length);
+    flushCache();
+    return {
+      success: true,
+      projectsProcessed: projectsProcessed,
+      legsWrote: legsWrote,
+      clocksStamped: clocksStamped,
+      phaseRefsStamped: phaseRefsStamped,
+      perProject: perProject,
+      review: review,
+      reviewCount: review.length
+    };
+  });
+}
+
+/** M2 — Manager review list only (no rewrite). */
+function reviewLogisticsLedgerGapsAPI(projectIdOrNull) {
+  return executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema(true);
+    var review = logisticsLedgerBuildReviewList_(sheets, projectIdOrNull || null);
+    return { success: true, review: review, reviewCount: review.length };
+  }, 3, true);
 }
 
 /**

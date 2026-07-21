@@ -34,6 +34,7 @@ One file per feature area. **Read only the topic you need.**
 - [workspace-migration.md](workspace-migration.md) — Google Workspace migration (done)
 - [drive-nas-year-archive.md](drive-nas-year-archive.md) — Drive → NAS year archive
 - [session-fork-platform.md](session-fork-platform.md) — session fork platform
+- [dal-live-forks-pause.md](dal-live-forks-pause.md) — **CURRENT** live forks pause / Sheets-only ops + restore
 - [data-cache-engine.md](data-cache-engine.md) — unified data cache engine
 - [warehouse-prep-session.md](warehouse-prep-session.md) — warehouse prep session fork
 - [timeline-collab-session.md](timeline-collab-session.md) — multi-user timeline room

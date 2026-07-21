@@ -4,6 +4,8 @@
 
 **Status:** Shared architecture for branched session types — dual-domain live @ v603+. Design lock: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md).
 
+> **CURRENT PRODUCTION (2026-07-21):** Live forks (prep **and** timeline) are **PAUSED** — Sheets-only. Canonical ops note: **[dal-live-forks-pause.md](dal-live-forks-pause.md)**. Do not open START PREP / START COLLAB until that note says restored.
+
 **Design lock (2026-07-13):** [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) — reconciliation engine, failed-writes pocket, Logistics Hub atomic ops (no fork), PA/Timeline fork lifecycle.
 
 **Prerequisite campaign (archived):** [../archive/data-access-layer.md](../archive/data-access-layer.md)
@@ -14,6 +16,7 @@
 |---------|------|
 | Warehouse preparation (PA, ledger, trucks, logistics hub) | [warehouse-prep-session.md](warehouse-prep-session.md) |
 | Timeline collaboration room | [timeline-collab-session.md](timeline-collab-session.md) |
+| **Live forks pause / restore (ops)** | [dal-live-forks-pause.md](dal-live-forks-pause.md) |
 
 **Last swept:** 2026-07-21
 
@@ -40,6 +43,8 @@ SESSION CLOSED (fork left)
 ```
 
 **Rule:** At coding level, **one router** per data slice — no scattered `if (prep)` that still calls Sheets APIs. Cache policies ride the same router — see [data-cache-engine.md](data-cache-engine.md).
+
+**Pause switch:** when `DAL_LIVE_FORKS_PAUSED` is true, production stays on the **NORMAL** row for both domains — see [dal-live-forks-pause.md](dal-live-forks-pause.md).
 
 ---
 
