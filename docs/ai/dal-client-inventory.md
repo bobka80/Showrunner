@@ -159,10 +159,13 @@
 | `sm_mobile_scan_reopen_panel` | `01j_Mobile_Scan.html` |
 | `sm_vault_cache` | `02a_Project_Equipment.html`, `06b1_Admin_Assets_Core.html`, `06b2_Admin_Assets_Form.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html` |
 | `sm_offer_lang` | `02d_Equipment_Render.html`, `02g_Project_Reports.html` |
+| `sm_dal_unload_prep_` | `02e6_Dal_Session.html`, `07_Core_Globals.html` |
 | `sm_company_name` | `02g_Project_Reports.html` |
 | `sm_logistics_def_` | `02_Project_Editor_Logistics.html` |
 | `sm_tracker_cache` | `04b_Equipment_Tracker.html` |
 | `sm_wh_cache` | `06_System_Admin.html`, `06b1_Admin_Assets_Core.html` |
+| `sm_dal_unload_prep_uid_` | `07_Core_Globals.html` |
+| `sm_dal_unload_tl_` | `07_Core_Globals.html` |
 | `sm_user_theme` | `07_Core_Globals.html` |
 | `sr_fcm_reg_key` | `10a_Notifications_Boot.html`, `Index.html` |
 | `sm_auto_login_off_` | `Index.html`, `Login.html` |
@@ -202,7 +205,7 @@
 | 02e3_Logic_Clipboard.html | 0 | 0 |
 | 02e4_Logic_Containers.html | 0 | 0 |
 | 02e5_Logic_Sync.html | 2 | 0 |
-| 02e6_Dal_Session.html | 6 | 0 |
+| 02e6_Dal_Session.html | 6 | 1 |
 | 02e7_Dal_Firestore_Client.html | 2 | 0 |
 | 02g_Project_Reports.html | 0 | 2 |
 | 03a_Timeline_Boot.html | 4 | 0 |
@@ -230,7 +233,7 @@
 | 06f_Admin_Audit.html | 4 | 0 |
 | 06g_Admin_Database.html | 7 | 0 |
 | 06h_Admin_Station_Profiles.html | 3 | 0 |
-| 07_Core_Globals.html | 9 | 2 |
+| 07_Core_Globals.html | 9 | 5 |
 | 07b_Grid_Engine.html | 0 | 0 |
 | 07c_Generalization_Engine.html | 0 | 0 |
 | 07d_Cache_Coordinator.html | 0 | 0 |

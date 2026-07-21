@@ -298,6 +298,21 @@ function openProjectAssetsModal() {
         }
         return;
     }
+
+    // Refresh/crash may leave Firebase Live open with nobody in the room.
+    // Gate before claiming assets presence / soft-joining.
+    if (typeof window.dalGatePrepEnterForOrphan_ === 'function') {
+      if (window.dalPrepOrphanEnterPending_) return;
+      window.dalGatePrepEnterForOrphan_(projectId, function() {
+        window.openProjectAssetsModalAfterOrphanGate_(projectId, assetsReadOnly);
+      });
+      return;
+    }
+    window.openProjectAssetsModalAfterOrphanGate_(projectId, assetsReadOnly);
+}
+
+window.openProjectAssetsModalAfterOrphanGate_ = function(projectId, assetsReadOnly) {
+    window.projectAssetsReadOnly = !!assetsReadOnly;
     
     window.activePresenceModule = 'assets';
     

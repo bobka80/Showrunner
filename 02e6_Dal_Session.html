@@ -207,6 +207,16 @@ window.startDalPrepSessionPoll_ = function(projectId) {
           window.dalPrepClosedPollStreak = 0;
           window.dalPrepOpeningClosedStreak_ = 0;
           if (!window.dalPrepPassStickyOpenGate_(info)) return;
+          // Refresh-abandoned Live: do not soft-join while unload flag still set.
+          try {
+            if (localStorage.getItem('sm_dal_unload_prep_' + projectId)) {
+              if (typeof window.dalGatePrepEnterForOrphan_ === 'function' &&
+                  !window.dalPrepOrphanEnterPending_ && !window.dalPrepClosing) {
+                window.dalGatePrepEnterForOrphan_(projectId, function() { /* watcher continues */ });
+              }
+              return;
+            }
+          } catch (eUn) { /* ignore */ }
           if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
             if (stOpen === 'opening') {
               window.dalApplyPrepOpeningUi_(true, info);

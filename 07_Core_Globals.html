@@ -292,9 +292,80 @@ window.dalUnloadLeaveFired_ = false;
 window.dalOrphanReclaimPrepPending_ = false;
 window.dalOrphanReclaimTlPending_ = false;
 
+/** localStorage survives refresh when google.script.run is aborted mid-unload. */
+window.dalMarkUnloadLivePrep_ = function(projectId) {
+  if (!projectId) return;
+  try {
+    localStorage.setItem('sm_dal_unload_prep_' + projectId, String(Date.now()));
+    var uid = String(window.dalPrepActiveSessionUid_ ||
+      (window.dalSessionState && (window.dalSessionState.prepUid || window.dalSessionState.sessionUid)) || '');
+    if (uid) localStorage.setItem('sm_dal_unload_prep_uid_' + projectId, uid);
+  } catch (e0) { /* ignore */ }
+};
+
+window.dalMarkUnloadLiveTimeline_ = function(projectId) {
+  if (!projectId) return;
+  try {
+    localStorage.setItem('sm_dal_unload_tl_' + projectId, String(Date.now()));
+  } catch (e0) { /* ignore */ }
+};
+
+window.dalConsumeUnloadPrepFlag_ = function(projectId) {
+  if (!projectId) return false;
+  try {
+    var k = 'sm_dal_unload_prep_' + projectId;
+    var t = Number(localStorage.getItem(k) || 0);
+    localStorage.removeItem(k);
+    localStorage.removeItem('sm_dal_unload_prep_uid_' + projectId);
+    if (!t) return false;
+    // Stale flags (>15m) ignore — do not surprise-commit later.
+    return (Date.now() - t) < (15 * 60 * 1000);
+  } catch (e1) { return false; }
+};
+
+window.dalConsumeUnloadTimelineFlag_ = function(projectId) {
+  if (!projectId) return false;
+  try {
+    var k = 'sm_dal_unload_tl_' + projectId;
+    var t = Number(localStorage.getItem(k) || 0);
+    localStorage.removeItem(k);
+    if (!t) return false;
+    return (Date.now() - t) < (15 * 60 * 1000);
+  } catch (e1) { return false; }
+};
+
+window.dalPrepOpenedAtMs_ = function(info) {
+  if (!info) return 0;
+  var raw = info.prepOpenedAt || (info.prep && info.prep.openedAt) || info.openedAt || '';
+  var ms = raw ? Date.parse(String(raw)) : 0;
+  return isFinite(ms) ? ms : 0;
+};
+
+/**
+ * Before joining a Sheets-open prep room: if this browser left via refresh/crash
+ * (or room is empty long enough), commit orphan instead of rejoining Live.
+ */
+window.dalShouldReclaimOrphanPrep_ = function(info, othersObj, unloadFlag) {
+  var st = typeof window.dalPrepStatusFromInfo_ === 'function'
+    ? window.dalPrepStatusFromInfo_(info)
+    : '';
+  if (st === 'committing') return 'committing';
+  if (st !== 'open') return '';
+  if (unloadFlag) return 'unload';
+  if (othersObj == null) return ''; // lock miss — do not guess
+  var peers = typeof window.dalCountFreshModulePeers_ === 'function'
+    ? window.dalCountFreshModulePeers_(othersObj, 'assets')
+    : { count: 0 };
+  if (peers.count > 0) return '';
+  var openedMs = window.dalPrepOpenedAtMs_(info);
+  // Empty presence + room open ≥90s → orphan (covers crash without unload flag).
+  if (openedMs && (Date.now() - openedMs) >= 90000) return 'empty-aged';
+  return '';
+};
+
 /**
  * Browser refresh / tab close — leave live modules in presence and last-leave commit if alone.
- * Best-effort: google.script.run may not finish after unload; empty-room reclaim covers the rest.
+ * Always write localStorage unload flags (RPCs often die on refresh).
  */
 window.dalOnBrowserLeaveLiveRooms_ = function(reason) {
   if (window.dalUnloadLeaveFired_) return;
@@ -311,6 +382,9 @@ window.dalOnBrowserLeaveLiveRooms_ = function(reason) {
 
   var inPrepLive = !!(window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_);
   var inTlLive = !!(window.dalTimelineSessionOpen || window.dalTlOpeningUi_);
+
+  if (inPrepLive && pid) window.dalMarkUnloadLivePrep_(pid);
+  if (inTlLive && pid) window.dalMarkUnloadLiveTimeline_(pid);
 
   // Drop presence immediately so peers / reclaim see an empty room (even if commit RPC dies).
   if (pid) {
@@ -343,9 +417,8 @@ window.dalBindLiveRoomUnloadLeave_ = function() {
 try { window.dalBindLiveRoomUnloadLeave_(); } catch (eBind) { /* ignore */ }
 
 /**
- * Fork still open in Sheets/Firebase but nobody present in that live module → commit.
- * Covers refresh/crash when unload leave did not finish closeDalSession.
- * Only when *this* client is not currently inside that room.
+ * Fork still open but room empty / unload-flagged → commit orphan.
+ * Enter-path gate (dalGatePrepEnterForOrphan_) is the primary fix for refresh rejoin.
  */
 window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
   if (othersObj == null) return;
@@ -360,14 +433,15 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
   var imInAssets = mod === 'assets';
   var imInTimeline = mod === 'timeline';
 
-  // Prep orphan
   if (!imInAssets && !window.dalPrepUiOpen && !window.dalPrepLatched && !window.dalPrepOpeningUi_ &&
       !window.dalPrepClosing && !window.dalPrepLastLeavePending_ && !window.dalOrphanReclaimPrepPending_ &&
       !!window.peForkPrepActive_) {
+    var hasUnload = false;
+    try { hasUnload = !!localStorage.getItem('sm_dal_unload_prep_' + projectId); } catch (eU) { hasUnload = false; }
     var prepPeers = typeof window.dalCountFreshModulePeers_ === 'function'
       ? window.dalCountFreshModulePeers_(othersObj, 'assets')
       : { count: 0 };
-    if (prepPeers.count === 0) {
+    if (hasUnload || prepPeers.count === 0) {
       window.dalOrphanReclaimPrepPending_ = true;
       google.script.run
         .withFailureHandler(function() { window.dalOrphanReclaimPrepPending_ = false; })
@@ -375,11 +449,13 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
           window.dalOrphanReclaimPrepPending_ = false;
           if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
           if (String(window.activePresenceModule || '') === 'assets') return;
-          var st = typeof window.dalPrepStatusFromInfo_ === 'function'
-            ? window.dalPrepStatusFromInfo_(info)
+          var flag = typeof window.dalConsumeUnloadPrepFlag_ === 'function'
+            ? window.dalConsumeUnloadPrepFlag_(projectId)
+            : false;
+          var why = typeof window.dalShouldReclaimOrphanPrep_ === 'function'
+            ? window.dalShouldReclaimOrphanPrep_(info, othersObj, flag)
             : '';
-          // Only reclaim a stuck Live room — not Opening (someone starting) or already committing.
-          if (st !== 'open') return;
+          if (why !== 'unload' && why !== 'empty-aged') return;
           if (typeof window.closeDalPrepSession === 'function') {
             window.closeDalPrepSession({
               auto: true,
@@ -392,14 +468,15 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
     }
   }
 
-  // Timeline orphan
   if (!imInTimeline && !window.dalTimelineSessionOpen && !window.dalTlOpeningUi_ &&
       !window.dalTlClosingUi_ && !window.dalTlLastLeavePending_ && !window.dalOrphanReclaimTlPending_ &&
       !!window.peForkTimelineActive_) {
+    var tlHasUnload = false;
+    try { tlHasUnload = !!localStorage.getItem('sm_dal_unload_tl_' + projectId); } catch (eT) { tlHasUnload = false; }
     var tlPeers = typeof window.dalCountFreshModulePeers_ === 'function'
       ? window.dalCountFreshModulePeers_(othersObj, 'timeline')
       : { count: 0 };
-    if (tlPeers.count === 0) {
+    if (tlHasUnload || tlPeers.count === 0) {
       window.dalOrphanReclaimTlPending_ = true;
       google.script.run
         .withFailureHandler(function() { window.dalOrphanReclaimTlPending_ = false; })
@@ -412,6 +489,15 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
             : null;
           var stTl = tl ? String(tl.status || '').toLowerCase() : '';
           if (stTl !== 'open') return;
+          var force = typeof window.dalConsumeUnloadTimelineFlag_ === 'function'
+            ? window.dalConsumeUnloadTimelineFlag_(projectId)
+            : false;
+          if (!force && tlPeers.count === 0) {
+            var rawAt = (tl && tl.openedAt) || '';
+            var msAt = rawAt ? Date.parse(String(rawAt)) : 0;
+            force = !!(msAt && (Date.now() - msAt) >= 90000);
+          }
+          if (!force) return;
           if (typeof window.closeDalTimelineCollabSession === 'function') {
             window.closeDalTimelineCollabSession({ auto: true, reason: 'orphan-empty' });
           }
@@ -419,6 +505,78 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
         .getDalSessionInfo(projectId);
     }
   }
+};
+
+/**
+ * Open PA only after orphan check — never soft-join a refresh-abandoned Live room.
+ */
+window.dalGatePrepEnterForOrphan_ = function(projectId, onReady) {
+  onReady = typeof onReady === 'function' ? onReady : function() {};
+  if (!projectId || projectId === 'NEW') {
+    onReady();
+    return;
+  }
+  if (window.dalPrepOrphanEnterPending_) return;
+  window.dalPrepOrphanEnterPending_ = true;
+
+  var actor = typeof window.dalPresenceActor_ === 'function'
+    ? window.dalPresenceActor_()
+    : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown');
+  var unloadFlag = typeof window.dalConsumeUnloadPrepFlag_ === 'function'
+    ? window.dalConsumeUnloadPrepFlag_(projectId)
+    : false;
+
+  var doneReady_ = function() {
+    window.dalPrepOrphanEnterPending_ = false;
+    onReady();
+  };
+
+  var reclaim_ = function() {
+    window.dalPrepOrphanEnterPending_ = false;
+    try {
+      var ov = document.getElementById('project-assets-modal-overlay');
+      if (ov) ov.style.display = 'flex';
+    } catch (eOv) { /* ignore */ }
+    if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+      window.dalApplyPrepCommittingUi_(true, projectId);
+    }
+    if (typeof window.startDalPaSessionWatcher === 'function') {
+      window.startDalPaSessionWatcher(projectId);
+    }
+    if (typeof window.closeDalPrepSession === 'function') {
+      window.closeDalPrepSession({
+        auto: true,
+        reason: 'orphan-empty',
+        projectId: projectId
+      });
+    }
+  };
+
+  google.script.run
+    .withFailureHandler(function() { doneReady_(); })
+    .withSuccessHandler(function(othersObj) {
+      google.script.run
+        .withFailureHandler(function() { doneReady_(); })
+        .withSuccessHandler(function(info) {
+          var why = typeof window.dalShouldReclaimOrphanPrep_ === 'function'
+            ? window.dalShouldReclaimOrphanPrep_(info, othersObj, unloadFlag)
+            : '';
+          if (why === 'committing') {
+            doneReady_();
+            if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+              window.dalApplyPrepCommittingUi_(true, projectId);
+            }
+            return;
+          }
+          if (why === 'unload' || why === 'empty-aged') {
+            reclaim_();
+            return;
+          }
+          doneReady_();
+        })
+        .getDalSessionInfo(projectId);
+    })
+    .reportProjectPresence(projectId, actor, 'ping', 'main', '');
 };
 
 window.dalPresenceProjectId_ = function() {
