@@ -173,30 +173,64 @@ function dalCollectLogisticsManagerNames_() {
   return names;
 }
 
-function dalAlertFailedWrite_(projectId, domain, actor, detail) {
-  var title = 'DAL commit failed — ' + dalReconcileDomainLabel_(domain);
+/** ROOT crew only — DAL commit push alerts (director lock 2026-07-21). */
+function dalCollectRootNames_() {
+  var names = [];
+  var seen = {};
+  try {
+    var sheets = verifyVaultSchema(true);
+    var crewData = getSheetData(sheets.crew);
+    var cMap = getHeaderMap(crewData);
+    for (var i = 1; i < crewData.length; i++) {
+      var name = cMap['Name'] !== undefined ? String(crewData[i][cMap['Name']] || '').trim() : '';
+      if (!name || seen[name]) continue;
+      try {
+        if (verifyBackendPrivilege(name, 'ROOT')) {
+          seen[name] = true;
+          names.push(name);
+        }
+      } catch (ePerm) { /* skip row */ }
+    }
+  } catch (e) { /* vault unavailable */ }
+  return names;
+}
+
+/**
+ * opts.push === false → audit only (no toast/inbox).
+ * Push recipients = ROOT only (never logistics managers / commit actor fan-out).
+ */
+function dalAlertFailedWrite_(projectId, domain, actor, detail, opts) {
+  opts = opts || {};
+  var doPush = opts.push !== false;
+  var title = opts.title || ('DAL commit failed — ' + dalReconcileDomainLabel_(domain));
   var body = 'Project ' + projectId + ': ' + String(detail || 'Sheets did not match Firebase fork after commit.');
   try {
     writeToAuditLog(
       actor || 'System',
-      'FAIL',
+      doPush ? 'FAIL' : 'WARN',
       'DAL_RECONCILE',
       projectId,
       dalReconcileDomainLabel_(domain),
-      body
+      (doPush ? '' : '[no-push] ') + body
     );
   } catch (eAudit) { /* continue */ }
 
+  if (!doPush) return;
+
   try {
-    var recipients = dalCollectLogisticsManagerNames_();
-    if (actor && recipients.indexOf(actor) === -1) recipients.push(actor);
-    if (typeof dispatchPushToCrewNames === 'function' && recipients.length) {
+    var recipients = dalCollectRootNames_();
+    if (!recipients.length) {
+      writeToAuditLog(actor || 'System', 'WARN', 'DAL_RECONCILE', projectId, 'PUSH',
+        'No ROOT recipients for DAL alert — push skipped.');
+      return;
+    }
+    if (typeof dispatchPushToCrewNames === 'function') {
       dispatchPushToCrewNames(recipients, title, body, '', actor || 'System');
     }
   } catch (ePush) {
     try {
       writeToAuditLog(actor || 'System', 'FAIL', 'DAL_RECONCILE', projectId, 'PUSH',
-        'Manager push failed: ' + (ePush.message || ePush));
+        'Root push failed: ' + (ePush.message || ePush));
     } catch (e2) { /* ignore */ }
   }
 }
@@ -365,7 +399,8 @@ function dalFwProcessQueueItem_(queueDoc) {
   }
   if (payload.truncated) {
     dalAlertFailedWrite_(projectId, domain, actor,
-      'Retry skipped — pocket payload truncated. Manual repair required. ' + itemId);
+      'Retry skipped — pocket payload truncated. Manual repair required. ' + itemId,
+      { push: false });
     firestoreWriteDocument_(path, Object.assign({}, pocket, {
       status: 'truncated',
       retryCount: retryCount + 1,
@@ -423,11 +458,14 @@ function dalFwProcessQueueItem_(queueDoc) {
   }));
 
   if (newCount >= 3) {
-    dalAlertFailedWrite_(projectId, domain, actor,
-      'Retry #' + newCount + ' failed for ' + itemId + ': ' + errNote);
+    // Do not re-toast — first failure already notified ROOT once. Audit only.
+    try {
+      writeToAuditLog(actor, 'WARN', 'DAL_RECONCILE', projectId, domain,
+        'Retry #' + newCount + ' still failing for ' + itemId + ' (no repeat push): ' + errNote);
+    } catch (eAud) { /* ignore */ }
   } else {
     try {
-      writeToAuditLog(actor, 'FAIL', 'DAL_RECONCILE', projectId, domain,
+      writeToAuditLog(actor, 'WARN', 'DAL_RECONCILE', projectId, domain,
         'Retry #' + newCount + ' failed: ' + errNote);
     } catch (eLog) { /* ignore */ }
   }

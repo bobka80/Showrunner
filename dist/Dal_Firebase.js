@@ -374,7 +374,8 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
     } catch (eAud) { /* ignore */ }
     try {
       dalAlertFailedWrite_(projectId, 'assets', actor,
-        'END PREP mirror mismatch: ' + mirror.summary + ' (committed from state fixtures + collection autos)');
+        'END PREP mirror mismatch: ' + mirror.summary + ' (committed from state fixtures + collection autos)',
+        { push: false, title: 'DAL prep mirror warn — assets' });
     } catch (eAlert) { /* ignore */ }
     try {
       dalPocketFailedWrite_({
@@ -514,7 +515,8 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   } catch (eCol) {
     try {
       dalAlertFailedWrite_(projectId, 'assets', actor,
-        'Sheets committed OK but fork cleanup failed — clear assets collection manually if needed.');
+        'Sheets committed OK but fork cleanup failed — clear assets collection manually if needed.',
+        { push: false, title: 'DAL fork cleanup warn — assets' });
     } catch (eA5) { /* ignore */ }
   }
 }

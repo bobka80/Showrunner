@@ -358,7 +358,8 @@ Hard refresh web.app (GAS **v717+**). Use a **test** project only.
 | 2026-07-20 | **Auto-close already-closed @ GAS v715:** stale latch double-leave → `No open prep session` wrapped as Database Lockout (retry filter missed "prep"). Idempotent close + probe before Firebase write. |
 | 2026-07-21 | **False auto-close alerts @ GAS v717:** wait/poll on `committing`; re-probe on close/write fail; probe fail ≠ assume open; station teardown skip re-arm last-leave; close actor = ACTIVE_USER_NAME. |
 | 2026-07-21 | **B6 verified:** Part B checklist vs code — 7 PASS, station PA “always” = PARTIAL (host/`canOpenDalPrep` gate, intentional). **Next: B7** floor smoke (card in hub). |
-| 2026-07-21 | **Commit fail-safe C:** `dal_commit_retry/{projectId}` pointer only on real Sheets/reconcile fail; PA/TL Retry UI; idempotent (no fork → alreadyOk). False auto-close alerts do **not** set the pointer. |
+| 2026-07-21 | **Commit fail-safe C @ GAS v718:** `dal_commit_retry/{projectId}` pointer only on real Sheets/reconcile fail; PA/TL Retry UI; idempotent (no fork → alreadyOk). False auto-close alerts do **not** set the pointer. |
+| 2026-07-21 | **DAL commit toasts:** push **ROOT only**; no repeat sweep toasts; mirror/fork-cleanup = audit-only (no push). |
 
 ---
 

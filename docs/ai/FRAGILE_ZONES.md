@@ -498,7 +498,8 @@ While prep UI open (dalPrepUiOpen)
 END PREP (local or peer)
   → Sheets → committing → **backup Sheets snapshot to `dal_commit_backups/`** → write Sheets → reconcile
   → On empty Firebase vs non-empty Sheets: **refuse** (fork intact; no retry pointer)
-  → On Sheets/reconcile fail: **restore previous Sheets**, reopen session, keep fork + backup, set **`dal_commit_retry/{projectId}` needsRetry** (fail-safe C), alert managers
+  → On Sheets/reconcile fail: **restore previous Sheets**, reopen session, keep fork + backup, set **`dal_commit_retry/{projectId}` needsRetry** (fail-safe C); **push alert ROOT only** (no logistics fan-out; no repeat sweep toasts)
+  → Mirror mismatch / fork-cleanup-after-OK: **audit only** (no push — not a Sheets commit failure)
   → Only after verify OK: delete `_meta` + assets collection; **clear retry pointer** (backup retained, needsRetry false)
   → Client red-dot / RETRY COMMIT only when needsRetry pointer exists — not on false leave alerts
   → Peer: meta missing → dalPrepMetaEndPending_ (do NOT drop prep UI yet)
