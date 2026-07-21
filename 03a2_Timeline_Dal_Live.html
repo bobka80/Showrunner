@@ -1745,11 +1745,15 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
   }
 
   if (window.dalTlCommittingWait_) {
-    window.dalApplyTlCommittingUi_(false);
-    if (!isOpen && !isOpening) {
-      window.dalTlPostCommitReenter_ = true;
-      if (typeof window.maybeAutoOpenDalTimeline_ === 'function') {
-        window.maybeAutoOpenDalTimeline_();
+    if (typeof window.dalTlTryPostCommitReopen_ === 'function') {
+      window.dalTlTryPostCommitReopen_();
+    } else {
+      window.dalApplyTlCommittingUi_(false);
+      if (!isOpen && !isOpening) {
+        window.dalTlPostCommitReenter_ = true;
+        if (typeof window.maybeAutoOpenDalTimeline_ === 'function') {
+          window.maybeAutoOpenDalTimeline_();
+        }
       }
     }
   }
@@ -1786,9 +1790,30 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
  * Committing freeze — everyone locked (incl. re-entry while Sheets still committing).
  * Blue SYNC bar stays visible with "Saving to Sheets…" copy.
  */
+window.dalTlTryPostCommitReopen_ = function() {
+  if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+    window.dalApplyTlCommittingUi_(false);
+  } else {
+    window.dalTlCommittingWait_ = false;
+    window.dalTlClosingUi_ = false;
+  }
+  if (typeof window.dalTimelineLayerOpen_ === 'function' && !window.dalTimelineLayerOpen_()) return;
+  if (typeof window.dalMayAutoStartFork_ === 'function' && !window.dalMayAutoStartFork_('timeline')) {
+    if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+      window.dalApplyTimelineSessionUi_(false, false);
+    }
+    return;
+  }
+  window.dalTlPostCommitReenter_ = true;
+  if (typeof window.maybeAutoOpenDalTimeline_ === 'function') {
+    window.maybeAutoOpenDalTimeline_();
+  }
+};
+
 window.dalApplyTlCommittingUi_ = function(active, projectId) {
   var startBtn = document.getElementById('dal-timeline-start-btn');
   var endBtn = document.getElementById('dal-timeline-end-btn');
+  var saveBtn = document.getElementById('tt-save-btn');
   if (active) {
     window.dalTlCommittingWait_ = true;
     window.dalTlClosingUi_ = true;
@@ -1800,6 +1825,11 @@ window.dalApplyTlCommittingUi_ = function(active, projectId) {
       }
       var layer = document.getElementById('shift-layer');
       if (layer) layer.classList.add('tt-readonly-mode');
+      if (saveBtn) saveBtn.style.display = 'none';
+      // Rebuild so drag handles / edit chrome disappear (flag alone leaves stale DOM).
+      try {
+        if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+      } catch (eRb) { /* ignore */ }
     }
     if (startBtn) startBtn.style.display = 'none';
     if (endBtn) endBtn.style.display = 'none';
@@ -1828,6 +1858,10 @@ window.dalApplyTlCommittingUi_ = function(active, projectId) {
       window.dalTlReadOnlyBeforeCommitting_ = null;
       var layerClr = document.getElementById('shift-layer');
       if (layerClr) layerClr.classList.toggle('tt-readonly-mode', !!currentIsReadOnly);
+      if (saveBtn && !currentIsReadOnly) saveBtn.style.display = '';
+      try {
+        if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+      } catch (eRb2) { /* ignore */ }
     }
   }
   if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {

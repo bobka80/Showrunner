@@ -219,10 +219,14 @@ window.startDalPrepSessionPoll_ = function(projectId) {
 
         // Sheets says closed.
         if (window.dalPrepCommittingWait_) {
-          window.dalApplyPrepCommittingUi_(false);
-          window.dalPrepPostCommitReenter_ = true;
-          if (typeof window.maybeAutoOpenDalPrep_ === 'function') {
-            window.maybeAutoOpenDalPrep_();
+          if (typeof window.dalPrepTryPostCommitReopen_ === 'function') {
+            window.dalPrepTryPostCommitReopen_();
+          } else {
+            window.dalApplyPrepCommittingUi_(false);
+            window.dalPrepPostCommitReenter_ = true;
+            if (typeof window.maybeAutoOpenDalPrep_ === 'function') {
+              window.maybeAutoOpenDalPrep_();
+            }
           }
         }
         if (window.dalPrepOpeningUi_) {
@@ -400,6 +404,43 @@ window.dalCanShowPrepButtons = function() {
 window.dalPaApplyOpeningFreeze_ = function(frozen) {
   if (typeof window.dalPaApplySyncBlockedUi_ === 'function') {
     window.dalPaApplySyncBlockedUi_(!!frozen);
+  }
+};
+
+/** True while Project Assets modal is on screen. */
+window.dalPaViewStillOpen_ = function() {
+  var ov = document.getElementById('project-assets-modal-overlay');
+  if (!ov) return false;
+  try {
+    return ov.style.display === 'flex' || window.getComputedStyle(ov).display === 'flex';
+  } catch (e0) {
+    return ov.style.display === 'flex';
+  }
+};
+
+/**
+ * After Sheets commit clears: if still in PA, start a *new* Firebase prep room.
+ * Clears committing freeze first (maybeAutoOpen refuses while wait is latched).
+ */
+window.dalPrepTryPostCommitReopen_ = function() {
+  if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+    window.dalApplyPrepCommittingUi_(false);
+  } else {
+    window.dalPrepCommittingWait_ = false;
+    window.dalPrepClosingUi_ = false;
+  }
+  if (!window.dalPaViewStillOpen_()) return;
+  if (typeof window.dalMayAutoStartFork_ === 'function' && !window.dalMayAutoStartFork_('prep')) {
+    if (typeof window.dalApplyDalPrepUiState_ === 'function') {
+      var pid = document.getElementById('edit-folder-id')
+        ? document.getElementById('edit-folder-id').value : '';
+      window.dalApplyDalPrepUiState_(false, pid, { allowClose: true });
+    }
+    return;
+  }
+  window.dalPrepPostCommitReenter_ = true;
+  if (typeof window.maybeAutoOpenDalPrep_ === 'function') {
+    window.maybeAutoOpenDalPrep_();
   }
 };
 
@@ -621,10 +662,14 @@ window.refreshDalSessionBanner = function() {
         window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
       } else if (!window.dalPrepLatched) {
         if (window.dalPrepCommittingWait_) {
-          window.dalApplyPrepCommittingUi_(false);
-          window.dalPrepPostCommitReenter_ = true;
-          if (typeof window.maybeAutoOpenDalPrep_ === 'function') {
-            window.maybeAutoOpenDalPrep_();
+          if (typeof window.dalPrepTryPostCommitReopen_ === 'function') {
+            window.dalPrepTryPostCommitReopen_();
+          } else {
+            window.dalApplyPrepCommittingUi_(false);
+            window.dalPrepPostCommitReenter_ = true;
+            if (typeof window.maybeAutoOpenDalPrep_ === 'function') {
+              window.maybeAutoOpenDalPrep_();
+            }
           }
           return;
         }
@@ -908,10 +953,8 @@ window.closeDalPrepSession = function(opts) {
   if (window.dalPrepClosing) return;
   window.dalClearRoomIdle_('prep');
   window.dalPrepClosing = true;
-  window.dalPrepClosingUi_ = true;
-  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
-    window.dalUpdateRemotePendingBanner_();
-  }
+  // Hard freeze + SYNC "Saving to Sheets…" for the whole commit (stay-in-view safe).
+  window.dalApplyPrepCommittingUi_(true, projectId);
   window.dalPrepSheetsPollGen++;
   window.dalPrepIgnoreCloseUntil = 0;
   // Local END — also block lagging Sheets from re-opening this tab during commit.
@@ -925,7 +968,11 @@ window.closeDalPrepSession = function(opts) {
 
   var failCloseAlert_ = function(errOrMsg) {
     window.dalPrepClosing = false;
-    window.dalPrepClosingUi_ = false;
+    if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+      window.dalApplyPrepCommittingUi_(false);
+    } else {
+      window.dalPrepClosingUi_ = false;
+    }
     if (overlay) overlay.style.cursor = '';
     if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
       window.dalUpdateRemotePendingBanner_();
@@ -940,16 +987,44 @@ window.closeDalPrepSession = function(opts) {
     if (overlay) overlay.style.cursor = '';
     window.dalPrepLeaveIntent_ = false;
     window.dalPrepLastLeavePending_ = false;
+    window.dalPrepClosing = false;
+    // Keep freeze while Sheets may still be committing; re-assert after live-sync stop.
+    window.dalApplyPrepCommittingUi_(true, projectId);
     window.dalPrepMarkSessionEnded_(projectId);
+    window.dalApplyPrepCommittingUi_(true, projectId);
     window.dalSessionState = { status: 'normal', sessionType: '', projectId: projectId, prepStatus: '' };
     if (typeof stopDalPaSessionWatcher === 'function') stopDalPaSessionWatcher({ clearLatch: true });
     if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
     if (typeof window.dalCacheInvalidatePa_ === 'function') window.dalCacheInvalidatePa_(projectId);
     else try { localStorage.removeItem('sm_pa_cache_' + projectId); } catch (e) {}
-    window.dalPrepClosing = false;
-    window.dalPrepClosingUi_ = false;
     if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);
     doneMsg_();
+
+    var reopenAfterCommit_ = function() {
+      if (typeof window.dalPrepTryPostCommitReopen_ === 'function') {
+        window.dalPrepTryPostCommitReopen_();
+      }
+    };
+    google.script.run
+      .withFailureHandler(function() {
+        // Probe failed — assume commit done; try stay-in-view reopen.
+        reopenAfterCommit_();
+      })
+      .withSuccessHandler(function(info) {
+        var st = window.dalPrepStatusFromInfo_(info);
+        if (st === 'committing') {
+          window.dalApplyPrepCommittingUi_(true, projectId);
+          dalPrepWaitCommitThen_(projectId, reopenAfterCommit_, function() {
+            window.dalApplyPrepCommittingUi_(false);
+            alert(opts.auto
+              ? 'Auto-close prep: Sheets commit is still running — wait a moment, then Start Prep if needed.'
+              : 'End prep: Sheets commit is still running — wait a moment, then Start Prep if needed.');
+          });
+          return;
+        }
+        reopenAfterCommit_();
+      })
+      .getDalSessionInfo(projectId);
   };
 
   var waitCommitOrFinish_ = function(stuckMsg) {

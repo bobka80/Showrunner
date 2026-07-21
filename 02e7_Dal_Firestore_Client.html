@@ -1779,7 +1779,10 @@ window.stopDalPaLiveSync_ = function() {
   window.stopDalPaGasSync_();
   window.dalPaClearBlockedRetry_();
   window.dalPaStopHealTicker_();
-  window.dalPaApplySyncBlockedUi_(false);
+  // Keep committing freeze — ending live sync must not unlock edits mid-commit.
+  if (!window.dalPrepCommittingWait_) {
+    window.dalPaApplySyncBlockedUi_(false);
+  }
   window.dalPaLiveSyncMode = '';
   window.dalPaLiveSyncFailed = false;
   window.dalPaLiveSyncFailReason_ = '';

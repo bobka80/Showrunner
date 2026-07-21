@@ -89,6 +89,39 @@ function dalTimelineErrMsg_(err) {
   return msg;
 }
 
+/** Poll until timeline domain leaves committing (or timeout). */
+function dalTlWaitCommitThen_(projectId, onDone, onStuck) {
+  var attempts = 0;
+  var maxAttempts = 15;
+  var tick = function() {
+    google.script.run
+      .withFailureHandler(function() {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          if (typeof onStuck === 'function') onStuck();
+          return;
+        }
+        setTimeout(tick, 2000);
+      })
+      .withSuccessHandler(function(info) {
+        var tl = window.dalTimelineInfoFromSession_(info);
+        var st = tl ? String(tl.status).toLowerCase() : '';
+        if (st !== 'committing') {
+          if (typeof onDone === 'function') onDone(info);
+          return;
+        }
+        attempts++;
+        if (attempts >= maxAttempts) {
+          if (typeof onStuck === 'function') onStuck();
+          return;
+        }
+        setTimeout(tick, 2000);
+      })
+      .getDalSessionInfo(projectId);
+  };
+  tick();
+}
+
 function dalTimelineCollabStarted_(joined, opts) {
   opts = opts || {};
   window.dalClearTlOpeningHang_();
@@ -325,9 +358,14 @@ window.closeDalTimelineCollabSession = function(opts) {
   }
   if (window.dalTlClosingUi_ && opts.auto) return;
   if (typeof window.dalClearRoomIdle_ === 'function') window.dalClearRoomIdle_('timeline');
-  window.dalTlClosingUi_ = true;
-  if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
-    window.dalUpdateTimelineLiveBanner_();
+  // Hard freeze + SYNC for the whole commit (stay-in-view safe).
+  if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+    window.dalApplyTlCommittingUi_(true, projectId);
+  } else {
+    window.dalTlClosingUi_ = true;
+    if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+      window.dalUpdateTimelineLiveBanner_();
+    }
   }
   var layer = document.getElementById('shift-layer');
   if (layer) layer.style.cursor = 'wait';
@@ -335,14 +373,59 @@ window.closeDalTimelineCollabSession = function(opts) {
   var doneMsg_ = function() {
     // Success toast retired — ending timeline collab is silent (errors still alert).
   };
+  var clearCloseFailUi_ = function() {
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(false);
+    } else {
+      window.dalTlClosingUi_ = false;
+    }
+    if (layer) layer.style.cursor = '';
+    if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+      window.dalUpdateTimelineLiveBanner_();
+    }
+  };
+  var finishCloseTlOk_ = function() {
+    if (layer) layer.style.cursor = '';
+    window.dalTimelineSessionOpen = false;
+    window.dalTlWasSessionOpen = false;
+    if (typeof window.dalClearRoomIdle_ === 'function') window.dalClearRoomIdle_('timeline');
+    if (typeof window.stopDalTimelineStateSync_ === 'function') window.stopDalTimelineStateSync_();
+    if (typeof window.dalCacheInvalidateTimeline_ === 'function') window.dalCacheInvalidateTimeline_(projectId);
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(true, projectId);
+    }
+    doneMsg_();
+    var reopenAfter_ = function() {
+      if (typeof window.dalTlTryPostCommitReopen_ === 'function') {
+        window.dalTlTryPostCommitReopen_();
+      } else {
+        window.refreshTimelineDalBanner();
+      }
+    };
+    google.script.run
+      .withFailureHandler(function() { reopenAfter_(); })
+      .withSuccessHandler(function(info) {
+        var tl = window.dalTimelineInfoFromSession_(info);
+        var st = tl ? String(tl.status).toLowerCase() : '';
+        if (st === 'committing') {
+          if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+            window.dalApplyTlCommittingUi_(true, projectId);
+          }
+          dalTlWaitCommitThen_(projectId, reopenAfter_, function() {
+            clearCloseFailUi_();
+            alert((opts.auto ? 'Auto-close' : 'End') +
+              ' timeline collab: Sheets commit is still running — wait a moment, then Start Collab if needed.');
+          });
+          return;
+        }
+        reopenAfter_();
+      })
+      .getDalSessionInfo(projectId);
+  };
   var runCloseTl_ = function() {
     google.script.run
       .withFailureHandler(function(err) {
-        window.dalTlClosingUi_ = false;
-        if (layer) layer.style.cursor = '';
-        if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
-          window.dalUpdateTimelineLiveBanner_();
-        }
+        clearCloseFailUi_();
         google.script.run
           .withFailureHandler(function() {
             alert((opts.auto ? 'Auto-close' : 'End') + ' timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
@@ -351,11 +434,11 @@ window.closeDalTimelineCollabSession = function(opts) {
             var tl = window.dalTimelineInfoFromSession_(info);
             var status = tl ? String(tl.status).toLowerCase() : '';
             if (!status || status === 'normal' || status === '') {
-              window.dalTimelineSessionOpen = false;
-              window.dalTlClosingUi_ = false;
-              if (typeof window.dalClearRoomIdle_ === 'function') window.dalClearRoomIdle_('timeline');
-              window.refreshTimelineDalBanner();
-              doneMsg_();
+              finishCloseTlOk_();
+              return;
+            }
+            if (status === 'committing') {
+              finishCloseTlOk_();
               return;
             }
             alert((opts.auto ? 'Auto-close' : 'End') + ' timeline collab failed:\n\n' + dalTimelineErrMsg_(err));
@@ -363,15 +446,7 @@ window.closeDalTimelineCollabSession = function(opts) {
           .getDalSessionInfo(projectId);
       })
       .withSuccessHandler(function() {
-        if (layer) layer.style.cursor = '';
-        window.dalTimelineSessionOpen = false;
-        window.dalTlWasSessionOpen = false;
-        window.dalTlClosingUi_ = false;
-        if (typeof window.dalClearRoomIdle_ === 'function') window.dalClearRoomIdle_('timeline');
-        if (typeof window.stopDalTimelineStateSync_ === 'function') window.stopDalTimelineStateSync_();
-        if (typeof window.dalCacheInvalidateTimeline_ === 'function') window.dalCacheInvalidateTimeline_(projectId);
-        window.refreshTimelineDalBanner();
-        doneMsg_();
+        finishCloseTlOk_();
       })
       .closeDalSession(projectId, actor, 'timelineCollab');
   };
@@ -388,11 +463,7 @@ window.closeDalTimelineCollabSession = function(opts) {
         return;
       }
       if (attempts >= 3) {
-        window.dalTlClosingUi_ = false;
-        if (layer) layer.style.cursor = '';
-        if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
-          window.dalUpdateTimelineLiveBanner_();
-        }
+        clearCloseFailUi_();
         alert((opts.auto ? 'Auto-close' : 'End') + ' timeline collab failed:\n\n' +
           'Timeline kept changing during sync — pause edits, wait a second, End Collab again.\n\nFork left intact.');
         return;
@@ -402,11 +473,7 @@ window.closeDalTimelineCollabSession = function(opts) {
       window.dalTlFlushTimer = null;
       window.dalWriteTimelineForkToFirestore_(function(writeErr) {
         if (writeErr) {
-          window.dalTlClosingUi_ = false;
-          if (layer) layer.style.cursor = '';
-          if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
-            window.dalUpdateTimelineLiveBanner_();
-          }
+          clearCloseFailUi_();
           alert((opts.auto ? 'Auto-close' : 'End') + ' timeline collab failed:\n\n' +
             'Could not sync live timeline to Firebase before commit.\n\n' +
             (writeErr.message || writeErr) +
@@ -429,11 +496,7 @@ window.closeDalTimelineCollabSession = function(opts) {
       }
       if (waitN > 40) {
         clearInterval(waitTimer);
-        window.dalTlClosingUi_ = false;
-        if (layer) layer.style.cursor = '';
-        if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
-          window.dalUpdateTimelineLiveBanner_();
-        }
+        clearCloseFailUi_();
         alert((opts.auto ? 'Auto-close' : 'End') + ' timeline collab failed:\n\n' +
           'Live timeline sync is still writing — wait a moment and End Collab again.\n\nFork left intact.');
       }

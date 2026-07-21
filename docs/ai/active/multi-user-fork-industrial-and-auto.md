@@ -363,7 +363,8 @@ Hard refresh web.app (latest GAS — committing freeze @ **v721+**). Use a **tes
 | 2026-07-21 | **Commit fail-safe C @ GAS v718:** `dal_commit_retry/{projectId}` pointer only on real Sheets/reconcile fail; PA/TL Retry UI; idempotent (no fork → alreadyOk). False auto-close alerts do **not** set the pointer. |
 | 2026-07-21 | **DAL commit toasts @ GAS v719:** push **ROOT only**; no repeat sweep toasts; mirror/fork-cleanup = audit-only (no push). |
 | 2026-07-21 | **DAL drawer + fork dots @ GAS v720:** durable `dal_commit_fail` notif with COPY; calendar amber while committing; 4s poll while lit; no premature optimistic clear. |
-| 2026-07-21 | **Committing hard-freeze:** while Sheets `committing`, freeze everyone (no writes/START) incl. re-entry; SYNC “Saving to Sheets…”; after clear auto-open **new** room + “Live again” toast. |
+| 2026-07-21 | **Committing hard-freeze @ GAS v721:** while Sheets `committing`, freeze everyone (no writes/START) incl. re-entry; SYNC “Saving to Sheets…”; after clear auto-open **new** room + “Live again” toast (PA + timeline). |
+| 2026-07-21 | **Stay-in-view commit reopen:** End/last-leave hard-freeze (live-sync stop no longer unlocks); after Sheets clears, auto new Firebase cycle if still on PA/timeline. |
 
 ---
 
