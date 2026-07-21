@@ -115,7 +115,7 @@ function saveProjectData(projectData, timelinesArray, actor = "System UI") {
     if (timelinesArray && timelinesArray.length > 0) {
       let newRows = timelinesArray.map(t => {
         let r = new Array(tCols).fill("");
-        if(tMap['uid'] !== undefined) r[tMap['uid']] = Utilities.getUuid();
+        if(tMap['uid'] !== undefined) r[tMap['uid']] = t.uid || t.id || Utilities.getUuid();
         if(tPidCol !== undefined) r[tPidCol] = resolvedProjectId;
         else if (r.length > 1) r[1] = resolvedProjectId;
         if(tMap['Sub_Event_Type'] !== undefined) r[tMap['Sub_Event_Type']] = t.Sub_Event_Type || "MAIN";
@@ -276,7 +276,7 @@ function getExistingProjects() {
          }
       }
       
-      projectMap[pId].fragments.push({ type: type, date: eDate, startTime: startTime, endTime: endTime, note: note });
+      projectMap[pId].fragments.push({ uid: (tMap['uid'] !== undefined ? (timelineData[i][tMap['uid']] || '') : ''), type: type, date: eDate, startTime: startTime, endTime: endTime, note: note });
       
       // --- FIX: Calculate project span from ALL fragments, not just main/show days ---
       if (!p.start || eDate < p.start) p.start = eDate;

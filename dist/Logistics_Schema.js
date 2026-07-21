@@ -15,7 +15,7 @@ function verifyDatabaseSchema(readOnly = false) {
   const sm = {};
   for (let i = 0; i < sheetsArr.length; i++) sm[sheetsArr[i].getName()] = sheetsArr[i];
 
-  cachedEngineSheets = { index: sm["Projects_Index"], timelines: sm["Project_Timelines"], shifts: sm["Shift_Assignments"], blocks: sm["Phase_Blocks"], overrides: sm["Dept_Overrides"], leaves: sm["Leave_Tracker"], tasks: sm["Global_Tasks"], notifs: sm["Notifications"], taskAssignees: sm["Task_Assignees"], taskTodos: sm["Task_Todos"], taskAssets: sm["Task_Assets"], projectChecklists: sm["Project_Checklists"], projectAssets: sm["Project_Assets"], conflictOverrides: sm["Conflict_Overrides"], opsLedger: sm["Operations_Ledger"] };
+  cachedEngineSheets = { index: sm["Projects_Index"], timelines: sm["Project_Timelines"], shifts: sm["Shift_Assignments"], blocks: sm["Phase_Blocks"], overrides: sm["Dept_Overrides"], leaves: sm["Leave_Tracker"], tasks: sm["Global_Tasks"], notifs: sm["Notifications"], taskAssignees: sm["Task_Assignees"], taskTodos: sm["Task_Todos"], taskAssets: sm["Task_Assets"], projectChecklists: sm["Project_Checklists"], projectAssets: sm["Project_Assets"], conflictOverrides: sm["Conflict_Overrides"], opsLedger: sm["Operations_Ledger"], logisticsLedger: sm["Logistics_Ledger"] };
   if (readOnly) return cachedEngineSheets;
 
   let indexSheet = sm["Projects_Index"];
@@ -224,6 +224,19 @@ function verifyDatabaseSchema(readOnly = false) {
       opsLedgerSheet.getRange(1, 1, 1, opsLedgerHeaders.length).setValues([opsLedgerHeaders]).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
   }
 
+  // Movement SoT (Logistics Ledger campaign M1) — additive; PA truck columns remain until M4
+  let logisticsLedgerSheet = sm["Logistics_Ledger"];
+  const logisticsLedgerHeaders = ["uid", "project_uid", "parent_uid", "asset_uid", "quantity", "truck_uid", "from_location", "to_location", "load_time", "unload_time", "leg_id", "phase_ref", "x", "y", "z", "rotated", "staged", "creator"];
+  if (!logisticsLedgerSheet) {
+      logisticsLedgerSheet = ss.insertSheet("Logistics_Ledger");
+      logisticsLedgerSheet.appendRow(logisticsLedgerHeaders);
+      logisticsLedgerSheet.getRange(1, 1, 1, logisticsLedgerHeaders.length).setFontWeight("bold").setBackground("#0ea5e9").setFontColor("#ffffff");
+      logisticsLedgerSheet.setFrozenRows(1);
+  } else {
+      if (logisticsLedgerSheet.getMaxColumns() < logisticsLedgerHeaders.length) logisticsLedgerSheet.insertColumnsAfter(logisticsLedgerSheet.getMaxColumns(), logisticsLedgerHeaders.length - logisticsLedgerSheet.getMaxColumns());
+      logisticsLedgerSheet.getRange(1, 1, 1, logisticsLedgerHeaders.length).setValues([logisticsLedgerHeaders]).setFontWeight("bold").setBackground("#0ea5e9").setFontColor("#ffffff");
+  }
+
   let ledgerSheet = sm["Financial_Ledger"];
   const ledgerHeaders = ["uid", "Date", "Category", "Description", "Amount", "Reference_ID", "Created_By"];
   if (!ledgerSheet) { 
@@ -235,6 +248,6 @@ function verifyDatabaseSchema(readOnly = false) {
       ledgerSheet.getRange(1, 1, 1, ledgerHeaders.length).setValues([ledgerHeaders]).setFontWeight("bold").setBackground("#eab308").setFontColor("#000000");
   }
 
-  cachedEngineSheets = { index: indexSheet, timelines: timelineSheet, shifts: shiftSheet, blocks: blockSheet, overrides: overrideSheet, leaves: leaveSheet, tasks: taskSheet, notifs: notifSheet, taskAssignees: taskAssigneesSheet, taskTodos: taskTodosSheet, taskAssets: taskAssetsSheet, projectChecklists: projectChecklistsSheet, projectAssets: projectAssetsSheet, conflictOverrides: conflictOverridesSheet, opsLedger: opsLedgerSheet, finLedger: ledgerSheet };
+  cachedEngineSheets = { index: indexSheet, timelines: timelineSheet, shifts: shiftSheet, blocks: blockSheet, overrides: overrideSheet, leaves: leaveSheet, tasks: taskSheet, notifs: notifSheet, taskAssignees: taskAssigneesSheet, taskTodos: taskTodosSheet, taskAssets: taskAssetsSheet, projectChecklists: projectChecklistsSheet, projectAssets: projectAssetsSheet, conflictOverrides: conflictOverridesSheet, opsLedger: opsLedgerSheet, logisticsLedger: logisticsLedgerSheet, finLedger: ledgerSheet };
   return cachedEngineSheets;
 }

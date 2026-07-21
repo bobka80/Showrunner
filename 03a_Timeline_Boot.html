@@ -336,7 +336,7 @@ function openShiftLayout(mode, isReadOnly = false) {
                       let dur = eHr - sHr;
                       if (dur <= 0) dur += 24;
                       
-                      activeSubEvents.push({ id: 'se_' + Math.random(), type: f.type, start: startHr, duration: dur, note: f.note });
+                      activeSubEvents.push({ id: (f.uid ? String(f.uid) : ('se_' + Math.random())), type: f.type, start: startHr, duration: dur, note: f.note });
                   }
               });
           }
@@ -556,7 +556,8 @@ function saveAndCloseShifts() {
       let uiPhaseMap = { 'wh': 'WAREHOUSE', 'main': 'MAIN_EVENT', 'show': 'SHOW_DAY', 'recovery': 'RECOVERY', 'transit': 'TRANSIT' };
       let backendType = uiPhaseMap[se.type] || se.type;
       
-      timelines.push({ Sub_Event_Type: backendType, Event_Date: isoDay, Start_Time: formatT(sHr), End_Time: formatT(eHr), Note: se.note || "" });
+      let fragUid = (se.id && String(se.id).indexOf('se_') !== 0) ? se.id : (se.uid || '');
+      timelines.push({ uid: fragUid, Sub_Event_Type: backendType, Event_Date: isoDay, Start_Time: formatT(sHr), End_Time: formatT(eHr), Note: se.note || "" });
   });
 
   let finishedCb = document.getElementById('tt-crew-finished-cb');

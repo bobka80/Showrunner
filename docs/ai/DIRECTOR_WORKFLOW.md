@@ -120,7 +120,7 @@ The director does not need to name files, functions, or technical causes. Observ
 
 ## What AI Must Return After a Fix
 
-Every build-mode fix should end with:
+Every build-mode fix (and any campaign update that moves work forward) should end with:
 
 1. **What was wrong** — one or two sentences, no jargon
 2. **What we changed** — conceptually ("fixed how equipment saves when…")
@@ -129,8 +129,12 @@ Every build-mode fix should end with:
    - Add one fixture via the search bar
    - Click Save
    - You should see X; if you still see Y, tell me
-4. **What to watch for** — optional one-line warning if a fragile zone was involved
-5. **Documentation offer (mandatory):** The AI MUST ask:
+4. **This turn (simple words)** — mandatory for update campaigns (see [AI_DOCTRINE.md](../../AI_DOCTRINE.md) Rule 6):
+   - **What I just did**
+   - **What I updated**
+   - **Next slice** (the one thing to OK go next)
+5. **What to watch for** — optional one-line warning if a fragile zone was involved
+6. **Documentation offer (mandatory):** The AI MUST ask:
 
    > *"Do you want me to add this to the Incident Log in `FRAGILE_ZONES.md` so we don't hit the same break again?"*
 

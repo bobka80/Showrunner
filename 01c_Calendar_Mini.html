@@ -175,8 +175,15 @@ function bootMiniCalendar(targetDateString, projectId, focusCue) {
                         let endStr = dEnd.getFullYear() + '-' + String(dEnd.getMonth()+1).padStart(2,'0') + '-' + String(dEnd.getDate()).padStart(2,'0');
 
                         let lastBlock = blocks.find(b => b.type === uiType && b.endStr === startStr && b.note === (f.note || ''));
-                        if (lastBlock) lastBlock.endStr = endStr;
-                        else blocks.push({ type: uiType, startStr: startStr, endStr: endStr, note: f.note || '', startTime: f.startTime || "00:00", endTime: f.endTime || "23:59" });
+                        if (lastBlock) {
+                            lastBlock.endStr = endStr;
+                            if (!lastBlock.uidsByDate) lastBlock.uidsByDate = {};
+                            if (f.uid) lastBlock.uidsByDate[f.date] = f.uid;
+                        } else {
+                            let uidsByDate = {};
+                            if (f.uid) uidsByDate[f.date] = f.uid;
+                            blocks.push({ type: uiType, startStr: startStr, endStr: endStr, note: f.note || '', startTime: f.startTime || "00:00", endTime: f.endTime || "23:59", uidsByDate: uidsByDate });
+                        }
                     });
                     
                     blocks.forEach(b => {
@@ -186,7 +193,7 @@ function bootMiniCalendar(targetDateString, projectId, focusCue) {
                             start: b.startStr,
                             end: b.endStr,
                             classNames: ['paint-' + b.type],
-                            extendedProps: { phaseType: b.type, note: b.note, startTime: b.startTime, endTime: b.endTime },
+                            extendedProps: { phaseType: b.type, note: b.note, startTime: b.startTime, endTime: b.endTime, uidsByDate: b.uidsByDate || {} },
                             allDay: true,
                             display: 'block'
                         });

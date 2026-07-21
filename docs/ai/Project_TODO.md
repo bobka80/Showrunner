@@ -14,9 +14,9 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ---
 
-## Next up (director, 2026-07-20)
+## Next up (director, 2026-07-21)
 
-**Primary campaign (NEXT):** Multi-user fork **Part B** — B6 verified; **B7 floor smoke** then archive. Prep live rollback **v654** + `host-boot.js?v=653`. — [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md).
+**Primary campaign (NEXT):** **Logistics Ledger** — M0+M1 shipped; **M2 backfill** next. — [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md).
 
 **Operational logs:** Bug journal [error-journal/](error-journal/) · root `RELEASES.md` / `WORKS_LOG.md`.
 
@@ -24,7 +24,8 @@ Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Multi-user fork Part B** | **B7 floor smoke** — B6 checklist verified; then archive | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| **Logistics Ledger** | **M0+M1 shipped** — next M2 backfill | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) |
+| **Project Campaign Room** | After Ledger M4+ | [topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog brief — OK go per domain | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
 | **Phone app** | In-flight mobile (parallel) | [topics/mobile-crew.md](topics/mobile-crew.md) |
@@ -35,8 +36,10 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Multi-user fork: test pipeline → bulletproof → auto fork** | **B7 floor smoke** — B6 verified 2026-07-21 | [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) · [bulletproof](active/bulletproof-multiuser-live-editors-2026-07-18.md) |
+| **Logistics Ledger** (movement SoT + PA slim) | **M0+M1 shipped** — next M2 backfill | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md) · [schema](topics/logistics-ledger-schema-2026-07-20.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
+
+**Closed this session:** Multi-user fork Part B → [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) · process [archive/bulletproof-multiuser-live-editors-2026-07-18.md](archive/bulletproof-multiuser-live-editors-2026-07-18.md).
 
 **Operational log (not a campaign):** [error-journal/](error-journal/) — lasting bug memory from Report → Hand over packs. Day files: [error-journal/days/](error-journal/days/).
 
@@ -51,8 +54,9 @@ Also on the board (do not mix without director pick):
 | Mobile crew UX | Shipped v314+; **phone QR scan shipped v474** (see topic) | [topics/mobile-crew.md](topics/mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [topics/financials.md](topics/financials.md) |
-| **Offer / invoice · crew swap · availability conflicts** | Future campaign — locked 2026-07-20; **after** multi-user Part B; not active | [topics/offer-invoice-crew-availability-2026-07-20.md](topics/offer-invoice-crew-availability-2026-07-20.md) |
-| **Logistics Ledger** (movement SoT + conflict detection) | Future campaign — schema homework locked 2026-07-20; **after** Part B **and** offer redesign; structural PA refactor — not active | [topics/logistics-ledger-schema-2026-07-20.md](topics/logistics-ledger-schema-2026-07-20.md) |
+| **Offer / invoice · crew swap · availability conflicts** | Future — **off critical path** (parallel or later); soft/hard defs still useful for Ledger M5 | [topics/offer-invoice-crew-availability-2026-07-20.md](topics/offer-invoice-crew-availability-2026-07-20.md) |
+| **Logistics Ledger** (movement SoT + conflict detection) | **ACTIVE — M0+M1 shipped** — dual-write; next M2 backfill | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) · [schema](topics/logistics-ledger-schema-2026-07-20.md) |
+| **Project Campaign Room (Firebase hybrid)** | After Logistics Ledger M4+; locks + pack filed 2026-07-21 — not active | [topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md) |
 | Logistics & warehouse RFID | Active campaign — station BLE reconnect UI-restart solved (APK 0.1.36); phone QR shipped → mobile-crew | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |
@@ -65,12 +69,12 @@ Also on the board (do not mix without director pick):
 | Drive → NAS year archive | Backlog — Workspace host ready | [topics/drive-nas-year-archive.md](topics/drive-nas-year-archive.md) |
 | Session fork platform | Live — dual-domain shipped; see topic | [topics/session-fork-platform.md](topics/session-fork-platform.md) |
 | Unified data cache engine **+ DAL** | **Campaign archived** — Phase 6B live; lasting ref in topic | [topics/data-cache-engine.md](topics/data-cache-engine.md) · [archive/data-access-layer.md](archive/data-access-layer.md) |
-| Warehouse prep session | Partial — PA fork live rollback **v654**; auto-fork = campaign **Part B** (NEXT) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
-| Timeline collab session | Live sync stable; **auto fork** = campaign **Part B** (NEXT) | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) · [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) |
+| Warehouse prep session | Partial — PA fork live rollback **v654**; auto-fork **shipped** (Part B archived) | [topics/warehouse-prep-session.md](topics/warehouse-prep-session.md) · [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) |
+| Timeline collab session | Live sync stable; auto-fork **shipped** (Part B archived) | [topics/timeline-collab-session.md](topics/timeline-collab-session.md) · [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) |
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
 | Pre-ship expansion (other domains) | Backlog brief | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 
-**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → ~~DAL campaign~~ ✓ (archived) → **warehouse prep / timeline collab Part B** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).
+**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → ~~DAL campaign~~ ✓ → ~~warehouse prep / timeline collab Part B~~ ✓ → **Logistics Ledger** → Project Campaign Room → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).
 
 ---
 

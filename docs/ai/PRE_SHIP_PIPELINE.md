@@ -66,7 +66,7 @@ $env:PRE_SHIP_DAL_CONCURRENCY_OK=1; node milestone.js "…"
 
 **Gap 3 (reconciliation / failed-writes)** remains **Phase 5 product work** — shipped in DAL campaign; see [dal-phase-safety-playbook.md](archive/dal-phase-safety-playbook.md).
 
-**Planned DAL live-sync gates (Gap 1 shipped with Part A):** sync-mode lint — [dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md) · hub [multi-user-fork](active/multi-user-fork-industrial-and-auto.md).
+**Planned DAL live-sync gates (Gap 1 shipped with Part A):** sync-mode lint — [dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md) · hub [multi-user-fork](archive/multi-user-fork-industrial-and-auto.md) (archived).
 
 **Future domain gates (RBAC / notifications / truck / financials):** [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) — board item; director OK go per domain.
 

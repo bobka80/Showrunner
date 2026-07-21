@@ -1,7 +1,7 @@
 # Prep PA live sync — delete / resurrect failure (2026-07-18)
 
-**Status:** **ARCHIVED** — closed into FRAGILE. Delete notes + seed-once + Cases E–G. **Current prep live rollback:** GAS **v654**. Canonical: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § session UI + § prep PA. Floor scope: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).  
-**Campaign:** [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) · [data-access-layer.md](data-access-layer.md)  
+**Status:** **ARCHIVED** — closed into FRAGILE. Delete notes + seed-once + Cases E–G. **Current prep live rollback:** GAS **v654**. Canonical: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § session UI + § prep PA. Floor scope: [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).  
+**Campaign:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) · [data-access-layer.md](data-access-layer.md)  
 **Prior science:** [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md) · [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ timeline / prep PA / session UI  
 **Industry + process (canonical):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md)
 

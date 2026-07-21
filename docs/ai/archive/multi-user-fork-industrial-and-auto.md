@@ -1,17 +1,20 @@
-# Active — Multi-user fork: industrial harden → auto fork (timeline + PA)
+# Archived — Multi-user fork: industrial harden → auto fork (timeline + PA)
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Predecessor:** [../archive/data-access-layer.md](../archive/data-access-layer.md) — prep/timeline forks. **Prep live rollback (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. DAL-era catastrophic rollback: **v576**.  
+**Predecessor:** [data-access-layer.md](data-access-layer.md) — prep/timeline forks. **Prep live rollback (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. DAL-era catastrophic rollback: **v576**.  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ DAL prep / timeline session UI · prep PA fork live sync · timeline fork live sync  
-**How live works today:** [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) · FRAGILE “How prep session UI works now”  
+**How live works today:** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) · FRAGILE “How prep session UI works now”  
 **Process + harden depth:** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
 **Auto-fork product spec (canonical UX):** [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject) (applies to **timeline and PA**)
 
-**Opened:** 2026-07-18 · **Status:** **B6 checklist verified** — Part B behavior matches topic matrix (station PA start = host/`canOpenDalPrep` gate, intentional). **Next: B7 floor smoke** (director) → archive when agreed. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
-**Production / prep live rollback:** GAS **v656** · hosting `host-boot.js?v=655` · sync baseline **v654** · Prep banner **`live sync (patch)`**  
-**Latest shipped:** False auto-close alerts **GAS v717** · commit fail-safe B **v711–v712** · B0 baseline **v693**.  
+**Opened:** 2026-07-18 · **Closed:** 2026-07-21 · **Status:** **COMPLETE** — B7 floor smoke finished (director). **Archived** here. Bug log [../error-journal/](../error-journal/). Sync rollback pin still **v654** / `host-boot.js?v=653`.
+**Production / prep live rollback:** GAS **v725** tip · hosting per RELEASES · sync baseline **v654** · Prep banner **`live sync (patch)`**  
+**Latest shipped:** Refresh rejoin **GAS v725** · committing freeze **v721+** · B0 baseline **v693**.  
   
-**Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md).
+**Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
+
+**Process companion (archived with this campaign):** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
+**NEXT after this campaign:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)
 
 ---
 
@@ -23,8 +26,8 @@
 4. **No code** on B1+ until B0 GAS version is recorded (or director waives).  
 5. After any implementation: `node milestone.js "…"`; hosting only if `host-boot.js` changes.
 
-**Point the new agent here:**  
-`docs/ai/active/multi-user-fork-industrial-and-auto.md`
+**Point agents at the successor:**  
+`docs/ai/active/logistics-ledger-2026-07-21.md`
 
 ---
 
@@ -264,9 +267,9 @@ Prep cross-link: [warehouse-prep-session.md](../topics/warehouse-prep-session.md
 
 ### B7 — Part B exit
 
-- [ ] Director floor smoke both domains — use **§ B7 floor smoke card** below  
-- [ ] Update topic checklists; FRAGILE if lifecycle rules changed  
-- [ ] Campaign status → complete → archive when director agrees  
+- [x] Director floor smoke both domains — use **§ B7 floor smoke card** below  
+- [x] Update topic checklists; FRAGILE if lifecycle rules changed  
+- [x] Campaign status → complete → archive when director agrees (2026-07-21)  
 
 ### B7 floor smoke card (director)
 
@@ -367,13 +370,14 @@ Hard refresh web.app (latest GAS — committing freeze @ **v721+**). Use a **tes
 | 2026-07-21 | **Stay-in-view commit reopen @ GAS v722:** End/last-leave hard-freeze (live-sync stop no longer unlocks); after Sheets clears, auto new Firebase cycle if still on PA/timeline. |
 | 2026-07-21 | **Peer Opening→Live unfreeze @ GAS v723:** sticky leave block yields to new sessionUid; keep freeze until Opening (no edit gap); Live latch clears peer freeze. |
 | 2026-07-21 | **Refresh/orphan empty-room commit @ GAS v724:** unload leave presence + last-leave; presence ping reclaim when fork open and module empty. |
-| 2026-07-21 | **Refresh rejoin fix:** localStorage unload flag + orphan gate before PA enter (RPC unload often aborted). |
+| 2026-07-21 | **Refresh rejoin fix @ GAS v725:** localStorage unload flag + orphan gate before PA enter (RPC unload often aborted; no soft-join of abandoned Live). |
+| 2026-07-21 | **B7 complete — campaign closed.** Director floor smoke finished. Archive; **NEXT** = Logistics Ledger ([../topics/architecture-multi-campaign-pack-2026-07-21.md](../topics/architecture-multi-campaign-pack-2026-07-21.md)). |
 
 ---
 
 ## When this campaign closes
 
-1. Part A + Part B exits checked (or Part B explicitly deferred by director with note).  
-2. Move this file to [../archive/](../archive/).  
-3. Update [Project_TODO.md](../Project_TODO.md) Active campaigns.  
+1. [x] Part A + Part B exits checked.  
+2. [x] Move this file to [../archive/](../archive/).  
+3. [x] Update [Project_TODO.md](../Project_TODO.md) Active campaigns.  
 4. Leave long-term UX in [timeline-collab-session.md](../topics/timeline-collab-session.md) + FRAGILE updates.

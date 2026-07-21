@@ -113,7 +113,7 @@ function dalPaFixtureToCommitObj_(pa, projectId) {
   if ((pa.isShortage === true || pa.isShortage === 'true') && String(formula).indexOf('[SHORT] ') !== 0) {
     formula = '[SHORT] ' + formula;
   }
-  return {
+  var obj = {
     uid: String(pa.uid || ''),
     project_uid: String(projectId || ''),
     asset_uid: String(pa.assetId || pa.asset_uid || ''),
@@ -125,6 +125,28 @@ function dalPaFixtureToCommitObj_(pa, projectId) {
     container_uid: pa.containerUid || pa.container_uid || '',
     scan_status: pa.scanStatus || pa.scan_status || 'Assigned'
   };
+  // M1 dual-write window: preserve truck/staging if present on fixture or overlay (END PREP must not wipe)
+  var truckKeys = [
+    ['outbound_truck_uid', 'outboundTruckUid'],
+    ['outbound_x', 'outboundX'],
+    ['outbound_y', 'outboundY'],
+    ['outbound_z', 'outboundZ'],
+    ['outbound_rotated', 'outboundRotated'],
+    ['outbound_staged', 'outboundStaged'],
+    ['inbound_truck_uid', 'inboundTruckUid'],
+    ['inbound_x', 'inboundX'],
+    ['inbound_y', 'inboundY'],
+    ['inbound_z', 'inboundZ'],
+    ['inbound_rotated', 'inboundRotated'],
+    ['inbound_staged', 'inboundStaged']
+  ];
+  truckKeys.forEach(function (pair) {
+    var snake = pair[0];
+    var camel = pair[1];
+    if (pa[snake] !== undefined && pa[snake] !== null && pa[snake] !== '') obj[snake] = pa[snake];
+    else if (pa[camel] !== undefined && pa[camel] !== null && pa[camel] !== '') obj[snake] = pa[camel];
+  });
+  return obj;
 }
 
 function getFirebaseAdapter() {
@@ -394,6 +416,37 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   }
 
   // State fixtures = SSOT for non-autos; autos live only on collection (rebuild locally during prep).
+  // Load Sheets BEFORE building commit so truck overlay prefers live arrangement (Sheets-path dual-write).
+  var previousSheetRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId) || [];
+  var sheetByUid = {};
+  previousSheetRows.forEach(function (r) {
+    if (!r || !r.data || hdr.map['uid'] === undefined) return;
+    sheetByUid[String(r.data[hdr.map['uid']])] = dalPaSheetRowToObject_(r.data, hdr.map);
+  });
+  var colByUid = {};
+  (collectionRows || []).forEach(function (r) {
+    if (!r || !r.data || hdr.map['uid'] === undefined) return;
+    colByUid[String(r.data[hdr.map['uid']])] = dalPaSheetRowToObject_(r.data, hdr.map);
+  });
+  var truckFieldKeys = [
+    'outbound_truck_uid', 'outbound_x', 'outbound_y', 'outbound_z', 'outbound_rotated', 'outbound_staged',
+    'inbound_truck_uid', 'inbound_x', 'inbound_y', 'inbound_z', 'inbound_rotated', 'inbound_staged'
+  ];
+  function overlayTruckFields_(commitObj, uid) {
+    var fromSheet = sheetByUid[String(uid)];
+    var fromCol = colByUid[String(uid)];
+    truckFieldKeys.forEach(function (k) {
+      if (commitObj[k] !== undefined && commitObj[k] !== '' && commitObj[k] !== null) return;
+      if (fromSheet && fromSheet[k] !== undefined && fromSheet[k] !== '' && fromSheet[k] !== null) {
+        commitObj[k] = fromSheet[k];
+        return;
+      }
+      if (fromCol && fromCol[k] !== undefined && fromCol[k] !== '' && fromCol[k] !== null) {
+        commitObj[k] = fromCol[k];
+      }
+    });
+  }
+
   var commitObjs = [];
   var fixtureSource = stateFixtures;
   if ((!fixtureSource || !fixtureSource.length) && colFixtures.length) {
@@ -401,14 +454,15 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   }
   (fixtureSource || []).forEach(function (pa) {
     if (!pa || !pa.uid || dalPaFixtureIsAuto_(pa)) return;
-    commitObjs.push(dalPaFixtureToCommitObj_(pa, projectId));
+    var commitObj = dalPaFixtureToCommitObj_(pa, projectId);
+    try { overlayTruckFields_(commitObj, pa.uid); } catch (eOverlay) { /* keep fixture-only */ }
+    commitObjs.push(commitObj);
   });
   colAutoRows.forEach(function (r) {
     commitObjs.push(dalPaSheetRowToObject_(r.data, hdr.map));
   });
 
   // B fail-safe: snapshot current Sheets BEFORE mutate; refuse empty wipe.
-  var previousSheetRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId) || [];
   var previousObjects = previousSheetRows.map(function (r) {
     return dalPaSheetRowToObject_(r.data, hdr.map);
   });
@@ -1068,7 +1122,7 @@ function saveTimelineDataFirestore_(folderId, mode, shifts, crewUids, phases, ov
       if (subEvents.length > 0) {
         var tlRows = subEvents.map(function (t) {
           var r = new Array(tInfo.cols).fill('');
-          if (tMap['uid'] !== undefined) r[tMap['uid']] = Utilities.getUuid();
+          if (tMap['uid'] !== undefined) r[tMap['uid']] = t.uid || t.id || Utilities.getUuid();
           if (tMap['project_uid'] !== undefined) r[tMap['project_uid']] = folderId;
           if (tMap['Sub_Event_Type'] !== undefined) r[tMap['Sub_Event_Type']] = t.Sub_Event_Type || 'MAIN';
           if (tMap['Event_Date'] !== undefined) r[tMap['Event_Date']] = t.Event_Date || '';

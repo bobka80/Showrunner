@@ -88,6 +88,7 @@ function getActiveConflicts() {
             
             if (!isNaN(sEpoch) && !isNaN(eEpoch)) {
                 projects[pId].phases.push({
+                    uid: tMap['uid'] !== undefined ? (timelineData[i][tMap['uid']] || '') : '',
                     type: timelineData[i][tMap['Sub_Event_Type']],
                     start: sEpoch,
                     end: eEpoch

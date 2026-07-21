@@ -10,7 +10,7 @@
 
 **Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed**. ~~forgotten / disappearing concurrent edits~~ **Fixed** — touch/patch merge (editing crew B cannot rewrite crew A’s untouched strip).
 
-**Post-campaign optional → now owned by next campaign:** auto fork / pull-in / idle eject (timeline **and** PA). **Build order:** **(1) testing pipeline H0 → (2) bulletproof multi-user → (3) auto UX** — [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) · process [../active/bulletproof-multiuser-live-editors-2026-07-18.md](../active/bulletproof-multiuser-live-editors-2026-07-18.md). Spec text remains in § Optional update below (canonical UX).
+**Post-campaign optional → shipped:** auto fork / pull-in / idle eject (timeline **and** PA). **Archived:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) · process [../archive/bulletproof-multiuser-live-editors-2026-07-18.md](../archive/bulletproof-multiuser-live-editors-2026-07-18.md). Spec text remains in § Optional update below (canonical UX). **NEXT:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
 
 ---
 
@@ -29,7 +29,7 @@ Is: **collaborative room** with shared live state.
 
 ## Optional update — auto fork, live pull-in & idle eject
 
-**When:** **Part B** of [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) — **after** Part A (industrial harden) is director-confirmed. Not during DAL close paperwork alone.
+**When:** ~~Part B~~ of [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) — **shipped / archived 2026-07-21**.
 
 **Why document:** Reconstruct this UX without re-brainstorming. Locked **2026-07-18** (director survey: all recommended picks + freelancer exclusion). Supersedes the 2026-07-16 “auto room + idle commit” sketch.
 
@@ -157,7 +157,7 @@ Exact art/copy TBD at build; behavior above is locked.
 - [x] Redesigned visual cues same milestone
 - [x] Baseline milestone → try → keep or rollback (B0 @ v693)
 
-Floor exit: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) § B7.
+Floor exit: [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) § B7 — **done**.
 ---
 
 
@@ -223,7 +223,7 @@ Floor exit: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-u
 - [ ] Grace period, force-close, session history export to `SM_Showrunner_LOGS` optional
 
 ### After campaign — optional UX → **active campaign Part B**
-- [x] Auto fork + live pull-in + Opening warm-up + idle eject (timeline **and** PA) — code complete; **B7 floor smoke** pending — [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md)
+- [x] Auto fork + live pull-in + Opening warm-up + idle eject (timeline **and** PA) — **shipped; B7 closed 2026-07-21** — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md)
 ---
 
 ## Comparison to prep session

@@ -1,16 +1,13 @@
 # Logistics Ledger — Equipment Movement & Conflict Detection
 
-**Status:** Future campaign — design locked at brainstorm level (2026-07-20). **Schema homework complete in this file.** **Not active. Not implemented.**  
-**Sequencing:** Explicitly deferred until **after**:
+**Status:** Future campaign — design locked at brainstorm level (2026-07-20). **Schema homework complete in this file.** **Promoted to active 2026-07-21** — build checklist: [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md). **Architecture pack:** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md).  
+**Sequencing:** After Part B (**archived 2026-07-21**). Offer **off** critical path (director locks). Do **not** begin schema/migration code until director says **OK go** on the active brief.
 
-1. Multi-user fork Part A (done) + **Part B** — [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md)
-2. Offer / invoice · crew · availability product campaign — [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md)
-
-Director: this is **not a small thing** — a **structural ENGINE refactor**, not a quick patch. Do **not** begin implementation until the director confirms sequencing and says **OK go**.
+Director: this is **not a small thing** — a **structural ENGINE refactor**, not a quick patch.
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Companion use-case:** [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) §3 (soft/hard definitions, day-view, false-badge bug)  
-**Related:** [availability-fleet.md](availability-fleet.md) · [warehouse-prep-session.md](warehouse-prep-session.md) · [ENGINEERING_RULES.md](../ENGINEERING_RULES.md) §6–7 · [SCHEMA.md](../SCHEMA.md)
+**Related:** [availability-fleet.md](availability-fleet.md) · [warehouse-prep-session.md](warehouse-prep-session.md) · [ENGINEERING_RULES.md](../ENGINEERING_RULES.md) §6–7 · [SCHEMA.md](../SCHEMA.md) · [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md)
 
 **Industry reference (director):** Flex Rental Solutions / LendControl-style platforms track movement as discrete auditable manifest events — a **ledger**, not a fixed two-leg property on the asset list.
 
@@ -80,6 +77,8 @@ Canonical headers in `Logistics_Schema.js` (`projectAssetsHeaders`):
 
 **Fragile today:** `saveProjectAssetsAPI` / `dalApplyPaDeltas_` **omit** truck fields on write — a full PA replace after arrange can leave spatial data inconsistent. Ledger migration must not make this worse.
 
+**Also fragile (sweep 2026-07-21):** END PREP via `dalPaFixtureToCommitObj_` + `dalCommitPaFromFirestore_` commits **assignment-only** fixtures and **clears all 12 truck fields** on Sheets rewrite. Collection snapshot docs may still carry truck fields; `state.fixturesJson` does not. Dual-write must not rely on fixtures for movement.
+
 **DAL gap:** `saveTruckArrangementAPI` is still **Sheets full rewrite**, not routed through `getProjectAssetsRepo()` / Firebase adapter. Prep topic lists truck arrangement as **Firebase (phased)** — unfinished. This campaign and prep-fork truck work must be planned together when promoted (see §8).
 
 ### 2.3 What `Conflicts.js` actually does today
@@ -124,7 +123,8 @@ Prior prep-topic idea (“truck placement events on `Operations_Ledger`”) is *
 | `Shift_Assignments` | Crew/truck shifts; Auto outbound/inbound notes |
 
 **Locked design intent:** soft availability = **phase end** (e.g. breakdown/recovery completion), not truck load clock alone.  
-**Recommended default (homework):** `phase_ref` → **`Project_Timelines.uid`** (same source Conflicts already trusts for windows). Confirm with director before code if Phase_Blocks should be preferred instead — **do not dual-ref without a rule**.
+**`phase_ref` target:** **`Project_Timelines.uid`** (director lock).  
+**UID preserve (director 2026-07-21):** live saves currently regenerate `Project_Timelines.uid` every rewrite — **must fix in M0/M1** (keep/reuse ids; expose `uid` on fragments) before trusting `phase_ref` FKs. Do **not** dual-ref `Phase_Blocks` without a new director rule.
 
 ---
 
@@ -222,17 +222,17 @@ When promoted, treat as a **checklist of blast radius** — not optional polish:
 
 ### Schema / cache
 
-- [ ] `Logistics_Schema.js` — create `Logistics_Ledger` sheet + headers; shrink `projectAssetsHeaders`; wire `cachedEngineSheets` / sheet map
-- [ ] `Dal_Cache.js` (and any hot-sheet lists) — register new tab
-- [ ] Live Engine workbook migration (production + any staging Engine copies)
+- [x] `Logistics_Schema.js` — create `Logistics_Ledger` sheet + headers; wire `cachedEngineSheets` / sheet map (PA columns **not** shrunk yet — M4)
+- [x] `Dal_Cache.js` (and any hot-sheet lists) — register new tab
+- [ ] Live Engine workbook migration (production + any staging Engine copies) — auto-heals on `verifyDatabaseSchema()` after deploy
 
 ### Writers / readers of old PA truck columns
 
-- [ ] `saveTruckArrangementAPI` → write ledger legs (outbound/inbound as rows), stop writing PA columns
-- [ ] `05a_Truck_Arrangement.html`, `02_Project_Editor_Logistics.html`
-- [ ] `getProjectAssetsSheets_`, `getUnifiedTrackerData` (Matryoshka inherit rules → ledger)
-- [ ] `04b_Equipment_Tracker.html`, `01h_Mobile_Assets.html`
-- [ ] `generateLogisticsPayloadAPI` truck-shift creation — decide: still create timeline shifts for crew UX, and/or also seed ledger rows (director pick at planning)
+- [x] `saveTruckArrangementAPI` → dual-write ledger legs (still writes PA columns until M4)
+- [ ] `05a_Truck_Arrangement.html`, `02_Project_Editor_Logistics.html` (UI unchanged in M1)
+- [ ] `getProjectAssetsSheets_`, `getUnifiedTrackerData` (Matryoshka inherit rules → ledger) — M3
+- [ ] `04b_Equipment_Tracker.html`, `01h_Mobile_Assets.html` — M3
+- [x] `generateLogisticsPayloadAPI` — keep AUTO shifts; stamp clocks onto matching ledger legs
 
 ### Conflicts
 
@@ -306,15 +306,51 @@ This is a **destructive shape change** on a live transactional table. Do not shi
 | Offer / availability product | Soft/hard **definitions** + day-view UX live there; **this** file owns schema + detection SoT |
 | Warehouse prep / truck Firebase | Prep topic still lists truck arrange as phased Firebase; cutover should land placement on **`Logistics_Ledger`**, not embed truck fields back into PA fork docs |
 | Pre-ship expansion | Consider a future structural gate: forbid new `outbound_truck_uid` references after cutover |
+| **Project Campaign Room (Firebase hybrid)** | **Must follow this campaign** — unified warm room + periodic Sheets publish; ledger + **timeline** are linked (load clocks / `phase_ref`). Director locks: [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md). Decision brief: [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) |
+
+---
+
+## 8b. Decision brief — Firebase campaign room (director 2026-07-21)
+
+Director brainstorm: near show date, crews revisit the same project often; short **commit/reopen** session cycles feel wrong. Proposed future model = **48h leased Firebase workspace** + **~30m publish checkpoints** to Sheets, with listeners so people move fluidly.
+
+**Why this ledger campaign matters for that decision:**
+
+- Today truck/staging lives on **PA rows** and in **Firebase asset docs** — a bad foundation for a “whole project room.”
+- After cutover, movement is **`Logistics_Ledger`**; PA is list-only → campaign room = **assets + logistics + timeline** (three slices), not one monolithic snapshot.
+- Building the hybrid room **before** ledger ships would embed truck fields in Firebase twice (build now, strip later).
+
+**Planning lock:** Logistics Ledger **before** Project Campaign Room implementation unless director explicitly reorders.
+
+Full pros/cons, options A–D, sequencing, open questions: **[project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md)**.
 
 ---
 
 ## 9. Director decisions still open (resolve at planning, before OK go on code)
 
-1. **`phase_ref` target:** confirm `Project_Timelines.uid` (recommended) vs `Phase_Blocks.uid`.
-2. **Stay / on-site rows:** allow `truck_uid` empty for continuity legs?
-3. **Dual-write duration:** mandatory M1–M3 dual-write vs big-bang (homework recommends dual-write).
-4. **Timeline auto truck shifts:** keep generating `AUTO-OUTBOUND`/`AUTO-INBOUND` shifts for crew timeline UX after ledger exists?
+**Partially locked 2026-07-21** — see [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md):
+
+| # | Topic | Lock |
+|---|--------|------|
+| 1 | `phase_ref` target | **`Project_Timelines.uid`** |
+| 2 | Empty `truck_uid` for continuity | **Allowed** |
+| 3 | Dual-write duration | **Mandatory M1–M3** |
+| 4 | AUTO-OUTBOUND / AUTO-INBOUND shifts | **Keep and link to ledger legs** |
+| — | Load/unload clocks | **Timeline truck shifts** + phase_ref for availability |
+| — | Soft conflict free-at | **Phase end** (not truck load alone) |
+| — | Offer before Ledger? | **No** — Offer off critical path |
+| — | `Project_Timelines.uid` for `phase_ref` | **Preserve on rewrite** + expose on fragments (2026-07-21) |
+
+Remaining at promote time (if any): empty times after backfill review UI; `[TRANSFER_FROM` as ledger edges vs formula bypass only.
+
+---
+
+## 9b. Was open (historical — do not re-litigate without director)
+
+1. ~~**`phase_ref` target:**~~ locked → `Project_Timelines.uid`
+2. ~~**Stay / on-site rows:**~~ locked → empty `truck_uid` allowed
+3. ~~**Dual-write duration:**~~ locked → M1–M3
+4. ~~**Timeline auto truck shifts:**~~ locked → keep + link to ledger
 5. **`[TRANSFER_FROM`:** remain formula bypass only, or also express as ledger edges?
 6. **Empty times after backfill:** manager review UI vs leave blank until next arrange save?
 
@@ -324,10 +360,10 @@ This is a **destructive shape change** on a live transactional table. Do not shi
 
 ### Gates
 
-- [ ] Director confirms sequencing (after Part B + offer campaign, or explicit reorder)
-- [ ] Director resolves §9 open decisions
-- [ ] Active brief created under `docs/ai/active/` (copy checklist; keep this file as design lock)
-- [ ] Explicit **OK go** before any schema or migration code
+- [x] Director confirms sequencing (Part B archived; Offer off path)
+- [x] Director resolves phase UID preserve + §9 product locks
+- [x] Active brief created under `docs/ai/active/` — [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)
+- [ ] Explicit **OK go** before any schema or migration code (M0/M1)
 
 ### Design lock (this file) — done at brainstorm
 

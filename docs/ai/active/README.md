@@ -12,4 +12,6 @@ Full lifecycle: [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) Rule 11.
 
 **Major rewind (2026-07-11):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — GAS **530** baseline. **Station UI next:** [STATION_UI.md](../STATION_UI.md) · [station-ui-handoff.md](station-ui-handoff.md).
 
+**NEXT (2026-07-21):** [logistics-ledger-2026-07-21.md](logistics-ledger-2026-07-21.md) — Logistics Ledger M0/M1 awaiting OK go for code.
+
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md)

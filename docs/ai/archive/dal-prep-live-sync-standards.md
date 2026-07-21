@@ -1,6 +1,6 @@
 # Prep PA live sync — industry standards + how we work (locked)
 
-**Campaign hub (checkboxes + floor scope):** [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md)  
+**Campaign hub (checkboxes + floor scope):** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md)  
 **DAL era hub (archived):** [data-access-layer.md](data-access-layer.md)  
 **Never-dos (code):** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) §§ timeline + prep PA + session UI  
 **Incident science:** [dal-pa-live-sync-thrash.md](dal-pa-live-sync-thrash.md) · [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md)  
@@ -8,7 +8,7 @@
 
 **Purpose:** Durable doctrine for **warehouse prep multi-user live sync** (archived with DAL; floor work continues on multi-user hub). Not an incident log. Fresh agents read this **before** another prep live sync code change.
 
-**Locked:** 2026-07-18 (industry harden + process) · **Prep live rollback / production (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. **Floor workflow:** [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md) — search/formula batch absolute upserts **primary**; floor +/- combine **secondary**.
+**Locked:** 2026-07-18 (industry harden + process) · **Prep live rollback / production (director 2026-07-19):** GAS **v654** + hosting `host-boot.js?v=653`. **Floor workflow:** [multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](multi-user-fork-industrial-and-auto.md) — search/formula batch absolute upserts **primary**; floor +/- combine **secondary**.
 
 **Canonical “how it works” (session + fixtures):** [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep / timeline session UI · § DAL prep PA fork live sync.
 

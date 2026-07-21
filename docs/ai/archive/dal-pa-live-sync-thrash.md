@@ -1,6 +1,6 @@
 # Prep PA live sync thrash — investigation log (2026-07-17)
 
-**Status:** **ARCHIVED** — closed into FRAGILE. Structural qty thrash fix = txn state doc. **Current prep live rollback:** GAS **v654** + `host-boot.js?v=653`. Historical smoke: v645. Delete/resurrect + banner: [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) · [FRAGILE § session UI](../FRAGILE_ZONES.md). Floor scope: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).  
+**Status:** **ARCHIVED** — closed into FRAGILE. Structural qty thrash fix = txn state doc. **Current prep live rollback:** GAS **v654** + `host-boot.js?v=653`. Historical smoke: v645. Delete/resurrect + banner: [dal-pa-delete-resurrect.md](dal-pa-delete-resurrect.md) · [FRAGILE § session UI](../FRAGILE_ZONES.md). Floor scope: [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).  
 **Test:** `node scripts/dal-pa-live-sync-test.js` (Cases A–G)
 
 ## Root cause (why v628–v634 failed)

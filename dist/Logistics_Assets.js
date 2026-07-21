@@ -367,6 +367,17 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
         sheets.projectAssets.clearContents();
         if(keptRows.length > 0) sheets.projectAssets.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
 
+        // M1 dual-write: mirror arrangement into Logistics_Ledger (PA columns still SoT for readers)
+        var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
+        var projectPaOnly = keptRows.slice(1).filter(function (r) {
+          return String(r[map['project_uid']]) === String(projectId);
+        });
+        try {
+          logisticsLedgerDualWriteFromPaRows_(sheets, projectId, projectPaOnly, map, dualLegs, actor);
+        } catch (eLl) {
+          writeToAuditLog(actor, "WARN", "LOGISTICS_LEDGER", projectId, projectId, "Dual-write failed: " + (eLl && eLl.message ? eLl.message : eLl));
+        }
+
         flushCache();
         writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT", projectId, projectId, `Saved spatial arrangement for ${layoutData.length} cases.`);
         return "Saved Truck Layout";
@@ -474,7 +485,7 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             if(dStr instanceof Date) eDateStr = `${dStr.getFullYear()}-${String(dStr.getMonth() + 1).padStart(2, '0')}-${String(dStr.getDate()).padStart(2, '0')}`;
             else if(dStr) { let match = String(dStr).match(/^(\d{4})-(\d{2})-(\d{2})/); if(match) eDateStr = match[0]; }
             
-            if(eDateStr) projects[pid].dates.push({ date: eDateStr, type: subType, startTime: extractTime(timelineData[i][tMap['Start_Time']]), endTime: extractTime(timelineData[i][tMap['End_Time']]) });
+            if(eDateStr) projects[pid].dates.push({ uid: tMap['uid'] !== undefined ? (timelineData[i][tMap['uid']] || '') : '', date: eDateStr, type: subType, startTime: extractTime(timelineData[i][tMap['Start_Time']]), endTime: extractTime(timelineData[i][tMap['End_Time']]) });
         }
         
         // Filter to overlapping projects only
@@ -874,6 +885,11 @@ function generateLogisticsPayloadAPI(projectId, deltas, logData, actor = "System
         }
         sheets.shifts.clearContents();
         if (keptShiftRows.length > 0) sheets.shifts.getRange(1, 1, keptShiftRows.length, keptShiftRows[0].length).setValues(keptShiftRows);
+
+        // M1: link AUTO truck clocks onto matching Logistics_Ledger legs (leg_id + truck_uid)
+        try {
+          logisticsLedgerStampClocksFromHub_(sheets, projectId, logData);
+        } catch (eStamp) { /* non-fatal during dual-write window */ }
 
         // Notify changes
         let oldShiftIds = deletedShiftRows.map(r => r[sMap['uid']]);

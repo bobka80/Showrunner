@@ -84,9 +84,10 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`02e5_Logic_Sync.html`**: Optimistic syncing and delta calculations. *Quirk: Houses 'processFormulas()'.*
 - **`02g_Project_Reports.html`**: The Print Studio modal and logistics tree filtering. **Wired** in `Index.html` (required for `openPrintModal()` from Project Assets PRINT button).
 - **`Logistics_Assets.js`**: The master logistics aggregator for project assets on the backend.
+- **`Logistics_Ledger.js`**: Movement ledger helpers — `Logistics_Ledger` dual-write (M1), PA truck inventory API, AUTO clock stamp onto legs.
 - **`Logistics_Projects.js`**: CRUD operations for project lifecycles.
 - **`Logistics_Roster.js`**: Month Matrix and un-paid scanner data operations.
-- **`Logistics_Schema.js`**: Relational engine schemas.
+- **`Logistics_Schema.js`**: Relational engine schemas (incl. `Logistics_Ledger` tab bootstrap).
 - **`Logistics_Tasks.js`**: Task routing logic.
 - **`Logistics_Timeline.js`**: Project timeline backend CRUD.
 - **`Dal_Repos.js`**: DAL Phase 1–3 — `SheetsAdapter` + domain repos + scoped row write helpers.
@@ -380,6 +381,8 @@ Below is the definitive list of all `@INDEX:` markers mapped inside the codebase
 - `PA_ENGINE -> Project Assets Logistics`
 - `TRACKER_ENGINE -> Unified Equipment Matrix Data`
 - `PA_ENGINE -> Master Logistics Aggregator`
+### Logistics_Ledger.js
+- `LEDGER_ENGINE -> Logistics_Ledger dual-write + inventory`
 ### Logistics_Projects.js
 - `CRUD_PROJECTS -> Project & Checklists Save`
 - `CRUD_PROJECTS -> Status & Lifecycle`

@@ -17,8 +17,12 @@ One file per feature area. **Read only the topic you need.**
 - [mobile-crew.md](mobile-crew.md) — mobile crew UX
 - [database-ops.md](database-ops.md) — backup/restore + push admin
 - [financials.md](financials.md) — financials & quoting
-- [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — future campaign: offer/invoice, crew swap, availability conflicts (after Part B)
-- [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — future campaign: Logistics_Ledger SoT + PA truck-column migration (after Part B + offer)
+- [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — future campaign: offer/invoice, crew swap, availability (off critical path)
+- [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — schema lock for Logistics_Ledger + PA truck-column migration · **active:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)
+- [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md) — sequenced pack: Ledger → Campaign Room → packet sync
+- [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — decision brief: 48h Firebase campaign room + Sheets checkpoints (after ledger; not active)
+- [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md) — director poll locks (idle, publish order, ledger↔timeline, UID preserve)
+- [architecture-campaign-fresh-agent-prompt-2026-07-21.md](architecture-campaign-fresh-agent-prompt-2026-07-21.md) — copy-paste prompt for design-only codebase sweep
 - [logistics-warehouse.md](logistics-warehouse.md) — warehouse RFID, station gun, gate
 - [project-assets-concurrency.md](project-assets-concurrency.md) — multi-user Project Assets
 - [compliance.md](compliance.md) — compliance & H&S
@@ -35,6 +39,6 @@ One file per feature area. **Read only the topic you need.**
 - [timeline-collab-session.md](timeline-collab-session.md) — multi-user timeline room
 - [timeline-shift-field-crew.md](timeline-shift-field-crew.md) — shift confirm & field actuals
 
-**Build order:** ~~[workspace-migration.md](workspace-migration.md)~~ ✓ → ~~DAL campaign~~ ✓ ([../archive/data-access-layer.md](../archive/data-access-layer.md) through **Phase 4 Slice D** [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) + Phase 5–6) → fuller [warehouse-prep-session.md](warehouse-prep-session.md) / [timeline-collab-session.md](timeline-collab-session.md) UX (Part B). **Shift confirm** may start early; **field actuals** after confirm. **Last before users:** [pre-beta-hardening.md](pre-beta-hardening.md).
+**Build order:** ~~[workspace-migration.md](workspace-migration.md)~~ ✓ → ~~DAL campaign~~ ✓ → ~~Part B multi-user fork~~ ✓ → **[Logistics Ledger](../active/logistics-ledger-2026-07-21.md)** → Campaign Room → … **Last before users:** [pre-beta-hardening.md](pre-beta-hardening.md).
 
 When adding a new area: create a topic file here, add one line to `Project_TODO.md` index (the only status table). **Do not** put canonical “how it works” docs in this folder — use [drawer placement rules](../README.md#where-to-put-new-documentation) in the parent README.

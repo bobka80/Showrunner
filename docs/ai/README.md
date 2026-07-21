@@ -42,8 +42,10 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md) | DAL mechanical gates handbook — **read before DAL hot-path ships** |
 | [dal-client-inventory.md](dal-client-inventory.md) | Generated client call inventory (pre-ship `--check`) |
 | [error-journal/](error-journal/) | **Operational log** — bug memory from Report → Hand over · build: [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md) |
-| [active/multi-user-fork-industrial-and-auto.md](active/multi-user-fork-industrial-and-auto.md) | **NEXT Part B** — Part A complete; middle archived |
-| [active/bulletproof-multiuser-live-editors-2026-07-18.md](active/bulletproof-multiuser-live-editors-2026-07-18.md) | Process depth for live-sync harden (testing + fix approach) |
+| [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) | Multi-user fork Part A+B — **archived 2026-07-21** |
+| [archive/bulletproof-multiuser-live-editors-2026-07-18.md](archive/bulletproof-multiuser-live-editors-2026-07-18.md) | Process depth for live-sync harden (archived with Part B) |
+| [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) | **NEXT** — Logistics Ledger M0–M5 |
+| [topics/architecture-multi-campaign-pack-2026-07-21.md](topics/architecture-multi-campaign-pack-2026-07-21.md) | Sequenced pack: Ledger → Campaign Room → packet sync |
 | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) | Future pre-ship gates: RBAC / FCM / truck / financials |
 | [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) | Scoped pre-ship + Bugbot gate (all layers) |
 | [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now **full protocol** (the root `../../MILESTONE_NOW.md` is the director's quick card that points here) |

@@ -25,6 +25,7 @@ function dalSheetNamesForTag_(tag) {
     ];
   }
   if (/:pa$/.test(tag)) return ['Project_Assets'];
+  if (/:logistics$/.test(tag) || tag.indexOf('logistics_ledger') !== -1) return ['Logistics_Ledger'];
   if (/:timeline$/.test(tag)) {
     return ['Shift_Assignments', 'Phase_Blocks', 'Dept_Overrides', 'Project_Timelines', 'Projects_Index'];
   }
@@ -37,7 +38,7 @@ function dalSheetNamesForTag_(tag) {
   if (tag === 'fleet') return ['Vehicles'];
   if (tag === 'clients') return ['Clients'];
   if (tag === 'tracker') {
-    return ['Project_Assets', 'Shift_Assignments', 'Phase_Blocks', 'Projects_Index', 'Operations_Ledger'];
+    return ['Project_Assets', 'Shift_Assignments', 'Phase_Blocks', 'Projects_Index', 'Operations_Ledger', 'Logistics_Ledger'];
   }
   return [];
 }

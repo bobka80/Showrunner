@@ -11,7 +11,7 @@
 
 | Mode | Canonical doc |
 |------|----------------|
-| **START PREP open** (Firebase PA fork, live patch, search/formula batch adds, pack, floor +/-) | [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md) · [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) · FRAGILE prep PA |
+| **START PREP open** (Firebase PA fork, live patch, search/formula batch adds, pack, floor +/-) | [../archive/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../archive/multi-user-fork-industrial-and-auto.md) · [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) · FRAGILE prep PA |
 | **Normal day** (no prep session — Sheets `saveProjectAssetsDelta`, mobile auto-save, collision gaps) | **This file** (below) |
 
 Do **not** treat the backlog below as the prep-floor sync model. Prep live rollback: GAS **v654** + `host-boot.js?v=653`.
@@ -108,7 +108,7 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 4. Desktop auto-save + merge improvements  
 5. Checkout/list status closure  
 
-**Floor / prep mode:** Live multi-user list = [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md). Prep session UX shell: [warehouse-prep-session.md](warehouse-prep-session.md).
+**Floor / prep mode:** Live multi-user list = [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (archived). Prep session UX shell: [warehouse-prep-session.md](warehouse-prep-session.md). **NEXT structural:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
 
 ---
 

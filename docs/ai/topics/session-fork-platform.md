@@ -15,11 +15,13 @@
 | Warehouse preparation (PA, ledger, trucks, logistics hub) | [warehouse-prep-session.md](warehouse-prep-session.md) |
 | Timeline collaboration room | [timeline-collab-session.md](timeline-collab-session.md) |
 
-**Last swept:** 2026-07-15
+**Last swept:** 2026-07-21
 
 **Firestore paths (canonical):** `projects/{projectId}/assets/` and `projects/{projectId}/timeline/` per [design lock](../archive/dal-firebase-design-lock-2026-07-13.md). The older `sessions/{projectId}/{sessionType}/` sketch is historical only.
 
-**Dual-domain (Phase 4 Slice D):** prep + timeline may both be open **concurrent** on one project — [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) (shipped @ v603).
+**Future architecture decision (not active):** [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — 48h Project Campaign Room + periodic Sheets publish; depends on [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md). **Sequenced pack:** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger active:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
+
+**Dual-domain (Phase 4 Slice D):** prep + timeline may both be open **concurrent** on one project — [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) (shipped @ v603). **Auto-fork Part B:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (closed 2026-07-21).
 
 ---
 
@@ -86,6 +88,50 @@ SESSION CLOSED (fork left)
 
 - [ ] Reuse FCM data messages: `session_opened`, `session_closing`, `session_committed`
 - [ ] Users must use web.app PWA — [notifications.md](notifications.md)
+
+---
+
+## Future — Project Campaign Room (director brainstorm 2026-07-21)
+
+**Status:** Decision brief only — **not implemented.** Canonical write-up: [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md).
+
+### Problem
+
+Current model = **short sessions** per domain (prep + timeline may both be open, but separate lifecycles). Close triggers: End ∪ last-leave ∪ idle → **one commit** → room closed. Near show date, crews **revisit the same project repeatedly**; commit/reopen churn causes UX pain (committing freeze, refresh orphans, calendar dots).
+
+### Proposed direction (Option C — recommended in brief)
+
+| Element | Proposal |
+|---------|----------|
+| **Room type** | **Project Campaign Room** — one leased workspace per project (not weeks; **48h max**) |
+| **Slices** | After Logistics Ledger: **assets** + **logistics** + **timeline** (multi-path, not one Firestore doc) |
+| **Sheets** | **Publish checkpoints** ~every 30m if dirty; room stays live |
+| **Expiry** | 48h → final publish → rotate room |
+| **Outside room** | Vault, RFID `Operations_Ledger`, financials, cross-project tracker |
+
+### Pros (summary)
+
+- Fits show-week revisit pattern; less commit/reopen friction
+- Regular durable checkpoints limit worst-case data loss vs “Firebase-only for days”
+- Post-ledger: list vs movement vs timeline **separate slices** → fewer edit collisions
+- Listeners give live awareness without requiring constant session restart
+
+### Cons (summary)
+
+- **Conflicts with design lock** rule “no periodic Sheets sync during session” — requires doctrine revision
+- Sheets may lag live Firebase by up to checkpoint interval
+- More lifecycle complexity (lease, publish, rollover, failed publish retry)
+- Must **not** build on pre-ledger PA truck-column embedding
+- Firebase quota / listener cost over longer room lifetime
+
+### Sequencing (planning lock — updated 2026-07-21)
+
+1. ~~Multi-user Part B exit (B7 floor smoke)~~ ✓ archived  
+2. ~~Offer / availability~~ — **off critical path** (locks)  
+3. **Logistics Ledger** — [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)  
+4. Project Campaign Room  
+
+Interim: refresh/orphan/commit UX within short-session model was improved during Part B; Campaign Room replaces leave/idle-as-commit later.
 
 ---
 

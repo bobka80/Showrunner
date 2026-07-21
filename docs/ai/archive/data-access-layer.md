@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic:** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **ARCHIVED** 2026-07-20 — Phases 0–6 complete enough to close. Prep live rollback **v654** + `host-boot.js?v=653`. Floor multi-user work continues on [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md). **DAL-era catastrophic rollback:** **v576**.
+**Opened:** 2026-07-05 · **Status:** **ARCHIVED** 2026-07-20 — Phases 0–6 complete enough to close. Prep live rollback **v654** + `host-boot.js?v=653`. Floor multi-user work continues on [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md). **DAL-era catastrophic rollback:** **v576**.
 
 **Living docs after close:** topic [data-cache-engine.md](../topics/data-cache-engine.md) · never-dos [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) · prep live standards (this archive) [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) · gates handbook [dal-pre-ship-gates.md](dal-pre-ship-gates.md) · generated inventory [../dal-client-inventory.md](../dal-client-inventory.md).
 
@@ -18,7 +18,7 @@
 
 **Slice D (dual-domain sessions):** [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) — prep + timeline concurrent; **gate before Phase 5** (shipped).
 
-**Prep PA live sync (industry standards + investigation process):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — entity patch (not CRDT); **batch absolute upserts primary** (search/formula); floor +/- deltas secondary; hardening H1–H5; prove-with-sim + mutation inventory before another prep live ship. Floor scope: [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md). Never-dos: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md).
+**Prep PA live sync (industry standards + investigation process):** [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md) — entity patch (not CRDT); **batch absolute upserts primary** (search/formula); floor +/- deltas secondary; hardening H1–H5; prove-with-sim + mutation inventory before another prep live ship. Floor scope: [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md). Never-dos: [FRAGILE_ZONES.md](../FRAGILE_ZONES.md).
 
 This is the **live campaign file** for the single database layer.
 
@@ -415,7 +415,7 @@ Same as Phase 1 — no new UX. Hard refresh once after deploy.
 - **2026-07-15:** **Slice D documented** — dual-domain concurrent prep + timeline — [dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md). **Shipped v603.**
 - **2026-07-16:** Post-campaign **optional** timeline UX (auto room on enter + idle commit) documented — do **not** build during this campaign.
 - **2026-07-18:** Optional UX **expanded & locked** (auto fork + live pull-in + idle eject; timeline **and** PA; freelancer exclusion) — [../topics/timeline-collab-session.md § Optional update](../topics/timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject); prep cross-link in [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md). Build only as multi-user fork **Part B** after harden.
-- **2026-07-19:** Multi-user fork **order locked** — H0 testing pipeline → bulletproof H1–H5 + Gap 1 → Part B auto fork. Process brief [../active/bulletproof-multiuser-live-editors-2026-07-18.md](../active/bulletproof-multiuser-live-editors-2026-07-18.md); Gap 1 folded into hub + [dal-pre-ship-gates.md](dal-pre-ship-gates.md) (no parallel gap-closure novel); other-domain gates [../topics/pre-ship-pipeline-expansion-2026-07-18.md](../topics/pre-ship-pipeline-expansion-2026-07-18.md).
+- **2026-07-19:** Multi-user fork **order locked** — H0 testing pipeline → bulletproof H1–H5 + Gap 1 → Part B auto fork. Process brief [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md); Gap 1 folded into hub + [dal-pre-ship-gates.md](dal-pre-ship-gates.md) (no parallel gap-closure novel); other-domain gates [../topics/pre-ship-pipeline-expansion-2026-07-18.md](../topics/pre-ship-pipeline-expansion-2026-07-18.md).
 - **2026-07-20:** **Campaign archived** — hub + satellites → `docs/ai/archive/`. Living: topic cache engine, FRAGILE, inventory at `docs/ai/dal-client-inventory.md`.
 - **2026-07-16:** Director clarified close bar — **not** “absolutely every DB path through DAL.” Documented out-of-campaign inventory below.
 

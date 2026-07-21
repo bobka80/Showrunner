@@ -160,7 +160,7 @@ function saveTimelineDataSheets_(folderId, mode, shifts, crewUids, phases, overr
       if (subEvents.length > 0) {
         let tlRows = subEvents.map(t => {
           let r = new Array(tInfo.cols).fill("");
-          if(tMap['uid'] !== undefined) r[tMap['uid']] = Utilities.getUuid();
+          if(tMap['uid'] !== undefined) r[tMap['uid']] = t.uid || t.id || Utilities.getUuid();
           if(tMap['project_uid'] !== undefined) r[tMap['project_uid']] = folderId;
           if(tMap['Sub_Event_Type'] !== undefined) r[tMap['Sub_Event_Type']] = t.Sub_Event_Type || "MAIN";
           if(tMap['Event_Date'] !== undefined) r[tMap['Event_Date']] = t.Event_Date || "";

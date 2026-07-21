@@ -6,15 +6,15 @@
 
 **Related:** [project-assets-concurrency.md](project-assets-concurrency.md) · [logistics-warehouse.md](logistics-warehouse.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Status:** Partial — prep PA fork live; **Part B auto-fork code complete** (B6 verified); **B7 floor smoke** pending — [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).
+**Status:** Partial — prep PA fork live; auto-fork **shipped** (Part B archived 2026-07-21) — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md).
 
-**Live sync:** Production / prep live rollback GAS **v654** + `host-boot.js?v=653`. **Floor scope (locked):** search/formula batch absolute adds primary; packing + RFID checkout parallel; floor +/- secondary — [../active/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../active/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
+**Live sync:** Production / prep live rollback GAS **v654** + `host-boot.js?v=653`. **Floor scope (locked):** search/formula batch absolute adds primary; packing + RFID checkout parallel; floor +/- secondary — [../archive/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../archive/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
 
-**Last swept:** 2026-07-19
+**Last swept:** 2026-07-21
 
 **Dual-domain vs timeline:** **Resolved** (Slice D / GAS v603) — prep + timeline collab may both be open. Spec: [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md).
 
-**Post-campaign optional (do not build during DAL):** now **Part B** of [multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md) (**after H0 testing + Part A harden**). Spec: [timeline-collab-session.md § Optional update](timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject).
+**Post-campaign optional (do not build during DAL):** ~~Part B~~ **shipped** — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md). Spec: [timeline-collab-session.md § Optional update](timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject). **NEXT structural:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
 
 **Design lock note:** Logistics Hub / ledger = **atomic ops, not a prep fork** ([design lock §2](../archive/dal-firebase-design-lock-2026-07-13.md)). Older bullet below about ledger/hub on the Firebase fork is aspirational floor UX; router today keeps `LEDGER` on Sheets.
 

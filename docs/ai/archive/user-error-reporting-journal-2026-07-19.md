@@ -5,7 +5,7 @@
 **Point agents (live):** `docs/ai/error-journal/` · this file = build history only.  
 **Journal:** [../error-journal/README.md](../error-journal/README.md)
 
-**Related:** Multi-user fork Part B — [../active/multi-user-fork-industrial-and-auto.md](../active/multi-user-fork-industrial-and-auto.md).
+**Related:** Multi-user fork Part B — [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md).
 
 **UI lock (Phase 2):** Top lip drawer; freeze on open; everyone. **Phase 3:** Database → ERROR LOGS → Hand over to Cursor (copy pack + delete inbox rows).
 

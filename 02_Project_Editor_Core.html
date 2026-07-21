@@ -453,7 +453,7 @@ function runSchedule() {
             let isoDay = currentD.getFullYear() + "-" + 
                          String(currentD.getMonth() + 1).padStart(2, '0') + "-" + 
                          String(currentD.getDate()).padStart(2, '0');
-            timelines.push({ Sub_Event_Type: backendType, Event_Date: isoDay, Start_Time: sTime, End_Time: eTime, Note: note });
+            timelines.push({ uid: (ev.extendedProps.uidsByDate && ev.extendedProps.uidsByDate[isoDay]) || ev.extendedProps.uid || '', Sub_Event_Type: backendType, Event_Date: isoDay, Start_Time: sTime, End_Time: eTime, Note: note });
             currentD.setDate(currentD.getDate() + 1);
         }
     });

@@ -101,7 +101,12 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 
 **Note on Cases / Kits / Presets:** The 30-table target model lists separate `Cases`, `Kits`, and `Presets` sheets. **Current implementation:** kit/case/preset logic is largely consolidated in the **`Assets`** sheet plus `GeneralizationEngine.generateBlueprint()` (`07c_Generalization_Engine.html`). Separate Cases/Kits/Presets tables are **planned**, not separate cached sheets in `Resources_Core.js` today.
 
-**THE ENGINE (Transactional):** `Projects_Index`, `Project_Timelines`, `Shift_Assignments`, `Phase_Blocks`, `Dept_Overrides`, `Leave_Tracker`, `Global_Tasks`, `Task_Assignees`, `Task_Todos`, `Task_Assets`, `Project_Checklists`, `Notifications`, `Project_Assets`, `Conflict_Overrides`, `Operations_Ledger`
+**THE ENGINE (Transactional):** `Projects_Index`, `Project_Timelines`, `Shift_Assignments`, `Phase_Blocks`, `Dept_Overrides`, `Leave_Tracker`, `Global_Tasks`, `Task_Assignees`, `Task_Todos`, `Task_Assets`, `Project_Checklists`, `Notifications`, `Project_Assets`, `Conflict_Overrides`, `Operations_Ledger`, `Logistics_Ledger`
+
+### Logistics_Ledger (movement SoT — campaign active)
+
+Engine tab for planned/actual movement legs. **Not** RFID `Operations_Ledger`. Full field list: [topics/logistics-ledger-schema-2026-07-20.md](topics/logistics-ledger-schema-2026-07-20.md). Headers: `uid`, `project_uid`, `parent_uid`, `asset_uid`, `quantity`, `truck_uid`, `from_location`, `to_location`, `load_time`, `unload_time`, `leg_id`, `phase_ref`, `x`, `y`, `z`, `rotated`, `staged`, `creator`.  
+**M1:** dual-write with PA truck columns; `leg_id` = `outbound`|`inbound` links to AUTO truck shift notes. `phase_ref` → `Project_Timelines.uid` (UIDs preserved on rewrite).
 
 **Planned financial columns (Phase 1 — not in schema builder yet):** `Projects_Index.rental_days`, `Projects_Index.global_discount` — see [topics/financials.md](topics/financials.md).
 

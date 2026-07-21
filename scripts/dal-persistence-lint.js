@@ -11,6 +11,7 @@ const ROOT = path.join(__dirname, '..');
 const CLEARCONTENTS_ALLOWLIST = new Set([
   'Integrations.js',
   'Logistics_Assets.js',
+  'Logistics_Ledger.js',
   'Logistics_Projects.js',
   'Logistics_Roster.js',
   'Logistics_Schema.js',
