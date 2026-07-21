@@ -692,7 +692,9 @@ window.dalMayTakeOverOpening_ = function(domain) {
 window.maybeAutoOpenDalPrep_ = function() {
   if (!window.dalMayAutoStartFork_('prep')) return;
   if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
-  if (window.dalPrepClosingUi_ || window.dalPrepCommittingWait_) return;
+  var postReenter = !!window.dalPrepPostCommitReenter_;
+  // Post-commit reopen keeps closingUi freeze until Opening — allow through.
+  if (!postReenter && (window.dalPrepClosingUi_ || window.dalPrepCommittingWait_)) return;
   if (window.dalPrepAutoStartPending_) return;
   var projectId = document.getElementById('edit-folder-id')
     ? document.getElementById('edit-folder-id').value : '';
@@ -701,12 +703,13 @@ window.maybeAutoOpenDalPrep_ = function() {
   setTimeout(function() {
     window.dalPrepAutoStartPending_ = false;
     if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
-    if (window.dalPrepClosingUi_ || window.dalPrepCommittingWait_) return;
+    var stillReenter = !!window.dalPrepPostCommitReenter_;
+    if (!stillReenter && (window.dalPrepClosingUi_ || window.dalPrepCommittingWait_)) return;
     if (!window.dalMayAutoStartFork_('prep')) return;
     if (typeof window.openDalPrepSession === 'function') {
       window.openDalPrepSession({
         auto: true,
-        postCommitReenter: !!window.dalPrepPostCommitReenter_
+        postCommitReenter: stillReenter
       });
     }
   }, 400);
@@ -715,7 +718,8 @@ window.maybeAutoOpenDalPrep_ = function() {
 window.maybeAutoOpenDalTimeline_ = function() {
   if (!window.dalMayAutoStartFork_('timeline')) return;
   if (window.dalTimelineSessionOpen || window.dalTlOpeningUi_) return;
-  if (window.dalTlClosingUi_ || window.dalTlCommittingWait_) return;
+  var postReenter = !!window.dalTlPostCommitReenter_;
+  if (!postReenter && (window.dalTlClosingUi_ || window.dalTlCommittingWait_)) return;
   if (window.dalTlAutoStartPending_) return;
   var projectId = document.getElementById('edit-folder-id')
     ? document.getElementById('edit-folder-id').value : '';
@@ -724,12 +728,13 @@ window.maybeAutoOpenDalTimeline_ = function() {
   setTimeout(function() {
     window.dalTlAutoStartPending_ = false;
     if (window.dalTimelineSessionOpen || window.dalTlOpeningUi_) return;
-    if (window.dalTlClosingUi_ || window.dalTlCommittingWait_) return;
+    var stillReenter = !!window.dalTlPostCommitReenter_;
+    if (!stillReenter && (window.dalTlClosingUi_ || window.dalTlCommittingWait_)) return;
     if (!window.dalMayAutoStartFork_('timeline')) return;
     if (typeof window.openDalTimelineCollabSession === 'function') {
       window.openDalTimelineCollabSession({
         auto: true,
-        postCommitReenter: !!window.dalTlPostCommitReenter_
+        postCommitReenter: stillReenter
       });
     }
   }, 400);

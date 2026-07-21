@@ -113,6 +113,36 @@ window.dalPrepStatusFromInfo_ = function(info) {
   return '';
 };
 
+window.dalPrepUidFromInfo_ = function(info) {
+  if (!info) return '';
+  if (info.prepUid) return String(info.prepUid || '');
+  if (info.prep && typeof info.prep === 'object' && info.prep.sessionUid) {
+    return String(info.prep.sessionUid || '');
+  }
+  if (String(info.sessionType || '') === 'prep' && info.sessionUid) {
+    return String(info.sessionUid || '');
+  }
+  return '';
+};
+
+/**
+ * Sticky leave block must not trap peers on a *new* Opening/Live room.
+ * Returns false = stay closed; true = allowed (and clears sticky block for new uid).
+ */
+window.dalPrepPassStickyOpenGate_ = function(info) {
+  var uid = window.dalPrepUidFromInfo_(info);
+  if (typeof window.dalPrepAllowRemoteOpen_ === 'function' && !window.dalPrepAllowRemoteOpen_(uid)) {
+    return false;
+  }
+  // New room (or no sticky block) — drop leave latch so Opening→Live can finish.
+  if (window.dalPrepSheetsOpenBlocked_ || (Date.now() < (window.dalPrepIgnoreOpenUntil || 0))) {
+    if (!uid) return false;
+    window.dalPrepSheetsOpenBlocked_ = false;
+    window.dalPrepIgnoreOpenUntil = 0;
+  }
+  return true;
+};
+
 window.dalIsPrepOpenFromInfo_ = function(info) {
   var st = window.dalPrepStatusFromInfo_(info);
   // opening/committing = still in prep lifecycle (do not clear remote UI mid-transition)
@@ -163,9 +193,10 @@ window.startDalPrepSessionPoll_ = function(projectId) {
             }
             return;
           }
-          // Left committing → normal/open path below; clear wait first if needed.
+          // Left committing → Opening/open path below. Keep freeze until Opening/Live
+          // (do not unlock for a Sheets-edit gap). Only clear the wait latch.
           if (window.dalPrepCommittingWait_) {
-            window.dalApplyPrepCommittingUi_(false);
+            window.dalPrepCommittingWait_ = false;
           }
           // Meta deleted but Sheets still lagging as "open" — end after short settle (real END).
           if (window.dalPrepMetaEndPending_ && window.dalPrepMetaEndPendingSince_ &&
@@ -175,8 +206,7 @@ window.startDalPrepSessionPoll_ = function(projectId) {
           }
           window.dalPrepClosedPollStreak = 0;
           window.dalPrepOpeningClosedStreak_ = 0;
-          if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
-          if (window.dalPrepSheetsOpenBlocked_) return;
+          if (!window.dalPrepPassStickyOpenGate_(info)) return;
           if (!window.dalPrepUiOpen && !window.dalPrepLatched) {
             if (stOpen === 'opening') {
               window.dalApplyPrepOpeningUi_(true, info);
@@ -186,7 +216,8 @@ window.startDalPrepSessionPoll_ = function(projectId) {
             if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
             window.dalApplyDalPrepUiState_(true, projectId, {
               invalidateCache: !wasStarterLatch,
-              localOpen: wasStarterLatch
+              localOpen: wasStarterLatch,
+              sessionUid: window.dalPrepUidFromInfo_(info)
             });
             if (wasStarterLatch) {
               window.dalPaEntryDeltaPending_ = true;
@@ -202,7 +233,8 @@ window.startDalPrepSessionPoll_ = function(projectId) {
             if (!window.dalPrepUiOpen) {
               window.dalApplyDalPrepUiState_(true, projectId, {
                 invalidateCache: !wasStarterOpen,
-                localOpen: wasStarterOpen
+                localOpen: wasStarterOpen,
+                sessionUid: window.dalPrepUidFromInfo_(info)
               });
               if (wasStarterOpen) {
                 window.dalPaEntryDeltaPending_ = true;
@@ -212,6 +244,15 @@ window.startDalPrepSessionPoll_ = function(projectId) {
                   }
                 }, 600);
               }
+            }
+          } else if (window.dalPrepOpeningPeerFrozen_ && stOpen === 'open') {
+            // Safety: Opening UI flag lost but peer freeze stuck — force Live join.
+            window.dalApplyPrepOpeningUi_(false);
+            if (!window.dalPrepUiOpen) {
+              window.dalApplyDalPrepUiState_(true, projectId, {
+                invalidateCache: true,
+                sessionUid: window.dalPrepUidFromInfo_(info)
+              });
             }
           }
           return;
@@ -315,6 +356,16 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
 
   var changed = window.dalPrepUiOpen !== isPrepOpen;
   window.dalPrepUiOpen = isPrepOpen;
+
+  // Live latch — always drop Opening/committing freeze (peer must not stay locked).
+  if (isPrepOpen) {
+    window.dalPrepCommittingWait_ = false;
+    window.dalPrepClosingUi_ = false;
+    if (window.dalPrepOpeningPeerFrozen_ || window.dalPaSyncBlockedReadOnlyLatch_) {
+      window.dalPrepOpeningPeerFrozen_ = false;
+      window.dalPaApplyOpeningFreeze_(false);
+    }
+  }
 
   // Part B3 — peer soft pull-in (already on PA, someone else opened Live).
   if (isPrepOpen && changed && !opts.localOpen) {
@@ -420,22 +471,27 @@ window.dalPaViewStillOpen_ = function() {
 
 /**
  * After Sheets commit clears: if still in PA, start a *new* Firebase prep room.
- * Clears committing freeze first (maybeAutoOpen refuses while wait is latched).
+ * Keep freeze until Opening/Live — no Sheets-edit gap.
  */
 window.dalPrepTryPostCommitReopen_ = function() {
-  if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
-    window.dalApplyPrepCommittingUi_(false);
-  } else {
-    window.dalPrepCommittingWait_ = false;
-    window.dalPrepClosingUi_ = false;
+  // Drop wait latch so auto-open / peer Opening poll can proceed; keep freeze+SYNC.
+  window.dalPrepCommittingWait_ = false;
+  window.dalPrepClosingUi_ = true;
+  window.dalPaApplyOpeningFreeze_(true);
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    window.dalUpdateRemotePendingBanner_();
   }
-  if (!window.dalPaViewStillOpen_()) return;
-  if (typeof window.dalMayAutoStartFork_ === 'function' && !window.dalMayAutoStartFork_('prep')) {
-    if (typeof window.dalApplyDalPrepUiState_ === 'function') {
-      var pid = document.getElementById('edit-folder-id')
-        ? document.getElementById('edit-folder-id').value : '';
-      window.dalApplyDalPrepUiState_(false, pid, { allowClose: true });
+  if (!window.dalPaViewStillOpen_()) {
+    if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+      window.dalApplyPrepCommittingUi_(false);
     }
+    return;
+  }
+  if (typeof window.dalMayAutoStartFork_ === 'function' && !window.dalMayAutoStartFork_('prep')) {
+    // Non-starter surfaces: stay frozen; poll joins peer Opening/Live.
+    var pid = document.getElementById('edit-folder-id')
+      ? document.getElementById('edit-folder-id').value : '';
+    if (pid) window.startDalPrepSessionPoll_(pid);
     return;
   }
   window.dalPrepPostCommitReenter_ = true;
@@ -577,11 +633,19 @@ window.dalApplyPrepOpeningUi_ = function(active, info) {
       window.dalPrepOpeningPeerFrozen_ = false;
       window.dalPaApplyOpeningFreeze_(false);
     }
+    // Leaving Opening into Live — drop leftover committing cue.
+    if (!window.dalPrepCommittingWait_ && !window.dalPrepClosing) {
+      window.dalPrepClosingUi_ = false;
+    }
     if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
       window.dalUpdateRemotePendingBanner_();
     }
     return;
   }
+
+  // Entering Opening — leave committing cue; starter editable / peers frozen below.
+  window.dalPrepCommittingWait_ = false;
+  window.dalPrepClosingUi_ = false;
 
   var openedBy = info.prepOpenedBy || info.openedBy || window.dalPrepOpeningBy_ || '';
   var uid = info.prepUid || info.sessionUid || window.dalPrepOpeningUid_ || '';
@@ -606,6 +670,9 @@ window.dalApplyPrepOpeningUi_ = function(active, info) {
     }
   } else if (window.dalPrepOpeningPeerFrozen_) {
     window.dalPrepOpeningPeerFrozen_ = false;
+    window.dalPaApplyOpeningFreeze_(false);
+  } else {
+    // Starter may edit during Opening — clear committing freeze if still on.
     window.dalPaApplyOpeningFreeze_(false);
   }
 
@@ -646,22 +713,24 @@ window.refreshDalSessionBanner = function() {
       if (window.dalPrepClosing) return;
       window.dalSessionState = info || {};
       if (window.dalIsPrepOpenFromInfo_(info)) {
-        if (window.dalPrepSheetsOpenBlocked_) return;
-        if (Date.now() < (window.dalPrepIgnoreOpenUntil || 0)) return;
         var stRefresh = window.dalPrepStatusFromInfo_(info);
         if (stRefresh === 'committing') {
           window.dalApplyPrepCommittingUi_(true, projectId);
           return;
         }
-        if (window.dalPrepCommittingWait_) window.dalApplyPrepCommittingUi_(false);
+        if (window.dalPrepCommittingWait_) window.dalPrepCommittingWait_ = false;
+        if (!window.dalPrepPassStickyOpenGate_(info)) return;
         if (stRefresh === 'opening') {
           window.dalApplyPrepOpeningUi_(true, info);
           return;
         }
         if (window.dalPrepOpeningUi_) window.dalApplyPrepOpeningUi_(false);
-        window.dalApplyDalPrepUiState_(true, projectId, { invalidateCache: true });
+        window.dalApplyDalPrepUiState_(true, projectId, {
+          invalidateCache: true,
+          sessionUid: window.dalPrepUidFromInfo_(info)
+        });
       } else if (!window.dalPrepLatched) {
-        if (window.dalPrepCommittingWait_) {
+        if (window.dalPrepCommittingWait_ || window.dalPrepClosingUi_) {
           if (typeof window.dalPrepTryPostCommitReopen_ === 'function') {
             window.dalPrepTryPostCommitReopen_();
           } else {
@@ -761,7 +830,9 @@ window.openDalPrepSession = function(opts) {
   if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('prep')) {
     return alert('You cannot start preparation on this device.');
   }
-  if (window.dalPrepCommittingWait_ || (window.dalPrepClosingUi_ && !window.dalPrepUiOpen && !window.dalPrepOpeningUi_)) {
+  var postReenter = !!(opts.postCommitReenter || window.dalPrepPostCommitReenter_);
+  if (!postReenter && (window.dalPrepCommittingWait_ ||
+      (window.dalPrepClosingUi_ && !window.dalPrepUiOpen && !window.dalPrepOpeningUi_))) {
     window.dalApplyPrepCommittingUi_(true, projectId);
     if (!opts.auto) {
       alert('Saving to Sheets — edits locked. Stay or come back in a moment.');

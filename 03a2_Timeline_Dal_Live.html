@@ -1456,6 +1456,18 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
   window.dalTimelineSessionOpen = !!isOpen;
   window.dalTlOpeningUi_ = !!isOpening && !isOpen;
 
+  // Live latch — drop committing + Opening freezes (peer must not stay locked).
+  if (isOpen) {
+    window.dalTlCommittingWait_ = false;
+    window.dalTlClosingUi_ = false;
+    if (window.dalTlCommittingFrozen_ && typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(false);
+    }
+  } else if (isOpening) {
+    window.dalTlCommittingWait_ = false;
+    window.dalTlClosingUi_ = false;
+  }
+
   var wasOpenBefore = !!window.dalTlWasSessionOpenUi_;
   window.dalTlWasSessionOpenUi_ = !!isOpen;
 
@@ -1500,7 +1512,17 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
     }
   } else if (window.dalTlOpeningPeerFrozen_) {
     window.dalTlOpeningPeerFrozen_ = false;
-    if (typeof currentIsReadOnly !== 'undefined' && window.dalTlReadOnlyBeforeOpening_ !== null) {
+    if (isOpen) {
+      // Live join — do not restore a "before" that was itself a committing freeze.
+      window.dalTlReadOnlyBeforeOpening_ = null;
+      try {
+        var layerLive = document.getElementById('shift-layer');
+        if (layerLive && typeof currentIsReadOnly !== 'undefined') {
+          layerLive.classList.toggle('tt-readonly-mode', !!currentIsReadOnly);
+        }
+        if (typeof rebuildTimelineGrid === 'function') rebuildTimelineGrid();
+      } catch (eLive) { /* ignore */ }
+    } else if (typeof currentIsReadOnly !== 'undefined' && window.dalTlReadOnlyBeforeOpening_ !== null) {
       currentIsReadOnly = !!window.dalTlReadOnlyBeforeOpening_;
       window.dalTlReadOnlyBeforeOpening_ = null;
     }
@@ -1791,16 +1813,27 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
  * Blue SYNC bar stays visible with "Saving to Sheets…" copy.
  */
 window.dalTlTryPostCommitReopen_ = function() {
-  if (typeof window.dalApplyTlCommittingUi_ === 'function') {
-    window.dalApplyTlCommittingUi_(false);
-  } else {
-    window.dalTlCommittingWait_ = false;
-    window.dalTlClosingUi_ = false;
+  // Keep freeze until Opening/Live — no Sheets-edit gap.
+  window.dalTlCommittingWait_ = false;
+  window.dalTlClosingUi_ = true;
+  if (!window.dalTlCommittingFrozen_) {
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(true);
+    }
+  } else if (typeof window.dalUpdateTimelineLiveBanner_ === 'function') {
+    window.dalUpdateTimelineLiveBanner_();
   }
-  if (typeof window.dalTimelineLayerOpen_ === 'function' && !window.dalTimelineLayerOpen_()) return;
+  if (typeof window.dalTimelineLayerOpen_ === 'function' && !window.dalTimelineLayerOpen_()) {
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(false);
+    }
+    return;
+  }
   if (typeof window.dalMayAutoStartFork_ === 'function' && !window.dalMayAutoStartFork_('timeline')) {
-    if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
-      window.dalApplyTimelineSessionUi_(false, false);
+    var pid = document.getElementById('edit-folder-id')
+      ? document.getElementById('edit-folder-id').value : '';
+    if (pid && typeof window.startDalTimelineSessionWatcher === 'function') {
+      window.startDalTimelineSessionWatcher(pid);
     }
     return;
   }

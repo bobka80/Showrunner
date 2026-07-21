@@ -476,7 +476,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Cue phases (Part B5):** SYNC status uses `dalForkPhaseStatusText_` — Normal (hide) / Opening / Live / Closing. Closing copy: **Saving to Sheets — edits locked. Stay or come back in a moment.** Idle T−5 via B4.
 
-**Committing hard-freeze (2026-07-21 @ v722+):** While Sheets domain status is `committing` **or** local End/last-leave is in flight, **everyone** is frozen (no writes, no new START) — including stay-in-view. SYNC bar stays visible (*Saving to Sheets…*). `stopDalPaLiveSync_` must **not** clear that freeze. After commit succeeds, if still on PA/timeline → auto-start a **new** Firebase room (`sessionUid`) + *Live again* toast. Do not drop to Sheets-only and wait for manual START.
+**Committing hard-freeze (2026-07-21 @ v723+):** While Sheets `committing` **or** local End/last-leave is in flight, freeze everyone. Keep freeze until **Opening/Live** (no Sheets-edit gap). Sticky leave block (`SheetsOpenBlocked` / IgnoreOpenUntil) must yield to a **new** `sessionUid` Opening/Live so peers unfreeze and join. `stopDalPaLiveSync_` must not clear freeze mid-commit. Stay-in-view → auto new Firebase room after commit.
 
 **Idle / auto-close (Part B4 @ v703+):** Timeline idle **45m** / prep **75m**; T−5 SYNC **Session closing — tap to keep open**; last leave + idle call same `closeDalSession` commit path; station presence blocks prep idle eject; presence ping ~**45s**, server stale **150s**.
 

@@ -258,7 +258,9 @@ window.openDalTimelineCollabSession = function(opts) {
   if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('timeline')) {
     return alert('You cannot start timeline collaboration on this device.');
   }
-  if (window.dalTlCommittingWait_ || (window.dalTlClosingUi_ && !window.dalTimelineSessionOpen && !window.dalTlOpeningUi_)) {
+  var postReenter = !!(opts.postCommitReenter || window.dalTlPostCommitReenter_);
+  if (!postReenter && (window.dalTlCommittingWait_ ||
+      (window.dalTlClosingUi_ && !window.dalTimelineSessionOpen && !window.dalTlOpeningUi_))) {
     if (typeof window.dalApplyTlCommittingUi_ === 'function') {
       window.dalApplyTlCommittingUi_(true, projectId);
     }

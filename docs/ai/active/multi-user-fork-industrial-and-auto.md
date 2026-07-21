@@ -364,7 +364,8 @@ Hard refresh web.app (latest GAS — committing freeze @ **v721+**). Use a **tes
 | 2026-07-21 | **DAL commit toasts @ GAS v719:** push **ROOT only**; no repeat sweep toasts; mirror/fork-cleanup = audit-only (no push). |
 | 2026-07-21 | **DAL drawer + fork dots @ GAS v720:** durable `dal_commit_fail` notif with COPY; calendar amber while committing; 4s poll while lit; no premature optimistic clear. |
 | 2026-07-21 | **Committing hard-freeze @ GAS v721:** while Sheets `committing`, freeze everyone (no writes/START) incl. re-entry; SYNC “Saving to Sheets…”; after clear auto-open **new** room + “Live again” toast (PA + timeline). |
-| 2026-07-21 | **Stay-in-view commit reopen:** End/last-leave hard-freeze (live-sync stop no longer unlocks); after Sheets clears, auto new Firebase cycle if still on PA/timeline. |
+| 2026-07-21 | **Stay-in-view commit reopen @ GAS v722:** End/last-leave hard-freeze (live-sync stop no longer unlocks); after Sheets clears, auto new Firebase cycle if still on PA/timeline. |
+| 2026-07-21 | **Peer Opening→Live unfreeze:** sticky leave block must not trap peers; keep freeze until Opening (no edit gap); Live latch clears peer freeze. |
 
 ---
 
