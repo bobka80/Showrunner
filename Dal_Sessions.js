@@ -23,8 +23,22 @@ function dalLiveForksPaused_() {
   return DAL_LIVE_FORKS_PAUSED === true;
 }
 
+/** One-shot: clear leftover Index fork flags after pause ships (Sheets stay SoT). */
+function dalEnsurePausedForksAbandoned_() {
+  if (!dalLiveForksPaused_()) return;
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DAL_LIVE_FORKS_ABANDONED_V1') === '1') return;
+  try {
+    abandonAllOpenDalLiveForksAPI('System Pause');
+    props.setProperty('DAL_LIVE_FORKS_ABANDONED_V1', '1');
+  } catch (eAbandon) {
+    // Retry on a later request — do not block reads.
+  }
+}
+
 /** Client / ops probe. */
 function isDalLiveForksPausedAPI() {
+  try { dalEnsurePausedForksAbandoned_(); } catch (e0) { /* ignore */ }
   return { paused: dalLiveForksPaused_() };
 }
 
@@ -355,7 +369,10 @@ function getOpenDalForkMap() {
 function resolveDalSessionStatus_(projectId, domain) {
   try {
     // Pause = Sheets-only for PA + timeline even if Index still shows an old open flag.
-    if (dalLiveForksPaused_()) return DAL_SESSION.NORMAL;
+    if (dalLiveForksPaused_()) {
+      try { dalEnsurePausedForksAbandoned_(); } catch (e0) { /* ignore */ }
+      return DAL_SESSION.NORMAL;
+    }
     var sheets = verifyDatabaseSchema(true);
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) return DAL_SESSION.NORMAL;
