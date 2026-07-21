@@ -2895,6 +2895,24 @@
     };
     var od = pa.overrideDept != null ? pa.overrideDept : (pa.override_dept || '');
     doc.override_dept = od || '';
+    // Truck / staging — always stamp so prep arrange + End Prep survive merge mirrors
+    function numOrEmpty_(v) {
+      if (v === undefined || v === null || v === '') return '';
+      var n = Number(v);
+      return isNaN(n) ? '' : n;
+    }
+    doc.outbound_truck_uid = pa.outboundTruckUid || pa.outbound_truck_uid || '';
+    doc.outbound_x = numOrEmpty_(pa.outboundX != null ? pa.outboundX : pa.outbound_x);
+    doc.outbound_y = numOrEmpty_(pa.outboundY != null ? pa.outboundY : pa.outbound_y);
+    doc.outbound_z = numOrEmpty_(pa.outboundZ != null ? pa.outboundZ : pa.outbound_z);
+    doc.outbound_rotated = !!(pa.outboundRotated || pa.outbound_rotated);
+    doc.outbound_staged = !!(pa.outboundStaged || pa.outbound_staged);
+    doc.inbound_truck_uid = pa.inboundTruckUid || pa.inbound_truck_uid || '';
+    doc.inbound_x = numOrEmpty_(pa.inboundX != null ? pa.inboundX : pa.inbound_x);
+    doc.inbound_y = numOrEmpty_(pa.inboundY != null ? pa.inboundY : pa.inbound_y);
+    doc.inbound_z = numOrEmpty_(pa.inboundZ != null ? pa.inboundZ : pa.inbound_z);
+    doc.inbound_rotated = !!(pa.inboundRotated || pa.inbound_rotated);
+    doc.inbound_staged = !!(pa.inboundStaged || pa.inbound_staged);
     return doc;
   }
 

@@ -108,6 +108,47 @@ function dalReadPaStateFixtures_(projectId) {
   };
 }
 
+/**
+ * Live assets/state fixture shape (camelCase truck fields) from a sheet-column PA object.
+ * Keep flush / delta / truck-arrange / snapshot builders aligned.
+ */
+function dalPaObjToLiveFixture_(obj) {
+  obj = obj || {};
+  var formula = obj.formula || '';
+  var isShortage = String(formula).indexOf('[SHORT] ') === 0;
+  if (isShortage) formula = formula.substring(8);
+  var fix = {
+    uid: String(obj.uid || ''),
+    assetId: String(obj.asset_uid || ''),
+    qty: obj.assigned_quantity != null ? obj.assigned_quantity : 1,
+    location: obj.location || 'General',
+    formula: formula,
+    isShortage: isShortage,
+    creator: obj.creator || 'System',
+    overrideDept: obj.override_dept || '',
+    containerUid: obj.container_uid || '',
+    scanStatus: obj.scan_status || 'Assigned'
+  };
+  function numOrNull_(v) {
+    if (v === undefined || v === null || v === '') return null;
+    var n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+  fix.outboundTruckUid = obj.outbound_truck_uid || '';
+  fix.outboundX = numOrNull_(obj.outbound_x);
+  fix.outboundY = numOrNull_(obj.outbound_y);
+  fix.outboundZ = numOrNull_(obj.outbound_z);
+  fix.outboundRotated = obj.outbound_rotated === true || obj.outbound_rotated === 'true';
+  fix.outboundStaged = obj.outbound_staged === true || obj.outbound_staged === 'true';
+  fix.inboundTruckUid = obj.inbound_truck_uid || '';
+  fix.inboundX = numOrNull_(obj.inbound_x);
+  fix.inboundY = numOrNull_(obj.inbound_y);
+  fix.inboundZ = numOrNull_(obj.inbound_z);
+  fix.inboundRotated = obj.inbound_rotated === true || obj.inbound_rotated === 'true';
+  fix.inboundStaged = obj.inbound_staged === true || obj.inbound_staged === 'true';
+  return fix;
+}
+
 function dalPaFixtureToCommitObj_(pa, projectId) {
   var formula = pa.formula || 'Standalone';
   if ((pa.isShortage === true || pa.isShortage === 'true') && String(formula).indexOf('[SHORT] ') !== 0) {
@@ -273,21 +314,9 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
       var allRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
       var fixtures = (allRows || []).map(function (r) {
         var obj = dalPaSheetRowToObject_(r.data, hdr.map);
-        var formula = obj.formula || '';
-        var isShortage = String(formula).indexOf('[SHORT] ') === 0;
-        if (isShortage) formula = formula.substring(8);
-        return {
-          uid: String(obj.uid || r.docId || ''),
-          assetId: String(obj.asset_uid || ''),
-          qty: obj.assigned_quantity != null ? obj.assigned_quantity : 1,
-          location: obj.location || 'General',
-          formula: formula,
-          isShortage: isShortage,
-          creator: obj.creator || 'System',
-          overrideDept: obj.override_dept || '',
-          containerUid: obj.container_uid || '',
-          scanStatus: obj.scan_status || 'Assigned'
-        };
+        var fix = dalPaObjToLiveFixture_(obj);
+        if (!fix.uid) fix.uid = String(r.docId || '');
+        return fix;
       });
       var prevSeq = 0;
       try {
@@ -309,6 +338,91 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
   });
 }
 
+/**
+ * Prep-open truck arrange: rewrite Firebase PA collection + assets/state (with truck fields),
+ * dual-write Logistics_Ledger on Sheets. Does NOT touch Sheets Project_Assets.
+ */
+function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
+  return executeWithRetry(function () {
+    assertActorCanEditProjectAssets(actor);
+    if (!dalFirestoreIsConfigured_()) {
+      throw new Error('Firebase not configured — cannot save truck layout during prep session.');
+    }
+    var hdr = dalGetProjectAssetsHeaderAndMap_();
+    var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+    var projectRowsMap = {};
+    var oldUids = {};
+    (projectRows || []).forEach(function (r) {
+      var uid = String(r.data[hdr.map['uid']] || r.docId || '');
+      if (!uid) return;
+      projectRowsMap[uid] = r.data;
+      oldUids[uid] = true;
+    });
+
+    var resultRows = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg || 'outbound', hdr.map);
+    var basePath = dalFirestorePaCollection_(projectId);
+    var newUids = {};
+    var fixtures = [];
+
+    (resultRows || []).forEach(function (rowData) {
+      var docId = String(rowData[hdr.map['uid']] || Utilities.getUuid());
+      if (!rowData[hdr.map['uid']]) rowData[hdr.map['uid']] = docId;
+      newUids[docId] = true;
+      var obj = dalPaSheetRowToObject_(rowData, hdr.map);
+      try {
+        var existing = firestoreFetch_('get', basePath + '/' + docId);
+        if (existing && existing.fields) {
+          var plain = firestoreDecodeFields_(existing.fields);
+          obj.writeSeq = (Number(plain.writeSeq || 0) || 0) + 1;
+        } else {
+          obj.writeSeq = 1;
+        }
+      } catch (eSeq) {
+        obj.writeSeq = 1;
+      }
+      obj.clientId = 'gas_truck_' + String(actor || 'system');
+      firestoreWriteDocument_(basePath + '/' + docId, obj);
+      fixtures.push(dalPaObjToLiveFixture_(obj));
+    });
+
+    Object.keys(oldUids).forEach(function (uid) {
+      if (!newUids[uid]) {
+        try { firestoreDeleteDocument_(basePath + '/' + uid); } catch (eDel) { /* continue */ }
+      }
+    });
+
+    var prevSeq = 0;
+    try {
+      var st = firestoreFetch_('get', basePath + '/state');
+      if (st && st.fields) {
+        var plainSt = firestoreDecodeFields_(st.fields);
+        prevSeq = Number(plainSt.writeSeq || 0) || 0;
+      }
+    } catch (eSt) { prevSeq = 0; }
+    firestoreWriteDocument_(basePath + '/state', {
+      fixturesJson: JSON.stringify(fixtures),
+      writeSeq: prevSeq + 1,
+      clientId: 'gas_truck_' + String(actor || 'system'),
+      updatedAt: new Date().toISOString(),
+      updatedBy: actor || 'System'
+    });
+
+    // Ledger stays on Sheets (not forked)
+    var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
+    try {
+      var sheets = verifyDatabaseSchema();
+      logisticsLedgerDualWriteFromPaRows_(sheets, projectId, resultRows, hdr.map, dualLegs, actor);
+    } catch (eLl) {
+      writeToAuditLog(actor, "WARN", "LOGISTICS_LEDGER", projectId, projectId,
+        "Dual-write failed (Firebase truck path): " + (eLl && eLl.message ? eLl.message : eLl));
+    }
+
+    writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT_FIRESTORE", projectId, projectId,
+      'Saved spatial arrangement for ' + ((layoutData && layoutData.length) || 0) + ' cases on prep fork.');
+    return "Saved Truck Layout";
+  });
+}
+
 function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
   var hdr = dalGetProjectAssetsHeaderAndMap_();
   var projectRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId);
@@ -318,21 +432,9 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
     var obj = dalPaSheetRowToObject_(r.data, hdr.map);
     var docId = String(obj.uid || Utilities.getUuid());
     firestoreWriteDocument_(basePath + '/' + docId, obj);
-    var formula = obj.formula || '';
-    var isShortage = String(formula).indexOf('[SHORT] ') === 0;
-    if (isShortage) formula = formula.substring(8);
-    fixtures.push({
-      uid: docId,
-      assetId: String(obj.asset_uid || ''),
-      qty: obj.assigned_quantity != null ? obj.assigned_quantity : 1,
-      location: obj.location || 'General',
-      formula: formula,
-      isShortage: isShortage,
-      creator: obj.creator || 'System',
-      overrideDept: obj.override_dept || '',
-      containerUid: obj.container_uid || '',
-      scanStatus: obj.scan_status || 'Assigned'
-    });
+    var fix = dalPaObjToLiveFixture_(obj);
+    fix.uid = docId;
+    fixtures.push(fix);
   });
   // Live collab state doc (timeline twin) — transactional patch target for clients.
   firestoreWriteDocument_(basePath + '/state', {
@@ -416,7 +518,8 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   }
 
   // State fixtures = SSOT for non-autos; autos live only on collection (rebuild locally during prep).
-  // Load Sheets BEFORE building commit so truck overlay prefers live arrangement (Sheets-path dual-write).
+  // Load Sheets BEFORE building commit so truck overlay can fill gaps.
+  // Prefer Firebase collection (live prep arrange) over frozen Sheets snapshot.
   var previousSheetRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId) || [];
   var sheetByUid = {};
   previousSheetRows.forEach(function (r) {
@@ -435,14 +538,15 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   function overlayTruckFields_(commitObj, uid) {
     var fromSheet = sheetByUid[String(uid)];
     var fromCol = colByUid[String(uid)];
+    // Prefer collection (live prep arrange) over frozen Sheets snapshot.
     truckFieldKeys.forEach(function (k) {
       if (commitObj[k] !== undefined && commitObj[k] !== '' && commitObj[k] !== null) return;
-      if (fromSheet && fromSheet[k] !== undefined && fromSheet[k] !== '' && fromSheet[k] !== null) {
-        commitObj[k] = fromSheet[k];
-        return;
-      }
       if (fromCol && fromCol[k] !== undefined && fromCol[k] !== '' && fromCol[k] !== null) {
         commitObj[k] = fromCol[k];
+        return;
+      }
+      if (fromSheet && fromSheet[k] !== undefined && fromSheet[k] !== '' && fromSheet[k] !== null) {
+        commitObj[k] = fromSheet[k];
       }
     });
   }

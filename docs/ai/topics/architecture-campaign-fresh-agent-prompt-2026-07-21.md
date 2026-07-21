@@ -45,7 +45,8 @@ Key locks (summary — full file wins):
 - Checkpoint: always publish meta → PA → timeline → ledger (~30m fixed)
 - Conflicts/Tracker: Sheets by default + optional Live preview (ledger AND timeline together)
 - Offer pull while warm: one-shot from Firebase then freeze
-- Ledger depends on TIMELINE: load/unload clocks from timeline truck shifts; phase_ref → Project_Timelines.uid; soft conflict free-at = phase END; keep AUTO-OUTBOUND/INBOUND shifts LINKED to ledger legs
+- Ledger depends on TIMELINE: load/unload clocks from timeline truck shifts; `phase_ref` → `Project_Timelines.uid` (**sub-event**); soft conflict free-at = **sub-event END**; keep AUTO-OUTBOUND/INBOUND shifts LINKED to ledger legs
+- Terminology: **sub-events** = `Project_Timelines`; **phases** = `Phase_Blocks` (timeline header) — [GLOSSARY.md](../GLOSSARY.md)
 - Empty truck_uid allowed for continuity; dual-write mandatory M1–M3
 - M4 must strip PA truck fields from Firebase mappers AND dalPaContentSig_ / dalPaRowSignature_ together
 - Surgical lifecycle change: keep DAL router/repos; replace leave/idle/orphan close triggers — do not scrap the fork
@@ -77,8 +78,8 @@ A. Project_Assets truck/staging columns (outbound_*/inbound_*)
 - Dal_Reconcile.js — dalPaRowSignature_
 - Any other SpreadsheetApp / saveProjectAssets* paths that omit or clobber truck fields
 
-B. Timeline surfaces that supply truck clocks / phases
-- Project_Timelines, Phase_Blocks, Shift_Assignments
+B. Timeline surfaces that supply truck clocks / **sub-events** / phases
+- Project_Timelines (**sub-events**), Phase_Blocks (**phases**), Shift_Assignments
 - AUTO-OUTBOUND / AUTO-INBOUND generation and consumers
 - Timeline DAL session + live sync (03a1, 03a2, Dal_Sessions.js)
 
@@ -87,7 +88,7 @@ C. Session lifecycle (what Campaign Room must replace carefully)
 - calendar fork dots, fail-safe commit backup/retry
 - Dal_Router / projectDataRouter / repos — what stays vs what changes
 
-D. Conflicts.js — current soft/hard math vs product locks (phase end)
+D. Conflicts.js — current soft/hard math vs product locks (**sub-event** end)
 E. Sheets writes that bypass DAL for room-slice data (list every one)
 F. Firebase paths today: projects/{id}/assets|timeline — propose logistics + meta paths consistent with existing layout
 

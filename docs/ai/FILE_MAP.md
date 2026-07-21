@@ -61,7 +61,7 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`01c_Calendar_Mini.html`**: The scoped Mini Calendar editor boot sequence.
 - **`01d_Calendar_Mobile.html`**: Mobile Command Center (home, events, RFID, notifs).
 - **`01e_Mobile_Crew_Hub.html`**: Crew briefing screen on phone — replaces opening full project editor from events.
-- **`01f_Mobile_Phase_Rail.html`**: Deconstructed mini calendar (phase segments from `fragments`).
+- **`01f_Mobile_Phase_Rail.html`**: Deconstructed mini calendar (**sub-event** segments from `fragments`; “Phase” in filename is legacy).
 - **`01g_Mobile_Tasks.html`**: MY TASKS view in Mobile Command Center.
 - **`01h_Mobile_Assets.html`**: Compact Project Assets on phone (`mobile-pa-compact`).
 - **`01j_Mobile_Scan.html`**: Phone QR scan panel — header Scan dropdown, shell camera via `SHOWRUNNER_MOBILE_SCAN_OPEN_CAMERA`, boot consume `pending-mobile-scan-b64`, vault resolve (`resolveMobileScanTag`, `pullStagedMobileScan`), status actions (`setMobileAssetStatus` in `Station_Security.js`). **Handoff:** see [FRAGILE_ZONES.md](FRAGILE_ZONES.md) § Mobile QR. Styles: `Styles_Mobile.html`.

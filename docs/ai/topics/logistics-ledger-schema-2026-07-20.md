@@ -28,7 +28,9 @@ Director: this is **not a small thing** — a **structural ENGINE refactor**, no
 
 ## 1. Problem statement
 
-Today, planned equipment movement is modeled as **fixed columns on `Project_Assets`**: one outbound leg + one inbound leg (truck UID + XYZ + rotated + staged each). Load/unload *times* are not on those columns — Logistics Hub creates timeline truck shifts (`AUTO-OUTBOUND` / `AUTO-INBOUND` notes). Availability conflict math in `Conflicts.js` does **not** read the truck columns at all; it uses coarse **project timeline phase envelopes**.
+Today, planned equipment movement is modeled as **fixed columns on `Project_Assets`**: one outbound leg + one inbound leg (truck UID + XYZ + rotated + staged each). Load/unload *times* are not on those columns — Logistics Hub creates timeline truck shifts (`AUTO-OUTBOUND` / `AUTO-INBOUND` notes). Availability conflict math in `Conflicts.js` does **not** read the truck columns at all; it uses coarse **sub-event envelopes** from `Project_Timelines` (Warehouse / Main / Show / Recovery / Transit).
+
+> **Terminology:** [GLOSSARY.md](../GLOSSARY.md) § Timeline: sub-events vs phases. **Sub-events** = `Project_Timelines`. **Phases** = `Phase_Blocks` (timeline header). Do not call sub-events “phases.”
 
 ### Structural limits
 
@@ -86,8 +88,8 @@ Canonical headers in `Logistics_Schema.js` (`projectAssetsHeaders`):
 `getActiveConflicts()` asset section:
 
 - **Does not read** `outbound_*` / `inbound_*` or truck shifts.
-- Builds windows from **`Project_Timelines`** rows (`Sub_Event_Type`, date, start/end):
-  - `equipStart` / `equipEnd` = min/max of **all** phases
+- Builds windows from **`Project_Timelines`** **sub-event** rows (`Sub_Event_Type`, date, start/end):
+  - `equipStart` / `equipEnd` = min/max of **all** sub-events
   - `coreStart` / `coreEnd` = min/max of `MAIN_EVENT` / `SHOW_DAY` (else fall back to equip)
 - Sweep: `out` at equipStart, `in` at equipEnd; shortage vs vault pool capacity.
 - **Hard** (`HARD_SHORTAGE`): core windows overlap (or single-project over-ask).
@@ -114,17 +116,17 @@ Ledger + `phase_ref` exists to implement the **product** definitions with precis
 
 Prior prep-topic idea (“truck placement events on `Operations_Ledger`”) is **superseded** for *planned routing/staging*: those belong on `Logistics_Ledger`. Ops ledger stays scan/custody events.
 
-### 2.6 Timeline structures for `phase_ref`
+### 2.6 Timeline structures for `phase_ref` (legacy column name → **sub-event**)
 
-| Sheet | Role today |
-|-------|------------|
-| `Project_Timelines` | Calendar phases Conflicts already uses (`WAREHOUSE`, `MAIN_EVENT`, `SHOW_DAY`, `RECOVERY`, `TRANSIT`) |
-| `Phase_Blocks` | Timeline UI blocks (`Phase_Mode`: `wh` / `main` / `show` / `recovery` / `transit`, duration) |
-| `Shift_Assignments` | Crew/truck shifts; Auto outbound/inbound notes |
+| Sheet | Product name | Role today |
+|-------|--------------|------------|
+| `Project_Timelines` | **Sub-events** | Calendar blocks Conflicts already uses (`WAREHOUSE`, `MAIN_EVENT`, `SHOW_DAY`, `RECOVERY`, `TRANSIT`) |
+| `Phase_Blocks` | **Phases** (event phases) | Timeline **header** bars (`Phase_Mode`: `wh` / `main` / `show` / `recovery` / `transit`, duration) — build / breakdown guides |
+| `Shift_Assignments` | Shifts | Crew/truck shifts; Auto outbound/inbound notes |
 
-**Locked design intent:** soft availability = **phase end** (e.g. breakdown/recovery completion), not truck load clock alone.  
-**`phase_ref` target:** **`Project_Timelines.uid`** (director lock).  
-**UID preserve (director 2026-07-21):** live saves currently regenerate `Project_Timelines.uid` every rewrite — **must fix in M0/M1** (keep/reuse ids; expose `uid` on fragments) before trusting `phase_ref` FKs. Do **not** dual-ref `Phase_Blocks` without a new director rule.
+**Locked design intent:** soft availability = linked **sub-event end** (e.g. Recovery / Transit completion on the calendar) — **not** truck load clock alone, and **not** a `Phase_Blocks` row unless the director later retargets.  
+**`phase_ref` target:** **`Project_Timelines.uid`** (a **sub-event** uid). Column name is legacy — means sub-event ref; rename deferred.  
+**UID preserve (director 2026-07-21 / shipped M1):** keep/reuse `Project_Timelines.uid` on rewrite; expose `uid` on fragments. Do **not** dual-ref `Phase_Blocks` without a new director rule.
 
 ---
 
@@ -132,7 +134,7 @@ Prior prep-topic idea (“truck placement events on `Operations_Ledger`”) is *
 
 ### 3.1 Plain-language model
 
-The ledger is a **logbook of physical movements**. Each row is one movement (or stop): what moved, how much, which truck, from where, to where, when loaded/unloaded, optional phase tie, optional XYZ/staging for that leg. The same `asset_uid` appears in many rows over time. No permanent “this asset’s only outbound truck” property on the equipment list.
+The ledger is a **logbook of physical movements**. Each row is one movement (or stop): what moved, how much, which truck, from where, to where, when loaded/unloaded, optional **sub-event** tie (`phase_ref`), optional XYZ/staging for that leg. The same `asset_uid` appears in many rows over time. No permanent “this asset’s only outbound truck” property on the equipment list.
 
 ### 3.2 Relationship to `Project_Assets`
 
@@ -160,7 +162,7 @@ New Engine tab **`Logistics_Ledger`** (same Engine workbook — **new tab, not a
 | `load_time` | Left previous location |
 | `unload_time` | Arrived next location |
 | `leg_id` | Groups related movements (outbound 1, inbound 1, outbound 2, …) |
-| `phase_ref` | FK to timeline phase that defines availability (see §4) — typically breakdown/recovery end |
+| `phase_ref` | **Legacy column name.** FK to a **sub-event** (`Project_Timelines.uid`) that defines availability end — typically Recovery / related calendar sub-event. **Not** a `Phase_Blocks` (timeline header phase) uid. |
 | `x`, `y`, `z`, `rotated`, `staged` | Staging/placement **per ledger row** (migrated meaning of outbound_/inbound_ spatial fields) |
 | `creator` | Who logged the row (same doctrine as PA) |
 
@@ -183,13 +185,13 @@ Back-to-back festivals / same venue / partial swap: additional ledger row with s
 
 ---
 
-## 4. Event-phase soft conflict detection
+## 4. Sub-event soft conflict detection
 
 ### 4.1 Locked rule
 
-Equipment becomes available for its **next** movement when the relevant **event phase ends** (e.g. breakdown / recovery completion) — **not** merely when a truck’s scheduled load time says so.
+Equipment becomes available for its **next** movement when the linked **sub-event ends** (e.g. Recovery completion on the project calendar) — **not** merely when a truck’s scheduled load time says so, and **not** by reading timeline-header **phases** (`Phase_Blocks`) under the current lock.
 
-Example: asset free at 18:00 when breakdown ends; Event B needs load by 17:30 → soft conflict, 30 minutes short. Resolution path (product): change routing — **not** auto-fix in this campaign.
+Example: asset free at 18:00 when the Recovery sub-event ends; Event B needs load by 17:30 → soft conflict, 30 minutes short. Resolution path (product): change routing — **not** auto-fix in this campaign.
 
 ### 4.2 Hard vs soft (product — target for ledger-era Conflicts)
 
@@ -332,12 +334,12 @@ Full pros/cons, options A–D, sequencing, open questions: **[project-campaign-f
 
 | # | Topic | Lock |
 |---|--------|------|
-| 1 | `phase_ref` target | **`Project_Timelines.uid`** |
+| 1 | `phase_ref` target | **`Project_Timelines.uid`** (**sub-event**; column name legacy) |
 | 2 | Empty `truck_uid` for continuity | **Allowed** |
 | 3 | Dual-write duration | **Mandatory M1–M3** |
 | 4 | AUTO-OUTBOUND / AUTO-INBOUND shifts | **Keep and link to ledger legs** |
-| — | Load/unload clocks | **Timeline truck shifts** + phase_ref for availability |
-| — | Soft conflict free-at | **Phase end** (not truck load alone) |
+| — | Load/unload clocks | **Timeline truck shifts** + `phase_ref` (sub-event) for availability |
+| — | Soft conflict free-at | **Sub-event end** (not truck load alone; not `Phase_Blocks` under current lock) |
 | — | Offer before Ledger? | **No** — Offer off critical path |
 | — | `Project_Timelines.uid` for `phase_ref` | **Preserve on rewrite** + expose on fragments (2026-07-21) |
 
@@ -347,12 +349,13 @@ Remaining at promote time (if any): empty times after backfill review UI; `[TRAN
 
 ## 9b. Was open (historical — do not re-litigate without director)
 
-1. ~~**`phase_ref` target:**~~ locked → `Project_Timelines.uid`
+1. ~~**`phase_ref` target:**~~ locked → `Project_Timelines.uid` (**sub-event**)
 2. ~~**Stay / on-site rows:**~~ locked → empty `truck_uid` allowed
 3. ~~**Dual-write duration:**~~ locked → M1–M3
 4. ~~**Timeline auto truck shifts:**~~ locked → keep + link to ledger
 5. **`[TRANSFER_FROM`:** remain formula bypass only, or also express as ledger edges?
 6. **Empty times after backfill:** manager review UI vs leave blank until next arrange save?
+7. **Rename `phase_ref` → clearer sub-event FK name:** deferred (docs truth first; schema rename later)
 
 ---
 
@@ -370,7 +373,7 @@ Remaining at promote time (if any): empty times after backfill review UI; `[TRAN
 - [x] Problem / trust rationale
 - [x] Field list + leg/stop hierarchy
 - [x] PA columns to remove vs keep
-- [x] Soft conflict from phase end, not truck load alone
+- [x] Soft conflict from **sub-event** end, not truck load alone (and not `Phase_Blocks` under current lock)
 - [x] Detection-only scope
 - [x] Name separation from `Operations_Ledger`
 - [x] Current-code research baseline + migration outline
@@ -387,6 +390,6 @@ Remaining at promote time (if any): empty times after backfill review UI; `[TRAN
 
 ## 11. Summary for planning
 
-This campaign **removes** twelve live columns from `Project_Assets` and introduces Engine tab **`Logistics_Ledger`** as the relational SoT for movement, staging-per-leg, and precise soft/hard conflict inputs via `phase_ref`. It is intentionally queued behind multi-user and offer work. Current conflict code already ignores PA truck columns and uses coarse timeline envelopes — so the ledger is both a **logistics fidelity** upgrade and the path to the **product** soft/hard model. Treat cutover as a phased migration with dual-write; never let implementation invent columns or merge this with the RFID `Operations_Ledger`.
+This campaign **removes** twelve live columns from `Project_Assets` and introduces Engine tab **`Logistics_Ledger`** as the relational SoT for movement, staging-per-leg, and precise soft/hard conflict inputs via `phase_ref` (legacy name = **sub-event** FK). It is intentionally queued behind multi-user and offer work. Current conflict code already ignores PA truck columns and uses coarse **sub-event** envelopes — so the ledger is both a **logistics fidelity** upgrade and the path to the **product** soft/hard model. Treat cutover as a staged migration with dual-write; never let implementation invent columns or merge this with the RFID `Operations_Ledger`.
 
 **Promote:** director picks this work → move checklist to `docs/ai/active/`, set index status, resolve §9, then OK go.

@@ -2,6 +2,8 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
+**Terminology:** **Phases** = timeline-header event phases (`Phase_Blocks`). **Sub-events** = calendar blocks (`Project_Timelines`). Do not swap these — [GLOSSARY.md](../GLOSSARY.md).
+
 **Platform:** [session-fork-platform.md](session-fork-platform.md) — fork router, Firebase buffer, commit pattern.
 
 **Replaces/enhances:** current timeline **single-editor** presence lock (`reportProjectPresence`, `🔒 NAME EDITING` in `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`).

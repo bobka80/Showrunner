@@ -7,17 +7,17 @@
 **Predecessor:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
 **Next after this campaign:** Project Campaign Room — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)
 
-**Opened:** 2026-07-21 · **Status:** **M0+M1 shipped** — dual-write live; readers still on PA truck columns until M3.  
-**Production tip at open:** GAS **v725**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-21 · **Status:** **M1.1 prep-truck fix** — truck arrange routes to Firebase when prep open; ledger dual-write both paths. M0+M1 still base.  
+**Production tip:** GAS tip after this ship (see status log). Prep live rollback pin still **v654**.
 
 ---
 
 ## Fresh-agent start
 
-1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → **this file** → schema topic → architecture pack §3 → locks.  
+1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → [GLOSSARY.md](../GLOSSARY.md) § sub-events vs phases → **this file** → schema topic → architecture pack §3 → locks.  
 2. Do **not** invent columns beyond the schema topic.  
 3. Do **not** start Campaign Room or Offer in this campaign.  
-4. **Next build:** M2 backfill (existing PA truck → ledger) after director OK go.  
+4. **Next build:** M2 backfill (existing PA truck → ledger) after director OK go — **after** prep-truck fix verified green.  
 5. After any implementation: `node milestone.js "…"`; update this checklist same session.
 
 ---
@@ -27,9 +27,9 @@
 | Lock | Value |
 |------|--------|
 | Sequencing | After Part B; before Campaign Room; Offer **off** path |
-| `phase_ref` | → `Project_Timelines.uid` |
-| UID churn fix | **Preserve UIDs** on rewrite + expose on fragments (2026-07-21) |
-| Soft free-at | Phase **end** |
+| `phase_ref` | → `Project_Timelines.uid` (**sub-event**; legacy column name — not `Phase_Blocks`) |
+| UID churn fix | **Preserve sub-event UIDs** on rewrite + expose on fragments (2026-07-21) |
+| Soft free-at | **Sub-event end** |
 | Load clocks | Timeline AUTO truck shifts + link to ledger legs |
 | Empty `truck_uid` | Allowed |
 | Dual-write | Mandatory **M1–M3** |
@@ -40,11 +40,12 @@
 
 ## Live blast-radius notes (sweep 2026-07-21)
 
-- Only intentional Sheets writer of the 12 truck fields: `Logistics_Assets.js` · `saveTruckArrangementAPI` (+ dual-write to ledger)
-- **END PREP clobber mitigation (M1):** commit overlays truck fields from Firestore collection docs onto fixture commit objects
+- Truck writers: `saveTruckArrangementAPI` → Sheets when prep **closed**; `saveTruckArrangementFirestore_` when prep **open** (+ ledger dual-write both)
+- Live flush / host mirror / state fixtures now carry the 12 truck fields (peers + End Prep)
+- **END PREP:** overlay prefers **collection** truck over frozen Sheets
 - Tracker AUTO clocks: `04b` · `getTruckSchedule`; roster often drops `Note` — backfill from sheet
-- Conflicts today ignore truck cols; use phase envelopes — product math = M5
-- `saveTruckArrangementAPI` is **not** DAL/Firebase-routed today
+- Conflicts today ignore truck cols; use **sub-event** envelopes — product math = M5
+- **Terminology:** [GLOSSARY.md](../GLOSSARY.md) — sub-events ≠ phases
 
 ---
 
@@ -57,6 +58,7 @@
 - [x] `phase_ref` UID pick = preserve
 - [x] Active brief created (this file)
 - [x] Director **OK go** for M0/M1 **code** (schema + dual-write)
+- [x] Director **OK go** for prep-open truck → Firebase + ledger (M1.1)
 
 ### M0 — Freeze & inventory
 
@@ -71,7 +73,8 @@
 - [x] Keep AUTO-OUTBOUND / AUTO-INBOUND; start leg↔shift link (`leg_id` + truck_uid; clock stamp from hub)
 - [x] Ship `Project_Timelines.uid` preservation + expose `uid` on fragments (+ UI round-trip)
 - [x] Doctrine: SCHEMA / ENGINEERING_RULES §6 (15→16) / FILE_MAP same session
-- [ ] `node milestone.js` after first ship
+- [x] `node milestone.js` after first ship — **GAS v726**
+- [x] **M1.1** Prep-open: Firebase PA collection + state (truck in fixtures) + ledger dual-write; End Prep overlay collection-first; host-boot truck mirror
 
 ### M2 — Backfill
 
@@ -109,4 +112,6 @@
 | Date | Note |
 |------|------|
 | 2026-07-21 | Promoted to active after Part B archive + design pack OK go. UID preserve locked. Waiting **OK go** for M0/M1 code. |
-| 2026-07-21 | **M0+M1 code:** `Logistics_Ledger` tab; dual-write; UID preserve; END PREP truck overlay; AUTO clock stamp. Next: M2 backfill. |
+| 2026-07-21 | **M0+M1 code @ GAS v726:** `Logistics_Ledger` tab; dual-write; UID preserve; END PREP truck overlay (Sheets-first); AUTO clock stamp; Bugbot Highs fixed. Next: M2 backfill. |
+| 2026-07-21 | **Doc hygiene:** director terminology lock — **sub-events** (`Project_Timelines`) vs **phases** (`Phase_Blocks`); GLOSSARY + ledger/architecture/locks cleaned. Schema rename of `phase_ref` deferred. |
+| 2026-07-21 | **M1.1 (in ship):** Prep-open truck arrange → Firebase + ledger; fixtures/host flush carry truck; End Prep overlay collection-first. Verify before M2. |

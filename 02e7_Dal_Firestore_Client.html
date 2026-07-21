@@ -612,8 +612,39 @@ window.dalPaFlushPayloadSig_ = function(pa) {
     String(window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || '')),
     String(pa.containerUid || ''),
     String(pa.scanStatus || 'Assigned'),
-    String(pa.overrideDept || '')
+    String(pa.overrideDept || ''),
+    String(pa.outboundTruckUid || ''),
+    String(pa.outboundX != null ? pa.outboundX : ''),
+    String(pa.outboundY != null ? pa.outboundY : ''),
+    String(pa.outboundZ != null ? pa.outboundZ : ''),
+    pa.outboundRotated ? '1' : '0',
+    pa.outboundStaged ? '1' : '0',
+    String(pa.inboundTruckUid || ''),
+    String(pa.inboundX != null ? pa.inboundX : ''),
+    String(pa.inboundY != null ? pa.inboundY : ''),
+    String(pa.inboundZ != null ? pa.inboundZ : ''),
+    pa.inboundRotated ? '1' : '0',
+    pa.inboundStaged ? '1' : '0'
   ].join('\t');
+};
+
+/** Copy truck/staging fields onto a live fixturesJson entry (camelCase). */
+window.dalPaCopyTruckOntoFixture_ = function(fix, pa) {
+  fix = fix || {};
+  pa = pa || {};
+  fix.outboundTruckUid = pa.outboundTruckUid || '';
+  fix.outboundX = pa.outboundX != null ? pa.outboundX : null;
+  fix.outboundY = pa.outboundY != null ? pa.outboundY : null;
+  fix.outboundZ = pa.outboundZ != null ? pa.outboundZ : null;
+  fix.outboundRotated = !!pa.outboundRotated;
+  fix.outboundStaged = !!pa.outboundStaged;
+  fix.inboundTruckUid = pa.inboundTruckUid || '';
+  fix.inboundX = pa.inboundX != null ? pa.inboundX : null;
+  fix.inboundY = pa.inboundY != null ? pa.inboundY : null;
+  fix.inboundZ = pa.inboundZ != null ? pa.inboundZ : null;
+  fix.inboundRotated = !!pa.inboundRotated;
+  fix.inboundStaged = !!pa.inboundStaged;
+  return fix;
 };
 
 window.dalPaIsAutoRow_ = function(pa) {
@@ -2345,7 +2376,7 @@ window.dalWritePaForkFullToFirestore_ = function(projectId, done) {
           return !window.dalPaIsAutoRow_(currentByUid[uid]);
         }).map(function(uid) {
           var pa = currentByUid[uid];
-          return {
+          var fix = {
             uid: String(pa.uid),
             assetId: String(pa.assetId || ''),
             qty: pa.qty != null ? pa.qty : 1,
@@ -2357,6 +2388,7 @@ window.dalWritePaForkFullToFirestore_ = function(projectId, done) {
             containerUid: pa.containerUid || '',
             scanStatus: pa.scanStatus || 'Assigned'
           };
+          return window.dalPaCopyTruckOntoFixture_ ? window.dalPaCopyTruckOntoFixture_(fix, pa) : fix;
         });
         var allTouched = {};
         fixtures.forEach(function(f) { allTouched[f.uid] = 1; });
@@ -2426,7 +2458,7 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
         if (!pa || window.dalPaIsAutoRow_(pa)) return;
         if (!pa.uid) pa.uid = window.dalNewUid_();
         currentByUid[String(pa.uid)] = pa;
-        localFixtures.push({
+        var fixLive = {
           uid: String(pa.uid),
           assetId: String(pa.assetId || ''),
           qty: pa.qty != null ? pa.qty : 1,
@@ -2437,7 +2469,8 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
           isShortage: !!pa.isShortage,
           containerUid: pa.containerUid || '',
           scanStatus: pa.scanStatus || 'Assigned'
-        });
+        };
+        localFixtures.push(window.dalPaCopyTruckOntoFixture_ ? window.dalPaCopyTruckOntoFixture_(fixLive, pa) : fixLive);
       });
 
       // Qty deltas vs last-acked originals — server adds to remote so multi-window +/+ combines.
@@ -2594,18 +2627,9 @@ window.dalWritePaForkToFirestore_ = function(projectId, done) {
           Object.keys(touched).forEach(function(uid) {
             var pa = out[uid];
             if (!pa) return;
-            tx.set(col.doc(String(uid)), window.dalPaAssetToFsDoc_({
-              uid: pa.uid,
-              assetId: pa.assetId,
-              qty: pa.qty,
-              location: pa.location,
-              formula: pa.formula,
-              creator: pa.creator,
-              overrideDept: pa.overrideDept,
-              isShortage: pa.isShortage,
-              containerUid: pa.containerUid,
-              scanStatus: pa.scanStatus
-            }, projectId), { merge: true });
+            // Full current asset (incl. truck) — sparse fixture alone omits arrangement.
+            var src = currentByUid[uid] || pa;
+            tx.set(col.doc(String(uid)), window.dalPaAssetToFsDoc_(src, projectId), { merge: true });
           });
           return { merged: merged, updatedAt: updatedAt, writeSeq: writeSeq };
         });

@@ -12,7 +12,7 @@
 
 **Current production context (2026-07-21):** Multi-user fork **Part B archived** after B7 (@ GAS **v725** tip). Prep live rollback pin **v654**. Design lock still says: Sheets = truth **between** sessions; Firebase = buffer during live fork; **no periodic Sheets sync** during active session ([dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) rules 1–2) — **revise at Campaign Room time** (see pack §4).
 
-**Director locks (poll v2, 2026-07-21):** [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md) — **48h idle timer** (not lease); publish **meta → PA → timeline → ledger**; ledger load clocks from timeline shifts + `phase_ref`. Option C “hard expiry / lease” language below is **superseded** by those locks.
+**Director locks (poll v2, 2026-07-21):** [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md) — **48h idle timer** (not lease); publish **meta → PA → timeline → ledger**; ledger load clocks from timeline shifts + `phase_ref` (**sub-event** FK). Option C “hard expiry / lease” language below is **superseded** by those locks. **Terminology:** [GLOSSARY.md](../GLOSSARY.md) — sub-events ≠ phases.
 
 **Sequenced pack (canonical):** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger active:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
 
@@ -68,7 +68,7 @@ Single giant Firebase document for “everything in the project.” **Not recomm
 |-------|---------------------------|---------------|---------------|
 | **Project Assets** | `projects/{id}/assets/` | `Project_Assets` | List design: qty, formula, container, dept, scan — **no truck columns** |
 | **Logistics Ledger** | `projects/{id}/logistics/` (TBD at build) | `Logistics_Ledger` | Movement legs/stops: truck, from/to, load/unload, staging XYZ, `phase_ref` |
-| **Timeline** | `projects/{id}/timeline/` | Shifts, phases, sub-events | Collab timeline state |
+| **Timeline** | `projects/{id}/timeline/` | Shifts, **phases** (`Phase_Blocks`), **sub-events** (`Project_Timelines`) | Collab timeline state |
 
 **Explicitly outside the live room:**
 
@@ -96,9 +96,9 @@ Director intent (“everything behind the project editor”) maps to **PA + Logi
 **After ledger campaign:**
 
 - PA **shrinks** — assignment list only
-- Movement moves to append-friendly **`Logistics_Ledger`** (legs + stops, `phase_ref` to timeline)
+- Movement moves to append-friendly **`Logistics_Ledger`** (legs + stops, `phase_ref` → **sub-event** on `Project_Timelines`)
 - Truck arrange must target **ledger**, not PA fork docs ([logistics-ledger §8](logistics-ledger-schema-2026-07-20.md))
-- Conflicts read **ledger + phase_ref**, not coarse timeline envelopes
+- Conflicts read **ledger + phase_ref (sub-event)**, not coarse sub-event envelopes alone
 
 **Implication for Firebase hybrid:** Building a unified 48h room **on today’s PA shape** would **cement the wrong model** (truck fields inside every asset doc) and require **a second refactor** when ledger ships. **Sequence ledger first** (or at minimum lock schema + strip truck fields from PA/Firebase mappers), **then** build Project Campaign Room.
 

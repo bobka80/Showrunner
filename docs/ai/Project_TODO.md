@@ -16,7 +16,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-21)
 
-**Primary campaign (NEXT):** **Logistics Ledger** — M0+M1 shipped; **M2 backfill** next. — [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md).
+**Primary campaign (NEXT):** **Logistics Ledger** — M1.1 prep-truck Firebase fix in ship; verify then **M2 backfill**. — [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md).
 
 **Operational logs:** Bug journal [error-journal/](error-journal/) · root `RELEASES.md` / `WORKS_LOG.md`.
 
@@ -24,7 +24,7 @@ Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Logistics Ledger** | **M0+M1 shipped** — next M2 backfill | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) |
+| **Logistics Ledger** | **M1.1 prep-truck** — verify then M2 backfill | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) |
 | **Project Campaign Room** | After Ledger M4+ | [topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog brief — OK go per domain | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
@@ -36,7 +36,7 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Logistics Ledger** (movement SoT + PA slim) | **M0+M1 shipped** — next M2 backfill | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md) · [schema](topics/logistics-ledger-schema-2026-07-20.md) |
+| **Logistics Ledger** (movement SoT + PA slim) | **M1.1 prep-truck** — verify then M2 | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md) · [schema](topics/logistics-ledger-schema-2026-07-20.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 
 **Closed this session:** Multi-user fork Part B → [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) · process [archive/bulletproof-multiuser-live-editors-2026-07-18.md](archive/bulletproof-multiuser-live-editors-2026-07-18.md).

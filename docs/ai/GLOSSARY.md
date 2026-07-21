@@ -2,6 +2,24 @@
 
 The ShowRider Logistics system uses several string flags and constants to drive routing and logic. This glossary maps out what they mean.
 
+## Timeline: sub-events vs phases (director lock — 2026-07-21)
+
+**Canonical product language. Do not blur these in docs or agent speech.**
+
+| Term | Meaning | Engine sheet | UI home |
+|------|---------|--------------|---------|
+| **Sub-events** | Calendar blocks: Warehouse, Transit, Main event, Show day, Recovery, etc. (`Sub_Event_Type`) | **`Project_Timelines`** | Project calendar / mini calendar / painted day fragments |
+| **Phases** | Event phases on the **timeline header** (build, breakdown, warehouse mode bars, etc.) | **`Phase_Blocks`** | Timeline collab strip header / Gantt guide bars |
+
+**Rules:**
+- Call `Project_Timelines` rows **sub-events** — never “calendar phases,” “timeline phases,” or “event phases” unless you mean `Phase_Blocks`.
+- Call `Phase_Blocks` rows **phases** (or **event phases**).
+- Column name `phase_ref` on `Logistics_Ledger` is a **legacy/schema name**; it is an FK to a **sub-event** (`Project_Timelines.uid`), **not** to a phase (`Phase_Blocks`). Do not invent a rename in docs until the director OK goes a schema rename.
+- Soft free-at for ledger conflicts (current lock): end of the linked **sub-event**, not truck load alone. Whether product later retargets to a real **phase** is a separate update discussion.
+- Migration steps named M0–M5 are **campaign migration stages**, not timeline phases.
+
+See [topics/logistics-ledger-schema-2026-07-20.md](topics/logistics-ledger-schema-2026-07-20.md) · [topics/timeline-collab-session.md](topics/timeline-collab-session.md).
+
 ## Vault types & nesting (see [EQUIPMENT_MODEL.md](EQUIPMENT_MODEL.md))
 
 - **`type: "Bulk"`** — One vault row; quantity is a **count**. Not unique; **cannot** have per-piece RFID. Married to a level-3 case via `containerUid` for checkout.

@@ -12,9 +12,11 @@
 
 ## 1. Plain-language summary
 
-Today, truck placement lives as **12 columns on every equipment-list row**, while load/unload clocks live as **AUTO truck shifts on the timeline**, and conflict math uses **coarse calendar phase envelopes**. That is three half-stories.
+Today, truck placement lives as **12 columns on every equipment-list row**, while load/unload clocks live as **AUTO truck shifts on the timeline**, and conflict math uses **coarse sub-event envelopes** (`Project_Timelines`). That is three half-stories.
 
-**Logistics Ledger** makes movement its own Engine logbook (`Logistics_Ledger`), slims PA to “what gear is on the project,” keeps AUTO shifts as the clock surface, and ties availability to **phase end** via `phase_ref`.
+**Logistics Ledger** makes movement its own Engine logbook (`Logistics_Ledger`), slims PA to “what gear is on the project,” keeps AUTO shifts as the clock surface, and ties availability to **sub-event end** via `phase_ref` (legacy column name → **sub-event** FK).
+
+> **Terminology:** [GLOSSARY.md](../GLOSSARY.md) — **Sub-events** = `Project_Timelines`. **Phases** = `Phase_Blocks` (timeline header). Never call sub-events “phases.”
 
 **Project Campaign Room** (after Ledger) keeps one warm Firebase workspace for show week: meta + PA + timeline + ledger under one `campaignRoomUid`, publishes to Sheets every ~30 minutes, and auto-closes after **48 hours of silence** (writes or station dock — not mere presence). Explicit End stays.
 
@@ -29,7 +31,7 @@ Building the room **before** Ledger would embed truck fields in Firebase twice. 
 | Gate | Campaign | Exit criteria |
 |------|----------|----------------|
 | **0** | Multi-user Part B | **DONE 2026-07-21** — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) |
-| **1** | Logistics Ledger M0–M5 | PA truck cols gone; ledger SoT; Conflicts on ledger + phase; dual-write retired |
+| **1** | Logistics Ledger M0–M5 | PA truck cols gone; ledger SoT; Conflicts on ledger + **sub-event**; dual-write retired |
 | **2** | Project Campaign Room | 48h idle timer; ~30m publish meta→PA→timeline→ledger; one room uid; design-lock rules 1–2 revised |
 | **3** | Hierarchical delta / packet sync | Separate later |
 | — | Offer / Availability | **Off critical path** (parallel or later) |
@@ -43,7 +45,7 @@ Building the room **before** Ledger would embed truck fields in Firebase twice. 
 ## 3. Campaign 1 — Logistics Ledger
 
 ### Goal
-Engine tab **`Logistics_Ledger`** = single source of truth for movement / staging / load windows; PA answers only assignment; Conflicts move toward product soft/hard via ledger + `phase_ref`.
+Engine tab **`Logistics_Ledger`** = single source of truth for movement / staging / load windows; PA answers only assignment; Conflicts move toward product soft/hard via ledger + `phase_ref` (**sub-event** FK).
 
 ### In scope
 - Schema + M0–M5 migration
@@ -95,7 +97,7 @@ Engine tab **`Logistics_Ledger`** = single source of truth for movement / stagin
 - Migrate/strip fork docs that still embed truck fields.
 
 **M5 — Conflict engine**
-- Replace coarse envelope soft math with ledger + `phase_ref` (free-at = **phase end**).
+- Replace coarse envelope soft math with ledger + `phase_ref` (free-at = **sub-event end**).
 - Preserve `Conflict_Overrides`.
 - Re-evaluate single-project unique false badge.
 - Soft/hard product wording can stay thin if Offer is still later.
@@ -123,8 +125,8 @@ Engine tab **`Logistics_Ledger`** = single source of truth for movement / stagin
 | Concern | Live source | Ledger rule |
 |---------|-------------|-------------|
 | Load/unload clocks | AUTO truck shifts on `Shift_Assignments` (`Note`) | Keep shifts; link to legs |
-| Soft free-at | Phase **end** | `phase_ref` → `Project_Timelines.uid` (**preserve UIDs**) |
-| Gantt `Phase_Blocks` | Separate collab surface | **Not** `phase_ref` target |
+| Soft free-at | **Sub-event** end | `phase_ref` → `Project_Timelines.uid` (**preserve UIDs**; legacy column name) |
+| Timeline-header **phases** | `Phase_Blocks` | **Not** `phase_ref` target under current lock |
 | PA truck cols | Spatial only | Migrate off; not clocks |
 
 ### Risks + rollback

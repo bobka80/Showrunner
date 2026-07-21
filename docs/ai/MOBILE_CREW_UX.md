@@ -10,7 +10,7 @@
 
 Crew on phones use the **Mobile Command Center** (unchanged shell) and open projects into a **Crew Hub** — not the full desktop project editor. Managers can still open **MANAGER: FULL EDITOR** from the hub.
 
-**Non-goals on phone:** Creating/editing event phases via FullCalendar mini calendar (desktop only).
+**Non-goals on phone:** Creating/editing **sub-events** via FullCalendar mini calendar (desktop only).
 
 ---
 
@@ -20,7 +20,7 @@ Crew on phones use the **Mobile Command Center** (unchanged shell) and open proj
 |------|------|
 | `Styles_Mobile.html` | All `@media (max-width:768px)` rules + crew hub, phase rail, timeline zoom, compact PA CSS. Included after `Styles.html`. |
 | `01d_Calendar_Mobile.html` | Command Center logic (home, events, RFID, notifs). Events → `openMobileCrewHub()`. |
-| `01f_Mobile_Phase_Rail.html` | `buildPhaseSegmentsFromFragments()` + `renderMobilePhaseRail()` — deconstructed mini calendar from `project.fragments`. |
+| `01f_Mobile_Phase_Rail.html` | `buildPhaseSegmentsFromFragments()` + `renderMobilePhaseRail()` — deconstructed mini calendar from `project.fragments` (**sub-events** from `Project_Timelines`; file name “Phase” is legacy UI). |
 | `01e_Mobile_Crew_Hub.html` | Full-screen crew briefing: title, type, status, location, phase rail, weather, my shift, actions. |
 | `01g_Mobile_Tasks.html` | MY TASKS view in Command Center. |
 | `01h_Mobile_Assets.html` | `body.mobile-pa-compact` — assigned equipment only; tap group for formula detail sheet. |
@@ -102,7 +102,7 @@ Colors use existing `--color-paint-*` CSS variables.
 
 1. Command Center still loads; Events, Tasks, RFID, Notifications work.
 2. Tap event → Crew Hub (not full editor toolbar).
-3. Phase rail shows WH / MAIN / etc. with dates (if fragments exist).
+3. Phase rail shows WH / MAIN / etc. with dates (if **sub-event** fragments exist).
 4. Outdoor project → weather strip appears.
 5. OPEN TIMELINE → zoom bar; overview hides shift labels; slider shows detail.
 6. PROJECT ASSETS → assigned list; PRINT + SEARCH + SAVE; Design/Packing toggle; PACK / CHECK-OUT when permitted.

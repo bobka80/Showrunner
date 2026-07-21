@@ -261,9 +261,85 @@ function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
 // ==========================================
 // --- TRUCK ARRANGEMENT SPATIAL SAVING ---
 // ==========================================
+
+/** Stamp one layout box onto a PA row (mutates copy). Supports leg = outbound|inbound|both. */
+function applyTruckBoxToPaRow_(newRow, map, leg, box) {
+    var tUid = leg + '_truck_uid';
+    var tX = leg + '_x';
+    var tY = leg + '_y';
+    var tZ = leg + '_z';
+    var tRot = leg + '_rotated';
+    var tStaged = leg + '_staged';
+    if (leg === 'both') {
+        if (box.outbound) {
+            if (map['outbound_truck_uid'] !== undefined) newRow[map['outbound_truck_uid']] = box.outbound.truckUid || "";
+            if (map['outbound_x'] !== undefined) newRow[map['outbound_x']] = box.outbound.truckX !== null ? box.outbound.truckX : "";
+            if (map['outbound_y'] !== undefined) newRow[map['outbound_y']] = box.outbound.truckY !== null ? box.outbound.truckY : "";
+            if (map['outbound_z'] !== undefined) newRow[map['outbound_z']] = box.outbound.truckZ !== null ? box.outbound.truckZ : "";
+            if (map['outbound_rotated'] !== undefined) newRow[map['outbound_rotated']] = box.outbound.isRotated || false;
+            if (map['outbound_staged'] !== undefined) newRow[map['outbound_staged']] = box.outbound.isStaged || false;
+        }
+        if (box.inbound) {
+            if (map['inbound_truck_uid'] !== undefined) newRow[map['inbound_truck_uid']] = box.inbound.truckUid || "";
+            if (map['inbound_x'] !== undefined) newRow[map['inbound_x']] = box.inbound.truckX !== null ? box.inbound.truckX : "";
+            if (map['inbound_y'] !== undefined) newRow[map['inbound_y']] = box.inbound.truckY !== null ? box.inbound.truckY : "";
+            if (map['inbound_z'] !== undefined) newRow[map['inbound_z']] = box.inbound.truckZ !== null ? box.inbound.truckZ : "";
+            if (map['inbound_rotated'] !== undefined) newRow[map['inbound_rotated']] = box.inbound.isRotated || false;
+            if (map['inbound_staged'] !== undefined) newRow[map['inbound_staged']] = box.inbound.isStaged || false;
+        }
+        return newRow;
+    }
+    if (map[tUid] !== undefined) newRow[map[tUid]] = box.truckUid || "";
+    if (map[tX] !== undefined) newRow[map[tX]] = box.truckX !== null ? box.truckX : "";
+    if (map[tY] !== undefined) newRow[map[tY]] = box.truckY !== null ? box.truckY : "";
+    if (map[tZ] !== undefined) newRow[map[tZ]] = box.truckZ !== null ? box.truckZ : "";
+    if (map[tRot] !== undefined) newRow[map[tRot]] = box.isRotated || false;
+    if (map[tStaged] !== undefined) newRow[map[tStaged]] = box.isStaged || false;
+    return newRow;
+}
+
+/**
+ * Apply truck layout to a uid→row map. Returns project PA rows after arrange
+ * (may mint new UIDs when splitting bulk qty>1).
+ */
+function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map) {
+    var paUpdates = {};
+    (layoutData || []).forEach(function (item) {
+        if (!paUpdates[item.paUid]) paUpdates[item.paUid] = [];
+        paUpdates[item.paUid].push(item);
+    });
+    var out = [];
+    Object.keys(projectRowsMap).forEach(function (uidKey) {
+        var origRow = projectRowsMap[uidKey];
+        var uid = origRow[map['uid']];
+        if (paUpdates[uid]) {
+            if (paUpdates[uid].length === 1 && parseInt(origRow[map['assigned_quantity']], 10) === 1) {
+                // PRESERVE UID when already an individual virtual ID
+                out.push(applyTruckBoxToPaRow_(origRow.slice(), map, leg, paUpdates[uid][0]));
+            } else {
+                // Legacy: split grouped bulk into qty=1 rows with new UIDs
+                paUpdates[uid].forEach(function (box) {
+                    var newRow = origRow.slice();
+                    newRow[map['uid']] = Utilities.getUuid();
+                    newRow[map['assigned_quantity']] = 1;
+                    out.push(applyTruckBoxToPaRow_(newRow, map, leg, box));
+                });
+            }
+        } else {
+            out.push(origRow);
+        }
+    });
+    return out;
+}
+
 function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor = "System UI") {
+    assertActorCanEditProjectAssets(actor);
+    // Prep fork open → Firebase PA + Sheets ledger. Closed → Sheets PA + ledger.
+    if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN) {
+        return saveTruckArrangementFirestore_(projectId, layoutData, leg, actor);
+    }
     return executeWithRetry(() => {
-        assertActorCanEditProjectAssets(actor);
+        dalAssertSheetsPaNotForked_(projectId);
         const sheets = verifyDatabaseSchema();
         let data = sheets.projectAssets.getDataRange().getValues();
         let map = {}; if(data.length > 0) data[0].forEach((h,i)=>map[h.toString().trim()]=i);
@@ -279,99 +355,14 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
             }
         }
 
-        let paUpdates = {};
-        layoutData.forEach(item => {
-            if (!paUpdates[item.paUid]) paUpdates[item.paUid] = [];
-            paUpdates[item.paUid].push(item);
-        });
-
-        let tUid = leg + '_truck_uid';
-        let tX = leg + '_x';
-        let tY = leg + '_y';
-        let tZ = leg + '_z';
-        let tRot = leg + '_rotated';
-        let tStaged = leg + '_staged';
-
-        Object.values(projectRowsMap).forEach(origRow => {
-            let uid = origRow[map['uid']];
-            if (paUpdates[uid]) {
-                if (paUpdates[uid].length === 1 && parseInt(origRow[map['assigned_quantity']], 10) === 1) {
-                    // PRESERVE UID: Do not generate a new UID if it's already an Individual Virtual ID!
-                    let box = paUpdates[uid][0];
-                    let newRow = [...origRow];
-                    if (leg === 'both') {
-                        if (box.outbound) {
-                            if (map['outbound_truck_uid'] !== undefined) newRow[map['outbound_truck_uid']] = box.outbound.truckUid || "";
-                            if (map['outbound_x'] !== undefined) newRow[map['outbound_x']] = box.outbound.truckX !== null ? box.outbound.truckX : "";
-                            if (map['outbound_y'] !== undefined) newRow[map['outbound_y']] = box.outbound.truckY !== null ? box.outbound.truckY : "";
-                            if (map['outbound_z'] !== undefined) newRow[map['outbound_z']] = box.outbound.truckZ !== null ? box.outbound.truckZ : "";
-                            if (map['outbound_rotated'] !== undefined) newRow[map['outbound_rotated']] = box.outbound.isRotated || false;
-                            if (map['outbound_staged'] !== undefined) newRow[map['outbound_staged']] = box.outbound.isStaged || false;
-                        }
-                        if (box.inbound) {
-                            if (map['inbound_truck_uid'] !== undefined) newRow[map['inbound_truck_uid']] = box.inbound.truckUid || "";
-                            if (map['inbound_x'] !== undefined) newRow[map['inbound_x']] = box.inbound.truckX !== null ? box.inbound.truckX : "";
-                            if (map['inbound_y'] !== undefined) newRow[map['inbound_y']] = box.inbound.truckY !== null ? box.inbound.truckY : "";
-                            if (map['inbound_z'] !== undefined) newRow[map['inbound_z']] = box.inbound.truckZ !== null ? box.inbound.truckZ : "";
-                            if (map['inbound_rotated'] !== undefined) newRow[map['inbound_rotated']] = box.inbound.isRotated || false;
-                            if (map['inbound_staged'] !== undefined) newRow[map['inbound_staged']] = box.inbound.isStaged || false;
-                        }
-                    } else {
-                        if (map[tUid] !== undefined) newRow[map[tUid]] = box.truckUid || "";
-                        if (map[tX] !== undefined) newRow[map[tX]] = box.truckX !== null ? box.truckX : "";
-                        if (map[tY] !== undefined) newRow[map[tY]] = box.truckY !== null ? box.truckY : "";
-                        if (map[tZ] !== undefined) newRow[map[tZ]] = box.truckZ !== null ? box.truckZ : "";
-                        if (map[tRot] !== undefined) newRow[map[tRot]] = box.isRotated || false;
-                        if (map[tStaged] !== undefined) newRow[map[tStaged]] = box.isStaged || false;
-                    }
-                    keptRows.push(newRow);
-                } else {
-                    // Legacy fallback for splitting grouped Bulk items on the truck
-                    paUpdates[uid].forEach(box => {
-                        let newRow = [...origRow];
-                        newRow[map['uid']] = Utilities.getUuid(); 
-                        newRow[map['assigned_quantity']] = 1; 
-                        if (leg === 'both') {
-                            if (box.outbound) {
-                                if (map['outbound_truck_uid'] !== undefined) newRow[map['outbound_truck_uid']] = box.outbound.truckUid || "";
-                                if (map['outbound_x'] !== undefined) newRow[map['outbound_x']] = box.outbound.truckX !== null ? box.outbound.truckX : "";
-                                if (map['outbound_y'] !== undefined) newRow[map['outbound_y']] = box.outbound.truckY !== null ? box.outbound.truckY : "";
-                                if (map['outbound_z'] !== undefined) newRow[map['outbound_z']] = box.outbound.truckZ !== null ? box.outbound.truckZ : "";
-                                if (map['outbound_rotated'] !== undefined) newRow[map['outbound_rotated']] = box.outbound.isRotated || false;
-                                if (map['outbound_staged'] !== undefined) newRow[map['outbound_staged']] = box.outbound.isStaged || false;
-                            }
-                            if (box.inbound) {
-                                if (map['inbound_truck_uid'] !== undefined) newRow[map['inbound_truck_uid']] = box.inbound.truckUid || "";
-                                if (map['inbound_x'] !== undefined) newRow[map['inbound_x']] = box.inbound.truckX !== null ? box.inbound.truckX : "";
-                                if (map['inbound_y'] !== undefined) newRow[map['inbound_y']] = box.inbound.truckY !== null ? box.inbound.truckY : "";
-                                if (map['inbound_z'] !== undefined) newRow[map['inbound_z']] = box.inbound.truckZ !== null ? box.inbound.truckZ : "";
-                                if (map['inbound_rotated'] !== undefined) newRow[map['inbound_rotated']] = box.inbound.isRotated || false;
-                                if (map['inbound_staged'] !== undefined) newRow[map['inbound_staged']] = box.inbound.isStaged || false;
-                            }
-                        } else {
-                            if (map[tUid] !== undefined) newRow[map[tUid]] = box.truckUid || "";
-                            if (map[tX] !== undefined) newRow[map[tX]] = box.truckX !== null ? box.truckX : "";
-                            if (map[tY] !== undefined) newRow[map[tY]] = box.truckY !== null ? box.truckY : "";
-                            if (map[tZ] !== undefined) newRow[map[tZ]] = box.truckZ !== null ? box.truckZ : "";
-                            if (map[tRot] !== undefined) newRow[map[tRot]] = box.isRotated || false;
-                            if (map[tStaged] !== undefined) newRow[map[tStaged]] = box.isStaged || false;
-                        }
-                        keptRows.push(newRow);
-                    });
-                }
-            } else {
-                keptRows.push(origRow);
-            }
-        });
+        var projectPaOnly = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map);
+        projectPaOnly.forEach(function (r) { keptRows.push(r); });
 
         sheets.projectAssets.clearContents();
         if(keptRows.length > 0) sheets.projectAssets.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
 
         // M1 dual-write: mirror arrangement into Logistics_Ledger (PA columns still SoT for readers)
         var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
-        var projectPaOnly = keptRows.slice(1).filter(function (r) {
-          return String(r[map['project_uid']]) === String(projectId);
-        });
         try {
           logisticsLedgerDualWriteFromPaRows_(sheets, projectId, projectPaOnly, map, dualLegs, actor);
         } catch (eLl) {
