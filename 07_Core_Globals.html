@@ -209,7 +209,10 @@ window.dalPaintSurfaceForkSyncBar_ = function() {
 };
 
 /** Manual START button allowed (creds ∩ surface ∩ not freelancer). */
+window.DAL_LIVE_FORKS_PAUSED = true; // keep in sync with Dal_Sessions.js · DAL_LIVE_FORKS_PAUSED
+
 window.dalMayManualStartFork_ = function(domain) {
+  if (window.DAL_LIVE_FORKS_PAUSED) return false;
   if (window.dalIsLiveForkExcluded_()) return false;
   var surface = window.dalSessionSurface_();
   var d = String(domain || '');
@@ -240,6 +243,7 @@ window.dalMayAutoStartFork_ = function(domain) {
 
 /** Soft-join / pull-in latch allowed (not freelancer). */
 window.dalMayJoinLiveFork_ = function() {
+  if (window.DAL_LIVE_FORKS_PAUSED) return false;
   return !window.dalIsLiveForkExcluded_();
 };
 

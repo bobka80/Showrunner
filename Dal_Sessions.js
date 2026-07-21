@@ -12,6 +12,22 @@ var DAL_SESSION_TYPE = {
   TIMELINE_COLLAB: 'timelineCollab'
 };
 
+/**
+ * TEMP pause — Logistics Ledger campaign (2026-07-21).
+ * true = Sheets-only PA + timeline (no Firebase forks).
+ * Set false and ship to restore START PREP / START COLLAB + auto-start.
+ */
+var DAL_LIVE_FORKS_PAUSED = true;
+
+function dalLiveForksPaused_() {
+  return DAL_LIVE_FORKS_PAUSED === true;
+}
+
+/** Client / ops probe. */
+function isDalLiveForksPausedAPI() {
+  return { paused: dalLiveForksPaused_() };
+}
+
 var DAL_SESSION_INDEX_COLS = [
   'Dal_Session_Type',
   'Dal_Session_Status',
@@ -224,6 +240,26 @@ function dalLegacyFlatFromDomains_(prep, timeline) {
  */
 function getDalSessionInfo(projectId) {
   return executeWithRetry(function () {
+    // While forks paused, always report closed so clients do not soft-join Firebase.
+    if (dalLiveForksPaused_()) {
+      return {
+        projectId: projectId,
+        prepStatus: '',
+        prepUid: '',
+        prepOpenedAt: '',
+        prepOpenedBy: '',
+        timelineStatus: '',
+        timelineUid: '',
+        timelineOpenedAt: '',
+        timelineOpenedBy: '',
+        status: '',
+        sessionType: '',
+        sessionUid: '',
+        openedAt: '',
+        openedBy: '',
+        liveForksPaused: true
+      };
+    }
     var sheets = verifyDatabaseSchema(true);
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) {
@@ -284,6 +320,7 @@ function dalStatusIsForkLive_(status) {
  */
 function getOpenDalForkMap() {
   return executeWithRetry(function () {
+    if (dalLiveForksPaused_()) return {};
     var sheets = verifyDatabaseSchema(true);
     var indexData = sheets.index.getDataRange().getValues();
     if (!indexData.length) return {};
@@ -317,6 +354,8 @@ function getOpenDalForkMap() {
 
 function resolveDalSessionStatus_(projectId, domain) {
   try {
+    // Pause = Sheets-only for PA + timeline even if Index still shows an old open flag.
+    if (dalLiveForksPaused_()) return DAL_SESSION.NORMAL;
     var sheets = verifyDatabaseSchema(true);
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) return DAL_SESSION.NORMAL;
@@ -375,6 +414,12 @@ function dalReclaimStaleDomainSession_(indexSheet, row, sessionType) {
 }
 
 function dalAssertCanOpenSessionType_(sessionType, actor) {
+  if (dalLiveForksPaused_()) {
+    throw new Error(
+      'DAL_LIVE_FORKS_PAUSED: Live prep and timeline collab are paused (Sheets-only). ' +
+      'Set DAL_LIVE_FORKS_PAUSED=false and ship to restore.'
+    );
+  }
   dalAssertNotLiveForkExcluded_(actor);
   if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
     assertActorCanEditTimeline(actor);
@@ -649,4 +694,65 @@ function closeDalSession(projectId, actor, sessionType) {
     writeToAuditLog(actor, 'CLOSE', 'DAL_SESSION', projectId, projectId, 'Closed ' + closingType + ' session — committed to Sheets.');
     return { success: true, sessionType: closingType, status: 'closed' };
   });
+}
+
+/**
+ * Mass-abandon open/opening/committing prep + timeline flags on Projects_Index.
+ * Does NOT commit Firebase → Sheets (Sheets stay SoT while forks are paused/broken).
+ * Best-effort deletes Firestore _meta after Index clear (outside ScriptLock).
+ * Only runs when DAL_LIVE_FORKS_PAUSED is true.
+ */
+function abandonAllOpenDalLiveForksAPI(actor) {
+  actor = actor || 'System UI';
+  if (!dalLiveForksPaused_()) {
+    throw new Error('Refuse mass abandon while DAL_LIVE_FORKS_PAUSED is false.');
+  }
+
+  var cleared = executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema();
+    var indexData = sheets.index.getDataRange().getValues();
+    if (!indexData.length) return [];
+    var iMap = dalEnsureSessionIndexColumns_(sheets.index, indexData);
+    var out = [];
+    var types = [DAL_SESSION_TYPE.PREP, DAL_SESSION_TYPE.TIMELINE_COLLAB];
+    for (var i = 1; i < indexData.length; i++) {
+      var pid = iMap['uid'] !== undefined ? String(indexData[i][iMap['uid']] || '') : '';
+      if (!pid) continue;
+      var row = { rowNum: i + 1, map: iMap, data: indexData[i] };
+      types.forEach(function (sessionType) {
+        var cur = dalReadDomainSession_(row, sessionType);
+        var st = String(cur.status || '').toLowerCase();
+        if (!dalStatusIsForkLive_(st)) return;
+        dalClearDomainSession_(sheets.index, row.rowNum, row.map, sessionType);
+        out.push({
+          projectId: pid,
+          sessionType: sessionType,
+          wasStatus: st,
+          sessionUid: cur.sessionUid || ''
+        });
+      });
+    }
+    if (out.length) flushCache();
+    writeToAuditLog(actor, 'PAUSE', 'DAL_SESSION', '', '',
+      'Abandoned ' + out.length + ' live fork flag(s) — Sheets-only pause (no Firebase commit).');
+    return out;
+  });
+
+  // Best-effort meta cleanup — no ScriptLock across UrlFetch
+  (cleared || []).forEach(function (entry) {
+    try {
+      if (entry.sessionType === DAL_SESSION_TYPE.PREP) {
+        firestoreDeleteDocument_('projects/' + entry.projectId + '/assets/_meta');
+      } else if (entry.sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
+        firestoreDeleteDocument_('projects/' + entry.projectId + '/timeline/_meta');
+      }
+    } catch (eMeta) { /* Index already cleared */ }
+  });
+
+  return {
+    success: true,
+    paused: true,
+    abandoned: cleared || [],
+    count: (cleared || []).length
+  };
 }

@@ -252,6 +252,9 @@ window.openDalTimelineCollabSession = function(opts) {
   opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
   if (!projectId || projectId === 'NEW') return alert('Save the project first.');
+  if (window.DAL_LIVE_FORKS_PAUSED) {
+    return alert('Live timeline collab is paused — timeline saves to Google Sheets only until forks are re-enabled.');
+  }
   if (typeof window.dalIsLiveForkExcluded_ === 'function' && window.dalIsLiveForkExcluded_()) {
     return alert('Live timeline collaboration is not available for freelancer accounts.');
   }
