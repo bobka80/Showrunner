@@ -287,6 +287,139 @@ window.dalPrepLastLeaveSeq_ = 0;
 window.dalTlLastLeaveSeq_ = 0;
 window.dalPrepLeaveIntent_ = false;
 window.dalTlLeaveIntent_ = false;
+window.dalUnloadLeaveBound_ = false;
+window.dalUnloadLeaveFired_ = false;
+window.dalOrphanReclaimPrepPending_ = false;
+window.dalOrphanReclaimTlPending_ = false;
+
+/**
+ * Browser refresh / tab close — leave live modules in presence and last-leave commit if alone.
+ * Best-effort: google.script.run may not finish after unload; empty-room reclaim covers the rest.
+ */
+window.dalOnBrowserLeaveLiveRooms_ = function(reason) {
+  if (window.dalUnloadLeaveFired_) return;
+  window.dalUnloadLeaveFired_ = true;
+  var pid = '';
+  try {
+    pid = (typeof window.dalResolvePrepProjectId_ === 'function' && window.dalResolvePrepProjectId_()) ||
+      (typeof window.dalPresenceProjectId_ === 'function' && window.dalPresenceProjectId_()) ||
+      '';
+  } catch (ePid) { pid = ''; }
+  var actor = typeof window.dalPresenceActor_ === 'function'
+    ? window.dalPresenceActor_()
+    : (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'Unknown');
+
+  var inPrepLive = !!(window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_);
+  var inTlLive = !!(window.dalTimelineSessionOpen || window.dalTlOpeningUi_);
+
+  // Drop presence immediately so peers / reclaim see an empty room (even if commit RPC dies).
+  if (pid) {
+    try {
+      google.script.run.reportProjectPresence(pid, actor, 'leave');
+    } catch (eLeave) { /* ignore */ }
+  }
+
+  if (inPrepLive && typeof window.dalMaybeLastLeaveClosePrep_ === 'function') {
+    try { window.dalMaybeLastLeaveClosePrep_(); } catch (ePrep) { /* ignore */ }
+  }
+  if (inTlLive && typeof window.dalMaybeLastLeaveCloseTimeline_ === 'function') {
+    try { window.dalMaybeLastLeaveCloseTimeline_(); } catch (eTl) { /* ignore */ }
+  }
+};
+
+window.dalBindLiveRoomUnloadLeave_ = function() {
+  if (window.dalUnloadLeaveBound_) return;
+  window.dalUnloadLeaveBound_ = true;
+  var fire = function() {
+    try { window.dalOnBrowserLeaveLiveRooms_('unload'); } catch (e0) { /* ignore */ }
+  };
+  window.addEventListener('pagehide', fire);
+  window.addEventListener('beforeunload', fire);
+  // bfcache restore — allow a future leave to fire again.
+  window.addEventListener('pageshow', function() {
+    window.dalUnloadLeaveFired_ = false;
+  });
+};
+try { window.dalBindLiveRoomUnloadLeave_(); } catch (eBind) { /* ignore */ }
+
+/**
+ * Fork still open in Sheets/Firebase but nobody present in that live module → commit.
+ * Covers refresh/crash when unload leave did not finish closeDalSession.
+ * Only when *this* client is not currently inside that room.
+ */
+window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
+  if (othersObj == null) return;
+  if (typeof window.dalMayJoinLiveFork_ === 'function' && !window.dalMayJoinLiveFork_()) return;
+
+  var projectId = typeof window.dalPresenceProjectId_ === 'function'
+    ? window.dalPresenceProjectId_()
+    : '';
+  if (!projectId) return;
+
+  var mod = String(window.activePresenceModule || 'main');
+  var imInAssets = mod === 'assets';
+  var imInTimeline = mod === 'timeline';
+
+  // Prep orphan
+  if (!imInAssets && !window.dalPrepUiOpen && !window.dalPrepLatched && !window.dalPrepOpeningUi_ &&
+      !window.dalPrepClosing && !window.dalPrepLastLeavePending_ && !window.dalOrphanReclaimPrepPending_ &&
+      !!window.peForkPrepActive_) {
+    var prepPeers = typeof window.dalCountFreshModulePeers_ === 'function'
+      ? window.dalCountFreshModulePeers_(othersObj, 'assets')
+      : { count: 0 };
+    if (prepPeers.count === 0) {
+      window.dalOrphanReclaimPrepPending_ = true;
+      google.script.run
+        .withFailureHandler(function() { window.dalOrphanReclaimPrepPending_ = false; })
+        .withSuccessHandler(function(info) {
+          window.dalOrphanReclaimPrepPending_ = false;
+          if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
+          if (String(window.activePresenceModule || '') === 'assets') return;
+          var st = typeof window.dalPrepStatusFromInfo_ === 'function'
+            ? window.dalPrepStatusFromInfo_(info)
+            : '';
+          // Only reclaim a stuck Live room — not Opening (someone starting) or already committing.
+          if (st !== 'open') return;
+          if (typeof window.closeDalPrepSession === 'function') {
+            window.closeDalPrepSession({
+              auto: true,
+              reason: 'orphan-empty',
+              projectId: projectId
+            });
+          }
+        })
+        .getDalSessionInfo(projectId);
+    }
+  }
+
+  // Timeline orphan
+  if (!imInTimeline && !window.dalTimelineSessionOpen && !window.dalTlOpeningUi_ &&
+      !window.dalTlClosingUi_ && !window.dalTlLastLeavePending_ && !window.dalOrphanReclaimTlPending_ &&
+      !!window.peForkTimelineActive_) {
+    var tlPeers = typeof window.dalCountFreshModulePeers_ === 'function'
+      ? window.dalCountFreshModulePeers_(othersObj, 'timeline')
+      : { count: 0 };
+    if (tlPeers.count === 0) {
+      window.dalOrphanReclaimTlPending_ = true;
+      google.script.run
+        .withFailureHandler(function() { window.dalOrphanReclaimTlPending_ = false; })
+        .withSuccessHandler(function(info) {
+          window.dalOrphanReclaimTlPending_ = false;
+          if (window.dalTimelineSessionOpen || window.dalTlOpeningUi_) return;
+          if (String(window.activePresenceModule || '') === 'timeline') return;
+          var tl = typeof window.dalTimelineInfoFromSession_ === 'function'
+            ? window.dalTimelineInfoFromSession_(info)
+            : null;
+          var stTl = tl ? String(tl.status || '').toLowerCase() : '';
+          if (stTl !== 'open') return;
+          if (typeof window.closeDalTimelineCollabSession === 'function') {
+            window.closeDalTimelineCollabSession({ auto: true, reason: 'orphan-empty' });
+          }
+        })
+        .getDalSessionInfo(projectId);
+    }
+  }
+};
 
 window.dalPresenceProjectId_ = function() {
   if (typeof activePresenceProject !== 'undefined' && activePresenceProject) {

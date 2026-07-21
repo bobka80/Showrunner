@@ -310,6 +310,10 @@ function startPresencePing(projectId) {
                 typeof window.dalTouchRoomIdle_ === 'function') {
               window.dalTouchRoomIdle_('timeline');
             }
+            // Empty live module + fork still open → commit (covers refresh/crash orphans).
+            if (typeof window.dalMaybeReclaimEmptyLiveForks_ === 'function') {
+              window.dalMaybeReclaimEmptyLiveForks_(othersObj);
+            }
         }).reportProjectPresence(
           activePresenceProject,
           userAlias,

@@ -44,7 +44,7 @@
 | `closeDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `finishDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `getDalCommitRetryStatus` | `02e6_Dal_Session.html` |
-| `getDalSessionInfo` | `02_Project_Editor_Core.html`, `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html` |
+| `getDalSessionInfo` | `02_Project_Editor_Core.html`, `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html`, `03a2_Timeline_Dal_Live.html`, `07_Core_Globals.html` |
 | `retryDalFailedCommit` | `02e6_Dal_Session.html` |
 | `getDalFirebaseClientAuth` | `02e7_Dal_Firestore_Client.html` |
 | `deleteProjectFull` | `02_Project_Editor_Core.html` |
@@ -230,7 +230,7 @@
 | 06f_Admin_Audit.html | 4 | 0 |
 | 06g_Admin_Database.html | 7 | 0 |
 | 06h_Admin_Station_Profiles.html | 3 | 0 |
-| 07_Core_Globals.html | 8 | 2 |
+| 07_Core_Globals.html | 9 | 2 |
 | 07b_Grid_Engine.html | 0 | 0 |
 | 07c_Generalization_Engine.html | 0 | 0 |
 | 07d_Cache_Coordinator.html | 0 | 0 |
