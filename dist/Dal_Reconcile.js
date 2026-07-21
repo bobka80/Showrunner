@@ -196,34 +196,73 @@ function dalCollectRootNames_() {
 }
 
 /**
- * opts.push === false → audit only (no toast/inbox).
- * Push recipients = ROOT only (never logistics managers / commit actor fan-out).
+ * opts.push === false → audit only (no toast/inbox push).
+ * Push recipients = ROOT only.
+ * Always writes a durable in-app drawer row (linkType dal_commit_fail) when push is on,
+ * so ROOT can copy-paste the full detail after the toast disappears.
  */
 function dalAlertFailedWrite_(projectId, domain, actor, detail, opts) {
   opts = opts || {};
   var doPush = opts.push !== false;
-  var title = opts.title || ('DAL commit failed — ' + dalReconcileDomainLabel_(domain));
-  var body = 'Project ' + projectId + ': ' + String(detail || 'Sheets did not match Firebase fork after commit.');
+  var domainLabel = dalReconcileDomainLabel_(domain);
+  var title = opts.title || ('DAL commit failed — ' + domainLabel);
+  var detailStr = String(detail || 'Sheets did not match Firebase fork after commit.');
+  var body = 'Project ' + projectId + ': ' + detailStr;
+  var drawerMsg =
+    '[DAL_COMMIT_FAIL]\n' +
+    'domain: ' + domainLabel + '\n' +
+    'projectId: ' + String(projectId || '') + '\n' +
+    'actor: ' + String(actor || 'System') + '\n' +
+    'at: ' + new Date().toISOString() + '\n' +
+    'detail: ' + detailStr + '\n' +
+    '---\n' +
+    'Copy this whole card for support / AI handoff.';
+
   try {
     writeToAuditLog(
       actor || 'System',
       doPush ? 'FAIL' : 'WARN',
       'DAL_RECONCILE',
       projectId,
-      dalReconcileDomainLabel_(domain),
+      domainLabel,
       (doPush ? '' : '[no-push] ') + body
     );
   } catch (eAudit) { /* continue */ }
 
   if (!doPush) return;
 
+  var recipients = [];
   try {
-    var recipients = dalCollectRootNames_();
-    if (!recipients.length) {
+    recipients = dalCollectRootNames_() || [];
+  } catch (eRoot) { recipients = []; }
+
+  if (!recipients.length) {
+    try {
       writeToAuditLog(actor || 'System', 'WARN', 'DAL_RECONCILE', projectId, 'PUSH',
-        'No ROOT recipients for DAL alert — push skipped.');
-      return;
+        'No ROOT recipients for DAL alert — push/drawer skipped.');
+    } catch (eNo) { /* ignore */ }
+    return;
+  }
+
+  // Durable drawer row (Sheets Notifications) — toast alone vanishes.
+  try {
+    var sheets = verifyDatabaseSchema(true);
+    if (sheets && sheets.notifs) {
+      recipients.forEach(function (rootName) {
+        try {
+          appendInAppNotification_(sheets.notifs, rootName, drawerMsg, 'dal_commit_fail', String(projectId || ''));
+        } catch (eRow) { /* next root */ }
+      });
+      try { flushCache(); } catch (eFlush) { /* ignore */ }
     }
+  } catch (eDrawer) {
+    try {
+      writeToAuditLog(actor || 'System', 'WARN', 'DAL_RECONCILE', projectId, 'NOTIF',
+        'Drawer append failed: ' + (eDrawer.message || eDrawer));
+    } catch (e2) { /* ignore */ }
+  }
+
+  try {
     if (typeof dispatchPushToCrewNames === 'function') {
       dispatchPushToCrewNames(recipients, title, body, '', actor || 'System');
     }
@@ -231,7 +270,7 @@ function dalAlertFailedWrite_(projectId, domain, actor, detail, opts) {
     try {
       writeToAuditLog(actor || 'System', 'FAIL', 'DAL_RECONCILE', projectId, 'PUSH',
         'Root push failed: ' + (ePush.message || ePush));
-    } catch (e2) { /* ignore */ }
+    } catch (e3) { /* ignore */ }
   }
 }
 

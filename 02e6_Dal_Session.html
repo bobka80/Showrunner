@@ -352,9 +352,8 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     }
   }
   if (changed && typeof window.refreshCalForkFlagsNow_ === 'function') {
-    if (!isPrepOpen && typeof window.calOptimisticClearFork_ === 'function') {
-      window.calOptimisticClearFork_(projectId, 'prep');
-    }
+    // Do not optimistic-clear on leave — Sheets may still be committing; orange/amber must stay
+    // until getOpenDalForkMap says the domain is closed.
     window.refreshCalForkFlagsNow_();
   }
 };

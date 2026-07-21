@@ -176,7 +176,7 @@ Use `.crew-cb` for IAM and structural forms. Timeline grid uses `.crew-cb.small-
 
 Presence still updates OPEN TIMELINE label when others are inside (`👥 … IN TIMELINE`) but **never disables** the button. Paint lives in `paintProjectEditorModuleBtns_` / `refreshProjectEditorForkChrome_` (`02_Project_Editor_Core.html`).
 
-**Main calendar rollup strips:** after the event name, stacked fork dots (orange on top = PA / prep on Firebase; blue underneath = timeline on Firebase). Source: `dalPrepFork` / `dalTimelineFork` on projects + `getOpenDalForkMap` poll (`01a_Calendar_Core.html`).
+**Main calendar rollup strips:** after the event name, stacked fork dots (orange on top = PA / prep **live**; **amber** = PA **committing** to Sheets; blue underneath = timeline live; light-blue = timeline committing). Source: `getOpenDalForkMap` (Sheets Index status) + adaptive poll 4s while lit / 15s idle (`01a_Calendar_Core.html`). Dot staying lit after leave means the fork/commit is not finished yet — not a wrong indicator.
 
 **Phone / station:** fixed bottom `#surface-fork-sync-bar` — orange in PA when prep fork live, blue in timeline when collab fork live (`dalPaintSurfaceForkSyncBar_`). Desktop keeps vault / crew-column SYNC panels.
 

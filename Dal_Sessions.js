@@ -279,7 +279,8 @@ function dalStatusIsForkLive_(status) {
 
 /**
  * Lightweight map of projects with an active prep and/or timeline fork (calendar chrome).
- * Returns { [projectId]: { prep: boolean, timeline: boolean } } — only entries with at least one true.
+ * Returns { [projectId]: { prep, timeline, prepCommitting, timelineCommitting } }
+ * — only entries with at least one live domain.
  */
 function getOpenDalForkMap() {
   return executeWithRetry(function () {
@@ -297,10 +298,17 @@ function getOpenDalForkMap() {
     for (var i = 1; i < indexData.length; i++) {
       var pid = uidCol !== undefined ? String(indexData[i][uidCol] || '') : '';
       if (!pid || pid === 'uid') continue;
-      var prep = prepCol !== undefined && dalStatusIsForkLive_(indexData[i][prepCol]);
-      var timeline = tlCol !== undefined && dalStatusIsForkLive_(indexData[i][tlCol]);
+      var prepSt = prepCol !== undefined ? String(indexData[i][prepCol] || '').toLowerCase() : '';
+      var tlSt = tlCol !== undefined ? String(indexData[i][tlCol] || '').toLowerCase() : '';
+      var prep = dalStatusIsForkLive_(prepSt);
+      var timeline = dalStatusIsForkLive_(tlSt);
       if (prep || timeline) {
-        out[pid] = { prep: !!prep, timeline: !!timeline };
+        out[pid] = {
+          prep: !!prep,
+          timeline: !!timeline,
+          prepCommitting: prepSt === 'committing',
+          timelineCommitting: tlSt === 'committing'
+        };
       }
     }
     return out;

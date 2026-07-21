@@ -1531,9 +1531,7 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
   }
   if ((isOpen !== wasOpenBefore || (!isOpen && !isOpening)) &&
       typeof window.refreshCalForkFlagsNow_ === 'function') {
-    if (!isOpen && !isOpening && typeof window.calOptimisticClearFork_ === 'function') {
-      window.calOptimisticClearFork_(projectId, 'timeline');
-    }
+    // Keep calendar lit through committing — poll clears when Sheets status is normal.
     window.refreshCalForkFlagsNow_();
   }
 };

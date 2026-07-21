@@ -203,6 +203,8 @@ function getExistingProjects() {
       projectMap[pId].dalTimelineFork = liveFn
         ? liveFn(tlSt)
         : (tlSt.toLowerCase() === 'open' || tlSt.toLowerCase() === 'opening' || tlSt.toLowerCase() === 'committing');
+      projectMap[pId].dalPrepForkCommitting = String(prepSt).toLowerCase() === 'committing';
+      projectMap[pId].dalTimelineForkCommitting = String(tlSt).toLowerCase() === 'committing';
     } catch (eFork) { /* ignore */ }
   }
   

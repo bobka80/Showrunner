@@ -179,28 +179,39 @@ document.addEventListener('DOMContentLoaded', function() {
 
           let safeTitle = typeof escapeHTML === 'function' ? escapeHTML(arg.event.title) : String(arg.event.title).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-          // Fork chrome: orange (PA) on top, blue (timeline) underneath — after the name
+          // Fork chrome: orange (PA live) / amber (PA committing) on top; blue / light-blue timeline
           let forkFlags;
           if (window.calForkFlagsReady_) {
             forkFlags = (window.calForkFlags_ && window.calForkFlags_[arg.event.id])
-              || { prep: false, timeline: false };
+              || { prep: false, timeline: false, prepCommitting: false, timelineCommitting: false };
           } else {
             let raw = arg.event.extendedProps.rawDbData || {};
-            forkFlags = { prep: !!raw.dalPrepFork, timeline: !!raw.dalTimelineFork };
+            forkFlags = {
+              prep: !!raw.dalPrepFork,
+              timeline: !!raw.dalTimelineFork,
+              prepCommitting: !!raw.dalPrepForkCommitting,
+              timelineCommitting: !!raw.dalTimelineForkCommitting
+            };
           }
           let forkDotsHtml = '';
           if (forkFlags.prep || forkFlags.timeline) {
+            let prepColor = forkFlags.prepCommitting ? '#fbbf24' : '#f97316';
+            let tlColor = forkFlags.timelineCommitting ? '#93c5fd' : '#3b82f6';
+            let tipParts = [];
+            if (forkFlags.prep) {
+              tipParts.push(forkFlags.prepCommitting ? 'PA fork committing to Sheets' : 'PA fork live on Firebase');
+            }
+            if (forkFlags.timeline) {
+              tipParts.push(forkFlags.timelineCommitting ? 'Timeline fork committing' : 'Timeline fork live');
+            }
             forkDotsHtml =
-              '<span class="cal-fork-dots" title="' +
-              (forkFlags.prep && forkFlags.timeline
-                ? 'PA + Timeline forks on Firebase'
-                : (forkFlags.prep ? 'PA fork on Firebase' : 'Timeline fork on Firebase')) +
+              '<span class="cal-fork-dots" title="' + tipParts.join(' · ') +
               '" style="display:inline-flex;flex-direction:column;justify-content:center;gap:2px;margin-left:6px;flex-shrink:0;">' +
               (forkFlags.prep
-                ? '<span style="width:6px;height:6px;border-radius:50%;background:#f97316;box-shadow:0 0 3px #f97316;"></span>'
+                ? '<span style="width:6px;height:6px;border-radius:50%;background:' + prepColor + ';box-shadow:0 0 3px ' + prepColor + ';"></span>'
                 : '<span style="width:6px;height:6px;visibility:hidden;"></span>') +
               (forkFlags.timeline
-                ? '<span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;box-shadow:0 0 3px #3b82f6;"></span>'
+                ? '<span style="width:6px;height:6px;border-radius:50%;background:' + tlColor + ';box-shadow:0 0 3px ' + tlColor + ';"></span>'
                 : '<span style="width:6px;height:6px;visibility:hidden;"></span>') +
               '</span>';
           }
@@ -803,11 +814,13 @@ window.calRepaintForkDots_ = function() {
     calendar.getEvents().forEach(function(ev) {
       if (!ev || !ev.extendedProps || !ev.extendedProps.isRollup) return;
       var id = String(ev.id || '');
-      var flags = map[id] || { prep: false, timeline: false };
+      var flags = map[id] || { prep: false, timeline: false, prepCommitting: false, timelineCommitting: false };
       var raw = ev.extendedProps.rawDbData || {};
       var nextPrep = !!flags.prep;
       var nextTl = !!flags.timeline;
-      var sig = (nextPrep ? '1' : '0') + (nextTl ? '1' : '0');
+      var nextPrepC = !!flags.prepCommitting;
+      var nextTlC = !!flags.timelineCommitting;
+      var sig = (nextPrep ? '1' : '0') + (nextTl ? '1' : '0') + (nextPrepC ? 'c' : '') + (nextTlC ? 't' : '');
       // New object required — mutating raw in place may not trigger FullCalendar eventContent.
       var next = {};
       for (var k in raw) {
@@ -815,6 +828,8 @@ window.calRepaintForkDots_ = function() {
       }
       next.dalPrepFork = nextPrep;
       next.dalTimelineFork = nextTl;
+      next.dalPrepForkCommitting = nextPrepC;
+      next.dalTimelineForkCommitting = nextTlC;
       ev.setExtendedProp('rawDbData', next);
       ev.setExtendedProp('forkDotSig', sig);
     });
@@ -832,11 +847,26 @@ window.calApplyForkFlagsMap_ = function(map) {
   var sig = '';
   try { sig = JSON.stringify(map); } catch (e1) { sig = ''; }
   window.calForkFlagsReady_ = true;
-  if (sig === window.calForkFlagsSig_) return false;
-  window.calForkFlags_ = map;
-  window.calForkFlagsSig_ = sig;
-  if (typeof window.calRepaintForkDots_ === 'function') window.calRepaintForkDots_();
-  return true;
+  var changed = sig !== window.calForkFlagsSig_;
+  if (changed) {
+    window.calForkFlags_ = map;
+    window.calForkFlagsSig_ = sig;
+    if (typeof window.calRepaintForkDots_ === 'function') window.calRepaintForkDots_();
+  }
+  if (typeof window.calRescheduleForkFlagsPoll_ === 'function') {
+    window.calRescheduleForkFlagsPoll_();
+  }
+  return changed;
+};
+
+window.calForkFlagsAnyLive_ = function() {
+  var map = window.calForkFlags_ || {};
+  var keys = Object.keys(map);
+  for (var i = 0; i < keys.length; i++) {
+    var f = map[keys[i]];
+    if (f && (f.prep || f.timeline)) return true;
+  }
+  return false;
 };
 
 window.refreshCalForkFlagsNow_ = function() {
@@ -854,7 +884,8 @@ window.refreshCalForkFlagsNow_ = function() {
     .getOpenDalForkMap();
 };
 
-/** Instant local clear (END PREP / END COLLAB) before Sheets poll catches up. */
+/** Instant local clear (END PREP / END COLLAB) before Sheets poll catches up.
+ *  Do NOT use while status may still be committing — calendar must stay lit until Sheets clears. */
 window.calOptimisticClearFork_ = function(projectId, domain) {
   var id = String(projectId || '');
   if (!id) return;
@@ -862,23 +893,64 @@ window.calOptimisticClearFork_ = function(projectId, domain) {
   var map = {};
   var src = window.calForkFlags_ || {};
   Object.keys(src).forEach(function(k) {
-    map[k] = { prep: !!src[k].prep, timeline: !!src[k].timeline };
+    map[k] = {
+      prep: !!src[k].prep,
+      timeline: !!src[k].timeline,
+      prepCommitting: !!src[k].prepCommitting,
+      timelineCommitting: !!src[k].timelineCommitting
+    };
   });
-  var cur = map[id] || { prep: false, timeline: false };
-  if (domain === 'prep' || domain === 'pa') cur.prep = false;
-  if (domain === 'timeline' || domain === 'timelineCollab') cur.timeline = false;
+  var cur = map[id] || { prep: false, timeline: false, prepCommitting: false, timelineCommitting: false };
+  // Never optimistic-clear while this domain is committing (would lie that the fork is gone).
+  if ((domain === 'prep' || domain === 'pa') && cur.prepCommitting) {
+    if (typeof window.refreshCalForkFlagsNow_ === 'function') window.refreshCalForkFlagsNow_();
+    return;
+  }
+  if ((domain === 'timeline' || domain === 'timelineCollab') && cur.timelineCommitting) {
+    if (typeof window.refreshCalForkFlagsNow_ === 'function') window.refreshCalForkFlagsNow_();
+    return;
+  }
+  if (domain === 'prep' || domain === 'pa') {
+    cur.prep = false;
+    cur.prepCommitting = false;
+  }
+  if (domain === 'timeline' || domain === 'timelineCollab') {
+    cur.timeline = false;
+    cur.timelineCommitting = false;
+  }
   if (cur.prep || cur.timeline) map[id] = cur;
   else delete map[id];
   if (typeof window.calApplyForkFlagsMap_ === 'function') window.calApplyForkFlagsMap_(map);
 };
 
-window.startCalForkFlagsPoll_ = function() {
-  if (window.calForkFlagsPollTimer_) return;
-  var tick = function() {
+window.calRescheduleForkFlagsPoll_ = function() {
+  if (window.calForkFlagsPollTimer_) {
+    clearInterval(window.calForkFlagsPollTimer_);
+    window.calForkFlagsPollTimer_ = null;
+  }
+  // Faster while any fork is lit so commit→clear is not stuck on a 15s lag.
+  var ms = window.calForkFlagsAnyLive_() ? 4000 : 15000;
+  window.calForkFlagsPollTimer_ = setInterval(function() {
     if (typeof window.refreshCalForkFlagsNow_ === 'function') window.refreshCalForkFlagsNow_();
-  };
-  tick();
-  window.calForkFlagsPollTimer_ = setInterval(tick, 15000);
+  }, ms);
+};
+
+window.startCalForkFlagsPoll_ = function() {
+  if (window.calForkFlagsPollBound_) {
+    if (typeof window.refreshCalForkFlagsNow_ === 'function') window.refreshCalForkFlagsNow_();
+    return;
+  }
+  window.calForkFlagsPollBound_ = true;
+  if (typeof window.refreshCalForkFlagsNow_ === 'function') window.refreshCalForkFlagsNow_();
+  if (typeof window.calRescheduleForkFlagsPoll_ === 'function') window.calRescheduleForkFlagsPoll_();
+  if (!window.calForkFlagsVisibilityBound_) {
+    window.calForkFlagsVisibilityBound_ = true;
+    document.addEventListener('visibilitychange', function() {
+      if (!document.hidden && typeof window.refreshCalForkFlagsNow_ === 'function') {
+        window.refreshCalForkFlagsNow_();
+      }
+    });
+  }
 };
 
 function refreshData(opts) {

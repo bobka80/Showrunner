@@ -33,6 +33,8 @@ function resolveNotifNavigation(n) {
     if (!n) return null;
     const linkType = String(n.linkType || '').toLowerCase().trim();
     const linkId = String(n.linkId || '').trim();
+    // Ops pack for ROOT — copy-only, do not deep-link like a normal project notif.
+    if (linkType === 'dal_commit_fail') return null;
     if (linkType && linkId) return { type: linkType, id: linkId };
 
     const msg = String(n.message || '');
@@ -54,21 +56,77 @@ function buildNotifCardHtml(n, opts) {
     if (ts > new Date().getTime()) return { html: '', unread: false };
 
     let read = (typeof isNotifRead === 'function') ? isNotifRead(n.isRead) : !!n.isRead;
-    let bg = read ? 'transparent' : 'rgba(244, 63, 94, 0.1)';
-    let border = read ? '#333' : '#f43f5e';
+    const isDalFail = String(n.linkType || '').toLowerCase() === 'dal_commit_fail';
+    let bg = isDalFail
+      ? (read ? 'rgba(127, 29, 29, 0.35)' : 'rgba(185, 28, 28, 0.45)')
+      : (read ? 'transparent' : 'rgba(244, 63, 94, 0.1)');
+    let border = isDalFail ? '#ef4444' : (read ? '#333' : '#f43f5e');
     let dateStr = new Date(n.timestamp).toLocaleDateString();
     const nav = resolveNotifNavigation(n);
     const navHint = nav ? ' title="Open ' + (nav.type === 'task' ? 'task' : 'event') + '"' : '';
-    const cardClass = 'notif-card' + (mobile ? ' notif-card--mobile' : '');
+    const cardClass = 'notif-card' + (mobile ? ' notif-card--mobile' : '') + (isDalFail ? ' notif-card--dal-fail' : '');
+    const label = isDalFail
+      ? '<div style="font-size:10px;font-weight:900;letter-spacing:0.06em;color:#fca5a5;margin-bottom:4px;">DAL COMMIT FAIL — COPY FOR SUPPORT</div>'
+      : '';
+    const copyBtn = isDalFail
+      ? '<button type="button" class="btn-outline btn-sm" style="margin:8px 0 0 0;border-color:#fca5a5;color:#fecaca;font-size:10px;padding:4px 10px !important;" onclick="event.stopPropagation(); copyDalCommitFailNotif(\'' + n.id + '\')">COPY FULL TEXT</button>'
+      : '';
+    const clickAttr = isDalFail
+      ? ''
+      : ' onclick="openNotifTarget(\'' + n.id + '\')"';
 
     const html = '<div id="notif-card-' + n.id + '" class="' + cardClass + '" data-read="' + read + '"' + navHint +
-        ' onclick="openNotifTarget(\'' + n.id + '\')" style="background:' + bg + '; border:1px solid ' + border + ';">' +
+        clickAttr + ' style="background:' + bg + '; border:1px solid ' + border + ';">' +
         '<button type="button" class="notif-dismiss-btn" onclick="event.stopPropagation(); dismissNotif(\'' + n.id + '\')" title="Dismiss" aria-label="Dismiss">×</button>' +
-        '<div class="notif-card-message">' + escapeHTML(n.message) + '</div>' +
+        label +
+        '<div class="notif-card-message" style="' + (isDalFail ? 'white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace;font-size:11px;line-height:1.35;' : '') + '">' +
+        escapeHTML(n.message) + '</div>' +
+        copyBtn +
         '<div class="notif-card-date">' + dateStr + '</div>' +
         '</div>';
     return { html: html, unread: !read };
 }
+
+window.copyDalCommitFailNotif = function(id) {
+  var n = (typeof globalNotifs !== 'undefined' ? globalNotifs : []).find(function(x) {
+    return String(x.id) === String(id);
+  });
+  var text = n && n.message ? String(n.message) : '';
+  if (!text) {
+    try { alert('Nothing to copy.'); } catch (e0) { /* ignore */ }
+    return;
+  }
+  var done = function() {
+    try {
+      if (typeof showPushToast === 'function') showPushToast('Copied', 'DAL commit fail text is on the clipboard.');
+      else alert('Copied to clipboard.');
+    } catch (e1) { /* ignore */ }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(function() {
+      window.copyDalCommitFailNotifFallback_(text, done);
+    });
+    return;
+  }
+  window.copyDalCommitFailNotifFallback_(text, done);
+};
+
+window.copyDalCommitFailNotifFallback_ = function(text, done) {
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    if (typeof done === 'function') done();
+  } catch (e) {
+    try { prompt('Copy this text:', text); } catch (e2) { /* ignore */ }
+  }
+};
 
 function renderNotifCardsHtml(notifs, opts) {
     opts = opts || {};
