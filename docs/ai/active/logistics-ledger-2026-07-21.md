@@ -122,4 +122,4 @@
 | 2026-07-21 | **M1.1 @ GAS v727** (+ hosting host-boot **v668**): Prep-open truck → Firebase PA + state (truck fixtures) + ledger dual-write; flush/host mirror carry truck; End Prep overlay collection-first. |
 | 2026-07-21 | **Live forks PAUSED @ GAS v728–v729** (PA + timeline): Sheets-only until ledger work done. Flag `DAL_LIVE_FORKS_PAUSED`; one-shot abandon Index flags (no Firebase commit). |
 | 2026-07-21 | **Docs:** canonical agent note [dal-live-forks-pause.md](../topics/dal-live-forks-pause.md); wired from doctrine, AGENTS, session-fork-platform, prep/timeline topics, FRAGILE, GLOSSARY. |
-| 2026-07-21 | **M2 backfill:** `backfillLogisticsLedgerFromPaAPI` + sheet AUTO clocks + RECOVERY `phase_ref` (exact-one) + review list. Arrange save also stamps clocks/phase_ref when resolvable. |
+| 2026-07-21 | **M2 @ GAS v730:** `backfillLogisticsLedgerFromPaAPI` + sheet AUTO clocks + RECOVERY `phase_ref` (exact-one) + `reviewLogisticsLedgerGapsAPI`. Arrange save also stamps when resolvable. Next: run backfill once, then M3. |
