@@ -254,6 +254,12 @@ function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
             }
         }
 
+        // M3: prefer Logistics_Ledger legs (PA columns = fallback)
+        try {
+          var legsMap = logisticsLedgerLegsByProject_(sheets, projectId);
+          assets.forEach(function (a) { applyLedgerLegsOntoPaAsset_(a, legsMap); });
+        } catch (eLlRead) { /* PA-only fallback */ }
+
         return getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets);
     });
 }
@@ -586,6 +592,12 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
         // 4. Fetch Assignments (Project Assets)
         const paData = getSheetData(dbSheets.projectAssets);
         const paMap = paData.hMap;
+
+        // M3: ledger truck UIDs for active projects (prefer over PA columns)
+        var ledgerByProject = {};
+        try {
+          ledgerByProject = logisticsLedgerLegsByProjects_(dbSheets, Object.keys(activeProjects || {}));
+        } catch (eLlTrk) { ledgerByProject = {}; }
         
         // --- 🏗️ MATRYOSHKA INHERITANCE: Map Container Truck Assignments ---
         let containerTrucks = {};
@@ -593,8 +605,11 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             let pUid = paData[i][paMap['project_uid']] || paData[i][paMap['Project_ID']];
             let aUid = paData[i][paMap['asset_uid']] || paData[i][paMap['Asset_ID']];
             let form = paData[i][paMap['formula']] || 'Standalone';
-            let outT = paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "";
-            let inT = paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "";
+            let legsMap = ledgerByProject[String(pUid)] || {};
+            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound',
+              paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "");
+            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound',
+              paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "");
             if (outT || inT) {
                 let cid = form !== 'Standalone' ? (aUid + "|||" + form) : aUid;
                 containerTrucks[pUid + "|||" + cid] = { out: outT, in: inT };
@@ -613,9 +628,12 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             
             let qty = parseInt(paData[i][paMap['assigned_quantity']], 10) || 0;
             if(qty <= 0) continue;
-            
-            let outT = paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "";
-            let inT = paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "";
+
+            let legsMap = ledgerByProject[String(pUid)] || {};
+            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound',
+              paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "");
+            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound',
+              paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "");
             let cUid = paData[i][paMap['container_uid']];
             if (cUid) {
                 let parentKey = pUid + "|||" + cUid;

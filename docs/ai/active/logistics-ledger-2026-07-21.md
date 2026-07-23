@@ -7,7 +7,7 @@
 **Predecessor:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
 **Next after this campaign:** Project Campaign Room — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)
 
-**Opened:** 2026-07-21 · **Status:** **M2 backfill shipped** — live forks still PAUSED (Sheets-only). Next: M3 readers.  
+**Opened:** 2026-07-21 · **Status:** **M3 readers shipped** — live forks still PAUSED (Sheets-only). Next: smoke M3, then M4.  
 **Production tip:** see status log. Prep live rollback pin still **v654**.
 
 ---
@@ -18,7 +18,7 @@
 2. Do **not** invent columns beyond the schema topic.  
 3. Do **not** start Campaign Room or Offer in this campaign.  
 4. **Live forks:** **PAUSED** — read [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) before any prep/collab/Firebase PA work. Flags: `DAL_LIVE_FORKS_PAUSED` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED` in `07_Core_Globals.html`.  
-5. **Next build:** M3 reader cutover after M2 verified.  
+5. **Next build:** M4 writer cutover + PA strip after M3 smoke green.  
 6. After any implementation: `node milestone.js "…"`; update this checklist same session.
 
 ---
@@ -88,8 +88,8 @@
 
 ### M3 — Reader cutover
 
-- [ ] Tracker / mobile arranged / logistics readiness read ledger
-- [ ] Keep dual-write until green
+- [x] Tracker / mobile arranged / logistics readiness read ledger — `getProjectAssetsSheets_` + `getProjectAssetsFirestore_` overlay; `getUnifiedTrackerData` resolves truck via ledger (PA fallback). Empty ledger `truck_uid` does not wipe PA unless staged/spatial.
+- [x] Keep dual-write until green
 
 ### M4 — Writer cutover + PA strip
 
@@ -123,3 +123,5 @@
 | 2026-07-21 | **Live forks PAUSED @ GAS v728–v729** (PA + timeline): Sheets-only until ledger work done. Flag `DAL_LIVE_FORKS_PAUSED`; one-shot abandon Index flags (no Firebase commit). |
 | 2026-07-21 | **Docs:** canonical agent note [dal-live-forks-pause.md](../topics/dal-live-forks-pause.md); wired from doctrine, AGENTS, session-fork-platform, prep/timeline topics, FRAGILE, GLOSSARY. |
 | 2026-07-21 | **M2 @ GAS v730:** `backfillLogisticsLedgerFromPaAPI` + sheet AUTO clocks + RECOVERY `phase_ref` (exact-one) + `reviewLogisticsLedgerGapsAPI`. Arrange save also stamps when resolvable. Next: run backfill once, then M3. |
+| 2026-07-23 | **M2 confirmed** (director: ledger rows present) + Admin **RUN LEDGER BACKFILL** button. |
+| 2026-07-23 | **M3 readers:** ledger prefer / PA fallback in assets + tracker + Firestore PA load. Bugbot High: blank ledger truck does not wipe PA. Next: director smoke, then M4. |

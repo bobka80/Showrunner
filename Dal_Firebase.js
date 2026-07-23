@@ -247,6 +247,11 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
     });
 
     var sheets = verifyDatabaseSchema(true);
+    // M3: overlay ledger even on Firestore PA load
+    try {
+      var legsMapFs = logisticsLedgerLegsByProject_(sheets, projectId);
+      assets.forEach(function (a) { applyLedgerLegsOntoPaAsset_(a, legsMapFs); });
+    } catch (eLlFs) { /* PA/FS fields only */ }
     var data = getSheetData(sheets.projectAssets);
     var map = data.hMap;
     var otherAssets = [];

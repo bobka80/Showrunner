@@ -2,7 +2,7 @@
 
 **Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md)
 
-**Generated:** 2026-07-21 · **Root HTML modules scanned:** 95
+**Generated:** 2026-07-23 · **Root HTML modules scanned:** 95
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 
@@ -98,6 +98,7 @@
 | `runYearlyEngineArchive` | `06e_Admin_Automation.html` |
 | `saveManagerConfig` | `06e_Admin_Automation.html` |
 | `saveSystemTags` | `06e_Admin_Automation.html` |
+| `backfillLogisticsLedgerFromPaAPI` | `06g_Admin_Database.html` |
 | `backupDatabaseFile` | `06g_Admin_Database.html` |
 | `getLiveDatabaseStatus` | `06g_Admin_Database.html` |
 | `handoverErrorReports` | `06g_Admin_Database.html` |
@@ -231,7 +232,7 @@
 | 06d_Admin_Fleet.html | 3 | 1 |
 | 06e_Admin_Automation.html | 10 | 0 |
 | 06f_Admin_Audit.html | 4 | 0 |
-| 06g_Admin_Database.html | 7 | 0 |
+| 06g_Admin_Database.html | 8 | 0 |
 | 06h_Admin_Station_Profiles.html | 3 | 0 |
 | 07_Core_Globals.html | 9 | 5 |
 | 07b_Grid_Engine.html | 0 | 0 |

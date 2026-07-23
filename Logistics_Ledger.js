@@ -458,3 +458,101 @@ function logisticsLedgerStampClocksFromHub_(sheets, projectId, logData) {
   }
   return { updated: updated };
 }
+
+// ==========================================
+// --- M3 READERS: ledger prefer, PA fallback ---
+// ==========================================
+
+/**
+ * Top-level Logistics_Ledger legs for one or many projects.
+ * @returns {Object} { [projectId]: { [`${asset_uid}|${leg}`]: legObj } }
+ */
+function logisticsLedgerLegsByProjects_(sheets, projectIdList) {
+  var out = {};
+  if (!sheets || !sheets.logisticsLedger) return out;
+  var filter = null;
+  if (projectIdList && projectIdList.length) {
+    filter = {};
+    projectIdList.forEach(function (pid) { filter[String(pid)] = true; });
+  }
+  var llData = sheets.logisticsLedger.getDataRange().getValues();
+  if (llData.length < 2) return out;
+  var llMap = {};
+  llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  if (llMap['asset_uid'] === undefined || llMap['leg_id'] === undefined) return out;
+
+  function numOrNull_(v) {
+    if (v === undefined || v === null || v === '') return null;
+    var n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+
+  for (var i = 1; i < llData.length; i++) {
+    var row = llData[i];
+    var pid = llMap['project_uid'] !== undefined ? String(row[llMap['project_uid']] || '') : '';
+    if (!pid) continue;
+    if (filter && !filter[pid]) continue;
+    if (llMap['parent_uid'] !== undefined && String(row[llMap['parent_uid']] || '')) continue;
+    var leg = String(row[llMap['leg_id']] || '');
+    if (leg !== 'outbound' && leg !== 'inbound') continue;
+    var assetUid = String(row[llMap['asset_uid']] || '');
+    if (!assetUid) continue;
+    if (!out[pid]) out[pid] = {};
+    out[pid][assetUid + '|' + leg] = {
+      truck_uid: llMap['truck_uid'] !== undefined ? String(row[llMap['truck_uid']] || '') : '',
+      x: llMap['x'] !== undefined ? numOrNull_(row[llMap['x']]) : null,
+      y: llMap['y'] !== undefined ? numOrNull_(row[llMap['y']]) : null,
+      z: llMap['z'] !== undefined ? numOrNull_(row[llMap['z']]) : null,
+      rotated: llMap['rotated'] !== undefined && (row[llMap['rotated']] === true || row[llMap['rotated']] === 'true'),
+      staged: llMap['staged'] !== undefined && (row[llMap['staged']] === true || row[llMap['staged']] === 'true'),
+      load_time: llMap['load_time'] !== undefined ? row[llMap['load_time']] : '',
+      unload_time: llMap['unload_time'] !== undefined ? row[llMap['unload_time']] : '',
+      phase_ref: llMap['phase_ref'] !== undefined ? String(row[llMap['phase_ref']] || '') : ''
+    };
+  }
+  return out;
+}
+
+function logisticsLedgerLegsByProject_(sheets, projectId) {
+  var all = logisticsLedgerLegsByProjects_(sheets, projectId ? [String(projectId)] : null);
+  return all[String(projectId)] || {};
+}
+
+/**
+ * Prefer ledger onto camelCase PA asset. Missing key → keep PA.
+ * Blank ledger truck_uid does not wipe PA unless staged/spatial (intentional empty truck).
+ */
+function applyLedgerLegsOntoPaAsset_(asset, legsMap) {
+  if (!asset || !legsMap) return asset;
+  var assetId = String(asset.assetId || asset.asset_uid || '');
+  if (!assetId) return asset;
+  ['outbound', 'inbound'].forEach(function (leg) {
+    var legRow = legsMap[assetId + '|' + leg];
+    if (!legRow) return;
+    var hasTruck = !!(legRow.truck_uid);
+    var intentionalEmpty = !hasTruck && (!!legRow.staged || legRow.x != null || !!legRow.rotated);
+    if (!hasTruck && !intentionalEmpty) return;
+    var prefix = leg;
+    asset[prefix + 'TruckUid'] = legRow.truck_uid || '';
+    asset[prefix + 'X'] = legRow.x;
+    asset[prefix + 'Y'] = legRow.y;
+    asset[prefix + 'Z'] = legRow.z;
+    asset[prefix + 'Rotated'] = !!legRow.rotated;
+    asset[prefix + 'Staged'] = !!legRow.staged;
+  });
+  return asset;
+}
+
+/** Resolve truck_uid from ledger, else PA fallback (same empty-truck rules). */
+function logisticsLedgerResolveTruckUid_(legsMap, assetUid, leg, paFallback) {
+  if (legsMap) {
+    var legRow = legsMap[String(assetUid) + '|' + leg];
+    if (legRow) {
+      if (legRow.truck_uid) return legRow.truck_uid;
+      var intentionalEmpty = !!legRow.staged || legRow.x != null || !!legRow.rotated;
+      if (intentionalEmpty) return '';
+      return paFallback || '';
+    }
+  }
+  return paFallback || '';
+}
