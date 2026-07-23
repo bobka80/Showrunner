@@ -45,6 +45,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) | Multi-user fork Part A+B — **archived 2026-07-21** |
 | [archive/bulletproof-multiuser-live-editors-2026-07-18.md](archive/bulletproof-multiuser-live-editors-2026-07-18.md) | Process depth for live-sync harden (archived with Part B) |
 | [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) | **NEXT** — Logistics Ledger M0–M5 (**live forks paused** — Sheets-only) |
+| [active/ui-qol-standing-agent.md](active/ui-qol-standing-agent.md) | **Standing agent** — UI/QoL minor polish; collision-check before edit |
 | [topics/dal-live-forks-pause.md](topics/dal-live-forks-pause.md) | Live forks architecture + **CURRENT** pause / restore |
 | [topics/architecture-multi-campaign-pack-2026-07-21.md](topics/architecture-multi-campaign-pack-2026-07-21.md) | Sequenced pack: Ledger → Campaign Room → packet sync |
 | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) | Future pre-ship gates: RBAC / FCM / truck / financials |
