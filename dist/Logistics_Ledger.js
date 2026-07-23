@@ -1,9 +1,9 @@
 /**
- * SM Showrunner — Logistics_Ledger helpers (M1 dual-write window)
- * Movement SoT tab; PA truck columns still written until M4.
+ * SM Showrunner — Logistics_Ledger helpers (movement SoT)
+ * M4+: writers are ledger-only; PA truck columns stripped.
  * Schema lock: docs/ai/topics/logistics-ledger-schema-2026-07-20.md
  */
-// @INDEX: LEDGER_ENGINE -> Logistics_Ledger dual-write + M2 backfill
+// @INDEX: LEDGER_ENGINE -> Logistics_Ledger arrange write + M2 backfill
 
 var LOGISTICS_LEDGER_HEADERS_ = [
   'uid', 'project_uid', 'parent_uid', 'asset_uid', 'quantity', 'truck_uid',
@@ -11,7 +11,7 @@ var LOGISTICS_LEDGER_HEADERS_ = [
   'phase_ref', 'x', 'y', 'z', 'rotated', 'staged', 'creator'
 ];
 
-/** M0 inventory — count PA rows that still carry truck/staging columns. */
+/** Diagnostic — after M4, truck cols should be absent (0). */
 function inventoryPaTruckFieldsAPI() {
   return executeWithRetry(function () {
     var sheets = verifyDatabaseSchema(true);
@@ -26,6 +26,18 @@ function inventoryPaTruckFieldsAPI() {
       'outbound_truck_uid', 'outbound_x', 'outbound_y', 'outbound_z', 'outbound_rotated', 'outbound_staged',
       'inbound_truck_uid', 'inbound_x', 'inbound_y', 'inbound_z', 'inbound_rotated', 'inbound_staged'
     ].filter(function (c) { return map[c] !== undefined; });
+
+    if (!truckCols.length) {
+      return {
+        totalPaRows: data.length - 1,
+        withAnyTruckField: 0,
+        projectsWithArrangement: 0,
+        byProject: {},
+        truckColumnsPresent: 0,
+        logisticsLedgerPresent: !!(sheets.logisticsLedger),
+        note: 'PA truck cols stripped (M4) — movement lives on Logistics_Ledger'
+      };
+    }
 
     var withAny = 0;
     var byProject = {};
@@ -53,15 +65,121 @@ function inventoryPaTruckFieldsAPI() {
   });
 }
 
+function logisticsLedgerNormalizeArrangeBox_(box) {
+  box = box || {};
+  return {
+    truck_uid: box.truckUid || box.truck_uid || '',
+    x: (box.truckX != null && box.truckX !== '') ? box.truckX : (box.x != null ? box.x : ''),
+    y: (box.truckY != null && box.truckY !== '') ? box.truckY : (box.y != null ? box.y : ''),
+    z: (box.truckZ != null && box.truckZ !== '') ? box.truckZ : (box.z != null ? box.z : ''),
+    rotated: !!(box.isRotated || box.rotated),
+    staged: !!(box.isStaged || box.staged)
+  };
+}
+
 /**
- * Replace top-level ledger legs for a project for the given leg_ids from current PA rows.
- * Dual-write only — does not remove PA columns.
- * @param {Object} sheets verifyDatabaseSchema() result
- * @param {string} projectId
- * @param {Array} paRows array of PA row arrays (no header)
- * @param {Object} paMap header map
- * @param {string[]} legIds e.g. ['outbound'] or ['outbound','inbound']
- * @param {string} actor
+ * M4 — replace top-level ledger legs from arrange layout items (not PA columns).
+ * @param {Array} layoutItems [{ assetUid, quantity, creator, legs: { outbound?: box, inbound?: box } }]
+ */
+function logisticsLedgerWriteFromLayoutItems_(sheets, projectId, layoutItems, legIds, actor) {
+  if (!sheets || !sheets.logisticsLedger) return { wrote: 0, skipped: true };
+  var legs = (legIds || []).filter(function (l) { return l === 'outbound' || l === 'inbound'; });
+  if (!legs.length) return { wrote: 0, skipped: true };
+
+  var llData = sheets.logisticsLedger.getDataRange().getValues();
+  if (!llData.length) {
+    sheets.logisticsLedger.appendRow(LOGISTICS_LEDGER_HEADERS_);
+    llData = [LOGISTICS_LEDGER_HEADERS_];
+  }
+  var llMap = {};
+  llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  var cols = llData[0].length;
+
+  var touchedAssets = {};
+  (layoutItems || []).forEach(function (item) {
+    if (!item) return;
+    var a = String(item.assetUid || item.asset_uid || '');
+    if (a) touchedAssets[a] = true;
+  });
+
+  var kept = [llData[0]];
+  for (var i = 1; i < llData.length; i++) {
+    var row = llData[i];
+    var rowPid = llMap['project_uid'] !== undefined ? String(row[llMap['project_uid']] || '') : '';
+    var parent = llMap['parent_uid'] !== undefined ? String(row[llMap['parent_uid']] || '') : '';
+    var legId = llMap['leg_id'] !== undefined ? String(row[llMap['leg_id']] || '') : '';
+    var isTopLeg = !parent;
+    var isOurRewrite = rowPid === String(projectId) && isTopLeg && legs.indexOf(legId) !== -1;
+    if (isOurRewrite) {
+      var rowAsset = llMap['asset_uid'] !== undefined ? String(row[llMap['asset_uid']] || '') : '';
+      // Keep legs for assets not in this arrange payload (partial/auto saves must not wipe others)
+      if (rowAsset && !touchedAssets[rowAsset]) kept.push(row);
+      continue;
+    }
+    kept.push(row);
+  }
+
+  var newRows = [];
+  (layoutItems || []).forEach(function (item) {
+    if (!item) return;
+    var assetUid = String(item.assetUid || item.asset_uid || '');
+    if (!assetUid) return;
+    var qty = item.quantity != null ? item.quantity : 1;
+    var creator = item.creator || actor || 'System';
+    var itemLegs = item.legs || {};
+
+    legs.forEach(function (leg) {
+      var rawBox = itemLegs[leg];
+      if (!rawBox) return;
+      var box = logisticsLedgerNormalizeArrangeBox_(rawBox);
+      var hasSpatial = box.x !== '' && box.x !== null && box.x !== undefined;
+      if (!box.truck_uid && !hasSpatial && !box.staged && !box.rotated) return;
+
+      var r = new Array(cols).fill('');
+      if (llMap['uid'] !== undefined) r[llMap['uid']] = Utilities.getUuid();
+      if (llMap['project_uid'] !== undefined) r[llMap['project_uid']] = String(projectId);
+      if (llMap['parent_uid'] !== undefined) r[llMap['parent_uid']] = '';
+      if (llMap['asset_uid'] !== undefined) r[llMap['asset_uid']] = assetUid;
+      if (llMap['quantity'] !== undefined) r[llMap['quantity']] = qty;
+      if (llMap['truck_uid'] !== undefined) r[llMap['truck_uid']] = box.truck_uid;
+      if (llMap['from_location'] !== undefined) r[llMap['from_location']] = '';
+      if (llMap['to_location'] !== undefined) r[llMap['to_location']] = '';
+      if (llMap['load_time'] !== undefined) r[llMap['load_time']] = '';
+      if (llMap['unload_time'] !== undefined) r[llMap['unload_time']] = '';
+      if (llMap['leg_id'] !== undefined) r[llMap['leg_id']] = leg;
+      if (llMap['phase_ref'] !== undefined) r[llMap['phase_ref']] = '';
+      if (llMap['x'] !== undefined) r[llMap['x']] = box.x !== null && box.x !== undefined ? box.x : '';
+      if (llMap['y'] !== undefined) r[llMap['y']] = box.y !== null && box.y !== undefined ? box.y : '';
+      if (llMap['z'] !== undefined) r[llMap['z']] = box.z !== null && box.z !== undefined ? box.z : '';
+      if (llMap['rotated'] !== undefined) r[llMap['rotated']] = box.rotated;
+      if (llMap['staged'] !== undefined) r[llMap['staged']] = box.staged;
+      if (llMap['creator'] !== undefined) r[llMap['creator']] = creator;
+      newRows.push(r);
+    });
+  });
+
+  var out = kept.concat(newRows);
+  var backup = llData.map(function (row) { return row.slice(); });
+  try {
+    sheets.logisticsLedger.clearContents();
+    if (out.length > 0) {
+      sheets.logisticsLedger.getRange(1, 1, out.length, out[0].length).setValues(out);
+    }
+  } catch (eWrite) {
+    try {
+      sheets.logisticsLedger.clearContents();
+      if (backup.length > 0) {
+        sheets.logisticsLedger.getRange(1, 1, backup.length, backup[0].length).setValues(backup);
+      }
+    } catch (eRestore) { /* best-effort restore */ }
+    throw eWrite;
+  }
+  return { wrote: newRows.length, skipped: false };
+}
+
+/**
+ * M2 backfill helper — read truck/spatial from PA row columns into ledger.
+ * After M4 PA strip this is a no-op path (cols gone); arrange uses logisticsLedgerWriteFromLayoutItems_.
  */
 function logisticsLedgerDualWriteFromPaRows_(sheets, projectId, paRows, paMap, legIds, actor) {
   if (!sheets || !sheets.logisticsLedger) return { wrote: 0, skipped: true };
@@ -338,14 +456,28 @@ function backfillLogisticsLedgerFromPaAPI(projectIdOrNull, actor) {
     var paMap = {};
     paData[0].forEach(function (h, i) { paMap[String(h).trim()] = i; });
 
+    var truckColsProbe = [
+      'outbound_truck_uid', 'outbound_x', 'outbound_y', 'outbound_z', 'outbound_rotated', 'outbound_staged',
+      'inbound_truck_uid', 'inbound_x', 'inbound_y', 'inbound_z', 'inbound_rotated', 'inbound_staged'
+    ].filter(function (c) { return paMap[c] !== undefined; });
+    if (!truckColsProbe.length) {
+      return {
+        success: true,
+        skipped: true,
+        reason: 'M4 PA truck cols gone — backfill N/A (ledger is SoT)',
+        projectsProcessed: 0,
+        legsWrote: 0,
+        clocksStamped: 0,
+        phaseRefsStamped: 0,
+        review: []
+      };
+    }
+
     var targetIds = {};
     if (projectIdOrNull) {
       targetIds[String(projectIdOrNull)] = true;
     } else {
-      var truckCols = [
-        'outbound_truck_uid', 'outbound_x', 'outbound_y', 'outbound_z', 'outbound_rotated', 'outbound_staged',
-        'inbound_truck_uid', 'inbound_x', 'inbound_y', 'inbound_z', 'inbound_rotated', 'inbound_staged'
-      ].filter(function (c) { return paMap[c] !== undefined; });
+      var truckCols = truckColsProbe;
       for (var pi = 1; pi < paData.length; pi++) {
         var pidScan = paMap['project_uid'] !== undefined ? String(paData[pi][paMap['project_uid']] || '') : '';
         if (!pidScan || targetIds[pidScan]) continue;
@@ -519,8 +651,7 @@ function logisticsLedgerLegsByProject_(sheets, projectId) {
 }
 
 /**
- * Prefer ledger onto camelCase PA asset. Missing key → keep PA.
- * Blank ledger truck_uid does not wipe PA unless staged/spatial (intentional empty truck).
+ * Overlay ledger legs onto camelCase PA asset (UI contract). Missing key → leave defaults.
  */
 function applyLedgerLegsOntoPaAsset_(asset, legsMap) {
   if (!asset || !legsMap) return asset;
@@ -529,9 +660,6 @@ function applyLedgerLegsOntoPaAsset_(asset, legsMap) {
   ['outbound', 'inbound'].forEach(function (leg) {
     var legRow = legsMap[assetId + '|' + leg];
     if (!legRow) return;
-    var hasTruck = !!(legRow.truck_uid);
-    var intentionalEmpty = !hasTruck && (!!legRow.staged || legRow.x != null || !!legRow.rotated);
-    if (!hasTruck && !intentionalEmpty) return;
     var prefix = leg;
     asset[prefix + 'TruckUid'] = legRow.truck_uid || '';
     asset[prefix + 'X'] = legRow.x;
@@ -543,16 +671,10 @@ function applyLedgerLegsOntoPaAsset_(asset, legsMap) {
   return asset;
 }
 
-/** Resolve truck_uid from ledger, else PA fallback (same empty-truck rules). */
-function logisticsLedgerResolveTruckUid_(legsMap, assetUid, leg, paFallback) {
-  if (legsMap) {
-    var legRow = legsMap[String(assetUid) + '|' + leg];
-    if (legRow) {
-      if (legRow.truck_uid) return legRow.truck_uid;
-      var intentionalEmpty = !!legRow.staged || legRow.x != null || !!legRow.rotated;
-      if (intentionalEmpty) return '';
-      return paFallback || '';
-    }
-  }
-  return paFallback || '';
+/** Resolve truck_uid from ledger only (M4 — no PA column fallback). */
+function logisticsLedgerResolveTruckUid_(legsMap, assetUid, leg) {
+  if (!legsMap) return '';
+  var legRow = legsMap[String(assetUid) + '|' + leg];
+  if (!legRow) return '';
+  return legRow.truck_uid || '';
 }

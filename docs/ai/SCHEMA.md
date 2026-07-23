@@ -106,7 +106,11 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 ### Logistics_Ledger (movement SoT — campaign active)
 
 Engine tab for planned/actual movement legs. **Not** RFID `Operations_Ledger`. Full field list: [topics/logistics-ledger-schema-2026-07-20.md](topics/logistics-ledger-schema-2026-07-20.md). Headers: `uid`, `project_uid`, `parent_uid`, `asset_uid`, `quantity`, `truck_uid`, `from_location`, `to_location`, `load_time`, `unload_time`, `leg_id`, `phase_ref`, `x`, `y`, `z`, `rotated`, `staged`, `creator`.  
-**M1:** dual-write with PA truck columns; `leg_id` = `outbound`|`inbound` links to AUTO truck shift notes. `phase_ref` → `Project_Timelines.uid` (**sub-event** uid; column name legacy — not a timeline-header **phase**). See [GLOSSARY.md](GLOSSARY.md) § Timeline.
+**M4+:** ledger is SoT for movement; PA truck columns removed. `leg_id` = `outbound`|`inbound` links to AUTO truck shift notes. `phase_ref` → `Project_Timelines.uid` (**sub-event** uid; column name legacy — not a timeline-header **phase**). See [GLOSSARY.md](GLOSSARY.md) § Timeline.
+
+### Project_Assets (assignment only after M4)
+
+Headers: `uid`, `project_uid`, `asset_uid`, `assigned_quantity`, `location`, `formula`, `creator`, `override_dept`, `container_uid`, `scan_status`. Truck/staging fields live on `Logistics_Ledger`.
 
 **Planned financial columns (Phase 1 — not in schema builder yet):** `Projects_Index.rental_days`, `Projects_Index.global_discount` — see [topics/financials.md](topics/financials.md).
 

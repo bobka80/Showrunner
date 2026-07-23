@@ -127,25 +127,20 @@ function dalPaObjToLiveFixture_(obj) {
     creator: obj.creator || 'System',
     overrideDept: obj.override_dept || '',
     containerUid: obj.container_uid || '',
-    scanStatus: obj.scan_status || 'Assigned'
+    scanStatus: obj.scan_status || 'Assigned',
+    outboundTruckUid: '',
+    outboundX: null,
+    outboundY: null,
+    outboundZ: null,
+    outboundRotated: false,
+    outboundStaged: false,
+    inboundTruckUid: '',
+    inboundX: null,
+    inboundY: null,
+    inboundZ: null,
+    inboundRotated: false,
+    inboundStaged: false
   };
-  function numOrNull_(v) {
-    if (v === undefined || v === null || v === '') return null;
-    var n = Number(v);
-    return isNaN(n) ? null : n;
-  }
-  fix.outboundTruckUid = obj.outbound_truck_uid || '';
-  fix.outboundX = numOrNull_(obj.outbound_x);
-  fix.outboundY = numOrNull_(obj.outbound_y);
-  fix.outboundZ = numOrNull_(obj.outbound_z);
-  fix.outboundRotated = obj.outbound_rotated === true || obj.outbound_rotated === 'true';
-  fix.outboundStaged = obj.outbound_staged === true || obj.outbound_staged === 'true';
-  fix.inboundTruckUid = obj.inbound_truck_uid || '';
-  fix.inboundX = numOrNull_(obj.inbound_x);
-  fix.inboundY = numOrNull_(obj.inbound_y);
-  fix.inboundZ = numOrNull_(obj.inbound_z);
-  fix.inboundRotated = obj.inbound_rotated === true || obj.inbound_rotated === 'true';
-  fix.inboundStaged = obj.inbound_staged === true || obj.inbound_staged === 'true';
   return fix;
 }
 
@@ -166,27 +161,7 @@ function dalPaFixtureToCommitObj_(pa, projectId) {
     container_uid: pa.containerUid || pa.container_uid || '',
     scan_status: pa.scanStatus || pa.scan_status || 'Assigned'
   };
-  // M1 dual-write window: preserve truck/staging if present on fixture or overlay (END PREP must not wipe)
-  var truckKeys = [
-    ['outbound_truck_uid', 'outboundTruckUid'],
-    ['outbound_x', 'outboundX'],
-    ['outbound_y', 'outboundY'],
-    ['outbound_z', 'outboundZ'],
-    ['outbound_rotated', 'outboundRotated'],
-    ['outbound_staged', 'outboundStaged'],
-    ['inbound_truck_uid', 'inboundTruckUid'],
-    ['inbound_x', 'inboundX'],
-    ['inbound_y', 'inboundY'],
-    ['inbound_z', 'inboundZ'],
-    ['inbound_rotated', 'inboundRotated'],
-    ['inbound_staged', 'inboundStaged']
-  ];
-  truckKeys.forEach(function (pair) {
-    var snake = pair[0];
-    var camel = pair[1];
-    if (pa[snake] !== undefined && pa[snake] !== null && pa[snake] !== '') obj[snake] = pa[snake];
-    else if (pa[camel] !== undefined && pa[camel] !== null && pa[camel] !== '') obj[snake] = pa[camel];
-  });
+  // M4: movement lives on Logistics_Ledger — never commit truck cols onto Project_Assets
   return obj;
 }
 
@@ -223,18 +198,19 @@ function dalFirestoreAssetFromRow_(row, map) {
     overrideDept: map['override_dept'] !== undefined ? (row[map['override_dept']] || "") : "",
     containerUid: row[map['container_uid']] || "",
     scanStatus: row[map['scan_status']] || "Assigned",
-    outboundTruckUid: map['outbound_truck_uid'] !== undefined ? (row[map['outbound_truck_uid']] || "") : "",
-    outboundX: map['outbound_x'] !== undefined && row[map['outbound_x']] !== "" ? Number(row[map['outbound_x']]) : null,
-    outboundY: map['outbound_y'] !== undefined && row[map['outbound_y']] !== "" ? Number(row[map['outbound_y']]) : null,
-    outboundZ: map['outbound_z'] !== undefined && row[map['outbound_z']] !== "" ? Number(row[map['outbound_z']]) : null,
-    outboundRotated: map['outbound_rotated'] !== undefined && (row[map['outbound_rotated']] === true || row[map['outbound_rotated']] === 'true'),
-    outboundStaged: map['outbound_staged'] !== undefined && (row[map['outbound_staged']] === true || row[map['outbound_staged']] === 'true'),
-    inboundTruckUid: map['inbound_truck_uid'] !== undefined ? (row[map['inbound_truck_uid']] || "") : "",
-    inboundX: map['inbound_x'] !== undefined && row[map['inbound_x']] !== "" ? Number(row[map['inbound_x']]) : null,
-    inboundY: map['inbound_y'] !== undefined && row[map['inbound_y']] !== "" ? Number(row[map['inbound_y']]) : null,
-    inboundZ: map['inbound_z'] !== undefined && row[map['inbound_z']] !== "" ? Number(row[map['inbound_z']]) : null,
-    inboundRotated: map['inbound_rotated'] !== undefined && (row[map['inbound_rotated']] === true || row[map['inbound_rotated']] === 'true'),
-    inboundStaged: map['inbound_staged'] !== undefined && (row[map['inbound_staged']] === true || row[map['inbound_staged']] === 'true')
+    // M4: truck fields filled by Logistics_Ledger overlay in getProjectAssetsFirestore_
+    outboundTruckUid: "",
+    outboundX: null,
+    outboundY: null,
+    outboundZ: null,
+    outboundRotated: false,
+    outboundStaged: false,
+    inboundTruckUid: "",
+    inboundX: null,
+    inboundY: null,
+    inboundZ: null,
+    inboundRotated: false,
+    inboundStaged: false
   };
 }
 
@@ -247,11 +223,11 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
     });
 
     var sheets = verifyDatabaseSchema(true);
-    // M3: overlay ledger even on Firestore PA load
+    // M4: overlay ledger onto camelCase PA shape
     try {
       var legsMapFs = logisticsLedgerLegsByProject_(sheets, projectId);
       assets.forEach(function (a) { applyLedgerLegsOntoPaAsset_(a, legsMapFs); });
-    } catch (eLlFs) { /* PA/FS fields only */ }
+    } catch (eLlFs) { /* empty truck fields */ }
     var data = getSheetData(sheets.projectAssets);
     var map = data.hMap;
     var otherAssets = [];
@@ -344,8 +320,8 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
 }
 
 /**
- * Prep-open truck arrange: rewrite Firebase PA collection + assets/state (with truck fields),
- * dual-write Logistics_Ledger on Sheets. Does NOT touch Sheets Project_Assets.
+ * Prep-open truck arrange: rewrite Firebase PA collection + assets/state (assignment only),
+ * write Logistics_Ledger on Sheets. Does NOT stamp truck onto PA docs (M4).
  */
 function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
   return executeWithRetry(function () {
@@ -364,7 +340,8 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       oldUids[uid] = true;
     });
 
-    var resultRows = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg || 'outbound', hdr.map);
+    var arranged = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg || 'outbound', hdr.map);
+    var resultRows = arranged.rows || [];
     var basePath = dalFirestorePaCollection_(projectId);
     var newUids = {};
     var fixtures = [];
@@ -412,16 +389,17 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       updatedBy: actor || 'System'
     });
 
-    // Ledger stays on Sheets (not forked)
+    // Ledger stays on Sheets (not forked) — must succeed (M4 SoT)
     var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
     try {
       var sheets = verifyDatabaseSchema();
-      logisticsLedgerDualWriteFromPaRows_(sheets, projectId, resultRows, hdr.map, dualLegs, actor);
+      logisticsLedgerWriteFromLayoutItems_(sheets, projectId, arranged.ledgerItems, dualLegs, actor);
       try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
       try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
     } catch (eLl) {
-      writeToAuditLog(actor, "WARN", "LOGISTICS_LEDGER", projectId, projectId,
-        "Dual-write failed (Firebase truck path): " + (eLl && eLl.message ? eLl.message : eLl));
+      writeToAuditLog(actor, "ERROR", "LOGISTICS_LEDGER", projectId, projectId,
+        "Ledger write failed (Firebase truck path): " + (eLl && eLl.message ? eLl.message : eLl));
+      throw eLl;
     }
 
     writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT_FIRESTORE", projectId, projectId,
@@ -525,38 +503,8 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   }
 
   // State fixtures = SSOT for non-autos; autos live only on collection (rebuild locally during prep).
-  // Load Sheets BEFORE building commit so truck overlay can fill gaps.
-  // Prefer Firebase collection (live prep arrange) over frozen Sheets snapshot.
+  // Load Sheets BEFORE building commit (B fail-safe snapshot).
   var previousSheetRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId) || [];
-  var sheetByUid = {};
-  previousSheetRows.forEach(function (r) {
-    if (!r || !r.data || hdr.map['uid'] === undefined) return;
-    sheetByUid[String(r.data[hdr.map['uid']])] = dalPaSheetRowToObject_(r.data, hdr.map);
-  });
-  var colByUid = {};
-  (collectionRows || []).forEach(function (r) {
-    if (!r || !r.data || hdr.map['uid'] === undefined) return;
-    colByUid[String(r.data[hdr.map['uid']])] = dalPaSheetRowToObject_(r.data, hdr.map);
-  });
-  var truckFieldKeys = [
-    'outbound_truck_uid', 'outbound_x', 'outbound_y', 'outbound_z', 'outbound_rotated', 'outbound_staged',
-    'inbound_truck_uid', 'inbound_x', 'inbound_y', 'inbound_z', 'inbound_rotated', 'inbound_staged'
-  ];
-  function overlayTruckFields_(commitObj, uid) {
-    var fromSheet = sheetByUid[String(uid)];
-    var fromCol = colByUid[String(uid)];
-    // Prefer collection (live prep arrange) over frozen Sheets snapshot.
-    truckFieldKeys.forEach(function (k) {
-      if (commitObj[k] !== undefined && commitObj[k] !== '' && commitObj[k] !== null) return;
-      if (fromCol && fromCol[k] !== undefined && fromCol[k] !== '' && fromCol[k] !== null) {
-        commitObj[k] = fromCol[k];
-        return;
-      }
-      if (fromSheet && fromSheet[k] !== undefined && fromSheet[k] !== '' && fromSheet[k] !== null) {
-        commitObj[k] = fromSheet[k];
-      }
-    });
-  }
 
   var commitObjs = [];
   var fixtureSource = stateFixtures;
@@ -566,7 +514,6 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
   (fixtureSource || []).forEach(function (pa) {
     if (!pa || !pa.uid || dalPaFixtureIsAuto_(pa)) return;
     var commitObj = dalPaFixtureToCommitObj_(pa, projectId);
-    try { overlayTruckFields_(commitObj, pa.uid); } catch (eOverlay) { /* keep fixture-only */ }
     commitObjs.push(commitObj);
   });
   colAutoRows.forEach(function (r) {

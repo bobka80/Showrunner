@@ -48,9 +48,7 @@ function dalPaRowSignature_(obj) {
     String(obj.location || ''),
     String(obj.formula || ''),
     String(obj.container_uid || ''),
-    String(obj.scan_status || ''),
-    String(obj.outbound_truck_uid || ''),
-    String(obj.inbound_truck_uid || '')
+    String(obj.scan_status || '')
   ].join('|');
 }
 

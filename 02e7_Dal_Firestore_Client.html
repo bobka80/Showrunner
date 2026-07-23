@@ -511,18 +511,19 @@ window.dalFsDocToPaAsset_ = function(docId, d) {
     scanStatus: d.scan_status || 'Assigned',
     writeSeq: Number(d.writeSeq || 0) || 0,
     clientId: d.clientId || '',
-    outboundTruckUid: d.outbound_truck_uid || '',
-    outboundX: d.outbound_x !== undefined && d.outbound_x !== '' ? Number(d.outbound_x) : null,
-    outboundY: d.outbound_y !== undefined && d.outbound_y !== '' ? Number(d.outbound_y) : null,
-    outboundZ: d.outbound_z !== undefined && d.outbound_z !== '' ? Number(d.outbound_z) : null,
-    outboundRotated: d.outbound_rotated === true || d.outbound_rotated === 'true',
-    outboundStaged: d.outbound_staged === true || d.outbound_staged === 'true',
-    inboundTruckUid: d.inbound_truck_uid || '',
-    inboundX: d.inbound_x !== undefined && d.inbound_x !== '' ? Number(d.inbound_x) : null,
-    inboundY: d.inbound_y !== undefined && d.inbound_y !== '' ? Number(d.inbound_y) : null,
-    inboundZ: d.inbound_z !== undefined && d.inbound_z !== '' ? Number(d.inbound_z) : null,
-    inboundRotated: d.inbound_rotated === true || d.inbound_rotated === 'true',
-    inboundStaged: d.inbound_staged === true || d.inbound_staged === 'true'
+    // M4: movement on Logistics_Ledger — client camelCase still present for UI; empty from FS
+    outboundTruckUid: '',
+    outboundX: null,
+    outboundY: null,
+    outboundZ: null,
+    outboundRotated: false,
+    outboundStaged: false,
+    inboundTruckUid: '',
+    inboundX: null,
+    inboundY: null,
+    inboundZ: null,
+    inboundRotated: false,
+    inboundStaged: false
   };
 };
 
@@ -586,18 +587,6 @@ window.dalPaContentSig_ = function(pa) {
     String(window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || '')),
     String(pa.containerUid || ''),
     String(pa.scanStatus || 'Assigned'),
-    String(pa.outboundTruckUid || ''),
-    String(pa.outboundX != null ? pa.outboundX : ''),
-    String(pa.outboundY != null ? pa.outboundY : ''),
-    String(pa.outboundZ != null ? pa.outboundZ : ''),
-    pa.outboundRotated ? '1' : '0',
-    pa.outboundStaged ? '1' : '0',
-    String(pa.inboundTruckUid || ''),
-    String(pa.inboundX != null ? pa.inboundX : ''),
-    String(pa.inboundY != null ? pa.inboundY : ''),
-    String(pa.inboundZ != null ? pa.inboundZ : ''),
-    pa.inboundRotated ? '1' : '0',
-    pa.inboundStaged ? '1' : '0',
     String(pa.overrideDept || '')
   ].join('\t');
 };
@@ -612,39 +601,13 @@ window.dalPaFlushPayloadSig_ = function(pa) {
     String(window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || '')),
     String(pa.containerUid || ''),
     String(pa.scanStatus || 'Assigned'),
-    String(pa.overrideDept || ''),
-    String(pa.outboundTruckUid || ''),
-    String(pa.outboundX != null ? pa.outboundX : ''),
-    String(pa.outboundY != null ? pa.outboundY : ''),
-    String(pa.outboundZ != null ? pa.outboundZ : ''),
-    pa.outboundRotated ? '1' : '0',
-    pa.outboundStaged ? '1' : '0',
-    String(pa.inboundTruckUid || ''),
-    String(pa.inboundX != null ? pa.inboundX : ''),
-    String(pa.inboundY != null ? pa.inboundY : ''),
-    String(pa.inboundZ != null ? pa.inboundZ : ''),
-    pa.inboundRotated ? '1' : '0',
-    pa.inboundStaged ? '1' : '0'
+    String(pa.overrideDept || '')
   ].join('\t');
 };
 
-/** Copy truck/staging fields onto a live fixturesJson entry (camelCase). */
+/** M4 no-op — truck/staging no longer on PA fixtures (ledger SoT). */
 window.dalPaCopyTruckOntoFixture_ = function(fix, pa) {
-  fix = fix || {};
-  pa = pa || {};
-  fix.outboundTruckUid = pa.outboundTruckUid || '';
-  fix.outboundX = pa.outboundX != null ? pa.outboundX : null;
-  fix.outboundY = pa.outboundY != null ? pa.outboundY : null;
-  fix.outboundZ = pa.outboundZ != null ? pa.outboundZ : null;
-  fix.outboundRotated = !!pa.outboundRotated;
-  fix.outboundStaged = !!pa.outboundStaged;
-  fix.inboundTruckUid = pa.inboundTruckUid || '';
-  fix.inboundX = pa.inboundX != null ? pa.inboundX : null;
-  fix.inboundY = pa.inboundY != null ? pa.inboundY : null;
-  fix.inboundZ = pa.inboundZ != null ? pa.inboundZ : null;
-  fix.inboundRotated = !!pa.inboundRotated;
-  fix.inboundStaged = !!pa.inboundStaged;
-  return fix;
+  return fix || {};
 };
 
 window.dalPaIsAutoRow_ = function(pa) {
@@ -2284,18 +2247,7 @@ window.dalPaAssetToFsDoc_ = function(pa, projectId) {
     scan_status: pa.scanStatus || 'Assigned',
     override_dept: pa.overrideDept || ''
   };
-  if (pa.outboundTruckUid) doc.outbound_truck_uid = pa.outboundTruckUid;
-  if (pa.outboundX != null) doc.outbound_x = pa.outboundX;
-  if (pa.outboundY != null) doc.outbound_y = pa.outboundY;
-  if (pa.outboundZ != null) doc.outbound_z = pa.outboundZ;
-  if (pa.outboundRotated) doc.outbound_rotated = true;
-  if (pa.outboundStaged) doc.outbound_staged = true;
-  if (pa.inboundTruckUid) doc.inbound_truck_uid = pa.inboundTruckUid;
-  if (pa.inboundX != null) doc.inbound_x = pa.inboundX;
-  if (pa.inboundY != null) doc.inbound_y = pa.inboundY;
-  if (pa.inboundZ != null) doc.inbound_z = pa.inboundZ;
-  if (pa.inboundRotated) doc.inbound_rotated = true;
-  if (pa.inboundStaged) doc.inbound_staged = true;
+  // M4: do not write truck/staging onto PA fork docs
   // writeSeq stamped on host (read-increment); clientId identifies echo.
   doc.clientId = window.dalPaClientId || '';
   return doc;

@@ -153,7 +153,7 @@ function verifyDatabaseSchema(readOnly = false) {
   }
 
   let projectAssetsSheet = sm["Project_Assets"];
-  const projectAssetsHeaders = ["uid", "project_uid", "asset_uid", "assigned_quantity", "location", "formula", "creator", "override_dept", "container_uid", "scan_status", "outbound_truck_uid", "outbound_x", "outbound_y", "outbound_z", "outbound_rotated", "outbound_staged", "inbound_truck_uid", "inbound_x", "inbound_y", "inbound_z", "inbound_rotated", "inbound_staged"];
+  const projectAssetsHeaders = ["uid", "project_uid", "asset_uid", "assigned_quantity", "location", "formula", "creator", "override_dept", "container_uid", "scan_status"];
   if (!projectAssetsSheet) { 
       projectAssetsSheet = ss.insertSheet("Project_Assets"); 
       projectAssetsSheet.appendRow(projectAssetsHeaders); 
@@ -198,8 +198,53 @@ function verifyDatabaseSchema(readOnly = false) {
           projectAssetsSheet.insertColumnBefore(odIdx + 1);
         }
       })();
-      if (projectAssetsSheet.getMaxColumns() < projectAssetsHeaders.length) projectAssetsSheet.insertColumnsAfter(projectAssetsSheet.getMaxColumns(), projectAssetsHeaders.length - projectAssetsSheet.getMaxColumns());
-      projectAssetsSheet.getRange(1, 1, 1, projectAssetsHeaders.length).setValues([projectAssetsHeaders]).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+      // M4: one-time rewrite — drop 12 truck/staging columns; keep assignment-only shape
+      (function stripPaTruckColumnsM4_() {
+        var want = projectAssetsHeaders;
+        var lastCol = Math.max(projectAssetsSheet.getLastColumn(), 1);
+        var lastRow = Math.max(projectAssetsSheet.getLastRow(), 1);
+        var raw = projectAssetsSheet.getRange(1, 1, lastRow, lastCol).getValues();
+        var oldHeader = (raw[0] || []).map(function (h) { return h != null ? String(h).trim() : ''; });
+        var truckNames = {
+          outbound_truck_uid: 1, outbound_x: 1, outbound_y: 1, outbound_z: 1, outbound_rotated: 1, outbound_staged: 1,
+          inbound_truck_uid: 1, inbound_x: 1, inbound_y: 1, inbound_z: 1, inbound_rotated: 1, inbound_staged: 1
+        };
+        var needsStrip = oldHeader.length !== want.length;
+        if (!needsStrip) {
+          for (var hi = 0; hi < want.length; hi++) {
+            if (oldHeader[hi] !== want[hi]) { needsStrip = true; break; }
+          }
+        }
+        if (!needsStrip) {
+          for (var ti = 0; ti < oldHeader.length; ti++) {
+            if (truckNames[oldHeader[ti]]) { needsStrip = true; break; }
+          }
+        }
+        if (!needsStrip) {
+          projectAssetsSheet.getRange(1, 1, 1, want.length).setValues([want]).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+          return;
+        }
+        var oldMap = {};
+        oldHeader.forEach(function (h, i) { if (h) oldMap[h] = i; });
+        var out = [want];
+        for (var r = 1; r < raw.length; r++) {
+          var row = [];
+          for (var c = 0; c < want.length; c++) {
+            var idx = oldMap[want[c]];
+            row.push(idx !== undefined ? raw[r][idx] : '');
+          }
+          out.push(row);
+        }
+        projectAssetsSheet.clearContents();
+        if (projectAssetsSheet.getMaxColumns() < want.length) {
+          projectAssetsSheet.insertColumnsAfter(projectAssetsSheet.getMaxColumns(), want.length - projectAssetsSheet.getMaxColumns());
+        }
+        projectAssetsSheet.getRange(1, 1, out.length, want.length).setValues(out);
+        projectAssetsSheet.getRange(1, 1, 1, want.length).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+        while (projectAssetsSheet.getMaxColumns() > want.length) {
+          projectAssetsSheet.deleteColumn(projectAssetsSheet.getMaxColumns());
+        }
+      })();
   }
   
   let conflictOverridesSheet = sm["Conflict_Overrides"];
@@ -224,7 +269,7 @@ function verifyDatabaseSchema(readOnly = false) {
       opsLedgerSheet.getRange(1, 1, 1, opsLedgerHeaders.length).setValues([opsLedgerHeaders]).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
   }
 
-  // Movement SoT (Logistics Ledger campaign M1) — additive; PA truck columns remain until M4
+  // Movement SoT (Logistics Ledger) — PA truck columns stripped at M4
   let logisticsLedgerSheet = sm["Logistics_Ledger"];
   const logisticsLedgerHeaders = ["uid", "project_uid", "parent_uid", "asset_uid", "quantity", "truck_uid", "from_location", "to_location", "load_time", "unload_time", "leg_id", "phase_ref", "x", "y", "z", "rotated", "staged", "creator"];
   if (!logisticsLedgerSheet) {

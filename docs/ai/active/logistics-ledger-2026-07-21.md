@@ -7,7 +7,7 @@
 **Predecessor:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
 **Next after this campaign:** Project Campaign Room — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)
 
-**Opened:** 2026-07-21 · **Status:** **M3 readers shipped** — live forks still PAUSED (Sheets-only). Next: smoke M3, then M4.  
+**Opened:** 2026-07-21 · **Status:** **M4 writer cutover + PA strip shipped** — live forks still PAUSED. Next: smoke M4, then M5.  
 **Production tip:** see status log. Prep live rollback pin still **v654**.
 
 ---
@@ -18,7 +18,7 @@
 2. Do **not** invent columns beyond the schema topic.  
 3. Do **not** start Campaign Room or Offer in this campaign.  
 4. **Live forks:** **PAUSED** — read [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) before any prep/collab/Firebase PA work. Flags: `DAL_LIVE_FORKS_PAUSED` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED` in `07_Core_Globals.html`.  
-5. **Next build:** M4 writer cutover + PA strip after M3 smoke green.  
+5. **Next build:** M5 conflicts via ledger + `phase_ref` after M4 smoke green.  
 6. After any implementation: `node milestone.js "…"`; update this checklist same session.
 
 ---
@@ -93,10 +93,10 @@
 
 ### M4 — Writer cutover + PA strip
 
-- [ ] Ledger-only writers
-- [ ] Drop 12 PA columns from headers + Engine rewrite
-- [ ] Strip Firebase mappers + content/row sigs **together**
-- [ ] Strip/migrate fork docs; verify END PREP / deltas
+- [x] Ledger-only writers — `logisticsLedgerWriteFromLayoutItems_` from arrange layout; PA may still split qty=1
+- [x] Drop 12 PA columns from headers + Engine rewrite (`stripPaTruckColumnsM4_` in `Logistics_Schema.js`)
+- [x] Strip Firebase mappers + content/row sigs **together** (`Dal_Firebase`, `02e7`, `Dal_Reconcile`, host-boot)
+- [x] Strip/migrate fork docs; verify END PREP / deltas — no truck on commit fixtures; copy-truck no-op
 
 ### M5 — Conflicts
 
@@ -124,4 +124,5 @@
 | 2026-07-21 | **Docs:** canonical agent note [dal-live-forks-pause.md](../topics/dal-live-forks-pause.md); wired from doctrine, AGENTS, session-fork-platform, prep/timeline topics, FRAGILE, GLOSSARY. |
 | 2026-07-21 | **M2 @ GAS v730:** `backfillLogisticsLedgerFromPaAPI` + sheet AUTO clocks + RECOVERY `phase_ref` (exact-one) + `reviewLogisticsLedgerGapsAPI`. Arrange save also stamps when resolvable. Next: run backfill once, then M3. |
 | 2026-07-23 | **M2 confirmed** (director: ledger rows present) + Admin **RUN LEDGER BACKFILL** button. |
-| 2026-07-23 | **M3 readers:** ledger prefer / PA fallback in assets + tracker + Firestore PA load. Bugbot High: blank ledger truck does not wipe PA. Next: director smoke, then M4. |
+| 2026-07-23 | **M3 readers @ GAS v734:** ledger prefer / PA fallback in assets + tracker + Firestore PA load. Bugbot High: blank ledger truck does not wipe PA. Next: director smoke, then M4. |
+| 2026-07-23 | **M4:** ledger-only arrange writers; strip 12 PA truck cols + Firebase/host mappers + content/row sigs; host-boot **v669**. Next: smoke, then M5. |

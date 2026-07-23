@@ -232,18 +232,19 @@ function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
                     overrideDept: map['override_dept'] !== undefined ? (data[i][map['override_dept']] || "") : "",
                     containerUid: data[i][map['container_uid']] || "",
                     scanStatus: data[i][map['scan_status']] || "Assigned",
-                    outboundTruckUid: map['outbound_truck_uid'] !== undefined ? (data[i][map['outbound_truck_uid']] || "") : "",
-                    outboundX: map['outbound_x'] !== undefined && data[i][map['outbound_x']] !== "" ? Number(data[i][map['outbound_x']]) : null,
-                    outboundY: map['outbound_y'] !== undefined && data[i][map['outbound_y']] !== "" ? Number(data[i][map['outbound_y']]) : null,
-                    outboundZ: map['outbound_z'] !== undefined && data[i][map['outbound_z']] !== "" ? Number(data[i][map['outbound_z']]) : null,
-                    outboundRotated: map['outbound_rotated'] !== undefined && (data[i][map['outbound_rotated']] === true || data[i][map['outbound_rotated']] === 'true'),
-                    outboundStaged: map['outbound_staged'] !== undefined && (data[i][map['outbound_staged']] === true || data[i][map['outbound_staged']] === 'true'),
-                    inboundTruckUid: map['inbound_truck_uid'] !== undefined ? (data[i][map['inbound_truck_uid']] || "") : "",
-                    inboundX: map['inbound_x'] !== undefined && data[i][map['inbound_x']] !== "" ? Number(data[i][map['inbound_x']]) : null,
-                    inboundY: map['inbound_y'] !== undefined && data[i][map['inbound_y']] !== "" ? Number(data[i][map['inbound_y']]) : null,
-                    inboundZ: map['inbound_z'] !== undefined && data[i][map['inbound_z']] !== "" ? Number(data[i][map['inbound_z']]) : null,
-                    inboundRotated: map['inbound_rotated'] !== undefined && (data[i][map['inbound_rotated']] === true || data[i][map['inbound_rotated']] === 'true'),
-                    inboundStaged: map['inbound_staged'] !== undefined && (data[i][map['inbound_staged']] === true || data[i][map['inbound_staged']] === 'true')
+                    // M4: movement from Logistics_Ledger overlay below
+                    outboundTruckUid: "",
+                    outboundX: null,
+                    outboundY: null,
+                    outboundZ: null,
+                    outboundRotated: false,
+                    outboundStaged: false,
+                    inboundTruckUid: "",
+                    inboundX: null,
+                    inboundY: null,
+                    inboundZ: null,
+                    inboundRotated: false,
+                    inboundStaged: false
                 });
             } else if (!isShortage) {
                 otherAssets.push({
@@ -254,59 +255,40 @@ function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
             }
         }
 
-        // M3: prefer Logistics_Ledger legs (PA columns = fallback)
+        // M4: Logistics_Ledger overlay (PA no longer stores truck cols)
         try {
           var legsMap = logisticsLedgerLegsByProject_(sheets, projectId);
           assets.forEach(function (a) { applyLedgerLegsOntoPaAsset_(a, legsMap); });
-        } catch (eLlRead) { /* PA-only fallback */ }
+        } catch (eLlRead) { /* empty truck fields */ }
 
         return getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets);
     });
 }
 
 // ==========================================
-// --- TRUCK ARRANGEMENT SPATIAL SAVING ---
+// --- TRUCK ARRANGEMENT (PA split + ledger write) ---
 // ==========================================
 
-/** Stamp one layout box onto a PA row (mutates copy). Supports leg = outbound|inbound|both. */
-function applyTruckBoxToPaRow_(newRow, map, leg, box) {
-    var tUid = leg + '_truck_uid';
-    var tX = leg + '_x';
-    var tY = leg + '_y';
-    var tZ = leg + '_z';
-    var tRot = leg + '_rotated';
-    var tStaged = leg + '_staged';
-    if (leg === 'both') {
-        if (box.outbound) {
-            if (map['outbound_truck_uid'] !== undefined) newRow[map['outbound_truck_uid']] = box.outbound.truckUid || "";
-            if (map['outbound_x'] !== undefined) newRow[map['outbound_x']] = box.outbound.truckX !== null ? box.outbound.truckX : "";
-            if (map['outbound_y'] !== undefined) newRow[map['outbound_y']] = box.outbound.truckY !== null ? box.outbound.truckY : "";
-            if (map['outbound_z'] !== undefined) newRow[map['outbound_z']] = box.outbound.truckZ !== null ? box.outbound.truckZ : "";
-            if (map['outbound_rotated'] !== undefined) newRow[map['outbound_rotated']] = box.outbound.isRotated || false;
-            if (map['outbound_staged'] !== undefined) newRow[map['outbound_staged']] = box.outbound.isStaged || false;
-        }
-        if (box.inbound) {
-            if (map['inbound_truck_uid'] !== undefined) newRow[map['inbound_truck_uid']] = box.inbound.truckUid || "";
-            if (map['inbound_x'] !== undefined) newRow[map['inbound_x']] = box.inbound.truckX !== null ? box.inbound.truckX : "";
-            if (map['inbound_y'] !== undefined) newRow[map['inbound_y']] = box.inbound.truckY !== null ? box.inbound.truckY : "";
-            if (map['inbound_z'] !== undefined) newRow[map['inbound_z']] = box.inbound.truckZ !== null ? box.inbound.truckZ : "";
-            if (map['inbound_rotated'] !== undefined) newRow[map['inbound_rotated']] = box.inbound.isRotated || false;
-            if (map['inbound_staged'] !== undefined) newRow[map['inbound_staged']] = box.inbound.isStaged || false;
-        }
-        return newRow;
-    }
-    if (map[tUid] !== undefined) newRow[map[tUid]] = box.truckUid || "";
-    if (map[tX] !== undefined) newRow[map[tX]] = box.truckX !== null ? box.truckX : "";
-    if (map[tY] !== undefined) newRow[map[tY]] = box.truckY !== null ? box.truckY : "";
-    if (map[tZ] !== undefined) newRow[map[tZ]] = box.truckZ !== null ? box.truckZ : "";
-    if (map[tRot] !== undefined) newRow[map[tRot]] = box.isRotated || false;
-    if (map[tStaged] !== undefined) newRow[map[tStaged]] = box.isStaged || false;
-    return newRow;
+/**
+ * Build a ledger layout item from a PA row + arrange box (M4 — not stamped onto PA).
+ */
+function logisticsLedgerItemFromArrangeBox_(paRow, map, leg, box) {
+  var assetUid = map['asset_uid'] !== undefined ? String(paRow[map['asset_uid']] || '') : '';
+  var qty = map['assigned_quantity'] !== undefined ? (paRow[map['assigned_quantity']] || 1) : 1;
+  var creator = map['creator'] !== undefined ? (paRow[map['creator']] || '') : '';
+  var item = { assetUid: assetUid, quantity: qty, creator: creator, legs: {} };
+  if (leg === 'both') {
+    if (box && box.outbound) item.legs.outbound = box.outbound;
+    if (box && box.inbound) item.legs.inbound = box.inbound;
+  } else {
+    item.legs[String(leg || 'outbound')] = box;
+  }
+  return item;
 }
 
 /**
- * Apply truck layout to a uid→row map. Returns project PA rows after arrange
- * (may mint new UIDs when splitting bulk qty>1).
+ * Apply truck layout to a uid→row map. May mint new UIDs when splitting bulk qty>1.
+ * Does NOT stamp truck onto PA (M4). Returns { rows, ledgerItems }.
  */
 function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map) {
     var paUpdates = {};
@@ -315,32 +297,46 @@ function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map)
         paUpdates[item.paUid].push(item);
     });
     var out = [];
+    var ledgerItems = [];
     Object.keys(projectRowsMap).forEach(function (uidKey) {
         var origRow = projectRowsMap[uidKey];
         var uid = origRow[map['uid']];
         if (paUpdates[uid]) {
             if (paUpdates[uid].length === 1 && parseInt(origRow[map['assigned_quantity']], 10) === 1) {
-                // PRESERVE UID when already an individual virtual ID
-                out.push(applyTruckBoxToPaRow_(origRow.slice(), map, leg, paUpdates[uid][0]));
+                var kept = origRow.slice();
+                out.push(kept);
+                ledgerItems.push(logisticsLedgerItemFromArrangeBox_(kept, map, leg, paUpdates[uid][0]));
             } else {
-                // Legacy: split grouped bulk into qty=1 rows with new UIDs
                 paUpdates[uid].forEach(function (box) {
                     var newRow = origRow.slice();
                     newRow[map['uid']] = Utilities.getUuid();
                     newRow[map['assigned_quantity']] = 1;
-                    out.push(applyTruckBoxToPaRow_(newRow, map, leg, box));
+                    out.push(newRow);
+                    ledgerItems.push(logisticsLedgerItemFromArrangeBox_(newRow, map, leg, box));
                 });
             }
         } else {
             out.push(origRow);
         }
     });
-    return out;
+    return { rows: out, ledgerItems: ledgerItems };
+}
+
+/** Truncate PA rows to current header width (drops orphan truck cells after M4 strip). */
+function paTruncateRowsToHeader_(rows, colCount) {
+  return (rows || []).map(function (r) {
+    if (!r) return r;
+    if (r.length === colCount) return r;
+    if (r.length > colCount) return r.slice(0, colCount);
+    var padded = r.slice();
+    while (padded.length < colCount) padded.push('');
+    return padded;
+  });
 }
 
 function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor = "System UI") {
     assertActorCanEditProjectAssets(actor);
-    // Prep fork open → Firebase PA + Sheets ledger. Closed → Sheets PA + ledger.
+    // Prep fork open → Firebase PA (assignment only) + Sheets ledger. Closed → Sheets PA + ledger.
     if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN) {
         return saveTruckArrangementFirestore_(projectId, layoutData, leg, actor);
     }
@@ -349,6 +345,7 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
         const sheets = verifyDatabaseSchema();
         let data = sheets.projectAssets.getDataRange().getValues();
         let map = {}; if(data.length > 0) data[0].forEach((h,i)=>map[h.toString().trim()]=i);
+        var colCount = data[0] ? data[0].length : 0;
 
         let keptRows = [data[0]];
         let projectRowsMap = {}; 
@@ -361,20 +358,22 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
             }
         }
 
-        var projectPaOnly = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map);
-        projectPaOnly.forEach(function (r) { keptRows.push(r); });
+        var arranged = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map);
+        arranged.rows.forEach(function (r) { keptRows.push(r); });
+        keptRows = paTruncateRowsToHeader_(keptRows, colCount);
 
         sheets.projectAssets.clearContents();
         if(keptRows.length > 0) sheets.projectAssets.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
 
-        // M1 dual-write: mirror arrangement into Logistics_Ledger (PA columns still SoT for readers)
+        // M4: ledger-only movement write — must succeed (PA no longer holds truck)
         var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
         try {
-          logisticsLedgerDualWriteFromPaRows_(sheets, projectId, projectPaOnly, map, dualLegs, actor);
+          logisticsLedgerWriteFromLayoutItems_(sheets, projectId, arranged.ledgerItems, dualLegs, actor);
           try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
           try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
         } catch (eLl) {
-          writeToAuditLog(actor, "WARN", "LOGISTICS_LEDGER", projectId, projectId, "Dual-write failed: " + (eLl && eLl.message ? eLl.message : eLl));
+          writeToAuditLog(actor, "ERROR", "LOGISTICS_LEDGER", projectId, projectId, "Ledger write failed: " + (eLl && eLl.message ? eLl.message : eLl));
+          throw eLl;
         }
 
         flushCache();
@@ -593,7 +592,7 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
         const paData = getSheetData(dbSheets.projectAssets);
         const paMap = paData.hMap;
 
-        // M3: ledger truck UIDs for active projects (prefer over PA columns)
+        // M4: ledger truck UIDs for active projects
         var ledgerByProject = {};
         try {
           ledgerByProject = logisticsLedgerLegsByProjects_(dbSheets, Object.keys(activeProjects || {}));
@@ -606,10 +605,8 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             let aUid = paData[i][paMap['asset_uid']] || paData[i][paMap['Asset_ID']];
             let form = paData[i][paMap['formula']] || 'Standalone';
             let legsMap = ledgerByProject[String(pUid)] || {};
-            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound',
-              paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "");
-            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound',
-              paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "");
+            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound');
+            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound');
             if (outT || inT) {
                 let cid = form !== 'Standalone' ? (aUid + "|||" + form) : aUid;
                 containerTrucks[pUid + "|||" + cid] = { out: outT, in: inT };
@@ -630,10 +627,8 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             if(qty <= 0) continue;
 
             let legsMap = ledgerByProject[String(pUid)] || {};
-            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound',
-              paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "");
-            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound',
-              paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "");
+            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound');
+            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound');
             let cUid = paData[i][paMap['container_uid']];
             if (cUid) {
                 let parentKey = pUid + "|||" + cUid;
