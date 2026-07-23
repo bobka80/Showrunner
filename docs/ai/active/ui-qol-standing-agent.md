@@ -71,7 +71,7 @@ This is a **warning gate**, not a hard lock. Stale drawers, undocumented WIP, an
 
 ### Done (recent)
 
-- Sidebar setup trio 50px above lock (spacer 14→64) — pending ship
+- Sidebar setup trio 50px above lock (GAS v732)
 - Project editor Assets/Timeline chrome (GAS v696)
 - Calendar fork dots + clear-on-close (v698 / v704)
 - Phone/station bottom SYNC bar (v699)
