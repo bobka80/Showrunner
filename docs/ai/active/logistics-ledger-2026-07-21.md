@@ -125,4 +125,4 @@
 | 2026-07-21 | **M2 @ GAS v730:** `backfillLogisticsLedgerFromPaAPI` + sheet AUTO clocks + RECOVERY `phase_ref` (exact-one) + `reviewLogisticsLedgerGapsAPI`. Arrange save also stamps when resolvable. Next: run backfill once, then M3. |
 | 2026-07-23 | **M2 confirmed** (director: ledger rows present) + Admin **RUN LEDGER BACKFILL** button. |
 | 2026-07-23 | **M3 readers @ GAS v734:** ledger prefer / PA fallback in assets + tracker + Firestore PA load. Bugbot High: blank ledger truck does not wipe PA. Next: director smoke, then M4. |
-| 2026-07-23 | **M4:** ledger-only arrange writers; strip 12 PA truck cols + Firebase/host mappers + content/row sigs; host-boot **v669**. Next: smoke, then M5. |
+| 2026-07-23 | **M4 @ GAS v735** (+ hosting host-boot **v669**): ledger-only arrange writers; strip 12 PA truck cols + Firebase/host mappers + content/row sigs; partial-save preserves other assets' legs; ledger write failure fails the save. Next: smoke, then M5. |
