@@ -126,4 +126,4 @@
 | 2026-07-23 | **M2 confirmed** (director: ledger rows present) + Admin **RUN LEDGER BACKFILL** button. |
 | 2026-07-23 | **M3 readers @ GAS v734:** ledger prefer / PA fallback in assets + tracker + Firestore PA load. Bugbot High: blank ledger truck does not wipe PA. Next: director smoke, then M4. |
 | 2026-07-23 | **M4 @ GAS v735** (+ hosting host-boot **v669**): ledger-only arrange writers; strip 12 PA truck cols + Firebase/host mappers + content/row sigs; partial-save preserves other assets' legs; ledger write failure fails the save. Next: smoke, then M5. |
-| 2026-07-24 | **M5 conflicts:** free-at from ledger `phase_ref` → sub-event end (RECOVERY fallback); soft suppressed if unresolved; unique single-project false badge removed; overrides kept. Next: smoke, then Exit (re-enable forks). |
+| 2026-07-24 | **M5 conflicts @ GAS v737:** free-at from ledger `phase_ref` → sub-event end (RECOVERY fallback); soft suppressed if unresolved; unique single-project false badge removed; overrides kept. Next: smoke, then Exit (re-enable forks). |

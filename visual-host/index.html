@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visual Host — Theme Playground</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/api/styles.css" />
+  <link rel="stylesheet" href="/playground.css" />
+</head>
+<body>
+  <div id="vh-app">
+    <aside id="vh-sidebar">
+      <h1>Visual Host</h1>
+      <p class="vh-sub">Theme playground. Edit dark / light or create a theme, preview UI reports, then bake into Styles + the app theme engine.</p>
+
+      <div class="vh-field">
+        <label for="vh-theme-select">Active theme</label>
+        <select id="vh-theme-select"></select>
+      </div>
+
+      <div class="vh-field">
+        <label for="vh-theme-label">Theme label</label>
+        <input id="vh-theme-label" type="text" maxlength="40" />
+      </div>
+
+      <div class="vh-field">
+        <label for="vh-theme-base">Family base</label>
+        <select id="vh-theme-base">
+          <option value="dark">Dark family (ops console)</option>
+          <option value="light">Light family (uses light structural overrides)</option>
+        </select>
+      </div>
+
+      <div class="vh-row">
+        <button type="button" class="vh-btn" id="vh-new-theme">New theme</button>
+        <button type="button" class="vh-btn vh-btn-danger" id="vh-delete-theme">Delete</button>
+      </div>
+
+      <div class="vh-row">
+        <button type="button" class="vh-btn vh-btn-primary" id="vh-bake">Save theme &amp; bake</button>
+        <button type="button" class="vh-btn" id="vh-reload">Reload registry</button>
+      </div>
+
+      <div id="vh-status">Loading…</div>
+
+      <div id="vh-token-list"></div>
+    </aside>
+
+    <main id="vh-preview-shell">
+      <div id="vh-preview-bar">
+        <strong>UI element reports</strong>
+        <span id="vh-preview-theme-name" style="font-size:12px;color:#8b8b9a;"></span>
+      </div>
+      <div id="vh-preview-frame">
+        <div id="preview-root">
+
+          <section class="vh-report">
+            <h2 class="vh-report-title">01 · Surfaces &amp; tokens</h2>
+            <div class="vh-swatch-row" id="vh-swatches"></div>
+          </section>
+
+          <section class="vh-report">
+            <h2 class="vh-report-title">02 · Typography</h2>
+            <div class="view-header" style="position:relative; left:0; width:100%; border:1px solid #333; border-radius:8px;">
+              <div class="view-header-title">View header title</div>
+            </div>
+            <div class="modal-title" style="margin-top:12px;">Modal title</div>
+            <div class="section-title" style="margin-top:8px;">Section title</div>
+            <div class="input-label" style="margin-top:8px;">Field label</div>
+            <p style="margin:8px 0 0; font-size:13px;">Body copy — Inter 13px on <code style="color:var(--accent);">--text-main</code> / muted labels use <code style="color:var(--accent);">--text-muted</code>.</p>
+          </section>
+
+          <section class="vh-report">
+            <h2 class="vh-report-title">03 · Buttons</h2>
+            <div class="vh-flex">
+              <button type="button" class="btn-main">Save</button>
+              <button type="button" class="btn-outline">Outline</button>
+              <button type="button" class="btn-add">Add</button>
+              <button type="button" class="btn-blue">Blue</button>
+              <button type="button" class="btn-orange">Orange</button>
+              <button type="button" class="btn-purple">Purple</button>
+              <button type="button" class="btn-settings">Settings</button>
+              <button type="button" class="btn-close">Cancel</button>
+              <button type="button" class="btn-delete">Delete</button>
+              <button type="button" class="btn-outline-blue">Outline blue</button>
+              <button type="button" class="btn-outline-orange">Outline orange</button>
+              <button type="button" class="btn-outline-purple">Outline purple</button>
+              <button type="button" class="btn-sm btn-outline">Small</button>
+              <button type="button" class="btn-ghost">Ghost</button>
+              <button type="button" class="btn-new" style="width:auto; margin:0;">New (accent)</button>
+            </div>
+            <div class="vh-flex" style="margin-top:12px;">
+              <button type="button" class="btn-tab">Tab</button>
+              <button type="button" class="btn-tab active">Tab active</button>
+              <button type="button" class="btn-tab-database">Database</button>
+              <button type="button" class="btn-tab-database active">Database on</button>
+            </div>
+          </section>
+
+          <section class="vh-report">
+            <h2 class="vh-report-title">04 · Forms</h2>
+            <div class="vh-stack">
+              <div>
+                <div class="input-label">Text input</div>
+                <input type="text" value="Sample value" style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main);" />
+              </div>
+              <div>
+                <div class="input-label">Select</div>
+                <select style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main);">
+                  <option>Option A</option>
+                  <option>Option B</option>
+                </select>
+              </div>
+              <div>
+                <div class="input-label">Textarea</div>
+                <textarea rows="3" style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main); resize:vertical;">Notes…</textarea>
+              </div>
+            </div>
+          </section>
+
+          <section class="vh-report">
+            <h2 class="vh-report-title">05 · Cards, pills, badges</h2>
+            <div class="vh-flex" style="align-items:stretch;">
+              <div class="project-card" style="width:200px;">
+                <b>Project card</b>
+                <span style="font-size:12px; color:var(--text-muted);">Client · dates</span>
+              </div>
+              <div class="roster-item" style="width:220px; margin:0;">
+                <span>Roster item</span>
+                <span class="badge-orange" style="padding:2px 8px; border-radius:4px; font-size:10px; font-weight:800;">ORANGE</span>
+              </div>
+              <div class="wh-root-item" style="width:180px; padding:12px; border:1px solid #333; border-radius:8px;">Warehouse root</div>
+              <div class="admin-card" style="width:200px;">
+                <div class="admin-card-title">Admin card</div>
+                <div class="admin-panel-body">Panel body text</div>
+              </div>
+            </div>
+            <div class="vh-flex" style="margin-top:12px;">
+              <div class="info-pill info-pill--amber" style="width:220px;">
+                <div class="pill-info-grid">
+                  <div class="info-cell"><div class="info-cell-label">Label</div><div class="info-cell-value">Amber pill</div></div>
+                  <div class="info-cell"><div class="info-cell-label">Status</div><div class="info-cell-value">OK</div></div>
+                </div>
+              </div>
+              <span class="badge-red" style="padding:4px 10px; border-radius:4px; font-size:11px; font-weight:800; color:#fff;">RED</span>
+              <span class="badge-yellow" style="padding:4px 10px; border-radius:4px; font-size:11px; font-weight:800;">YELLOW</span>
+              <span class="conflict-badge-grey">GREY</span>
+            </div>
+          </section>
+
+          <section class="vh-report">
+            <h2 class="vh-report-title">06 · Shell chrome</h2>
+            <div class="vh-flex" style="align-items:stretch;">
+              <div class="vh-fake-nav">
+                <button type="button" class="nav-icon-btn nav-active" title="Active">●</button>
+                <button type="button" class="nav-icon-btn" title="Idle">○</button>
+              </div>
+              <div class="vh-mini-sidebar">
+                <button type="button" class="btn-new">New project</button>
+                <div class="project-card">
+                  <b>Sidebar card</b>
+                  <span style="font-size:12px; color:var(--text-muted);">Hover border uses accent</span>
+                </div>
+              </div>
+              <div class="modal" style="position:relative; max-width:320px; display:flex;">
+                <div class="modal-title">Modal frame</div>
+                <div class="input-label">Field</div>
+                <input type="text" value="Inside modal" style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main);" />
+                <div class="vh-flex">
+                  <button type="button" class="btn-main">Confirm</button>
+                  <button type="button" class="btn-close">Close</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="vh-report">
+            <h2 class="vh-report-title">07 · Grid / calendar scraps</h2>
+            <div class="vh-grid-demo">
+              <div class="hdr">Crew</div>
+              <div class="hdr">Mon</div>
+              <div class="hdr">Tue</div>
+              <div class="hdr">Wed</div>
+              <div>Alex</div>
+              <div><span class="vh-event-chip">Load-in</span></div>
+              <div></div>
+              <div><span class="vh-event-chip">Show</span></div>
+            </div>
+            <div style="margin-top:12px;">
+              <div class="fc-col-header-cell-cushion" style="max-width:160px; text-align:center;">Day header</div>
+              <div class="fc-daygrid-day-frame" style="max-width:160px; min-height:80px !important; margin-top:6px; padding:8px;">
+                <span class="vh-event-chip">Event</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/playground.js"></script>
+</body>
+</html>

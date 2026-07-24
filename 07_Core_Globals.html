@@ -1339,25 +1339,77 @@ syncEffectivePermClasses();
 // --- THEME ENGINE (LOCAL PREFERENCES) ---
 // ==========================================
 // @INDEX: GLOBALS -> CSS Theme Engine
+// @THEME_REGISTRY start
+var SM_THEME_REGISTRY = [
+    {
+      "id": "dark",
+      "label": "Dark",
+      "base": "dark",
+      "builtin": true
+    },
+    {
+      "id": "light",
+      "label": "Light",
+      "base": "light",
+      "builtin": true
+    }
+  ];
+function getThemeRegistryEntry(themeId) {
+  var list = typeof SM_THEME_REGISTRY !== 'undefined' ? SM_THEME_REGISTRY : [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === themeId) return list[i];
+  }
+  return null;
+}
+function populateThemeSelects() {
+  var list = typeof SM_THEME_REGISTRY !== 'undefined' ? SM_THEME_REGISTRY : [];
+  ['user-theme-select', 'mobile-user-theme-select'].forEach(function(id) {
+    var select = document.getElementById(id);
+    if (!select) return;
+    var current = select.value;
+    select.innerHTML = '';
+    list.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.label;
+      select.appendChild(opt);
+    });
+    if (current) select.value = current;
+  });
+}
 function changeUserTheme(theme) {
     localStorage.setItem('sm_user_theme', theme);
     applyTheme(theme);
 }
-
 function applyTheme(theme) {
-    if (theme === 'light') {
-        document.documentElement.classList.add('theme-light');
-        document.body.classList.add('theme-light');
-    } else {
-        document.documentElement.classList.remove('theme-light');
-        document.body.classList.remove('theme-light');
+    var entry = getThemeRegistryEntry(theme);
+    if (!entry) {
+        theme = 'dark';
+        entry = getThemeRegistryEntry('dark') || { id: 'dark', base: 'dark' };
+        try { localStorage.setItem('sm_user_theme', 'dark'); } catch (e) { /* ignore */ }
     }
-    
+    var root = document.documentElement;
+    var body = document.body;
+    Array.prototype.slice.call(root.classList).forEach(function(c) {
+      if (c.indexOf('theme-') === 0) root.classList.remove(c);
+    });
+    Array.prototype.slice.call(body.classList).forEach(function(c) {
+      if (c.indexOf('theme-') === 0) body.classList.remove(c);
+    });
+    if (entry.id === 'light' || entry.base === 'light') {
+        root.classList.add('theme-light');
+        body.classList.add('theme-light');
+    }
+    if (entry.id !== 'dark' && entry.id !== 'light') {
+        root.classList.add('theme-' + entry.id);
+        body.classList.add('theme-' + entry.id);
+    }
     ['user-theme-select', 'mobile-user-theme-select'].forEach(function(id) {
-        let select = document.getElementById(id);
-        if (select) select.value = theme;
+        var select = document.getElementById(id);
+        if (select) select.value = entry.id;
     });
 }
+// @THEME_REGISTRY end
 
 // ==========================================
 // --- PERSONAL HUB (ACCOUNT / LOGOUT / PIN) ---
@@ -1471,6 +1523,7 @@ function refreshPersonalHubUI() {
 
     let savedTheme = 'dark';
     try { savedTheme = localStorage.getItem('sm_user_theme') || 'dark'; } catch (e) { /* ignore */ }
+    if (typeof populateThemeSelects === 'function') populateThemeSelects();
     applyTheme(savedTheme);
 
     ['personal-pin-current', 'personal-pin-new', 'personal-pin-confirm'].forEach(function(id) {
@@ -1964,6 +2017,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Apply user theme preference immediately on boot
   let savedTheme = localStorage.getItem('sm_user_theme') || 'dark';
+  if (typeof populateThemeSelects === 'function') populateThemeSelects();
   applyTheme(savedTheme);
 
   // Global Dirty Memory Heartbeat for Nav Dashboard Lock

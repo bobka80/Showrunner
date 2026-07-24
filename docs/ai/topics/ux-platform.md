@@ -2,11 +2,12 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
 
-**Last swept:** 2026-07-17 · **Production:** GAS **v625** · **Status:** Partial — Personal Hub + **desktop lock shipped** (lock preserves working screen @ v625)
+**Last swept:** 2026-07-24 · **Production:** see `RELEASES.md` · **Status:** Partial — Personal Hub + **desktop lock shipped**; **Visual Host theme playground** added
 
 ## Backlog
 
 - [ ] **Personal user hub:** Extended profile modal (contact, dietary) — partial; theme/logout/PIN shipped
+- [x] **Visual Host theme playground** — `node visual-host.js` / `npm run visual-host`; edit dark/light/custom tokens; bake into `Styles.html` + theme engine (`theme-registry.json`)
 - [ ] **Freelancer shift placeholders & bidding:** TBD shifts, broadcast pool, accept/bid, rating-based selection
 - [ ] Personal Hub on mobile (theme-only polish)
 - [ ] Manager agenda reminders → [notifications-catalog.md](notifications-catalog.md)

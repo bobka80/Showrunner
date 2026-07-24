@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "tokenMeta": [
+    {
+      "key": "--bg-dark",
+      "label": "Page canvas",
+      "group": "surfaces"
+    },
+    {
+      "key": "--bg-sidebar",
+      "label": "Sidebar / shell",
+      "group": "surfaces"
+    },
+    {
+      "key": "--bg-cell",
+      "label": "Cards / panels",
+      "group": "surfaces"
+    },
+    {
+      "key": "--bg-event",
+      "label": "Event chips",
+      "group": "surfaces"
+    },
+    {
+      "key": "--bg-header",
+      "label": "Headers",
+      "group": "surfaces"
+    },
+    {
+      "key": "--accent",
+      "label": "Brand accent",
+      "group": "brand"
+    },
+    {
+      "key": "--text-main",
+      "label": "Body text",
+      "group": "text"
+    },
+    {
+      "key": "--text-muted",
+      "label": "Muted text",
+      "group": "text"
+    },
+    {
+      "key": "--border-light",
+      "label": "Border (light family)",
+      "group": "light-only"
+    },
+    {
+      "key": "--shadow-light",
+      "label": "Card shadow",
+      "group": "light-only"
+    },
+    {
+      "key": "--shadow-modal",
+      "label": "Modal shadow",
+      "group": "light-only"
+    },
+    {
+      "key": "--radius-cell",
+      "label": "Cell radius",
+      "group": "shape",
+      "type": "text"
+    },
+    {
+      "key": "--radius-event",
+      "label": "Event radius",
+      "group": "shape",
+      "type": "text"
+    }
+  ],
+  "themes": [
+    {
+      "id": "dark",
+      "label": "Dark",
+      "base": "dark",
+      "builtin": true,
+      "tokens": {
+        "--bg-dark": "#0a0a0c",
+        "--bg-sidebar": "#111114",
+        "--bg-cell": "#1a1a1e",
+        "--bg-event": "#222228",
+        "--bg-header": "#27272f",
+        "--accent": "#698b99",
+        "--text-main": "#f4f4f5",
+        "--text-muted": "#71717a",
+        "--radius-cell": "10px",
+        "--radius-event": "6px"
+      }
+    },
+    {
+      "id": "light",
+      "label": "Light",
+      "base": "light",
+      "builtin": true,
+      "tokens": {
+        "--bg-dark": "#f3f4f6",
+        "--bg-sidebar": "#ffffff",
+        "--bg-cell": "#ffffff",
+        "--bg-event": "#e5e7eb",
+        "--bg-header": "#f9fafb",
+        "--accent": "#698b99",
+        "--text-main": "#111827",
+        "--text-muted": "#6b7280",
+        "--border-light": "#d1d5db",
+        "--shadow-light": "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+        "--shadow-modal": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+        "--radius-cell": "10px",
+        "--radius-event": "6px"
+      }
+    }
+  ]
+}

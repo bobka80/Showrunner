@@ -12,12 +12,20 @@
   <style>
     /* @INDEX: STYLES -> Core Theme Variables */
     /* --- 1. CORE THEME & CALENDAR --- */
+    /* @THEME_VARS:dark start */
     :root {
       --bg-dark: #0a0a0c;
-      --bg-sidebar: #111114; --bg-cell: #1a1a1e; --bg-event: #222228;
-      --bg-header: #27272f; --accent: #698b99; --text-main: #f4f4f5; --text-muted: #71717a;
-      --radius-cell: 10px; --radius-event: 6px;
+      --bg-sidebar: #111114;
+      --bg-cell: #1a1a1e;
+      --bg-event: #222228;
+      --bg-header: #27272f;
+      --accent: #698b99;
+      --text-main: #f4f4f5;
+      --text-muted: #71717a;
+      --radius-cell: 10px;
+      --radius-event: 6px;
     }
+    /* @THEME_VARS:dark end */
     body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg-dark); color: var(--text-main); height: 100vh; overflow: hidden; }
     
     /* --- CUSTOM SCROLLBARS --- */
@@ -1795,18 +1803,27 @@
     /* ==========================================
        --- LIGHT THEME OVERRIDES ---
        ========================================== */
+    /* @THEME_VARS:light start */
     :root.theme-light {
-      --bg-dark: #f3f4f6;       
-      --bg-sidebar: #ffffff;    
-      --bg-cell: #ffffff;       
-      --bg-event: #e5e7eb;      
-      --bg-header: #f9fafb;     
-      --text-main: #111827;     
-      --text-muted: #6b7280;    
-      --border-light: #d1d5db;  
+      --bg-dark: #f3f4f6;
+      --bg-sidebar: #ffffff;
+      --bg-cell: #ffffff;
+      --bg-event: #e5e7eb;
+      --bg-header: #f9fafb;
+      --accent: #698b99;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --border-light: #d1d5db;
       --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
       --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      --radius-cell: 10px;
+      --radius-event: 6px;
     }
+    /* @THEME_VARS:light end */
+
+    /* @THEME_CUSTOM start */
+    /* (no custom themes) */
+    /* @THEME_CUSTOM end */
     
     .theme-light body { background: var(--bg-dark); color: var(--text-main); }
     
@@ -4433,8 +4450,8 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
          <div class="mobile-account-theme-block">
            <div class="input-label" style="margin-bottom: 8px;">UI Theme</div>
            <select id="mobile-user-theme-select" class="personal-hub-theme-select mobile-theme-select-full" onchange="changeUserTheme(this.value)" title="UI Theme">
-             <option value="dark">🌙 Dark</option>
-             <option value="light">☀️ Light</option>
+             <option value="dark">Dark</option>
+             <option value="light">Light</option>
            </select>
          </div>
        </div>

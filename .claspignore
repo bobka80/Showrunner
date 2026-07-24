@@ -19,4 +19,7 @@ git-push-backup.js
 test.js
 test_db.js
 run_test.js
+create-repomix.js
+visual-host.js
+pre-ship.js
 

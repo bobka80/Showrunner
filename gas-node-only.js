@@ -23,6 +23,7 @@ module.exports = new Set([
   'test_db.js',
   'run_test.js',
   'create-repomix.js',
+  'visual-host.js',
   'pre-ship.js',
   'gas-ship-exclude.js',
 ]);

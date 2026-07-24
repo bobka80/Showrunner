@@ -47,7 +47,7 @@
 | `--radius-cell` | `10px` | Calendar cells |
 | `--radius-event` | `6px` | Event chips |
 
-**Theme:** `changeUserTheme()` / `.theme-light` in `07_Core_Globals.html` — light mode overrides exist; new structural classes need light-theme rules in `Styles.html` when added.
+**Theme:** `theme-registry.json` is the token source. Edit via **Visual Host** (`node visual-host.js` → http://127.0.0.1:4177) then **Save theme & bake**. Runtime: `SM_THEME_REGISTRY` / `changeUserTheme()` / `applyTheme()` in `07_Core_Globals.html`. Dark = default `:root`; light = `.theme-light` (+ structural overrides in `Styles.html`); custom themes = `:root.theme-{id}` and optional light-family class. New structural classes still need `.theme-light` rules when added.
 
 ---
 

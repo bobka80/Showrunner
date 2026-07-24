@@ -12,6 +12,7 @@
     "rollback-milestone": "node rollback-milestone.js",
     "check-google": "node check-google-account.js",
     "pre-ship": "node pre-ship.js",
-    "create-repomix": "node create-repomix.js"
+    "create-repomix": "node create-repomix.js",
+    "visual-host": "node visual-host.js"
   }
 }
