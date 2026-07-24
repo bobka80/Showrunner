@@ -171,8 +171,11 @@ Use `.crew-cb` for IAM and structural forms. Timeline grid uses `.crew-cb.small-
 |--------|----------------|------------------|
 | OPEN TIMELINE (`#master-timeline-btn`) | `btn-outline` (gray) | `btn-outline btn-outline-blue` |
 | PROJECT ASSETS (`#master-assets-btn`) | `btn-outline` (gray) | `btn-outline btn-outline-orange` (no green) |
+| END ROOM (`#master-end-room-btn`) | hidden | shown when **Campaign Room warm** (red outline); publishes PA + timeline and closes room |
 | SAVE & SYNC | `btn-main` | — |
 | CANCEL | `btn-close` | — |
+
+While Campaign Room is warm, module **END PREP** / **END COLLAB** stay hidden — End lives on the project editor only.
 
 Presence still updates OPEN TIMELINE label when others are inside (`👥 … IN TIMELINE`) but **never disables** the button. Paint lives in `paintProjectEditorModuleBtns_` / `refreshProjectEditorForkChrome_` (`02_Project_Editor_Core.html`).
 

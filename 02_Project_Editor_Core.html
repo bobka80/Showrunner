@@ -112,9 +112,10 @@
         <div id="mini-project-calendar" style="flex: 1; background: #0a0a0c; padding: 10px;"></div>
 
     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
-      <div style="display:flex; gap:12px; align-items:center;">
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
          <button id="master-timeline-btn" class="btn-outline" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
          <button id="master-assets-btn" class="btn-outline" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
+         <button id="master-end-room-btn" class="btn-outline" style="margin:0; border-color:#ef4444; color:#ef4444; display:none;" onclick="closeDalCampaignRoomFromUi_()" title="Publish Project Assets + Timeline to Sheets and close the campaign room">END ROOM</button>
       </div>
       <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
@@ -150,10 +151,11 @@ window.peForkTimelineActive_ = false; // Project editor chrome: timeline fork on
 window.peForkRoomActive_ = false;     // Campaign Room R1: warm room on Index / meta
 window.peCampaignRoomJoinFor_ = '';   // Latch — open/join room once per editor entry
 
-/** Paint OPEN TIMELINE / PROJECT ASSETS chrome from fork + presence flags (never disables click). */
+/** Paint OPEN TIMELINE / PROJECT ASSETS / END ROOM chrome from fork + presence flags (never disables click). */
 window.paintProjectEditorModuleBtns_ = function() {
   var tlBtn = document.getElementById('master-timeline-btn');
   var paBtn = document.getElementById('master-assets-btn');
+  var endRoomBtn = document.getElementById('master-end-room-btn');
   var occupants = window.timelineOccupants || [];
   var tlFork = !!window.peForkTimelineActive_;
   var paFork = !!window.peForkPrepActive_;
@@ -196,6 +198,15 @@ window.paintProjectEditorModuleBtns_ = function() {
       paBtn.className = 'btn-outline';
       paBtn.title = roomWarm ? 'Campaign room warm' : '';
     }
+  }
+
+  if (endRoomBtn) {
+    endRoomBtn.style.display = roomWarm ? 'inline-flex' : 'none';
+    endRoomBtn.disabled = !!window.dalCampaignRoomClosing_;
+  }
+
+  if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') {
+    window.dalPaintCampaignEndBtnLabels_();
   }
 };
 
@@ -265,17 +276,22 @@ window.dalPaintCampaignEndBtnLabels_ = function() {
   var warm = typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_();
   var endPrep = document.getElementById('dal-prep-end-btn');
   var endTl = document.getElementById('dal-timeline-end-btn');
+  // Primary End is on the project editor (#master-end-room-btn). Hide module Ends while warm.
   if (endPrep) {
-    endPrep.textContent = warm ? 'END ROOM' : 'END PREP';
-    endPrep.title = warm
-      ? 'Publish Project Assets + Timeline to Sheets and close the campaign room'
-      : 'End preparation and commit equipment to Sheets';
+    if (warm) {
+      endPrep.style.display = 'none';
+    } else {
+      endPrep.textContent = 'END PREP';
+      endPrep.title = 'End preparation and commit equipment to Sheets';
+    }
   }
   if (endTl) {
-    endTl.textContent = warm ? 'END ROOM' : 'END COLLAB';
-    endTl.title = warm
-      ? 'Publish Project Assets + Timeline to Sheets and close the campaign room'
-      : 'End timeline collaboration and commit to Sheets';
+    if (warm) {
+      endTl.style.display = 'none';
+    } else {
+      endTl.textContent = 'END COLLAB';
+      endTl.title = 'End timeline collaboration and commit to Sheets';
+    }
   }
 };
 

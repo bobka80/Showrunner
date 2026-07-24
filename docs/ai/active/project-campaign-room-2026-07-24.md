@@ -9,7 +9,7 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R2 shipping**. Smoke then **OK go for R3** (ledger slice).  
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R2 @ GAS v742**. Smoke then **OK go for R3** (ledger slice).  
 **Production tip:** see RELEASES.md. Prep live rollback pin still **v654**.
 
 ---
@@ -233,7 +233,7 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 - [x] Retarget orphan / refresh reclaim to room (soft-rejoin when warm — no domain commit)
 - [x] Stop using last-leave / 45m·75m as primary commit once room is open
 - [x] Explicit End still final-publishes + closes room (`closeDalCampaignRoom`; END ROOM label when warm)
-- [ ] Ship + smoke: PA + timeline both live in one room; End closes both cleanly
+- [x] Ship + smoke: PA + timeline both live in one room; End closes both cleanly — **shipped GAS v742**; director smoke next
 
 ### R3 — Ledger slice in room
 
@@ -280,4 +280,4 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 | 2026-07-24 | Active brief opened (director OK go). Next: OK go for **R0**. |
 | 2026-07-24 | **R0 complete** (docs): design-lock § Campaign Room revision; dual-domain inventory; Index + station proposals. Next: **OK go for R1**. |
 | 2026-07-24 | **R1 shipped @ GAS v741** — Index `Dal_Campaign_*`, `openOrJoinDalCampaignRoom`, Firebase `meta/state`, calendar green room dot + editor chrome. Firestore rules deployed. Next: director smoke → **OK go for R2**. |
-| 2026-07-24 | **R2 implemented** — `_meta.roomUid`, soft leave/idle/orphan when warm, `closeDalCampaignRoom` + END ROOM. Ship pending. |)
+| 2026-07-24 | **R2 shipped @ GAS v742** — `_meta.roomUid`, soft leave/idle/orphan when warm, `closeDalCampaignRoom` + END ROOM. Next: smoke → **OK go for R3**. |)

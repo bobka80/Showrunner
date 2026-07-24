@@ -8806,9 +8806,10 @@ body.station-dock-screensaver-active #station-dock-shell {
         <div id="mini-project-calendar" style="flex: 1; background: #0a0a0c; padding: 10px;"></div>
 
     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
-      <div style="display:flex; gap:12px; align-items:center;">
+      <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">
          <button id="master-timeline-btn" class="btn-outline" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
          <button id="master-assets-btn" class="btn-outline" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
+         <button id="master-end-room-btn" class="btn-outline" style="margin:0; border-color:#ef4444; color:#ef4444; display:none;" onclick="closeDalCampaignRoomFromUi_()" title="Publish Project Assets + Timeline to Sheets and close the campaign room">END ROOM</button>
       </div>
       <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
