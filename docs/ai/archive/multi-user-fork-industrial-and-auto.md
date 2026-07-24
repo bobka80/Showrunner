@@ -14,7 +14,7 @@
 **Floor workflow lock (director 2026-07-19):** § **Warehouse prep — real multi-user scope** below. **Do not** redesign live sync as “increment counters.” Primary ops = search/formula **batch absolute upserts** + pack/delete; +/- is secondary. Tech merge notes: [dal-prep-live-sync-standards.md](dal-prep-live-sync-standards.md).
 
 **Process companion (archived with this campaign):** [bulletproof-multiuser-live-editors-2026-07-18.md](bulletproof-multiuser-live-editors-2026-07-18.md)  
-**NEXT after this campaign:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)
+**NEXT after this campaign:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md)
 
 ---
 
@@ -27,7 +27,7 @@
 5. After any implementation: `node milestone.js "…"`; hosting only if `host-boot.js` changes.
 
 **Point agents at the successor:**  
-`docs/ai/active/logistics-ledger-2026-07-21.md`
+`docs/ai/archive/logistics-ledger-2026-07-21.md`
 
 ---
 

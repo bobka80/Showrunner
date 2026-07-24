@@ -13,20 +13,25 @@ var DAL_SESSION_TYPE = {
 };
 
 /**
- * TEMP pause — Logistics Ledger campaign (2026-07-21).
- * true = Sheets-only PA + timeline (no Firebase forks).
- * Set false and ship to restore START PREP / START COLLAB + auto-start.
+ * Live forks switch — false = START PREP / START COLLAB + auto-start restored.
+ * Was paused for Logistics Ledger campaign (2026-07-21 → 2026-07-24).
  */
-var DAL_LIVE_FORKS_PAUSED = true;
+var DAL_LIVE_FORKS_PAUSED = false;
 
 function dalLiveForksPaused_() {
   return DAL_LIVE_FORKS_PAUSED === true;
 }
 
-/** One-shot: clear leftover Index fork flags after pause ships (Sheets stay SoT). */
+/**
+ * While paused: one-shot clear leftover Index fork flags (Sheets stay SoT).
+ * While live: clear abandon latch so a future pause can abandon again.
+ */
 function dalEnsurePausedForksAbandoned_() {
-  if (!dalLiveForksPaused_()) return;
   var props = PropertiesService.getScriptProperties();
+  if (!dalLiveForksPaused_()) {
+    try { props.deleteProperty('DAL_LIVE_FORKS_ABANDONED_V1'); } catch (eClr) { /* ignore */ }
+    return;
+  }
   if (props.getProperty('DAL_LIVE_FORKS_ABANDONED_V1') === '1') return;
   try {
     abandonAllOpenDalLiveForksAPI('System Pause');

@@ -1,6 +1,6 @@
 # Logistics Ledger — Equipment Movement & Conflict Detection
 
-**Status:** Future campaign — design locked at brainstorm level (2026-07-20). **Schema homework complete in this file.** **Promoted to active 2026-07-21** — build checklist: [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md). **Architecture pack:** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md).  
+**Status:** Design locked (2026-07-20). **Campaign COMPLETE / archived 2026-07-24** — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). **Architecture pack:** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md).
 **Sequencing:** After Part B (**archived 2026-07-21**). Offer **off** critical path (director locks). Do **not** begin schema/migration code until director says **OK go** on the active brief.
 
 Director: this is **not a small thing** — a **structural ENGINE refactor**, not a quick patch.
@@ -365,7 +365,7 @@ Remaining at promote time (if any): empty times after backfill review UI; `[TRAN
 
 - [x] Director confirms sequencing (Part B archived; Offer off path)
 - [x] Director resolves phase UID preserve + §9 product locks
-- [x] Active brief created under `docs/ai/active/` — [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)
+- [x] Active brief created under `docs/ai/active/` — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md)
 - [ ] Explicit **OK go** before any schema or migration code (M0/M1)
 
 ### Design lock (this file) — done at brainstorm

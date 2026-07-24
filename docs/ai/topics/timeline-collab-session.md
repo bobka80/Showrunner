@@ -14,7 +14,7 @@
 
 **Known gap:** ~~saves during collab still require SAVE SHIFTS~~ **Fixed** — collab flushes on drag-end; prefers direct Firebase. ~~shift positions thrash in co-op~~ **Fixed**. ~~forgotten / disappearing concurrent edits~~ **Fixed** — touch/patch merge (editing crew B cannot rewrite crew A’s untouched strip).
 
-**Post-campaign optional → shipped:** auto fork / pull-in / idle eject (timeline **and** PA). **Archived:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) · process [../archive/bulletproof-multiuser-live-editors-2026-07-18.md](../archive/bulletproof-multiuser-live-editors-2026-07-18.md). Spec text remains in § Optional update below (canonical UX). **NEXT:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
+**Post-campaign optional → shipped:** auto fork / pull-in / idle eject (timeline **and** PA). **Archived:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) · process [../archive/bulletproof-multiuser-live-editors-2026-07-18.md](../archive/bulletproof-multiuser-live-editors-2026-07-18.md). Spec text remains in § Optional update below (canonical UX). **NEXT:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
 
 ---
 

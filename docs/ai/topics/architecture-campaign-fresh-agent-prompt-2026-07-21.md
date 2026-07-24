@@ -60,7 +60,7 @@ READ FIRST (in order)
 5. docs/ai/topics/session-fork-platform.md
 6. docs/ai/archive/dal-firebase-design-lock-2026-07-13.md
 7. docs/ai/archive/multi-user-fork-industrial-and-auto.md — Part B archived; do NOT redesign
-8. docs/ai/active/logistics-ledger-2026-07-21.md — NEXT build checklist
+8. docs/ai/archive/logistics-ledger-2026-07-21.md — NEXT build checklist
 9. docs/ai/topics/architecture-multi-campaign-pack-2026-07-21.md — filed design pack
 8. docs/ai/FRAGILE_ZONES.md — DAL / prep PA / timeline sections
 9. docs/ai/EQUIPMENT_MODEL.md

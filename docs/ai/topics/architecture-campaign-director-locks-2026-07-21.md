@@ -8,7 +8,7 @@
 **Companions:**
 
 - [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md) — **canonical sequenced pack**
-- [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md) — **active build**
+- [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md) — **active build**
 - [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — options A–D (lease framing **superseded** by idle timer below)
 - [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — full ledger schema
 - [session-fork-platform.md](session-fork-platform.md) — current fork lifecycle
@@ -98,4 +98,4 @@ RFID `Operations_Ledger` stays **atomic / outside the room permanently**.
 
 ## Fresh-agent one-liner
 
-Obey this file + the [architecture pack](architecture-multi-campaign-pack-2026-07-21.md) + [GLOSSARY](../GLOSSARY.md) sub-event/phase lock. Build Ledger from [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md). Do not reopen settled IDs unless live code forces a director question.
+Obey this file + the [architecture pack](architecture-multi-campaign-pack-2026-07-21.md) + [GLOSSARY](../GLOSSARY.md) sub-event/phase lock. Build Ledger from [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). Do not reopen settled IDs unless live code forces a director question.

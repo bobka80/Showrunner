@@ -109,7 +109,7 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 4. Desktop auto-save + merge improvements  
 5. Checkout/list status closure  
 
-**Floor / prep mode:** Live multi-user list = [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (archived). Prep session UX shell: [warehouse-prep-session.md](warehouse-prep-session.md). **NEXT structural:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
+**Floor / prep mode:** Live multi-user list = [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (archived). Prep session UX shell: [warehouse-prep-session.md](warehouse-prep-session.md). **NEXT structural:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
 
 ---
 

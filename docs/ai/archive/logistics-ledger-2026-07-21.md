@@ -1,25 +1,24 @@
-# Active — Logistics Ledger (movement SoT + PA slim)
+# Archived — Logistics Ledger (movement SoT + PA slim)
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
 **Design lock (schema):** [../topics/logistics-ledger-schema-2026-07-20.md](../topics/logistics-ledger-schema-2026-07-20.md)  
 **Architecture pack:** [../topics/architecture-multi-campaign-pack-2026-07-21.md](../topics/architecture-multi-campaign-pack-2026-07-21.md)  
 **Director locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
-**Predecessor:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
+**Predecessor:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
 **Next after this campaign:** Project Campaign Room — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)
 
-**Opened:** 2026-07-21 · **Status:** **M5 conflicts shipped** — live forks still PAUSED. Next: smoke M5, then Exit (re-enable forks).  
-**Production tip:** see status log. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-21 · **Closed:** 2026-07-24 · **Status:** **COMPLETE** — M0–M5 + Exit (live forks re-enabled). **Archived** here.  
+**Production tip:** see RELEASES.md. Prep live rollback pin still **v654**. Live forks: [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md).
 
 ---
 
 ## Fresh-agent start
 
-1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → [GLOSSARY.md](../GLOSSARY.md) § sub-events vs phases → **this file** → schema topic → architecture pack §3 → locks.  
+1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → [GLOSSARY.md](../GLOSSARY.md) § sub-events vs phases → **this archive** → schema topic → architecture pack §3 → locks.  
 2. Do **not** invent columns beyond the schema topic.  
-3. Do **not** start Campaign Room or Offer in this campaign.  
-4. **Live forks:** **PAUSED** — read [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) before any prep/collab/Firebase PA work. Flags: `DAL_LIVE_FORKS_PAUSED` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED` in `07_Core_Globals.html`.  
-5. **Next build:** Exit — re-enable live forks after M5 smoke green.  
-6. After any implementation: `node milestone.js "…"`; update this checklist same session.
+3. Campaign complete — next structural work is Campaign Room (await director OK go).  
+4. **Live forks:** **LIVE** again — [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md). Flags: `DAL_LIVE_FORKS_PAUSED = false` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED = false` in `07_Core_Globals.html`.  
+5. After any implementation: `node milestone.js "…"`; update the owning topic same session.
 
 ---
 
@@ -36,7 +35,7 @@
 | Dual-write | Mandatory **M1–M3** |
 | M4 | Strip PA truck cols **and** Firebase mappers **and** `dalPaContentSig_` / `dalPaRowSignature_` together |
 | Ops ledger | Never merge with RFID `Operations_Ledger` |
-| Live forks | **Paused** — Sheets-only · [dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) |
+| Live forks | **Live** again (Exit 2026-07-24) — [dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) |
 
 ---
 
@@ -106,9 +105,9 @@
 
 ### Exit
 
-- [ ] All M0–M5 checked
-- [ ] Re-enable live forks (`DAL_LIVE_FORKS_PAUSED = false`) + smoke START/END PREP + collab
-- [ ] Archive this file; set Campaign Room as NEXT in Project_TODO
+- [x] All M0–M5 checked
+- [x] Re-enable live forks (`DAL_LIVE_FORKS_PAUSED = false`) + smoke START/END PREP + collab (director smoke after ship)
+- [x] Archive this file; set Campaign Room as NEXT in Project_TODO
 
 ---
 
@@ -127,3 +126,4 @@
 | 2026-07-23 | **M3 readers @ GAS v734:** ledger prefer / PA fallback in assets + tracker + Firestore PA load. Bugbot High: blank ledger truck does not wipe PA. Next: director smoke, then M4. |
 | 2026-07-23 | **M4 @ GAS v735** (+ hosting host-boot **v669**): ledger-only arrange writers; strip 12 PA truck cols + Firebase/host mappers + content/row sigs; partial-save preserves other assets' legs; ledger write failure fails the save. Next: smoke, then M5. |
 | 2026-07-24 | **M5 conflicts @ GAS v737:** free-at from ledger `phase_ref` → sub-event end (RECOVERY fallback); soft suppressed if unresolved; unique single-project false badge removed; overrides kept. Next: smoke, then Exit (re-enable forks). |
+| 2026-07-24 | **Exit:** `DAL_LIVE_FORKS_PAUSED = false` (server + client); abandon latch cleared on live path; campaign archived; Campaign Room = NEXT. |

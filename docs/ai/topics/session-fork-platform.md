@@ -22,7 +22,7 @@
 
 **Firestore paths (canonical):** `projects/{projectId}/assets/` and `projects/{projectId}/timeline/` per [design lock](../archive/dal-firebase-design-lock-2026-07-13.md). The older `sessions/{projectId}/{sessionType}/` sketch is historical only.
 
-**Future architecture decision (not active):** [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — 48h Project Campaign Room + periodic Sheets publish; depends on [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md). **Sequenced pack:** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger active:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
+**Future architecture decision (not active):** [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — 48h Project Campaign Room + periodic Sheets publish; depends on [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md). **Sequenced pack:** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger active:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
 
 **Dual-domain (Phase 4 Slice D):** prep + timeline may both be open **concurrent** on one project — [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) (shipped @ v603). **Auto-fork Part B:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (closed 2026-07-21).
 
@@ -133,7 +133,7 @@ Current model = **short sessions** per domain (prep + timeline may both be open,
 
 1. ~~Multi-user Part B exit (B7 floor smoke)~~ ✓ archived  
 2. ~~Offer / availability~~ — **off critical path** (locks)  
-3. **Logistics Ledger** — [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)  
+3. **Logistics Ledger** — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md)  
 4. Project Campaign Room  
 
 Interim: refresh/orphan/commit UX within short-session model was improved during Part B; Campaign Room replaces leave/idle-as-commit later.

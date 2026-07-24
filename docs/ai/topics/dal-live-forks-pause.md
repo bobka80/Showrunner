@@ -1,9 +1,9 @@
 # Live forks — architecture & pause switch
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Platform home:** [session-fork-platform.md](session-fork-platform.md)  
-**Active campaign holding the pause:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md)
+**Pause was held by:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md) (complete 2026-07-24)
 
-**Last updated:** 2026-07-21 · **Production tip:** GAS **v729+** while pause is on.
+**Last updated:** 2026-07-24 · **Production:** live forks **ON** (`DAL_LIVE_FORKS_PAUSED = false`).
 
 ---
 
@@ -35,30 +35,28 @@ SESSION CLOSED
 
 ---
 
-## CURRENT PRODUCTION MODE (2026-07-21) — forks PAUSED
+## CURRENT PRODUCTION MODE (2026-07-24) — forks LIVE
 
-**Both** prep and timeline live forks are **temporarily off** so Logistics Ledger work can stay on a single SoT (Sheets) without Sheets↔Firebase thrash.
+Prep and timeline live forks are **on** again after Logistics Ledger Exit.
 
-| Flag | Where | Value while paused |
-|------|--------|--------------------|
-| `DAL_LIVE_FORKS_PAUSED` | `Dal_Sessions.js` | `true` |
-| `window.DAL_LIVE_FORKS_PAUSED` | `07_Core_Globals.html` | `true` — **keep in sync with server** |
-| Script Property `DAL_LIVE_FORKS_ABANDONED_V1` | Apps Script props | `'1'` after one-shot Index cleanup |
+| Flag | Where | Value while live |
+|------|--------|------------------|
+| `DAL_LIVE_FORKS_PAUSED` | `Dal_Sessions.js` | `false` |
+| `window.DAL_LIVE_FORKS_PAUSED` | `07_Core_Globals.html` | `false` — **keep in sync with server** |
+| Script Property `DAL_LIVE_FORKS_ABANDONED_V1` | Apps Script props | cleared when pause is false (so a future pause can abandon again) |
 
-### Behavior while paused
+### Behavior while live
 
-1. **No new opens** — `dalAssertCanOpenSessionType_` throws; START PREP / START COLLAB blocked; auto-start off.
-2. **Router = Sheets** — `resolveDalSessionStatus_` always returns `NORMAL` for PA + timeline.
-3. **Clients do not soft-join** — `getDalSessionInfo` / `getOpenDalForkMap` report closed; `dalMayJoinLiveFork_` false.
-4. **Leftover Index flags** — cleared once by `abandonAllOpenDalLiveForksAPI` / `dalEnsurePausedForksAbandoned_` (**no** Firebase→Sheets commit; Sheets stay SoT).
-5. **Truck arrange + ledger dual-write** use the **Sheets** path (`saveTruckArrangementAPI`).
+1. START PREP / START COLLAB and auto-start work again.
+2. Open sessions route that domain to Firebase; closed = Sheets.
+3. Truck arrange with prep open → Firebase PA path + ledger on Sheets; closed → Sheets PA + ledger.
 
-### What is not paused
+### How to pause again (temporary Sheets-only)
 
-- Normal PA / timeline / truck edits on Sheets  
-- Logistics Ledger dual-write from truck arrange  
-- RFID / Operations_Ledger  
-- Hosting shell / station (except they also cannot open prep)
+1. Set **`DAL_LIVE_FORKS_PAUSED = true`** in `Dal_Sessions.js`.  
+2. Set **`window.DAL_LIVE_FORKS_PAUSED = true`** in `07_Core_Globals.html`.  
+3. `node milestone.js "Pause live forks (Sheets-only)"`.  
+4. One-shot Index abandon runs via `dalEnsurePausedForksAbandoned_` (no Firebase→Sheets commit).
 
 ---
 
@@ -77,17 +75,6 @@ SESSION CLOSED
 
 ---
 
-## How to restore forks (after ledger campaign)
-
-1. Set **`DAL_LIVE_FORKS_PAUSED = false`** in `Dal_Sessions.js`.  
-2. Set **`window.DAL_LIVE_FORKS_PAUSED = false`** in `07_Core_Globals.html`.  
-3. Delete Script Property **`DAL_LIVE_FORKS_ABANDONED_V1`** (so a future pause can abandon again).  
-4. `node milestone.js "Re-enable live forks (PA prep + timeline collab)"`.  
-5. Smoke: START/END PREP (two browsers) · START/END COLLAB · truck arrange with prep open (Firebase path) and closed (Sheets path).  
-6. Update [active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md) Exit checklist + this file’s “CURRENT PRODUCTION MODE” section.
-
----
-
 ## Related docs
 
 | Doc | Role |
@@ -99,3 +86,4 @@ SESSION CLOSED
 | [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) | Prep session UI + live sync traps |
 | [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) | Design lock (Sheets between sessions) |
 | [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) | Part B auto-fork (archived) |
+| [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md) | Ledger campaign that held the pause |

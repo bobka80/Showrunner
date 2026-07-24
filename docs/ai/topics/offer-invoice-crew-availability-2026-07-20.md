@@ -1,7 +1,7 @@
 # Offer / Invoice · Crew Timeline Swap · Availability Conflicts
 
 **Status:** Future campaign — **locked brainstorm** filed 2026-07-20. **Not active.** Do **not** implement until the director confirms sequencing has reached this campaign.  
-**Sequencing:** Part B **archived**. Offer remains **off critical path** (director locks 2026-07-21) — parallel or later. Soft/hard **detection implementation** depends on Logistics Ledger — [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md). Part B archive: [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md).  
+**Sequencing:** Part B **archived**. Offer remains **off critical path** (director locks 2026-07-21) — parallel or later. Soft/hard **detection implementation** depends on Logistics Ledger — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). Part B archive: [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md).  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Related area topics:** [financials.md](financials.md) · [availability-fleet.md](availability-fleet.md) · [timeline-shift-field-crew.md](timeline-shift-field-crew.md)
 

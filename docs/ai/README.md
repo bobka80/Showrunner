@@ -44,7 +44,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [error-journal/](error-journal/) | **Operational log** — bug memory from Report → Hand over · build: [archive/user-error-reporting-journal-2026-07-19.md](archive/user-error-reporting-journal-2026-07-19.md) |
 | [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md) | Multi-user fork Part A+B — **archived 2026-07-21** |
 | [archive/bulletproof-multiuser-live-editors-2026-07-18.md](archive/bulletproof-multiuser-live-editors-2026-07-18.md) | Process depth for live-sync harden (archived with Part B) |
-| [active/logistics-ledger-2026-07-21.md](active/logistics-ledger-2026-07-21.md) | **NEXT** — Logistics Ledger M0–M5 (**live forks paused** — Sheets-only) |
+| [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) | **COMPLETE** — Logistics Ledger M0–M5 + Exit (live forks re-enabled) |
 | [active/ui-qol-standing-agent.md](active/ui-qol-standing-agent.md) | **Standing agent** — UI/QoL minor polish; collision-check before edit |
 | [topics/dal-live-forks-pause.md](topics/dal-live-forks-pause.md) | Live forks architecture + **CURRENT** pause / restore |
 | [topics/architecture-multi-campaign-pack-2026-07-21.md](topics/architecture-multi-campaign-pack-2026-07-21.md) | Sequenced pack: Ledger → Campaign Room → packet sync |

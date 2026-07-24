@@ -14,7 +14,7 @@
 
 **Director locks (poll v2, 2026-07-21):** [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md) — **48h idle timer** (not lease); publish **meta → PA → timeline → ledger**; ledger load clocks from timeline shifts + `phase_ref` (**sub-event** FK). Option C “hard expiry / lease” language below is **superseded** by those locks. **Terminology:** [GLOSSARY.md](../GLOSSARY.md) — sub-events ≠ phases.
 
-**Sequenced pack (canonical):** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger active:** [../active/logistics-ledger-2026-07-21.md](../active/logistics-ledger-2026-07-21.md).
+**Sequenced pack (canonical):** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger archived:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). **This is NEXT** — awaiting director OK go for an active brief.
 
 ---
 
