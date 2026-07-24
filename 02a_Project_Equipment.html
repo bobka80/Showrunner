@@ -299,19 +299,28 @@ function openProjectAssetsModal() {
         return;
     }
 
-    // Refresh/crash may leave Firebase Live open with nobody in the room.
-    // Gate before claiming assets presence / soft-joining.
+    // Open the window immediately. Orphan reclaim still runs before soft-join / auto-prep
+    // (refresh-abandoned Live) — same gate, no Sheets wait before paint.
+    window.openProjectAssetsModalAfterOrphanGate_(projectId, assetsReadOnly, { deferLiveJoin: true });
     if (typeof window.dalGatePrepEnterForOrphan_ === 'function') {
-      if (window.dalPrepOrphanEnterPending_) return;
       window.dalGatePrepEnterForOrphan_(projectId, function() {
-        window.openProjectAssetsModalAfterOrphanGate_(projectId, assetsReadOnly);
+        window.openProjectAssetsModalFinishLiveJoin_(projectId);
       });
       return;
     }
-    window.openProjectAssetsModalAfterOrphanGate_(projectId, assetsReadOnly);
+    window.openProjectAssetsModalFinishLiveJoin_(projectId);
 }
 
-window.openProjectAssetsModalAfterOrphanGate_ = function(projectId, assetsReadOnly) {
+/** After orphan gate clears (no reclaim): start watcher + auto-prep. Reclaim path skips this. */
+window.openProjectAssetsModalFinishLiveJoin_ = function(projectId) {
+    if (!projectId || projectId === 'NEW') return;
+    if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+    if (typeof window.maybeAutoOpenDalPrep_ === 'function') window.maybeAutoOpenDalPrep_();
+    if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);
+};
+
+window.openProjectAssetsModalAfterOrphanGate_ = function(projectId, assetsReadOnly, opts) {
+    opts = opts || {};
     window.projectAssetsReadOnly = !!assetsReadOnly;
     
     window.activePresenceModule = 'assets';
@@ -347,15 +356,17 @@ window.openProjectAssetsModalAfterOrphanGate_ = function(projectId, assetsReadOn
     }
     if (typeof applyPaHeaderChrome_ === 'function') applyPaHeaderChrome_();
     if (typeof window.evalDalPrepButtons === 'function') window.evalDalPrepButtons();
-    if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
     // User is back in PA — cancel any in-flight last-leave from a prior close.
     window.dalPrepLeaveIntent_ = false;
     window.dalPrepLastLeaveSeq_ = (window.dalPrepLastLeaveSeq_ || 0) + 1;
     window.dalPrepLastLeavePending_ = false;
     document.getElementById('project-assets-modal-overlay').style.display = 'flex';
     if (typeof applyProjectAssetsReadOnly === 'function') applyProjectAssetsReadOnly(assetsReadOnly);
-    if (typeof window.maybeAutoOpenDalPrep_ === 'function') window.maybeAutoOpenDalPrep_();
-    if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);
+    if (!opts.deferLiveJoin) {
+      if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
+      if (typeof window.maybeAutoOpenDalPrep_ === 'function') window.maybeAutoOpenDalPrep_();
+      if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);
+    }
     
     if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
         try {

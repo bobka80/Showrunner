@@ -71,6 +71,8 @@ This is a **warning gate**, not a hard lock. Stale drawers, undocumented WIP, an
 
 ### Done (recent)
 
+- PA window opens immediately (orphan gate after paint; soft-join still gated)
+- Visual Host theme playground (`npm run visual-host`) — edit/bake dark+light+custom (GAS v738)
 - Sidebar setup↔lock gap match tasks↔calendar 25px (GAS v736; was 64)
 - Sidebar setup trio 50px above lock (GAS v732)
 - Project editor Assets/Timeline chrome (GAS v696)

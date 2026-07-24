@@ -482,7 +482,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Idle / auto-close (Part B4 @ v703+):** Timeline idle **45m** / prep **75m**; T−5 SYNC **Session closing — tap to keep open**; last leave + idle call same `closeDalSession` commit path; station presence blocks prep idle eject; presence ping ~**45s**, server stale **150s**.
 
-**Refresh / tab close (2026-07-21 @ v725+):** `pagehide`/`beforeunload` writes **localStorage unload flag** (RPCs often die on refresh) + best-effort presence leave + last-leave. **Before PA enter / soft-join:** `dalGatePrepEnterForOrphan_` — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup.
+**Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+):** `pagehide`/`beforeunload` writes **localStorage unload flag** (RPCs often die on refresh) + best-effort presence leave + last-leave. **PA window paints immediately**; `dalGatePrepEnterForOrphan_` still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup.
 
 ```
 START PREP (local)

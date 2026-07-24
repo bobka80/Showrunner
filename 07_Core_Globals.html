@@ -423,6 +423,7 @@ try { window.dalBindLiveRoomUnloadLeave_(); } catch (eBind) { /* ignore */ }
 /**
  * Fork still open but room empty / unload-flagged → commit orphan.
  * Enter-path gate (dalGatePrepEnterForOrphan_) is the primary fix for refresh rejoin.
+ * PA shell may paint first; gate still runs before soft-join / auto-prep.
  */
 window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
   if (othersObj == null) return;
@@ -512,7 +513,8 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
 };
 
 /**
- * Open PA only after orphan check — never soft-join a refresh-abandoned Live room.
+ * Orphan check before soft-join / auto-prep — never rejoin a refresh-abandoned Live room.
+ * PA UI may already be open; onReady starts watcher + auto-prep (reclaim skips onReady).
  */
 window.dalGatePrepEnterForOrphan_ = function(projectId, onReady) {
   onReady = typeof onReady === 'function' ? onReady : function() {};
@@ -520,8 +522,14 @@ window.dalGatePrepEnterForOrphan_ = function(projectId, onReady) {
     onReady();
     return;
   }
-  if (window.dalPrepOrphanEnterPending_) return;
+  if (window.dalPrepOrphanEnterPending_) {
+    // Another enter/watcher already gating — queue finish hooks (shell may already be open).
+    window.dalPrepOrphanEnterOnReadyQueue_ = window.dalPrepOrphanEnterOnReadyQueue_ || [];
+    window.dalPrepOrphanEnterOnReadyQueue_.push(onReady);
+    return;
+  }
   window.dalPrepOrphanEnterPending_ = true;
+  window.dalPrepOrphanEnterOnReadyQueue_ = [];
 
   var actor = typeof window.dalPresenceActor_ === 'function'
     ? window.dalPresenceActor_()
@@ -530,13 +538,24 @@ window.dalGatePrepEnterForOrphan_ = function(projectId, onReady) {
     ? window.dalConsumeUnloadPrepFlag_(projectId)
     : false;
 
+  var drainReadyQueue_ = function(run) {
+    var q = window.dalPrepOrphanEnterOnReadyQueue_ || [];
+    window.dalPrepOrphanEnterOnReadyQueue_ = [];
+    if (!run) return;
+    try { onReady(); } catch (e0) { /* ignore */ }
+    for (var i = 0; i < q.length; i++) {
+      try { q[i](); } catch (e1) { /* ignore */ }
+    }
+  };
+
   var doneReady_ = function() {
     window.dalPrepOrphanEnterPending_ = false;
-    onReady();
+    drainReadyQueue_(true);
   };
 
   var reclaim_ = function() {
     window.dalPrepOrphanEnterPending_ = false;
+    drainReadyQueue_(false); // reclaim owns watcher/commit — do not soft-join
     try {
       var ov = document.getElementById('project-assets-modal-overlay');
       if (ov) ov.style.display = 'flex';
@@ -985,6 +1004,7 @@ window.dalMayTakeOverOpening_ = function(domain) {
 };
 
 window.maybeAutoOpenDalPrep_ = function() {
+  if (window.dalPrepOrphanEnterPending_) return;
   if (!window.dalMayAutoStartFork_('prep')) return;
   if (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_) return;
   var postReenter = !!window.dalPrepPostCommitReenter_;
