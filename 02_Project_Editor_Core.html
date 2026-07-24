@@ -228,6 +228,7 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
       window.peForkTimelineActive_ = !!tlOpen;
       window.peForkRoomActive_ = !!roomWarm;
       if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
+      if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') window.dalPaintCampaignEndBtnLabels_();
     })
     .getDalSessionInfo(projectId);
 };
@@ -260,11 +261,22 @@ window.openOrJoinDalCampaignRoom_ = function(projectId) {
     .openOrJoinDalCampaignRoom(projectId, actor);
 };
 
-window.dalIsCampaignRoomWarmFromInfo_ = function(info) {
-  if (!info) return false;
-  if (info.campaignRoomWarm) return true;
-  var st = String(info.campaignStatus || '').toLowerCase();
-  return st === 'open' || st === 'opening' || st === 'committing';
+window.dalPaintCampaignEndBtnLabels_ = function() {
+  var warm = typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_();
+  var endPrep = document.getElementById('dal-prep-end-btn');
+  var endTl = document.getElementById('dal-timeline-end-btn');
+  if (endPrep) {
+    endPrep.textContent = warm ? 'END ROOM' : 'END PREP';
+    endPrep.title = warm
+      ? 'Publish Project Assets + Timeline to Sheets and close the campaign room'
+      : 'End preparation and commit equipment to Sheets';
+  }
+  if (endTl) {
+    endTl.textContent = warm ? 'END ROOM' : 'END COLLAB';
+    endTl.title = warm
+      ? 'Publish Project Assets + Timeline to Sheets and close the campaign room'
+      : 'End timeline collaboration and commit to Sheets';
+  }
 };
 
 window.dalPaPresenceModeLabel_ = function(mode, opType) {

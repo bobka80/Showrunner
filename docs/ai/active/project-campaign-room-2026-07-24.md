@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R1 shipping** (room registry + meta). Awaiting smoke then **OK go for R2**.  
-**Production tip:** see RELEASES.md. Prep live rollback pin still **v654**. Short-session Part B timers remain until R2+.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R2 shipping**. Smoke then **OK go for R3** (ledger slice).  
+**Production tip:** see RELEASES.md. Prep live rollback pin still **v654**.
 
 ---
 
@@ -209,7 +209,8 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 - [x] Director **OK go** to open this campaign (2026-07-24)
 - [x] Director **OK go** for **R0** (doctrine revision + inventory — docs only) — done this session
 - [x] Director **OK go** for **R1** code (room registry + meta slice) — 2026-07-24
-- [ ] Director **OK go** for **R2** (unify PA + timeline under room uid)
+- [x] Director **OK go** for **R2** (unify PA + timeline under room uid) — 2026-07-24
+- [ ] Director **OK go** for **R3** (ledger slice in room)
 
 ### R0 — Doctrine + inventory (no lifecycle code)
 
@@ -224,14 +225,14 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 - [x] One `campaignRoomUid` on Index; open/join room from project editor entry
 - [x] `projects/{id}/meta/` warm doc (`meta/state`: roomUid, status, openedAt, openedBy, lastActivityAt, lastPublishedAt)
 - [x] Calendar / editor chrome can read “room warm” (green calendar dot + green inset on module buttons)
-- [ ] Ship + smoke: open project → room warm flag visible; no checkpoint yet
+- [x] Ship + smoke: open project → room warm flag visible; no checkpoint yet — **shipped GAS v741**; director smoke next
 
 ### R2 — Unify PA + timeline under room uid
 
-- [ ] Prep + timeline live paths share `campaignRoomUid` (keep slice listen paths)
-- [ ] Retarget orphan / refresh reclaim to room (not per-domain short session only)
-- [ ] Stop using last-leave / 45m·75m as primary commit once room is open
-- [ ] Explicit End still final-publishes + closes room
+- [x] Prep + timeline live paths share `campaignRoomUid` (keep slice listen paths; `_meta.roomUid` stamp)
+- [x] Retarget orphan / refresh reclaim to room (soft-rejoin when warm — no domain commit)
+- [x] Stop using last-leave / 45m·75m as primary commit once room is open
+- [x] Explicit End still final-publishes + closes room (`closeDalCampaignRoom`; END ROOM label when warm)
 - [ ] Ship + smoke: PA + timeline both live in one room; End closes both cleanly
 
 ### R3 — Ledger slice in room
@@ -278,4 +279,5 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 |------|------|
 | 2026-07-24 | Active brief opened (director OK go). Next: OK go for **R0**. |
 | 2026-07-24 | **R0 complete** (docs): design-lock § Campaign Room revision; dual-domain inventory; Index + station proposals. Next: **OK go for R1**. |
-| 2026-07-24 | **R1 implemented** — Index `Dal_Campaign_*`, `openOrJoinDalCampaignRoom`, Firebase `meta/state`, calendar green room dot + editor chrome. Ship pending smoke. Next: **OK go for R2** after smoke. |)
+| 2026-07-24 | **R1 shipped @ GAS v741** — Index `Dal_Campaign_*`, `openOrJoinDalCampaignRoom`, Firebase `meta/state`, calendar green room dot + editor chrome. Firestore rules deployed. Next: director smoke → **OK go for R2**. |
+| 2026-07-24 | **R2 implemented** — `_meta.roomUid`, soft leave/idle/orphan when warm, `closeDalCampaignRoom` + END ROOM. Ship pending. |)

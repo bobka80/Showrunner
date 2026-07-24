@@ -1543,6 +1543,9 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
     startBtn.style.display = (isOpen || blockStart || !mayManual) ? 'none' : 'inline-flex';
   }
   if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
+  if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') {
+    window.dalPaintCampaignEndBtnLabels_();
+  }
 
   if (isOpen) {
     // Do NOT seed sync base from local — wait for first remote/snapshot.
@@ -1813,6 +1816,15 @@ window.dalHandleTimelineSessionInfo_ = function(info) {
  * Blue SYNC bar stays visible with "Saving to Sheets…" copy.
  */
 window.dalTlTryPostCommitReopen_ = function() {
+  // R2: after Campaign Room End, do not auto-start a new timeline fork.
+  if (window.dalSkipPostCommitReopen_ || window.dalCampaignRoomEndedSkipReopen_) {
+    window.dalTlCommittingWait_ = false;
+    window.dalTlClosingUi_ = false;
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(false);
+    }
+    return;
+  }
   // Keep freeze until Opening/Live — no Sheets-edit gap.
   window.dalTlCommittingWait_ = false;
   window.dalTlClosingUi_ = true;

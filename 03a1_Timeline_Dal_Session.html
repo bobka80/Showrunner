@@ -350,6 +350,21 @@ window.openDalTimelineCollabSession = function(opts) {
 window.closeDalTimelineCollabSession = function(opts) {
   opts = opts || {};
   var projectId = document.getElementById('edit-folder-id').value;
+
+  // R2: warm room — auto soft-leave; manual End closes whole room.
+  if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_()) {
+    if (opts.auto) {
+      if (typeof window.dalSoftLeaveTimelineKeepRoom_ === 'function') {
+        window.dalSoftLeaveTimelineKeepRoom_(projectId);
+      }
+      return;
+    }
+    if (typeof window.closeDalCampaignRoomFromUi_ === 'function') {
+      window.closeDalCampaignRoomFromUi_(opts);
+      return;
+    }
+  }
+
   if (window.dalTlOpeningUi_ && !window.dalTimelineSessionOpen) {
     if (opts.auto) return;
     if (!confirm('Abort opening and stay on normal timeline?')) return;

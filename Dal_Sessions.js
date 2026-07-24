@@ -660,11 +660,18 @@ function finishDalSession(projectId, sessionUid, actor) {
   if (gate.alreadyOpen) return gate.result;
 
   var sessionType = gate.sessionType;
+  // R2: stamp shared campaignRoomUid onto slice _meta (keep per-domain sessionUid).
+  var roomUid = '';
+  try {
+    var roomEnsure = openOrJoinDalCampaignRoom(projectId, actor);
+    if (roomEnsure && roomEnsure.campaignRoomUid) roomUid = String(roomEnsure.campaignRoomUid);
+  } catch (eRoom) { /* domain open still proceeds */ }
+
   try {
     if (sessionType === DAL_SESSION_TYPE.PREP) {
-      dalSnapshotPaToFirestore_(projectId, sessionUid, actor);
+      dalSnapshotPaToFirestore_(projectId, sessionUid, actor, roomUid);
     } else if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
-      dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, 'main');
+      dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, 'main', roomUid);
     } else {
       throw new Error('Unknown session type: ' + sessionType);
     }
@@ -684,9 +691,23 @@ function finishDalSession(projectId, sessionUid, actor) {
     var cur = dalReadDomainSession_(row, resolvedType);
     if (cur.sessionUid !== String(sessionUid)) throw new Error('Session open raced — retry.');
     dalWriteDomainSession_(sheets.index, row.rowNum, row.map, resolvedType, { status: 'open' });
+    if (roomUid) {
+      try {
+        dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+          campaignLastActivityAt: new Date().toISOString()
+        });
+      } catch (eAct) { /* ignore */ }
+    }
     dalFlushDomainCache_(projectId, resolvedType);
     writeToAuditLog(actor, 'OPEN', 'DAL_SESSION', projectId, sessionUid, 'Opened ' + resolvedType + ' session.');
-    return { success: true, joined: false, sessionUid: sessionUid, sessionType: resolvedType, status: 'open' };
+    return {
+      success: true,
+      joined: false,
+      sessionUid: sessionUid,
+      sessionType: resolvedType,
+      status: 'open',
+      campaignRoomUid: roomUid || ''
+    };
   });
 }
 
@@ -805,9 +826,104 @@ function closeDalSession(projectId, actor, sessionType) {
 }
 
 /**
- * Campaign Room R1 — open or join warm room from project editor entry.
+ * Campaign Room R2 — explicit End: final-publish open prep + timeline slices, then clear room.
+ * Soft leave / short idle must NOT call this while room is warm.
+ */
+function closeDalCampaignRoom(projectId, actor) {
+  actor = actor || 'System';
+  if (!projectId) throw new Error('Missing projectId.');
+
+  var plan = executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) throw new Error('Project not found.');
+    var camp = dalReadCampaignRoom_(row);
+    var prep = dalReadDomainSession_(row, DAL_SESSION_TYPE.PREP);
+    var timeline = dalReadDomainSession_(row, DAL_SESSION_TYPE.TIMELINE_COLLAB);
+    var roomWarm = dalStatusIsForkLive_(camp.campaignStatus) || !!camp.campaignRoomUid;
+    var prepOpen = dalStatusIsForkLive_(prep.status);
+    var tlOpen = dalStatusIsForkLive_(timeline.status);
+    if (!roomWarm && !prepOpen && !tlOpen) {
+      return { alreadyClosed: true, roomUid: '', prepOpen: false, tlOpen: false };
+    }
+    if (roomWarm || camp.campaignRoomUid) {
+      dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+        campaignStatus: 'committing',
+        campaignLastActivityAt: new Date().toISOString()
+      });
+      try { flushCache(); } catch (eFlush) { /* ignore */ }
+    }
+    return {
+      alreadyClosed: false,
+      roomUid: camp.campaignRoomUid || '',
+      prepOpen: prepOpen,
+      tlOpen: tlOpen
+    };
+  });
+
+  if (plan.alreadyClosed) {
+    return { success: true, alreadyClosed: true, closed: [], campaignRoomUid: '' };
+  }
+
+  try {
+    if (typeof firestoreSetCampaignMeta_ === 'function' && plan.roomUid) {
+      firestoreSetCampaignMeta_(projectId, {
+        roomUid: plan.roomUid,
+        status: 'committing',
+        lastActivityAt: new Date().toISOString(),
+        domain: 'meta'
+      });
+    }
+  } catch (eMetaC) { /* Index already committing */ }
+
+  var closed = [];
+  var closeDomainSafe_ = function (sessionType) {
+    try {
+      closeDalSession(projectId, actor, sessionType);
+      closed.push(sessionType);
+    } catch (err) {
+      var msg = String((err && err.message) || err || '');
+      if (/No open |already closed|not open|Missing session/i.test(msg)) {
+        closed.push(sessionType + ':already-clear');
+        return;
+      }
+      throw err;
+    }
+  };
+
+  if (plan.prepOpen) closeDomainSafe_(DAL_SESSION_TYPE.PREP);
+  if (plan.tlOpen) closeDomainSafe_(DAL_SESSION_TYPE.TIMELINE_COLLAB);
+
+  executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) return;
+    dalClearCampaignRoom_(sheets.index, row.rowNum, row.map);
+    try { flushCache(); } catch (eFlush2) { /* ignore */ }
+  });
+
+  try {
+    firestoreDeleteDocument_('projects/' + projectId + '/meta/state');
+  } catch (eDel) { /* ignore */ }
+
+  try {
+    writeToAuditLog(actor, 'CLOSE', 'DAL_CAMPAIGN_ROOM', projectId, plan.roomUid || '',
+      'Closed Campaign Room — published: ' + (closed.join(', ') || 'none'));
+  } catch (eAud) { /* ignore */ }
+
+  return {
+    success: true,
+    alreadyClosed: false,
+    closed: closed,
+    campaignRoomUid: plan.roomUid || '',
+    campaignRoomWarm: false
+  };
+}
+
+/**
+ * Campaign Room — open or join warm room from project editor entry.
  * Does not open prep/timeline forks. Soft-skips when paused / freelancer / no Firebase.
- * Status vocab: opening → open (warm). Close/checkpoint deferred to R2–R5.
+ * Status vocab: opening → open (warm). R2 End uses closeDalCampaignRoom.
  */
 function openOrJoinDalCampaignRoom(projectId, actor) {
   actor = actor || 'System';

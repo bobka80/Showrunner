@@ -115,6 +115,7 @@
 | `apiLogoutSession` | `07_Core_Globals.html` |
 | `beginDatabaseBackupLock` | `07_Core_Globals.html` |
 | `changeMyPasscode` | `07_Core_Globals.html` |
+| `closeDalCampaignRoom` | `07_Core_Globals.html` |
 | `endDatabaseBackupLock` | `07_Core_Globals.html` |
 | `getDatabaseBackupHealth` | `07_Core_Globals.html` |
 | `runNightlyBackup` | `07_Core_Globals.html` |
@@ -235,7 +236,7 @@
 | 06f_Admin_Audit.html | 4 | 0 |
 | 06g_Admin_Database.html | 8 | 0 |
 | 06h_Admin_Station_Profiles.html | 3 | 0 |
-| 07_Core_Globals.html | 9 | 5 |
+| 07_Core_Globals.html | 10 | 5 |
 | 07b_Grid_Engine.html | 0 | 0 |
 | 07c_Generalization_Engine.html | 0 | 0 |
 | 07d_Cache_Coordinator.html | 0 | 0 |

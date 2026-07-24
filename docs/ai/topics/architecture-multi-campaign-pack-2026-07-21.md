@@ -245,8 +245,8 @@ For **each** of meta / PA / timeline / ledger:
 
 ## 9. Recommended first build after this pack
 
-**Project Campaign Room R1** — room registry + meta shipping.  
-After smoke: say **OK go for R2** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).
+**Project Campaign Room R2** — soft leave + END ROOM shipping.  
+After smoke: say **OK go for R3** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (ledger slice in room).
 
 ---
 

@@ -409,7 +409,7 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
   });
 }
 
-function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
+function dalSnapshotPaToFirestore_(projectId, sessionUid, actor, roomUid) {
   var hdr = dalGetProjectAssetsHeaderAndMap_();
   var projectRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId);
   var basePath = dalFirestorePaCollection_(projectId);
@@ -430,13 +430,15 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor) {
     updatedAt: new Date().toISOString(),
     updatedBy: actor || 'System'
   });
-  firestoreSetSessionMeta_(projectId, {
+  var meta = {
     sessionUid: sessionUid,
     sessionType: DAL_SESSION_TYPE.PREP,
     openedAt: new Date().toISOString(),
     openedBy: actor,
     domain: 'assets'
-  });
+  };
+  if (roomUid) meta.roomUid = String(roomUid);
+  firestoreSetSessionMeta_(projectId, meta);
 }
 
 function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
@@ -953,18 +955,20 @@ function dalReadTimelineStateFromFirestore_(projectId) {
   };
 }
 
-function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode) {
+function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode, roomUid) {
   // Status is "opening" — Sheets path allowed. getTimelineDataSheets_ takes its own short lock.
   var state = getTimelineDataSheets_(projectId, mode || 'main');
   // Meta first so UI can see the fork sooner; state doc carries the payload.
-  firestoreSetTimelineSessionMeta_(projectId, {
+  var meta = {
     sessionUid: sessionUid,
     sessionType: DAL_SESSION_TYPE.TIMELINE_COLLAB,
     openedAt: new Date().toISOString(),
     openedBy: actor,
     domain: 'timeline',
     mode: mode || 'main'
-  });
+  };
+  if (roomUid) meta.roomUid = String(roomUid);
+  firestoreSetTimelineSessionMeta_(projectId, meta);
   dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor, true);
 }
 

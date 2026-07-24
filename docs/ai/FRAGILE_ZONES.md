@@ -484,6 +484,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign Room R1 (2026-07-24):** Warm-room registry coexists with dual prep/timeline columns. Index `Dal_Campaign_Room_*` + Firebase `projects/{id}/meta/state`. Open/join from project editor entry (`openOrJoinDalCampaignRoom`). Calendar green room dot + editor green inset when warm. **Still read `prepStatus` / `timelineStatus` for forks** — do not treat campaign columns as prep/timeline drivers. No checkpoint / no room close yet (R2–R5).
 
+**Campaign Room R2 (2026-07-24):** Slice `_meta` carries `roomUid` (= `campaignRoomUid`). While room warm: last-leave / 45m·75m idle / orphan reclaim are **soft leave only** (no Sheets commit). Explicit **END ROOM** (END PREP / END COLLAB when warm) → `closeDalCampaignRoom` (publish both open domains, clear room). No post-commit auto-reopen after room End. Cold room keeps Part B short-session behavior.
+
 **Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+):** `pagehide`/`beforeunload` writes **localStorage unload flag** (RPCs often die on refresh) + best-effort presence leave + last-leave. **PA window paints immediately**; `dalGatePrepEnterForOrphan_` still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup.
 
 ```

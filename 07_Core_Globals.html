@@ -348,8 +348,14 @@ window.dalPrepOpenedAtMs_ = function(info) {
 /**
  * Before joining a Sheets-open prep room: if this browser left via refresh/crash
  * (or room is empty long enough), commit orphan instead of rejoining Live.
+ * R2: while Campaign Room is warm, do not reclaim/commit — soft-rejoin instead.
  */
 window.dalShouldReclaimOrphanPrep_ = function(info, othersObj, unloadFlag) {
+  if (info && (info.campaignRoomWarm ||
+      (typeof window.dalIsCampaignRoomWarmFromInfo_ === 'function' &&
+        window.dalIsCampaignRoomWarmFromInfo_(info)))) {
+    return '';
+  }
   var st = typeof window.dalPrepStatusFromInfo_ === 'function'
     ? window.dalPrepStatusFromInfo_(info)
     : '';
@@ -365,6 +371,172 @@ window.dalShouldReclaimOrphanPrep_ = function(info, othersObj, unloadFlag) {
   // Empty presence + room open ≥90s → orphan (covers crash without unload flag).
   if (openedMs && (Date.now() - openedMs) >= 90000) return 'empty-aged';
   return '';
+};
+
+/** True when Campaign Room is warm (cached chrome or last session info). */
+window.dalCampaignRoomIsWarm_ = function(info) {
+  if (window.peForkRoomActive_) return true;
+  if (info && (info.campaignRoomWarm ||
+      (typeof window.dalIsCampaignRoomWarmFromInfo_ === 'function' &&
+        window.dalIsCampaignRoomWarmFromInfo_(info)))) {
+    return true;
+  }
+  return false;
+};
+
+/** Soft leave PA while room stays warm — detach live sync; no Sheets commit. */
+window.dalSoftLeavePrepKeepRoom_ = function(projectId) {
+  projectId = projectId || (typeof window.dalPresenceProjectId_ === 'function'
+    ? window.dalPresenceProjectId_() : '');
+  window.activePresenceModule = 'main';
+  if (typeof window.stopDalPaLiveSync_ === 'function') {
+    try { window.stopDalPaLiveSync_(); } catch (e0) { /* ignore */ }
+  }
+  window.dalPrepLeaveIntent_ = false;
+  window.dalPrepLastLeavePending_ = false;
+  if (projectId && typeof window.dalEnsurePresencePing_ === 'function') {
+    window.dalEnsurePresencePing_(projectId);
+  }
+};
+
+/** Soft leave timeline while room stays warm. */
+window.dalSoftLeaveTimelineKeepRoom_ = function(projectId) {
+  projectId = projectId || (typeof window.dalPresenceProjectId_ === 'function'
+    ? window.dalPresenceProjectId_() : '');
+  window.activePresenceModule = 'main';
+  if (typeof window.stopDalTimelineSessionWatcher === 'function') {
+    try { window.stopDalTimelineSessionWatcher(); } catch (e0) { /* ignore */ }
+  }
+  if (typeof window.stopDalTimelineStateSync_ === 'function') {
+    try { window.stopDalTimelineStateSync_(); } catch (e1) { /* ignore */ }
+  }
+  window.dalTlLeaveIntent_ = false;
+  window.dalTlLastLeavePending_ = false;
+  if (projectId && typeof window.dalEnsurePresencePing_ === 'function') {
+    window.dalEnsurePresencePing_(projectId);
+  }
+};
+
+/**
+ * R2 explicit End — publish both open slices and clear Campaign Room.
+ * Called from END PREP / END COLLAB when the room is warm.
+ */
+window.closeDalCampaignRoomFromUi_ = function(opts) {
+  opts = opts || {};
+  var projectId = '';
+  try {
+    projectId = (typeof window.dalResolvePrepProjectId_ === 'function' &&
+      window.dalResolvePrepProjectId_(opts.projectId)) ||
+      (document.getElementById('edit-folder-id')
+        ? document.getElementById('edit-folder-id').value : '') ||
+      (typeof window.dalPresenceProjectId_ === 'function' && window.dalPresenceProjectId_()) ||
+      '';
+  } catch (ePid) { projectId = String(opts.projectId || ''); }
+  if (!projectId || projectId === 'NEW') {
+    alert('End room failed:\n\nMissing project id.');
+    return;
+  }
+  if (window.dalCampaignRoomClosing_) return;
+  if (!opts.auto) {
+    if (!confirm(
+      'End campaign room and publish Project Assets + Timeline to Google Sheets?\n\n' +
+      'This closes the whole warm room (not just one module).'
+    )) return;
+  }
+
+  window.dalCampaignRoomClosing_ = true;
+  window.dalSkipPostCommitReopen_ = true;
+  window.dalCampaignRoomEndedSkipReopen_ = true;
+
+  if (typeof window.dalClearRoomIdle_ === 'function') {
+    try { window.dalClearRoomIdle_('prep'); } catch (e0) { /* ignore */ }
+    try { window.dalClearRoomIdle_('timeline'); } catch (e1) { /* ignore */ }
+  }
+  if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+    window.dalApplyPrepCommittingUi_(true, projectId);
+  }
+  if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+    window.dalApplyTlCommittingUi_(true, projectId);
+  }
+
+  var actor = (typeof window.dalPrepCloseActor_ === 'function' && window.dalPrepCloseActor_()) ||
+    (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+
+  var fail_ = function(err) {
+    window.dalCampaignRoomClosing_ = false;
+    window.dalSkipPostCommitReopen_ = false;
+    if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+      window.dalApplyPrepCommittingUi_(false);
+    }
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(false);
+    }
+    var msg = (err && err.message) ? String(err.message) : String(err || 'Unknown error');
+    alert('End campaign room failed:\n\n' + msg);
+  };
+
+  var ok_ = function() {
+    window.dalCampaignRoomClosing_ = false;
+    window.peForkRoomActive_ = false;
+    window.peCampaignRoomJoinFor_ = '';
+    window.dalSkipPostCommitReopen_ = true;
+    window.dalCampaignRoomEndedSkipReopen_ = true;
+
+    if (typeof window.dalPrepMarkSessionEnded_ === 'function') {
+      try { window.dalPrepMarkSessionEnded_(projectId); } catch (eP) { /* ignore */ }
+    }
+    window.dalPrepClosing = false;
+    window.dalPrepLeaveIntent_ = false;
+    window.dalPrepLastLeavePending_ = false;
+    if (typeof stopDalPaSessionWatcher === 'function') {
+      try { stopDalPaSessionWatcher({ clearLatch: true }); } catch (eW) { /* ignore */ }
+    }
+    if (typeof window.stopDalPaLiveSync_ === 'function') {
+      try { window.stopDalPaLiveSync_(); } catch (eS) { /* ignore */ }
+    }
+
+    window.dalTimelineSessionOpen = false;
+    window.dalTlWasSessionOpen = false;
+    window.dalTlClosingUi_ = false;
+    if (typeof window.stopDalTimelineStateSync_ === 'function') {
+      try { window.stopDalTimelineStateSync_(); } catch (eT) { /* ignore */ }
+    }
+    if (typeof window.stopDalTimelineSessionWatcher === 'function') {
+      try { window.stopDalTimelineSessionWatcher(); } catch (eTw) { /* ignore */ }
+    }
+
+    if (typeof window.dalCacheInvalidatePa_ === 'function') {
+      try { window.dalCacheInvalidatePa_(projectId); } catch (eC0) { /* ignore */ }
+    }
+    if (typeof window.dalCacheInvalidateTimeline_ === 'function') {
+      try { window.dalCacheInvalidateTimeline_(projectId); } catch (eC1) { /* ignore */ }
+    }
+
+    if (typeof window.dalApplyPrepCommittingUi_ === 'function') {
+      window.dalApplyPrepCommittingUi_(false);
+    }
+    if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+      window.dalApplyTlCommittingUi_(false);
+    }
+    if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+      window.refreshProjectEditorForkChrome_(projectId);
+    }
+    if (typeof window.refreshCalForkFlagsNow_ === 'function') {
+      try { window.refreshCalForkFlagsNow_(); } catch (eCal) { /* ignore */ }
+    }
+    if (typeof window.refreshTimelineDalBanner === 'function') {
+      try { window.refreshTimelineDalBanner(); } catch (eB) { /* ignore */ }
+    }
+    if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+      try { window.dalUpdateRemotePendingBanner_(); } catch (eU) { /* ignore */ }
+    }
+    // Room stays cold until next project-editor entry (startPresencePing → openOrJoin).
+  };
+
+  google.script.run
+    .withFailureHandler(fail_)
+    .withSuccessHandler(function() { ok_(); })
+    .closeDalCampaignRoom(projectId, actor);
 };
 
 /**
@@ -461,6 +633,9 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
             ? window.dalShouldReclaimOrphanPrep_(info, othersObj, flag)
             : '';
           if (why !== 'unload' && why !== 'empty-aged') return;
+          if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_(info)) {
+            return; // R2: warm room — keep fork; soft-rejoin later
+          }
           if (typeof window.closeDalPrepSession === 'function') {
             window.closeDalPrepSession({
               auto: true,
@@ -503,6 +678,9 @@ window.dalMaybeReclaimEmptyLiveForks_ = function(othersObj) {
             force = !!(msAt && (Date.now() - msAt) >= 90000);
           }
           if (!force) return;
+          if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_(info)) {
+            return; // R2: warm room — keep timeline fork
+          }
           if (typeof window.closeDalTimelineCollabSession === 'function') {
             window.closeDalTimelineCollabSession({ auto: true, reason: 'orphan-empty' });
           }
@@ -762,6 +940,13 @@ window.dalTickRoomIdle_ = function(domain) {
   var warnBefore = window.DAL_IDLE_WARN_BEFORE_MS_ || (5 * 60 * 1000);
   var age = Date.now() - st.lastTouch;
   if (age >= limit) {
+    // R2: short idle is not a commit trigger while Campaign Room is warm (48h is R5).
+    if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_()) {
+      st.lastTouch = Date.now();
+      if (d === 'prep') window.dalPrepIdleWarn_ = false;
+      else window.dalTlIdleWarn_ = false;
+      return;
+    }
     st.ejecting = true;
     if (d === 'prep') {
       window.dalPrepIdleWarn_ = false;
@@ -881,6 +1066,13 @@ window.dalMaybeLastLeaveClosePrep_ = function() {
       return;
     }
     if (window.dalPrepClosing) return;
+    // R2: alone in module but Campaign Room warm → soft leave (no Sheets commit).
+    if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_()) {
+      if (typeof window.dalSoftLeavePrepKeepRoom_ === 'function') {
+        window.dalSoftLeavePrepKeepRoom_(projectId);
+      }
+      return;
+    }
     if (typeof window.closeDalPrepSession === 'function') {
       window.closeDalPrepSession({ auto: true, reason: 'last-leave', projectId: projectId });
     }
@@ -961,6 +1153,13 @@ window.dalMaybeLastLeaveCloseTimeline_ = function() {
       return;
     }
     if (window.dalTlClosingUi_) return;
+    // R2: alone but room warm → soft leave.
+    if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_()) {
+      if (typeof window.dalSoftLeaveTimelineKeepRoom_ === 'function') {
+        window.dalSoftLeaveTimelineKeepRoom_(projectId);
+      }
+      return;
+    }
     if (typeof window.closeDalTimelineCollabSession === 'function') {
       window.closeDalTimelineCollabSession({ auto: true, reason: 'last-leave' });
     }
