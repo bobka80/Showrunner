@@ -115,6 +115,8 @@ Headers: `uid`, `project_uid`, `asset_uid`, `assigned_quantity`, `location`, `fo
 
 **Planned financial columns (Phase 1 — not in schema builder yet):** `Projects_Index.rental_days`, `Projects_Index.global_discount` — see [topics/financials.md](topics/financials.md).
 
+**Campaign Room Index columns (R1 — lazy-added by `dalEnsureSessionIndexColumns_`):** `Dal_Campaign_Room_UID`, `Dal_Campaign_Room_Status`, `Dal_Campaign_Opened_At`, `Dal_Campaign_Opened_By`, `Dal_Campaign_Last_Activity_At`, `Dal_Campaign_Last_Published_At`. Status: `opening` \| `open` \| `committing` (empty = closed). Firebase mirror: `projects/{id}/meta/state`. See [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md).
+
 Backend modules: `Resources_*.js` (Vault), `Logistics_*.js` (Engine). Full rules in [ENGINEERING_RULES.md](ENGINEERING_RULES.md).
 
 ## 6. Error report row (`Error_Reports` tab)

@@ -60,8 +60,25 @@ var DAL_SESSION_INDEX_COLS = [
   'Dal_Timeline_Session_Status',
   'Dal_Timeline_Session_UID',
   'Dal_Timeline_Session_Opened_At',
-  'Dal_Timeline_Session_Opened_By'
+  'Dal_Timeline_Session_Opened_By',
+  // Campaign Room R1 — warm room registry (coexists with dual prep/timeline cols)
+  'Dal_Campaign_Room_UID',
+  'Dal_Campaign_Room_Status',
+  'Dal_Campaign_Opened_At',
+  'Dal_Campaign_Opened_By',
+  'Dal_Campaign_Last_Activity_At',
+  'Dal_Campaign_Last_Published_At'
 ];
+
+/** Campaign room Index column names (status vocab mirrors domain forks: opening|open|committing). */
+var DAL_CAMPAIGN_COLS_ = {
+  uid: 'Dal_Campaign_Room_UID',
+  status: 'Dal_Campaign_Room_Status',
+  openedAt: 'Dal_Campaign_Opened_At',
+  openedBy: 'Dal_Campaign_Opened_By',
+  lastActivityAt: 'Dal_Campaign_Last_Activity_At',
+  lastPublishedAt: 'Dal_Campaign_Last_Published_At'
+};
 
 function dalSessionFamilyPrefix_(sessionType) {
   if (sessionType === DAL_SESSION_TYPE.PREP) return 'Dal_Prep_Session';
@@ -257,11 +274,61 @@ function dalLegacyFlatFromDomains_(prep, timeline) {
  * Read session records for a project (google.script.run safe — read only).
  * Always includes flat prepStatus / timelineStatus fields (nested objects alone are unreliable for dual-domain UI).
  */
+function dalEmptyCampaignInfoFields_() {
+  return {
+    campaignRoomUid: '',
+    campaignStatus: '',
+    campaignOpenedAt: '',
+    campaignOpenedBy: '',
+    campaignLastActivityAt: '',
+    campaignLastPublishedAt: '',
+    campaignRoomWarm: false
+  };
+}
+
+function dalReadCampaignRoom_(row) {
+  var m = row.map;
+  var c = DAL_CAMPAIGN_COLS_;
+  var status = m[c.status] !== undefined ? String(row.data[m[c.status]] || '') : '';
+  return {
+    campaignRoomUid: m[c.uid] !== undefined ? String(row.data[m[c.uid]] || '') : '',
+    campaignStatus: status,
+    campaignOpenedAt: m[c.openedAt] !== undefined ? (row.data[m[c.openedAt]] || '') : '',
+    campaignOpenedBy: m[c.openedBy] !== undefined ? String(row.data[m[c.openedBy]] || '') : '',
+    campaignLastActivityAt: m[c.lastActivityAt] !== undefined ? (row.data[m[c.lastActivityAt]] || '') : '',
+    campaignLastPublishedAt: m[c.lastPublishedAt] !== undefined ? (row.data[m[c.lastPublishedAt]] || '') : '',
+    campaignRoomWarm: dalStatusIsForkLive_(status)
+  };
+}
+
+function dalWriteCampaignRoom_(indexSheet, rowNum, map, fields) {
+  var c = DAL_CAMPAIGN_COLS_;
+  var write = {};
+  if (fields.campaignRoomUid !== undefined) write[c.uid] = fields.campaignRoomUid;
+  if (fields.campaignStatus !== undefined) write[c.status] = fields.campaignStatus;
+  if (fields.campaignOpenedAt !== undefined) write[c.openedAt] = fields.campaignOpenedAt;
+  if (fields.campaignOpenedBy !== undefined) write[c.openedBy] = fields.campaignOpenedBy;
+  if (fields.campaignLastActivityAt !== undefined) write[c.lastActivityAt] = fields.campaignLastActivityAt;
+  if (fields.campaignLastPublishedAt !== undefined) write[c.lastPublishedAt] = fields.campaignLastPublishedAt;
+  dalWriteSessionIndexFields_(indexSheet, rowNum, map, write);
+}
+
+function dalClearCampaignRoom_(indexSheet, rowNum, map) {
+  dalWriteCampaignRoom_(indexSheet, rowNum, map, {
+    campaignRoomUid: '',
+    campaignStatus: '',
+    campaignOpenedAt: '',
+    campaignOpenedBy: '',
+    campaignLastActivityAt: '',
+    campaignLastPublishedAt: ''
+  });
+}
+
 function getDalSessionInfo(projectId) {
   return executeWithRetry(function () {
     // While forks paused, always report closed so clients do not soft-join Firebase.
     if (dalLiveForksPaused_()) {
-      return {
+      var pausedOut = {
         projectId: projectId,
         prepStatus: '',
         prepUid: '',
@@ -278,11 +345,14 @@ function getDalSessionInfo(projectId) {
         openedBy: '',
         liveForksPaused: true
       };
+      var emptyCamp = dalEmptyCampaignInfoFields_();
+      Object.keys(emptyCamp).forEach(function (k) { pausedOut[k] = emptyCamp[k]; });
+      return pausedOut;
     }
     var sheets = verifyDatabaseSchema(true);
     var row = dalGetProjectIndexRow_(projectId, sheets);
     if (!row) {
-      return {
+      var missing = {
         projectId: projectId,
         prepStatus: '',
         prepUid: '',
@@ -298,6 +368,9 @@ function getDalSessionInfo(projectId) {
         openedAt: '',
         openedBy: ''
       };
+      var emptyCamp2 = dalEmptyCampaignInfoFields_();
+      Object.keys(emptyCamp2).forEach(function (k) { missing[k] = emptyCamp2[k]; });
+      return missing;
     }
 
     dalMigrateLegacySessionToDomain_(sheets.index, row);
@@ -305,6 +378,7 @@ function getDalSessionInfo(projectId) {
     var prep = dalDomainInfoPayload_(dalReadDomainSession_(row, DAL_SESSION_TYPE.PREP));
     var timeline = dalDomainInfoPayload_(dalReadDomainSession_(row, DAL_SESSION_TYPE.TIMELINE_COLLAB));
     var legacy = dalLegacyFlatFromDomains_(prep, timeline);
+    var campaign = dalReadCampaignRoom_(row);
     return {
       projectId: projectId,
       prep: prep,
@@ -321,7 +395,14 @@ function getDalSessionInfo(projectId) {
       sessionType: legacy.sessionType,
       sessionUid: legacy.sessionUid,
       openedAt: legacy.openedAt,
-      openedBy: legacy.openedBy
+      openedBy: legacy.openedBy,
+      campaignRoomUid: campaign.campaignRoomUid,
+      campaignStatus: campaign.campaignStatus,
+      campaignOpenedAt: campaign.campaignOpenedAt,
+      campaignOpenedBy: campaign.campaignOpenedBy,
+      campaignLastActivityAt: campaign.campaignLastActivityAt,
+      campaignLastPublishedAt: campaign.campaignLastPublishedAt,
+      campaignRoomWarm: campaign.campaignRoomWarm
     };
   }, 3, true);
 }
@@ -334,8 +415,8 @@ function dalStatusIsForkLive_(status) {
 
 /**
  * Lightweight map of projects with an active prep and/or timeline fork (calendar chrome).
- * Returns { [projectId]: { prep, timeline, prepCommitting, timelineCommitting } }
- * — only entries with at least one live domain.
+ * Returns { [projectId]: { prep, timeline, prepCommitting, timelineCommitting, room, roomCommitting } }
+ * — only entries with at least one live domain or warm campaign room.
  */
 function getOpenDalForkMap() {
   return executeWithRetry(function () {
@@ -350,20 +431,25 @@ function getOpenDalForkMap() {
     var out = {};
     var prepCol = iMap['Dal_Prep_Session_Status'];
     var tlCol = iMap['Dal_Timeline_Session_Status'];
+    var roomCol = iMap[DAL_CAMPAIGN_COLS_.status];
     var uidCol = iMap['uid'];
     for (var i = 1; i < indexData.length; i++) {
       var pid = uidCol !== undefined ? String(indexData[i][uidCol] || '') : '';
       if (!pid || pid === 'uid') continue;
       var prepSt = prepCol !== undefined ? String(indexData[i][prepCol] || '').toLowerCase() : '';
       var tlSt = tlCol !== undefined ? String(indexData[i][tlCol] || '').toLowerCase() : '';
+      var roomSt = roomCol !== undefined ? String(indexData[i][roomCol] || '').toLowerCase() : '';
       var prep = dalStatusIsForkLive_(prepSt);
       var timeline = dalStatusIsForkLive_(tlSt);
-      if (prep || timeline) {
+      var room = dalStatusIsForkLive_(roomSt);
+      if (prep || timeline || room) {
         out[pid] = {
           prep: !!prep,
           timeline: !!timeline,
           prepCommitting: prepSt === 'committing',
-          timelineCommitting: tlSt === 'committing'
+          timelineCommitting: tlSt === 'committing',
+          room: !!room,
+          roomCommitting: roomSt === 'committing'
         };
       }
     }
@@ -719,6 +805,143 @@ function closeDalSession(projectId, actor, sessionType) {
 }
 
 /**
+ * Campaign Room R1 — open or join warm room from project editor entry.
+ * Does not open prep/timeline forks. Soft-skips when paused / freelancer / no Firebase.
+ * Status vocab: opening → open (warm). Close/checkpoint deferred to R2–R5.
+ */
+function openOrJoinDalCampaignRoom(projectId, actor) {
+  actor = actor || 'System';
+  if (!projectId) throw new Error('Missing projectId.');
+
+  if (dalLiveForksPaused_()) {
+    return { success: true, skipped: true, reason: 'paused', campaignRoomWarm: false };
+  }
+  try {
+    dalAssertNotLiveForkExcluded_(actor);
+  } catch (eEx) {
+    return { success: true, skipped: true, reason: 'excluded', campaignRoomWarm: false };
+  }
+  if (typeof dalFirestoreIsConfigured_ === 'function' && !dalFirestoreIsConfigured_()) {
+    return { success: true, skipped: true, reason: 'no_firebase', campaignRoomWarm: false };
+  }
+
+  var roomUid = Utilities.getUuid();
+  var now = new Date().toISOString();
+  var phase = executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) throw new Error('Project not found.');
+
+    var cur = dalReadCampaignRoom_(row);
+    var st = String(cur.campaignStatus || '').toLowerCase();
+    if (dalStatusIsForkLive_(st) && cur.campaignRoomUid) {
+      return {
+        joined: true,
+        roomUid: cur.campaignRoomUid,
+        status: st === 'committing' ? 'committing' : 'open',
+        openedAt: cur.campaignOpenedAt,
+        openedBy: cur.campaignOpenedBy,
+        lastActivityAt: cur.campaignLastActivityAt,
+        lastPublishedAt: cur.campaignLastPublishedAt
+      };
+    }
+
+    dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+      campaignRoomUid: roomUid,
+      campaignStatus: 'opening',
+      campaignOpenedAt: now,
+      campaignOpenedBy: actor,
+      campaignLastActivityAt: now
+    });
+    try { flushCache(); } catch (eFlush) { /* ignore */ }
+    return {
+      joined: false,
+      roomUid: roomUid,
+      status: 'opening',
+      openedAt: now,
+      openedBy: actor,
+      lastActivityAt: now,
+      lastPublishedAt: ''
+    };
+  });
+
+  if (phase.joined) {
+    return {
+      success: true,
+      joined: true,
+      campaignRoomUid: phase.roomUid,
+      campaignStatus: phase.status,
+      campaignOpenedAt: phase.openedAt,
+      campaignOpenedBy: phase.openedBy,
+      campaignLastActivityAt: phase.lastActivityAt,
+      campaignLastPublishedAt: phase.lastPublishedAt || '',
+      campaignRoomWarm: true
+    };
+  }
+
+  // Firestore meta outside Index lock / ScriptLock (same pattern as finishDalSession).
+  try {
+    if (typeof firestoreSetCampaignMeta_ === 'function') {
+      firestoreSetCampaignMeta_(projectId, {
+        roomUid: phase.roomUid,
+        status: 'open',
+        openedAt: phase.openedAt,
+        openedBy: phase.openedBy,
+        lastActivityAt: phase.lastActivityAt,
+        lastPublishedAt: '',
+        domain: 'meta'
+      });
+    }
+  } catch (eMeta) {
+    try {
+      executeWithRetry(function () {
+        var sheets = verifyDatabaseSchema();
+        var row = dalGetProjectIndexRow_(projectId, sheets);
+        if (!row) return;
+        var cur = dalReadCampaignRoom_(row);
+        if (String(cur.campaignRoomUid || '') === String(phase.roomUid)) {
+          dalClearCampaignRoom_(sheets.index, row.rowNum, row.map);
+          try { flushCache(); } catch (e2) { /* ignore */ }
+        }
+      });
+    } catch (eClr) { /* ignore */ }
+    throw eMeta;
+  }
+
+  executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) throw new Error('Project not found.');
+    var cur = dalReadCampaignRoom_(row);
+    if (String(cur.campaignRoomUid || '') !== String(phase.roomUid)) {
+      throw new Error('Campaign room open raced — retry.');
+    }
+    dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+      campaignStatus: 'open',
+      campaignLastActivityAt: phase.lastActivityAt
+    });
+    try { flushCache(); } catch (eFlush2) { /* ignore */ }
+  });
+
+  try {
+    writeToAuditLog(actor, 'OPEN', 'DAL_CAMPAIGN_ROOM', projectId, phase.roomUid,
+      'Opened Project Campaign Room (R1 registry + meta).');
+  } catch (eAud) { /* ignore */ }
+
+  return {
+    success: true,
+    joined: false,
+    campaignRoomUid: phase.roomUid,
+    campaignStatus: 'open',
+    campaignOpenedAt: phase.openedAt,
+    campaignOpenedBy: phase.openedBy,
+    campaignLastActivityAt: phase.lastActivityAt,
+    campaignLastPublishedAt: '',
+    campaignRoomWarm: true
+  };
+}
+
+/**
  * Mass-abandon open/opening/committing prep + timeline flags on Projects_Index.
  * Does NOT commit Firebase → Sheets (Sheets stay SoT while forks are paused/broken).
  * Best-effort deletes Firestore _meta after Index clear (outside ScriptLock).
@@ -753,6 +976,16 @@ function abandonAllOpenDalLiveForksAPI(actor) {
           sessionUid: cur.sessionUid || ''
         });
       });
+      var camp = dalReadCampaignRoom_(row);
+      if (dalStatusIsForkLive_(camp.campaignStatus)) {
+        dalClearCampaignRoom_(sheets.index, row.rowNum, row.map);
+        out.push({
+          projectId: pid,
+          sessionType: 'campaignRoom',
+          wasStatus: String(camp.campaignStatus || '').toLowerCase(),
+          sessionUid: camp.campaignRoomUid || ''
+        });
+      }
     }
     if (out.length) flushCache();
     writeToAuditLog(actor, 'PAUSE', 'DAL_SESSION', '', '',
@@ -767,6 +1000,8 @@ function abandonAllOpenDalLiveForksAPI(actor) {
         firestoreDeleteDocument_('projects/' + entry.projectId + '/assets/_meta');
       } else if (entry.sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
         firestoreDeleteDocument_('projects/' + entry.projectId + '/timeline/_meta');
+      } else if (entry.sessionType === 'campaignRoom') {
+        firestoreDeleteDocument_('projects/' + entry.projectId + '/meta/state');
       }
     } catch (eMeta) { /* Index already cleared */ }
   });

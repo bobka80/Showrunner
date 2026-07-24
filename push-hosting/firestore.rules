@@ -16,5 +16,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isShowrunnerClient() && docId != '_meta';
     }
+    // Campaign Room meta — GAS writes room registry; clients may read warmth stamps.
+    match /projects/{projectId}/meta/{docId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
   }
 }

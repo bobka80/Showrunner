@@ -186,16 +186,19 @@ function getExistingProjects() {
       readinessState: {},
       start: null, end: null, fragments: [],
       dalPrepFork: false,
-      dalTimelineFork: false
+      dalTimelineFork: false,
+      dalCampaignRoom: false
     };
     
     try { if (indexData[i][iMap['Readiness_State']]) projectMap[pId].readinessState = JSON.parse(indexData[i][iMap['Readiness_State']]); } catch(e) {}
-    // Calendar chrome: orange/blue fork dots (read-only session columns; no open/close side effects)
+    // Calendar chrome: orange/blue fork dots + green campaign-room warm (read-only; no open/close side effects)
     try {
       var prepSt = (iMap['Dal_Prep_Session_Status'] !== undefined)
         ? String(indexData[i][iMap['Dal_Prep_Session_Status']] || '') : '';
       var tlSt = (iMap['Dal_Timeline_Session_Status'] !== undefined)
         ? String(indexData[i][iMap['Dal_Timeline_Session_Status']] || '') : '';
+      var roomSt = (iMap['Dal_Campaign_Room_Status'] !== undefined)
+        ? String(indexData[i][iMap['Dal_Campaign_Room_Status']] || '') : '';
       var liveFn = (typeof dalStatusIsForkLive_ === 'function') ? dalStatusIsForkLive_ : null;
       projectMap[pId].dalPrepFork = liveFn
         ? liveFn(prepSt)
@@ -203,8 +206,12 @@ function getExistingProjects() {
       projectMap[pId].dalTimelineFork = liveFn
         ? liveFn(tlSt)
         : (tlSt.toLowerCase() === 'open' || tlSt.toLowerCase() === 'opening' || tlSt.toLowerCase() === 'committing');
+      projectMap[pId].dalCampaignRoom = liveFn
+        ? liveFn(roomSt)
+        : (roomSt.toLowerCase() === 'open' || roomSt.toLowerCase() === 'opening' || roomSt.toLowerCase() === 'committing');
       projectMap[pId].dalPrepForkCommitting = String(prepSt).toLowerCase() === 'committing';
       projectMap[pId].dalTimelineForkCommitting = String(tlSt).toLowerCase() === 'committing';
+      projectMap[pId].dalCampaignRoomCommitting = String(roomSt).toLowerCase() === 'committing';
     } catch (eFork) { /* ignore */ }
   }
   

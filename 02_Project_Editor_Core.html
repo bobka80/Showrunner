@@ -147,6 +147,8 @@ window.timelineOccupants = [];        // Other users currently in timeline modul
 window.paPrepOccupants = [];          // Other users in assets module during prep [{name, mode}]
 window.peForkPrepActive_ = false;     // Project editor chrome: prep fork on Firebase
 window.peForkTimelineActive_ = false; // Project editor chrome: timeline fork on Firebase
+window.peForkRoomActive_ = false;     // Campaign Room R1: warm room on Index / meta
+window.peCampaignRoomJoinFor_ = '';   // Latch — open/join room once per editor entry
 
 /** Paint OPEN TIMELINE / PROJECT ASSETS chrome from fork + presence flags (never disables click). */
 window.paintProjectEditorModuleBtns_ = function() {
@@ -155,26 +157,30 @@ window.paintProjectEditorModuleBtns_ = function() {
   var occupants = window.timelineOccupants || [];
   var tlFork = !!window.peForkTimelineActive_;
   var paFork = !!window.peForkPrepActive_;
+  var roomWarm = !!window.peForkRoomActive_;
+  var roomInset = roomWarm ? 'inset 3px 0 0 #22c55e' : '';
 
   if (tlBtn) {
     tlBtn.disabled = false;
     tlBtn.style.borderColor = '';
     tlBtn.style.color = '';
+    tlBtn.style.boxShadow = roomInset;
     if (occupants.length > 0) {
       var n = occupants.length;
       tlBtn.innerText = n === 1
         ? ('👥 ' + String(occupants[0]).toUpperCase() + ' IN TIMELINE')
         : ('👥 ' + n + ' IN TIMELINE');
       tlBtn.className = 'btn-outline btn-outline-blue';
-      tlBtn.title = 'Open timeline — others already inside: ' + occupants.join(', ');
+      tlBtn.title = 'Open timeline — others already inside: ' + occupants.join(', ') +
+        (roomWarm ? ' · Campaign room warm' : '');
     } else if (tlFork) {
       tlBtn.innerText = 'OPEN TIMELINE';
       tlBtn.className = 'btn-outline btn-outline-blue';
-      tlBtn.title = 'Timeline fork is on Firebase';
+      tlBtn.title = 'Timeline fork is on Firebase' + (roomWarm ? ' · Campaign room warm' : '');
     } else {
       tlBtn.innerText = 'OPEN TIMELINE';
       tlBtn.className = 'btn-outline';
-      tlBtn.title = '';
+      tlBtn.title = roomWarm ? 'Campaign room warm' : '';
     }
   }
 
@@ -182,12 +188,13 @@ window.paintProjectEditorModuleBtns_ = function() {
     paBtn.disabled = false;
     paBtn.style.borderColor = '';
     paBtn.style.color = '';
+    paBtn.style.boxShadow = roomInset;
     if (paFork) {
       paBtn.className = 'btn-outline btn-outline-orange';
-      paBtn.title = 'Project Assets fork is on Firebase';
+      paBtn.title = 'Project Assets fork is on Firebase' + (roomWarm ? ' · Campaign room warm' : '');
     } else {
       paBtn.className = 'btn-outline';
-      paBtn.title = '';
+      paBtn.title = roomWarm ? 'Campaign room warm' : '';
     }
   }
 };
@@ -198,6 +205,7 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
   if (!projectId || projectId === 'NEW') {
     window.peForkPrepActive_ = false;
     window.peForkTimelineActive_ = false;
+    window.peForkRoomActive_ = false;
     if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
     return;
   }
@@ -213,11 +221,50 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
         : null;
       var tlSt = tl ? String(tl.status || '').toLowerCase() : '';
       var tlOpen = (tlSt === 'open' || tlSt === 'opening' || tlSt === 'committing');
+      var roomWarm = !!(info && (info.campaignRoomWarm ||
+        (typeof window.dalIsCampaignRoomWarmFromInfo_ === 'function' &&
+          window.dalIsCampaignRoomWarmFromInfo_(info))));
       window.peForkPrepActive_ = !!prepOpen;
       window.peForkTimelineActive_ = !!tlOpen;
+      window.peForkRoomActive_ = !!roomWarm;
       if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
     })
     .getDalSessionInfo(projectId);
+};
+
+/** Campaign Room R1 — open/join warm room once when entering a saved project. */
+window.openOrJoinDalCampaignRoom_ = function(projectId) {
+  projectId = projectId || activePresenceProject ||
+    (document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '');
+  if (!projectId || projectId === 'NEW') return;
+  if (window.peCampaignRoomJoinFor_ === String(projectId)) return;
+  window.peCampaignRoomJoinFor_ = String(projectId);
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+  var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME)
+    : 'System';
+  google.script.run
+    .withFailureHandler(function() {
+      // Allow retry on next editor entry if open failed.
+      if (window.peCampaignRoomJoinFor_ === String(projectId)) window.peCampaignRoomJoinFor_ = '';
+    })
+    .withSuccessHandler(function(res) {
+      if (res && res.campaignRoomWarm) window.peForkRoomActive_ = true;
+      if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+        window.refreshProjectEditorForkChrome_(projectId);
+      }
+      if (typeof window.refreshCalForkFlagsNow_ === 'function') {
+        try { window.refreshCalForkFlagsNow_(); } catch (eCal) { /* ignore */ }
+      }
+    })
+    .openOrJoinDalCampaignRoom(projectId, actor);
+};
+
+window.dalIsCampaignRoomWarmFromInfo_ = function(info) {
+  if (!info) return false;
+  if (info.campaignRoomWarm) return true;
+  var st = String(info.campaignStatus || '').toLowerCase();
+  return st === 'open' || st === 'opening' || st === 'committing';
 };
 
 window.dalPaPresenceModeLabel_ = function(mode, opType) {
@@ -256,7 +303,11 @@ function startPresencePing(projectId) {
     window.paPrepOccupants = [];
     window.peForkPrepActive_ = false;
     window.peForkTimelineActive_ = false;
+    window.peForkRoomActive_ = false;
     if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
+    if (typeof window.openOrJoinDalCampaignRoom_ === 'function') {
+      window.openOrJoinDalCampaignRoom_(projectId);
+    }
     if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
       window.refreshProjectEditorForkChrome_(projectId);
     }
@@ -341,6 +392,7 @@ function stopPresencePing() {
     if (activePresenceProject) { google.script.run.reportProjectPresence(activePresenceProject, ACTIVE_USER_NAME, 'leave'); activePresenceProject = null; }
     window.peForkPrepActive_ = false;
     window.peForkTimelineActive_ = false;
+    window.peForkRoomActive_ = false;
     window.timelineOccupants = [];
     window.isTimelineOccupiedBy = null;
     window.paPrepOccupants = [];

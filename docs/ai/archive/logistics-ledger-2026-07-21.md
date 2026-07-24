@@ -16,7 +16,7 @@
 
 1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → [GLOSSARY.md](../GLOSSARY.md) § sub-events vs phases → **this archive** → schema topic → architecture pack §3 → locks.  
 2. Do **not** invent columns beyond the schema topic.  
-3. Campaign complete — next structural work is Campaign Room (await director OK go).  
+3. Campaign complete — next structural work is Campaign Room — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).  
 4. **Live forks:** **LIVE** again — [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md). Flags: `DAL_LIVE_FORKS_PAUSED = false` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED = false` in `07_Core_Globals.html`.  
 5. After any implementation: `node milestone.js "…"`; update the owning topic same session.
 

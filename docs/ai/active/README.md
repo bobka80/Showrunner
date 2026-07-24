@@ -13,6 +13,6 @@ Full lifecycle: [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) Rule 11.
 
 **Major rewind (2026-07-11):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — GAS **530** baseline. **Station UI next:** [STATION_UI.md](../STATION_UI.md) · [station-ui-handoff.md](station-ui-handoff.md).
 
-**NEXT (2026-07-24):** Project Campaign Room — awaiting OK go — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md). Ledger archived: [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
+**ACTIVE (2026-07-24):** Project Campaign Room — [project-campaign-room-2026-07-24.md](project-campaign-room-2026-07-24.md) (**R1** registry + meta; smoke then R2). Ledger archived: [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md)

@@ -102,6 +102,21 @@ Sits **between UI and repos** — never inside adapters, never inside Firebase/S
 6. Every fork is scoped to one project + one domain. No cross-project data ever shares a fork.
 7. **Concurrent domains on one project are allowed and required** — prep (`assets`) and timeline (`timeline`) may both be open at once. Session registry, close, reconciliation, and cache flush are **per domain**. A singleton “one session per project” slot is a Phase 4 Slice A–C shortcut and is **not** the locked end state — see [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) (**Phase 4 Slice D**, before Phase 5).
 
+### Campaign Room revision (filed R0 — 2026-07-24)
+
+**Active build:** [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) · **Locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)
+
+When **Project Campaign Room** is warm, rules **1** and **2** above are **superseded** as follows (RFID / Logistics Hub atomic ops unchanged):
+
+| Rule | Short-session (today / between rooms) | Campaign Room (warm) |
+|------|----------------------------------------|----------------------|
+| **1 — authority** | Sheets = SoT between sessions; Firebase = live buffer until End | Firebase = **active workspace**; Sheets = latest **published** durable record (may lag ≤ checkpoint interval). After End / idle close / between rooms: Sheets remains restore point. |
+| **2 — Sheets writes** | No mid-session Sheets sync — one commit at close | **Periodic publish checkpoints** (~30m, dirty-only) allowed while room stays live. Final publish on Explicit End / 48h idle close. |
+
+**Unchanged forever:** Rules 3–5 and 7; RFID `Operations_Ledger` / Logistics Hub **atomic per-op** Sheets path (never a room slice); no silent drop of failed publishes.
+
+**Until R1+ ships:** production still runs the short-session rules 1–2 above. This subsection is the doctrine text R1+ must implement against.
+
 ---
 
 ## 7. Phase 0 — Codebase Discovery Sweep (instructions for Cursor)

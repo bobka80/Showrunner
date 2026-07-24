@@ -13,6 +13,7 @@ var __dalFirebaseAdapterSingleton = null;
 
 var DAL_FIRESTORE_PA_COLLECTION = 'assets';
 var DAL_FIRESTORE_TIMELINE_COLLECTION = 'timeline';
+var DAL_FIRESTORE_META_COLLECTION = 'meta';
 
 /** H4 — keep in sync with scripts/lib/dal-state-size-mirror-core.js */
 var DAL_STATE_WARN_BYTES = 512 * 1024;

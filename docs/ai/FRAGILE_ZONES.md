@@ -459,7 +459,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 | File | Role |
 |------|------|
-| `Dal_Sessions.js` | Dual-domain registry on `Projects_Index`; `getDalSessionInfo`; begin/finish/close |
+| `Dal_Sessions.js` | Dual-domain registry on `Projects_Index`; Campaign Room R1 `Dal_Campaign_Room_*` + `openOrJoinDalCampaignRoom`; `getDalSessionInfo`; begin/finish/close |
 | `02e6_Dal_Session.html` | Prep START/END UI, latch, Sheets poll, ended-sessionUid gate |
 | `02e7_Dal_Firestore_Client.html` | Prep Firestore `_meta` + live PA `assets/state` sync |
 | `03a1_Timeline_Dal_Session.html` / `03a2_Timeline_Dal_Live.html` | Timeline collab START/END + session watcher |
@@ -480,7 +480,9 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Committing hard-freeze (2026-07-21 @ v723+):** While Sheets `committing` **or** local End/last-leave is in flight, freeze everyone. Keep freeze until **Opening/Live** (no Sheets-edit gap). Sticky leave block (`SheetsOpenBlocked` / IgnoreOpenUntil) must yield to a **new** `sessionUid` Opening/Live so peers unfreeze and join. `stopDalPaLiveSync_` must not clear freeze mid-commit. Stay-in-view → auto new Firebase room after commit.
 
-**Idle / auto-close (Part B4 @ v703+):** Timeline idle **45m** / prep **75m**; T−5 SYNC **Session closing — tap to keep open**; last leave + idle call same `closeDalSession` commit path; station presence blocks prep idle eject; presence ping ~**45s**, server stale **150s**.
+**Idle / auto-close (Part B4 @ v703+):** Timeline idle **45m** / prep **75m**; T−5 SYNC **Session closing — tap to keep open**; last leave + idle call same `closeDalSession` commit path; station presence blocks prep idle eject; presence ping ~**45s**, server stale **150s**. **Campaign Room (R5):** replace with **48h silence** idle (writes or station dock reset; presence alone does not) — [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md). Until then Part B timers stay.
+
+**Campaign Room R1 (2026-07-24):** Warm-room registry coexists with dual prep/timeline columns. Index `Dal_Campaign_Room_*` + Firebase `projects/{id}/meta/state`. Open/join from project editor entry (`openOrJoinDalCampaignRoom`). Calendar green room dot + editor green inset when warm. **Still read `prepStatus` / `timelineStatus` for forks** — do not treat campaign columns as prep/timeline drivers. No checkpoint / no room close yet (R2–R5).
 
 **Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+):** `pagehide`/`beforeunload` writes **localStorage unload flag** (RPCs often die on refresh) + best-effort presence leave + last-leave. **PA window paints immediately**; `dalGatePrepEnterForOrphan_` still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup.
 

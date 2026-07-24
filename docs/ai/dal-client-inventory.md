@@ -49,6 +49,7 @@
 | `getDalFirebaseClientAuth` | `02e7_Dal_Firestore_Client.html` |
 | `deleteProjectFull` | `02_Project_Editor_Core.html` |
 | `generateProjectFolders` | `02_Project_Editor_Core.html` |
+| `openOrJoinDalCampaignRoom` | `02_Project_Editor_Core.html` |
 | `printEquipmentList` | `02_Project_Editor_Core.html` |
 | `reportProjectPresence` | `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`, `07_Core_Globals.html` |
 | `restoreProjectWithConflictCheck` | `02_Project_Editor_Core.html` |
@@ -194,7 +195,7 @@
 | 01h_Mobile_Assets.html | 2 | 1 |
 | 01i_Desktop_Lock.html | 2 | 1 |
 | 01j_Mobile_Scan.html | 4 | 3 |
-| 02_Project_Editor_Core.html | 9 | 0 |
+| 02_Project_Editor_Core.html | 10 | 0 |
 | 02_Project_Editor_Logistics.html | 7 | 1 |
 | 02_Project_Editor_Map.html | 0 | 0 |
 | 02a_Project_Equipment.html | 1 | 1 |

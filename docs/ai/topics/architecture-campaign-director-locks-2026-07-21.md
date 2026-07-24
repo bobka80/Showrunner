@@ -1,6 +1,6 @@
 # Director locks — Architecture campaigns (2026-07-21)
 
-**Status:** Director locks + design pack filed. Part B **archived**. Logistics Ledger **active** (M0+M1 shipped @ v726).  
+**Status:** Director locks + design pack filed. Part B **archived**. Logistics Ledger **COMPLETE**. Project Campaign Room **active** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).  
 **Source:** Canvas `architecture-campaign-locks` (`answers_v2`) + design sweep OK go 2026-07-21.  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Terminology (law):** [GLOSSARY.md](../GLOSSARY.md) § Timeline: **sub-events** vs **phases**.
@@ -8,7 +8,8 @@
 **Companions:**
 
 - [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md) — **canonical sequenced pack**
-- [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md) — **active build**
+- [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md) — Ledger complete
+- [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) — **active build**
 - [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — options A–D (lease framing **superseded** by idle timer below)
 - [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — full ledger schema
 - [session-fork-platform.md](session-fork-platform.md) — current fork lifecycle
@@ -23,8 +24,8 @@
 | Order | Campaign | Notes |
 |-------|----------|--------|
 | 0 | Multi-user Part B — B7 → archive | **DONE 2026-07-21** |
-| 1 | Logistics Ledger (M0–M5) | **ACTIVE** — shape + migration first |
-| 2 | Project Campaign Room | 48h **idle** timer; warm Firebase; Sheets publish |
+| 1 | Logistics Ledger (M0–M5) | **DONE** — archived |
+| 2 | Project Campaign Room | **ACTIVE** — 48h idle; warm Firebase; Sheets publish |
 | 3 | Hierarchical delta / packet sync | Separate, later |
 | — | Offer / Availability | **Off critical path** (parallel or later) |
 
@@ -86,11 +87,12 @@ RFID `Operations_Ledger` stays **atomic / outside the room permanently**.
 
 ## Still open at Room promote (not Ledger blockers)
 
-- Checkpoint-fail escalation (lag > N hours)  
-- Exact station-docked activity rule on server  
-- Explicit revision text for 2026-07-13 design lock rules 1–2 at Campaign Room time  
+- Checkpoint-fail escalation (lag > N hours) — R4  
+- Exact Index campaign column names + station-dock server rule — **proposed in R0** ([../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) § R0 proposals); confirm with **OK go for R1**  
 - Whether soft free-at should later retarget from **sub-event** to a real **phase** (`Phase_Blocks`) — director discussion pending  
 - Whether to rename column `phase_ref` → a sub-event-clear name — deferred  
+
+**Filed in R0 (2026-07-24):** design-lock rules 1–2 revision — [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision.
 
 **Filed:** Sheets ↔ Firebase room-slice parity checklist lives in [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md) §6.
 
@@ -98,4 +100,4 @@ RFID `Operations_Ledger` stays **atomic / outside the room permanently**.
 
 ## Fresh-agent one-liner
 
-Obey this file + the [architecture pack](architecture-multi-campaign-pack-2026-07-21.md) + [GLOSSARY](../GLOSSARY.md) sub-event/phase lock. Build Ledger from [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). Do not reopen settled IDs unless live code forces a director question.
+Obey this file + the [architecture pack](architecture-multi-campaign-pack-2026-07-21.md) + [GLOSSARY](../GLOSSARY.md) sub-event/phase lock. Build Campaign Room from [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md). Do not reopen settled IDs unless live code forces a director question.

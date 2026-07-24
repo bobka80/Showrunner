@@ -1,9 +1,9 @@
 # Architecture pack — Logistics Ledger → Campaign Room → Packet sync
 
-**Status:** Design packed & filed 2026-07-21. **Part B archived.** **Logistics Ledger = NEXT** (active). Campaign Room / packet sync not OK go for code.  
+**Status:** Design packed & filed 2026-07-21. **Part B archived.** **Logistics Ledger COMPLETE.** **Project Campaign Room = ACTIVE** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Locks (law):** [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md)  
-**Active build:** ~~Logistics Ledger~~ **COMPLETE** — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). **NEXT:** Campaign Room (await OK go).
+**Active build:** Project Campaign Room — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md). Ledger archive: [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
 **Companions:** [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) · [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) · [session-fork-platform.md](session-fork-platform.md)
 
 **Source:** Fresh design-agent codebase sweep 2026-07-21 (live root, not dist/). Director OK go to file + B7 closed + `phase_ref` UID pick = **preserve**.
@@ -245,8 +245,8 @@ For **each** of meta / PA / timeline / ledger:
 
 ## 9. Recommended first build after this pack
 
-**Logistics Ledger M0 → M1 only** — inventory + UID preserve + additive `Logistics_Ledger` tab + dual-write.  
-Say **OK go** on the active Ledger campaign for schema/code.
+**Project Campaign Room R1** — room registry + meta shipping.  
+After smoke: say **OK go for R2** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).
 
 ---
 

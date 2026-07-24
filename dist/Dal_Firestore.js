@@ -199,3 +199,14 @@ function firestoreGetTimelineSessionMeta_(projectId) {
   if (!doc || !doc.fields) return null;
   return firestoreDecodeFields_(doc.fields);
 }
+
+/** Campaign Room R1 — warm room meta slice (GAS-owned; clients read-only via rules). */
+function firestoreSetCampaignMeta_(projectId, meta) {
+  firestoreWriteDocument_('projects/' + projectId + '/meta/state', meta);
+}
+
+function firestoreGetCampaignMeta_(projectId) {
+  var doc = firestoreFetch_('get', 'projects/' + projectId + '/meta/state');
+  if (!doc || !doc.fields) return null;
+  return firestoreDecodeFields_(doc.fields);
+}

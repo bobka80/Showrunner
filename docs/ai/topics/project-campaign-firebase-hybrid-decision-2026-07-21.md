@@ -1,6 +1,6 @@
 # Decision brief — Project Campaign Room (Firebase hybrid)
 
-**Status:** Brainstorm / architecture decision — **not active, not OK go for code.**  
+**Status:** Decision filed 2026-07-21 · **ACTIVE build** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (**R0 complete**; awaiting **OK go for R1**).  
 **Filed:** 2026-07-21 (director brainstorm with Cursor agent).  
 **Purpose:** External AI review pack — pros/cons, sequencing, and dependency on Logistics Ledger.  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)
@@ -14,7 +14,7 @@
 
 **Director locks (poll v2, 2026-07-21):** [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md) — **48h idle timer** (not lease); publish **meta → PA → timeline → ledger**; ledger load clocks from timeline shifts + `phase_ref` (**sub-event** FK). Option C “hard expiry / lease” language below is **superseded** by those locks. **Terminology:** [GLOSSARY.md](../GLOSSARY.md) — sub-events ≠ phases.
 
-**Sequenced pack (canonical):** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger archived:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). **This is NEXT** — awaiting director OK go for an active brief.
+**Sequenced pack (canonical):** [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md). **Ledger archived:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). **Active brief:** [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).
 
 ---
 
@@ -192,10 +192,10 @@ Listeners **help visibility**; they do **not** remove merge logic.
 |-------|------|-----------|
 | **1** | ~~Finish Multi-user Part B~~ | **DONE** — archived |
 | **2** | ~~Offer / availability~~ | **Off critical path** (director locks) |
-| **3** | **Logistics Ledger** (M0–M5) | **ACTIVE** — PA slimming; movement SoT; strip truck fields from Firebase mappers |
-| **4** | **Project Campaign Room** (this brief) | 48h idle + 30m publish on **meta + assets + logistics + timeline** |
+| **3** | ~~**Logistics Ledger** (M0–M5)~~ | **DONE** — archived 2026-07-24 |
+| **4** | **Project Campaign Room** (this brief) | **ACTIVE** — [active brief](../active/project-campaign-room-2026-07-24.md); 48h idle + 30m publish |
 
-**Do not OK go** Project Campaign Room until Ledger **M4+** proven.
+**Prerequisite met:** Ledger M4+ proven / Exit complete.
 
 ---
 
