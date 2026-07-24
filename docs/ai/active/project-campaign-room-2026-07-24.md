@@ -9,7 +9,7 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R2 @ GAS v742**. Smoke then **OK go for R3** (ledger slice).  
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R3 shipping** (ledger slice). Smoke then **OK go for R4** (30m checkpoint).  
 **Production tip:** see RELEASES.md. Prep live rollback pin still **v654**.
 
 ---
@@ -210,7 +210,8 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 - [x] Director **OK go** for **R0** (doctrine revision + inventory — docs only) — done this session
 - [x] Director **OK go** for **R1** code (room registry + meta slice) — 2026-07-24
 - [x] Director **OK go** for **R2** (unify PA + timeline under room uid) — 2026-07-24
-- [ ] Director **OK go** for **R3** (ledger slice in room)
+- [x] Director **OK go** for **R3** (ledger slice in room) — 2026-07-24
+- [ ] Director **OK go** for **R4** (30m publish checkpoint)
 
 ### R0 — Doctrine + inventory (no lifecycle code)
 
@@ -237,9 +238,9 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 
 ### R3 — Ledger slice in room
 
-- [ ] `projects/{id}/logistics/` live path + host/GAS listen/flush parity with Sheets `Logistics_Ledger`
-- [ ] Arrange / ledger writers honor warm room (Firebase) vs published (Sheets)
-- [ ] Size WARN/MAX for logistics state
+- [x] `projects/{id}/logistics/` live path + GAS snapshot/write/commit (`state` + `_meta`)
+- [x] Arrange / ledger writers honor warm room (Firebase) vs published (Sheets)
+- [x] Size WARN/MAX for logistics state
 - [ ] Ship + smoke: truck arrange in warm room; Sheets unchanged until publish
 
 ### R4 — 30m publish checkpoint
@@ -280,4 +281,6 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 | 2026-07-24 | Active brief opened (director OK go). Next: OK go for **R0**. |
 | 2026-07-24 | **R0 complete** (docs): design-lock § Campaign Room revision; dual-domain inventory; Index + station proposals. Next: **OK go for R1**. |
 | 2026-07-24 | **R1 shipped @ GAS v741** — Index `Dal_Campaign_*`, `openOrJoinDalCampaignRoom`, Firebase `meta/state`, calendar green room dot + editor chrome. Firestore rules deployed. Next: director smoke → **OK go for R2**. |
-| 2026-07-24 | **R2 shipped @ GAS v742** — `_meta.roomUid`, soft leave/idle/orphan when warm, `closeDalCampaignRoom` + END ROOM. Next: smoke → **OK go for R3**. |)
+| 2026-07-24 | **R2 shipped @ GAS v742** — `_meta.roomUid`, soft leave/idle/orphan when warm, `closeDalCampaignRoom` + END ROOM. Next: smoke → **OK go for R3**. |
+| 2026-07-24 | END ROOM moved to project editor (@ v743). |
+| 2026-07-24 | **R3 implemented** — `logistics/state` warm arrange; End commits ledger. Ship pending. |)

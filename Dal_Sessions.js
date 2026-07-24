@@ -670,6 +670,13 @@ function finishDalSession(projectId, sessionUid, actor) {
   try {
     if (sessionType === DAL_SESSION_TYPE.PREP) {
       dalSnapshotPaToFirestore_(projectId, sessionUid, actor, roomUid);
+      try { dalSnapshotLogisticsToFirestore_(projectId, roomUid, actor); } catch (eLlSnap) {
+        // Soft: PA can open even if logistics snapshot fails; arrange will seed on first save.
+        try {
+          writeToAuditLog(actor, 'WARN', 'LOGISTICS_LEDGER', projectId, sessionUid,
+            'Logistics snapshot skipped: ' + (eLlSnap && eLlSnap.message ? eLlSnap.message : eLlSnap));
+        } catch (eAud) { /* ignore */ }
+      }
     } else if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
       dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, 'main', roomUid);
     } else {
@@ -893,6 +900,22 @@ function closeDalCampaignRoom(projectId, actor) {
 
   if (plan.prepOpen) closeDomainSafe_(DAL_SESSION_TYPE.PREP);
   if (plan.tlOpen) closeDomainSafe_(DAL_SESSION_TYPE.TIMELINE_COLLAB);
+
+  // R3: publish warm logistics slice (Sheets lag until End / checkpoint).
+  try {
+    if (typeof dalCommitLogisticsFromFirestore_ === 'function') {
+      var llRes = dalCommitLogisticsFromFirestore_(projectId, actor);
+      if (llRes && llRes.committed) closed.push('logistics');
+      else if (llRes && llRes.empty) closed.push('logistics:empty');
+    }
+  } catch (eLlCommit) {
+    // Leave room committing so floor can retry End; do not clear Index yet.
+    try {
+      writeToAuditLog(actor, 'ERROR', 'DAL_CAMPAIGN_ROOM', projectId, plan.roomUid || '',
+        'Logistics commit failed: ' + (eLlCommit && eLlCommit.message ? eLlCommit.message : eLlCommit));
+    } catch (eAudLl) { /* ignore */ }
+    throw eLlCommit;
+  }
 
   executeWithRetry(function () {
     var sheets = verifyDatabaseSchema();

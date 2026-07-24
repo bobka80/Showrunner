@@ -49,7 +49,7 @@ Prep and timeline live forks are **on** again after Logistics Ledger Exit.
 
 1. START PREP / START COLLAB and auto-start work again.
 2. Open sessions route that domain to Firebase; closed = Sheets.
-3. Truck arrange with prep open → Firebase PA path + ledger on Sheets; closed → Sheets PA + ledger.
+3. Truck arrange with prep open → Firebase PA + Firebase `logistics/state` (Campaign Room R3); Sheets ledger publishes on **END ROOM** (or R4 checkpoint). Closed → Sheets PA + ledger.
 
 ### How to pause again (temporary Sheets-only)
 

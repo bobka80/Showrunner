@@ -95,9 +95,11 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Logistics_Timeline.js`**: Project timeline backend CRUD.
 - **`Dal_Repos.js`**: DAL Phase 1–3 — `SheetsAdapter` + domain repos + scoped row write helpers.
 - **`Dal_Router.js`**: DAL Phase 4 — `projectDataRouter(domain, sessionStatus)`; Firebase when session-open.
-- **`Dal_Sessions.js`**: DAL Phase 4 — dual-domain session registry (`Dal_Prep_Session_*` / `Dal_Timeline_Session_*`); Campaign Room R1 (`Dal_Campaign_Room_*`, `openOrJoinDalCampaignRoom`); `getDalSessionInfo` returns `prepStatus` / `timelineStatus` + `campaignRoomWarm`; `getOpenDalForkMap` for calendar fork-dot chrome (prep / timeline / room).
-- **`Dal_Firestore.js`**: Firestore REST helpers — includes `firestoreSetCampaignMeta_` → `projects/{id}/meta/state`.
-- **`push-hosting/firestore.rules`**: Client read for `assets` / `timeline` / `meta`; client write denied for `_meta` and all `meta/{docId}` (GAS SA bypasses).
+- **`Dal_Sessions.js`**: DAL Phase 4 — dual-domain session registry (`Dal_Prep_Session_*` / `Dal_Timeline_Session_*`); Campaign Room R1–R3 (`Dal_Campaign_Room_*`, `openOrJoinDalCampaignRoom`, `closeDalCampaignRoom` + logistics commit); `getDalSessionInfo` returns `prepStatus` / `timelineStatus` + `campaignRoomWarm`; `getOpenDalForkMap` for calendar fork-dot chrome (prep / timeline / room).
+- **`Dal_Firestore.js`**: Firestore REST helpers — includes `firestoreSetCampaignMeta_` → `projects/{id}/meta/state` and `firestoreSetLogisticsSessionMeta_` → `projects/{id}/logistics/_meta`.
+- **`push-hosting/firestore.rules`**: Client read for `assets` / `timeline` / `meta` / `logistics`; client write denied for `_meta` docs (GAS SA bypasses).
+- **`Logistics_Ledger.js`**: Movement SoT helpers + R3 Firebase state apply/replace (`logisticsLedgerApplyLayoutItemsToObjects_`, `logisticsLedgerReplaceProjectTopLegsOnSheet_`).
+- **`Dal_Firebase.js`**: Firebase adapter — PA/timeline forks + R3 `dalSnapshotLogisticsToFirestore_` / `dalCommitLogisticsFromFirestore_` / warm arrange logistics write.
 - **`Dal_Firestore.js`**: DAL Phase 4 — Firestore REST (GAS service account) for prep + timeline forks.
 - **`Dal_Firebase.js`**: DAL Phase 4 — FirebaseAdapter; snapshot/commit; wires Phase 5A reconcile after commit.
 - **`Dal_Cache.js`**: DAL Phase 6A — `dalInvalidateCacheTags_(tags)`; domain tags `project:{id}:pa` / `project:{id}:timeline` (selective, not global `flushCache`).

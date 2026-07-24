@@ -4,7 +4,7 @@
  *
  * Prep session: PA reads/writes Firestore.
  * Timeline collab session: timeline reads/writes Firestore.
- * Ledger: durable Sheets; atomic journal + verify via Dal_Ledger.js (not a fork).
+ * Ledger: Sheets SoT when cold; Campaign Room R3 warm path uses projects/{id}/logistics/state.
  */
 
 // @INDEX: DAL -> Firebase adapter (Phase 4)
@@ -14,6 +14,7 @@ var __dalFirebaseAdapterSingleton = null;
 var DAL_FIRESTORE_PA_COLLECTION = 'assets';
 var DAL_FIRESTORE_TIMELINE_COLLECTION = 'timeline';
 var DAL_FIRESTORE_META_COLLECTION = 'meta';
+var DAL_FIRESTORE_LOGISTICS_COLLECTION = 'logistics';
 
 /** H4 — keep in sync with scripts/lib/dal-state-size-mirror-core.js */
 var DAL_STATE_WARN_BYTES = 512 * 1024;
@@ -177,6 +178,140 @@ function dalFirestorePaCollection_(projectId) {
   return 'projects/' + projectId + '/' + DAL_FIRESTORE_PA_COLLECTION;
 }
 
+function dalFirestoreLogisticsCollection_(projectId) {
+  return 'projects/' + projectId + '/' + DAL_FIRESTORE_LOGISTICS_COLLECTION;
+}
+
+/**
+ * Campaign Room R3 — snapshot Sheets Logistics_Ledger top legs → Firebase logistics/state.
+ */
+function dalSnapshotLogisticsToFirestore_(projectId, roomUid, actor) {
+  var sheets = verifyDatabaseSchema(true);
+  var legs = logisticsLedgerLoadProjectLegObjects_(sheets, projectId) || [];
+  var legsJson = JSON.stringify(legs);
+  var size = dalStateSizeReport_({ json: legsJson, count: legs.length });
+  if (size.overMax) {
+    throw new Error(
+      'LOGISTICS_STATE_TOO_LARGE: ledger state is ' + size.bytes + ' bytes / ' + size.count +
+      ' legs (max ' + DAL_STATE_MAX_BYTES + ' bytes or ' + DAL_STATE_MAX_COUNT + ').'
+    );
+  }
+  var meta = {
+    roomUid: roomUid ? String(roomUid) : '',
+    status: 'open',
+    openedAt: new Date().toISOString(),
+    openedBy: actor || 'System',
+    domain: 'logistics'
+  };
+  firestoreSetLogisticsSessionMeta_(projectId, meta);
+  firestoreWriteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state', {
+    legsJson: legsJson,
+    writeSeq: 1,
+    clientId: 'snapshot',
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor || 'System',
+    roomUid: roomUid ? String(roomUid) : ''
+  });
+  return { count: legs.length, bytes: size.bytes, overWarn: size.overWarn };
+}
+
+/**
+ * Read warm logistics state.
+ * @returns {{ present: boolean, legs: Array, writeSeq: number, roomUid: string, updatedAt: string, updatedBy: string }}
+ * Throws LOGISTICS_STATE_CORRUPT / LOGISTICS_STATE_READ_FAILED — never silent empty on error.
+ */
+function dalReadLogisticsStateFromFirestore_(projectId) {
+  var doc;
+  try {
+    doc = firestoreFetch_('get', dalFirestoreLogisticsCollection_(projectId) + '/state');
+  } catch (e0) {
+    throw new Error('LOGISTICS_STATE_READ_FAILED: ' + (e0 && e0.message ? e0.message : e0));
+  }
+  if (!doc || !doc.fields) {
+    return { present: false, legs: [], writeSeq: 0, roomUid: '', updatedAt: '', updatedBy: '' };
+  }
+  var plain = firestoreDecodeFields_(doc.fields);
+  var legs = [];
+  if (plain.legsJson != null && plain.legsJson !== '') {
+    try {
+      legs = JSON.parse(plain.legsJson);
+    } catch (eParse) {
+      throw new Error('LOGISTICS_STATE_CORRUPT: legsJson parse failed');
+    }
+  }
+  if (!Array.isArray(legs)) {
+    throw new Error('LOGISTICS_STATE_CORRUPT: legsJson is not an array');
+  }
+  return {
+    present: true,
+    legs: legs,
+    writeSeq: Number(plain.writeSeq || 0) || 0,
+    roomUid: plain.roomUid || '',
+    updatedAt: plain.updatedAt || '',
+    updatedBy: plain.updatedBy || ''
+  };
+}
+
+function dalWriteLogisticsStateToFirestore_(projectId, legs, actor, roomUid) {
+  var legsJson = JSON.stringify(legs || []);
+  var size = dalStateSizeReport_({ json: legsJson, count: (legs || []).length });
+  if (size.overMax) {
+    throw new Error(
+      'LOGISTICS_STATE_TOO_LARGE: ledger state is ' + size.bytes + ' bytes / ' + size.count +
+      ' legs (max ' + DAL_STATE_MAX_BYTES + ' bytes or ' + DAL_STATE_MAX_COUNT + ').'
+    );
+  }
+  var prevSeq = 0;
+  try {
+    var st = dalReadLogisticsStateFromFirestore_(projectId);
+    if (st && st.present) prevSeq = Number(st.writeSeq || 0) || 0;
+  } catch (eSt) { prevSeq = 0; }
+  firestoreWriteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state', {
+    legsJson: legsJson,
+    writeSeq: prevSeq + 1,
+    clientId: 'gas_logistics_' + String(actor || 'system'),
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor || 'System',
+    roomUid: roomUid ? String(roomUid) : ''
+  });
+  return { count: (legs || []).length, bytes: size.bytes, overWarn: size.overWarn, writeSeq: prevSeq + 1 };
+}
+
+/** Final-publish Firebase logistics → Sheets Logistics_Ledger (top legs for project). */
+function dalCommitLogisticsFromFirestore_(projectId, actor) {
+  var snap;
+  try {
+    snap = dalReadLogisticsStateFromFirestore_(projectId);
+  } catch (eRead) {
+    // Do not delete Firebase or wipe Sheets on transient/corrupt reads.
+    throw eRead;
+  }
+  if (!snap || !snap.present) {
+    try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/_meta'); } catch (e0) { /* ignore */ }
+    try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state'); } catch (e1) { /* ignore */ }
+    return { committed: false, empty: true };
+  }
+  var size = dalStateSizeReport_({
+    json: JSON.stringify(snap.legs || []),
+    count: (snap.legs || []).length
+  });
+  if (size.overMax) {
+    throw new Error(
+      'LOGISTICS_STATE_TOO_LARGE: cannot commit — ' + size.bytes + ' bytes / ' + size.count + ' legs.'
+    );
+  }
+  var sheets = verifyDatabaseSchema();
+  logisticsLedgerReplaceProjectTopLegsOnSheet_(sheets, projectId, snap.legs || []);
+  try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
+  try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
+  try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/_meta'); } catch (eM) { /* ignore */ }
+  try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state'); } catch (eS) { /* ignore */ }
+  try { flushCache(); } catch (eC) { /* ignore */ }
+  writeToAuditLog(actor || 'System', 'CLOSE', 'LOGISTICS_LEDGER', projectId, projectId,
+    'Committed Campaign Room logistics slice to Sheets (' + (snap.legs || []).length + ' legs).');
+  return { committed: true, count: (snap.legs || []).length };
+}
+
 function dalLoadPaProjectRowsFromFirestore_(projectId, header, map) {
   var docs = firestoreListCollection_(dalFirestorePaCollection_(projectId));
   return docs.filter(function (doc) {
@@ -224,9 +359,18 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
     });
 
     var sheets = verifyDatabaseSchema(true);
-    // M4: overlay ledger onto camelCase PA shape
+    // R3: if warm logistics/state is present (even empty), overlay from Firebase — never mix Sheets lag.
     try {
-      var legsMapFs = logisticsLedgerLegsByProject_(sheets, projectId);
+      var legsMapFs = null;
+      var liveLl = null;
+      try {
+        liveLl = dalReadLogisticsStateFromFirestore_(projectId);
+      } catch (eLive) { liveLl = null; }
+      if (liveLl && liveLl.present) {
+        legsMapFs = logisticsLedgerLegsMapFromObjects_(liveLl.legs || []);
+      } else {
+        legsMapFs = logisticsLedgerLegsByProject_(sheets, projectId);
+      }
       assets.forEach(function (a) { applyLedgerLegsOntoPaAsset_(a, legsMapFs); });
     } catch (eLlFs) { /* empty truck fields */ }
     var data = getSheetData(sheets.projectAssets);
@@ -322,7 +466,8 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
 
 /**
  * Prep-open truck arrange: rewrite Firebase PA collection + assets/state (assignment only),
- * write Logistics_Ledger on Sheets. Does NOT stamp truck onto PA docs (M4).
+ * write Logistics_Ledger to Firebase logistics/state while Campaign Room warm (R3).
+ * Sheets ledger publishes on End Room / checkpoint (R4).
  */
 function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
   return executeWithRetry(function () {
@@ -390,21 +535,60 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       updatedBy: actor || 'System'
     });
 
-    // Ledger stays on Sheets (not forked) — must succeed (M4 SoT)
+    // R3: warm logistics on Firebase — Sheets unchanged until End Room / checkpoint.
     var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
     try {
-      var sheets = verifyDatabaseSchema();
-      logisticsLedgerWriteFromLayoutItems_(sheets, projectId, arranged.ledgerItems, dualLegs, actor);
-      try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
-      try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
+      var roomUid = '';
+      try {
+        var sheetsIdx = verifyDatabaseSchema(true);
+        var idxRow = dalGetProjectIndexRow_(projectId, sheetsIdx);
+        if (idxRow) {
+          var camp = dalReadCampaignRoom_(idxRow);
+          roomUid = camp.campaignRoomUid || '';
+        }
+      } catch (eRoom) { /* ignore */ }
+
+      var existingLl = null;
+      try {
+        existingLl = dalReadLogisticsStateFromFirestore_(projectId);
+      } catch (eExist) { existingLl = null; }
+      var baseLegs = (existingLl && existingLl.present) ? (existingLl.legs || []) : null;
+      if (!baseLegs) {
+        var sheetsSeed = verifyDatabaseSchema(true);
+        baseLegs = logisticsLedgerLoadProjectLegObjects_(sheetsSeed, projectId) || [];
+      }
+      var nextLegs = logisticsLedgerApplyLayoutItemsToObjects_(
+        baseLegs, projectId, arranged.ledgerItems, dualLegs, actor
+      );
+      dalWriteLogisticsStateToFirestore_(projectId, nextLegs, actor, roomUid);
+      try {
+        firestoreSetLogisticsSessionMeta_(projectId, {
+          roomUid: roomUid || '',
+          status: 'open',
+          domain: 'logistics',
+          updatedAt: new Date().toISOString(),
+          updatedBy: actor || 'System'
+        });
+      } catch (eMeta) { /* ignore */ }
+      try {
+        if (roomUid) {
+          var sheetsAct = verifyDatabaseSchema();
+          var rowAct = dalGetProjectIndexRow_(projectId, sheetsAct);
+          if (rowAct) {
+            dalWriteCampaignRoom_(sheetsAct.index, rowAct.rowNum, rowAct.map, {
+              campaignLastActivityAt: new Date().toISOString()
+            });
+          }
+        }
+      } catch (eAct) { /* ignore */ }
     } catch (eLl) {
       writeToAuditLog(actor, "ERROR", "LOGISTICS_LEDGER", projectId, projectId,
-        "Ledger write failed (Firebase truck path): " + (eLl && eLl.message ? eLl.message : eLl));
+        "Firebase logistics write failed (truck path): " + (eLl && eLl.message ? eLl.message : eLl));
       throw eLl;
     }
 
     writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT_FIRESTORE", projectId, projectId,
-      'Saved spatial arrangement for ' + ((layoutData && layoutData.length) || 0) + ' cases on prep fork.');
+      'Saved spatial arrangement for ' + ((layoutData && layoutData.length) || 0) + ' cases on prep fork (ledger warm).');
     return "Saved Truck Layout";
   });
 }

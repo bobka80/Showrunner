@@ -725,3 +725,225 @@ function logisticsLedgerResolveProjectFreeAt_(phases, legsMapForProject) {
   }
   return { freeAt: null, freeAtResolved: false, source: 'unresolved' };
 }
+
+// ==========================================
+// --- Campaign Room R3: Firebase logistics state ---
+// ==========================================
+
+function logisticsLedgerRowToObject_(row, llMap) {
+  function cell_(key) {
+    return llMap[key] !== undefined ? row[llMap[key]] : '';
+  }
+  function numOrNull_(v) {
+    if (v === undefined || v === null || v === '') return null;
+    var n = Number(v);
+    return isNaN(n) ? null : n;
+  }
+  return {
+    uid: String(cell_('uid') || ''),
+    project_uid: String(cell_('project_uid') || ''),
+    parent_uid: String(cell_('parent_uid') || ''),
+    asset_uid: String(cell_('asset_uid') || ''),
+    quantity: cell_('quantity') !== '' && cell_('quantity') != null ? Number(cell_('quantity')) || 1 : 1,
+    truck_uid: String(cell_('truck_uid') || ''),
+    from_location: String(cell_('from_location') || ''),
+    to_location: String(cell_('to_location') || ''),
+    load_time: cell_('load_time') != null ? cell_('load_time') : '',
+    unload_time: cell_('unload_time') != null ? cell_('unload_time') : '',
+    leg_id: String(cell_('leg_id') || ''),
+    phase_ref: String(cell_('phase_ref') || ''),
+    x: numOrNull_(cell_('x')),
+    y: numOrNull_(cell_('y')),
+    z: numOrNull_(cell_('z')),
+    rotated: cell_('rotated') === true || cell_('rotated') === 'true',
+    staged: cell_('staged') === true || cell_('staged') === 'true',
+    creator: String(cell_('creator') || '')
+  };
+}
+
+/** Top-level outbound/inbound leg objects for one project from Sheets. */
+function logisticsLedgerLoadProjectLegObjects_(sheets, projectId) {
+  var out = [];
+  if (!sheets || !sheets.logisticsLedger) return out;
+  var llData = sheets.logisticsLedger.getDataRange().getValues();
+  if (llData.length < 2) return out;
+  var llMap = {};
+  llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  for (var i = 1; i < llData.length; i++) {
+    var row = llData[i];
+    var pid = llMap['project_uid'] !== undefined ? String(row[llMap['project_uid']] || '') : '';
+    if (pid !== String(projectId)) continue;
+    if (llMap['parent_uid'] !== undefined && String(row[llMap['parent_uid']] || '')) continue;
+    var leg = llMap['leg_id'] !== undefined ? String(row[llMap['leg_id']] || '') : '';
+    if (leg !== 'outbound' && leg !== 'inbound') continue;
+    out.push(logisticsLedgerRowToObject_(row, llMap));
+  }
+  return out;
+}
+
+/** Build asset|leg map from plain leg objects (same shape as logisticsLedgerLegsByProject_). */
+function logisticsLedgerLegsMapFromObjects_(legObjects) {
+  var out = {};
+  (legObjects || []).forEach(function (o) {
+    if (!o) return;
+    if (String(o.parent_uid || '')) return;
+    var leg = String(o.leg_id || '');
+    if (leg !== 'outbound' && leg !== 'inbound') return;
+    var assetUid = String(o.asset_uid || '');
+    if (!assetUid) return;
+    out[assetUid + '|' + leg] = {
+      truck_uid: String(o.truck_uid || ''),
+      x: o.x != null && o.x !== '' ? Number(o.x) : null,
+      y: o.y != null && o.y !== '' ? Number(o.y) : null,
+      z: o.z != null && o.z !== '' ? Number(o.z) : null,
+      rotated: !!o.rotated,
+      staged: !!o.staged,
+      load_time: o.load_time != null ? o.load_time : '',
+      unload_time: o.unload_time != null ? o.unload_time : '',
+      phase_ref: String(o.phase_ref || '')
+    };
+  });
+  return out;
+}
+
+/**
+ * Apply arrange layout items onto an in-memory legs array (top-level only).
+ * Mirrors logisticsLedgerWriteFromLayoutItems_ keep/replace rules.
+ */
+function logisticsLedgerApplyLayoutItemsToObjects_(existingObjects, projectId, layoutItems, legIds, actor) {
+  var legs = (legIds || []).filter(function (l) { return l === 'outbound' || l === 'inbound'; });
+  if (!legs.length) return existingObjects || [];
+
+  var touchedAssets = {};
+  (layoutItems || []).forEach(function (item) {
+    if (!item) return;
+    var a = String(item.assetUid || item.asset_uid || '');
+    if (a) touchedAssets[a] = true;
+  });
+
+  var kept = [];
+  (existingObjects || []).forEach(function (o) {
+    if (!o) return;
+    var isOurRewrite = String(o.project_uid || '') === String(projectId) &&
+      !String(o.parent_uid || '') &&
+      legs.indexOf(String(o.leg_id || '')) !== -1;
+    if (isOurRewrite) {
+      var rowAsset = String(o.asset_uid || '');
+      if (rowAsset && !touchedAssets[rowAsset]) kept.push(o);
+      return;
+    }
+    kept.push(o);
+  });
+
+  var newRows = [];
+  (layoutItems || []).forEach(function (item) {
+    if (!item) return;
+    var assetUid = String(item.assetUid || item.asset_uid || '');
+    if (!assetUid) return;
+    var qty = item.quantity != null ? item.quantity : 1;
+    var creator = item.creator || actor || 'System';
+    var itemLegs = item.legs || {};
+    legs.forEach(function (leg) {
+      var rawBox = itemLegs[leg];
+      if (!rawBox) return;
+      var box = logisticsLedgerNormalizeArrangeBox_(rawBox);
+      var hasSpatial = box.x !== '' && box.x !== null && box.x !== undefined;
+      if (!box.truck_uid && !hasSpatial && !box.staged && !box.rotated) return;
+      newRows.push({
+        uid: Utilities.getUuid(),
+        project_uid: String(projectId),
+        parent_uid: '',
+        asset_uid: assetUid,
+        quantity: qty,
+        truck_uid: box.truck_uid || '',
+        from_location: '',
+        to_location: '',
+        load_time: '',
+        unload_time: '',
+        leg_id: leg,
+        phase_ref: '',
+        x: box.x !== null && box.x !== undefined ? box.x : null,
+        y: box.y !== null && box.y !== undefined ? box.y : null,
+        z: box.z !== null && box.z !== undefined ? box.z : null,
+        rotated: !!box.rotated,
+        staged: !!box.staged,
+        creator: creator
+      });
+    });
+  });
+  return kept.concat(newRows);
+}
+
+/**
+ * Replace top-level outbound/inbound legs for a project on Sheets from objects.
+ * Keeps stops (parent_uid) and other projects untouched.
+ */
+function logisticsLedgerReplaceProjectTopLegsOnSheet_(sheets, projectId, legObjects) {
+  if (!sheets || !sheets.logisticsLedger) return { wrote: 0, skipped: true };
+  var llData = sheets.logisticsLedger.getDataRange().getValues();
+  if (!llData.length) {
+    sheets.logisticsLedger.appendRow(LOGISTICS_LEDGER_HEADERS_);
+    llData = [LOGISTICS_LEDGER_HEADERS_];
+  }
+  var llMap = {};
+  llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  var cols = llData[0].length;
+
+  var kept = [llData[0]];
+  for (var i = 1; i < llData.length; i++) {
+    var row = llData[i];
+    var rowPid = llMap['project_uid'] !== undefined ? String(row[llMap['project_uid']] || '') : '';
+    var parent = llMap['parent_uid'] !== undefined ? String(row[llMap['parent_uid']] || '') : '';
+    var legId = llMap['leg_id'] !== undefined ? String(row[llMap['leg_id']] || '') : '';
+    var isTopLeg = !parent && (legId === 'outbound' || legId === 'inbound');
+    if (rowPid === String(projectId) && isTopLeg) continue;
+    kept.push(row);
+  }
+
+  var newRows = [];
+  (legObjects || []).forEach(function (o) {
+    if (!o) return;
+    if (String(o.project_uid || '') !== String(projectId)) return;
+    if (String(o.parent_uid || '')) return;
+    var leg = String(o.leg_id || '');
+    if (leg !== 'outbound' && leg !== 'inbound') return;
+    var r = new Array(cols).fill('');
+    if (llMap['uid'] !== undefined) r[llMap['uid']] = o.uid || Utilities.getUuid();
+    if (llMap['project_uid'] !== undefined) r[llMap['project_uid']] = String(projectId);
+    if (llMap['parent_uid'] !== undefined) r[llMap['parent_uid']] = '';
+    if (llMap['asset_uid'] !== undefined) r[llMap['asset_uid']] = String(o.asset_uid || '');
+    if (llMap['quantity'] !== undefined) r[llMap['quantity']] = o.quantity != null ? o.quantity : 1;
+    if (llMap['truck_uid'] !== undefined) r[llMap['truck_uid']] = o.truck_uid || '';
+    if (llMap['from_location'] !== undefined) r[llMap['from_location']] = o.from_location || '';
+    if (llMap['to_location'] !== undefined) r[llMap['to_location']] = o.to_location || '';
+    if (llMap['load_time'] !== undefined) r[llMap['load_time']] = o.load_time != null ? o.load_time : '';
+    if (llMap['unload_time'] !== undefined) r[llMap['unload_time']] = o.unload_time != null ? o.unload_time : '';
+    if (llMap['leg_id'] !== undefined) r[llMap['leg_id']] = leg;
+    if (llMap['phase_ref'] !== undefined) r[llMap['phase_ref']] = o.phase_ref || '';
+    if (llMap['x'] !== undefined) r[llMap['x']] = o.x != null ? o.x : '';
+    if (llMap['y'] !== undefined) r[llMap['y']] = o.y != null ? o.y : '';
+    if (llMap['z'] !== undefined) r[llMap['z']] = o.z != null ? o.z : '';
+    if (llMap['rotated'] !== undefined) r[llMap['rotated']] = !!o.rotated;
+    if (llMap['staged'] !== undefined) r[llMap['staged']] = !!o.staged;
+    if (llMap['creator'] !== undefined) r[llMap['creator']] = o.creator || '';
+    newRows.push(r);
+  });
+
+  var out = kept.concat(newRows);
+  var backup = llData.map(function (row) { return row.slice(); });
+  try {
+    sheets.logisticsLedger.clearContents();
+    if (out.length > 0) {
+      sheets.logisticsLedger.getRange(1, 1, out.length, out[0].length).setValues(out);
+    }
+  } catch (eWrite) {
+    try {
+      sheets.logisticsLedger.clearContents();
+      if (backup.length > 0) {
+        sheets.logisticsLedger.getRange(1, 1, backup.length, backup[0].length).setValues(backup);
+      }
+    } catch (eRestore) { /* best-effort */ }
+    throw eWrite;
+  }
+  return { wrote: newRows.length, skipped: false };
+}

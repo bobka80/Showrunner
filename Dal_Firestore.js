@@ -210,3 +210,14 @@ function firestoreGetCampaignMeta_(projectId) {
   if (!doc || !doc.fields) return null;
   return firestoreDecodeFields_(doc.fields);
 }
+
+/** Campaign Room R3 — logistics slice meta (GAS-owned). */
+function firestoreSetLogisticsSessionMeta_(projectId, meta) {
+  firestoreWriteDocument_('projects/' + projectId + '/logistics/_meta', meta);
+}
+
+function firestoreGetLogisticsSessionMeta_(projectId) {
+  var doc = firestoreFetch_('get', 'projects/' + projectId + '/logistics/_meta');
+  if (!doc || !doc.fields) return null;
+  return firestoreDecodeFields_(doc.fields);
+}

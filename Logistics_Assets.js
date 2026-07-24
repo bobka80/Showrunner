@@ -336,7 +336,7 @@ function paTruncateRowsToHeader_(rows, colCount) {
 
 function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor = "System UI") {
     assertActorCanEditProjectAssets(actor);
-    // Prep fork open → Firebase PA (assignment only) + Sheets ledger. Closed → Sheets PA + ledger.
+    // Prep fork open → Firebase PA + Firebase logistics (R3). Closed → Sheets PA + Sheets ledger.
     if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN) {
         return saveTruckArrangementFirestore_(projectId, layoutData, leg, actor);
     }

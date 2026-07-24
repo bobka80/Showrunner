@@ -245,8 +245,8 @@ For **each** of meta / PA / timeline / ledger:
 
 ## 9. Recommended first build after this pack
 
-**Project Campaign Room R2** — soft leave + END ROOM shipping.  
-After smoke: say **OK go for R3** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (ledger slice in room).
+**Project Campaign Room R3** — logistics warm slice shipping.  
+After smoke: say **OK go for R4** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (30m publish checkpoint).
 
 ---
 
