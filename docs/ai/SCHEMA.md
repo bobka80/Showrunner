@@ -107,6 +107,7 @@ Users do NOT have a direct system access tier. They inherit it strictly from the
 
 Engine tab for planned/actual movement legs. **Not** RFID `Operations_Ledger`. Full field list: [topics/logistics-ledger-schema-2026-07-20.md](topics/logistics-ledger-schema-2026-07-20.md). Headers: `uid`, `project_uid`, `parent_uid`, `asset_uid`, `quantity`, `truck_uid`, `from_location`, `to_location`, `load_time`, `unload_time`, `leg_id`, `phase_ref`, `x`, `y`, `z`, `rotated`, `staged`, `creator`.  
 **M4+:** ledger is SoT for movement; PA truck columns removed. `leg_id` = `outbound`|`inbound` links to AUTO truck shift notes. `phase_ref` → `Project_Timelines.uid` (**sub-event** uid; column name legacy — not a timeline-header **phase**). See [GLOSSARY.md](GLOSSARY.md) § Timeline.
+**M5:** asset conflict free-at = `phase_ref` sub-event end (else exactly-one RECOVERY); soft suppressed if unresolved; hard = core show overlap / bulk over-ask.
 
 ### Project_Assets (assignment only after M4)
 

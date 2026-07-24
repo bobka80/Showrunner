@@ -196,7 +196,12 @@ function getActiveConflicts() {
     let paFormCol = paMap['formula'] !== undefined ? paMap['formula'] : 5;
     let paLocCol = paMap['location'] !== undefined ? paMap['location'] : 4;
 
-    // Calculate Equipment Windows (From first WH phase to last Recovery phase)
+    // Calculate Equipment Windows + M5 free-at (ledger phase_ref → sub-event end)
+    var ledgerByProject = {};
+    try {
+      ledgerByProject = logisticsLedgerLegsByProjects_(eSheets, Object.keys(projects));
+    } catch (eLlConf) { ledgerByProject = {}; }
+
     for (let pId in projects) {
         if (projects[pId].phases.length > 0) {
             projects[pId].equipStart = Math.min(...projects[pId].phases.map(p => p.start));
@@ -209,6 +214,19 @@ function getActiveConflicts() {
             } else {
                 projects[pId].coreStart = projects[pId].equipStart;
                 projects[pId].coreEnd = projects[pId].equipEnd;
+            }
+
+            var freeRes = logisticsLedgerResolveProjectFreeAt_(
+              projects[pId].phases,
+              ledgerByProject[String(pId)] || {}
+            );
+            if (freeRes.freeAtResolved && freeRes.freeAt) {
+              projects[pId].freeAt = freeRes.freeAt;
+              projects[pId].freeAtResolved = true;
+            } else {
+              // Sweep still needs an in-time; unresolved soft conflicts are suppressed below
+              projects[pId].freeAt = projects[pId].equipEnd;
+              projects[pId].freeAtResolved = false;
             }
         }
     }
@@ -247,7 +265,8 @@ function getActiveConflicts() {
         for (let pId in assetUsage[poolKey]) {
             let qty = assetUsage[poolKey][pId];
             events.push({ time: projects[pId].equipStart, type: 'out', qty: qty, pId: pId });
-            events.push({ time: projects[pId].equipEnd, type: 'in', qty: qty, pId: pId });
+            // M5: return at free-at (phase_ref sub-event end), not coarse equipEnd alone
+            events.push({ time: projects[pId].freeAt, type: 'in', qty: qty, pId: pId });
         }
 
         // Sort: Chronological. If simultaneous, process 'in' (returns) before 'out' (deployments)
@@ -269,12 +288,17 @@ function getActiveConflicts() {
                 let groupKey = `ASSET_${triggerId}_${pairNames.replace(/[^a-zA-Z0-9]/g, '')}_${poolKey}`;
                 let key = `${poolKey}_${triggerId}`;
                 
-                // Evaluate if the CORE SHOW DAYS actually overlap, or if it's just a prep/recovery turnaround
+                // Hard = cores overlap (two places at once). Soft = free-at turnaround.
                 let activeArr = Array.from(activeProjects);
                 let coreOverlap = false;
+
+                // Unique cannot be double-booked inside one project (false badge fix)
+                if (activeArr.length === 1 && !isBulk) {
+                    continue;
+                }
                 
                 if (activeArr.length === 1) {
-                    coreOverlap = true; // The project ITSELF requested more than the warehouse owns! Hard shortage.
+                    coreOverlap = true; // Bulk: project exceeds warehouse stock
                 } else {
                     for (let j = 0; j < activeArr.length; j++) {
                         for (let k = j + 1; k < activeArr.length; k++) {
@@ -289,6 +313,14 @@ function getActiveConflicts() {
                         if (coreOverlap) break;
                     }
                 }
+
+                // Soft only when free-at resolved for all holding projects (no silent coarse soft)
+                if (!coreOverlap) {
+                    let allFreeResolved = activeArr.every(function (id) {
+                        return projects[id] && projects[id].freeAtResolved;
+                    });
+                    if (!allFreeResolved) continue;
+                }
                 
                 if (!flaggedShortages.has(key)) {
                     flaggedShortages.add(key);
@@ -299,9 +331,11 @@ function getActiveConflicts() {
                     
                     let cDesc = "";
                     if (activeArr.length === 1) {
-                        cDesc = isBulk ? `${shortage}x ${assetName} short. Project exceeds total warehouse stock.` : `Unique Unit [${assetName}] is double-booked inside the same project.`;
+                        cDesc = `${shortage}x ${assetName} short. Project exceeds total warehouse stock.`;
                     } else {
-                        cDesc = isBulk ? `${shortage}x ${assetName} short. ${coreOverlap ? 'Demand' : 'Turnaround overlap'} between: ${pairNames}.` : `Unique Unit [${assetName}] is ${coreOverlap ? 'double-booked' : 'in a tight turnaround'} between: ${pairNames}.`;
+                        cDesc = isBulk
+                          ? `${shortage}x ${assetName} short. ${coreOverlap ? 'Demand' : 'Turnaround (free-at)'} between: ${pairNames}.`
+                          : `Unique Unit [${assetName}] is ${coreOverlap ? 'double-booked' : 'in a tight turnaround (still committed past free-at)'} between: ${pairNames}.`;
                     }
 
                     conflicts.push({

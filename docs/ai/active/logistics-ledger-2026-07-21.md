@@ -7,7 +7,7 @@
 **Predecessor:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
 **Next after this campaign:** Project Campaign Room — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)
 
-**Opened:** 2026-07-21 · **Status:** **M4 writer cutover + PA strip shipped** — live forks still PAUSED. Next: smoke M4, then M5.  
+**Opened:** 2026-07-21 · **Status:** **M5 conflicts shipped** — live forks still PAUSED. Next: smoke M5, then Exit (re-enable forks).  
 **Production tip:** see status log. Prep live rollback pin still **v654**.
 
 ---
@@ -18,7 +18,7 @@
 2. Do **not** invent columns beyond the schema topic.  
 3. Do **not** start Campaign Room or Offer in this campaign.  
 4. **Live forks:** **PAUSED** — read [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) before any prep/collab/Firebase PA work. Flags: `DAL_LIVE_FORKS_PAUSED` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED` in `07_Core_Globals.html`.  
-5. **Next build:** M5 conflicts via ledger + `phase_ref` after M4 smoke green.  
+5. **Next build:** Exit — re-enable live forks after M5 smoke green.  
 6. After any implementation: `node milestone.js "…"`; update this checklist same session.
 
 ---
@@ -100,9 +100,9 @@
 
 ### M5 — Conflicts
 
-- [ ] Product soft/hard via ledger + `phase_ref`
-- [ ] Keep `Conflict_Overrides`
-- [ ] Single-project false badge re-eval
+- [x] Product soft/hard via ledger + `phase_ref` — free-at = sub-event end; soft suppressed if unresolved; hard = core overlap / bulk over-ask
+- [x] Keep `Conflict_Overrides`
+- [x] Single-project false badge re-eval — unique single-project “double-book” no longer emitted
 
 ### Exit
 
@@ -126,3 +126,4 @@
 | 2026-07-23 | **M2 confirmed** (director: ledger rows present) + Admin **RUN LEDGER BACKFILL** button. |
 | 2026-07-23 | **M3 readers @ GAS v734:** ledger prefer / PA fallback in assets + tracker + Firestore PA load. Bugbot High: blank ledger truck does not wipe PA. Next: director smoke, then M4. |
 | 2026-07-23 | **M4 @ GAS v735** (+ hosting host-boot **v669**): ledger-only arrange writers; strip 12 PA truck cols + Firebase/host mappers + content/row sigs; partial-save preserves other assets' legs; ledger write failure fails the save. Next: smoke, then M5. |
+| 2026-07-24 | **M5 conflicts:** free-at from ledger `phase_ref` → sub-event end (RECOVERY fallback); soft suppressed if unresolved; unique single-project false badge removed; overrides kept. Next: smoke, then Exit (re-enable forks). |

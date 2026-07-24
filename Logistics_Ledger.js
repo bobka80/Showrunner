@@ -678,3 +678,50 @@ function logisticsLedgerResolveTruckUid_(legsMap, assetUid, leg) {
   if (!legRow) return '';
   return legRow.truck_uid || '';
 }
+
+/**
+ * M5 — free-at epoch for a project from Logistics_Ledger phase_ref → Project_Timelines.end.
+ * Prefers inbound leg phase_refs; max end among preferred set.
+ * Fallback: exactly one RECOVERY sub-event end. Else unresolved (caller suppresses soft).
+ * @param {Array} phases [{ uid, type, start, end }]
+ * @param {Object} legsMapForProject from logisticsLedgerLegsByProject_
+ * @returns {{ freeAt: number|null, freeAtResolved: boolean, source: string }}
+ */
+function logisticsLedgerResolveProjectFreeAt_(phases, legsMapForProject) {
+  var timelineByUid = {};
+  (phases || []).forEach(function (p) {
+    if (p && p.uid) timelineByUid[String(p.uid)] = p;
+  });
+
+  var inboundEnds = [];
+  var anyEnds = [];
+  Object.keys(legsMapForProject || {}).forEach(function (key) {
+    var legRow = legsMapForProject[key];
+    if (!legRow || !legRow.phase_ref) return;
+    var se = timelineByUid[String(legRow.phase_ref)];
+    if (!se || !se.end) return;
+    anyEnds.push(se.end);
+    if (String(key).indexOf('|inbound') !== -1) inboundEnds.push(se.end);
+  });
+  var pool = inboundEnds.length ? inboundEnds : anyEnds;
+  if (pool.length) {
+    return {
+      freeAt: Math.max.apply(null, pool),
+      freeAtResolved: true,
+      source: 'phase_ref'
+    };
+  }
+
+  var recoveries = (phases || []).filter(function (p) {
+    var t = String(p.type || '').toUpperCase().replace(/\s+/g, '_');
+    return t === 'RECOVERY';
+  });
+  if (recoveries.length === 1 && recoveries[0].end) {
+    return {
+      freeAt: recoveries[0].end,
+      freeAtResolved: true,
+      source: 'recovery_fallback'
+    };
+  }
+  return { freeAt: null, freeAtResolved: false, source: 'unresolved' };
+}

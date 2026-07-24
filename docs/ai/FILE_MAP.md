@@ -35,9 +35,11 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`scripts/dal-pa-live-sync-test.js`** + **`scripts/lib/dal-*-core.js`**: Node-only PA/timeline live-sync sims (Cases A–V). Includes `dal-remote-apply-diff-core.js` (H2 targeted redraw gate).
 - **`gas-push-sync.js`**: Node-only. Replaces all Apps Script project files from `dist/` via API (deletes orphans). Used by `milestone.js` and `dev-push.js` instead of bare `clasp push`.
 - **`Security.js`**: Manages user authentication and extracts security profiles.
-- **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here.
+- **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here. Theme CSS vars marked `@THEME_VARS:dark|light` + `@THEME_CUSTOM` (baked by Visual Host).
+- **`theme-registry.json`**: Theme token registry (dark / light / custom). Source of truth for Visual Host bake.
+- **`visual-host.js`** + **`visual-host/`**: Local **Visual Host** theme playground (`npm run visual-host` → http://127.0.0.1:4177). UI element reports + token editors; **Save theme & bake** writes registry → `Styles.html` + theme engine + Personal Hub selects. Then ship with `node milestone.js`.
 - **`Styles_Mobile.html`**: Mobile-only CSS (`≤768px`) + crew hub / phase rail / timeline zoom / compact PA. Included after `Styles.html`.
-- **`07_Core_Globals.html`**: Centralized utility functions, live tag parsers, and the CSS theme engine initialization.
+- **`07_Core_Globals.html`**: Centralized utility functions, live tag parsers, and the CSS theme engine (`SM_THEME_REGISTRY`, `applyTheme`).
 - **`07b_Grid_Engine.html`**: The interactive Drag & Drop data grid core.
 - **`07c_Generalization_Engine.html`**: The Blueprint template engine.
 - **`08_Conflict_Manager.html`**: Renders the active triage drawer for resolving timeline and equipment conflicts.
@@ -84,7 +86,8 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`02e5_Logic_Sync.html`**: Optimistic syncing and delta calculations. *Quirk: Houses 'processFormulas()'.*
 - **`02g_Project_Reports.html`**: The Print Studio modal and logistics tree filtering. **Wired** in `Index.html` (required for `openPrintModal()` from Project Assets PRINT button).
 - **`Logistics_Assets.js`**: The master logistics aggregator for project assets on the backend.
-- **`Logistics_Ledger.js`**: Movement ledger SoT — arrange write (`logisticsLedgerWriteFromLayoutItems_`), M2 backfill (no-op after PA strip), AUTO clock stamp, RECOVERY `phase_ref`, review gaps API, reader overlay helpers.
+- **`Logistics_Ledger.js`**: Movement ledger SoT — arrange write, M2 backfill (no-op after PA strip), AUTO clock stamp, RECOVERY `phase_ref`, review gaps, reader overlay, M5 free-at resolver (`logisticsLedgerResolveProjectFreeAt_`).
+- **`Conflicts.js`**: Asset hard/soft via core overlap + ledger free-at (`phase_ref` → sub-event end); unique single-project false badge suppressed; `Conflict_Overrides` ack path.
 - **`Logistics_Projects.js`**: CRUD operations for project lifecycles.
 - **`Logistics_Roster.js`**: Month Matrix and un-paid scanner data operations.
 - **`Logistics_Schema.js`**: Relational engine schemas (incl. `Logistics_Ledger` tab bootstrap).
