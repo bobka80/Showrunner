@@ -2,7 +2,7 @@
 
 **Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md)
 
-**Generated:** 2026-07-24 · **Root HTML modules scanned:** 95
+**Generated:** 2026-07-25 · **Root HTML modules scanned:** 95
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 
@@ -56,6 +56,7 @@
 | `saveEventFromUI` | `02_Project_Editor_Core.html` |
 | `setProjectStatus` | `02_Project_Editor_Core.html` |
 | `triggerManualCrewEmail` | `02_Project_Editor_Core.html` |
+| `ensureDalWarmHubWorkspace` | `02_Project_Editor_Logistics.html` |
 | `generateLogisticsPayloadAPI` | `02_Project_Editor_Logistics.html` |
 | `getTimelineData` | `02_Project_Editor_Logistics.html`, `03a2_Timeline_Dal_Live.html`, `03a_Timeline_Boot.html` |
 | `saveTimelineData` | `02_Project_Editor_Logistics.html`, `03a_Timeline_Boot.html` |
@@ -197,7 +198,7 @@
 | 01i_Desktop_Lock.html | 2 | 1 |
 | 01j_Mobile_Scan.html | 4 | 3 |
 | 02_Project_Editor_Core.html | 10 | 0 |
-| 02_Project_Editor_Logistics.html | 7 | 1 |
+| 02_Project_Editor_Logistics.html | 8 | 1 |
 | 02_Project_Editor_Map.html | 0 | 0 |
 | 02a_Project_Equipment.html | 1 | 1 |
 | 02b_Project_Syntax.html | 0 | 0 |

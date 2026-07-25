@@ -101,7 +101,10 @@ Today `Operations_Ledger` is mostly checkout/check-in scans. During prep the led
 - [ ] Live sync for loaders + gate
 
 ### Phase D — Logistics hub fast path
-- [ ] Replace slow project-editor logistics hub during prep
+
+**Pulled into Campaign Room as R3b** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (after ledger slice R3, before 30m checkpoint R4).
+
+- [x] Replace slow project-editor logistics hub during warm room (R3b) — code path; smoke after ship
 - [ ] Auto-arrange: batch on fork or GAS job writing results to Firebase (compute strategy TBD — Firebase does not speed GAS CPU)
 
 ---

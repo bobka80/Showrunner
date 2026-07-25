@@ -591,6 +591,39 @@ function logisticsLedgerStampClocksFromHub_(sheets, projectId, logData) {
   return { updated: updated };
 }
 
+/**
+ * Campaign Room R3b — stamp Hub clocks onto in-memory leg objects (Firebase logistics/state).
+ * Same link rule as logisticsLedgerStampClocksFromHub_ (leg_id + truck_uid, top legs only).
+ */
+function logisticsLedgerStampClocksOnObjects_(legObjects, projectId, logData) {
+  var legs = Array.isArray(legObjects) ? legObjects : [];
+  if (!logData || !logData.generateTimes) return { legs: legs, updated: 0 };
+  var updated = 0;
+
+  function stampLeg(legId, truckUid, loadHr, unloadHr) {
+    for (var i = 0; i < legs.length; i++) {
+      var o = legs[i];
+      if (!o) continue;
+      if (String(o.project_uid || '') !== String(projectId)) continue;
+      if (String(o.parent_uid || '')) continue;
+      if (String(o.leg_id || '') !== legId) continue;
+      if (String(o.truck_uid || '') !== String(truckUid || '')) continue;
+      o.load_time = loadHr != null ? String(loadHr) : '';
+      o.unload_time = unloadHr != null ? String(unloadHr) : '';
+      updated++;
+    }
+  }
+
+  (logData.outTrucks || []).forEach(function (tUid) {
+    stampLeg('outbound', tUid, logData.outStartHr, (Number(logData.outStartHr) || 0) + (Number(logData.outDur) || 0));
+  });
+  (logData.inTrucks || []).forEach(function (tUid) {
+    stampLeg('inbound', tUid, logData.inStartHr, (Number(logData.inStartHr) || 0) + (Number(logData.inDur) || 0));
+  });
+
+  return { legs: legs, updated: updated };
+}
+
 // ==========================================
 // --- M3 READERS: ledger prefer, PA fallback ---
 // ==========================================

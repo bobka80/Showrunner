@@ -52,6 +52,26 @@ function dalAdapterFor_(projectId, domain) {
   return projectDataRouter(domain, resolveDalSessionStatus_(projectId, domain));
 }
 
+/** R3b — before PA write, seed prep under warm Campaign Room so router picks Firebase. */
+function dalMaybeSeedWarmHubForPaWrite_(projectId, actor) {
+  if (!projectId || projectId === 'NEW') return;
+  if (typeof dalCampaignRoomIsWarmForProject_ !== 'function' || !dalCampaignRoomIsWarmForProject_(projectId)) return;
+  if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN) return;
+  if (typeof dalEnsureWarmHubWorkspace_ !== 'function') {
+    throw new Error('WARM_HUB_SEED_FAILED: Campaign Room is warm but Hub seed is unavailable.');
+  }
+  var ens;
+  try {
+    ens = dalEnsureWarmHubWorkspace_(projectId, actor || 'System', {});
+  } catch (eSeed) {
+    throw eSeed;
+  }
+  if (!ens || !ens.warm ||
+      resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) !== DAL_SESSION.SESSION_OPEN) {
+    throw new Error('WARM_HUB_SEED_FAILED: Campaign Room is warm but prep did not open — PA Sheets write blocked.');
+  }
+}
+
 // ==========================================
 // --- SHEETS ADAPTER (delegates to *Sheets_* impls) ---
 // ==========================================
@@ -92,6 +112,7 @@ function createSheetsAdapter_() {
 function createProjectAssetsRepo_() {
   return {
     saveDelta: function (projectId, deltas, actor) {
+      dalMaybeSeedWarmHubForPaWrite_(projectId, actor);
       return dalAdapterFor_(projectId, DAL_DOMAIN.PROJECT_ASSETS).persistProjectAssetsDelta(projectId, deltas, actor);
     },
     getForProject: function (projectId, startDateStr, endDateStr) {

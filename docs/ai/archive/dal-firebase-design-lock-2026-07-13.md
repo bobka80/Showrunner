@@ -106,14 +106,16 @@ Sits **between UI and repos** — never inside adapters, never inside Firebase/S
 
 **Active build:** [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) · **Locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)
 
-When **Project Campaign Room** is warm, rules **1** and **2** above are **superseded** as follows (RFID / Logistics Hub atomic ops unchanged):
+When **Project Campaign Room** is warm, rules **1** and **2** above are **superseded** as follows (RFID atomic ops unchanged; Hub warm path = **R3b**):
 
 | Rule | Short-session (today / between rooms) | Campaign Room (warm) |
 |------|----------------------------------------|----------------------|
 | **1 — authority** | Sheets = SoT between sessions; Firebase = live buffer until End | Firebase = **active workspace**; Sheets = latest **published** durable record (may lag ≤ checkpoint interval). After End / idle close / between rooms: Sheets remains restore point. |
 | **2 — Sheets writes** | No mid-session Sheets sync — one commit at close | **Periodic publish checkpoints** (~30m, dirty-only) allowed while room stays live. Final publish on Explicit End / 48h idle close. |
 
-**Unchanged forever:** Rules 3–5 and 7; RFID `Operations_Ledger` / Logistics Hub **atomic per-op** Sheets path (never a room slice); no silent drop of failed publishes.
+**Unchanged forever:** Rules 3–5 and 7; RFID `Operations_Ledger` **atomic per-op** Sheets path (never a room slice); no silent drop of failed publishes.
+
+**Logistics Hub (revised 2026-07-25 — Campaign Room):** Older line “Hub forever Sheets atomic / never a room slice” is **superseded** while a Project Campaign Room is warm — Hub pack/fuse may target warm PA + ledger + timeline; Sheets durability via End / checkpoint. See [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) **R3b**. Cold / no-room path may still use atomic Sheets. RFID ops unchanged.
 
 **Until R1+ ships:** production still runs the short-session rules 1–2 above. This subsection is the doctrine text R1+ must implement against.
 

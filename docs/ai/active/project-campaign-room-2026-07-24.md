@@ -9,7 +9,7 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R3 shipping** (ledger slice). Smoke then **OK go for R4** (30m checkpoint).  
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R3b shipping**. After ship: smoke warm Hub, then **OK go for R4** (30m checkpoint).  
 **Production tip:** see RELEASES.md. Prep live rollback pin still **v654**.
 
 ---
@@ -55,16 +55,20 @@ One warm Firebase **Project Campaign Room** per project for show week:
 
 ---
 
-## Four slices
+## Four slices (+ Hub surface)
 
 | Slice | Firebase path | Sheets |
 |-------|---------------|--------|
-| **meta** | `projects/{id}/meta/` (propose) | Projects_Index campaign columns |
-| **PA** | `projects/{id}/assets/` *(exists)* | `Project_Assets` (no truck cols) |
-| **timeline** | `projects/{id}/timeline/` *(exists)* | shifts / `Phase_Blocks` / `Project_Timelines` |
-| **ledger** | `projects/{id}/logistics/` *(new)* | `Logistics_Ledger` |
+| **meta** | `projects/{id}/meta/` | Projects_Index campaign columns |
+| **PA** | `projects/{id}/assets/` | `Project_Assets` (no truck cols) |
+| **timeline** | `projects/{id}/timeline/` | shifts / `Phase_Blocks` / `Project_Timelines` |
+| **ledger** | `projects/{id}/logistics/` | `Logistics_Ledger` |
+
+**Logistics Hub** (project-editor pack / fuse-trucks button) is **not a fifth Firebase collection** — it is a **manager action surface** that must read/write the warm PA + ledger (+ timeline AUTO truck shifts) while the room is open. Today Hub is still cold Sheets atomic ([design lock](../archive/dal-firebase-design-lock-2026-07-13.md) § Logistics Hub). **Director 2026-07-25:** pull Hub into the warm room — see **R3b**.
 
 **Size caps (per state doc):** WARN 512 KiB / 1500; MAX 900 KiB / 4000.
+
+**Room open (R1):** Opening a **saved** project in the project editor calls `openOrJoinDalCampaignRoom` from `startPresencePing` — room goes **warm without** opening Project Assets or Timeline. PA/timeline forks still start only when those modules open (or auto-start).
 
 ---
 
@@ -72,7 +76,7 @@ One warm Firebase **Project Campaign Room** per project for show week:
 
 **KEEP:** `Dal_Router` / repos / adapters; reconcile; fail-safe backup/retry; host Auth/listen; calendar chrome reading room flags.
 
-**REPLACE / retarget:** dual-domain close triggers; last-leave / short idle as commit; orphan/refresh toward room; committing freeze for **End / idle-close only** — **not** routine 30m checkpoint.
+**REPLACE / retarget:** dual-domain close triggers; last-leave / short idle as commit; orphan/refresh toward room; committing freeze for **End / idle-close only** — **not** routine 30m checkpoint; **Logistics Hub** cold Sheets grind → warm-room pack/fuse (**R3b**).
 
 **Do not scrap the fork** — extend it into one warm room.
 
@@ -86,10 +90,11 @@ Canonical text: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/d
 |--------------------------|---------------------------|
 | Rule 1 — Sheets between sessions | While room warm: Firebase = active workspace; Sheets = latest **published** durable record (may lag ≤ checkpoint). Between rooms / after End: Sheets restore point. |
 | Rule 2 — no periodic sync | Periodic **publish checkpoints** allowed during active Campaign Room. Final publish on End / idle close. RFID ops remain per-op atomic. |
+| Logistics Hub “forever Sheets atomic” | **Superseded for Campaign Room (director 2026-07-25):** Hub may run against **warm** PA + ledger + timeline; durable Sheets via End / checkpoint. RFID `Operations_Ledger` stays atomic/outside forever. |
 
-Pointers: [../topics/session-fork-platform.md](../topics/session-fork-platform.md) § Future · [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) idle note.
+Pointers: [../topics/session-fork-platform.md](../topics/session-fork-platform.md) § Future · [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) idle note · [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md) Phase D.
 
-**Until R1+ ships:** production still runs short-session rules 1–2.
+**Until R1+ ships:** production still runs short-session rules 1–2. **R3b:** Hub uses warm room when Campaign Room is open.
 
 ---
 
@@ -211,6 +216,7 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 - [x] Director **OK go** for **R1** code (room registry + meta slice) — 2026-07-24
 - [x] Director **OK go** for **R2** (unify PA + timeline under room uid) — 2026-07-24
 - [x] Director **OK go** for **R3** (ledger slice in room) — 2026-07-24
+- [x] Director **OK go** for **R3b** (warm Logistics Hub) — 2026-07-25
 - [ ] Director **OK go** for **R4** (30m publish checkpoint)
 
 ### R0 — Doctrine + inventory (no lifecycle code)
@@ -241,7 +247,19 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 - [x] `projects/{id}/logistics/` live path + GAS snapshot/write/commit (`state` + `_meta`)
 - [x] Arrange / ledger writers honor warm room (Firebase) vs published (Sheets)
 - [x] Size WARN/MAX for logistics state
-- [ ] Ship + smoke: truck arrange in warm room; Sheets unchanged until publish
+- [x] Ship + smoke: truck arrange in warm room; Sheets unchanged until publish — **shipped GAS v744**; director smoke next
+
+### R3b — Warm Logistics Hub (pack / fuse trucks)
+
+**Why here:** Ledger + PA are already warm (R3). Hub needs those slices before checkpoint polish (R4). Pulls [warehouse-prep Phase D](../topics/warehouse-prep-session.md) into this campaign.
+
+- [x] Director **OK go** for **R3b** (warm Hub) — 2026-07-25
+- [x] File design-lock note: Hub warm-room path allowed; RFID ops still outside forever — **filed 2026-07-25** in design-lock § Campaign Room revision
+- [x] Hub pack / fuse reads & writes warm PA + `logistics/state` (+ timeline AUTO-OUTBOUND/INBOUND as today, linked to legs)
+- [x] No full cold Sheets grind while room warm; durable via END ROOM / later checkpoint
+- [x] Keep Hub as button-press transaction semantics (one Hub action = one coherent warm write), not continuous Hub autosave
+- [x] `dalEnsureWarmHubWorkspace_` — room warm + seed prep (and timeline when GENERATE clocks); Hub open / arrange / generate / PA delta use it
+- [ ] Ship + smoke: open project editor only (room warm) → Hub pack/fuse → arrangement visible in PA/arrange → Sheets lag until END ROOM
 
 ### R4 — 30m publish checkpoint
 
@@ -283,4 +301,6 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 | 2026-07-24 | **R1 shipped @ GAS v741** — Index `Dal_Campaign_*`, `openOrJoinDalCampaignRoom`, Firebase `meta/state`, calendar green room dot + editor chrome. Firestore rules deployed. Next: director smoke → **OK go for R2**. |
 | 2026-07-24 | **R2 shipped @ GAS v742** — `_meta.roomUid`, soft leave/idle/orphan when warm, `closeDalCampaignRoom` + END ROOM. Next: smoke → **OK go for R3**. |
 | 2026-07-24 | END ROOM moved to project editor (@ v743). |
-| 2026-07-24 | **R3 implemented** — `logistics/state` warm arrange; End commits ledger. Ship pending. |)
+| 2026-07-24 | **R3 shipped @ GAS v744** — `logistics/state` warm arrange; END ROOM commits ledger; Bugbot Highs fixed. Next: smoke → **OK go for R4**. |
+| 2026-07-25 | Director: Logistics Hub must be in warm room. Filed **R3b** (after ledger, before checkpoint). Confirmed: project editor alone warms room (R1). |
+| 2026-07-25 | **OK go R3b** — warm Hub: `dalEnsureWarmHubWorkspace_`, arrange/generate/pack → Firebase; cold fallback when room not warm. |)

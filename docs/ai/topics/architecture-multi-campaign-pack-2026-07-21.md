@@ -245,8 +245,9 @@ For **each** of meta / PA / timeline / ledger:
 
 ## 9. Recommended first build after this pack
 
-**Project Campaign Room R3** — logistics warm slice shipping.  
-After smoke: say **OK go for R4** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (30m publish checkpoint).
+**Project Campaign Room R3b** — warm Logistics Hub shipping.  
+After smoke: say **OK go for R4** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (30m publish checkpoint).  
+Brief: [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).
 
 ---
 

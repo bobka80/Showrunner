@@ -1080,6 +1080,91 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
   };
 }
 
+/** True when Projects_Index shows a live Campaign Room for this project. */
+function dalCampaignRoomIsWarmForProject_(projectId) {
+  if (!projectId || projectId === 'NEW') return false;
+  if (dalLiveForksPaused_()) return false;
+  try {
+    var sheets = verifyDatabaseSchema(true);
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) return false;
+    var camp = dalReadCampaignRoom_(row);
+    return !!(camp.campaignRoomWarm || (camp.campaignRoomUid && dalStatusIsForkLive_(camp.campaignStatus)));
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Campaign Room R3b — seed warm Hub workspace under the open room.
+ * Opens prep (PA + logistics snapshot) when room is warm but prep closed.
+ * Optionally opens timeline collab when Hub needs AUTO truck shifts.
+ * Soft-returns { warm:false } when room cannot open (pause / excluded / no Firebase).
+ */
+function dalEnsureWarmHubWorkspace_(projectId, actor, opts) {
+  actor = actor || 'System';
+  opts = opts || {};
+  if (!projectId || projectId === 'NEW') throw new Error('Missing projectId.');
+
+  var room = openOrJoinDalCampaignRoom(projectId, actor);
+  if (!room || !room.campaignRoomWarm) {
+    return {
+      warm: false,
+      reason: (room && room.reason) || 'room_not_warm',
+      campaignRoomUid: (room && room.campaignRoomUid) || '',
+      prepOpen: false,
+      timelineOpen: false
+    };
+  }
+
+  var roomUid = String(room.campaignRoomUid || '');
+  var prepOpen = resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN;
+  var timelineOpen = resolveDalSessionStatus_(projectId, DAL_DOMAIN.TIMELINE) === DAL_SESSION.SESSION_OPEN;
+
+  if (!prepOpen) {
+    openDalSession(projectId, DAL_SESSION_TYPE.PREP, actor);
+    prepOpen = true;
+  } else {
+    // Prep already open — ensure logistics state exists for Hub arrange/clocks.
+    try {
+      var ll = dalReadLogisticsStateFromFirestore_(projectId);
+      if (!ll || !ll.present) {
+        dalSnapshotLogisticsToFirestore_(projectId, roomUid, actor);
+      }
+    } catch (eLl) {
+      try { dalSnapshotLogisticsToFirestore_(projectId, roomUid, actor); } catch (eLl2) { /* arrange seeds */ }
+    }
+  }
+
+  if (opts.needTimeline && !timelineOpen) {
+    openDalSession(projectId, DAL_SESSION_TYPE.TIMELINE_COLLAB, actor);
+    timelineOpen = true;
+  }
+
+  try {
+    var sheetsAct = verifyDatabaseSchema();
+    var rowAct = dalGetProjectIndexRow_(projectId, sheetsAct);
+    if (rowAct) {
+      dalWriteCampaignRoom_(sheetsAct.index, rowAct.rowNum, rowAct.map, {
+        campaignLastActivityAt: new Date().toISOString()
+      });
+    }
+  } catch (eAct) { /* ignore */ }
+
+  return {
+    warm: true,
+    campaignRoomUid: roomUid,
+    prepOpen: prepOpen,
+    timelineOpen: timelineOpen || !!opts.needTimeline,
+    seeded: true
+  };
+}
+
+/** google.script.run — Hub open / pack / arrange / generate warm gate. */
+function ensureDalWarmHubWorkspace(projectId, actor, opts) {
+  return dalEnsureWarmHubWorkspace_(projectId, actor, opts || {});
+}
+
 /**
  * Mass-abandon open/opening/committing prep + timeline flags on Projects_Index.
  * Does NOT commit Firebase → Sheets (Sheets stay SoT while forks are paused/broken).

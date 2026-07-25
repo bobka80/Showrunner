@@ -182,11 +182,13 @@ function openLogisticsHubModal() {
         };
 
         const fetchAssets = () => {
-            if (window.paLoadedForProject === projectId && currentProjectAssets.length >= 0) {
+            // Force warm refresh after Hub seed so truck overlay comes from logistics/state.
+            if (window.paLoadedForProject === projectId && currentProjectAssets.length >= 0 && !window._hubForcePaReload_) {
                 targetAssets = { current: currentProjectAssets, overlapping: window.overlappingAllocations };
                 fetchTimeline();
                 return;
             }
+            window._hubForcePaReload_ = false;
             google.script.run
             .withFailureHandler(err => {
                 if (btn) { btn.innerText = origText; btn.disabled = false; }
@@ -198,13 +200,101 @@ function openLogisticsHubModal() {
             }).getProjectAssets(projectId, sDate, eDate);
         };
 
-        if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
-            google.script.run.withFailureHandler(err => { if (btn) { btn.innerText = origText; btn.disabled = false; } alert("Error loading vault: " + err.message); }).withSuccessHandler(assets => { globalAssets = assets || []; fetchAssets(); }).getAssetRegistry(ACTIVE_USER_NAME);
-        } else {
-            fetchAssets();
-        }
+        const startHubLoads = () => {
+            if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
+                google.script.run.withFailureHandler(err => { if (btn) { btn.innerText = origText; btn.disabled = false; } alert("Error loading vault: " + err.message); }).withSuccessHandler(assets => { globalAssets = assets || []; fetchAssets(); }).getAssetRegistry(ACTIVE_USER_NAME);
+            } else {
+                fetchAssets();
+            }
+        };
+
+        // R3b: seed prep under warm Campaign Room before Hub reads (editor-only → warm Hub).
+        google.script.run
+            .withFailureHandler(function () { startHubLoads(); })
+            .withSuccessHandler(function (ens) {
+                if (ens && ens.warm) {
+                    window._hubForcePaReload_ = true;
+                    window.peForkRoomActive_ = true;
+                    if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+                        try { window.refreshProjectEditorForkChrome_(projectId); } catch (eChrome) { /* ignore */ }
+                    }
+                }
+                startHubLoads();
+            })
+            .ensureDalWarmHubWorkspace(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI', {});
     } else {
-        proceedToHub();
+        // R3b: assets already cached — still seed warm Hub workspace, then refresh PA/timeline.
+        let btnFast = document.getElementById('logistics-hub-btn-layers') || document.getElementById('logistics-hub-btn');
+        let origFast = btnFast ? btnFast.innerText : 'LOGISTICS HUB';
+        if (btnFast) { btnFast.innerText = 'OPENING HUB...'; btnFast.disabled = true; }
+        let sDateFast = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+        let eDateFast = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
+        const finishFastHub_ = function (tData) {
+            if (btnFast) { btnFast.innerText = origFast; btnFast.disabled = false; }
+            proceedToHub(tData);
+        };
+        const afterSeedFast_ = function () {
+            google.script.run
+                .withFailureHandler(function () {
+                    google.script.run
+                        .withFailureHandler(function () { finishFastHub_(null); })
+                        .withSuccessHandler(finishFastHub_)
+                        .getTimelineData(projectId, 'main');
+                })
+                .withSuccessHandler(function (res) {
+                    currentProjectAssets = (res && res.current) || currentProjectAssets || [];
+                    window.overlappingAllocations = (res && res.overlapping) || window.overlappingAllocations || {};
+                    const processFormulasFast = (arr) => {
+                        let exploded = [];
+                        for (let i = arr.length - 1; i >= 0; i--) {
+                            let pa = arr[i];
+                            let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
+                            if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') {
+                                let parsedQty = parseInt(pa.qty, 10);
+                                if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
+                                    arr.splice(i, 1);
+                                    for (let k = 0; k < parsedQty; k++) {
+                                        let newPa = {...pa, qty: 1};
+                                        delete newPa.uid;
+                                        exploded.push(newPa);
+                                    }
+                                }
+                            }
+                        }
+                        if (exploded.length > 0) arr.push(...exploded);
+                        arr.forEach(pa => {
+                            if (pa.formula === 'Manual') pa.formula = 'Standalone';
+                            if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
+                            if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
+                            if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; }
+                            else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
+                            else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
+                            else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
+                        });
+                    };
+                    processFormulasFast(currentProjectAssets);
+                    window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                    processFormulasFast(window.originalProjectAssets);
+                    window.paLoadedForProject = projectId;
+                    google.script.run
+                        .withFailureHandler(function () { finishFastHub_(null); })
+                        .withSuccessHandler(finishFastHub_)
+                        .getTimelineData(projectId, 'main');
+                })
+                .getProjectAssets(projectId, sDateFast, eDateFast);
+        };
+        google.script.run
+            .withFailureHandler(function () { afterSeedFast_(); })
+            .withSuccessHandler(function (ens) {
+                if (ens && ens.warm) {
+                    window.peForkRoomActive_ = true;
+                    if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+                        try { window.refreshProjectEditorForkChrome_(projectId); } catch (eChrome2) { /* ignore */ }
+                    }
+                }
+                afterSeedFast_();
+            })
+            .ensureDalWarmHubWorkspace(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI', {});
     }
 }
 
@@ -473,6 +563,7 @@ window.executeLogisticsHub = function() {
 };
 
 window.toggleAutoArrangeHub = async function(leg) {
+    leg = leg || 'outbound';
     let isSym = document.getElementById('logistics-symmetrical-toggle').checked;
     let trucks = [];
     if (leg === 'outbound') {
