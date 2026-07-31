@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
           let safeTitle = typeof escapeHTML === 'function' ? escapeHTML(arg.event.title) : String(arg.event.title).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-          // Fork chrome: orange (PA) / amber (PA committing); blue / light-blue timeline; green campaign room
+          // Fork chrome: green campaign-room warm only (no PA orange / timeline blue).
           let forkFlags;
           if (window.calForkFlagsReady_) {
             forkFlags = (window.calForkFlags_ && window.calForkFlags_[arg.event.id])
@@ -196,32 +196,13 @@ document.addEventListener('DOMContentLoaded', function() {
             };
           }
           let forkDotsHtml = '';
-          if (forkFlags.prep || forkFlags.timeline || forkFlags.room) {
-            let prepColor = forkFlags.prepCommitting ? '#fbbf24' : '#f97316';
-            let tlColor = forkFlags.timelineCommitting ? '#93c5fd' : '#3b82f6';
+          if (forkFlags.room) {
             let roomColor = forkFlags.roomCommitting ? '#86efac' : '#22c55e';
-            let tipParts = [];
-            if (forkFlags.room) {
-              tipParts.push(forkFlags.roomCommitting ? 'Campaign room committing' : 'Campaign room warm');
-            }
-            if (forkFlags.prep) {
-              tipParts.push(forkFlags.prepCommitting ? 'PA fork committing to Sheets' : 'PA fork live on Firebase');
-            }
-            if (forkFlags.timeline) {
-              tipParts.push(forkFlags.timelineCommitting ? 'Timeline fork committing' : 'Timeline fork live');
-            }
+            let tip = forkFlags.roomCommitting ? 'Campaign room committing' : 'Campaign room warm';
             forkDotsHtml =
-              '<span class="cal-fork-dots" title="' + tipParts.join(' · ') +
-              '" style="display:inline-flex;flex-direction:column;justify-content:center;gap:2px;margin-left:6px;flex-shrink:0;">' +
-              (forkFlags.room
-                ? '<span style="width:6px;height:6px;border-radius:50%;background:' + roomColor + ';box-shadow:0 0 3px ' + roomColor + ';"></span>'
-                : '<span style="width:6px;height:6px;visibility:hidden;"></span>') +
-              (forkFlags.prep
-                ? '<span style="width:6px;height:6px;border-radius:50%;background:' + prepColor + ';box-shadow:0 0 3px ' + prepColor + ';"></span>'
-                : '<span style="width:6px;height:6px;visibility:hidden;"></span>') +
-              (forkFlags.timeline
-                ? '<span style="width:6px;height:6px;border-radius:50%;background:' + tlColor + ';box-shadow:0 0 3px ' + tlColor + ';"></span>'
-                : '<span style="width:6px;height:6px;visibility:hidden;"></span>') +
+              '<span class="cal-fork-dots" title="' + tip +
+              '" style="display:inline-flex;align-items:center;margin-left:6px;flex-shrink:0;">' +
+              '<span style="width:6px;height:6px;border-radius:50%;background:' + roomColor + ';"></span>' +
               '</span>';
           }
 

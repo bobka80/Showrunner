@@ -179,7 +179,7 @@ While Campaign Room is warm, module **END PREP** / **END COLLAB** stay hidden �
 
 Presence still updates OPEN TIMELINE label when others are inside (`👥 … IN TIMELINE`) but **never disables** the button. Paint lives in `paintProjectEditorModuleBtns_` / `refreshProjectEditorForkChrome_` (`02_Project_Editor_Core.html`).
 
-**Main calendar rollup strips:** after the event name, stacked fork dots (orange on top = PA / prep **live**; **amber** = PA **committing** to Sheets; blue underneath = timeline live; light-blue = timeline committing). Source: `getOpenDalForkMap` (Sheets Index status) + adaptive poll 4s while lit / 15s idle (`01a_Calendar_Core.html`). Dot staying lit after leave means the fork/commit is not finished yet — not a wrong indicator.
+**Main calendar rollup strips:** after the event name, a single **green** dot when the Campaign Room is warm (light green while committing). No PA orange / timeline blue dots. No glow on the room dot. Source: `getOpenDalForkMap` + adaptive poll 4s while lit / 15s idle (`01a_Calendar_Core.html`).
 
 **Phone / station:** fixed bottom `#surface-fork-sync-bar` — orange in PA when prep fork live, blue in timeline when collab fork live (`dalPaintSurfaceForkSyncBar_`). Desktop keeps vault / crew-column SYNC panels.
 
