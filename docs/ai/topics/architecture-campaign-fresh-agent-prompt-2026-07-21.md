@@ -38,7 +38,7 @@ docs/ai/topics/architecture-campaign-director-locks-2026-07-21.md
 Key locks (summary — full file wins):
 - Order: Part B B7 archive → Logistics Ledger → Project Campaign Room → sync protocol
 - Offer / Availability is OFF the critical path (parallel or later)
-- RFID Operations_Ledger forever outside the live room
+- RFID Operations_Ledger = **fifth warm slice** (`ops_ledger` = `warm_fifth_slice`, 2026-07-31) — not forever outside; still separate from Logistics_Ledger movement
 - 48h = idle silence timer; resets on room-slice WRITE (meta/PA/ledger/timeline) OR station docked; presence alone does NOT reset
 - Keep Explicit End / Publish now
 - One campaignRoomUid covering meta + PA + ledger + timeline

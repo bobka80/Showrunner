@@ -25,11 +25,11 @@
 |-------|----------|--------|
 | 0 | Multi-user Part B — B7 → archive | **DONE 2026-07-21** |
 | 1 | Logistics Ledger (M0–M5) | **DONE** — archived |
-| 2 | Project Campaign Room | **ACTIVE** — 48h idle; warm Firebase; Sheets publish |
+| 2 | Project Campaign Room | **ACTIVE** — five slices; N-day idle (48h default); warm Firebase; Sheets publish |
 | 3 | Hierarchical delta / packet sync | Separate, later |
 | — | Offer / Availability | **Off critical path** (parallel or later) |
 
-RFID `Operations_Ledger` stays **atomic / outside the room permanently**.
+RFID `Operations_Ledger` is the **fifth warm slice** (`ops_ledger` = `warm_fifth_slice`, reopened 2026-07-31). Still **outside** the room: vault, tracker conflicts, crew roster, financials, offers.
 
 ---
 
@@ -37,17 +37,20 @@ RFID `Operations_Ledger` stays **atomic / outside the room permanently**.
 
 | ID | Pick | Meaning |
 |----|------|---------|
-| `idle_touch` | `write_or_station` | Timer resets on any room-slice write (meta / PA / ledger / **timeline**) **or** station docked on that project. Presence alone does **not** reset. |
+| `idle_touch` | `write_or_station` | Timer resets on any room-slice write (meta / PA / ledger / timeline / **ops**) **or** station docked on that project. Presence alone does **not** reset. |
 | `explicit_end` | `yes_end` | Keep Explicit End / Publish now beside idle close. |
 | `conflict_warm_read` | `hybrid_badge` | Tracker/Conflicts: Sheets publish by default + optional Live preview; ledger **and** timeline together. |
 | `offer_pull_warm` | `firebase_oneshot` | Offer pull = one-shot from live Firebase (incl. timeline), then freeze in the offer. |
-| `checkpoint_scope` | `all_four_tl_before_ledger` | Always publish **meta → PA → timeline → ledger** (timeline before ledger for `phase_ref` / load windows). |
+| `checkpoint_scope` | `all_five_ops_last` | Always publish **meta → PA → timeline → ledger → ops** (timeline before ledger for `phase_ref` / load windows; ops last). |
 | `checkpoint_interval` | `fixed_30` | Fixed ~30 minutes. |
-| `room_registry` | `one_uid` | One `campaignRoomUid` covers meta, PA, ledger, timeline together. |
+| `room_registry` | `one_uid` | One `campaignRoomUid` covers meta, PA, timeline, ledger, **ops** together. |
+| `ops_ledger` | `warm_fifth_slice` | **Reopened 2026-07-31** (was `forever_out`). RFID ops journal is a warm room slice; Firebase live while warm; Sheets via checkpoint/End; fail-safe ≥ PA B/C; no silent scan loss. |
+| `listener_scope` | `active_user` | Listeners follow the active user across projects; do not linger on warm-but-empty rooms. |
+| `idle_ms_constant` | `single_knob` | One named constant (default 48h); 168h / 240h is config, not rearchitecture. |
 
-**Idle model (supersedes earlier “48h lease / hard expiry”):** room stays open while activity continues; auto-closes after **48 continuous hours with no qualifying activity**. Config number, not architecture.
+**Idle model (supersedes earlier “48h lease / hard expiry”):** room stays open while activity continues; auto-closes after **N continuous hours with no qualifying activity** (default **48h**). Config number, not architecture.
 
-**Presence:** keep for roster UX; do **not** use last-leave / short idle as commit triggers once Campaign Room ships.
+**Presence:** keep for roster UX; do **not** use last-leave / short idle as commit triggers once Campaign Room ships. Listeners ≠ idle clock.
 
 ---
 
@@ -81,18 +84,20 @@ RFID `Operations_Ledger` stays **atomic / outside the room permanently**.
 | ID | Pick | Meaning |
 |----|------|---------|
 | `offer_path` | `off_path` | Full Offer campaign not between Part B and Ledger. |
-| `ops_ledger` | `forever_out` | RFID ops ledger never enters the live room. |
+| `ops_ledger` | `warm_fifth_slice` | **Reopened 2026-07-31** — see Campaign Room locks (was `forever_out`). |
 
 ---
 
 ## Still open at Room promote (not Ledger blockers)
 
 - Checkpoint-fail escalation (lag > N hours) — R4  
-- Exact Index campaign column names + station-dock server rule — **proposed in R0** ([../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) § R0 proposals); confirm with **OK go for R1**  
+- Meta identity elevation + ops fifth slice — **R3c / R3d** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md)  
 - Whether soft free-at should later retarget from **sub-event** to a real **phase** (`Phase_Blocks`) — director discussion pending  
 - Whether to rename column `phase_ref` → a sub-event-clear name — deferred  
 
-**Filed in R0 (2026-07-24):** design-lock rules 1–2 revision — [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision.
+**Filed in R0 (2026-07-24):** design-lock rules 1–2 revision — [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision.  
+
+**Filed 2026-07-31:** five-slice architecture; `ops_ledger` → `warm_fifth_slice`; meta identity gap; listener-follows-user.
 
 **Filed:** Sheets ↔ Firebase room-slice parity checklist lives in [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md) §6.
 

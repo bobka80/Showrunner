@@ -23,6 +23,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | Document | Purpose |
 |----------|---------|
 | [DIRECTOR_WORKFLOW.md](DIRECTOR_WORKFLOW.md) | Brainstorm vs build; how the director works with AI |
+| [STUCK_LOOP_GATE.md](STUCK_LOOP_GATE.md) | Mid-build stop after 2–3 same-signature failures · Summary/Survey sync (Rule 13) |
 | [CURSOR_WORKFLOW.md](CURSOR_WORKFLOW.md) | Cursor rules, subagents, Bugbot/security gates, session routine |
 | [CLAUDE_PACK.md](CLAUDE_PACK.md) | Repomix pack for Claude project knowledge (`node create-repomix.js`) |
 | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) | Pre-flight checklist before dangerous edits |
@@ -72,6 +73,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | **JSON / sheet shapes** | [SCHEMA.md](SCHEMA.md) | ProjectAsset fields |
 | **UI structure rules** | [UI_DOCTRINE.md](UI_DOCTRINE.md) | Buttons, modals |
 | **Deploy / rollback** | [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) · [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) | milestone.js · pre-ship.js |
+| **Standing process gate (cross-cutting)** | Stable file in `docs/ai/` + Rule in [AI_DOCTRINE.md](../../AI_DOCTRINE.md) + link from workflow | [STUCK_LOOP_GATE.md](STUCK_LOOP_GATE.md) · Gate 0.5 in [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md) |
 | **Incident learned the hard way** | [FRAGILE_ZONES.md](FRAGILE_ZONES.md) incident log — **director approval only** | Black screen postmortem |
 
 **When expanding the system:** add stable reference docs to the table in this README and one task-routing line in [AI_DOCTRINE.md](../../AI_DOCTRINE.md). Add topic backlogs under `topics/` only for **work remaining**.

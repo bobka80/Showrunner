@@ -18,7 +18,7 @@ Today, truck placement lives as **12 columns on every equipment-list row**, whil
 
 > **Terminology:** [GLOSSARY.md](../GLOSSARY.md) — **Sub-events** = `Project_Timelines`. **Phases** = `Phase_Blocks` (timeline header). Never call sub-events “phases.”
 
-**Project Campaign Room** (after Ledger) keeps one warm Firebase workspace for show week: meta + PA + timeline + ledger under one `campaignRoomUid`, publishes to Sheets every ~30 minutes, and auto-closes after **48 hours of silence** (writes or station dock — not mere presence). Explicit End stays.
+**Project Campaign Room** (after Ledger) keeps one warm Firebase workspace: **five slices** (meta + PA + timeline + ledger + **ops**) under one `campaignRoomUid`, publishes to Sheets every ~30 minutes, and auto-closes after **N-day silence** (default **48h**; single config constant). Explicit End stays. Listeners follow active users.
 
 **Packet sync** stays later — not redesigned here.
 
@@ -32,10 +32,10 @@ Building the room **before** Ledger would embed truck fields in Firebase twice. 
 |------|----------|----------------|
 | **0** | Multi-user Part B | **DONE 2026-07-21** — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) |
 | **1** | Logistics Ledger M0–M5 | PA truck cols gone; ledger SoT; Conflicts on ledger + **sub-event**; dual-write retired |
-| **2** | Project Campaign Room | 48h idle timer; ~30m publish meta→PA→timeline→ledger; one room uid; design-lock rules 1–2 revised |
+| **2** | Project Campaign Room | N-day idle (48h default); ~30m publish meta→PA→timeline→ledger→**ops**; one room uid; five-slice architecture |
 | **3** | Hierarchical delta / packet sync | Separate later |
 | — | Offer / Availability | **Off critical path** (parallel or later) |
-| — | RFID `Operations_Ledger` | **Forever outside** the live room |
+| — | Out of room (by design) | Vault, tracker conflicts, crew roster, financials, offers — **not** ops (ops is fifth slice as of 2026-07-31) |
 
 **Do not start Gate 2 until Gate 1 M4+ (PA truck strip + Firebase mapper strip) is proven.**  
 **Do not start Gate 3 inside Room build.**
@@ -146,29 +146,32 @@ Engine tab **`Logistics_Ledger`** = single source of truth for movement / stagin
 ## 4. Campaign 2 — Project Campaign Room
 
 ### Goal
-One warm Firebase **Project Campaign Room** per project: less commit/reopen churn; Sheets durable via ~30m checkpoints; 48h **idle silence** auto-close. Explicit End stays.
+One warm Firebase **Project Campaign Room** per project: less commit/reopen churn; Sheets durable via ~30m checkpoints; N-day **idle silence** auto-close (default 48h). Explicit End stays. **Five slices** including ops (director 2026-07-31).
 
 ### Idle / End / presence / checkpoint / warm-read (locks)
 
-- **Idle 48h:** resets on room-slice **WRITE** (meta / PA / ledger / timeline) **or** station docked. Presence alone does **not** reset.
+- **Idle N-day (default 48h):** resets on room-slice **WRITE** (meta / PA / ledger / timeline / **ops**) **or** station docked. Presence alone does **not** reset. Single named constant.
 - **Explicit End / Publish now** — keep.
-- **Checkpoint:** fixed ~30m; always **meta → PA → timeline → ledger**; room stays live.
+- **Checkpoint:** fixed ~30m; always **meta → PA → timeline → ledger → ops**; room stays live.
 - **Warm read:** Sheets by default; optional Live preview = ledger **and** timeline together.
 - **Offer pull while warm:** one-shot from Firebase, then freeze.
-- **Registry:** one `campaignRoomUid` for all four slices.
+- **Registry:** one `campaignRoomUid` for all **five** slices.
+- **Listeners:** follow active user; do not linger on warm-but-empty rooms.
 
-### Four slices + Firebase paths
+### Five slices + Firebase paths
 
 | Slice | Path | Sheets |
 |-------|------|--------|
-| **meta** | `projects/{id}/meta/` (propose) | Projects_Index campaign columns |
-| **PA** | `projects/{id}/assets/` *(exists)* | `Project_Assets` (no truck cols post-M4) |
-| **timeline** | `projects/{id}/timeline/` *(exists)* | shifts / blocks / timelines |
-| **ledger** | `projects/{id}/logistics/` *(new)* | `Logistics_Ledger` |
+| **meta** | `projects/{id}/meta/` | Projects_Index + identity / sub-events (R3c expands beyond lifecycle stamps) |
+| **PA** | `projects/{id}/assets/` | `Project_Assets` (no truck cols post-M4) |
+| **timeline** | `projects/{id}/timeline/` | shifts / phases |
+| **ledger** | `projects/{id}/logistics/` | `Logistics_Ledger` |
+| **ops** | `projects/{id}/ops/` *(R3d)* | `Operations_Ledger` |
 
-**Outside forever:** RFID `Operations_Ledger` / `ledgerOps`, vault, financials.
+**Outside room (by design):** vault, tracker conflicts, crew roster, financials, offers.  
+**Ops** is **inside** the room as of 2026-07-31 (still a separate journal from logistics movement — do not merge domains).
 
-**Size caps:** WARN 512 KiB / 1500; MAX 900 KiB / 4000 per state doc.
+**Size caps:** WARN 512 KiB / 1500; MAX 900 KiB / 4000 per state doc. Ops fail-safe ≥ PA B/C.
 
 ### Lifecycle: keep vs replace
 
@@ -245,8 +248,8 @@ For **each** of meta / PA / timeline / ledger:
 
 ## 9. Recommended first build after this pack
 
-**Project Campaign Room R3b** — warm Logistics Hub shipping.  
-After smoke: say **OK go for R4** on [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (30m publish checkpoint).  
+**Project Campaign Room** — five-slice architecture filed 2026-07-31.  
+Next preferred: **OK go for R3c** (expand meta identity), then **R3d** (ops slice), then R4.  
 Brief: [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).
 
 ---

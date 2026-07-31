@@ -75,7 +75,7 @@ Single giant Firebase document for “everything in the project.” **Not recomm
 | Data | Why stay out |
 |------|----------------|
 | **Vault / master equipment** | Global reference, not per-project working copy |
-| **`Operations_Ledger`** (RFID scans) | Design lock: atomic per-op Sheets path, not session fork |
+| **`Operations_Ledger`** (RFID scans) | **Fifth warm slice** (director 2026-07-31) — Firebase while room warm; Sheets via checkpoint/End; fail-safe ≥ B/C. Until R3d ships: still Sheets-primary in production. |
 | **Offers / invoices / financials** | Snapshot after pull; not live-synced with timeline |
 | **Equipment Tracker / Conflicts** | Cross-project **read/compute** surfaces; consume **published** ledger + PA, not the live room itself |
 | **Crew roster / vault / global tasks** | Not project-editor working set |

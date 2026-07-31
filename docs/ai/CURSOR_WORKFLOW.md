@@ -4,7 +4,7 @@
 
 This doc maps **Cursor IDE features** (rules, skills, subagents, review agents) onto the doctrine you already use. It does not replace `AI_DOCTRINE.md` — it is the stable reference for *how to run sessions in Cursor*.
 
-`Last swept:` 2026-07-19 · `Production:` see `RELEASES.md` tip (GAS **v654**)
+`Last swept:` 2026-07-31 · `Production:` see `RELEASES.md` tip
 
 ---
 
@@ -53,6 +53,10 @@ Examples: *"Active drawer: RFID station"* · *"Read mobile-crew topic"* · *"FRA
 
 One clear outcome per build session (e.g. scan panel camera, not camera + notifications + warehouse).
 
+### 3b. Stuck Loop Gate (during build)
+
+If the **same symptom** keeps failing in the same area **2–3 times**, the agent **stops** and runs Summary + Survey sync — **[STUCK_LOOP_GATE.md](STUCK_LOOP_GATE.md)** (doctrine Rule 13). Do not burn tokens on a 4th silent patch or jump to a heavier model first. Log trips in [error-journal/](error-journal/).
+
 ### 4. Ship
 
 1. Mechanical **pre-ship** runs inside ship scripts (or preview: `node pre-ship.js --dry-run`).
@@ -74,7 +78,7 @@ One clear outcome per build session (e.g. scan panel camera, not camera + notifi
 | Also (manual director phrase) | When |
 |------|----------------|
 | Auth, session, FCM, station bridge (extra) | **"Security review before ship"** |
-| Stuck after two fix attempts | **"Use heavier reasoning"** |
+| Stuck after two fix attempts | First: [STUCK_LOOP_GATE.md](STUCK_LOOP_GATE.md) Summary/Survey · then **"Use heavier reasoning"** if concept matches doc |
 | PWA UI verification | **"Verify on web.app with the browser tool"** |
 
 Policy: `pre-ship/bugbot-policy.js` · report: `pre-ship/last-report.json`

@@ -4,97 +4,113 @@
 **Decision brief:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)  
 **Architecture pack §4:** [../topics/architecture-multi-campaign-pack-2026-07-21.md](../topics/architecture-multi-campaign-pack-2026-07-21.md)  
 **Director locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
-**Design lock to revise:** [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) rules 1–2  
+**Design lock:** [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision  
 **Predecessor:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md) (M0–M5 + Exit **COMPLETE**)  
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R3b shipping**. After ship: smoke warm Hub, then **OK go for R4** (30m checkpoint).  
-**Production tip:** see RELEASES.md. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **Five-slice architecture filed 2026-07-31**. Next preferred: **OK go for R3c** (expand meta identity), then **R3d** (ops slice), then **R4**.  
+**Production tip:** see RELEASES.md. Latest room ships: R3b Hub @ **GAS v745**. Prep live rollback pin still **v654**.
+
+**Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
 ---
 
 ## Fresh-agent start
 
 1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → [GLOSSARY.md](../GLOSSARY.md) § sub-events vs phases → **this file** → locks → pack §4 → decision brief.  
-2. Obey director locks — do **not** reopen settled IDs (`idle_touch`, `checkpoint_*`, `room_registry`, etc.).  
-3. Ledger prerequisite is **done** (PA truck cols gone; ledger SoT). Build room on **meta + PA + timeline + ledger** — not truck-on-PA.  
-4. **Index columns confirmed R1:** `Dal_Campaign_Room_UID` / `_Status` / `_Opened_At` / `_Opened_By` / `_Last_Activity_At` / `_Last_Published_At`. Status vocab mirrors forks: `opening` \| `open` \| `committing` (empty = closed). `open` = warm.  
-5. RFID `Operations_Ledger` stays **outside the room forever**.  
+2. Obey director locks — do **not** reopen settled IDs (`idle_touch`, `checkpoint_interval`, `room_registry`, etc.) without director. **`ops_ledger` was reopened 2026-07-31** → now `warm_fifth_slice`.  
+3. Ledger prerequisite is **done** (PA truck cols gone; logistics ledger SoT for movement). Build room on **five slices** — not truck-on-PA.  
+4. **Index columns confirmed R1:** `Dal_Campaign_Room_UID` / `_Status` / `_Opened_At` / `_Opened_By` / `_Last_Activity_At` / `_Last_Published_At`. Status vocab: `opening` \| `open` \| `committing` (empty = closed). `open` = warm.  
+5. **Ops is inside the room** (fifth slice). Still **outside** by design: vault/master catalog, Equipment Tracker conflicts, crew roster, financials, offers.  
 6. After any implementation: `node milestone.js "…"`; update this checklist same session.
 
 ---
 
 ## Goal (plain language)
 
-One warm Firebase **Project Campaign Room** per project for show week:
+One warm Firebase **Project Campaign Room** per project:
 
-- People reopen the same project without a full commit/reopen every short visit  
-- Sheets stay durable via **~30 minute** publish checkpoints (only when dirty)  
-- Room auto-closes after **48 hours of silence** (writes or station dock — **not** mere presence)  
-- Explicit **End / Publish now** still works  
-- One `campaignRoomUid` covers **meta → PA → timeline → ledger**
+- Open project **anywhere** (desktop editor, mobile, station) → warm the **same** shared room (`campaignRoomUid`)  
+- Warm = “we still care about this project.” Cold after **N-day silence** (single config constant; today **48h**). Rewarm on return may cost ~10–20s once  
+- Firebase = live short-term SoT while warm; Sheets = durable long-term SoT via ~30m checkpoints + End / idle close  
+- One `campaignRoomUid` covers **all five slices**  
+- Explicit **END ROOM** still final-publishes + closes  
+
+**One-line doctrine:** Open project anywhere → warm shared room → stay warm while interest continues → cold after N-day silence → rewarm on return; N is adjustable.
 
 ---
 
-## Director locks (do not reopen)
+## Director locks (do not reopen casually)
 
 | Lock | Value |
 |------|--------|
-| Idle | **48h silence**; reset on room-slice **WRITE** (meta / PA / ledger / timeline) **or** station docked |
-| Presence | Roster UX only — does **not** reset idle; not a commit trigger |
+| Idle | **N-day silence** via one named constant (today **48h**); reset on room-slice **WRITE** (all five) **or** station docked; presence alone does **not** |
+| Presence / listeners | Roster UX only for idle; **listeners follow active users** — unsubscribe when leaving a project; warm-but-empty rooms may have zero listeners |
 | Explicit End | Keep End / Publish now |
-| Checkpoint | Fixed **~30m**; always **meta → PA → timeline → ledger**; room **stays live** (no routine freeze) |
-| Registry | One `campaignRoomUid` for all four slices |
+| Checkpoint | Fixed **~30m**; always **meta → PA → timeline → ledger → ops**; room **stays live** (no routine freeze) |
+| Registry | One `campaignRoomUid` for all **five** slices |
 | Warm read | Tracker/Conflicts: Sheets publish default + optional Live preview (ledger **and** timeline) |
 | Offer pull | One-shot from live Firebase, then freeze in the offer |
-| Ops ledger | Forever outside the room |
+| Ops ledger | **`warm_fifth_slice`** (reopened 2026-07-31) — Firebase live while warm; same checkpoint/End; fail-safe ≥ PA B/C; no silent scan loss |
 | Short idle / last-leave | **Do not** keep 45m/75m / last-leave as primary commit once Room ships |
 
-**Idle model:** not a hard 48h lease. Room stays open while activity continues; closes after 48 continuous hours with no qualifying activity.
+**Idle model:** not a hard lease. Room stays open while activity continues; closes after N continuous hours with no qualifying activity. Changing 48h → 168h / 240h is a **config-line** change, not a rearchitecture — watch listener cost (§ listeners) and checkpoint-fail escalation.
 
 ---
 
-## Four slices (+ Hub surface)
+## Five slices (+ Hub surface)
 
 | Slice | Firebase path | Sheets |
 |-------|---------------|--------|
-| **meta** | `projects/{id}/meta/` | Projects_Index campaign columns |
+| **meta** | `projects/{id}/meta/` | Projects_Index (+ sub-events on `Project_Timelines`) |
 | **PA** | `projects/{id}/assets/` | `Project_Assets` (no truck cols) |
-| **timeline** | `projects/{id}/timeline/` | shifts / `Phase_Blocks` / `Project_Timelines` |
+| **timeline** | `projects/{id}/timeline/` | shifts / `Phase_Blocks` |
 | **ledger** | `projects/{id}/logistics/` | `Logistics_Ledger` |
+| **ops** | `projects/{id}/ops/` *(propose — R3d)* | `Operations_Ledger` |
 
-**Logistics Hub** (project-editor pack / fuse-trucks button) is **not a fifth Firebase collection** — it is a **manager action surface** that must read/write the warm PA + ledger (+ timeline AUTO truck shifts) while the room is open. Today Hub is still cold Sheets atomic ([design lock](../archive/dal-firebase-design-lock-2026-07-13.md) § Logistics Hub). **Director 2026-07-25:** pull Hub into the warm room — see **R3b**.
+**Meta scope (director 2026-07-31):** project identity + shape, not only room stamps:
 
-**Size caps (per state doc):** WARN 512 KiB / 1500; MAX 900 KiB / 4000.
+- Name, client, location, inside/outside  
+- Sub-events (calendar blocks on `Project_Timelines` — not the shift timeline itself)  
+- Room registry: `campaignRoomUid`, status, openedAt, openedBy, lastActivityAt, lastPublishedAt  
 
-**Room open (R1):** Opening a **saved** project in the project editor calls `openOrJoinDalCampaignRoom` from `startPresencePing` — room goes **warm without** opening Project Assets or Timeline. PA/timeline forks still start only when those modules open (or auto-start).
+**Gap today (R1):** only lifecycle stamps are elevated to Firebase meta. Identity fields still Sheets-only → **R3c**.
+
+**Logistics Hub** is **not** a sixth collection — manager pack/fuse/arrange surface over warm PA + ledger (+ timeline AUTO). **R3b shipped @ GAS v745** via `dalEnsureWarmHubWorkspace_` / `generateLogisticsPayloadFirestore_`. Proof-of-pattern for ops.
+
+**Size caps (per state doc):** WARN 512 KiB / 1500; MAX 900 KiB / 4000. Ops bar is **stricter** (no silent scan loss).
+
+**Room open (R1 shipped; universal entry still open):** Desktop editor `startPresencePing` → `openOrJoinDalCampaignRoom`. **Queued:** mobile project open + station project select must call the same open/join (see R1.5 / R5-prep). PA/timeline/ops forks still start when those modules need them (Hub seeds prep under room).
 
 ---
 
 ## Lifecycle: keep vs replace
 
-**KEEP:** `Dal_Router` / repos / adapters; reconcile; fail-safe backup/retry; host Auth/listen; calendar chrome reading room flags.
+**KEEP:** `Dal_Router` / repos / adapters; reconcile; fail-safe backup/retry (`dal_commit_backups` / `dal_commit_retry`); host Auth; calendar chrome reading room flags.
 
-**REPLACE / retarget:** dual-domain close triggers; last-leave / short idle as commit; orphan/refresh toward room; committing freeze for **End / idle-close only** — **not** routine 30m checkpoint; **Logistics Hub** cold Sheets grind → warm-room pack/fuse (**R3b**).
+**REPLACE / retarget:** dual-domain close triggers; last-leave / short idle as commit; orphan/refresh toward room; committing freeze for **End / idle-close only** — **not** routine 30m checkpoint; Hub cold grind → warm (**done R3b**); ops cold Sheets grind → warm fifth slice (**R3d**); meta lifecycle-only → full identity (**R3c**).
 
 **Do not scrap the fork** — extend it into one warm room.
 
 ---
 
-## Doctrine revisions (R0 filed)
+## Doctrine revisions
 
-Canonical text: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision.
+Canonical text: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision (updated 2026-07-31).
 
-| Design lock (2026-07-13) | New meaning at Room time |
-|--------------------------|---------------------------|
-| Rule 1 — Sheets between sessions | While room warm: Firebase = active workspace; Sheets = latest **published** durable record (may lag ≤ checkpoint). Between rooms / after End: Sheets restore point. |
-| Rule 2 — no periodic sync | Periodic **publish checkpoints** allowed during active Campaign Room. Final publish on End / idle close. RFID ops remain per-op atomic. |
-| Logistics Hub “forever Sheets atomic” | **Superseded for Campaign Room (director 2026-07-25):** Hub may run against **warm** PA + ledger + timeline; durable Sheets via End / checkpoint. RFID `Operations_Ledger` stays atomic/outside forever. |
+| Design lock | Room meaning |
+|-------------|--------------|
+| Rule 1 — Sheets between sessions | While warm: Firebase = active workspace; Sheets = latest **published** durable record (may lag ≤ checkpoint). After End / idle / between rooms: Sheets restore point. |
+| Rule 2 — no periodic sync | Periodic **publish checkpoints** allowed while room warm. Final publish on End / idle close. |
+| Hub “forever Sheets atomic” | **Superseded 2026-07-25** — warm Hub (R3b). |
+| Ops “forever outside” | **Superseded 2026-07-31** — ops is fifth warm slice; journal remains separate from logistics movement; fail-safe ≥ B/C. |
 
-Pointers: [../topics/session-fork-platform.md](../topics/session-fork-platform.md) § Future · [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) idle note · [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md) Phase D.
+**Still out of room:** vault, tracker conflicts, crew roster, financials, offers.
 
-**Until R1+ ships:** production still runs short-session rules 1–2. **R3b:** Hub uses warm room when Campaign Room is open.
+Pointers: [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) · [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md) Phase D.
+
+**Production today:** R1–R3b live; ops still cold Sheets until R3d; meta identity still Sheets-only until R3c; checkpoint / 48h idle not live (R4 / R5).
 
 ---
 
@@ -134,6 +150,7 @@ Family helpers: `dalSessionFamilyPrefix_` / `dalDomainSessionCols_` (`prep` → 
 |--------|----------|-------|------|
 | Timeline | `DAL_IDLE_TL_MS_` | **45m** | `07_Core_Globals.html` |
 | Prep | `DAL_IDLE_PREP_MS_` | **75m** | `07_Core_Globals.html` |
+| Campaign Room (R5) | **propose** `DAL_CAMPAIGN_IDLE_MS_` | **48h** (single knob → 168h / 240h later) | TBD |
 
 Touch / arm / keep-open: `dalTouchRoomIdle_` / `dalArmRoomIdle_` / `dalKeepOpenRoomIdle_` / `dalClearRoomIdle_`.  
 T−5 SYNC: “Session closing — tap to keep open”.  
@@ -144,23 +161,23 @@ Idle eject → same commit path as End (`closeDalSession`).
 - local `IS_STATION_DEVICE` and (`stationHostActive_()` or `dalPrepUiOpen`), **or**
 - any prep occupant `mode` matches `/station/i`
 
-It does **not** reset a shared 48h room timer (that timer does not exist yet). Presence ping alone does not count as write activity.
+It does **not** yet reset a shared room timer (R5). Presence ping alone does not count as write activity.
 
 ### Close / commit triggers (call sites)
 
-All roads → `closeDalSession(projectId, actor, sessionType)` in `Dal_Sessions.js` (and Firebase commit path in `Dal_Firebase.js`).
+All roads → `closeDalSession(projectId, actor, sessionType)` in `Dal_Sessions.js` (and Firebase commit path in `Dal_Firebase.js`). Room End → `closeDalCampaignRoom`.
 
 | Trigger | Entry points |
 |---------|----------------|
-| Explicit End | `closeDalPrepSession` / END PREP (`02a_Project_Equipment.html`, `02e6_Dal_Session.html`); END COLLAB (timeline) |
-| Last-leave prep | `dalMaybeLastLeaveClosePrep_` — `07_Core_Globals.html`; callers: PA close (`02a`), mobile assets (`01h`), station undock (`11m_Station_Dock_Logic.html`), unload |
-| Last-leave timeline | `dalMaybeLastLeaveCloseTimeline_` — `07_Core_Globals.html`; callers: timeline boot (`03a_Timeline_Boot.html`), unload |
-| Browser unload | `dalOnBrowserLeaveLiveRooms_` (`pagehide` / `beforeunload`) → localStorage unload flag + last-leave best-effort |
-| Idle auto-close | `dalArmRoomIdle_` eject path (prep/timeline timers above) |
-| Orphan enter-gate | `dalGatePrepEnterForOrphan_` — before soft-join / auto-prep (`02a` paint-first @ v740; `02e6`) |
-| Empty-room reclaim | `dalMaybeReclaimEmptyLiveForks_` — calendar/editor others poll (`02_Project_Editor_Core.html`); backup to enter-gate |
+| Explicit End | `closeDalPrepSession` / END PREP; END COLLAB; **END ROOM** (`closeDalCampaignRoom`) |
+| Last-leave prep | `dalMaybeLastLeaveClosePrep_` — soft while room warm (R2) |
+| Last-leave timeline | `dalMaybeLastLeaveCloseTimeline_` — soft while room warm (R2) |
+| Browser unload | `dalOnBrowserLeaveLiveRooms_` |
+| Idle auto-close | short timers today; **48h room idle = R5** |
+| Orphan enter-gate | `dalGatePrepEnterForOrphan_` |
+| Empty-room reclaim | `dalMaybeReclaimEmptyLiveForks_` |
 
-**Room retarget (R2+):** one End / 48h idle / orphan-on-room — **not** dual last-leave + 45m/75m as primary.
+**Room retarget (R2+):** one End / N-day idle / orphan-on-room — **not** dual last-leave + 45m/75m as primary.
 
 ---
 
@@ -168,39 +185,28 @@ All roads → `closeDalSession(projectId, actor, sessionType)` in `Dal_Sessions.
 
 ### A. Projects_Index campaign columns
 
-Add (lazy-ensure, same pattern as session cols):
-
 | Column | Role |
 |--------|------|
 | `Dal_Campaign_Room_UID` | One warm-room id (`campaignRoomUid`) |
-| `Dal_Campaign_Room_Status` | `normal` / `opening` / `live` / `committing` / `closed` (mirror session vocabulary) |
+| `Dal_Campaign_Room_Status` | `opening` \| `open` \| `committing` (empty = closed) |
 | `Dal_Campaign_Opened_At` | Room open stamp |
 | `Dal_Campaign_Opened_By` | Actor who opened |
 | `Dal_Campaign_Last_Activity_At` | Idle clock — bumped on qualifying write **or** station dock |
-| `Dal_Campaign_Last_Published_At` | Last successful ordered publish checkpoint / final publish |
+| `Dal_Campaign_Last_Published_At` | Last successful ordered publish |
 
-**Transition:** keep dual `Dal_Prep_*` / `Dal_Timeline_*` columns through R1–R2; stop treating them as primary close drivers once room is live. Do **not** delete legacy `Dal_Session_*` in R1.
-
-**Firebase meta mirror (R1):** `projects/{id}/meta/` should carry the same stamps (`roomUid`, `status`, `openedAt`, `openedBy`, `lastActivityAt`, `lastPublishedAt`) so host can read warmth without Sheets lag.
+**Confirmed with R1 go.** Shipped.
 
 ### B. Station-docked idle-reset (server-visible)
 
-Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code later):
-
-1. **Write reset:** any successful room-slice write (meta / PA / timeline / logistics) bumps `lastActivityAt` (Firebase meta + Index column on next durable touch / checkpoint — exact write cadence in R1/R5).  
-2. **Station dock reset:** when a station is **docked to this project** (host reports docked + `projectId` match), bump `lastActivityAt`. Prefer a dedicated dock heartbeat (or reuse station presence with `mode` containing `station` **and** docked-project equality) that is **server-visible** — not a client-only idle block.  
-3. **Not resets:** roster presence ping alone; peer soft-join; opening PA without a write; undock without write.  
-4. **Vs today:** replace “block prep idle eject while station present” with “station dock **resets** the shared 48h silence clock.” Blocking short idle becomes moot once 45m/75m are retired.
-
-**Confirm asked:** column names in §A and station rule in §B — say OK with R1 go, or edit names first.
+Lock `idle_touch` = `write_or_station`. Code in **R5**.
 
 ---
 
 ## Still open (not R0 blockers)
 
-- Checkpoint-fail escalation (lag > N hours) — R4  
+- Checkpoint-fail escalation (lag > N hours) — R4 (must scale with longer idle windows)  
 - Soft free-at later retarget to `Phase_Blocks` — out of scope unless director asks  
-- Exact Index / meta field names if director wants different labels than §A  
+- Exact Firebase ops collection shape — propose in R3d  
 
 ---
 
@@ -212,68 +218,109 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 - [x] Architecture pack + director locks filed
 - [x] Active brief created (this file)
 - [x] Director **OK go** to open this campaign (2026-07-24)
-- [x] Director **OK go** for **R0** (doctrine revision + inventory — docs only) — done this session
-- [x] Director **OK go** for **R1** code (room registry + meta slice) — 2026-07-24
+- [x] Director **OK go** for **R0** (doctrine revision + inventory — docs only)
+- [x] Director **OK go** for **R1** code (room registry + meta lifecycle) — 2026-07-24
 - [x] Director **OK go** for **R2** (unify PA + timeline under room uid) — 2026-07-24
 - [x] Director **OK go** for **R3** (ledger slice in room) — 2026-07-24
 - [x] Director **OK go** for **R3b** (warm Logistics Hub) — 2026-07-25
-- [ ] Director **OK go** for **R4** (30m publish checkpoint)
+- [x] Director **OK go** for **five-slice doctrine reframe** (docs) — 2026-07-31
+- [ ] Director **OK go** for **R3c** (expand meta identity)
+- [ ] Director **OK go** for **R3d** (ops fifth slice)
+- [ ] Director **OK go** for **R4** (30m publish checkpoint, five-slice order)
+- [ ] Director **OK go** for **R4b** (listener-follows-user) — may ship with R5
+- [ ] Director **OK go** for **R5** (idle close + Exit polish)
 
 ### R0 — Doctrine + inventory (no lifecycle code)
 
-- [x] File explicit design-lock rule 1–2 revision text (archive note + FRAGILE / session-fork pointers)
-- [x] Inventory current dual-domain session columns + close triggers + idle / last-leave call sites
-- [x] Propose Projects_Index campaign columns (`campaignRoomUid`, idle / publish stamps) — **confirmed with R1 go**
-- [x] Propose station-docked idle-reset rule (server-visible signal) — **confirmed with R1 go** (code in R5)
-- [x] Docs-only session — **no** `node milestone.js` (no inventory API shipped)
+- [x] File explicit design-lock rule 1–2 revision text
+- [x] Inventory dual-domain session columns + close triggers + idle / last-leave call sites
+- [x] Propose Projects_Index campaign columns — **confirmed with R1 go**
+- [x] Propose station-docked idle-reset rule — **confirmed with R1 go** (code in R5)
+- [x] Docs-only session — **no** `node milestone.js`
 
-### R1 — Room registry + meta slice
+### R1 — Room registry + meta slice (lifecycle)
 
 - [x] One `campaignRoomUid` on Index; open/join room from project editor entry
-- [x] `projects/{id}/meta/` warm doc (`meta/state`: roomUid, status, openedAt, openedBy, lastActivityAt, lastPublishedAt)
-- [x] Calendar / editor chrome can read “room warm” (green calendar dot + green inset on module buttons)
-- [x] Ship + smoke: open project → room warm flag visible; no checkpoint yet — **shipped GAS v741**; director smoke next
+- [x] `projects/{id}/meta/` warm doc (lifecycle stamps)
+- [x] Calendar / editor chrome can read “room warm”
+- [x] Ship + smoke — **shipped GAS v741**
+
+### R1.5 — Universal warm-on-entry (queued)
+
+- [ ] Desktop editor open/join — **done R1**
+- [ ] Mobile project open → `openOrJoinDalCampaignRoom` (same room uid)
+- [ ] Station project select → PA → same open/join
+- [ ] Smoke: cold project → open from each surface → warm once; later activity no re-warm cost
 
 ### R2 — Unify PA + timeline under room uid
 
-- [x] Prep + timeline live paths share `campaignRoomUid` (keep slice listen paths; `_meta.roomUid` stamp)
-- [x] Retarget orphan / refresh reclaim to room (soft-rejoin when warm — no domain commit)
-- [x] Stop using last-leave / 45m·75m as primary commit once room is open
-- [x] Explicit End still final-publishes + closes room (`closeDalCampaignRoom`; END ROOM label when warm)
-- [x] Ship + smoke: PA + timeline both live in one room; End closes both cleanly — **shipped GAS v742**; director smoke next
+- [x] Prep + timeline share `campaignRoomUid` (`_meta.roomUid`)
+- [x] Soft leave / idle / orphan while warm
+- [x] Explicit End final-publishes + closes room
+- [x] Ship — **GAS v742** (+ END ROOM on editor @ v743)
 
 ### R3 — Ledger slice in room
 
-- [x] `projects/{id}/logistics/` live path + GAS snapshot/write/commit (`state` + `_meta`)
-- [x] Arrange / ledger writers honor warm room (Firebase) vs published (Sheets)
+- [x] `projects/{id}/logistics/` live path + snapshot/write/commit
+- [x] Arrange writers honor warm room
 - [x] Size WARN/MAX for logistics state
-- [x] Ship + smoke: truck arrange in warm room; Sheets unchanged until publish — **shipped GAS v744**; director smoke next
+- [x] Ship — **GAS v744**
 
 ### R3b — Warm Logistics Hub (pack / fuse trucks)
 
-**Why here:** Ledger + PA are already warm (R3). Hub needs those slices before checkpoint polish (R4). Pulls [warehouse-prep Phase D](../topics/warehouse-prep-session.md) into this campaign.
+- [x] Director **OK go** — 2026-07-25
+- [x] Hub pack / fuse / generate → warm PA + `logistics/state` (+ timeline AUTO)
+- [x] No cold Sheets grind while room warm; durable via END ROOM / later checkpoint
+- [x] Button-press semantics; `dalEnsureWarmHubWorkspace_`
+- [x] Ship — **GAS v745**; director smoke still welcome
 
-- [x] Director **OK go** for **R3b** (warm Hub) — 2026-07-25
-- [x] File design-lock note: Hub warm-room path allowed; RFID ops still outside forever — **filed 2026-07-25** in design-lock § Campaign Room revision
-- [x] Hub pack / fuse reads & writes warm PA + `logistics/state` (+ timeline AUTO-OUTBOUND/INBOUND as today, linked to legs)
-- [x] No full cold Sheets grind while room warm; durable via END ROOM / later checkpoint
-- [x] Keep Hub as button-press transaction semantics (one Hub action = one coherent warm write), not continuous Hub autosave
-- [x] `dalEnsureWarmHubWorkspace_` — room warm + seed prep (and timeline when GENERATE clocks); Hub open / arrange / generate / PA delta use it
-- [ ] Ship + smoke: open project editor only (room warm) → Hub pack/fuse → arrangement visible in PA/arrange → Sheets lag until END ROOM
+### R3c — Expand meta (project identity)
+
+**Why here:** Timeline/sub-events and peers need live identity without Sheets round-trip; checkpoint should publish a complete meta slice.
+
+- [ ] Director **OK go** for **R3c**
+- [ ] Elevate name, client, location, inside/outside into Firebase `meta` on warm
+- [ ] Elevate sub-events (`Project_Timelines` calendar blocks) into meta (or agreed meta sub-doc) while warm
+- [ ] Writers: project editor Save & Sync / identity edits → warm meta when room open
+- [ ] Readers: warm peers / timeline context read Firebase meta, not Sheets lag
+- [ ] END ROOM / checkpoint publish identity back to Index + `Project_Timelines` as needed
+- [ ] Ship + smoke: edit name/client/sub-event mid-warm → peer sees live; Sheets lag until publish
+
+### R3d — Ops fifth slice (RFID Operations_Ledger)
+
+**Why here:** Avoid two-database sync while PA/ledger warm; snappy per-op Firebase docs; same checkpoint family; fail-safe ≥ B/C.
+
+- [ ] Director **OK go** for **R3d**
+- [ ] File Firebase shape: per-op keyed docs under `projects/{id}/ops/` (+ `_meta` / session as needed)
+- [ ] Warm path: checkout / check-in / scan batch write Firebase ops (not full Sheets rewrite)
+- [ ] Snapshot ops from Sheets on room/prep seed when needed; overlay reads while warm
+- [ ] Checkpoint + END ROOM / idle close commit ops → Sheets `Operations_Ledger`
+- [ ] Fail-safe: `dal_commit_backups` + `dal_commit_retry` + ROOT alert; **no fake success** if scans only in dying room
+- [ ] Cold / no-room fallback: existing Sheets atomic path until warm seed succeeds
+- [ ] Ship + smoke: warm room → scan wave live for peers → Sheets lag until checkpoint/End; kill network mid-commit → retry cue, no silent loss
 
 ### R4 — 30m publish checkpoint
 
 - [ ] Dirty-since-last-publish gate
-- [ ] Ordered publish **meta → PA → timeline → ledger**; room stays live (no routine freeze)
+- [ ] Ordered publish **meta → PA → timeline → ledger → ops**; room stays live
 - [ ] `lastPublishedAt` + per-slice content signatures
-- [ ] Fail → room stays live; manager retry (reuse fail-safe B/C patterns)
+- [ ] Fail → room stays live; manager retry (B/C patterns); escalation if lag > N hours (scale with idle window)
 - [ ] Subtle “Last published…” UI (alarm only on fail)
 - [ ] Ship + smoke: edit → wait/force checkpoint → Sheets match; peers stay live
 
-### R5 — 48h idle close + Exit polish
+### R4b — Listener follows active user
 
-- [ ] Idle timer: reset on slice WRITE or station dock; presence alone does not
-- [ ] Auto-close: final publish → close room → next entry from Sheets
+- [ ] On enter project / warm join: subscribe to that room’s needed slices
+- [ ] On leave project: unsubscribe (do not linger on warm-but-empty rooms)
+- [ ] Room may stay warm with zero listeners
+- [ ] Ship + smoke: switch projects → old listeners gone; Firebase read cost tracks presence, not idle length
+
+### R5 — Idle close + Exit polish
+
+- [ ] Single constant `DAL_CAMPAIGN_IDLE_MS_` (default 48h); document how to set 168h / 240h
+- [ ] Idle timer: reset on any of five slice WRITEs or station dock; presence alone does not
+- [ ] Auto-close: final publish (five slices) → close room → next entry from Sheets (rewarm cost OK)
+- [ ] Universal warm-on-entry complete if not done in R1.5
 - [ ] Warm-read hybrid badge for Tracker/Conflicts (optional Live preview)
 - [ ] Offer one-shot pull from warm Firebase (if Offer surface touches room)
 - [ ] Update session-fork-platform + FRAGILE “how it works now”
@@ -284,11 +331,12 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 ## What NOT to do
 
 - Do not build on PA truck columns (already stripped)  
-- Do not merge movement into RFID `Operations_Ledger`  
-- Do not scrap DAL router/repos — change lifecycle triggers only  
+- Do not **merge** logistics movement into RFID `Operations_Ledger` — they remain **separate slices** (ledger vs ops)  
+- Do not scrap DAL router/repos — change lifecycle + slice coverage  
 - Do not use presence / last-leave / short idle as Room commit primary  
 - Do not freeze all users every 30m for a routine checkpoint  
 - Do not invent packet-sync (Campaign 3) inside this build  
+- Do not put vault / tracker / roster / financials / offers in the room  
 
 ---
 
@@ -301,6 +349,7 @@ Lock `idle_touch` = `write_or_station`. Proposed rule for R5 (design now; code l
 | 2026-07-24 | **R1 shipped @ GAS v741** — Index `Dal_Campaign_*`, `openOrJoinDalCampaignRoom`, Firebase `meta/state`, calendar green room dot + editor chrome. Firestore rules deployed. Next: director smoke → **OK go for R2**. |
 | 2026-07-24 | **R2 shipped @ GAS v742** — `_meta.roomUid`, soft leave/idle/orphan when warm, `closeDalCampaignRoom` + END ROOM. Next: smoke → **OK go for R3**. |
 | 2026-07-24 | END ROOM moved to project editor (@ v743). |
-| 2026-07-24 | **R3 shipped @ GAS v744** — `logistics/state` warm arrange; END ROOM commits ledger; Bugbot Highs fixed. Next: smoke → **OK go for R4**. |
-| 2026-07-25 | Director: Logistics Hub must be in warm room. Filed **R3b** (after ledger, before checkpoint). Confirmed: project editor alone warms room (R1). |
-| 2026-07-25 | **OK go R3b** — warm Hub: `dalEnsureWarmHubWorkspace_`, arrange/generate/pack → Firebase; cold fallback when room not warm. |)
+| 2026-07-24 | **R3 shipped @ GAS v744** — `logistics/state` warm arrange; END ROOM commits ledger; Bugbot Highs fixed. |
+| 2026-07-25 | Director: Logistics Hub must be in warm room. Filed **R3b**. |
+| 2026-07-25 | **R3b shipped @ GAS v745** — warm Hub; Bugbot Highs fixed. |
+| 2026-07-31 | **Five-slice architecture** (director briefing): ops moves into room; meta expands to identity; listeners follow users; idle = single constant. Docs reframe — next **OK go for R3c**. |

@@ -14,7 +14,7 @@
   <div id="vh-app">
     <aside id="vh-sidebar">
       <h1>Visual Host</h1>
-      <p class="vh-sub">Theme playground. Edit dark / light or create a theme, preview UI reports, then bake into Styles + the app theme engine.</p>
+      <p class="vh-sub">Left: theme tools — hover a color/token to see a dotted frame on the pieces it affects on the right. Right: real-view tabs.</p>
 
       <div class="vh-field">
         <label for="vh-theme-select">Active theme</label>
@@ -45,154 +45,319 @@
       </div>
 
       <div id="vh-status">Loading…</div>
-
       <div id="vh-token-list"></div>
     </aside>
 
     <main id="vh-preview-shell">
       <div id="vh-preview-bar">
-        <strong>UI element reports</strong>
-        <span id="vh-preview-theme-name" style="font-size:12px;color:#8b8b9a;"></span>
+        <div id="vh-preview-bar-top">
+          <strong>View examples</strong>
+          <span id="vh-preview-theme-name" style="font-size:12px;color:#8b8b9a;"></span>
+        </div>
+        <div id="vh-view-tabs" role="tablist" aria-label="View examples">
+          <button type="button" class="vh-view-tab active" data-view="chrome" role="tab">Shared chrome</button>
+          <button type="button" class="vh-view-tab" data-view="calendar" role="tab">Calendar</button>
+          <button type="button" class="vh-view-tab" data-view="vault" role="tab">Vault table</button>
+          <button type="button" class="vh-view-tab" data-view="availability" role="tab">Availability</button>
+          <button type="button" class="vh-view-tab" data-view="timeline" role="tab">Timeline</button>
+          <button type="button" class="vh-view-tab" data-view="roster" role="tab">Month roster</button>
+          <button type="button" class="vh-view-tab" data-view="hub" role="tab">Personal Hub</button>
+        </div>
       </div>
+
       <div id="vh-preview-frame">
-        <div id="preview-root">
+        <div id="preview-root" data-vh-tokens="--bg-dark --text-main">
 
-          <section class="vh-report">
-            <h2 class="vh-report-title">01 · Surfaces &amp; tokens</h2>
-            <div class="vh-swatch-row" id="vh-swatches"></div>
-          </section>
+          <!-- SHARED CHROME -->
+          <section class="vh-view-panel active" data-view-panel="chrome">
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Shared chrome</strong> — buttons, forms, nav, cards used across many screens. Hover a token on the left to outline matching surfaces here.</p>
 
-          <section class="vh-report">
-            <h2 class="vh-report-title">02 · Typography</h2>
-            <div class="view-header" style="position:relative; left:0; width:100%; border:1px solid #333; border-radius:8px;">
-              <div class="view-header-title">View header title</div>
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <h2 data-vh-tokens="--text-muted --border-light" class="vh-report-title">Surfaces &amp; tokens</h2>
+              <div class="vh-swatch-row" id="vh-swatches" data-vh-tokens="--bg-dark --bg-sidebar --bg-cell --bg-event --bg-header --accent --text-main --text-muted"></div>
             </div>
-            <div class="modal-title" style="margin-top:12px;">Modal title</div>
-            <div class="section-title" style="margin-top:8px;">Section title</div>
-            <div class="input-label" style="margin-top:8px;">Field label</div>
-            <p style="margin:8px 0 0; font-size:13px;">Body copy — Inter 13px on <code style="color:var(--accent);">--text-main</code> / muted labels use <code style="color:var(--accent);">--text-muted</code>.</p>
-          </section>
 
-          <section class="vh-report">
-            <h2 class="vh-report-title">03 · Buttons</h2>
-            <div class="vh-flex">
-              <button type="button" class="btn-main">Save</button>
-              <button type="button" class="btn-outline">Outline</button>
-              <button type="button" class="btn-add">Add</button>
-              <button type="button" class="btn-blue">Blue</button>
-              <button type="button" class="btn-orange">Orange</button>
-              <button type="button" class="btn-purple">Purple</button>
-              <button type="button" class="btn-settings">Settings</button>
-              <button type="button" class="btn-close">Cancel</button>
-              <button type="button" class="btn-delete">Delete</button>
-              <button type="button" class="btn-outline-blue">Outline blue</button>
-              <button type="button" class="btn-outline-orange">Outline orange</button>
-              <button type="button" class="btn-outline-purple">Outline purple</button>
-              <button type="button" class="btn-sm btn-outline">Small</button>
-              <button type="button" class="btn-ghost">Ghost</button>
-              <button type="button" class="btn-new" style="width:auto; margin:0;">New (accent)</button>
-            </div>
-            <div class="vh-flex" style="margin-top:12px;">
-              <button type="button" class="btn-tab">Tab</button>
-              <button type="button" class="btn-tab active">Tab active</button>
-              <button type="button" class="btn-tab-database">Database</button>
-              <button type="button" class="btn-tab-database active">Database on</button>
-            </div>
-          </section>
-
-          <section class="vh-report">
-            <h2 class="vh-report-title">04 · Forms</h2>
-            <div class="vh-stack">
-              <div>
-                <div class="input-label">Text input</div>
-                <input type="text" value="Sample value" style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main);" />
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <h2 data-vh-tokens="--text-muted --border-light" class="vh-report-title">Typography</h2>
+              <div data-vh-tokens="--bg-sidebar --text-main --border-light" class="view-header" style="position:relative; left:0; width:100%; border:1px solid #333; border-radius:8px;">
+                <div data-vh-tokens="--text-main" class="view-header-title">View header title</div>
               </div>
-              <div>
-                <div class="input-label">Select</div>
-                <select style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main);">
-                  <option>Option A</option>
-                  <option>Option B</option>
-                </select>
-              </div>
-              <div>
-                <div class="input-label">Textarea</div>
-                <textarea rows="3" style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main); resize:vertical;">Notes…</textarea>
+              <div data-vh-tokens="--text-main --border-light" class="modal-title" style="margin-top:12px;">Modal title</div>
+              <div data-vh-tokens="--text-main --border-light" class="section-title" style="margin-top:8px;">Section title</div>
+              <div data-vh-tokens="--text-muted" class="input-label" style="margin-top:8px;">Field label</div>
+            </div>
+
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <h2 data-vh-tokens="--text-muted --border-light" class="vh-report-title">Buttons</h2>
+              <div class="vh-flex">
+                <button type="button" class="btn-main" data-vh-tokens="--text-main">Save</button>
+                <button type="button" class="btn-outline" data-vh-tokens="--text-main --border-light">Outline</button>
+                <button type="button" class="btn-add">Add</button>
+                <button type="button" class="btn-blue">Blue</button>
+                <button type="button" class="btn-orange">Orange</button>
+                <button type="button" class="btn-purple">Purple</button>
+                <button type="button" class="btn-settings" data-vh-tokens="--accent">Settings</button>
+                <button type="button" class="btn-close">Cancel</button>
+                <button type="button" class="btn-delete">Delete</button>
+                <button type="button" class="btn-tab active" data-vh-tokens="--text-muted --text-main --border-light">Tab active</button>
               </div>
             </div>
-          </section>
 
-          <section class="vh-report">
-            <h2 class="vh-report-title">05 · Cards, pills, badges</h2>
-            <div class="vh-flex" style="align-items:stretch;">
-              <div class="project-card" style="width:200px;">
-                <b>Project card</b>
-                <span style="font-size:12px; color:var(--text-muted);">Client · dates</span>
-              </div>
-              <div class="roster-item" style="width:220px; margin:0;">
-                <span>Roster item</span>
-                <span class="badge-orange" style="padding:2px 8px; border-radius:4px; font-size:10px; font-weight:800;">ORANGE</span>
-              </div>
-              <div class="wh-root-item" style="width:180px; padding:12px; border:1px solid #333; border-radius:8px;">Warehouse root</div>
-              <div class="admin-card" style="width:200px;">
-                <div class="admin-card-title">Admin card</div>
-                <div class="admin-panel-body">Panel body text</div>
-              </div>
-            </div>
-            <div class="vh-flex" style="margin-top:12px;">
-              <div class="info-pill info-pill--amber" style="width:220px;">
-                <div class="pill-info-grid">
-                  <div class="info-cell"><div class="info-cell-label">Label</div><div class="info-cell-value">Amber pill</div></div>
-                  <div class="info-cell"><div class="info-cell-label">Status</div><div class="info-cell-value">OK</div></div>
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <h2 data-vh-tokens="--text-muted --border-light" class="vh-report-title">Forms &amp; shell</h2>
+              <div class="vh-flex" style="align-items:stretch;">
+                <div data-vh-tokens="--bg-dark" class="vh-fake-nav">
+                  <button data-vh-tokens="--text-muted --text-main --accent" type="button" class="nav-icon-btn nav-active">●</button>
+                  <button data-vh-tokens="--text-muted --text-main --accent" type="button" class="nav-icon-btn">○</button>
+                </div>
+                <div data-vh-tokens="--bg-sidebar" class="vh-mini-sidebar">
+                  <button data-vh-tokens="--accent --radius-event" type="button" class="btn-new">New project</button>
+                  <div data-vh-tokens="--bg-cell --accent --radius-cell --text-main --border-light --shadow-light" class="project-card">
+                    <b>Project card</b>
+                    <span style="font-size:12px; color:var(--text-muted);">Client · dates</span>
+                  </div>
+                </div>
+                <div data-vh-tokens="--bg-cell --border-light --shadow-modal" class="modal" style="position:relative; max-width:320px; display:flex;">
+                  <div data-vh-tokens="--text-main --border-light" class="modal-title">Modal frame</div>
+                  <div data-vh-tokens="--text-muted" class="input-label">Field</div>
+                  <input type="text" value="Inside modal" style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main);" />
+                  <div class="vh-flex">
+                    <button type="button" class="btn-main" data-vh-tokens="--text-main">Confirm</button>
+                    <button type="button" class="btn-close">Close</button>
+                  </div>
                 </div>
               </div>
-              <span class="badge-red" style="padding:4px 10px; border-radius:4px; font-size:11px; font-weight:800; color:#fff;">RED</span>
-              <span class="badge-yellow" style="padding:4px 10px; border-radius:4px; font-size:11px; font-weight:800;">YELLOW</span>
-              <span class="conflict-badge-grey">GREY</span>
             </div>
           </section>
 
-          <section class="vh-report">
-            <h2 class="vh-report-title">06 · Shell chrome</h2>
-            <div class="vh-flex" style="align-items:stretch;">
-              <div class="vh-fake-nav">
-                <button type="button" class="nav-icon-btn nav-active" title="Active">●</button>
-                <button type="button" class="nav-icon-btn" title="Idle">○</button>
-              </div>
-              <div class="vh-mini-sidebar">
-                <button type="button" class="btn-new">New project</button>
-                <div class="project-card">
-                  <b>Sidebar card</b>
-                  <span style="font-size:12px; color:var(--text-muted);">Hover border uses accent</span>
+          <!-- CALENDAR -->
+          <section class="vh-view-panel" data-view-panel="calendar">
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Calendar</strong> — main dashboard month grid (FullCalendar). Open from the left nav calendar icon. Hover left tokens to outline calendar surfaces.</p>
+
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <h2 data-vh-tokens="--text-muted --border-light" class="vh-report-title">Month grid scrap</h2>
+              <div class="vh-cal-grid">
+                <div>
+                  <div data-vh-tokens="--bg-header --text-muted --text-main --radius-cell --border-light" class="fc-col-header-cell-cushion" style="text-align:center;">Mon</div>
+                  <div data-vh-tokens="--bg-cell --radius-cell --border-light" class="fc-daygrid-day-frame" style="min-height:110px !important; margin-top:6px; padding:4px;">
+                    <div data-vh-tokens="--text-muted" class="fc-daygrid-day-number" style="padding:6px;">12</div>
+                    <div data-vh-tokens="--bg-dark --bg-cell --radius-event --border-light --text-main" class="event-custom-frame" style="--event-border-color:#698b99; position:relative; margin:4px; padding:6px 8px; border-radius:var(--radius-event);">
+                      <span data-vh-tokens="--text-main" class="event-custom-title" style="font-size:12px; font-weight:800;">Tour load-in</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div data-vh-tokens="--bg-header --text-muted --text-main --radius-cell --border-light" class="fc-col-header-cell-cushion" style="text-align:center;">Tue</div>
+                  <div data-vh-tokens="--bg-cell --radius-cell --border-light" class="fc-daygrid-day-frame" style="min-height:110px !important; margin-top:6px; padding:4px;">
+                    <div data-vh-tokens="--text-muted" class="fc-daygrid-day-number" style="padding:6px;">13</div>
+                    <span data-vh-tokens="--bg-event --accent --radius-event --text-main" class="vh-event-chip" style="margin:4px;">Show day</span>
+                  </div>
+                </div>
+                <div>
+                  <div data-vh-tokens="--bg-header --text-muted --text-main --radius-cell --border-light" class="fc-col-header-cell-cushion" style="text-align:center;">Wed</div>
+                  <div data-vh-tokens="--bg-cell --radius-cell --border-light" class="fc-daygrid-day-frame" style="min-height:110px !important; margin-top:6px; padding:4px;">
+                    <div data-vh-tokens="--text-muted" class="fc-daygrid-day-number" style="padding:6px;">14</div>
+                  </div>
+                </div>
+                <div>
+                  <div data-vh-tokens="--bg-header --text-muted --text-main --radius-cell --border-light" class="fc-col-header-cell-cushion" style="text-align:center;">Thu</div>
+                  <div data-vh-tokens="--bg-cell --radius-cell --border-light" class="fc-daygrid-day-frame" style="min-height:110px !important; margin-top:6px; padding:4px; border-color:#d4d4d8;">
+                    <div data-vh-tokens="--text-muted" class="fc-daygrid-day-number" style="padding:6px;">15</div>
+                  </div>
                 </div>
               </div>
-              <div class="modal" style="position:relative; max-width:320px; display:flex;">
-                <div class="modal-title">Modal frame</div>
-                <div class="input-label">Field</div>
-                <input type="text" value="Inside modal" style="width:100%; padding:14px; border-radius:6px; border:1px solid #333; background:#27272a; color:var(--text-main);" />
+            </div>
+
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <h2 data-vh-tokens="--text-muted --border-light" class="vh-report-title">Calendar chrome bits</h2>
+              <div class="vh-flex">
+                <button type="button" class="fc-button-primary" data-vh-tokens="--text-main --border-light">Today</button>
+                <button type="button" class="btn-settings" data-vh-tokens="--accent">Visual Settings</button>
+                <div class="indicator-row">
+                  <span class="indicator-item"><span class="light red"></span>Hard</span>
+                  <span class="indicator-item"><span class="light yellow"></span>Soft</span>
+                  <span class="indicator-item"><span class="light green"></span>OK</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- VAULT -->
+          <section class="vh-view-panel" data-view-panel="vault">
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Equipment Vault table</strong> — master equipment registry (ROOT → Assets / Vault). Rows are `.asset-row`; department bands are `.asset-dept-header`. Code: `06b*_Admin_Assets_*.html`.</p>
+
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <h2 data-vh-tokens="--text-muted --border-light" class="vh-report-title">Vault table scrap</h2>
+              <div data-vh-tokens="--bg-sidebar --text-main --border-light" class="view-header" style="position:relative; left:0; width:100%; border:1px solid #333; border-radius:8px 8px 0 0; border-bottom:none;">
+                <div data-vh-tokens="--text-main" class="view-header-title">Equipment Vault</div>
+                <div class="view-header-actions">
+                  <button type="button" class="btn-outline btn-sm">Filter</button>
+                  <button type="button" class="btn-main btn-sm">Save</button>
+                </div>
+              </div>
+              <div class="vh-vault-table" style="border-radius:0 0 8px 8px;">
+                <div data-vh-tokens="--bg-header --text-muted --border-light" class="asset-col-header" style="display:grid; grid-template-columns: 2fr 1fr 1fr 100px; gap:8px; padding:10px 15px; background:var(--bg-header); border-bottom:1px solid #333; font-size:10px; font-weight:800; text-transform:uppercase; color:var(--text-muted);">
+                  <span>Name</span><span>Dept</span><span>Type</span><span>Status</span>
+                </div>
+                <div data-vh-tokens="--text-main --border-light" class="asset-dept-header" style="background:#1f1f23; color:#fff; border:1px solid #698b99; border-right:none; border-left:none; padding:10px 25px; font-size:11px; font-weight:900; text-transform:uppercase;">Audio</div>
+                <div data-vh-tokens="--bg-cell --bg-dark --text-main --border-light" class="asset-row parent-row" style="padding:10px 15px; border-bottom:2px solid #1a1a1e; background:#151518; display:grid; grid-template-columns:2fr 1fr 1fr 100px; gap:8px; font-size:12px;">
+                  <span style="font-weight:800;">Case · Wireless kit</span><span>Audio</span><span>Case</span><span class="badge-yellow" style="padding:2px 8px; border-radius:4px; width:max-content;">OK</span>
+                </div>
+                <div data-vh-tokens="--bg-cell --bg-dark --text-main --border-light" class="asset-row" style="padding:10px 15px; display:grid; grid-template-columns:2fr 1fr 1fr 100px; gap:8px; font-size:12px;">
+                  <span style="padding-left:18px;">Handheld TX A</span><span>Audio</span><span>Unique</span><span style="color:var(--text-muted);">In</span>
+                </div>
+                <div data-vh-tokens="--bg-cell --bg-dark --text-main --border-light" class="asset-row row-selected" style="padding:10px 15px; display:grid; grid-template-columns:2fr 1fr 1fr 100px; gap:8px; font-size:12px;">
+                  <span style="padding-left:18px;">Handheld TX B</span><span>Audio</span><span>Unique</span><span style="color:var(--text-muted);">Out</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- AVAILABILITY -->
+          <section class="vh-view-panel" data-view-panel="availability">
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Availability / Equipment Tracker</strong> — full-screen matrix from the left-nav “Global Availability &amp; Fleet” icon. Shell: `#availability-modal-overlay`. Logic: `04b_Equipment_Tracker.html`.</p>
+
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report" style="padding:0; overflow:hidden;">
+              <div data-vh-tokens="--bg-sidebar --text-main --border-light" class="view-header" style="position:relative; left:0; width:100%;">
+                <h2 data-vh-tokens="--text-main" class="view-header-title" style="margin:0;">Equipment Tracker</h2>
+                <div class="view-header-actions">
+                  <input type="text" class="input-compact" placeholder="Add to Watchlist..." style="width:180px;" />
+                  <button type="button" class="btn-outline btn-sm">PREV</button>
+                  <input type="date" class="input-compact" />
+                  <button type="button" class="btn-outline btn-sm">NEXT</button>
+                  <button type="button" class="btn-outline btn-sm" style="border-color:#f59e0b; color:#f59e0b;">Refresh</button>
+                </div>
+              </div>
+              <div data-vh-tokens="--bg-dark --border-light" class="vh-tracker-matrix" id="tracker-canvas-inner" style="border:none; border-radius:0;">
+                <div data-vh-tokens="--bg-sidebar --text-muted" class="vh-tracker-row vh-tracker-head">
+                  <div>Asset</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div>
+                </div>
+                <div class="vh-tracker-row">
+                  <div style="font-weight:700; color:var(--text-main);">Wireless TX pool</div>
+                  <div><div data-vh-tokens="--accent" class="vh-bar" style="width:70%;"></div></div>
+                  <div><div data-vh-tokens="--accent" class="vh-bar" style="width:40%;"></div></div>
+                  <div></div>
+                  <div><div data-vh-tokens="--accent" class="vh-bar" style="width:90%; background:rgba(239,68,68,0.35); border-color:#ef4444;"></div></div>
+                  <div><div data-vh-tokens="--accent" class="vh-bar" style="width:55%;"></div></div>
+                </div>
+                <div class="vh-tracker-row">
+                  <div style="font-weight:700;">LED wall panels</div>
+                  <div></div>
+                  <div><div data-vh-tokens="--accent" class="vh-bar" style="width:60%;"></div></div>
+                  <div><div data-vh-tokens="--accent" class="vh-bar" style="width:60%;"></div></div>
+                  <div><div data-vh-tokens="--accent" class="vh-bar" style="width:30%;"></div></div>
+                  <div></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- TIMELINE -->
+          <section class="vh-view-panel" data-view-panel="timeline">
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Timeline editor</strong> — full-screen shift layer `#shift-layer` opened from a project. Crew rows on the Y axis, days/hours on X, shift blocks on the grid. Files: `03a_Timeline_*`, styles `.tt-*` / `.shift-block`.</p>
+
+            <div class="vh-tt-demo">
+              <div data-vh-tokens="--bg-sidebar --border-light" class="tt-toolbar">
+                <div style="font-weight:900; font-size:13px;">Demo Project · Timeline</div>
                 <div class="vh-flex">
-                  <button type="button" class="btn-main">Confirm</button>
-                  <button type="button" class="btn-close">Close</button>
+                  <button type="button" class="btn-outline btn-sm">Zoom</button>
+                  <button type="button" class="btn-settings btn-sm">Settings</button>
+                </div>
+              </div>
+              <div class="tt-workspace" style="flex:1; min-height:0;">
+                <div data-vh-tokens="--bg-cell --bg-sidebar --border-light" class="tt-axis-y" style="width:140px; min-width:140px;">
+                  <div data-vh-tokens="--bg-header --border-light" class="tt-header-corner"></div>
+                  <div data-vh-tokens="--text-main --border-light" class="tt-crew-row">Alex Rivera</div>
+                  <div data-vh-tokens="--text-main --border-light" class="tt-crew-row">Sam Chen</div>
+                </div>
+                <div data-vh-tokens="--bg-dark" class="tt-grid-wrapper" style="background:#111;">
+                  <div data-vh-tokens="--bg-header --border-light" class="tt-header-x-container" style="width:max-content;">
+                    <div class="tt-header-days">
+                      <div data-vh-tokens="--bg-header --text-main --border-light" class="tt-day-mark">Mon 12</div>
+                    </div>
+                    <div class="tt-header-hours">
+                      <div data-vh-tokens="--text-muted --border-light" class="tt-hour-mark">08</div>
+                      <div data-vh-tokens="--text-muted --border-light" class="tt-hour-mark">09</div>
+                      <div data-vh-tokens="--text-muted --border-light" class="tt-hour-mark">10</div>
+                      <div data-vh-tokens="--text-muted --border-light" class="tt-hour-mark">11</div>
+                      <div data-vh-tokens="--text-muted --border-light" class="tt-hour-mark">12</div>
+                      <div data-vh-tokens="--text-muted --border-light" class="tt-hour-mark">13</div>
+                    </div>
+                  </div>
+                  <div id="tt-rows-container" style="width:max-content;">
+                    <div data-vh-tokens="--border-light --bg-cell" class="tt-grid-row" style="width:240px; position:relative;">
+                      <div data-vh-tokens="--border-light --shadow-light" class="shift-block selected" style="left:40px; width:100px; background:#3b82f6;">
+                        <span data-vh-tokens="--text-main" class="shift-label" style="left:8px; top:6px; font-size:11px;">FOH</span>
+                      </div>
+                    </div>
+                    <div data-vh-tokens="--border-light --bg-cell" class="tt-grid-row" style="width:240px; position:relative;">
+                      <div data-vh-tokens="--border-light --shadow-light" class="shift-block" style="left:80px; width:120px; background:#a855f7;">
+                        <span data-vh-tokens="--text-main" class="shift-label" style="left:8px; top:6px; font-size:11px;">Mon</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div data-vh-tokens="--bg-header --border-light" class="tt-bottom-actions">
+                <button type="button" class="btn-main btn-sm">Save</button>
+                <button type="button" class="btn-close btn-sm">Close</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- MONTH ROSTER -->
+          <section class="vh-view-panel" data-view-panel="roster">
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Month roster</strong> — crew × day matrix (`04_Month_Roster.html`). Conflict badges sit in day cells. Not the Equipment Tracker — this is people rostering.</p>
+
+            <div class="vh-mr-demo">
+              <div data-vh-tokens="--bg-sidebar --border-light" class="mr-grid-header" style="width:max-content;">
+                <div data-vh-tokens="--bg-sidebar --border-light" class="mr-corner"></div>
+                <div data-vh-tokens="--text-main --text-muted --border-light" class="mr-day-col" style="width:120px; min-width:120px;">12<span>Mon</span></div>
+                <div data-vh-tokens="--text-main --text-muted --border-light" class="mr-day-col" style="width:120px; min-width:120px;">13<span>Tue</span></div>
+                <div data-vh-tokens="--text-main --text-muted --border-light" class="mr-day-col" style="width:120px; min-width:120px;">14<span>Wed</span></div>
+              </div>
+              <div data-vh-tokens="--border-light" class="mr-grid-row" style="width:max-content; min-height:70px;">
+                <div data-vh-tokens="--bg-cell --text-main --border-light" class="mr-crew-row" style="width:150px;">Jordan Lee</div>
+                <div data-vh-tokens="--border-light --accent" class="mr-cell" style="width:120px; min-width:120px;">
+                  <span data-vh-tokens="--bg-event --accent --radius-event --text-main" class="vh-event-chip" style="font-size:10px; padding:4px 6px;">Call</span>
+                  <span class="rest-badge badge-red">!</span>
+                </div>
+                <div data-vh-tokens="--border-light --accent" class="mr-cell" style="width:120px; min-width:120px;"></div>
+                <div data-vh-tokens="--border-light --accent" class="mr-cell" style="width:120px; min-width:120px;">
+                  <span class="rest-badge badge-yellow">?</span>
                 </div>
               </div>
             </div>
           </section>
 
-          <section class="vh-report">
-            <h2 class="vh-report-title">07 · Grid / calendar scraps</h2>
-            <div class="vh-grid-demo">
-              <div class="hdr">Crew</div>
-              <div class="hdr">Mon</div>
-              <div class="hdr">Tue</div>
-              <div class="hdr">Wed</div>
-              <div>Alex</div>
-              <div><span class="vh-event-chip">Load-in</span></div>
-              <div></div>
-              <div><span class="vh-event-chip">Show</span></div>
-            </div>
-            <div style="margin-top:12px;">
-              <div class="fc-col-header-cell-cushion" style="max-width:160px; text-align:center;">Day header</div>
-              <div class="fc-daygrid-day-frame" style="max-width:160px; min-height:80px !important; margin-top:6px; padding:8px;">
-                <span class="vh-event-chip">Event</span>
+          <!-- PERSONAL HUB -->
+          <section class="vh-view-panel" data-view-panel="hub">
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Personal Hub</strong> — account / theme / lock settings overlay (`00b_UI_Hubs.html` · `#manager-settings-overlay`). Theme dropdown here is what users pick after you bake a theme.</p>
+
+            <div data-vh-tokens="--bg-cell --border-light" class="vh-report">
+              <div data-vh-tokens="--bg-sidebar --border-light" class="personal-hub-account-bar" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:12px; border:1px solid #333; border-radius:8px; background:var(--bg-sidebar);">
+                <div data-vh-tokens="--text-main" class="view-header-title" style="margin:0;">Personal Hub</div>
+                <select data-vh-tokens="--bg-cell --text-main --border-light" class="personal-hub-theme-select">
+                  <option>Dark</option>
+                  <option>Light</option>
+                </select>
+                <select data-vh-tokens="--bg-cell --text-main --border-light" class="personal-hub-theme-select personal-hub-lock-select">
+                  <option>Lock: 15 min</option>
+                </select>
+                <button type="button" class="btn-outline personal-hub-logout-btn">Log out</button>
+                <button type="button" class="btn-outline personal-hub-pin-btn">Change PIN</button>
+              </div>
+              <div class="vh-flex" style="margin-top:14px;">
+                <div data-vh-tokens="--bg-cell --text-muted --text-main --border-light" class="info-pill info-pill--amber" style="width:240px;">
+                  <div class="pill-info-grid">
+                    <div class="info-cell"><div data-vh-tokens="--text-muted" class="info-cell-label">Role</div><div data-vh-tokens="--text-main" class="info-cell-value">Manager</div></div>
+                    <div class="info-cell"><div data-vh-tokens="--text-muted" class="info-cell-label">Theme</div><div data-vh-tokens="--text-main" class="info-cell-value">Active</div></div>
+                  </div>
+                </div>
+                <div data-vh-tokens="--bg-cell --text-main --border-light" class="admin-card" style="width:200px;">
+                  <div data-vh-tokens="--text-main" class="admin-card-title">Admin card</div>
+                  <div data-vh-tokens="--text-muted" class="admin-panel-body">Panel body text</div>
+                </div>
               </div>
             </div>
           </section>
@@ -201,6 +366,7 @@
       </div>
     </main>
   </div>
+
   <script src="/playground.js"></script>
 </body>
 </html>

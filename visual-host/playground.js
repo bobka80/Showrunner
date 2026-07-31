@@ -136,6 +136,7 @@
 
       var row = document.createElement('div');
       row.className = 'vh-token';
+      row.setAttribute('data-token-key', meta.key);
       var controls = '';
       if (meta.type === 'text' || !isColorToken(val)) {
         controls =
@@ -152,11 +153,67 @@
           '<div class="vh-token-key">' + meta.key + '</div>' +
         '</div>' +
         '<div class="vh-token-controls">' + controls + '</div>';
+      row.addEventListener('mouseenter', function () { highlightTokenTargets(meta.key); });
+      row.addEventListener('mouseleave', clearTokenHighlights);
       el.tokens.appendChild(row);
     });
 
     el.tokens.querySelectorAll('input').forEach(function (input) {
       input.addEventListener('input', onTokenInput);
+      input.addEventListener('focus', function () {
+        highlightTokenTargets(input.getAttribute('data-key'));
+      });
+      input.addEventListener('blur', clearTokenHighlights);
+    });
+  }
+
+  function clearTokenHighlights() {
+    document.querySelectorAll('.vh-token-hit').forEach(function (node) {
+      node.classList.remove('vh-token-hit');
+    });
+    document.querySelectorAll('.vh-view-tab.vh-tab-has-hits').forEach(function (tab) {
+      tab.classList.remove('vh-tab-has-hits');
+    });
+    document.querySelectorAll('.vh-token.vh-token-active').forEach(function (row) {
+      row.classList.remove('vh-token-active');
+    });
+  }
+
+  function highlightTokenTargets(tokenKey) {
+    clearTokenHighlights();
+    if (!tokenKey) return;
+    var row = el.tokens.querySelector('.vh-token[data-token-key="' + tokenKey + '"]');
+    if (row) row.classList.add('vh-token-active');
+
+    var hits = [];
+    document.querySelectorAll('#preview-root [data-vh-tokens]').forEach(function (node) {
+      var list = (node.getAttribute('data-vh-tokens') || '').split(/\s+/);
+      if (list.indexOf(tokenKey) === -1) return;
+      node.classList.add('vh-token-hit');
+      hits.push(node);
+    });
+
+    // Button-group ring: hovering any --btn-main-* outlines all that group
+    if (tokenKey.indexOf('--btn-') === 0) {
+      var bm = tokenKey.match(/^--btn-(.+)-(bg|border|text|hover-bg)$/);
+      if (bm) {
+        document.querySelectorAll('#preview-root [data-vh-btn-group="' + bm[1] + '"]').forEach(function (node) {
+          if (!node.classList.contains('vh-token-hit')) {
+            node.classList.add('vh-token-hit');
+            hits.push(node);
+          }
+        });
+      }
+    }
+
+    var viewsWithHits = {};
+    hits.forEach(function (node) {
+      var panel = node.closest('[data-view-panel]');
+      if (panel) viewsWithHits[panel.getAttribute('data-view-panel')] = true;
+    });
+    Object.keys(viewsWithHits).forEach(function (view) {
+      var tab = document.querySelector('.vh-view-tab[data-view="' + view + '"]');
+      if (tab) tab.classList.add('vh-tab-has-hits');
     });
   }
 
@@ -193,6 +250,7 @@
     syncSelect();
     renderTokenEditors();
     applyPreview();
+    if (typeof annotateButtonSamples === 'function') annotateButtonSamples();
   }
 
   async function fetchRegistry() {
@@ -301,6 +359,206 @@
   });
   el.neu.addEventListener('click', newTheme);
   el.del.addEventListener('click', deleteTheme);
+
+  /* ---- View tabs ---- */
+  var tabBar = document.getElementById('vh-view-tabs');
+  if (tabBar) {
+    tabBar.addEventListener('click', function (ev) {
+      var btn = ev.target.closest('.vh-view-tab');
+      if (!btn) return;
+      var view = btn.getAttribute('data-view');
+      tabBar.querySelectorAll('.vh-view-tab').forEach(function (b) {
+        b.classList.toggle('active', b === btn);
+      });
+      document.querySelectorAll('[data-view-panel]').forEach(function (panel) {
+        panel.classList.toggle('active', panel.getAttribute('data-view-panel') === view);
+      });
+    });
+  }
+
+  /* ---- Button groups: annotate + click-to-edit ---- */
+  var BUTTON_SUFFIXES = ['-bg', '-border', '-text', '-hover-bg'];
+
+  function buttonGroups() {
+    return (registry && registry.buttonGroups) || [];
+  }
+
+  function groupTokens(prefix) {
+    return BUTTON_SUFFIXES.map(function (s) { return prefix + s; });
+  }
+
+  function findButtonGroupFromEl(node) {
+    var groups = buttonGroups();
+    var classes = (node.className || '').toString().split(/\s+/);
+    // Prefer more specific matches first (outline-blue before base)
+    var ranked = groups.slice().sort(function (a, b) {
+      return (b.match[0] || '').length - (a.match[0] || '').length;
+    });
+    for (var i = 0; i < ranked.length; i++) {
+      var g = ranked[i];
+      for (var j = 0; j < g.match.length; j++) {
+        var m = g.match[j];
+        if (m === 'btn-tab-active') {
+          if (classes.indexOf('btn-tab') !== -1 && classes.indexOf('active') !== -1) return g;
+          continue;
+        }
+        if (classes.indexOf(m) !== -1) {
+          if (m === 'btn-tab' && classes.indexOf('active') !== -1) continue;
+          return g;
+        }
+      }
+    }
+    // plain button / outline default
+    if (node.tagName === 'BUTTON' || classes.indexOf('btn-outline') !== -1 || classes.indexOf('fc-button-primary') !== -1) {
+      return groups.find(function (g) { return g.id === 'base'; }) || null;
+    }
+    return null;
+  }
+
+  function annotateButtonSamples() {
+    var root = el.previewRoot;
+    if (!root) return;
+    root.querySelectorAll('button, .btn-new, .fc-button-primary').forEach(function (node) {
+      if (node.closest('#vh-btn-editor')) return;
+      var g = findButtonGroupFromEl(node);
+      if (!g) return;
+      node.setAttribute('data-vh-btn-group', g.id);
+      node.setAttribute('data-vh-tokens', groupTokens(g.prefix).join(' '));
+      node.title = 'Click to edit all “' + g.label + '” buttons';
+    });
+    root.querySelectorAll('.view-header-title, .modal-title, .section-title').forEach(function (node) {
+      var existing = node.getAttribute('data-vh-tokens') || '';
+      if (existing.indexOf('--text-main') === -1) {
+        node.setAttribute('data-vh-tokens', (existing + ' --text-main').trim());
+      }
+      node.setAttribute('data-vh-text-token', '--text-main');
+      node.title = 'Click to edit body / title text color';
+    });
+  }
+
+  var btnEditor = null;
+  function ensureBtnEditor() {
+    if (btnEditor) return btnEditor;
+    btnEditor = document.createElement('div');
+    btnEditor.id = 'vh-btn-editor';
+    btnEditor.innerHTML =
+      '<div class="vh-btn-editor-head">' +
+        '<strong id="vh-btn-editor-title">Button group</strong>' +
+        '<button type="button" class="vh-btn" id="vh-btn-editor-close">Close</button>' +
+      '</div>' +
+      '<p class="vh-btn-editor-hint">Edits every button in this group (same class).</p>' +
+      '<div id="vh-btn-editor-fields"></div>';
+    document.body.appendChild(btnEditor);
+    btnEditor.querySelector('#vh-btn-editor-close').addEventListener('click', closeBtnEditor);
+    return btnEditor;
+  }
+
+  function closeBtnEditor() {
+    if (!btnEditor) return;
+    btnEditor.classList.remove('open');
+    clearTokenHighlights();
+  }
+
+  function openBtnEditor(group, clientX, clientY) {
+    var theme = themeById(activeId);
+    if (!theme || !group) return;
+    var ed = ensureBtnEditor();
+    ed.querySelector('#vh-btn-editor-title').textContent = group.label;
+    var fields = ed.querySelector('#vh-btn-editor-fields');
+    fields.innerHTML = '';
+    var keys = groupTokens(group.prefix);
+    var labels = { '-bg': 'Fill', '-border': 'Border', '-text': 'Text', '-hover-bg': 'Hover fill' };
+    keys.forEach(function (key) {
+      var suffix = key.slice(group.prefix.length);
+      var val = theme.tokens[key] || '';
+      var row = document.createElement('div');
+      row.className = 'vh-btn-editor-row';
+      var hexOk = isColorToken(val);
+      row.innerHTML =
+        '<label>' + (labels[suffix] || suffix) + '</label>' +
+        (hexOk
+          ? '<input type="color" data-key="' + key + '" value="' + normalizeHex(val) + '" />'
+          : '') +
+        '<input type="text" data-key="' + key + '" value="' + String(val).replace(/"/g, '&quot;') + '" />';
+      fields.appendChild(row);
+    });
+    fields.querySelectorAll('input').forEach(function (input) {
+      input.addEventListener('input', function (ev) {
+        var key = ev.target.getAttribute('data-key');
+        var value = ev.target.value;
+        theme.tokens[key] = value;
+        dirty = true;
+        if (ev.target.type === 'color') {
+          var sib = ev.target.parentNode.querySelector('input[type="text"][data-key="' + key + '"]');
+          if (sib) sib.value = value;
+        }
+        applyPreview();
+        highlightTokenTargets(key);
+        setStatus('Unsaved — bake to write into the app.', '');
+      });
+    });
+    ed.classList.add('open');
+    var x = Math.min(clientX + 12, window.innerWidth - 320);
+    var y = Math.min(clientY + 12, window.innerHeight - 280);
+    ed.style.left = Math.max(8, x) + 'px';
+    ed.style.top = Math.max(8, y) + 'px';
+    highlightTokenTargets(group.prefix + '-bg');
+  }
+
+  function openTextTokenEditor(tokenKey, clientX, clientY) {
+    var theme = themeById(activeId);
+    if (!theme) return;
+    var ed = ensureBtnEditor();
+    ed.querySelector('#vh-btn-editor-title').textContent = 'Title / body text';
+    var fields = ed.querySelector('#vh-btn-editor-fields');
+    var val = theme.tokens[tokenKey] || '#ffffff';
+    fields.innerHTML =
+      '<div class="vh-btn-editor-row">' +
+        '<label>Text color</label>' +
+        '<input type="color" data-key="' + tokenKey + '" value="' + normalizeHex(val) + '" />' +
+        '<input type="text" data-key="' + tokenKey + '" value="' + val + '" />' +
+      '</div>';
+    fields.querySelectorAll('input').forEach(function (input) {
+      input.addEventListener('input', function (ev) {
+        var key = ev.target.getAttribute('data-key');
+        var value = ev.target.value;
+        theme.tokens[key] = value;
+        dirty = true;
+        if (ev.target.type === 'color') {
+          var sib = ev.target.parentNode.querySelector('input[type="text"]');
+          if (sib) sib.value = value;
+        }
+        applyPreview();
+        highlightTokenTargets(key);
+        setStatus('Unsaved — bake to write into the app.', '');
+      });
+    });
+    ed.classList.add('open');
+    ed.style.left = Math.max(8, Math.min(clientX + 12, window.innerWidth - 320)) + 'px';
+    ed.style.top = Math.max(8, Math.min(clientY + 12, window.innerHeight - 200)) + 'px';
+    highlightTokenTargets(tokenKey);
+  }
+
+  el.previewRoot.addEventListener('click', function (ev) {
+    var textEl = ev.target.closest('[data-vh-text-token]');
+    if (textEl && el.previewRoot.contains(textEl)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      openTextTokenEditor(textEl.getAttribute('data-vh-text-token'), ev.clientX, ev.clientY);
+      return;
+    }
+    var btn = ev.target.closest('[data-vh-btn-group]');
+    if (!btn || !el.previewRoot.contains(btn)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var id = btn.getAttribute('data-vh-btn-group');
+    var group = buttonGroups().find(function (g) { return g.id === id; });
+    openBtnEditor(group, ev.clientX, ev.clientY);
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') closeBtnEditor();
+  });
 
   fetchRegistry().catch(function (err) {
     setStatus(String(err.message || err), 'err');

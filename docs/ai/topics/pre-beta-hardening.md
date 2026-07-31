@@ -1,9 +1,9 @@
 # Pre-beta hardening — multi-sweep debug campaign
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
-**Related:** [beta-prep.md](beta-prep.md) (product beta features) · [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) · [PRE_SHIP_PIPELINE.md](../PRE_SHIP_PIPELINE.md) · [DEPLOY_AND_ROLLBACK.md](../DEPLOY_AND_ROLLBACK.md)
+**Related:** [beta-prep.md](beta-prep.md) (product beta features) · [FRAGILE_ZONES.md](../FRAGILE_ZONES.md) · [PRE_SHIP_PIPELINE.md](../PRE_SHIP_PIPELINE.md) · [DEPLOY_AND_ROLLBACK.md](../DEPLOY_AND_ROLLBACK.md) · live mid-patch thrash: [STUCK_LOOP_GATE.md](../STUCK_LOOP_GATE.md) (Rule 13 — does **not** replace Gate 0.5)
 
-**Last swept:** 2026-07-17 · **Status:** Backlog — **runs last**, after product TODO / active campaigns are done enough for users · **Not started**
+**Last swept:** 2026-07-31 · **Status:** Backlog — **runs last**, after product TODO / active campaigns are done enough for users · **Not started**
 
 ---
 
@@ -45,6 +45,8 @@ Full-software debug **before real user/beta testing** — not mid-feature, not �
 ## Gate 0.5 — Intent survey (before Sweep 1)
 
 **Why:** Agents will otherwise “fix” deliberate quirks (e.g. formula copies pending consolidate, cache disabled on purpose, merge-favors-local). Director intent must sit **next to** symptoms before purity or RC work.
+
+**Not the Stuck Loop Gate:** Gate 0.5 is a **one-time pre-sweep** structured survey. Mid-sweep / mid-build thrash (same signature failing 2–3×) uses the live [STUCK_LOOP_GATE.md](../STUCK_LOOP_GATE.md) instead — both can apply during this campaign.
 
 **Mode:** Research + survey only — **no behavior patches**, no purity sweeps yet.
 

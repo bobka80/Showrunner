@@ -108,11 +108,11 @@ Current model = **short sessions** per domain (prep + timeline may both be open,
 
 | Element | Proposal |
 |---------|----------|
-| **Room type** | **Project Campaign Room** — one `campaignRoomUid`; **48h idle silence** (not hard lease) |
-| **Slices** | **meta** + **assets** + **timeline** + **logistics** |
-| **Sheets** | **Publish checkpoints** ~every 30m if dirty; room stays live |
-| **Close** | Explicit End ∪ 48h idle → final publish → close |
-| **Outside room** | Vault, RFID `Operations_Ledger`, financials, cross-project tracker |
+| **Room type** | **Project Campaign Room** — one `campaignRoomUid`; **N-day idle silence** (default 48h, single constant) |
+| **Slices** | **meta** + **assets** + **timeline** + **logistics** + **ops** (five; director 2026-07-31) |
+| **Sheets** | **Publish checkpoints** ~every 30m if dirty; room stays live; order meta→PA→timeline→ledger→ops |
+| **Close** | Explicit End ∪ N-day idle → final publish → close |
+| **Outside room** | Vault, financials, cross-project tracker, crew roster, offers — **not** ops (ops is fifth slice) |
 
 ### Doctrine
 

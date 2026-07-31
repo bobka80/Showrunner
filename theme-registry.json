@@ -1,5 +1,136 @@
 {
-  "version": 1,
+  "version": 2,
+  "buttonGroups": [
+    {
+      "id": "base",
+      "label": "Base / outline",
+      "match": [
+        "btn-outline",
+        "fc-button-primary"
+      ],
+      "prefix": "--btn-base"
+    },
+    {
+      "id": "main",
+      "label": "Save / confirm",
+      "match": [
+        "btn-main"
+      ],
+      "prefix": "--btn-main"
+    },
+    {
+      "id": "add",
+      "label": "Add",
+      "match": [
+        "btn-add"
+      ],
+      "prefix": "--btn-add"
+    },
+    {
+      "id": "blue",
+      "label": "Blue",
+      "match": [
+        "btn-blue"
+      ],
+      "prefix": "--btn-blue"
+    },
+    {
+      "id": "orange",
+      "label": "Orange",
+      "match": [
+        "btn-orange"
+      ],
+      "prefix": "--btn-orange"
+    },
+    {
+      "id": "purple",
+      "label": "Purple",
+      "match": [
+        "btn-purple"
+      ],
+      "prefix": "--btn-purple"
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "match": [
+        "btn-settings"
+      ],
+      "prefix": "--btn-settings"
+    },
+    {
+      "id": "close",
+      "label": "Cancel / close",
+      "match": [
+        "btn-close"
+      ],
+      "prefix": "--btn-close"
+    },
+    {
+      "id": "delete",
+      "label": "Delete",
+      "match": [
+        "btn-delete"
+      ],
+      "prefix": "--btn-delete"
+    },
+    {
+      "id": "outline-blue",
+      "label": "Outline blue",
+      "match": [
+        "btn-outline-blue"
+      ],
+      "prefix": "--btn-outline-blue"
+    },
+    {
+      "id": "outline-orange",
+      "label": "Outline orange",
+      "match": [
+        "btn-outline-orange"
+      ],
+      "prefix": "--btn-outline-orange"
+    },
+    {
+      "id": "outline-purple",
+      "label": "Outline purple",
+      "match": [
+        "btn-outline-purple"
+      ],
+      "prefix": "--btn-outline-purple"
+    },
+    {
+      "id": "tab",
+      "label": "Hub tab",
+      "match": [
+        "btn-tab"
+      ],
+      "prefix": "--btn-tab"
+    },
+    {
+      "id": "tab-active",
+      "label": "Hub tab active",
+      "match": [
+        "btn-tab-active"
+      ],
+      "prefix": "--btn-tab-active"
+    },
+    {
+      "id": "new",
+      "label": "New (accent)",
+      "match": [
+        "btn-new"
+      ],
+      "prefix": "--btn-new"
+    },
+    {
+      "id": "ghost",
+      "label": "Ghost",
+      "match": [
+        "btn-ghost"
+      ],
+      "prefix": "--btn-ghost"
+    }
+  ],
   "tokenMeta": [
     {
       "key": "--bg-dark",
@@ -33,12 +164,17 @@
     },
     {
       "key": "--text-main",
-      "label": "Body text",
+      "label": "Body / titles",
       "group": "text"
     },
     {
       "key": "--text-muted",
       "label": "Muted text",
+      "group": "text"
+    },
+    {
+      "key": "--border-chrome",
+      "label": "Chrome borders",
       "group": "text"
     },
     {
@@ -67,6 +203,326 @@
       "label": "Event radius",
       "group": "shape",
       "type": "text"
+    },
+    {
+      "key": "--btn-base-bg",
+      "label": "Base fill",
+      "group": "btn-base"
+    },
+    {
+      "key": "--btn-base-border",
+      "label": "Base border",
+      "group": "btn-base"
+    },
+    {
+      "key": "--btn-base-text",
+      "label": "Base text",
+      "group": "btn-base"
+    },
+    {
+      "key": "--btn-base-hover-bg",
+      "label": "Base hover",
+      "group": "btn-base"
+    },
+    {
+      "key": "--btn-main-bg",
+      "label": "Save fill",
+      "group": "btn-main"
+    },
+    {
+      "key": "--btn-main-border",
+      "label": "Save border",
+      "group": "btn-main"
+    },
+    {
+      "key": "--btn-main-text",
+      "label": "Save text",
+      "group": "btn-main"
+    },
+    {
+      "key": "--btn-main-hover-bg",
+      "label": "Save hover",
+      "group": "btn-main"
+    },
+    {
+      "key": "--btn-add-bg",
+      "label": "Add fill",
+      "group": "btn-add"
+    },
+    {
+      "key": "--btn-add-border",
+      "label": "Add border",
+      "group": "btn-add"
+    },
+    {
+      "key": "--btn-add-text",
+      "label": "Add text",
+      "group": "btn-add"
+    },
+    {
+      "key": "--btn-add-hover-bg",
+      "label": "Add hover",
+      "group": "btn-add"
+    },
+    {
+      "key": "--btn-blue-bg",
+      "label": "Blue fill",
+      "group": "btn-blue"
+    },
+    {
+      "key": "--btn-blue-border",
+      "label": "Blue border",
+      "group": "btn-blue"
+    },
+    {
+      "key": "--btn-blue-text",
+      "label": "Blue text",
+      "group": "btn-blue"
+    },
+    {
+      "key": "--btn-blue-hover-bg",
+      "label": "Blue hover",
+      "group": "btn-blue"
+    },
+    {
+      "key": "--btn-orange-bg",
+      "label": "Orange fill",
+      "group": "btn-orange"
+    },
+    {
+      "key": "--btn-orange-border",
+      "label": "Orange border",
+      "group": "btn-orange"
+    },
+    {
+      "key": "--btn-orange-text",
+      "label": "Orange text",
+      "group": "btn-orange"
+    },
+    {
+      "key": "--btn-orange-hover-bg",
+      "label": "Orange hover",
+      "group": "btn-orange"
+    },
+    {
+      "key": "--btn-purple-bg",
+      "label": "Purple fill",
+      "group": "btn-purple"
+    },
+    {
+      "key": "--btn-purple-border",
+      "label": "Purple border",
+      "group": "btn-purple"
+    },
+    {
+      "key": "--btn-purple-text",
+      "label": "Purple text",
+      "group": "btn-purple"
+    },
+    {
+      "key": "--btn-purple-hover-bg",
+      "label": "Purple hover",
+      "group": "btn-purple"
+    },
+    {
+      "key": "--btn-settings-bg",
+      "label": "Settings fill",
+      "group": "btn-settings"
+    },
+    {
+      "key": "--btn-settings-border",
+      "label": "Settings border",
+      "group": "btn-settings"
+    },
+    {
+      "key": "--btn-settings-text",
+      "label": "Settings text",
+      "group": "btn-settings"
+    },
+    {
+      "key": "--btn-settings-hover-bg",
+      "label": "Settings hover",
+      "group": "btn-settings"
+    },
+    {
+      "key": "--btn-close-bg",
+      "label": "Close fill",
+      "group": "btn-close"
+    },
+    {
+      "key": "--btn-close-border",
+      "label": "Close border",
+      "group": "btn-close"
+    },
+    {
+      "key": "--btn-close-text",
+      "label": "Close text",
+      "group": "btn-close"
+    },
+    {
+      "key": "--btn-close-hover-bg",
+      "label": "Close hover",
+      "group": "btn-close"
+    },
+    {
+      "key": "--btn-delete-bg",
+      "label": "Delete fill",
+      "group": "btn-delete"
+    },
+    {
+      "key": "--btn-delete-border",
+      "label": "Delete border",
+      "group": "btn-delete"
+    },
+    {
+      "key": "--btn-delete-text",
+      "label": "Delete text",
+      "group": "btn-delete"
+    },
+    {
+      "key": "--btn-delete-hover-bg",
+      "label": "Delete hover",
+      "group": "btn-delete"
+    },
+    {
+      "key": "--btn-outline-blue-bg",
+      "label": "Outline blue fill",
+      "group": "btn-outline-blue"
+    },
+    {
+      "key": "--btn-outline-blue-border",
+      "label": "Outline blue border",
+      "group": "btn-outline-blue"
+    },
+    {
+      "key": "--btn-outline-blue-text",
+      "label": "Outline blue text",
+      "group": "btn-outline-blue"
+    },
+    {
+      "key": "--btn-outline-blue-hover-bg",
+      "label": "Outline blue hover",
+      "group": "btn-outline-blue"
+    },
+    {
+      "key": "--btn-outline-orange-bg",
+      "label": "Outline orange fill",
+      "group": "btn-outline-orange"
+    },
+    {
+      "key": "--btn-outline-orange-border",
+      "label": "Outline orange border",
+      "group": "btn-outline-orange"
+    },
+    {
+      "key": "--btn-outline-orange-text",
+      "label": "Outline orange text",
+      "group": "btn-outline-orange"
+    },
+    {
+      "key": "--btn-outline-orange-hover-bg",
+      "label": "Outline orange hover",
+      "group": "btn-outline-orange"
+    },
+    {
+      "key": "--btn-outline-purple-bg",
+      "label": "Outline purple fill",
+      "group": "btn-outline-purple"
+    },
+    {
+      "key": "--btn-outline-purple-border",
+      "label": "Outline purple border",
+      "group": "btn-outline-purple"
+    },
+    {
+      "key": "--btn-outline-purple-text",
+      "label": "Outline purple text",
+      "group": "btn-outline-purple"
+    },
+    {
+      "key": "--btn-outline-purple-hover-bg",
+      "label": "Outline purple hover",
+      "group": "btn-outline-purple"
+    },
+    {
+      "key": "--btn-tab-bg",
+      "label": "Tab fill",
+      "group": "btn-tab"
+    },
+    {
+      "key": "--btn-tab-border",
+      "label": "Tab border",
+      "group": "btn-tab"
+    },
+    {
+      "key": "--btn-tab-text",
+      "label": "Tab text",
+      "group": "btn-tab"
+    },
+    {
+      "key": "--btn-tab-hover-bg",
+      "label": "Tab hover",
+      "group": "btn-tab"
+    },
+    {
+      "key": "--btn-tab-active-bg",
+      "label": "Tab active fill",
+      "group": "btn-tab-active"
+    },
+    {
+      "key": "--btn-tab-active-border",
+      "label": "Tab active border",
+      "group": "btn-tab-active"
+    },
+    {
+      "key": "--btn-tab-active-text",
+      "label": "Tab active text",
+      "group": "btn-tab-active"
+    },
+    {
+      "key": "--btn-tab-active-hover-bg",
+      "label": "Tab active hover",
+      "group": "btn-tab-active"
+    },
+    {
+      "key": "--btn-new-bg",
+      "label": "New fill",
+      "group": "btn-new"
+    },
+    {
+      "key": "--btn-new-border",
+      "label": "New border",
+      "group": "btn-new"
+    },
+    {
+      "key": "--btn-new-text",
+      "label": "New text",
+      "group": "btn-new"
+    },
+    {
+      "key": "--btn-new-hover-bg",
+      "label": "New hover",
+      "group": "btn-new"
+    },
+    {
+      "key": "--btn-ghost-bg",
+      "label": "Ghost fill",
+      "group": "btn-ghost"
+    },
+    {
+      "key": "--btn-ghost-border",
+      "label": "Ghost border",
+      "group": "btn-ghost"
+    },
+    {
+      "key": "--btn-ghost-text",
+      "label": "Ghost text",
+      "group": "btn-ghost"
+    },
+    {
+      "key": "--btn-ghost-hover-bg",
+      "label": "Ghost hover",
+      "group": "btn-ghost"
     }
   ],
   "themes": [
@@ -84,8 +540,73 @@
         "--accent": "#698b99",
         "--text-main": "#f4f4f5",
         "--text-muted": "#71717a",
+        "--border-chrome": "#333333",
         "--radius-cell": "10px",
-        "--radius-event": "6px"
+        "--radius-event": "6px",
+        "--btn-base-bg": "rgba(63, 63, 70, 0.4)",
+        "--btn-base-border": "#52525b",
+        "--btn-base-text": "#ffffff",
+        "--btn-base-hover-bg": "rgba(63, 63, 70, 0.6)",
+        "--btn-main-bg": "rgba(16, 185, 129, 0.4)",
+        "--btn-main-border": "#10b981",
+        "--btn-main-text": "#ffffff",
+        "--btn-main-hover-bg": "rgba(16, 185, 129, 0.6)",
+        "--btn-add-bg": "rgba(161, 161, 170, 0.4)",
+        "--btn-add-border": "#a1a1aa",
+        "--btn-add-text": "#ffffff",
+        "--btn-add-hover-bg": "rgba(161, 161, 170, 0.6)",
+        "--btn-blue-bg": "rgba(59, 130, 246, 0.4)",
+        "--btn-blue-border": "#3b82f6",
+        "--btn-blue-text": "#ffffff",
+        "--btn-blue-hover-bg": "rgba(59, 130, 246, 0.6)",
+        "--btn-orange-bg": "rgba(249, 115, 22, 0.4)",
+        "--btn-orange-border": "#f97316",
+        "--btn-orange-text": "#ffffff",
+        "--btn-orange-hover-bg": "rgba(249, 115, 22, 0.6)",
+        "--btn-purple-bg": "rgba(168, 85, 247, 0.4)",
+        "--btn-purple-border": "#a855f7",
+        "--btn-purple-text": "#ffffff",
+        "--btn-purple-hover-bg": "rgba(168, 85, 247, 0.6)",
+        "--btn-settings-bg": "transparent",
+        "--btn-settings-border": "#a855f7",
+        "--btn-settings-text": "#ffffff",
+        "--btn-settings-hover-bg": "rgba(168, 85, 247, 0.2)",
+        "--btn-close-bg": "rgba(239, 68, 68, 0.2)",
+        "--btn-close-border": "#ef4444",
+        "--btn-close-text": "#ffffff",
+        "--btn-close-hover-bg": "rgba(239, 68, 68, 0.4)",
+        "--btn-delete-bg": "rgba(239, 68, 68, 0.4)",
+        "--btn-delete-border": "#ef4444",
+        "--btn-delete-text": "#ffffff",
+        "--btn-delete-hover-bg": "rgba(239, 68, 68, 0.6)",
+        "--btn-outline-blue-bg": "rgba(63, 63, 70, 0.4)",
+        "--btn-outline-blue-border": "#3b82f6",
+        "--btn-outline-blue-text": "#bfdbfe",
+        "--btn-outline-blue-hover-bg": "rgba(59, 130, 246, 0.15)",
+        "--btn-outline-orange-bg": "rgba(63, 63, 70, 0.4)",
+        "--btn-outline-orange-border": "#f97316",
+        "--btn-outline-orange-text": "#ffedd5",
+        "--btn-outline-orange-hover-bg": "rgba(249, 115, 22, 0.15)",
+        "--btn-outline-purple-bg": "rgba(63, 63, 70, 0.4)",
+        "--btn-outline-purple-border": "#a855f7",
+        "--btn-outline-purple-text": "#e9d5ff",
+        "--btn-outline-purple-hover-bg": "rgba(168, 85, 247, 0.15)",
+        "--btn-tab-bg": "transparent",
+        "--btn-tab-border": "transparent",
+        "--btn-tab-text": "#a1a1aa",
+        "--btn-tab-hover-bg": "rgba(255, 255, 255, 0.05)",
+        "--btn-tab-active-bg": "rgba(255, 255, 255, 0.12)",
+        "--btn-tab-active-border": "#52525b",
+        "--btn-tab-active-text": "#ffffff",
+        "--btn-tab-active-hover-bg": "rgba(255, 255, 255, 0.12)",
+        "--btn-new-bg": "#698b99",
+        "--btn-new-border": "#698b99",
+        "--btn-new-text": "#ffffff",
+        "--btn-new-hover-bg": "#7a9ca9",
+        "--btn-ghost-bg": "transparent",
+        "--btn-ghost-border": "transparent",
+        "--btn-ghost-text": "#ef4444",
+        "--btn-ghost-hover-bg": "transparent"
       }
     },
     {
@@ -102,11 +623,76 @@
         "--accent": "#698b99",
         "--text-main": "#111827",
         "--text-muted": "#6b7280",
+        "--border-chrome": "#d1d5db",
         "--border-light": "#d1d5db",
         "--shadow-light": "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
         "--shadow-modal": "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
         "--radius-cell": "10px",
-        "--radius-event": "6px"
+        "--radius-event": "6px",
+        "--btn-base-bg": "#ffffff",
+        "--btn-base-border": "#d1d5db",
+        "--btn-base-text": "#111827",
+        "--btn-base-hover-bg": "#f9fafb",
+        "--btn-main-bg": "rgba(16, 185, 129, 0.1)",
+        "--btn-main-border": "#10b981",
+        "--btn-main-text": "#065f46",
+        "--btn-main-hover-bg": "rgba(16, 185, 129, 0.2)",
+        "--btn-add-bg": "rgba(161, 161, 170, 0.15)",
+        "--btn-add-border": "#a1a1aa",
+        "--btn-add-text": "#374151",
+        "--btn-add-hover-bg": "rgba(161, 161, 170, 0.25)",
+        "--btn-blue-bg": "rgba(59, 130, 246, 0.1)",
+        "--btn-blue-border": "#3b82f6",
+        "--btn-blue-text": "#1e40af",
+        "--btn-blue-hover-bg": "rgba(59, 130, 246, 0.2)",
+        "--btn-orange-bg": "rgba(249, 115, 22, 0.1)",
+        "--btn-orange-border": "#f97316",
+        "--btn-orange-text": "#9a3412",
+        "--btn-orange-hover-bg": "rgba(249, 115, 22, 0.2)",
+        "--btn-purple-bg": "rgba(168, 85, 247, 0.1)",
+        "--btn-purple-border": "#a855f7",
+        "--btn-purple-text": "#6b21a8",
+        "--btn-purple-hover-bg": "rgba(168, 85, 247, 0.2)",
+        "--btn-settings-bg": "transparent",
+        "--btn-settings-border": "#698b99",
+        "--btn-settings-text": "#698b99",
+        "--btn-settings-hover-bg": "rgba(105, 139, 153, 0.1)",
+        "--btn-close-bg": "#ffffff",
+        "--btn-close-border": "#d1d5db",
+        "--btn-close-text": "#111827",
+        "--btn-close-hover-bg": "#f9fafb",
+        "--btn-delete-bg": "rgba(239, 68, 68, 0.1)",
+        "--btn-delete-border": "#ef4444",
+        "--btn-delete-text": "#991b1b",
+        "--btn-delete-hover-bg": "rgba(239, 68, 68, 0.2)",
+        "--btn-outline-blue-bg": "#ffffff",
+        "--btn-outline-blue-border": "#3b82f6",
+        "--btn-outline-blue-text": "#1e40af",
+        "--btn-outline-blue-hover-bg": "rgba(59, 130, 246, 0.08)",
+        "--btn-outline-orange-bg": "#ffffff",
+        "--btn-outline-orange-border": "#f97316",
+        "--btn-outline-orange-text": "#9a3412",
+        "--btn-outline-orange-hover-bg": "rgba(249, 115, 22, 0.08)",
+        "--btn-outline-purple-bg": "#ffffff",
+        "--btn-outline-purple-border": "#a855f7",
+        "--btn-outline-purple-text": "#6b21a8",
+        "--btn-outline-purple-hover-bg": "rgba(168, 85, 247, 0.08)",
+        "--btn-tab-bg": "transparent",
+        "--btn-tab-border": "transparent",
+        "--btn-tab-text": "#6b7280",
+        "--btn-tab-hover-bg": "rgba(0, 0, 0, 0.04)",
+        "--btn-tab-active-bg": "#e5e7eb",
+        "--btn-tab-active-border": "#d1d5db",
+        "--btn-tab-active-text": "#111827",
+        "--btn-tab-active-hover-bg": "#e5e7eb",
+        "--btn-new-bg": "#698b99",
+        "--btn-new-border": "#698b99",
+        "--btn-new-text": "#ffffff",
+        "--btn-new-hover-bg": "#7a9ca9",
+        "--btn-ghost-bg": "transparent",
+        "--btn-ghost-border": "transparent",
+        "--btn-ghost-text": "#ef4444",
+        "--btn-ghost-hover-bg": "transparent"
       }
     }
   ]

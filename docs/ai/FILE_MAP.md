@@ -37,7 +37,8 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Security.js`**: Manages user authentication and extracts security profiles.
 - **`Styles.html`**: Global structural CSS. **Authority:** [UI_DOCTRINE.md](UI_DOCTRINE.md). Module density/colors → Visual Settings (`06c_Admin_Visuals.html`), not here. Theme CSS vars marked `@THEME_VARS:dark|light` + `@THEME_CUSTOM` (baked by Visual Host).
 - **`theme-registry.json`**: Theme token registry (dark / light / custom). Source of truth for Visual Host bake.
-- **`visual-host.js`** + **`visual-host/`**: Local **Visual Host** theme playground (`npm run visual-host` → http://127.0.0.1:4177). UI element reports + token editors; **Save theme & bake** writes registry → `Styles.html` + theme engine + Personal Hub selects. Then ship with `node milestone.js`.
+- **`visual-host.js`** + **`visual-host/`**: Local **Visual Host** theme playground (`npm run visual-host` or double-click **`OPEN-VISUAL-HOST.bat`** → http://127.0.0.1:4177). Left = theme tools; right = **view tabs** (Shared chrome, Calendar, Vault, Availability, Timeline, Month roster, Personal Hub). Hover a left token → **dotted frames** on matching samples on the right (tabs with hits also get a dashed ring). **Save theme & bake** writes registry → `Styles.html` + theme engine + Personal Hub selects. Then ship with `node milestone.js`.
+- **`OPEN-VISUAL-HOST.bat`** / **`OPEN-VISUAL-HOST.ps1`**: One-click start + open browser (no typing `node` after reboot). Optional Desktop icon: run **`CREATE-VISUAL-HOST-SHORTCUT.bat`** once.
 - **`Styles_Mobile.html`**: Mobile-only CSS (`≤768px`) + crew hub / phase rail / timeline zoom / compact PA. Included after `Styles.html`.
 - **`07_Core_Globals.html`**: Centralized utility functions, live tag parsers, and the CSS theme engine (`SM_THEME_REGISTRY`, `applyTheme`).
 - **`07b_Grid_Engine.html`**: The interactive Drag & Drop data grid core.

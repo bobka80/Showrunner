@@ -40,7 +40,8 @@ This doctrine applies to **any AI agent** in this repository (Cursor, Claude, et
 | Station gun scans, `RfidManager`, `showrunnerStationDeliverScan` | [FRAGILE_ZONES.md](docs/ai/FRAGILE_ZONES.md) § Two-layer shell bridge + § Station RFID delivery |
 | Cursor IDE session, rules, review gates | [CURSOR_WORKFLOW.md](docs/ai/CURSOR_WORKFLOW.md) |
 | Warehouse gate, guns, station profile, PA concurrency | [topics/logistics-warehouse.md](docs/ai/topics/logistics-warehouse.md) + [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) |
-| Pre-beta / full-app debug sweeps (before real users) | [topics/pre-beta-hardening.md](docs/ai/topics/pre-beta-hardening.md) — **runs last**; Freeze → **Intent survey** → purity → registry → S0/S1 RCs |
+| Pre-beta / full-app debug sweeps (before real users) | [topics/pre-beta-hardening.md](docs/ai/topics/pre-beta-hardening.md) — **runs last**; Freeze → **Intent survey** → purity → registry → S0/S1 RCs · live patch thrash: [STUCK_LOOP_GATE.md](docs/ai/STUCK_LOOP_GATE.md) |
+| Repeat fix failures / same symptom 2–3× / concept vs code unclear | [STUCK_LOOP_GATE.md](docs/ai/STUCK_LOOP_GATE.md) — **stop patching**; Summary + Survey sync (Rule 13) · log in [error-journal/](docs/ai/error-journal/) |
 
 The director may dictate by voice — match **terminology lock** in [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) when searching code. See **Rule 12 (dictation mode)** — speech-to-text errors are common; confirm ambiguous terms before acting.
 
@@ -112,6 +113,8 @@ The director may dictate by voice — match **terminology lock** in [EQUIPMENT_M
 
     This applies in **every mode** (brainstorm, summarize, build) — not only when the director mentions dictation.
 
+13. **Stuck Loop Gate & Summary/Survey Sync (live, every build):** During any build/patch session, track consecutive failed fixes against the **same error signature** (same symptom + same file/function/feature area). **Must stop at 3** attempts; **may stop at 2** if the concept looks unlocked. Do **not** try a 4th silent patch. Instead run the forced checkpoint in **[STUCK_LOOP_GATE.md](docs/ai/STUCK_LOOP_GATE.md)**: short agent **Summary** → 2–3 plain **Survey** questions → compare to the **written briefing**. Match → resume code debug and log; mismatch → stop and ask which is current (doc vs director) — **do not invent** the winner. Written doc wins until explicitly changed. Log every trip in [error-journal/](docs/ai/error-journal/) (`STUCK-YYYY-MM-DD-*.md`). Does **not** replace Gate 0.5 Intent Survey ([pre-beta-hardening.md](docs/ai/topics/pre-beta-hardening.md)) — that is pre-sweep; this is in-session and may fire repeatedly.
+
 ---
 
 ## Director Context
@@ -121,6 +124,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 | Doc | Purpose |
 |-----|---------|
 | [Director Workflow](docs/ai/DIRECTOR_WORKFLOW.md) | Brainstorm · summarize · hygiene sweep vs build |
+| [Stuck Loop Gate](docs/ai/STUCK_LOOP_GATE.md) | Mid-build stop after 2–3 same-signature failures · Summary/Survey sync |
 | [Cursor Workflow](docs/ai/CURSOR_WORKFLOW.md) | Cursor rules, review gates, session routine |
 | [Fragile Zones](docs/ai/FRAGILE_ZONES.md) | Pre-change checklist |
 | [Engineering Rules](docs/ai/ENGINEERING_RULES.md) | Deep mandates |
@@ -147,6 +151,7 @@ The project owner is a **Software Director**, not a developer. **You** own diagn
 | [EQUIPMENT_MODEL.md](docs/ai/EQUIPMENT_MODEL.md) | Bulk vs unique, Matryoshka, two packing engines — **before PA/warehouse work** |
 | [DRIVE_LAYOUT.md](docs/ai/DRIVE_LAYOUT.md) | `STAGE_MASTERS_SYSTEM_ROOT` — folder IDs, live DB names, sync vs backup |
 | [DIRECTOR_WORKFLOW.md](docs/ai/DIRECTOR_WORKFLOW.md) | How to work with the director |
+| [STUCK_LOOP_GATE.md](docs/ai/STUCK_LOOP_GATE.md) | Stuck Loop Gate · Summary/Survey sync (Rule 13) |
 
 **Situational:** read [docs/ai/active/](docs/ai/active/) and the relevant [docs/ai/topics/](docs/ai/topics/) file — not the whole TODO.
 

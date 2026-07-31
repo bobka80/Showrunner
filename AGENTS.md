@@ -23,4 +23,6 @@ Operational logs: root **`RELEASES.md`**, **`WORKS_LOG.md`** · bug memory **[do
 
 **Director triggers (no code until approved):** **summarize** = restate understanding; **hygiene sweep** (alias **doc hygiene**) = doc consistency report → **OK go** to apply doc fixes only; **create repo mix** = pack repo for quote.ai/Claude project knowledge → drag `claude-pack/repomix-output.md`. See [AI_DOCTRINE.md](AI_DOCTRINE.md) Rules 4b–4c · [CLAUDE_PACK.md](docs/ai/CLAUDE_PACK.md).
 
+**Stuck Loop Gate (Rule 13):** Same symptom fails 2–3× in a build session → **stop patching**; run Summary + Survey sync — [STUCK_LOOP_GATE.md](docs/ai/STUCK_LOOP_GATE.md). Log trips in [error-journal/](docs/ai/error-journal/).
+
 **Dictation:** The director often uses voice input — watch for mis-transcriptions (Rule 12 in [AI_DOCTRINE.md](AI_DOCTRINE.md)).

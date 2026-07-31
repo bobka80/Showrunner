@@ -88,6 +88,8 @@ See [CLAUDE_PACK.md](CLAUDE_PACK.md).
 5. **`node build.js`** then **`node milestone.js "<note>"`** — ship to production automatically (see [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md)). Report the new **GAS version** (e.g. v411). Do **not** ask the director to deploy.
 6. Give the director a **test checklist** on **web.app** (below)
 
+**Stuck Loop Gate (live, agent-enforced):** If the **same symptom** fails against the same area **2–3 times** in a row, the agent **stops patching** and runs a short Summary + Survey checkpoint instead of a 4th fix — full rule [STUCK_LOOP_GATE.md](STUCK_LOOP_GATE.md) ([AI_DOCTRINE.md](../../AI_DOCTRINE.md) Rule 13). The director answers 2–3 plain questions (expected result, match with the named briefing doc, goal changed?). If answers disagree with the written briefing, the agent asks which is current — it does **not** guess. Log every trip in [error-journal/](error-journal/).
+
 ---
 
 ## Bug Report Template (Director → AI)
@@ -173,7 +175,7 @@ The Incident Log is not a diary — each entry is one **lesson** so future AI se
 1. **Brainstorm first** for new features — agree scope before coding
 2. **One clear task per "OK go"** — not "fix calendar and rebuild financials" in one session
 3. **Default to Auto model in Cursor** for routine fixes; escalate to Sonnet only for fragile zones (see `FRAGILE_ZONES.md`)
-4. **Avoid Opus** unless stuck after Sonnet
+4. **Avoid Opus** unless stuck after Sonnet — and if the same signature failed 2–3×, run [STUCK_LOOP_GATE.md](STUCK_LOOP_GATE.md) **before** spending on a heavier model
 5. Set a **monthly spend cap** in Cursor billing to prevent surprise overages
 
 ---

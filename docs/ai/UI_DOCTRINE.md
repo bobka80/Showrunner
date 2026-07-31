@@ -47,7 +47,7 @@
 | `--radius-cell` | `10px` | Calendar cells |
 | `--radius-event` | `6px` | Event chips |
 
-**Theme:** `theme-registry.json` is the token source. Edit via **Visual Host** (`node visual-host.js` → http://127.0.0.1:4177) then **Save theme & bake**. Runtime: `SM_THEME_REGISTRY` / `changeUserTheme()` / `applyTheme()` in `07_Core_Globals.html`. Dark = default `:root`; light = `.theme-light` (+ structural overrides in `Styles.html`); custom themes = `:root.theme-{id}` and optional light-family class. New structural classes still need `.theme-light` rules when added.
+**Theme:** `theme-registry.json` is the token source (surfaces + **button groups** `--btn-*`). Edit via **Visual Host** (`OPEN-VISUAL-HOST.bat`) — hover left tokens for dotted frames; **click a sample button** to edit that whole button group; click titles to edit `--text-main`. Bake → `Styles.html` + theme engine. Titles/headers use `var(--text-main)` (not hardcoded white). Runtime: `SM_THEME_REGISTRY` / `applyTheme()` in `07_Core_Globals.html`.
 
 ---
 

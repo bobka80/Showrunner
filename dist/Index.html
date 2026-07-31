@@ -22,8 +22,73 @@
       --accent: #698b99;
       --text-main: #f4f4f5;
       --text-muted: #71717a;
+      --border-chrome: #333333;
       --radius-cell: 10px;
       --radius-event: 6px;
+      --btn-base-bg: rgba(63, 63, 70, 0.4);
+      --btn-base-border: #52525b;
+      --btn-base-text: #ffffff;
+      --btn-base-hover-bg: rgba(63, 63, 70, 0.6);
+      --btn-main-bg: rgba(16, 185, 129, 0.4);
+      --btn-main-border: #10b981;
+      --btn-main-text: #ffffff;
+      --btn-main-hover-bg: rgba(16, 185, 129, 0.6);
+      --btn-add-bg: rgba(161, 161, 170, 0.4);
+      --btn-add-border: #a1a1aa;
+      --btn-add-text: #ffffff;
+      --btn-add-hover-bg: rgba(161, 161, 170, 0.6);
+      --btn-blue-bg: rgba(59, 130, 246, 0.4);
+      --btn-blue-border: #3b82f6;
+      --btn-blue-text: #ffffff;
+      --btn-blue-hover-bg: rgba(59, 130, 246, 0.6);
+      --btn-orange-bg: rgba(249, 115, 22, 0.4);
+      --btn-orange-border: #f97316;
+      --btn-orange-text: #ffffff;
+      --btn-orange-hover-bg: rgba(249, 115, 22, 0.6);
+      --btn-purple-bg: rgba(168, 85, 247, 0.4);
+      --btn-purple-border: #a855f7;
+      --btn-purple-text: #ffffff;
+      --btn-purple-hover-bg: rgba(168, 85, 247, 0.6);
+      --btn-settings-bg: transparent;
+      --btn-settings-border: #a855f7;
+      --btn-settings-text: #ffffff;
+      --btn-settings-hover-bg: rgba(168, 85, 247, 0.2);
+      --btn-close-bg: rgba(239, 68, 68, 0.2);
+      --btn-close-border: #ef4444;
+      --btn-close-text: #ffffff;
+      --btn-close-hover-bg: rgba(239, 68, 68, 0.4);
+      --btn-delete-bg: rgba(239, 68, 68, 0.4);
+      --btn-delete-border: #ef4444;
+      --btn-delete-text: #ffffff;
+      --btn-delete-hover-bg: rgba(239, 68, 68, 0.6);
+      --btn-outline-blue-bg: rgba(63, 63, 70, 0.4);
+      --btn-outline-blue-border: #3b82f6;
+      --btn-outline-blue-text: #bfdbfe;
+      --btn-outline-blue-hover-bg: rgba(59, 130, 246, 0.15);
+      --btn-outline-orange-bg: rgba(63, 63, 70, 0.4);
+      --btn-outline-orange-border: #f97316;
+      --btn-outline-orange-text: #ffedd5;
+      --btn-outline-orange-hover-bg: rgba(249, 115, 22, 0.15);
+      --btn-outline-purple-bg: rgba(63, 63, 70, 0.4);
+      --btn-outline-purple-border: #a855f7;
+      --btn-outline-purple-text: #e9d5ff;
+      --btn-outline-purple-hover-bg: rgba(168, 85, 247, 0.15);
+      --btn-tab-bg: transparent;
+      --btn-tab-border: transparent;
+      --btn-tab-text: #a1a1aa;
+      --btn-tab-hover-bg: rgba(255, 255, 255, 0.05);
+      --btn-tab-active-bg: rgba(255, 255, 255, 0.12);
+      --btn-tab-active-border: #52525b;
+      --btn-tab-active-text: #ffffff;
+      --btn-tab-active-hover-bg: rgba(255, 255, 255, 0.12);
+      --btn-new-bg: #698b99;
+      --btn-new-border: #698b99;
+      --btn-new-text: #ffffff;
+      --btn-new-hover-bg: #7a9ca9;
+      --btn-ghost-bg: transparent;
+      --btn-ghost-border: transparent;
+      --btn-ghost-text: #ef4444;
+      --btn-ghost-hover-bg: transparent;
     }
     /* @THEME_VARS:dark end */
     body { font-family: 'Inter', sans-serif; margin: 0; background: var(--bg-dark); color: var(--text-main); height: 100vh; overflow: hidden; }
@@ -37,9 +102,9 @@
 
     /* --- UNIFIED BUTTON ARCHITECTURE --- */
     button, .btn-main, .btn-outline, .btn-add, .btn-blue, .btn-orange, .btn-purple, .btn-w, .fc-button-primary {
-        background: rgba(63, 63, 70, 0.4) !important;
-        color: #fff !important;
-        border: 1px solid #52525b !important;
+        background: var(--btn-base-bg) !important;
+        color: var(--btn-base-text) !important;
+        border: 1px solid var(--btn-base-border) !important;
         box-shadow: none !important;
         transition: 0.2s !important;
         display: inline-flex;
@@ -58,7 +123,7 @@
     }
 
     button:hover, .btn-outline:hover, .btn-w:hover, .fc-button-primary:hover {
-        background: rgba(63, 63, 70, 0.6) !important;
+        background: var(--btn-base-hover-bg) !important;
     }
     
     /* Exempt invisible structural controls */
@@ -96,88 +161,95 @@
 
     /* --- SAVE BUTTONS (GREEN) --- */
     .btn-main {
-        background: rgba(16, 185, 129, 0.4) !important;
-        border: 1px solid #10b981 !important;
+        background: var(--btn-main-bg) !important;
+        border: 1px solid var(--btn-main-border) !important;
+        color: var(--btn-main-text) !important;
     }
-    .btn-main:hover { background: rgba(16, 185, 129, 0.6) !important; }
+    .btn-main:hover { background: var(--btn-main-hover-bg) !important; }
 
     /* --- ADD BUTTONS (LIGHT GRAY) --- */
     .btn-add {
-        background: rgba(161, 161, 170, 0.4) !important;
-        border: 1px solid #a1a1aa !important;
+        background: var(--btn-add-bg) !important;
+        border: 1px solid var(--btn-add-border) !important;
+        color: var(--btn-add-text) !important;
     }
-    .btn-add:hover { background: rgba(161, 161, 170, 0.6) !important; }
+    .btn-add:hover { background: var(--btn-add-hover-bg) !important; }
 
     /* --- SETTINGS BUTTONS (PURPLE) --- */
     .btn-settings, .fc-customVisualSettings-button, .fc-customMiniSettings-button {
-        background: transparent !important;
-        border: 1px solid #a855f7 !important;
-        color: #fff !important;
+        background: var(--btn-settings-bg) !important;
+        border: 1px solid var(--btn-settings-border) !important;
+        color: var(--btn-settings-text) !important;
     }
-    .btn-settings:hover, .fc-customVisualSettings-button:hover, .fc-customMiniSettings-button:hover { background: rgba(168, 85, 247, 0.2) !important; }
+    .btn-settings:hover, .fc-customVisualSettings-button:hover, .fc-customMiniSettings-button:hover { background: var(--btn-settings-hover-bg) !important; }
 
     /* --- CLOSE / CANCEL BUTTONS --- */
     .btn-close {
-        background: rgba(239, 68, 68, 0.2) !important;
-        border: 1px solid #ef4444 !important;
+        background: var(--btn-close-bg) !important;
+        border: 1px solid var(--btn-close-border) !important;
+        color: var(--btn-close-text) !important;
     }
-    .btn-close:hover { background: rgba(239, 68, 68, 0.4) !important; }
+    .btn-close:hover { background: var(--btn-close-hover-bg) !important; }
 
     /* --- DELETE / TRASH BUTTONS --- */
     .btn-delete {
-        background: rgba(239, 68, 68, 0.4) !important;
-        border: 1px solid #ef4444 !important;
+        background: var(--btn-delete-bg) !important;
+        border: 1px solid var(--btn-delete-border) !important;
+        color: var(--btn-delete-text) !important;
     }
-    .btn-delete:hover { background: rgba(239, 68, 68, 0.6) !important; }
+    .btn-delete:hover { background: var(--btn-delete-hover-bg) !important; }
 
     /* --- BLUE BUTTONS --- */
     .btn-blue {
-        background: rgba(59, 130, 246, 0.4) !important;
-        border: 1px solid #3b82f6 !important;
+        background: var(--btn-blue-bg) !important;
+        border: 1px solid var(--btn-blue-border) !important;
+        color: var(--btn-blue-text) !important;
     }
-    .btn-blue:hover { background: rgba(59, 130, 246, 0.6) !important; }
+    .btn-blue:hover { background: var(--btn-blue-hover-bg) !important; }
 
     /* --- ORANGE BUTTONS --- */
     .btn-orange {
-        background: rgba(249, 115, 22, 0.4) !important;
-        border: 1px solid #f97316 !important;
+        background: var(--btn-orange-bg) !important;
+        border: 1px solid var(--btn-orange-border) !important;
+        color: var(--btn-orange-text) !important;
     }
-    .btn-orange:hover { background: rgba(249, 115, 22, 0.6) !important; }
+    .btn-orange:hover { background: var(--btn-orange-hover-bg) !important; }
 
     /* --- PURPLE BUTTONS --- */
     .btn-purple {
-        background: rgba(168, 85, 247, 0.4) !important;
-        border: 1px solid #a855f7 !important;
+        background: var(--btn-purple-bg) !important;
+        border: 1px solid var(--btn-purple-border) !important;
+        color: var(--btn-purple-text) !important;
     }
-    .btn-purple:hover { background: rgba(168, 85, 247, 0.6) !important; }
+    .btn-purple:hover { background: var(--btn-purple-hover-bg) !important; }
 
     /* --- OUTLINE ACCENT BUTTONS (gray fill + domain border) --- */
     .btn-outline-purple {
-        background: rgba(63, 63, 70, 0.4) !important;
-        border: 1px solid #a855f7 !important;
-        color: #e9d5ff !important;
+        background: var(--btn-outline-purple-bg) !important;
+        border: 1px solid var(--btn-outline-purple-border) !important;
+        color: var(--btn-outline-purple-text) !important;
     }
-    .btn-outline-purple:hover { background: rgba(168, 85, 247, 0.15) !important; }
+    .btn-outline-purple:hover { background: var(--btn-outline-purple-hover-bg) !important; }
 
     .btn-outline-orange {
-        background: rgba(63, 63, 70, 0.4) !important;
-        border: 1px solid #f97316 !important;
-        color: #ffedd5 !important;
+        background: var(--btn-outline-orange-bg) !important;
+        border: 1px solid var(--btn-outline-orange-border) !important;
+        color: var(--btn-outline-orange-text) !important;
     }
-    .btn-outline-orange:hover { background: rgba(249, 115, 22, 0.15) !important; }
+    .btn-outline-orange:hover { background: var(--btn-outline-orange-hover-bg) !important; }
 
     .btn-outline-blue {
-        background: rgba(63, 63, 70, 0.4) !important;
-        border: 1px solid #3b82f6 !important;
-        color: #bfdbfe !important;
+        background: var(--btn-outline-blue-bg) !important;
+        border: 1px solid var(--btn-outline-blue-border) !important;
+        color: var(--btn-outline-blue-text) !important;
     }
-    .btn-outline-blue:hover { background: rgba(59, 130, 246, 0.15) !important; }
+    .btn-outline-blue:hover { background: var(--btn-outline-blue-hover-bg) !important; }
 
     /* --- HUB TAB BUTTONS --- */
     .btn-tab {
-        background: transparent !important;
-        border: 1px solid transparent !important;
-        color: #a1a1aa !important;
+        background: var(--btn-tab-bg) !important;
+        border: 1px solid var(--btn-tab-border) !important;
+        color: var(--btn-tab-text) !important;
         padding: 8px 16px !important;
         font-size: 12px !important;
         font-weight: 800 !important;
@@ -185,13 +257,13 @@
         letter-spacing: 0.5px !important;
     }
     .btn-tab:hover {
-        color: #f4f4f5 !important;
-        background: rgba(255, 255, 255, 0.05) !important;
+        color: var(--text-main) !important;
+        background: var(--btn-tab-hover-bg) !important;
     }
     .btn-tab.active {
-        background: rgba(255, 255, 255, 0.12) !important;
-        border-color: #52525b !important;
-        color: #fff !important;
+        background: var(--btn-tab-active-bg) !important;
+        border-color: var(--btn-tab-active-border) !important;
+        color: var(--btn-tab-active-text) !important;
     }
     .btn-tab-database {
         border-color: #f59e0b !important;
@@ -213,23 +285,23 @@
 
     /* --- GHOST / TEXT ACTIONS --- */
     .btn-ghost {
-        background: transparent !important;
+        background: var(--btn-ghost-bg) !important;
         border: none !important;
-        color: #ef4444 !important;
+        color: var(--btn-ghost-text) !important;
         padding: 0 !important;
         font-size: 10px !important;
         font-weight: 800 !important;
         letter-spacing: 0.5px !important;
         text-transform: uppercase !important;
     }
-    .btn-ghost:hover { opacity: 0.85 !important; }
+    .btn-ghost:hover { opacity: 0.85 !important; background: var(--btn-ghost-hover-bg) !important; }
 
     /* --- FULL-SCREEN VIEW HEADERS (hubs / ops chrome) --- */
     .view-header {
         height: 70px;
         min-height: 70px;
         background: var(--bg-sidebar);
-        border-bottom: 1px solid #333;
+        border-bottom: 1px solid var(--border-chrome, #333);
         display: flex;
         align-items: center;
         padding: 0 25px;
@@ -238,7 +310,7 @@
         box-sizing: border-box;
     }
     .view-header-title {
-        color: #fff;
+        color: var(--text-main);
         font-weight: 900;
         font-size: 16px;
         letter-spacing: 1px;
@@ -253,10 +325,10 @@
     /* --- MODAL / SECTION TITLES --- */
     .modal-title {
         margin: 0 0 15px 0;
-        color: #fff;
+        color: var(--text-main);
         font-size: 16px;
         font-weight: 800;
-        border-bottom: 1px solid #333;
+        border-bottom: 1px solid var(--border-chrome, #333);
         padding-bottom: 10px;
     }
     .modal-title--plain {
@@ -273,11 +345,11 @@
         font-weight: 900;
         line-height: 1;
         letter-spacing: -0.02em;
-        color: #fff;
+        color: var(--text-main);
         margin: 0 0 16px 0;
     }
     .logout-confirm-message {
-        color: #a1a1aa;
+        color: var(--text-muted);
         font-size: 13px;
         line-height: 1.45;
         margin: 0 0 22px 0;
@@ -530,10 +602,10 @@
 
     .section-title {
         margin: 0 0 15px 0;
-        color: #fff;
+        color: var(--text-main);
         font-size: 14px;
         font-weight: 800;
-        border-bottom: 1px solid #333;
+        border-bottom: 1px solid var(--border-chrome, #333);
         padding-bottom: 10px;
         letter-spacing: 0.3px;
     }
@@ -690,11 +762,12 @@
 
     /* --- 2. SIDEBAR --- */
     .sidebar { width: 240px; padding: 25px; background: var(--bg-sidebar); border-left: 1px solid #1a1a1f; display: flex; flex-direction: column; }
-    .btn-new { width: 100%; padding: 16px; background: var(--accent); border: none; color: white; border-radius: var(--radius-event); cursor: pointer; font-weight: 800; margin-bottom: 25px; font-size: 12px; }
+    .btn-new { width: 100%; padding: 16px; background: var(--btn-new-bg, var(--accent)); border: 1px solid var(--btn-new-border, var(--accent)); color: var(--btn-new-text, white); border-radius: var(--radius-event); cursor: pointer; font-weight: 800; margin-bottom: 25px; font-size: 12px; }
+    .btn-new:hover { background: var(--btn-new-hover-bg, var(--accent)); }
     #unscheduled-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
     .project-card { background: var(--bg-cell); padding: 14px; border-radius: var(--radius-cell); border: 1px solid #222; cursor: pointer; transition: 0.2s; }
     .project-card:hover { border-color: var(--accent); }
-    .project-card b { font-size: 15px; font-weight: 800; color: #fff; display: block; margin-bottom: 6px; line-height: 1.2;}
+    .project-card b { font-size: 15px; font-weight: 800; color: var(--text-main); display: block; margin-bottom: 6px; line-height: 1.2;}
 
     /* --- 3. MODALS --- */
     .modal-overlay { display: none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 1000; justify-content: center; align-items: center; box-sizing: border-box; }
@@ -1813,11 +1886,76 @@
       --accent: #698b99;
       --text-main: #111827;
       --text-muted: #6b7280;
+      --border-chrome: #d1d5db;
       --border-light: #d1d5db;
       --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
       --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
       --radius-cell: 10px;
       --radius-event: 6px;
+      --btn-base-bg: #ffffff;
+      --btn-base-border: #d1d5db;
+      --btn-base-text: #111827;
+      --btn-base-hover-bg: #f9fafb;
+      --btn-main-bg: rgba(16, 185, 129, 0.1);
+      --btn-main-border: #10b981;
+      --btn-main-text: #065f46;
+      --btn-main-hover-bg: rgba(16, 185, 129, 0.2);
+      --btn-add-bg: rgba(161, 161, 170, 0.15);
+      --btn-add-border: #a1a1aa;
+      --btn-add-text: #374151;
+      --btn-add-hover-bg: rgba(161, 161, 170, 0.25);
+      --btn-blue-bg: rgba(59, 130, 246, 0.1);
+      --btn-blue-border: #3b82f6;
+      --btn-blue-text: #1e40af;
+      --btn-blue-hover-bg: rgba(59, 130, 246, 0.2);
+      --btn-orange-bg: rgba(249, 115, 22, 0.1);
+      --btn-orange-border: #f97316;
+      --btn-orange-text: #9a3412;
+      --btn-orange-hover-bg: rgba(249, 115, 22, 0.2);
+      --btn-purple-bg: rgba(168, 85, 247, 0.1);
+      --btn-purple-border: #a855f7;
+      --btn-purple-text: #6b21a8;
+      --btn-purple-hover-bg: rgba(168, 85, 247, 0.2);
+      --btn-settings-bg: transparent;
+      --btn-settings-border: #698b99;
+      --btn-settings-text: #698b99;
+      --btn-settings-hover-bg: rgba(105, 139, 153, 0.1);
+      --btn-close-bg: #ffffff;
+      --btn-close-border: #d1d5db;
+      --btn-close-text: #111827;
+      --btn-close-hover-bg: #f9fafb;
+      --btn-delete-bg: rgba(239, 68, 68, 0.1);
+      --btn-delete-border: #ef4444;
+      --btn-delete-text: #991b1b;
+      --btn-delete-hover-bg: rgba(239, 68, 68, 0.2);
+      --btn-outline-blue-bg: #ffffff;
+      --btn-outline-blue-border: #3b82f6;
+      --btn-outline-blue-text: #1e40af;
+      --btn-outline-blue-hover-bg: rgba(59, 130, 246, 0.08);
+      --btn-outline-orange-bg: #ffffff;
+      --btn-outline-orange-border: #f97316;
+      --btn-outline-orange-text: #9a3412;
+      --btn-outline-orange-hover-bg: rgba(249, 115, 22, 0.08);
+      --btn-outline-purple-bg: #ffffff;
+      --btn-outline-purple-border: #a855f7;
+      --btn-outline-purple-text: #6b21a8;
+      --btn-outline-purple-hover-bg: rgba(168, 85, 247, 0.08);
+      --btn-tab-bg: transparent;
+      --btn-tab-border: transparent;
+      --btn-tab-text: #6b7280;
+      --btn-tab-hover-bg: rgba(0, 0, 0, 0.04);
+      --btn-tab-active-bg: #e5e7eb;
+      --btn-tab-active-border: #d1d5db;
+      --btn-tab-active-text: #111827;
+      --btn-tab-active-hover-bg: #e5e7eb;
+      --btn-new-bg: #698b99;
+      --btn-new-border: #698b99;
+      --btn-new-text: #ffffff;
+      --btn-new-hover-bg: #7a9ca9;
+      --btn-ghost-bg: transparent;
+      --btn-ghost-border: transparent;
+      --btn-ghost-text: #ef4444;
+      --btn-ghost-hover-bg: transparent;
     }
     /* @THEME_VARS:light end */
 
@@ -1855,36 +1993,14 @@
     .theme-light .tt-bottom-actions { background: var(--bg-header) !important; border-top-color: var(--border-light) !important; }
     .theme-light .tt-toolbar { background: var(--bg-sidebar) !important; border-bottom-color: var(--border-light) !important; }
     
-    /* Buttons */
-    .theme-light button, .theme-light .btn-w, .theme-light .fc-button-primary { color: var(--text-main) !important; }
-    .theme-light .btn-main { background: rgba(16, 185, 129, 0.1) !important; border-color: #10b981 !important; color: #065f46 !important; }
-    .theme-light .btn-main:hover { background: rgba(16, 185, 129, 0.2) !important; }
-    .theme-light .btn-delete { background: rgba(239, 68, 68, 0.1) !important; border-color: #ef4444 !important; color: #991b1b !important; }
-    .theme-light .btn-delete:hover { background: rgba(239, 68, 68, 0.2) !important; }
-    .theme-light .btn-blue { background: rgba(59, 130, 246, 0.1) !important; border-color: #3b82f6 !important; color: #1e40af !important; }
-    .theme-light .btn-blue:hover { background: rgba(59, 130, 246, 0.2) !important; }
-    .theme-light .btn-purple { background: rgba(168, 85, 247, 0.1) !important; border-color: #a855f7 !important; color: #6b21a8 !important; }
-    .theme-light .btn-purple:hover { background: rgba(168, 85, 247, 0.2) !important; }
-    .theme-light .btn-orange { background: rgba(249, 115, 22, 0.1) !important; border-color: #f97316 !important; color: #9a3412 !important; }
-    .theme-light .btn-orange:hover { background: rgba(249, 115, 22, 0.2) !important; }
-    
-    .theme-light .btn-outline, .theme-light .btn-close { background: #ffffff !important; border-color: var(--border-light) !important; color: var(--text-main) !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
-    .theme-light .btn-outline:hover, .theme-light .btn-close:hover { background: #f9fafb !important; }
-    .theme-light .btn-settings { border-color: var(--accent) !important; color: var(--accent) !important; background: transparent !important; }
-    .theme-light .btn-settings:hover { background: rgba(105, 139, 153, 0.1) !important; }
-    .theme-light .btn-outline-orange { background: #ffffff !important; border-color: #f97316 !important; color: #9a3412 !important; }
-    .theme-light .btn-outline-orange:hover { background: rgba(249, 115, 22, 0.08) !important; }
-    .theme-light .btn-outline-blue { background: #ffffff !important; border-color: #3b82f6 !important; color: #1e40af !important; }
-    .theme-light .btn-outline-blue:hover { background: rgba(59, 130, 246, 0.08) !important; }
-    .theme-light .btn-outline-purple { background: #ffffff !important; border-color: #a855f7 !important; color: #6b21a8 !important; }
-    .theme-light .btn-outline-purple:hover { background: rgba(168, 85, 247, 0.08) !important; }
-    .theme-light .btn-tab { color: var(--text-muted) !important; }
-    .theme-light .btn-tab.active { background: #e5e7eb !important; border-color: var(--border-light) !important; color: var(--text-main) !important; }
-    .theme-light .view-header { background: var(--bg-sidebar) !important; border-bottom-color: var(--border-light) !important; }
-    .theme-light .modal-title, .theme-light .section-title { color: var(--text-main) !important; border-bottom-color: var(--border-light) !important; }
+    /* Buttons — colors come from theme tokens (--btn-*-*); light/dark set in @THEME_VARS.
+       Do not set a blanket `.theme-light button { color }` — it beats .btn-main text tokens. */
+    .theme-light .btn-outline, .theme-light .btn-close { box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; }
+    .theme-light .view-header { background: var(--bg-sidebar) !important; border-bottom-color: var(--border-chrome, var(--border-light)) !important; }
+    .theme-light .modal-title, .theme-light .section-title { color: var(--text-main) !important; border-bottom-color: var(--border-chrome, var(--border-light)) !important; }
 
-    .theme-light .fc-button-primary { background: #ffffff !important; border-color: var(--border-light) !important; color: var(--text-main) !important; }
-    .theme-light .fc-button-primary:hover { background: #f3f4f6 !important; }
+    .theme-light .fc-button-primary { background: var(--btn-base-bg) !important; border-color: var(--btn-base-border) !important; color: var(--btn-base-text) !important; }
+    .theme-light .fc-button-primary:hover { background: var(--btn-base-hover-bg) !important; }
     .theme-light .fc-button-primary:disabled { background: #e5e7eb !important; color: var(--text-muted) !important; }
     .theme-light .fc-button-active { background: #e5e7eb !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.05) !important; }
     .theme-light .fc-col-header-cell-cushion { background: var(--bg-header) !important; color: var(--text-main) !important; border: 1px solid var(--border-light) !important;}
@@ -4452,7 +4568,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
            <select id="mobile-user-theme-select" class="personal-hub-theme-select mobile-theme-select-full" onchange="changeUserTheme(this.value)" title="UI Theme">
              <option value="dark">Dark</option>
              <option value="light">Light</option>
-           </select>
+      </select>
          </div>
        </div>
     </div>
