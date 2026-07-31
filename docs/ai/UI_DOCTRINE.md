@@ -41,6 +41,10 @@
 | `--bg-cell` | `#1a1a1e` | Cards, panels |
 | `--bg-header` | `#27272f` | Table/calendar headers |
 | `--bg-event` | `#222228` | Event chips |
+| `--bg-recessed` | `#111111` | Timeline / tracker / roster canvas |
+| `--bg-dept-strip` | `#1f1f23` | Department strip headers |
+| `--bg-dept-row` | `#131316` | Month-roster dept band across days |
+| `--bg-weekend` | `#18181b` | Sat/Sun columns + CREW FINISHED fill |
 | `--accent` | `#698b99` | Brand |
 | `--text-main` | `#f4f4f5` | Body |
 | `--text-muted` | `#71717a` | Muted labels |

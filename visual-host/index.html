@@ -199,7 +199,7 @@
                 <div data-vh-tokens="--bg-header --text-muted --border-light" class="asset-col-header" style="display:grid; grid-template-columns: 2fr 1fr 1fr 100px; gap:8px; padding:10px 15px; background:var(--bg-header); border-bottom:1px solid #333; font-size:10px; font-weight:800; text-transform:uppercase; color:var(--text-muted);">
                   <span>Name</span><span>Dept</span><span>Type</span><span>Status</span>
                 </div>
-                <div data-vh-tokens="--text-main --border-light" class="asset-dept-header" style="background:#1f1f23; color:#fff; border:1px solid #698b99; border-right:none; border-left:none; padding:10px 25px; font-size:11px; font-weight:900; text-transform:uppercase;">Audio</div>
+                <div data-vh-tokens="--bg-dept-strip --text-main" class="asset-dept-header" style="color:#fff; border:1px solid #698b99; border-right:none; border-left:none; padding:10px 25px; font-size:11px; font-weight:900; text-transform:uppercase;">Audio</div>
                 <div data-vh-tokens="--bg-cell --bg-dark --text-main --border-light" class="asset-row parent-row" style="padding:10px 15px; border-bottom:2px solid #1a1a1e; background:#151518; display:grid; grid-template-columns:2fr 1fr 1fr 100px; gap:8px; font-size:12px;">
                   <span style="font-weight:800;">Case · Wireless kit</span><span>Audio</span><span>Case</span><span class="badge-yellow" style="padding:2px 8px; border-radius:4px; width:max-content;">OK</span>
                 </div>
@@ -215,7 +215,7 @@
 
           <!-- AVAILABILITY -->
           <section class="vh-view-panel" data-view-panel="availability">
-            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Availability / Equipment Tracker</strong> — full-screen matrix from the left-nav “Global Availability &amp; Fleet” icon. Shell: `#availability-modal-overlay`. Logic: `04b_Equipment_Tracker.html`.</p>
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Availability / Equipment Tracker</strong> — Sat/Sun use <code>--bg-weekend</code>; header/gantt canvas use <code>--bg-recessed</code>; project strips use <code>--bg-dept-strip</code>.</p>
 
             <div data-vh-tokens="--bg-cell --border-light" class="vh-report" style="padding:0; overflow:hidden;">
               <div data-vh-tokens="--bg-sidebar --text-main --border-light" class="view-header" style="position:relative; left:0; width:100%;">
@@ -228,7 +228,13 @@
                   <button type="button" class="btn-outline btn-sm" style="border-color:#f59e0b; color:#f59e0b;">Refresh</button>
                 </div>
               </div>
-              <div data-vh-tokens="--bg-dark --border-light" class="vh-tracker-matrix" id="tracker-canvas-inner" style="border:none; border-radius:0;">
+              <div style="display:flex; gap:8px; padding:10px; align-items:stretch;">
+                <div data-vh-tokens="--bg-recessed" class="bg-recessed" style="flex:1; min-height:48px; padding:10px; border:1px solid var(--border-chrome,#333); border-radius:6px;">Recessed canvas</div>
+                <div data-vh-tokens="--bg-weekend" class="bg-weekend" style="width:90px; min-height:48px; padding:10px; border:1px solid var(--border-chrome,#333); border-radius:6px; text-align:center; font-weight:800;">Sat</div>
+                <div data-vh-tokens="--bg-weekend" class="bg-weekend" style="width:90px; min-height:48px; padding:10px; border:1px solid var(--border-chrome,#333); border-radius:6px; text-align:center; font-weight:800;">Sun</div>
+                <div data-vh-tokens="--bg-dept-strip --text-main" class="vh-dept-strip" style="flex:1; min-height:48px; padding:10px; border-left:4px solid var(--accent); border-radius:4px; font-weight:900; text-transform:uppercase; font-size:11px;">Project strip</div>
+              </div>
+              <div data-vh-tokens="--bg-recessed --border-light" class="vh-tracker-matrix bg-recessed" id="tracker-canvas-inner" style="border:none; border-radius:0;">
                 <div data-vh-tokens="--bg-sidebar --text-muted" class="vh-tracker-row vh-tracker-head">
                   <div>Asset</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div>
                 </div>
@@ -270,7 +276,7 @@
                   <div data-vh-tokens="--text-main --border-light" class="tt-crew-row">Alex Rivera</div>
                   <div data-vh-tokens="--text-main --border-light" class="tt-crew-row">Sam Chen</div>
                 </div>
-                <div data-vh-tokens="--bg-dark" class="tt-grid-wrapper" style="background:#111;">
+                <div data-vh-tokens="--bg-recessed" class="tt-grid-wrapper">
                   <div data-vh-tokens="--bg-header --border-light" class="tt-header-x-container" style="width:max-content;">
                     <div class="tt-header-days">
                       <div data-vh-tokens="--bg-header --text-main --border-light" class="tt-day-mark">Mon 12</div>
@@ -299,6 +305,9 @@
                 </div>
               </div>
               <div data-vh-tokens="--bg-header --border-light" class="tt-bottom-actions">
+                <label id="tt-crew-finished-wrap" data-vh-tokens="--bg-weekend --text-main" style="margin-right:auto; display:flex; align-items:center; gap:8px; cursor:pointer; color:#10b981; font-weight:bold; font-size:12px; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
+                  <input type="checkbox" style="width:16px; height:16px; margin:0; accent-color:#10b981;"> CREW FINISHED
+                </label>
                 <button type="button" class="btn-main btn-sm">Save</button>
                 <button type="button" class="btn-close btn-sm">Close</button>
               </div>
@@ -307,7 +316,7 @@
 
           <!-- MONTH ROSTER -->
           <section class="vh-view-panel" data-view-panel="roster">
-            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Month roster</strong> — crew × day matrix (`04_Month_Roster.html`). Conflict badges sit in day cells. Not the Equipment Tracker — this is people rostering.</p>
+            <p data-vh-tokens="--bg-sidebar --text-muted --text-main --border-light" class="vh-view-intro"><strong>Month roster</strong> — crew × day matrix (`04_Month_Roster.html`). Department bands use <code>--bg-dept-strip</code> + <code>--bg-dept-row</code>.</p>
 
             <div class="vh-mr-demo">
               <div data-vh-tokens="--bg-sidebar --border-light" class="mr-grid-header" style="width:max-content;">
@@ -315,6 +324,10 @@
                 <div data-vh-tokens="--text-main --text-muted --border-light" class="mr-day-col" style="width:120px; min-width:120px;">12<span>Mon</span></div>
                 <div data-vh-tokens="--text-main --text-muted --border-light" class="mr-day-col" style="width:120px; min-width:120px;">13<span>Tue</span></div>
                 <div data-vh-tokens="--text-main --text-muted --border-light" class="mr-day-col" style="width:120px; min-width:120px;">14<span>Wed</span></div>
+              </div>
+              <div data-vh-tokens="--bg-dept-strip --bg-dept-row" class="mr-grid-row" style="width:max-content; min-height:40px; cursor:pointer;">
+                <div data-vh-tokens="--bg-dept-strip --text-main" class="mr-crew-row mr-dept-strip" style="width:150px; font-size:11px; font-weight:900; text-transform:uppercase; border:1px solid var(--accent);">▼ Audio</div>
+                <div data-vh-tokens="--bg-dept-row" class="mr-dept-row-band" style="width:360px; border:1px solid var(--accent); border-left:none;"></div>
               </div>
               <div data-vh-tokens="--border-light" class="mr-grid-row" style="width:max-content; min-height:70px;">
                 <div data-vh-tokens="--bg-cell --text-main --border-light" class="mr-crew-row" style="width:150px;">Jordan Lee</div>

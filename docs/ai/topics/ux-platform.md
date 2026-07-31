@@ -7,7 +7,7 @@
 ## Backlog
 
 - [ ] **Personal user hub:** Extended profile modal (contact, dietary) — partial; theme/logout/PIN shipped
-- [x] **Visual Host theme playground** — `OPEN-VISUAL-HOST.bat` / `npm run visual-host`; view tabs + left-token hover dotted frames on matching samples; bake into `Styles.html` + theme engine (`theme-registry.json`)
+- [x] **Visual Host theme playground** — `OPEN-VISUAL-HOST.bat` / `npm run visual-host`; view tabs + left-token hover dotted frames on matching samples; bake into `Styles.html` + theme engine (`theme-registry.json`); surface leftovers: `--bg-recessed`, `--bg-weekend`, `--bg-dept-strip`, `--bg-dept-row` (roster / tracker / timeline / vault / mini-cal)
 - [ ] **Freelancer shift placeholders & bidding:** TBD shifts, broadcast pool, accept/bid, rating-based selection
 - [ ] Personal Hub on mobile (theme-only polish)
 - [ ] Manager agenda reminders → [notifications-catalog.md](notifications-catalog.md)

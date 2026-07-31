@@ -19,6 +19,10 @@
       --bg-cell: #1a1a1e;
       --bg-event: #222228;
       --bg-header: #27272f;
+      --bg-recessed: #111111;
+      --bg-dept-strip: #1f1f23;
+      --bg-dept-row: #131316;
+      --bg-weekend: #18181b;
       --accent: #698b99;
       --text-main: #f4f4f5;
       --text-muted: #71717a;
@@ -743,6 +747,14 @@
     .asset-row:not(.parent-row):hover { background: #151518; }
     .asset-row.row-selected, .theme-light .asset-row.row-selected, .theme-light .asset-row.row-selected:hover { background: rgba(16, 185, 129, 0.2) !important; }
 
+    /* Recessed / weekend / department surfaces (theme tokens) */
+    .bg-recessed { background: var(--bg-recessed, #111); }
+    .bg-weekend, .tracker-weekend-col { background: var(--bg-weekend, #18181b); }
+    .vh-dept-strip, .asset-dept-header { background: var(--bg-dept-strip, #1f1f23); }
+    .mr-dept-row-band { background: var(--bg-dept-row, #131316) !important; }
+    .mr-crew-row.mr-dept-strip { background: var(--bg-dept-strip, #1f1f23) !important; }
+    #tt-crew-finished-wrap { background: var(--bg-weekend, #18181b); }
+
     /* --- ASSET COLUMN RESIZER --- */
     .col-resizer {
         display: none;
@@ -1146,7 +1158,7 @@
     .tt-header-corner { height: 90px; min-height: 90px; background: var(--bg-header); border-bottom: 1px solid #333; box-sizing: border-box; }
     .tt-crew-row { height: 60px; min-height: 60px; border-bottom: 1px solid #222; display: flex; align-items: center; padding: 0 10px; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-sizing: border-box; }
     
-    .tt-grid-wrapper { flex: 1; overflow-x: auto; overflow-y: auto; position: relative; background: #111; display: flex; flex-direction: column; }
+    .tt-grid-wrapper { flex: 1; overflow-x: auto; overflow-y: auto; position: relative; background: var(--bg-recessed, #111); display: flex; flex-direction: column; }
     .tt-header-x-container { height: 90px; min-height: 90px; background: var(--bg-header); border-bottom: 1px solid #333; position: sticky; top: 0; display: flex; flex-direction: column; z-index: 5; box-sizing: border-box; }
     .tt-header-days { display: flex; height: 50px; border-bottom: 1px solid #444; box-sizing: border-box; position: relative; }
     .tt-day-mark { width: 1440px; min-width: 1440px; border-right: 2px solid #555; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 900; color: #fff; background: rgba(0,0,0,0.3); box-sizing: border-box; }
@@ -1883,6 +1895,10 @@
       --bg-cell: #ffffff;
       --bg-event: #e5e7eb;
       --bg-header: #f9fafb;
+      --bg-recessed: #e5e7eb;
+      --bg-dept-strip: #d8dbe2;
+      --bg-dept-row: #e8eaef;
+      --bg-weekend: #d1d5db;
       --accent: #698b99;
       --text-main: #111827;
       --text-muted: #6b7280;
@@ -1989,6 +2005,11 @@
     .theme-light .tt-day-mark div { background: transparent !important; } 
     .theme-light .tt-hour-mark { color: var(--text-muted) !important; border-color: var(--border-light) !important; }
     .theme-light .tt-grid-row, .theme-light .tt-crew-row, .theme-light .mr-grid-row, .theme-light .mr-crew-row, .theme-light .mr-cell { border-color: var(--border-light) !important; color: var(--text-main) !important; background: var(--bg-cell) !important;}
+    .theme-light .mr-crew-row.mr-dept-strip { background: var(--bg-dept-strip) !important; }
+    .theme-light .mr-dept-row-band { background: var(--bg-dept-row) !important; }
+    .theme-light .bg-recessed, .theme-light .tt-grid-wrapper { background: var(--bg-recessed) !important; }
+    .theme-light .bg-weekend, .theme-light .tracker-weekend-col, .theme-light #tt-crew-finished-wrap { background: var(--bg-weekend) !important; }
+    .theme-light .vh-dept-strip { background: var(--bg-dept-strip) !important; }
     .theme-light .tt-grid-row:nth-child(even) { background: #f9fafb !important; }
     .theme-light .tt-bottom-actions { background: var(--bg-header) !important; border-top-color: var(--border-light) !important; }
     .theme-light .tt-toolbar { background: var(--bg-sidebar) !important; border-bottom-color: var(--border-light) !important; }
@@ -2063,7 +2084,8 @@
     .theme-light [style*="border-right: 1px solid #333"], .theme-light [style*="border-left: 1px solid #333"] { border-color: var(--border-light) !important; }
 
     /* Specific components */
-    .theme-light .asset-col-header, .theme-light .asset-dept-header { background: var(--bg-header) !important; border-color: var(--border-light) !important; color: var(--text-main) !important; }
+    .theme-light .asset-col-header { background: var(--bg-header) !important; border-color: var(--border-light) !important; color: var(--text-main) !important; }
+    .theme-light .asset-dept-header { background: var(--bg-dept-strip) !important; border-color: var(--border-light) !important; color: var(--text-main) !important; }
     .theme-light #left-nav-bar { background: var(--bg-sidebar) !important; border-color: var(--border-light) !important; }
     .theme-light .nav-icon-btn { color: var(--text-muted) !important; }
     .theme-light .nav-icon-btn:hover { color: var(--text-main) !important; background: #f3f4f6 !important; }
@@ -4735,7 +4757,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
         </div>
      </div>
      <!-- Unified Matrix Body -->
-     <div id="tracker-canvas-inner" style="flex: 1; overflow: auto; position: relative; background: #111; display: flex; flex-direction: column;">
+     <div id="tracker-canvas-inner" class="bg-recessed" style="flex: 1; overflow: auto; position: relative; display: flex; flex-direction: column;">
          <div style="padding: 40px; text-align: center; color: #888; font-style: italic;">Unified Equipment Matrix loading...</div>
      </div>
   </div>
@@ -4785,7 +4807,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
         <button type="button" id="dal-timeline-commit-retry-btn" class="btn-outline btn-sm" style="border-color:#fca5a5; color:#fecaca; margin:0; flex-shrink:0;" onclick="window.dalRetryFailedCommitUi_ && window.dalRetryFailedCommitUi_('timeline')">RETRY</button>
       </div>
       <div style="flex: 1;"></div>
-      <label id="tt-crew-finished-wrap" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
+      <label id="tt-crew-finished-wrap" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
           <input type="checkbox" id="tt-crew-finished-cb" style="width:16px; height:16px; margin:0; accent-color:#10b981;" onchange="window.isTimelineDirty = true;"> CREW FINISHED
       </label>
       <button id="tt-cancel-btn" class="btn-close" style="margin: 0; width: auto;" onclick="cancelShifts()">CANCEL (ESC)</button>
@@ -4804,7 +4826,7 @@ body.mobile-pa-compact #mobile-pa-unsaved-bar.mobile-pa-unsaved-bar--visible {
       </div>
           <div style="width: 16px;"></div> 
     </div>
-    <div id="mr-canvas-inner" style="flex: 1; overflow: auto; position: relative; background: #111;"></div>
+    <div id="mr-canvas-inner" class="bg-recessed" style="flex: 1; overflow: auto; position: relative;"></div>
   </div>
 </div>
 <div id="master-settings-overlay" style="display:none; position: fixed; top: 0; left: 60px; width: calc(100vw - 60px); height: 100vh; z-index: 2500; background: var(--bg-dark);">
@@ -8919,7 +8941,7 @@ body.station-dock-screensaver-active #station-dock-shell {
             </div>
         </div>
 
-        <div id="mini-project-calendar" style="flex: 1; background: #0a0a0c; padding: 10px;"></div>
+        <div id="mini-project-calendar" style="flex: 1; background: var(--bg-dark); padding: 10px;"></div>
 
     <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #333; display:flex; gap:12px; flex-wrap: wrap; justify-content: space-between; align-items: center;">
       <div style="display:flex; gap:12px; align-items:center; flex-wrap: wrap;">

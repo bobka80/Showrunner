@@ -158,6 +158,26 @@
       "group": "surfaces"
     },
     {
+      "key": "--bg-recessed",
+      "label": "Recessed canvas (timeline / tracker)",
+      "group": "surfaces"
+    },
+    {
+      "key": "--bg-dept-strip",
+      "label": "Department strip headers",
+      "group": "surfaces"
+    },
+    {
+      "key": "--bg-dept-row",
+      "label": "Department row band",
+      "group": "surfaces"
+    },
+    {
+      "key": "--bg-weekend",
+      "label": "Weekend columns / CREW FINISHED",
+      "group": "surfaces"
+    },
+    {
       "key": "--accent",
       "label": "Brand accent",
       "group": "brand"
@@ -537,6 +557,10 @@
         "--bg-cell": "#1a1a1e",
         "--bg-event": "#222228",
         "--bg-header": "#27272f",
+        "--bg-recessed": "#111111",
+        "--bg-dept-strip": "#1f1f23",
+        "--bg-dept-row": "#131316",
+        "--bg-weekend": "#18181b",
         "--accent": "#698b99",
         "--text-main": "#f4f4f5",
         "--text-muted": "#71717a",
@@ -620,6 +644,10 @@
         "--bg-cell": "#ffffff",
         "--bg-event": "#e5e7eb",
         "--bg-header": "#f9fafb",
+        "--bg-recessed": "#e5e7eb",
+        "--bg-dept-strip": "#d8dbe2",
+        "--bg-dept-row": "#e8eaef",
+        "--bg-weekend": "#d1d5db",
         "--accent": "#698b99",
         "--text-main": "#111827",
         "--text-muted": "#6b7280",

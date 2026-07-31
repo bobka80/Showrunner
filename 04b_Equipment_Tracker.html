@@ -277,7 +277,7 @@ function renderTrackerGrid() {
     // Split the UI: Top = Timeline Scrubber, Bottom = Dynamic Grid List
     let html = `<div style="display:flex; flex-direction:column; height:100%; width:100%;">
                   <!-- TOP TIMELINE SCRUBBER -->
-                  <div id="tracker-timeline-header" style="height: ${headerHeight + 20}px; overflow-x: auto; overflow-y: hidden; background: #111; border-bottom: 2px solid var(--accent); position: relative; flex-shrink: 0;">
+                  <div id="tracker-timeline-header" class="bg-recessed" style="height: ${headerHeight + 20}px; overflow-x: auto; overflow-y: hidden; border-bottom: 2px solid var(--accent); position: relative; flex-shrink: 0;">
                       <div class="mr-grid-header" style="position:relative; min-height:${headerHeight}px; width:max-content;">
                           <div style="display:flex; align-items: stretch; position:relative; width:${totalDays * colWidth}px;">`;
     
@@ -296,10 +296,10 @@ function renderTrackerGrid() {
         if (isPlayhead) {
             customStyle = `background:rgba(255,255,255,0.1); border: 2px solid #fff; z-index:10; box-shadow: 0 0 12px rgba(255,255,255,0.2); position:relative;`;
         } else {
-            customStyle = `border-right:1px solid #333; ${isToday ? 'background:#222228; border-bottom:2px solid var(--accent);' : (isWeekend ? 'background:#18181b;' : '')}`;
+            customStyle = `border-right:1px solid var(--border-chrome, #333); ${isToday ? 'background:var(--bg-event); border-bottom:2px solid var(--accent);' : (isWeekend ? 'background:var(--bg-weekend);' : '')}`;
         }
         
-        html += `<div style="${baseStyle} ${customStyle}" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='${isPlayhead ? 'rgba(255,255,255,0.1)' : (isToday ? '#222228' : (isWeekend ? '#18181b' : 'transparent'))}'" onclick="setTrackerPlayhead('${isoStr}')">${currD.getUTCDate()} <span style="font-size:9px; color:${isPlayhead ? '#fff' : '#888'}; text-transform:uppercase;">${dayNames[currD.getUTCDay()]}</span></div>`;
+        html += `<div style="${baseStyle} ${customStyle}" onmouseover="this.style.background='rgba(127,127,127,0.12)'" onmouseout="this.style.background='${isPlayhead ? 'rgba(255,255,255,0.1)' : (isToday ? 'var(--bg-event)' : (isWeekend ? 'var(--bg-weekend)' : 'transparent'))}'" onclick="setTrackerPlayhead('${isoStr}')">${currD.getUTCDate()} <span style="font-size:9px; color:${isPlayhead ? 'var(--text-main)' : 'var(--text-muted)'}; text-transform:uppercase;">${dayNames[currD.getUTCDay()]}</span></div>`;
     }
 
     // Dynamically draw Floating Gantt Event Strips
@@ -702,7 +702,7 @@ function renderTrackerList() {
         let ev = group.event;
         let statusColor = ev.status === 'APPROVED' ? '#10b981' : '#3b82f6';
         
-        html += `<div style="background:#1f1f23; border-left:4px solid ${statusColor}; padding:10px 15px; font-weight:900; color:#fff; text-transform:uppercase; font-size:11px; margin-top:5px; border-bottom:1px solid #333; cursor:pointer; display:flex; justify-content:space-between; align-items:center;" onclick="goToProjectEquipmentFromTracker('${ev.id}', event)">
+        html += `<div class="vh-dept-strip" style="border-left:4px solid ${statusColor}; padding:10px 15px; font-weight:900; color:var(--text-main); text-transform:uppercase; font-size:11px; margin-top:5px; border-bottom:1px solid var(--border-chrome, #333); cursor:pointer; display:flex; justify-content:space-between; align-items:center;" onclick="goToProjectEquipmentFromTracker('${ev.id}', event)">
                     <div>${ev.name} <span style="color:#a1a1aa; font-size:10px; margin-left:8px; font-weight:bold;">${ev.startStr} to ${ev.endStr}</span></div>
                  </div>`;
 
@@ -860,7 +860,7 @@ function renderTrackerList() {
 
                 let timelineBadge = headerTimelineStr ? `<span style="margin-left:15px; color:#ffffff; font-size:13px; font-family:monospace; font-weight:bold; letter-spacing:1px;">${headerTimelineStr}</span>` : '';
 
-                html += `<div style="background:#18181b; border-left:4px solid #3f3f46; padding:8px 15px; font-weight:bold; color:#a1a1aa; font-size:13px; border-bottom:1px solid #333; display:flex; align-items:center;">
+                html += `<div class="bg-weekend" style="border-left:4px solid #3f3f46; padding:8px 15px; font-weight:bold; color:var(--text-muted); font-size:13px; border-bottom:1px solid var(--border-chrome, #333); display:flex; align-items:center;">
                             <span style="margin-right:8px; font-size:14px;">🚛</span> <span style="color:#e4e4e7;">${tName}</span> ${timelineBadge}
                          </div>`;
             }

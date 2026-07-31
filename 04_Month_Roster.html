@@ -452,9 +452,9 @@ function renderMonthGrid() {
     let deptObj = getDeptObj(deptUid);
     let deptName = deptObj.name;
     
-    headerHtml += `<div class="mr-grid-row" onclick="toggleDept('${safeDept}', 'mr')" style="background: #1f1f23; cursor: pointer; position: relative;">
-        <div class="mr-crew-row" style="background: #1f1f23; color: #fff; border: 1px solid ${deptObj.color}; border-right: none; width: ${yWidth}px; min-width: ${yWidth}px; font-size: 11px; font-weight: 900; text-transform: uppercase;"><span id="icon-mr-${safeDept}">▼</span> &nbsp; ${deptName}</div>
-        <div style="display:flex; align-items: stretch; position:relative; width:${daysInMonth * 182}px; background: #131316; border: 1px solid ${deptObj.color}; border-left: none;">
+    headerHtml += `<div class="mr-grid-row" onclick="toggleDept('${safeDept}', 'mr')" style="background: var(--bg-dept-strip); cursor: pointer; position: relative;">
+        <div class="mr-crew-row mr-dept-strip" style="color: #fff; border: 1px solid ${deptObj.color}; border-right: none; width: ${yWidth}px; min-width: ${yWidth}px; font-size: 11px; font-weight: 900; text-transform: uppercase;"><span id="icon-mr-${safeDept}">▼</span> &nbsp; ${deptName}</div>
+        <div class="mr-dept-row-band" style="display:flex; align-items: stretch; position:relative; width:${daysInMonth * 182}px; border: 1px solid ${deptObj.color}; border-left: none;">
            <div id="summary-mr-${safeDept}" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;">`;
            
     for(let d=1; d<=daysInMonth; d++) {

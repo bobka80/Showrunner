@@ -27,7 +27,7 @@
         </div>
      </div>
      <!-- Unified Matrix Body -->
-     <div id="tracker-canvas-inner" style="flex: 1; overflow: auto; position: relative; background: #111; display: flex; flex-direction: column;">
+     <div id="tracker-canvas-inner" class="bg-recessed" style="flex: 1; overflow: auto; position: relative; display: flex; flex-direction: column;">
          <div style="padding: 40px; text-align: center; color: #888; font-style: italic;">Unified Equipment Matrix loading...</div>
      </div>
   </div>
@@ -77,7 +77,7 @@
         <button type="button" id="dal-timeline-commit-retry-btn" class="btn-outline btn-sm" style="border-color:#fca5a5; color:#fecaca; margin:0; flex-shrink:0;" onclick="window.dalRetryFailedCommitUi_ && window.dalRetryFailedCommitUi_('timeline')">RETRY</button>
       </div>
       <div style="flex: 1;"></div>
-      <label id="tt-crew-finished-wrap" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; background:#18181b; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
+      <label id="tt-crew-finished-wrap" style="display:flex; align-items:center; gap:8px; cursor:pointer; margin-right:15px; color:#10b981; font-weight:bold; font-size:12px; padding:8px 15px; border-radius:6px; border:1px solid #10b981;">
           <input type="checkbox" id="tt-crew-finished-cb" style="width:16px; height:16px; margin:0; accent-color:#10b981;" onchange="window.isTimelineDirty = true;"> CREW FINISHED
       </label>
       <button id="tt-cancel-btn" class="btn-close" style="margin: 0; width: auto;" onclick="cancelShifts()">CANCEL (ESC)</button>
@@ -96,6 +96,6 @@
       </div>
           <div style="width: 16px;"></div> 
     </div>
-    <div id="mr-canvas-inner" style="flex: 1; overflow: auto; position: relative; background: #111;"></div>
+    <div id="mr-canvas-inner" class="bg-recessed" style="flex: 1; overflow: auto; position: relative;"></div>
   </div>
 </div>

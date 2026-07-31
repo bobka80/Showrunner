@@ -72,11 +72,11 @@ This is a **warning gate**, not a hard lock. Stale drawers, undocumented WIP, an
 ### Done (recent)
 
 - PA window opens immediately (orphan gate after paint; soft-join still gated)
-- Visual Host theme playground (`npm run visual-host`) — edit/bake dark+light+custom (GAS v738)
+- Visual Host theme playground (`npm run visual-host`) — edit/bake dark+light+custom (GAS v738); recessed/weekend/dept surface tokens (tracker Sat/Sun, roster strips, timeline grid, CREW FINISHED, mini-cal outside cells)
 - Sidebar setup↔lock gap match tasks↔calendar 25px (GAS v736; was 64)
 - Sidebar setup trio 50px above lock (GAS v732)
 - Project editor Assets/Timeline chrome (GAS v696)
-- Calendar room-only green dot, no glow (pending ship); was stacked orange/blue (v698/v704)
+- Calendar room-only green dot, no glow / no PA orange or timeline blue (GAS v747)
 - Phone/station bottom SYNC bar (v699)
 - Timeline selection frame (v701 / v702)
 - Silent END PREP / END COLLAB success alerts (v706)
