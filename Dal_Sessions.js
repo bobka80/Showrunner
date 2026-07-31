@@ -1096,6 +1096,64 @@ function dalCampaignRoomIsWarmForProject_(projectId) {
 }
 
 /**
+ * Campaign Room R3b — open/join prep for Hub under a warm room.
+ * Completes an in-flight "opening" (finish) or takeOver if finish fails / stuck.
+ * Avoids "already opening" when Hub modal seed races arrange save.
+ */
+function dalOpenPrepForWarmHub_(projectId, actor) {
+  if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN) {
+    return { success: true, joined: true, status: 'open' };
+  }
+  var sheets = verifyDatabaseSchema(true);
+  var row = dalGetProjectIndexRow_(projectId, sheets);
+  if (!row) throw new Error('Project not found.');
+  dalMigrateLegacySessionToDomain_(sheets.index, row);
+  var cur = dalReadDomainSession_(row, DAL_SESSION_TYPE.PREP);
+  var st = String(cur.status || '').toLowerCase();
+  if (st === 'opening' && cur.sessionUid) {
+    try {
+      return finishDalSession(projectId, cur.sessionUid, actor);
+    } catch (eFin) {
+      try {
+        writeToAuditLog(actor, 'WARN', 'DAL_SESSION', projectId, cur.sessionUid,
+          'Hub prep finish of in-flight opening failed — takeOver: ' + (eFin && eFin.message ? eFin.message : eFin));
+      } catch (eAud) { /* ignore */ }
+    }
+  }
+  var begin = beginDalSession(projectId, DAL_SESSION_TYPE.PREP, actor, { takeOver: true });
+  if (begin && begin.joined) return begin;
+  return finishDalSession(projectId, begin.sessionUid, actor);
+}
+
+/**
+ * Same pattern for timeline when Hub GENERATE needs AUTO truck shifts.
+ */
+function dalOpenTimelineForWarmHub_(projectId, actor) {
+  if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.TIMELINE) === DAL_SESSION.SESSION_OPEN) {
+    return { success: true, joined: true, status: 'open' };
+  }
+  var sheets = verifyDatabaseSchema(true);
+  var row = dalGetProjectIndexRow_(projectId, sheets);
+  if (!row) throw new Error('Project not found.');
+  dalMigrateLegacySessionToDomain_(sheets.index, row);
+  var cur = dalReadDomainSession_(row, DAL_SESSION_TYPE.TIMELINE_COLLAB);
+  var st = String(cur.status || '').toLowerCase();
+  if (st === 'opening' && cur.sessionUid) {
+    try {
+      return finishDalSession(projectId, cur.sessionUid, actor);
+    } catch (eFin) {
+      try {
+        writeToAuditLog(actor, 'WARN', 'DAL_SESSION', projectId, cur.sessionUid,
+          'Hub timeline finish of in-flight opening failed — takeOver: ' + (eFin && eFin.message ? eFin.message : eFin));
+      } catch (eAud) { /* ignore */ }
+    }
+  }
+  var begin = beginDalSession(projectId, DAL_SESSION_TYPE.TIMELINE_COLLAB, actor, { takeOver: true });
+  if (begin && begin.joined) return begin;
+  return finishDalSession(projectId, begin.sessionUid, actor);
+}
+
+/**
  * Campaign Room R3b — seed warm Hub workspace under the open room.
  * Opens prep (PA + logistics snapshot) when room is warm but prep closed.
  * Optionally opens timeline collab when Hub needs AUTO truck shifts.
@@ -1122,8 +1180,11 @@ function dalEnsureWarmHubWorkspace_(projectId, actor, opts) {
   var timelineOpen = resolveDalSessionStatus_(projectId, DAL_DOMAIN.TIMELINE) === DAL_SESSION.SESSION_OPEN;
 
   if (!prepOpen) {
-    openDalSession(projectId, DAL_SESSION_TYPE.PREP, actor);
-    prepOpen = true;
+    dalOpenPrepForWarmHub_(projectId, actor);
+    prepOpen = resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN;
+    if (!prepOpen) {
+      throw new Error('WARM_HUB_SEED_FAILED: prep did not reach open after Hub seed.');
+    }
   } else {
     // Prep already open — ensure logistics state exists for Hub arrange/clocks.
     try {
@@ -1137,8 +1198,11 @@ function dalEnsureWarmHubWorkspace_(projectId, actor, opts) {
   }
 
   if (opts.needTimeline && !timelineOpen) {
-    openDalSession(projectId, DAL_SESSION_TYPE.TIMELINE_COLLAB, actor);
-    timelineOpen = true;
+    dalOpenTimelineForWarmHub_(projectId, actor);
+    timelineOpen = resolveDalSessionStatus_(projectId, DAL_DOMAIN.TIMELINE) === DAL_SESSION.SESSION_OPEN;
+    if (!timelineOpen) {
+      throw new Error('WARM_HUB_SEED_FAILED: timeline did not reach open after Hub seed.');
+    }
   }
 
   try {

@@ -609,9 +609,16 @@ window.toggleAutoArrangeHub = async function(leg) {
         let restoreBtn = () => { if (btn) { btn.innerHTML = "AUTO ARRANGE"; btn.disabled = false; } };
         
         let arrangeLogic = async () => {
-            await window.headlessAutoArrangeAsync(leg, trucks);
-            if (window.currentPaMode === 'design' && typeof collapseProjectAssets === 'function') collapseProjectAssets();
-            if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+            try {
+                await window.headlessAutoArrangeAsync(leg, trucks);
+                if (window.currentPaMode === 'design' && typeof collapseProjectAssets === 'function') collapseProjectAssets();
+                if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+            } catch (eArr) {
+                restoreBtn();
+                if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+                alert('Auto arrange failed: ' + ((eArr && eArr.message) ? eArr.message : eArr));
+                throw eArr;
+            }
         };
         
         if (deltas.length > 0 && typeof window.autoSaveAndExecute === 'function') {
@@ -645,7 +652,7 @@ window.updateAutoArrangeButtonState = function() {
 };
 
 window.headlessAutoArrangeAsync = function(leg, truckIds) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         if (!currentProjectAssets || currentProjectAssets.length === 0 || !truckIds || truckIds.length === 0) return resolve();
         
         let truckIdx = 0;
@@ -815,7 +822,17 @@ window.headlessAutoArrangeAsync = function(leg, truckIds) {
         });
 
         if (spatialPayload.length > 0) {
-            google.script.run.withSuccessHandler(resolve).withFailureHandler(resolve).saveTruckArrangementAPI(document.getElementById('edit-folder-id').value, spatialPayload, leg, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+            google.script.run
+                .withSuccessHandler(function () { resolve(); })
+                .withFailureHandler(function (err) {
+                    reject(err || new Error('saveTruckArrangementAPI failed'));
+                })
+                .saveTruckArrangementAPI(
+                    document.getElementById('edit-folder-id').value,
+                    spatialPayload,
+                    leg,
+                    typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI'
+                );
         } else {
             resolve();
         }
