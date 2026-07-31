@@ -300,7 +300,8 @@ function openTruckArrangementDashboard() {
         window.autoSaveAndExecute(bootLogic, false, null, true);
         return;
     }
-    window.autoSaveAndExecute(bootLogic, false, null, true);
+    // No PA deltas — skip forceSync round-trip (was glacial after warm Hub).
+    bootLogic();
 }
 
 function executeTruckArrangementBoot() {

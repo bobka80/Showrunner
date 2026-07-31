@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **Five-slice architecture filed 2026-07-31**. Next preferred: **OK go for R3c** (expand meta identity), then **R3d** (ops slice), then **R4**.  
-**Production tip:** see RELEASES.md. Latest room ships: R3b Hub @ **GAS v745**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **Five-slice architecture filed 2026-07-31**. Arrangement integrity (Phase A) shipping this turn. Next preferred after smoke: **Hub checklist UX (Phase B)** or **OK go for R3c**.  
+**Production tip:** see RELEASES.md. Latest room ships: R3b Hub @ **GAS v745**; arrangement integrity ship pending. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -353,3 +353,4 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 | 2026-07-25 | Director: Logistics Hub must be in warm room. Filed **R3b**. |
 | 2026-07-25 | **R3b shipped @ GAS v745** — warm Hub; Bugbot Highs fixed. |
 | 2026-07-31 | **Five-slice architecture** (director briefing): ops moves into room; meta expands to identity; listeners follow users; idle = single constant. Docs reframe — next **OK go for R3c**. |
+| 2026-07-31 | Director: arrangement integrity **before** Hub checklist UX. Phase A: ledger `pa_uid` overlay key + warm empty Sheets fallback + truck open skip forceSync. |

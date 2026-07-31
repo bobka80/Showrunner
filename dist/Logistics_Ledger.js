@@ -6,10 +6,37 @@
 // @INDEX: LEDGER_ENGINE -> Logistics_Ledger arrange write + M2 backfill
 
 var LOGISTICS_LEDGER_HEADERS_ = [
-  'uid', 'project_uid', 'parent_uid', 'asset_uid', 'quantity', 'truck_uid',
+  'uid', 'project_uid', 'parent_uid', 'asset_uid', 'pa_uid', 'quantity', 'truck_uid',
   'from_location', 'to_location', 'load_time', 'unload_time', 'leg_id',
   'phase_ref', 'x', 'y', 'z', 'rotated', 'staged', 'creator'
 ];
+
+/**
+ * Arrangement integrity — ensure `pa_uid` column exists (PA row instance key).
+ * Vault identity stays in `asset_uid`; overlay prefers `pa_uid|leg`.
+ */
+function logisticsLedgerEnsurePaUidColumn_(sheet) {
+  if (!sheet) return {};
+  var lastCol = Math.max(sheet.getLastColumn(), 1);
+  var header = sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [];
+  var map = {};
+  header.forEach(function (h, i) { map[String(h).trim()] = i; });
+  if (map['pa_uid'] !== undefined) return map;
+  var col = header.length + 1;
+  if (sheet.getMaxColumns() < col) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), col - sheet.getMaxColumns());
+  }
+  sheet.getRange(1, col).setValue('pa_uid');
+  map['pa_uid'] = col - 1;
+  return map;
+}
+
+/** Touch / map key for arrange replace: prefer PA instance uid, else vault asset uid. */
+function logisticsLedgerArrangeTouchKey_(paUid, assetUid) {
+  var p = String(paUid || '');
+  if (p) return p;
+  return String(assetUid || '');
+}
 
 /** Diagnostic — after M4, truck cols should be absent (0). */
 function inventoryPaTruckFieldsAPI() {
@@ -79,13 +106,14 @@ function logisticsLedgerNormalizeArrangeBox_(box) {
 
 /**
  * M4 — replace top-level ledger legs from arrange layout items (not PA columns).
- * @param {Array} layoutItems [{ assetUid, quantity, creator, legs: { outbound?: box, inbound?: box } }]
+ * @param {Array} layoutItems [{ assetUid, paUid, quantity, creator, legs: { outbound?: box, inbound?: box } }]
  */
 function logisticsLedgerWriteFromLayoutItems_(sheets, projectId, layoutItems, legIds, actor) {
   if (!sheets || !sheets.logisticsLedger) return { wrote: 0, skipped: true };
   var legs = (legIds || []).filter(function (l) { return l === 'outbound' || l === 'inbound'; });
   if (!legs.length) return { wrote: 0, skipped: true };
 
+  logisticsLedgerEnsurePaUidColumn_(sheets.logisticsLedger);
   var llData = sheets.logisticsLedger.getDataRange().getValues();
   if (!llData.length) {
     sheets.logisticsLedger.appendRow(LOGISTICS_LEDGER_HEADERS_);
@@ -93,13 +121,19 @@ function logisticsLedgerWriteFromLayoutItems_(sheets, projectId, layoutItems, le
   }
   var llMap = {};
   llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
-  var cols = llData[0].length;
+  if (llMap['pa_uid'] === undefined) {
+    logisticsLedgerEnsurePaUidColumn_(sheets.logisticsLedger);
+    llData = sheets.logisticsLedger.getDataRange().getValues();
+    llMap = {};
+    llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  }
+  var cols = Math.max(llData[0].length, LOGISTICS_LEDGER_HEADERS_.length);
 
-  var touchedAssets = {};
+  var touchedKeys = {};
   (layoutItems || []).forEach(function (item) {
     if (!item) return;
-    var a = String(item.assetUid || item.asset_uid || '');
-    if (a) touchedAssets[a] = true;
+    var k = logisticsLedgerArrangeTouchKey_(item.paUid || item.pa_uid, item.assetUid || item.asset_uid);
+    if (k) touchedKeys[k] = true;
   });
 
   var kept = [llData[0]];
@@ -111,9 +145,10 @@ function logisticsLedgerWriteFromLayoutItems_(sheets, projectId, layoutItems, le
     var isTopLeg = !parent;
     var isOurRewrite = rowPid === String(projectId) && isTopLeg && legs.indexOf(legId) !== -1;
     if (isOurRewrite) {
+      var rowPa = llMap['pa_uid'] !== undefined ? String(row[llMap['pa_uid']] || '') : '';
       var rowAsset = llMap['asset_uid'] !== undefined ? String(row[llMap['asset_uid']] || '') : '';
-      // Keep legs for assets not in this arrange payload (partial/auto saves must not wipe others)
-      if (rowAsset && !touchedAssets[rowAsset]) kept.push(row);
+      var rowKey = logisticsLedgerArrangeTouchKey_(rowPa, rowAsset);
+      if (rowKey && !touchedKeys[rowKey]) kept.push(row);
       continue;
     }
     kept.push(row);
@@ -123,7 +158,8 @@ function logisticsLedgerWriteFromLayoutItems_(sheets, projectId, layoutItems, le
   (layoutItems || []).forEach(function (item) {
     if (!item) return;
     var assetUid = String(item.assetUid || item.asset_uid || '');
-    if (!assetUid) return;
+    var paUid = String(item.paUid || item.pa_uid || '');
+    if (!assetUid && !paUid) return;
     var qty = item.quantity != null ? item.quantity : 1;
     var creator = item.creator || actor || 'System';
     var itemLegs = item.legs || {};
@@ -140,6 +176,7 @@ function logisticsLedgerWriteFromLayoutItems_(sheets, projectId, layoutItems, le
       if (llMap['project_uid'] !== undefined) r[llMap['project_uid']] = String(projectId);
       if (llMap['parent_uid'] !== undefined) r[llMap['parent_uid']] = '';
       if (llMap['asset_uid'] !== undefined) r[llMap['asset_uid']] = assetUid;
+      if (llMap['pa_uid'] !== undefined) r[llMap['pa_uid']] = paUid;
       if (llMap['quantity'] !== undefined) r[llMap['quantity']] = qty;
       if (llMap['truck_uid'] !== undefined) r[llMap['truck_uid']] = box.truck_uid;
       if (llMap['from_location'] !== undefined) r[llMap['from_location']] = '';
@@ -186,6 +223,7 @@ function logisticsLedgerDualWriteFromPaRows_(sheets, projectId, paRows, paMap, l
   var legs = (legIds || []).filter(function (l) { return l === 'outbound' || l === 'inbound'; });
   if (!legs.length) return { wrote: 0, skipped: true };
 
+  logisticsLedgerEnsurePaUidColumn_(sheets.logisticsLedger);
   var llData = sheets.logisticsLedger.getDataRange().getValues();
   if (!llData.length) {
     sheets.logisticsLedger.appendRow(LOGISTICS_LEDGER_HEADERS_);
@@ -193,7 +231,13 @@ function logisticsLedgerDualWriteFromPaRows_(sheets, projectId, paRows, paMap, l
   }
   var llMap = {};
   llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
-  var cols = llData[0].length;
+  if (llMap['pa_uid'] === undefined) {
+    logisticsLedgerEnsurePaUidColumn_(sheets.logisticsLedger);
+    llData = sheets.logisticsLedger.getDataRange().getValues();
+    llMap = {};
+    llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  }
+  var cols = Math.max(llData[0].length, LOGISTICS_LEDGER_HEADERS_.length);
 
   var kept = [llData[0]];
   for (var i = 1; i < llData.length; i++) {
@@ -210,7 +254,8 @@ function logisticsLedgerDualWriteFromPaRows_(sheets, projectId, paRows, paMap, l
   (paRows || []).forEach(function (pa) {
     if (!pa || !pa.length) return;
     var assetUid = paMap['asset_uid'] !== undefined ? String(pa[paMap['asset_uid']] || '') : '';
-    if (!assetUid) return;
+    var paUid = paMap['uid'] !== undefined ? String(pa[paMap['uid']] || '') : '';
+    if (!assetUid && !paUid) return;
     var qty = paMap['assigned_quantity'] !== undefined ? (pa[paMap['assigned_quantity']] || 1) : 1;
     var creator = paMap['creator'] !== undefined ? (pa[paMap['creator']] || actor || 'System') : (actor || 'System');
 
@@ -237,6 +282,7 @@ function logisticsLedgerDualWriteFromPaRows_(sheets, projectId, paRows, paMap, l
       if (llMap['project_uid'] !== undefined) r[llMap['project_uid']] = String(projectId);
       if (llMap['parent_uid'] !== undefined) r[llMap['parent_uid']] = '';
       if (llMap['asset_uid'] !== undefined) r[llMap['asset_uid']] = assetUid;
+      if (llMap['pa_uid'] !== undefined) r[llMap['pa_uid']] = paUid;
       if (llMap['quantity'] !== undefined) r[llMap['quantity']] = qty;
       if (llMap['truck_uid'] !== undefined) r[llMap['truck_uid']] = truck; // may be empty (continuity)
       if (llMap['from_location'] !== undefined) r[llMap['from_location']] = '';
@@ -630,7 +676,7 @@ function logisticsLedgerStampClocksOnObjects_(legObjects, projectId, logData) {
 
 /**
  * Top-level Logistics_Ledger legs for one or many projects.
- * @returns {Object} { [projectId]: { [`${asset_uid}|${leg}`]: legObj } }
+ * @returns {Object} { [projectId]: { [`${pa_uid|asset_uid}|${leg}`]: legObj } }
  */
 function logisticsLedgerLegsByProjects_(sheets, projectIdList) {
   var out = {};
@@ -661,9 +707,10 @@ function logisticsLedgerLegsByProjects_(sheets, projectIdList) {
     var leg = String(row[llMap['leg_id']] || '');
     if (leg !== 'outbound' && leg !== 'inbound') continue;
     var assetUid = String(row[llMap['asset_uid']] || '');
-    if (!assetUid) continue;
+    var paUid = llMap['pa_uid'] !== undefined ? String(row[llMap['pa_uid']] || '') : '';
+    if (!assetUid && !paUid) continue;
     if (!out[pid]) out[pid] = {};
-    out[pid][assetUid + '|' + leg] = {
+    var legObj = {
       truck_uid: llMap['truck_uid'] !== undefined ? String(row[llMap['truck_uid']] || '') : '',
       x: llMap['x'] !== undefined ? numOrNull_(row[llMap['x']]) : null,
       y: llMap['y'] !== undefined ? numOrNull_(row[llMap['y']]) : null,
@@ -672,8 +719,13 @@ function logisticsLedgerLegsByProjects_(sheets, projectIdList) {
       staged: llMap['staged'] !== undefined && (row[llMap['staged']] === true || row[llMap['staged']] === 'true'),
       load_time: llMap['load_time'] !== undefined ? row[llMap['load_time']] : '',
       unload_time: llMap['unload_time'] !== undefined ? row[llMap['unload_time']] : '',
-      phase_ref: llMap['phase_ref'] !== undefined ? String(row[llMap['phase_ref']] || '') : ''
+      phase_ref: llMap['phase_ref'] !== undefined ? String(row[llMap['phase_ref']] || '') : '',
+      pa_uid: paUid,
+      asset_uid: assetUid
     };
+    // Prefer PA instance key for overlay; keep vault key for free-at / legacy rows.
+    if (paUid) out[pid][paUid + '|' + leg] = legObj;
+    if (assetUid) out[pid][assetUid + '|' + leg] = legObj;
   }
   return out;
 }
@@ -684,14 +736,18 @@ function logisticsLedgerLegsByProject_(sheets, projectId) {
 }
 
 /**
- * Overlay ledger legs onto camelCase PA asset (UI contract). Missing key → leave defaults.
+ * Overlay ledger legs onto camelCase PA asset (UI contract).
+ * Prefer PA row uid key (`pa_uid|leg`); fall back to vault assetId for legacy rows.
  */
 function applyLedgerLegsOntoPaAsset_(asset, legsMap) {
   if (!asset || !legsMap) return asset;
+  var paUid = String(asset.uid || '');
   var assetId = String(asset.assetId || asset.asset_uid || '');
-  if (!assetId) return asset;
+  if (!paUid && !assetId) return asset;
   ['outbound', 'inbound'].forEach(function (leg) {
-    var legRow = legsMap[assetId + '|' + leg];
+    var legRow = (paUid && legsMap[paUid + '|' + leg]) ||
+      (assetId && legsMap[assetId + '|' + leg]) ||
+      null;
     if (!legRow) return;
     var prefix = leg;
     asset[prefix + 'TruckUid'] = legRow.truck_uid || '';
@@ -777,6 +833,7 @@ function logisticsLedgerRowToObject_(row, llMap) {
     project_uid: String(cell_('project_uid') || ''),
     parent_uid: String(cell_('parent_uid') || ''),
     asset_uid: String(cell_('asset_uid') || ''),
+    pa_uid: String(cell_('pa_uid') || ''),
     quantity: cell_('quantity') !== '' && cell_('quantity') != null ? Number(cell_('quantity')) || 1 : 1,
     truck_uid: String(cell_('truck_uid') || ''),
     from_location: String(cell_('from_location') || ''),
@@ -814,7 +871,7 @@ function logisticsLedgerLoadProjectLegObjects_(sheets, projectId) {
   return out;
 }
 
-/** Build asset|leg map from plain leg objects (same shape as logisticsLedgerLegsByProject_). */
+/** Build pa_uid|leg (preferred) + asset_uid|leg (legacy/free-at) map from plain leg objects. */
 function logisticsLedgerLegsMapFromObjects_(legObjects) {
   var out = {};
   (legObjects || []).forEach(function (o) {
@@ -823,8 +880,9 @@ function logisticsLedgerLegsMapFromObjects_(legObjects) {
     var leg = String(o.leg_id || '');
     if (leg !== 'outbound' && leg !== 'inbound') return;
     var assetUid = String(o.asset_uid || '');
-    if (!assetUid) return;
-    out[assetUid + '|' + leg] = {
+    var paUid = String(o.pa_uid || '');
+    if (!assetUid && !paUid) return;
+    var legObj = {
       truck_uid: String(o.truck_uid || ''),
       x: o.x != null && o.x !== '' ? Number(o.x) : null,
       y: o.y != null && o.y !== '' ? Number(o.y) : null,
@@ -833,8 +891,12 @@ function logisticsLedgerLegsMapFromObjects_(legObjects) {
       staged: !!o.staged,
       load_time: o.load_time != null ? o.load_time : '',
       unload_time: o.unload_time != null ? o.unload_time : '',
-      phase_ref: String(o.phase_ref || '')
+      phase_ref: String(o.phase_ref || ''),
+      pa_uid: paUid,
+      asset_uid: assetUid
     };
+    if (paUid) out[paUid + '|' + leg] = legObj;
+    if (assetUid) out[assetUid + '|' + leg] = legObj;
   });
   return out;
 }
@@ -847,11 +909,11 @@ function logisticsLedgerApplyLayoutItemsToObjects_(existingObjects, projectId, l
   var legs = (legIds || []).filter(function (l) { return l === 'outbound' || l === 'inbound'; });
   if (!legs.length) return existingObjects || [];
 
-  var touchedAssets = {};
+  var touchedKeys = {};
   (layoutItems || []).forEach(function (item) {
     if (!item) return;
-    var a = String(item.assetUid || item.asset_uid || '');
-    if (a) touchedAssets[a] = true;
+    var k = logisticsLedgerArrangeTouchKey_(item.paUid || item.pa_uid, item.assetUid || item.asset_uid);
+    if (k) touchedKeys[k] = true;
   });
 
   var kept = [];
@@ -861,8 +923,8 @@ function logisticsLedgerApplyLayoutItemsToObjects_(existingObjects, projectId, l
       !String(o.parent_uid || '') &&
       legs.indexOf(String(o.leg_id || '')) !== -1;
     if (isOurRewrite) {
-      var rowAsset = String(o.asset_uid || '');
-      if (rowAsset && !touchedAssets[rowAsset]) kept.push(o);
+      var rowKey = logisticsLedgerArrangeTouchKey_(o.pa_uid, o.asset_uid);
+      if (rowKey && !touchedKeys[rowKey]) kept.push(o);
       return;
     }
     kept.push(o);
@@ -872,7 +934,8 @@ function logisticsLedgerApplyLayoutItemsToObjects_(existingObjects, projectId, l
   (layoutItems || []).forEach(function (item) {
     if (!item) return;
     var assetUid = String(item.assetUid || item.asset_uid || '');
-    if (!assetUid) return;
+    var paUid = String(item.paUid || item.pa_uid || '');
+    if (!assetUid && !paUid) return;
     var qty = item.quantity != null ? item.quantity : 1;
     var creator = item.creator || actor || 'System';
     var itemLegs = item.legs || {};
@@ -887,6 +950,7 @@ function logisticsLedgerApplyLayoutItemsToObjects_(existingObjects, projectId, l
         project_uid: String(projectId),
         parent_uid: '',
         asset_uid: assetUid,
+        pa_uid: paUid,
         quantity: qty,
         truck_uid: box.truck_uid || '',
         from_location: '',
@@ -913,6 +977,7 @@ function logisticsLedgerApplyLayoutItemsToObjects_(existingObjects, projectId, l
  */
 function logisticsLedgerReplaceProjectTopLegsOnSheet_(sheets, projectId, legObjects) {
   if (!sheets || !sheets.logisticsLedger) return { wrote: 0, skipped: true };
+  logisticsLedgerEnsurePaUidColumn_(sheets.logisticsLedger);
   var llData = sheets.logisticsLedger.getDataRange().getValues();
   if (!llData.length) {
     sheets.logisticsLedger.appendRow(LOGISTICS_LEDGER_HEADERS_);
@@ -920,7 +985,13 @@ function logisticsLedgerReplaceProjectTopLegsOnSheet_(sheets, projectId, legObje
   }
   var llMap = {};
   llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
-  var cols = llData[0].length;
+  if (llMap['pa_uid'] === undefined) {
+    logisticsLedgerEnsurePaUidColumn_(sheets.logisticsLedger);
+    llData = sheets.logisticsLedger.getDataRange().getValues();
+    llMap = {};
+    llData[0].forEach(function (h, i) { llMap[String(h).trim()] = i; });
+  }
+  var cols = Math.max(llData[0].length, LOGISTICS_LEDGER_HEADERS_.length);
 
   var kept = [llData[0]];
   for (var i = 1; i < llData.length; i++) {
@@ -945,6 +1016,7 @@ function logisticsLedgerReplaceProjectTopLegsOnSheet_(sheets, projectId, legObje
     if (llMap['project_uid'] !== undefined) r[llMap['project_uid']] = String(projectId);
     if (llMap['parent_uid'] !== undefined) r[llMap['parent_uid']] = '';
     if (llMap['asset_uid'] !== undefined) r[llMap['asset_uid']] = String(o.asset_uid || '');
+    if (llMap['pa_uid'] !== undefined) r[llMap['pa_uid']] = String(o.pa_uid || '');
     if (llMap['quantity'] !== undefined) r[llMap['quantity']] = o.quantity != null ? o.quantity : 1;
     if (llMap['truck_uid'] !== undefined) r[llMap['truck_uid']] = o.truck_uid || '';
     if (llMap['from_location'] !== undefined) r[llMap['from_location']] = o.from_location || '';

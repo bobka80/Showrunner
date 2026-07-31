@@ -274,9 +274,11 @@ function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
  */
 function logisticsLedgerItemFromArrangeBox_(paRow, map, leg, box) {
   var assetUid = map['asset_uid'] !== undefined ? String(paRow[map['asset_uid']] || '') : '';
+  var paUid = map['uid'] !== undefined ? String(paRow[map['uid']] || '') : '';
+  if (!paUid && box && (box.paUid || box.pa_uid)) paUid = String(box.paUid || box.pa_uid || '');
   var qty = map['assigned_quantity'] !== undefined ? (paRow[map['assigned_quantity']] || 1) : 1;
   var creator = map['creator'] !== undefined ? (paRow[map['creator']] || '') : '';
-  var item = { assetUid: assetUid, quantity: qty, creator: creator, legs: {} };
+  var item = { assetUid: assetUid, paUid: paUid, quantity: qty, creator: creator, legs: {} };
   if (leg === 'both') {
     if (box && box.outbound) item.legs.outbound = box.outbound;
     if (box && box.inbound) item.legs.inbound = box.inbound;

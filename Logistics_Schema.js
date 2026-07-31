@@ -271,7 +271,7 @@ function verifyDatabaseSchema(readOnly = false) {
 
   // Movement SoT (Logistics Ledger) — PA truck columns stripped at M4
   let logisticsLedgerSheet = sm["Logistics_Ledger"];
-  const logisticsLedgerHeaders = ["uid", "project_uid", "parent_uid", "asset_uid", "quantity", "truck_uid", "from_location", "to_location", "load_time", "unload_time", "leg_id", "phase_ref", "x", "y", "z", "rotated", "staged", "creator"];
+  const logisticsLedgerHeaders = ["uid", "project_uid", "parent_uid", "asset_uid", "pa_uid", "quantity", "truck_uid", "from_location", "to_location", "load_time", "unload_time", "leg_id", "phase_ref", "x", "y", "z", "rotated", "staged", "creator"];
   if (!logisticsLedgerSheet) {
       logisticsLedgerSheet = ss.insertSheet("Logistics_Ledger");
       logisticsLedgerSheet.appendRow(logisticsLedgerHeaders);

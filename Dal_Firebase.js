@@ -359,7 +359,8 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
     });
 
     var sheets = verifyDatabaseSchema(true);
-    // R3: if warm logistics/state is present (even empty), overlay from Firebase — never mix Sheets lag.
+    // R3: prefer warm logistics/state when it has legs. Present-but-empty must not blank
+    // trucks that still live on Sheets (hub seed / warm-before-first-arrange).
     try {
       var legsMapFs = null;
       var liveLl = null;
@@ -367,7 +368,13 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
         liveLl = dalReadLogisticsStateFromFirestore_(projectId);
       } catch (eLive) { liveLl = null; }
       if (liveLl && liveLl.present) {
-        legsMapFs = logisticsLedgerLegsMapFromObjects_(liveLl.legs || []);
+        var warmLegs = liveLl.legs || [];
+        if (warmLegs.length > 0) {
+          legsMapFs = logisticsLedgerLegsMapFromObjects_(warmLegs);
+        } else {
+          var sheetsLegs = logisticsLedgerLegsByProject_(sheets, projectId);
+          legsMapFs = (sheetsLegs && Object.keys(sheetsLegs).length) ? sheetsLegs : logisticsLedgerLegsMapFromObjects_(warmLegs);
+        }
       } else {
         legsMapFs = logisticsLedgerLegsByProject_(sheets, projectId);
       }

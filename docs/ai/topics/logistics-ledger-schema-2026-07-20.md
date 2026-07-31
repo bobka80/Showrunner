@@ -155,6 +155,7 @@ New Engine tab **`Logistics_Ledger`** (same Engine workbook — **new tab, not a
 | `project_uid` | Owning project for **top-level leg** rows; null/empty on child stops (inherit via parent) |
 | `parent_uid` | Null = leg; set = stop under that leg’s `uid` |
 | `asset_uid` | Vault/equipment identity that moved |
+| `pa_uid` | **PA row instance** (`Project_Assets.uid`) for arrange overlay. Same vault `asset_uid` can appear on many PA rows (multi-case); overlay keys by `pa_uid\|leg` first, then vault `asset_uid\|leg` for legacy/free-at. Writers ensure the column exists. |
 | `quantity` | Amount in this row |
 | `truck_uid` | Vehicle that carried it (may be empty for on-site continuity / stay rows — director confirm at build) |
 | `from_location` | Origin (warehouse, event site, roadside, …) |
