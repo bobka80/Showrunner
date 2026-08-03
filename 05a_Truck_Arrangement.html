@@ -274,15 +274,35 @@ function applyTruckDimensions(truckId) {
 }
 
 // @INDEX: TRUCK_CAD -> Predictive Truck Packing
+/** True when a PA row is a truck-arrange case (matches packing list: include isAuto). */
+window.paIsTruckArrangeContainer_ = function(pa) {
+    if (!pa) return false;
+    if (pa.isAuto || pa.isGenericAuto) return true;
+    var f = String(pa.formula || '');
+    if (f === 'Auto-Container' || f === 'Gen-Auto-Container') return true;
+    if (f.indexOf('[AUTO] ') === 0 || f.indexOf('[GEN_AUTO] ') === 0) return true;
+    if (typeof globalAssets === 'undefined' || !globalAssets || !globalAssets.length) {
+        try {
+            var vaultObj = (typeof dalCacheGetVault_ === 'function') ? dalCacheGetVault_() : null;
+            if (!vaultObj) {
+                var raw = localStorage.getItem('sm_vault_cache');
+                if (raw) vaultObj = JSON.parse(raw);
+            }
+            if (vaultObj && vaultObj.assets) globalAssets = vaultObj.assets;
+        } catch (eVault) { /* ignore */ }
+    }
+    var asset = (typeof globalAssets !== 'undefined' && globalAssets)
+        ? globalAssets.find(function (a) { return a && a.id === pa.assetId; })
+        : null;
+    return !!(asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container'));
+};
+
 function openTruckArrangementDashboard() {
     if (typeof currentProjectAssets === 'undefined' || currentProjectAssets.length === 0) {
         return alert("No equipment assigned to this project yet.");
     }
     
-    let hasContainers = currentProjectAssets.some(pa => {
-        let asset = globalAssets.find(a => a.id === pa.assetId);
-        return asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
-    });
+    let hasContainers = currentProjectAssets.some(pa => window.paIsTruckArrangeContainer_(pa));
     
     if (!hasContainers) {
         alert("⚠️ No cases/containers found in this project. You must pack equipment into cases before arranging trucks.");
@@ -311,12 +331,35 @@ function openTruckArrangementDashboard() {
             .withFailureHandler(function () { bootLogic(); })
             .withSuccessHandler(function (res) {
                 if (res && res.current && res.current.length) {
-                    currentProjectAssets = res.current;
-                    if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
-                        window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
+                    var serverList = res.current;
+                    if (typeof window.dalProcessPaFormulas_ === 'function') {
+                        window.dalProcessPaFormulas_(serverList, { skipExplode: true });
                     }
-                    window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
-                    window.paLoadedForProject = projectId;
+                    if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
+                        window.dalPaNormalizeAssetsOverrideDept_(serverList);
+                    }
+                    var localHasCases = (currentProjectAssets || []).some(function (pa) {
+                        return window.paIsTruckArrangeContainer_(pa);
+                    });
+                    var serverHasCases = serverList.some(function (pa) {
+                        return window.paIsTruckArrangeContainer_(pa);
+                    });
+                    if (serverHasCases) {
+                        // Server list has cases + ledger overlay — prefer it (UID splits after save).
+                        currentProjectAssets = serverList;
+                        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                        window.paLoadedForProject = projectId;
+                    } else if (localHasCases) {
+                        // Keep packing cases (often freshly auto-packed, not on server yet).
+                        // Still copy any truck fields that exist on matching uids.
+                        if (typeof window.dalPaMergeTruckFieldsFromList_ === 'function') {
+                            window.dalPaMergeTruckFieldsFromList_(currentProjectAssets, serverList);
+                        }
+                    } else {
+                        currentProjectAssets = serverList;
+                        window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                        window.paLoadedForProject = projectId;
+                    }
                     if (res.overlapping) window.overlappingAllocations = res.overlapping;
                 }
                 bootLogic();
@@ -356,10 +399,23 @@ function executeTruckArrangementBoot() {
     let maxStageRowW = 0;
 
     currentProjectAssets.forEach(pa => {
-        let asset = globalAssets.find(a => a.id === pa.assetId);
-        if (asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.type === 'Container')) {
-            let qty = parseInt(pa.qty, 10) || 1;
-            let emptyWeight = parseFloat(asset.weight) || 0; 
+        let asset = (typeof globalAssets !== 'undefined' && globalAssets)
+            ? globalAssets.find(a => a.id === pa.assetId) : null;
+        if (!window.paIsTruckArrangeContainer_(pa)) return;
+        // Auto rows can still lack a vault hit briefly — use safe defaults for dims/weight.
+        if (!asset) {
+            asset = {
+                id: pa.assetId,
+                name: (pa.formula && pa.formula !== 'Standalone') ? pa.formula : 'Case',
+                weight: 0,
+                dims: '',
+                nestingLevel: 3,
+                type: 'Container',
+                department: ''
+            };
+        }
+        let qty = parseInt(pa.qty, 10) || 1;
+        let emptyWeight = parseFloat(asset.weight) || 0; 
             
             // Calculate exact weight of all nested equipment packed inside this specific case group
             let nestedWeight = 0;
@@ -467,7 +523,6 @@ function executeTruckArrangementBoot() {
                 }
                 allTruckCases.push(c);
             }
-        }
     });
     
     // Group cases into their restored stacks

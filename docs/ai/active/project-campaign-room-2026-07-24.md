@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **Five-slice architecture filed 2026-07-31**. Arrangement integrity Phase A @ **GAS v750**; warm-arrange staging hotfix @ **GAS v751**. Next preferred after smoke: **Hub checklist UX (Phase B)** or **OK go for R3c**.  
-**Production tip:** see RELEASES.md. Latest room ships: R3b Hub @ **GAS v745**; arrangement integrity @ **GAS v750**; arrange staging hotfix @ **GAS v751**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Arrangement reopen hotfix @ **GAS v752**. Next preferred after smoke: **Hub checklist UX (Phase B)** or **OK go for R3c**.  
+**Production tip:** see RELEASES.md. Latest: arrange reopen @ **GAS v752**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -358,3 +358,4 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 | 2026-07-31 | Smoke fail: save Arrange → reopen → all staging. Cause: live PA fixtures blanked trucks after warm save. Hotfix: stamp legs onto fixtures + local mirror + hydrate-on-open. |
 | 2026-07-31 | **Arrange staging hotfix @ GAS v751** — warm save stamps truck fields onto live fixtures; client mirrors save + hydrates before open when spatial empty. |
 | 2026-07-31 | Smoke still fail: packing explode stripped paUids so save dropped cases; hydrate merge missed UID splits. v752: collapse-before-arrange, replace hydrate, save returns `current`. |
+| 2026-07-31 | **Arrange reopen hotfix @ GAS v752** — packing explode uid strip fixed; Bugbot High (hydrate before autosave) fixed. |

@@ -592,10 +592,14 @@ window.toggleAutoArrangeHub = async function(leg) {
         
         let hasContainers = false;
         if (typeof currentProjectAssets !== 'undefined') {
-            hasContainers = currentProjectAssets.some(pa => {
-                let asset = globalAssets.find(a => a.id === pa.assetId);
-                return asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container');
-            });
+            hasContainers = currentProjectAssets.some(pa =>
+                (typeof window.paIsTruckArrangeContainer_ === 'function')
+                    ? window.paIsTruckArrangeContainer_(pa)
+                    : (function () {
+                        let asset = globalAssets.find(a => a.id === pa.assetId);
+                        return !!(pa.isAuto || pa.isGenericAuto || (asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.nestingLevel == 5 || asset.type === 'Container')));
+                    })()
+            );
         }
         if (!hasContainers) {
             return alert("⚠️ No cases/containers found in this project. You must pack equipment into cases before auto-arranging trucks.");

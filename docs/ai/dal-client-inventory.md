@@ -161,7 +161,7 @@
 | `sm_lock_idle_min_` | `01i_Desktop_Lock.html` |
 | `sm_mobile_qr_pending` | `01j_Mobile_Scan.html` |
 | `sm_mobile_scan_reopen_panel` | `01j_Mobile_Scan.html` |
-| `sm_vault_cache` | `02a_Project_Equipment.html`, `06b1_Admin_Assets_Core.html`, `06b2_Admin_Assets_Form.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html` |
+| `sm_vault_cache` | `02a_Project_Equipment.html`, `05a_Truck_Arrangement.html`, `06b1_Admin_Assets_Core.html`, `06b2_Admin_Assets_Form.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html` |
 | `sm_offer_lang` | `02d_Equipment_Render.html`, `02g_Project_Reports.html` |
 | `sm_dal_unload_prep_` | `02e6_Dal_Session.html`, `07_Core_Globals.html` |
 | `sm_company_name` | `02g_Project_Reports.html` |
@@ -223,7 +223,7 @@
 | 04_Month_Roster.html | 2 | 0 |
 | 04b_Equipment_Tracker.html | 2 | 1 |
 | 05_Warehouse_Engine.html | 6 | 0 |
-| 05a_Truck_Arrangement.html | 2 | 0 |
+| 05a_Truck_Arrangement.html | 2 | 1 |
 | 05b_Loadin_Plan.html | 0 | 0 |
 | 06_System_Admin.html | 3 | 2 |
 | 06a_Admin_IAM.html | 6 | 0 |
