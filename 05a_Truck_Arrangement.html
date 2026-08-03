@@ -295,13 +295,44 @@ function openTruckArrangementDashboard() {
         if (window.currentPaMode === 'design' && typeof collapseProjectAssets === 'function') collapseProjectAssets();
         executeTruckArrangementBoot();
     };
-    
-    if (typeof window.calculatePaDeltas === 'function' && window.calculatePaDeltas().length > 0) {
-        window.autoSaveAndExecute(bootLogic, false, null, true);
+
+    let startBoot = () => {
+        if (typeof window.calculatePaDeltas === 'function' && window.calculatePaDeltas().length > 0) {
+            window.autoSaveAndExecute(bootLogic, false, null, true);
+            return;
+        }
+        // No PA deltas — skip forceSync round-trip (was glacial after warm Hub).
+        bootLogic();
+    };
+
+    // Live fixtures historically blanked truck fields (M4). If memory has no spatial
+    // data, hydrate from getProjectAssets (ledger overlay) before painting Arrange.
+    let leg = window.activeArrangementLeg || 'outbound';
+    let hasAnySpatial = (currentProjectAssets || []).some(pa => {
+        let x = pa[leg + 'X'];
+        return x !== null && x !== undefined && x !== '';
+    });
+    if (hasAnySpatial) {
+        startBoot();
         return;
     }
-    // No PA deltas — skip forceSync round-trip (was glacial after warm Hub).
-    bootLogic();
+    let projectId = document.getElementById('edit-folder-id')
+        ? document.getElementById('edit-folder-id').value : '';
+    let sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+    let eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
+    if (!projectId || projectId === 'NEW' || typeof google === 'undefined' || !google.script || !google.script.run) {
+        startBoot();
+        return;
+    }
+    google.script.run
+        .withFailureHandler(function () { startBoot(); })
+        .withSuccessHandler(function (res) {
+            if (res && res.current && typeof window.dalPaMergeTruckFieldsFromList_ === 'function') {
+                window.dalPaMergeTruckFieldsFromList_(currentProjectAssets, res.current);
+            }
+            startBoot();
+        })
+        .getProjectAssets(projectId, sDate, eDate);
 }
 
 function executeTruckArrangementBoot() {
@@ -1400,6 +1431,20 @@ function saveTruckArrangement() {
     
     google.script.run
     .withSuccessHandler(res => {
+        // Mirror arrangement onto local PA immediately — live fixtures used to blank trucks
+        // so reopen Arrange dumped everything into staging before the next overlay hydrate.
+        try {
+            (payload || []).forEach(function (box) {
+                if (!box || !box.paUid) return;
+                let pa = (currentProjectAssets || []).find(function (a) { return a && String(a.uid) === String(box.paUid); });
+                if (pa && typeof window.dalPaApplyArrangePayloadOntoAsset_ === 'function') {
+                    window.dalPaApplyArrangePayloadOntoAsset_(pa, box, leg);
+                }
+            });
+            if (window.originalProjectAssets && typeof window.dalPaMergeTruckFieldsFromList_ === 'function') {
+                window.dalPaMergeTruckFieldsFromList_(window.originalProjectAssets, currentProjectAssets);
+            }
+        } catch (eLocal) { /* best-effort */ }
         btn.innerText = "SAVED ✓";
         setTimeout(() => { btn.innerText = origText; btn.disabled = false; }, 2000);
         window.isTruckDirty = false;

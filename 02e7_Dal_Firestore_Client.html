@@ -605,9 +605,55 @@ window.dalPaFlushPayloadSig_ = function(pa) {
   ].join('\t');
 };
 
-/** M4 no-op — truck/staging no longer on PA fixtures (ledger SoT). */
+/**
+ * M4: ledger remains SoT for movement, but live PA fixtures must mirror truck/staging
+ * for Arrange UI — otherwise save→reopen dumps every case into staging.
+ */
 window.dalPaCopyTruckOntoFixture_ = function(fix, pa) {
-  return fix || {};
+  if (!fix) return {};
+  if (!pa) return fix;
+  ['outbound', 'inbound'].forEach(function (leg) {
+    fix[leg + 'TruckUid'] = pa[leg + 'TruckUid'] || '';
+    fix[leg + 'X'] = (pa[leg + 'X'] != null && pa[leg + 'X'] !== '') ? pa[leg + 'X'] : null;
+    fix[leg + 'Y'] = (pa[leg + 'Y'] != null && pa[leg + 'Y'] !== '') ? pa[leg + 'Y'] : null;
+    fix[leg + 'Z'] = (pa[leg + 'Z'] != null && pa[leg + 'Z'] !== '') ? pa[leg + 'Z'] : null;
+    fix[leg + 'Rotated'] = !!pa[leg + 'Rotated'];
+    fix[leg + 'Staged'] = !!pa[leg + 'Staged'];
+  });
+  return fix;
+};
+
+/** Merge truck/staging camelCase fields from src → dest by matching uid (Arrange hydrate). */
+window.dalPaMergeTruckFieldsFromList_ = function(destList, srcList) {
+  if (!destList || !srcList) return destList;
+  var byUid = {};
+  (srcList || []).forEach(function (pa) {
+    if (pa && pa.uid) byUid[String(pa.uid)] = pa;
+  });
+  (destList || []).forEach(function (pa) {
+    if (!pa || !pa.uid) return;
+    var src = byUid[String(pa.uid)];
+    if (!src) return;
+    window.dalPaCopyTruckOntoFixture_(pa, src);
+  });
+  return destList;
+};
+
+/** Apply one arrange save payload row onto a PA asset (local mirror before listener). */
+window.dalPaApplyArrangePayloadOntoAsset_ = function(pa, box, leg) {
+  if (!pa || !box) return;
+  var L = String(leg || 'outbound');
+  if (L === 'both') {
+    if (box.outbound) window.dalPaApplyArrangePayloadOntoAsset_(pa, box.outbound, 'outbound');
+    if (box.inbound) window.dalPaApplyArrangePayloadOntoAsset_(pa, box.inbound, 'inbound');
+    return;
+  }
+  pa[L + 'TruckUid'] = box.isStaged ? '' : (box.truckUid || box.truck_uid || '');
+  pa[L + 'X'] = (box.truckX != null && box.truckX !== '') ? box.truckX : (box.x != null ? box.x : null);
+  pa[L + 'Y'] = (box.truckY != null && box.truckY !== '') ? box.truckY : (box.y != null ? box.y : null);
+  pa[L + 'Z'] = (box.truckZ != null && box.truckZ !== '') ? box.truckZ : (box.z != null ? box.z : null);
+  pa[L + 'Rotated'] = !!(box.isRotated || box.rotated);
+  pa[L + 'Staged'] = !!(box.isStaged || box.staged);
 };
 
 window.dalPaIsAutoRow_ = function(pa) {
@@ -1227,6 +1273,28 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
       if (!Number(pa.writeSeq || 0)) pa.writeSeq = docSeq;
     });
   }
+  // Preserve local truck/staging when remote fixtures still blank them (legacy writers).
+  // Ledger remains SoT; this only keeps Arrange UI from wiping on live PA snaps.
+  try {
+    var localTruckByUid = {};
+    (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).forEach(function (pa) {
+      if (pa && pa.uid) localTruckByUid[String(pa.uid)] = pa;
+    });
+    serverAssets.forEach(function (pa) {
+      if (!pa || !pa.uid) return;
+      var loc = localTruckByUid[String(pa.uid)];
+      if (!loc) return;
+      ['outbound', 'inbound'].forEach(function (leg) {
+        var rx = pa[leg + 'X'];
+        var remoteEmpty = rx === null || rx === undefined || rx === '';
+        var lx = loc[leg + 'X'];
+        var localHas = lx !== null && lx !== undefined && lx !== '';
+        if (remoteEmpty && localHas && typeof window.dalPaCopyTruckOntoFixture_ === 'function') {
+          window.dalPaCopyTruckOntoFixture_(pa, loc);
+        }
+      });
+    });
+  } catch (eTruckPreserve) { /* ignore */ }
   window.dalProcessPaFormulas_(serverAssets, { skipExplode: true });
   serverAssets = serverAssets.filter(function(pa) {
     return !(pa && pa.uid && window.dalPaIsRecentlyDeleted_(String(pa.uid)));

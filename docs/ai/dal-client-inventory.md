@@ -2,7 +2,7 @@
 
 **Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md)
 
-**Generated:** 2026-07-31 · **Root HTML modules scanned:** 95
+**Generated:** 2026-08-03 · **Root HTML modules scanned:** 95
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 
@@ -27,7 +27,7 @@
 | `saveTaskData` | `01b_Calendar_Tasks.html` |
 | `getAssetRegistry` | `01d_Calendar_Mobile.html`, `02_Project_Editor_Logistics.html`, `02a_Project_Equipment.html`, `06b1_Admin_Assets_Core.html`, `11_Station_Shell.html`, `11c_Station_Core_2.html` |
 | `provisionNewAsset` | `01d_Calendar_Mobile.html`, `06b2_Admin_Assets_Form.html`, `06f_Admin_Audit.html` |
-| `getProjectAssets` | `01h_Mobile_Assets.html`, `02_Project_Editor_Logistics.html`, `02e5_Logic_Sync.html`, `02e7_Dal_Firestore_Client.html` |
+| `getProjectAssets` | `01h_Mobile_Assets.html`, `02_Project_Editor_Logistics.html`, `02e5_Logic_Sync.html`, `02e7_Dal_Firestore_Client.html`, `05a_Truck_Arrangement.html` |
 | `updateProjectReadiness` | `01h_Mobile_Assets.html`, `02_Project_Editor_Logistics.html`, `02d_Equipment_Render.html`, `03a_Timeline_Boot.html` |
 | `getDesktopLockPrefix` | `01i_Desktop_Lock.html` |
 | `verifyDesktopLockUnlock` | `01i_Desktop_Lock.html` |
@@ -223,7 +223,7 @@
 | 04_Month_Roster.html | 2 | 0 |
 | 04b_Equipment_Tracker.html | 2 | 1 |
 | 05_Warehouse_Engine.html | 6 | 0 |
-| 05a_Truck_Arrangement.html | 1 | 0 |
+| 05a_Truck_Arrangement.html | 2 | 0 |
 | 05b_Loadin_Plan.html | 0 | 0 |
 | 06_System_Admin.html | 3 | 2 |
 | 06a_Admin_IAM.html | 6 | 0 |

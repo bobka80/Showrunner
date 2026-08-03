@@ -496,6 +496,34 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
     var arranged = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg || 'outbound', hdr.map);
     var resultRows = arranged.rows || [];
     var basePath = dalFirestorePaCollection_(projectId);
+    var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
+
+    // Build next logistics legs BEFORE rewriting live PA fixtures — fixtures must mirror
+    // arrangement for UI (ledger remains SoT; empty fixture trucks made reopen → staging).
+    var roomUid = '';
+    try {
+      var sheetsIdx = verifyDatabaseSchema(true);
+      var idxRow = dalGetProjectIndexRow_(projectId, sheetsIdx);
+      if (idxRow) {
+        var camp = dalReadCampaignRoom_(idxRow);
+        roomUid = camp.campaignRoomUid || '';
+      }
+    } catch (eRoom) { /* ignore */ }
+
+    var existingLl = null;
+    try {
+      existingLl = dalReadLogisticsStateFromFirestore_(projectId);
+    } catch (eExist) { existingLl = null; }
+    var baseLegs = (existingLl && existingLl.present) ? (existingLl.legs || []) : null;
+    if (!baseLegs) {
+      var sheetsSeed = verifyDatabaseSchema(true);
+      baseLegs = logisticsLedgerLoadProjectLegObjects_(sheetsSeed, projectId) || [];
+    }
+    var nextLegs = logisticsLedgerApplyLayoutItemsToObjects_(
+      baseLegs, projectId, arranged.ledgerItems, dualLegs, actor
+    );
+    var legsMap = logisticsLedgerLegsMapFromObjects_(nextLegs);
+
     var newUids = {};
     var fixtures = [];
 
@@ -517,7 +545,9 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       }
       obj.clientId = 'gas_truck_' + String(actor || 'system');
       firestoreWriteDocument_(basePath + '/' + docId, obj);
-      fixtures.push(dalPaObjToLiveFixture_(obj));
+      var fix = dalPaObjToLiveFixture_(obj);
+      applyLedgerLegsOntoPaAsset_(fix, legsMap);
+      fixtures.push(fix);
     });
 
     Object.keys(oldUids).forEach(function (uid) {
@@ -543,30 +573,7 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
     });
 
     // R3: warm logistics on Firebase — Sheets unchanged until End Room / checkpoint.
-    var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
     try {
-      var roomUid = '';
-      try {
-        var sheetsIdx = verifyDatabaseSchema(true);
-        var idxRow = dalGetProjectIndexRow_(projectId, sheetsIdx);
-        if (idxRow) {
-          var camp = dalReadCampaignRoom_(idxRow);
-          roomUid = camp.campaignRoomUid || '';
-        }
-      } catch (eRoom) { /* ignore */ }
-
-      var existingLl = null;
-      try {
-        existingLl = dalReadLogisticsStateFromFirestore_(projectId);
-      } catch (eExist) { existingLl = null; }
-      var baseLegs = (existingLl && existingLl.present) ? (existingLl.legs || []) : null;
-      if (!baseLegs) {
-        var sheetsSeed = verifyDatabaseSchema(true);
-        baseLegs = logisticsLedgerLoadProjectLegObjects_(sheetsSeed, projectId) || [];
-      }
-      var nextLegs = logisticsLedgerApplyLayoutItemsToObjects_(
-        baseLegs, projectId, arranged.ledgerItems, dualLegs, actor
-      );
       dalWriteLogisticsStateToFirestore_(projectId, nextLegs, actor, roomUid);
       try {
         firestoreSetLogisticsSessionMeta_(projectId, {
