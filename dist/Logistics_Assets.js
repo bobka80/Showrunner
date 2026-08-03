@@ -291,6 +291,8 @@ function logisticsLedgerItemFromArrangeBox_(paRow, map, leg, box) {
 /**
  * Apply truck layout to a uid→row map. May mint new UIDs when splitting bulk qty>1.
  * Does NOT stamp truck onto PA (M4). Returns { rows, ledgerItems }.
+ * Orphan layout paUids (common: auto-cases not yet on Firebase PA) still emit ledgerItems
+ * so warm Arrange placement is not silently dropped.
  */
 function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map) {
     var paUpdates = {};
@@ -303,10 +305,12 @@ function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map)
     });
     var out = [];
     var ledgerItems = [];
+    var matched = {};
     Object.keys(projectRowsMap).forEach(function (uidKey) {
         var origRow = projectRowsMap[uidKey];
         var uid = String(origRow[map['uid']] || uidKey || '');
         if (uid && paUpdates[uid]) {
+            matched[uid] = true;
             if (paUpdates[uid].length === 1 && parseInt(origRow[map['assigned_quantity']], 10) === 1) {
                 var kept = origRow.slice();
                 out.push(kept);
@@ -323,6 +327,31 @@ function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map)
         } else {
             out.push(origRow);
         }
+    });
+
+    Object.keys(paUpdates).forEach(function (key) {
+        if (matched[key]) return;
+        paUpdates[key].forEach(function (box) {
+            if (!box) return;
+            var item = {
+                assetUid: String(box.assetId || box.assetUid || box.asset_uid || ''),
+                paUid: key,
+                quantity: 1,
+                creator: box.creator || 'System',
+                isAuto: !!(box.isAuto || box.isGenericAuto),
+                isGenericAuto: !!box.isGenericAuto,
+                location: box.location || 'General',
+                formula: box.formula || 'Standalone',
+                legs: {}
+            };
+            if (leg === 'both') {
+                if (box.outbound) item.legs.outbound = box.outbound;
+                if (box.inbound) item.legs.inbound = box.inbound;
+            } else {
+                item.legs[String(leg || 'outbound')] = box;
+            }
+            ledgerItems.push(item);
+        });
     });
     return { rows: out, ledgerItems: ledgerItems };
 }

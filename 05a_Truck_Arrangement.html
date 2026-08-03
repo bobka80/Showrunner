@@ -1469,13 +1469,20 @@ function saveTruckArrangement() {
             let c = allTruckCases.find(x => x.id === cId);
             let targetPaUid = c.paUid || (c.paRef ? c.paRef.uid : null);
             if (c && targetPaUid) {
+                let pref = c.paRef || {};
                 payload.push({
                     paUid: targetPaUid,
+                    assetId: pref.assetId || c.assetId || '',
+                    formula: pref.formula || 'Standalone',
+                    location: pref.location || 'General',
+                    creator: pref.creator || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'),
+                    isAuto: !!(pref.isAuto || pref.isGenericAuto),
+                    isGenericAuto: !!pref.isGenericAuto,
                     truckUid: s.isStaged ? "" : (s.truckUid || ""),
                     truckX: s.x,
                     truckY: s.y,
                     truckZ: zIndex,
-                    isRotated: (s.l < s.w), // Check the live stack footprint. If l < w, it is rotated.
+                    isRotated: (s.l < s.w),
                     isStaged: s.isStaged
                 });
             }
@@ -1484,12 +1491,35 @@ function saveTruckArrangement() {
     
     google.script.run
     .withSuccessHandler(res => {
-        // Replace local PA with server list (truck fields included). Packing explode
-        // left uid-less clones; merge-by-uid could not restore placement after save.
         try {
             var list = (res && res.current) ? res.current : null;
             if (list && list.length) {
+                // Merge: keep local autos missing from fixture-only returns; stamp payload trucks.
+                var byUid = {};
+                list.forEach(function (pa) {
+                    if (pa && pa.uid) byUid[String(pa.uid)] = pa;
+                });
+                (currentProjectAssets || []).forEach(function (pa) {
+                    if (!pa || !pa.uid) return;
+                    var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
+                        ? window.dalPaIsAutoRow_(pa)
+                        : !!(pa.isAuto || pa.isGenericAuto);
+                    if (isAuto && !byUid[String(pa.uid)]) {
+                        list.push(pa);
+                        byUid[String(pa.uid)] = pa;
+                    }
+                });
+                (payload || []).forEach(function (box) {
+                    if (!box || !box.paUid) return;
+                    var pa = byUid[String(box.paUid)];
+                    if (pa && typeof window.dalPaApplyArrangePayloadOntoAsset_ === 'function') {
+                        window.dalPaApplyArrangePayloadOntoAsset_(pa, box, leg);
+                    }
+                });
                 currentProjectAssets = list;
+                if (typeof window.dalProcessPaFormulas_ === 'function') {
+                    window.dalProcessPaFormulas_(currentProjectAssets, { skipExplode: true });
+                }
                 if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
                     window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
                 }

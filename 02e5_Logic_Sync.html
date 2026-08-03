@@ -504,7 +504,13 @@ function recalcAutoContainers() {
                         for (let k = 0; k < take; k++) {
                             let clone = {...recycled, qty: 1};
                             if (k > 0) { 
-                                delete clone.uid; delete clone.truckX; delete clone.truckY; delete clone.truckZ; 
+                                // Extra physical units need fresh identity + blank placement.
+                                delete clone.uid;
+                                delete clone.truckX; delete clone.truckY; delete clone.truckZ;
+                                delete clone.outboundTruckUid; delete clone.outboundX; delete clone.outboundY;
+                                delete clone.outboundZ; delete clone.outboundRotated; delete clone.outboundStaged;
+                                delete clone.inboundTruckUid; delete clone.inboundX; delete clone.inboundY;
+                                delete clone.inboundZ; delete clone.inboundRotated; delete clone.inboundStaged;
                             }
                                 if (typeof window.insertIntoProjectAssets === 'function') window.insertIntoProjectAssets(clone);
                                 else currentProjectAssets.push(clone);

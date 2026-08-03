@@ -451,6 +451,15 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
         if (!fix.uid) fix.uid = String(r.docId || '');
         return fix;
       });
+      // Keep Arrange placement visible on live mirror after delta flushes (ledger SoT).
+      try {
+        var liveLlDelta = null;
+        try { liveLlDelta = dalReadLogisticsStateFromFirestore_(projectId); } catch (eLl0) { liveLlDelta = null; }
+        if (liveLlDelta && liveLlDelta.present && (liveLlDelta.legs || []).length) {
+          var legsMapDelta = logisticsLedgerLegsMapFromObjects_(liveLlDelta.legs || []);
+          fixtures.forEach(function (f) { applyLedgerLegsOntoPaAsset_(f, legsMapDelta); });
+        }
+      } catch (eLl1) { /* leave blank trucks */ }
       var prevSeq = 0;
       try {
         var st = firestoreFetch_('get', basePath + '/state');
@@ -548,6 +557,43 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       var fix = dalPaObjToLiveFixture_(obj);
       applyLedgerLegsOntoPaAsset_(fix, legsMap);
       fixtures.push(fix);
+    });
+
+    // Auto-cases often exist only in the browser. Upsert minimal PA docs so pa_uid overlay
+    // and End Room commit stay aligned with logistics legs just written.
+    (arranged.ledgerItems || []).forEach(function (item) {
+      if (!item) return;
+      var paUid = String(item.paUid || item.pa_uid || '');
+      if (!paUid || newUids[paUid]) return;
+      var assetUid = String(item.assetUid || item.asset_uid || '');
+      if (!assetUid && !item.isAuto) return;
+      var formula = item.formula || 'Standalone';
+      if (item.isGenericAuto && String(formula).indexOf('[GEN_AUTO] ') !== 0) {
+        formula = '[GEN_AUTO] ' + formula;
+      } else if (item.isAuto && String(formula).indexOf('[AUTO] ') !== 0 && String(formula).indexOf('[GEN_AUTO] ') !== 0) {
+        formula = '[AUTO] ' + formula;
+      }
+      var obj = {
+        uid: paUid,
+        project_uid: String(projectId),
+        asset_uid: assetUid,
+        assigned_quantity: item.quantity != null ? item.quantity : 1,
+        location: item.location || 'General',
+        formula: formula,
+        creator: item.creator || actor || 'System',
+        override_dept: '',
+        container_uid: '',
+        scan_status: 'Assigned',
+        writeSeq: 1,
+        clientId: 'gas_truck_auto_' + String(actor || 'system')
+      };
+      try {
+        firestoreWriteDocument_(basePath + '/' + paUid, obj);
+      } catch (eUp) { /* continue — logistics legs still hold placement */ }
+      newUids[paUid] = true;
+      var fixAuto = dalPaObjToLiveFixture_(obj);
+      applyLedgerLegsOntoPaAsset_(fixAuto, legsMap);
+      fixtures.push(fixAuto);
     });
 
     Object.keys(oldUids).forEach(function (uid) {

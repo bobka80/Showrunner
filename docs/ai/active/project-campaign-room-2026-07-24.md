@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Arrangement reopen hotfix @ **GAS v752**. Next preferred after smoke: **Hub checklist UX (Phase B)** or **OK go for R3c**.  
-**Production tip:** see RELEASES.md. Latest: arrange reopen @ **GAS v752**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Arrange save integrity in flight; **campaign exit badge** = batch Arrange + Hub. Next preferred after arrange sticks: **R3e batch ops** (or Hub checklist / R3c).  
+**Production tip:** see RELEASES.md. Latest: arrange isAuto gate @ **GAS v753**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -274,6 +274,27 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 - [x] Button-press semantics; `dalEnsureWarmHubWorkspace_`
 - [x] Ship — **GAS v745**; director smoke still welcome
 
+### R3b.5 — Arrange save integrity (URGENT — in flight)
+
+Director smoke (2026-08-03): cases return to **staging** after Save (board not empty, but **placement does not stick**). Root cause class: auto-packed cases are local-only on live prep → warm Arrange payload `paUid`s often **missing from Firebase PA** → `ledgerItems` empty → no logistics legs → reopen has null `outboundX` → staging.
+
+- [ ] Warm Arrange write ledger legs for **every** payload `paUid` (including autos not yet on Firebase PA)
+- [ ] Upsert minimal auto PA docs on Arrange save so overlay keys stay stable
+- [ ] Client: do **not** wipe local autos when save returns fixture-only `current`
+- [ ] Smoke: pack autos → Arrange onto truck → Save → reopen → still on truck
+
+### R3e — Batch operation commits (campaign **exit badge**)
+
+Director lock (brainstorm 2026-08-03): whole local operations must **not** chat Firebase/GAS one-row-at-a-time.
+
+**Rule:** Edit locally → **one batch commit** → one mirror update. Cuts latency + Google domain API quota.
+
+**Exit criteria (must ship before closing this campaign):**
+
+- [ ] **Truck Arrange save** = logistics-first **batch** (one `logistics/state` write; PA upserts only when qty-split / new auto docs; no per-case serial GET+WRITE storm)
+- [ ] **Logistics Hub** Generate / pack / arrange pipeline = **batch** commits (same doctrine) — Hub is a **big badge** surface for this rule
+- [ ] Standing note in FRAGILE: whole-operation modals batch; live multi-user floor edits stay small touch patches
+
 ### R3c — Expand meta (project identity)
 
 **Why here:** Timeline/sub-events and peers need live identity without Sheets round-trip; checkpoint should publish a complete meta slice.
@@ -359,3 +380,5 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 | 2026-07-31 | **Arrange staging hotfix @ GAS v751** — warm save stamps truck fields onto live fixtures; client mirrors save + hydrates before open when spatial empty. |
 | 2026-07-31 | Smoke still fail: packing explode stripped paUids so save dropped cases; hydrate merge missed UID splits. v752: collapse-before-arrange, replace hydrate, save returns `current`. |
 | 2026-07-31 | **Arrange reopen hotfix @ GAS v752** — packing explode uid strip fixed; Bugbot High (hydrate before autosave) fixed. |
+| 2026-07-31 | **Arrange isAuto gate @ GAS v753** — packing shows auto cases; Arrange now treats isAuto the same and won’t wipe local cases when server hydrate has none. |
+| 2026-08-03 | Director: file **batch-dispatch** as campaign exit badge (Arrange + Hub). Arrange still not persisting (staging after save) — filed **R3b.5** + **R3e**; fix autos→ledger unmatched next. |
