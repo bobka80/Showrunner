@@ -603,7 +603,13 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
 
     writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT_FIRESTORE", projectId, projectId,
       'Saved spatial arrangement for ' + ((layoutData && layoutData.length) || 0) + ' cases on prep fork (ledger warm).');
-    return "Saved Truck Layout";
+    // Return overlaid fixtures so the client can replace packing-exploded memory
+    // (uid-less clones / stale qty groups) instead of reopening into staging.
+    return {
+      success: true,
+      message: 'Saved Truck Layout',
+      current: fixtures
+    };
   });
 }
 

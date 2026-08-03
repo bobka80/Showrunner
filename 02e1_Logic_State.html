@@ -150,7 +150,12 @@ window.explodeProjectAssets = function() {
                 } else {
                     clone.scannedQty = 0;
                 }
-                if (i > 0) delete clone.uid;
+                // Keep first uid; mint fresh uids for siblings (Arrange/save need paUid).
+                if (i > 0) {
+                    clone.uid = (typeof window.dalNewUid_ === 'function')
+                        ? window.dalNewUid_()
+                        : ('pa_' + Date.now().toString(36) + '_' + i + '_' + Math.random().toString(36).slice(2, 8));
+                }
                 exploded.push(clone);
             }
         } else {

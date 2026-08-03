@@ -295,15 +295,18 @@ function logisticsLedgerItemFromArrangeBox_(paRow, map, leg, box) {
 function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map) {
     var paUpdates = {};
     (layoutData || []).forEach(function (item) {
-        if (!paUpdates[item.paUid]) paUpdates[item.paUid] = [];
-        paUpdates[item.paUid].push(item);
+        if (!item) return;
+        var key = String(item.paUid || item.pa_uid || '');
+        if (!key) return;
+        if (!paUpdates[key]) paUpdates[key] = [];
+        paUpdates[key].push(item);
     });
     var out = [];
     var ledgerItems = [];
     Object.keys(projectRowsMap).forEach(function (uidKey) {
         var origRow = projectRowsMap[uidKey];
-        var uid = origRow[map['uid']];
-        if (paUpdates[uid]) {
+        var uid = String(origRow[map['uid']] || uidKey || '');
+        if (uid && paUpdates[uid]) {
             if (paUpdates[uid].length === 1 && parseInt(origRow[map['assigned_quantity']], 10) === 1) {
                 var kept = origRow.slice();
                 out.push(kept);
@@ -396,7 +399,15 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
 
         flushCache();
         writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT", projectId, projectId, `Saved spatial arrangement for ${layoutData.length} cases.`);
-        return "Saved Truck Layout";
+        var refreshed = null;
+        try {
+          refreshed = getProjectAssets(projectId, '', '');
+        } catch (eRef) { refreshed = null; }
+        return {
+          success: true,
+          message: 'Saved Truck Layout',
+          current: (refreshed && refreshed.current) ? refreshed.current : null
+        };
     });
 }
 

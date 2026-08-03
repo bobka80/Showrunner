@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **Five-slice architecture filed 2026-07-31**. Arrangement integrity Phase A @ **GAS v750**. Next preferred after smoke: **Hub checklist UX (Phase B)** or **OK go for R3c**.  
-**Production tip:** see RELEASES.md. Latest room ships: R3b Hub @ **GAS v745**; arrangement integrity @ **GAS v750**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **Five-slice architecture filed 2026-07-31**. Arrangement integrity Phase A @ **GAS v750**; warm-arrange staging hotfix @ **GAS v751**. Next preferred after smoke: **Hub checklist UX (Phase B)** or **OK go for R3c**.  
+**Production tip:** see RELEASES.md. Latest room ships: R3b Hub @ **GAS v745**; arrangement integrity @ **GAS v750**; arrange staging hotfix @ **GAS v751**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -356,3 +356,5 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 | 2026-07-31 | Director: arrangement integrity **before** Hub checklist UX. Phase A: ledger `pa_uid` overlay key + warm empty Sheets fallback + truck open skip forceSync. |
 | 2026-07-31 | **Arrangement integrity Phase A @ GAS v750** — multi-case truck overlay by PA row uid; warm empty no longer blanks Sheets trucks; truck modal skips forceSync when no PA deltas. Smoke → then Hub checklist or R3c. |
 | 2026-07-31 | Smoke fail: save Arrange → reopen → all staging. Cause: live PA fixtures blanked trucks after warm save. Hotfix: stamp legs onto fixtures + local mirror + hydrate-on-open. |
+| 2026-07-31 | **Arrange staging hotfix @ GAS v751** — warm save stamps truck fields onto live fixtures; client mirrors save + hydrates before open when spatial empty. |
+| 2026-07-31 | Smoke still fail: packing explode stripped paUids so save dropped cases; hydrate merge missed UID splits. v752: collapse-before-arrange, replace hydrate, save returns `current`. |

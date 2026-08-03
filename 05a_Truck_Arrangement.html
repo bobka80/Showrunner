@@ -288,51 +288,49 @@ function openTruckArrangementDashboard() {
         alert("⚠️ No cases/containers found in this project. You must pack equipment into cases before arranging trucks.");
         return;
     }
-    
-    if (typeof explodeProjectAssets === 'function') explodeProjectAssets();
+
+    // Packing mode explodes qty>1 and deleted uids on clones — Arrange save then dropped
+    // those cases (no paUid). Always collapse first; boot expands qty into visual cases.
+    if (typeof collapseProjectAssets === 'function') collapseProjectAssets();
     
     let bootLogic = () => {
-        if (window.currentPaMode === 'design' && typeof collapseProjectAssets === 'function') collapseProjectAssets();
         executeTruckArrangementBoot();
     };
 
-    let startBoot = () => {
-        if (typeof window.calculatePaDeltas === 'function' && window.calculatePaDeltas().length > 0) {
-            window.autoSaveAndExecute(bootLogic, false, null, true);
+    let hydrateThenBoot = () => {
+        let projectId = document.getElementById('edit-folder-id')
+            ? document.getElementById('edit-folder-id').value : '';
+        let sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+        let eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
+        if (!projectId || projectId === 'NEW' ||
+            typeof google === 'undefined' || !google.script || !google.script.run) {
+            bootLogic();
             return;
         }
-        // No PA deltas — skip forceSync round-trip (was glacial after warm Hub).
-        bootLogic();
+        google.script.run
+            .withFailureHandler(function () { bootLogic(); })
+            .withSuccessHandler(function (res) {
+                if (res && res.current && res.current.length) {
+                    currentProjectAssets = res.current;
+                    if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
+                        window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
+                    }
+                    window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                    window.paLoadedForProject = projectId;
+                    if (res.overlapping) window.overlappingAllocations = res.overlapping;
+                }
+                bootLogic();
+            })
+            .getProjectAssets(projectId, sDate, eDate);
     };
 
-    // Live fixtures historically blanked truck fields (M4). If memory has no spatial
-    // data, hydrate from getProjectAssets (ledger overlay) before painting Arrange.
-    let leg = window.activeArrangementLeg || 'outbound';
-    let hasAnySpatial = (currentProjectAssets || []).some(pa => {
-        let x = pa[leg + 'X'];
-        return x !== null && x !== undefined && x !== '';
-    });
-    if (hasAnySpatial) {
-        startBoot();
+    // Autosave pending PA deltas BEFORE hydrate replace — otherwise getProjectAssets
+    // would wipe unsaved packing edits and zero calculatePaDeltas().
+    if (typeof window.calculatePaDeltas === 'function' && window.calculatePaDeltas().length > 0) {
+        window.autoSaveAndExecute(hydrateThenBoot, false, null, true);
         return;
     }
-    let projectId = document.getElementById('edit-folder-id')
-        ? document.getElementById('edit-folder-id').value : '';
-    let sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
-    let eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
-    if (!projectId || projectId === 'NEW' || typeof google === 'undefined' || !google.script || !google.script.run) {
-        startBoot();
-        return;
-    }
-    google.script.run
-        .withFailureHandler(function () { startBoot(); })
-        .withSuccessHandler(function (res) {
-            if (res && res.current && typeof window.dalPaMergeTruckFieldsFromList_ === 'function') {
-                window.dalPaMergeTruckFieldsFromList_(currentProjectAssets, res.current);
-            }
-            startBoot();
-        })
-        .getProjectAssets(projectId, sDate, eDate);
+    hydrateThenBoot();
 }
 
 function executeTruckArrangementBoot() {
@@ -1431,18 +1429,28 @@ function saveTruckArrangement() {
     
     google.script.run
     .withSuccessHandler(res => {
-        // Mirror arrangement onto local PA immediately — live fixtures used to blank trucks
-        // so reopen Arrange dumped everything into staging before the next overlay hydrate.
+        // Replace local PA with server list (truck fields included). Packing explode
+        // left uid-less clones; merge-by-uid could not restore placement after save.
         try {
-            (payload || []).forEach(function (box) {
-                if (!box || !box.paUid) return;
-                let pa = (currentProjectAssets || []).find(function (a) { return a && String(a.uid) === String(box.paUid); });
-                if (pa && typeof window.dalPaApplyArrangePayloadOntoAsset_ === 'function') {
-                    window.dalPaApplyArrangePayloadOntoAsset_(pa, box, leg);
+            var list = (res && res.current) ? res.current : null;
+            if (list && list.length) {
+                currentProjectAssets = list;
+                if (typeof window.dalPaNormalizeAssetsOverrideDept_ === 'function') {
+                    window.dalPaNormalizeAssetsOverrideDept_(currentProjectAssets);
                 }
-            });
-            if (window.originalProjectAssets && typeof window.dalPaMergeTruckFieldsFromList_ === 'function') {
-                window.dalPaMergeTruckFieldsFromList_(window.originalProjectAssets, currentProjectAssets);
+                window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                window.paLoadedForProject = projectId;
+            } else {
+                (payload || []).forEach(function (box) {
+                    if (!box || !box.paUid) return;
+                    let pa = (currentProjectAssets || []).find(function (a) { return a && String(a.uid) === String(box.paUid); });
+                    if (pa && typeof window.dalPaApplyArrangePayloadOntoAsset_ === 'function') {
+                        window.dalPaApplyArrangePayloadOntoAsset_(pa, box, leg);
+                    }
+                });
+                if (window.originalProjectAssets && typeof window.dalPaMergeTruckFieldsFromList_ === 'function') {
+                    window.dalPaMergeTruckFieldsFromList_(window.originalProjectAssets, currentProjectAssets);
+                }
             }
         } catch (eLocal) { /* best-effort */ }
         btn.innerText = "SAVED ✓";
