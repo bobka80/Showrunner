@@ -915,16 +915,18 @@ window.headlessAutoArrangeAsync = function(leg, truckIds) {
                             list.forEach(function (pa) {
                                 if (pa && pa.uid) byUid[String(pa.uid)] = pa;
                             });
+                            // Never shrink PA from a thin arrange return — keep any local rows missing.
                             (currentProjectAssets || []).forEach(function (pa) {
                                 if (!pa || !pa.uid) return;
-                                var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
-                                    ? window.dalPaIsAutoRow_(pa)
-                                    : !!(pa.isAuto || pa.isGenericAuto);
-                                if (isAuto && !byUid[String(pa.uid)]) {
+                                if (!byUid[String(pa.uid)]) {
                                     list.push(pa);
                                     byUid[String(pa.uid)] = pa;
                                 }
                             });
+                            if (list.length < (currentProjectAssets || []).length) {
+                                resolve(res);
+                                return;
+                            }
                             (spatialPayload || []).forEach(function (box) {
                                 if (!box || !box.paUid) return;
                                 var pa = byUid[String(box.paUid)];

@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Hub smoke fixes shipping (Auto Arrange autos + warm Timeline join). Next after smoke: **R3c**.  
-**Production tip:** see RELEASES.md. Latest tip: R3e Hub batch @ **GAS v756**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Hub smoke fixes @ **GAS v757**. Next after smoke: **R3c** meta identity.  
+**Production tip:** see RELEASES.md. Latest: Hub smoke @ **GAS v757**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -385,4 +385,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-03 | **R3b.5 @ GAS v754** — unmatched auto `paUid` → ledger legs + upsert auto PA; merge autos on save; delta mirror re-overlays logistics. Smoke → then **R3e batch**. |
 | 2026-08-04 | **R3e Arrange batch @ GAS v755** — placement-only warm save: logistics + assets/state (no per-PA GET/rewrite); structural path writes PA once; open skips hydrate when spatial present. Hub batch still open. |
 | 2026-08-04 | **R3e Hub batch @ GAS v756** — `saveProjectAssetsDeltaFirestore_` list-once + no per-row GET; Hub GENERATE/pack share that path; Arrange already on v755. **R3e exit badge complete** pending smoke → next **R3c**. |
-| 2026-08-04 | Hub smoke fail: Auto Arrange skipped autos; Timeline cold-open while room warm; GENERATE AUTO bars not pushed to UI. Fix: headless uses `paIsTruckArrangeContainer_`; warm Timeline join via `ensureDalWarmHubWorkspace`; GENERATE returns timeline snap. |
+| 2026-08-04 | **Hub smoke @ GAS v757** — Auto Arrange includes autos + full save payload; warm Timeline joins via Hub seed (no cold Opening); GENERATE returns timeline snap for UI. Smoke → then **R3c**. |
+| 2026-08-04 | **PA wipe hotfix** — thin `assets/state` after Hub/arrange wiped prep UI; heal from collection on get; refuse thin gas mirrors; re-list for state rebuild. |

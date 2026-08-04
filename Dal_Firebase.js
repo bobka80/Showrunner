@@ -119,6 +119,23 @@ function dalPaObjToLiveFixture_(obj) {
   var formula = obj.formula || '';
   var isShortage = String(formula).indexOf('[SHORT] ') === 0;
   if (isShortage) formula = formula.substring(8);
+  var isGenericAuto = false;
+  var isAuto = false;
+  if (String(formula).indexOf('[GEN_AUTO] ') === 0) {
+    isGenericAuto = true;
+    isAuto = true;
+    formula = formula.substring(11);
+  } else if (String(formula).indexOf('[AUTO] ') === 0) {
+    isAuto = true;
+    formula = formula.substring(7);
+  } else if (formula === 'Gen-Auto-Container') {
+    isGenericAuto = true;
+    isAuto = true;
+    formula = 'Standalone';
+  } else if (formula === 'Auto-Container') {
+    isAuto = true;
+    formula = 'Standalone';
+  }
   var fix = {
     uid: String(obj.uid || ''),
     assetId: String(obj.asset_uid || ''),
@@ -126,6 +143,8 @@ function dalPaObjToLiveFixture_(obj) {
     location: obj.location || 'General',
     formula: formula,
     isShortage: isShortage,
+    isAuto: isAuto,
+    isGenericAuto: isGenericAuto,
     creator: obj.creator || 'System',
     overrideDept: obj.override_dept || '',
     containerUid: obj.container_uid || '',
@@ -325,12 +344,29 @@ function dalLoadPaProjectRowsFromFirestore_(projectId, header, map) {
 }
 
 function dalFirestoreAssetFromRow_(row, map) {
+  var formula = row[map['formula']] || '';
+  var isShortage = String(formula).indexOf('[SHORT] ') === 0;
+  if (isShortage) formula = formula.substring(8);
+  var isGenericAuto = false;
+  var isAuto = false;
+  if (String(formula).indexOf('[GEN_AUTO] ') === 0) {
+    isGenericAuto = true; isAuto = true; formula = formula.substring(11);
+  } else if (String(formula).indexOf('[AUTO] ') === 0) {
+    isAuto = true; formula = formula.substring(7);
+  } else if (formula === 'Gen-Auto-Container') {
+    isGenericAuto = true; isAuto = true; formula = 'Standalone';
+  } else if (formula === 'Auto-Container') {
+    isAuto = true; formula = 'Standalone';
+  }
   return {
     uid: row[map['uid']],
     assetId: String(row[map['asset_uid']]),
     qty: row[map['assigned_quantity']] || 1,
     location: row[map['location']] || "",
-    formula: row[map['formula']] || "",
+    formula: formula,
+    isShortage: isShortage,
+    isAuto: isAuto,
+    isGenericAuto: isGenericAuto,
     creator: row[map['creator']] || "System",
     overrideDept: map['override_dept'] !== undefined ? (row[map['override_dept']] || "") : "",
     containerUid: row[map['container_uid']] || "",
@@ -355,6 +391,9 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
   return executeWithRetry(function () {
     var hdr = dalGetProjectAssetsHeaderAndMap_();
     var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+    // Heal: if live assets/state was published thin/empty while collection still has rows,
+    // rebuild the mirror so prep UI recovers without END ROOM.
+    try { dalHealPaLiveStateFromCollection_(projectId, hdr, projectRows); } catch (eHeal) { /* non-fatal */ }
     var assets = projectRows.map(function (r) {
       return dalFirestoreAssetFromRow_(r.data, hdr.map);
     });
@@ -398,6 +437,69 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
 
     return getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets);
   }, 3, true);
+}
+
+/**
+ * If assets/state fixture count is far below PA collection count, republish state
+ * from the collection (+ logistics overlay). Recovers Hub/arrange wipe of the live mirror.
+ */
+function dalHealPaLiveStateFromCollection_(projectId, hdr, projectRows) {
+  if (!projectId || !hdr) return;
+  var rows = projectRows;
+  if (!rows) {
+    rows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+  }
+  var collCount = 0;
+  (rows || []).forEach(function (r) {
+    if (!r || !r.data) return;
+    var qty = parseInt(r.data[hdr.map['assigned_quantity']], 10) || 0;
+    if (qty > 0) collCount++;
+  });
+  if (collCount === 0) return;
+
+  var snap = null;
+  try { snap = dalReadPaStateFixtures_(projectId); } catch (e0) { snap = null; }
+  var fixCount = (snap && snap.fixtures && snap.fixtures.length) ? snap.fixtures.length : 0;
+  // Heal when state empty/missing, or clearly thin vs collection (Hub wipe signature).
+  if (fixCount > 0 && fixCount >= Math.max(1, Math.floor(collCount * 0.6))) return;
+
+  var fixtures = [];
+  var legsMap = null;
+  try {
+    var liveLl = dalReadLogisticsStateFromFirestore_(projectId);
+    if (liveLl && liveLl.present && (liveLl.legs || []).length) {
+      legsMap = logisticsLedgerLegsMapFromObjects_(liveLl.legs || []);
+    }
+  } catch (eLl) { legsMap = null; }
+
+  (rows || []).forEach(function (r) {
+    if (!r || !r.data) return;
+    var uid = String(r.docId || r.data[hdr.map['uid']] || '');
+    if (!uid) return;
+    var qty = parseInt(r.data[hdr.map['assigned_quantity']], 10) || 0;
+    if (qty <= 0) return;
+    var obj = dalPaSheetRowToObject_(r.data, hdr.map);
+    obj.writeSeq = Number(r.writeSeq || 0) || 0;
+    var fix = dalPaObjToLiveFixture_(obj);
+    if (!fix.uid) fix.uid = uid;
+    if (legsMap) applyLedgerLegsOntoPaAsset_(fix, legsMap);
+    fixtures.push(fix);
+  });
+  if (!fixtures.length) return;
+
+  var basePath = dalFirestorePaCollection_(projectId);
+  var prevSeq = (snap && snap.writeSeq) ? Number(snap.writeSeq) || 0 : 0;
+  firestoreWriteDocument_(basePath + '/state', {
+    fixturesJson: JSON.stringify(fixtures),
+    writeSeq: prevSeq + 1,
+    clientId: 'gas_heal_pa_state',
+    updatedAt: new Date().toISOString(),
+    updatedBy: 'System'
+  });
+  try {
+    writeToAuditLog('System', 'HEAL', 'PROJECT_ASSETS_FIRESTORE', projectId, projectId,
+      'Rebuilt assets/state from collection (' + fixCount + ' → ' + fixtures.length + ' fixtures).');
+  } catch (eAud) { /* ignore */ }
 }
 
 /**
@@ -458,17 +560,19 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
       classified.rowsToUpdate.length + ' deletes=' + classified.rowsToDelete.length +
       ' appends=' + classified.rowsToAppend.length + ').');
 
-    // Live mirror from in-memory post-delta rows — no second collection list.
+    // Live mirror: ALWAYS re-list collection after writes. In-memory rebuild can under-count
+    // (list truncation / map edge cases) and gas_* state then wipes the prep UI via live sync.
     try {
+      var allRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
       var fixtures = [];
-      (projectRows || []).forEach(function (r) {
+      (allRows || []).forEach(function (r) {
         if (!r || !r.data) return;
         var uid = String(r.docId || r.data[hdr.map['uid']] || '');
-        if (!uid || deleteSet[uid]) return;
+        if (!uid) return;
         var qty = parseInt(r.data[hdr.map['assigned_quantity']], 10) || 0;
         if (qty <= 0) return;
         var obj = dalPaSheetRowToObject_(r.data, hdr.map);
-        obj.writeSeq = Number(seqByDoc[uid] || r.writeSeq || 0) || 0;
+        obj.writeSeq = Number(r.writeSeq || seqByDoc[uid] || 0) || 0;
         var fix = dalPaObjToLiveFixture_(obj);
         if (!fix.uid) fix.uid = uid;
         fixtures.push(fix);
@@ -490,13 +594,19 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
           prevSeq = Number(plain.writeSeq || 0) || 0;
         }
       } catch (eSt) { prevSeq = 0; }
-      firestoreWriteDocument_(basePath + '/state', {
-        fixturesJson: JSON.stringify(fixtures),
-        writeSeq: prevSeq + 1,
-        clientId: 'gas_' + String(actor || 'system'),
-        updatedAt: new Date().toISOString(),
-        updatedBy: actor || 'System'
-      });
+      // Refuse to publish an empty mirror when the collection still has rows (wipe guard).
+      if (fixtures.length === 0 && (allRows || []).length > 0) {
+        writeToAuditLog(actor, "WARN", "PROJECT_ASSETS_FIRESTORE", projectId, projectId,
+          'Skipped empty assets/state write — collection still has ' + allRows.length + ' doc(s).');
+      } else {
+        firestoreWriteDocument_(basePath + '/state', {
+          fixturesJson: JSON.stringify(fixtures),
+          writeSeq: prevSeq + 1,
+          clientId: 'gas_' + String(actor || 'system'),
+          updatedAt: new Date().toISOString(),
+          updatedBy: actor || 'System'
+        });
+      }
     } catch (eState) { /* live clients may seed */ }
     return "Saved Delta";
   });
@@ -646,6 +756,24 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       upsertOrphanAutos_();
     }
 
+    // Rebuild live mirror from full collection after writes (wipe guard — never publish
+    // a partial in-memory fixture list that live sync would apply as the whole PA).
+    fixtures = [];
+    try {
+      var allAfter = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+      (allAfter || []).forEach(function (r) {
+        if (!r || !r.data) return;
+        var docId = String(r.docId || r.data[hdr.map['uid']] || '');
+        if (!docId) return;
+        var qty = parseInt(r.data[hdr.map['assigned_quantity']], 10) || 0;
+        if (qty <= 0) return;
+        var stamped = stampFixtureFromRow_(r.data, docId);
+        fixtures.push(stamped.fix);
+      });
+    } catch (eRelist) {
+      // Fall back to in-memory fixtures already built above.
+    }
+
     var prevSeq = 0;
     try {
       var st = firestoreFetch_('get', basePath + '/state');
@@ -654,13 +782,18 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
         prevSeq = Number(plainSt.writeSeq || 0) || 0;
       }
     } catch (eSt) { prevSeq = 0; }
-    firestoreWriteDocument_(basePath + '/state', {
-      fixturesJson: JSON.stringify(fixtures),
-      writeSeq: prevSeq + 1,
-      clientId: 'gas_truck_' + String(actor || 'system'),
-      updatedAt: new Date().toISOString(),
-      updatedBy: actor || 'System'
-    });
+    if (fixtures.length === 0 && Object.keys(oldUids).length > 0 && !structuralChange) {
+      writeToAuditLog(actor, "WARN", "TRUCK_ARRANGEMENT_FIRESTORE", projectId, projectId,
+        'Skipped empty assets/state write after arrange — refusing UI wipe.');
+    } else {
+      firestoreWriteDocument_(basePath + '/state', {
+        fixturesJson: JSON.stringify(fixtures),
+        writeSeq: prevSeq + 1,
+        clientId: 'gas_truck_' + String(actor || 'system'),
+        updatedAt: new Date().toISOString(),
+        updatedBy: actor || 'System'
+      });
+    }
 
     try {
       dalWriteLogisticsStateToFirestore_(projectId, nextLegs, actor, roomUid);

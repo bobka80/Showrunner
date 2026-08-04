@@ -1983,6 +1983,46 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   // Empty with authority: apply empty (do not seed). Unloaded UI: wait for hydrate.
   if (fixtures.length === 0 && localSeed.length === 0 && !window.paLoadedForProject) return;
 
+  // Wipe guard: gas_* / gas_truck_* mirrors must not shrink a loaded PA list to a thin
+  // subset (Hub/arrange bug). Ignore and wait for heal republish from collection.
+  var localAll = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []) || [];
+  var localCount = localAll.filter(function (pa) { return pa && pa.uid; }).length;
+  var remoteClientLower = remoteClient.toLowerCase();
+  var fromGasMirror = remoteClientLower.indexOf('gas_') === 0 || remoteClientLower.indexOf('gas_truck') === 0 ||
+    remoteClientLower === 'gas_heal_pa_state';
+  if (fromGasMirror && localCount >= 5 && fixtures.length > 0 &&
+      fixtures.length < Math.max(2, Math.floor(localCount * 0.5)) &&
+      remoteClientLower !== 'gas_heal_pa_state') {
+    try {
+      console.warn('dalApplyRemotePaStateDoc_: ignored thin gas mirror', fixtures.length, 'vs local', localCount);
+    } catch (eW) { /* ignore */ }
+    // Kick a heal-capable fetch so server can republish full state.
+    try {
+      var pid = document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '';
+      var sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+      var eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
+      if (pid && pid !== 'NEW' && !window._dalPaThinMirrorHealPending_) {
+        window._dalPaThinMirrorHealPending_ = true;
+        google.script.run
+          .withFailureHandler(function () { window._dalPaThinMirrorHealPending_ = false; })
+          .withSuccessHandler(function (res) {
+            window._dalPaThinMirrorHealPending_ = false;
+            if (!res || !res.current || !res.current.length) return;
+            if (res.current.length < localCount) return;
+            currentProjectAssets = res.current;
+            if (typeof window.dalProcessPaFormulas_ === 'function') {
+              window.dalProcessPaFormulas_(currentProjectAssets, { skipExplode: true });
+            }
+            window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+            window.paLoadedForProject = pid;
+            if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+          })
+          .getProjectAssets(pid, sDate, eDate);
+      }
+    } catch (eHealKick) { window._dalPaThinMirrorHealPending_ = false; }
+    return;
+  }
+
   window.dalApplyRemotePaAssets_(fixtures, false, {
     fromCache: !!snapMeta.fromCache,
     hasPendingWrites: !!snapMeta.hasPendingWrites,
