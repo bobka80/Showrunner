@@ -116,6 +116,7 @@
          <button id="master-timeline-btn" class="btn-outline" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
          <button id="master-assets-btn" class="btn-outline" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
          <button id="master-end-room-btn" class="btn-outline" style="margin:0; border-color:#ef4444; color:#ef4444; display:none;" onclick="closeDalCampaignRoomFromUi_()" title="Publish Project Assets + Timeline to Sheets and close the campaign room">END ROOM</button>
+         <span id="master-checkpoint-cue" style="display:none; font-size:11px; color:#71717a; max-width:220px; line-height:1.3; cursor:pointer;" title="Double-click to publish Sheets now (room stays open)"></span>
       </div>
       <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
@@ -150,12 +151,18 @@ window.peForkPrepActive_ = false;     // Project editor chrome: prep fork on Fir
 window.peForkTimelineActive_ = false; // Project editor chrome: timeline fork on Firebase
 window.peForkRoomActive_ = false;     // Campaign Room R1: warm room on Index / meta
 window.peCampaignRoomJoinFor_ = '';   // Latch — open/join room once per editor entry
+window.peCheckpointLastPub_ = '';     // R4 — last successful Sheets publish ISO
+window.peCheckpointFailAt_ = '';
+window.peCheckpointEscalate_ = false;
+window.peCheckpointBusy_ = false;
+window.peCheckpointTimer_ = null;
 
 /** Paint OPEN TIMELINE / PROJECT ASSETS / END ROOM chrome from fork + presence flags (never disables click). */
 window.paintProjectEditorModuleBtns_ = function() {
   var tlBtn = document.getElementById('master-timeline-btn');
   var paBtn = document.getElementById('master-assets-btn');
   var endRoomBtn = document.getElementById('master-end-room-btn');
+  var cue = document.getElementById('master-checkpoint-cue');
   var occupants = window.timelineOccupants || [];
   var tlFork = !!window.peForkTimelineActive_;
   var paFork = !!window.peForkPrepActive_;
@@ -205,10 +212,141 @@ window.paintProjectEditorModuleBtns_ = function() {
     endRoomBtn.disabled = !!window.dalCampaignRoomClosing_;
   }
 
+  if (typeof window.paintCampaignCheckpointCue_ === 'function') {
+    window.paintCampaignCheckpointCue_();
+  } else if (cue) {
+    cue.style.display = roomWarm ? 'inline' : 'none';
+  }
+
   if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') {
     window.dalPaintCampaignEndBtnLabels_();
   }
 };
+
+window.paintCampaignCheckpointCue_ = function() {
+  var cue = document.getElementById('master-checkpoint-cue');
+  if (!cue) return;
+  var roomWarm = !!window.peForkRoomActive_;
+  if (!roomWarm) {
+    cue.style.display = 'none';
+    cue.textContent = '';
+    return;
+  }
+  cue.style.display = 'inline';
+  var fmt_ = function(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    } catch (e) { return ''; }
+  };
+  if (window.peCheckpointEscalate_ || window.peCheckpointFailAt_) {
+    cue.style.color = '#f87171';
+    var failT = fmt_(window.peCheckpointFailAt_);
+    cue.textContent = failT
+      ? ('Publish failed · ' + failT + ' — retry')
+      : 'Publish lagging — retry';
+    cue.title = 'Sheets publish failed or lagging. Double-click to retry now (room stays open).';
+  } else if (window.peCheckpointLastPub_) {
+    cue.style.color = '#71717a';
+    cue.textContent = 'Last published ' + (fmt_(window.peCheckpointLastPub_) || '…');
+    cue.title = 'Double-click to publish Sheets now (room stays open)';
+  } else {
+    cue.style.color = '#71717a';
+    cue.textContent = 'Not published yet';
+    cue.title = 'Double-click to publish Sheets now (room stays open)';
+  }
+};
+
+window.applyCampaignCheckpointResult_ = function(res) {
+  if (!res) return;
+  if (res.lastPublishedAt) window.peCheckpointLastPub_ = String(res.lastPublishedAt);
+  window.peCheckpointFailAt_ = res.checkpointFailAt ? String(res.checkpointFailAt) : '';
+  window.peCheckpointEscalate_ = !!res.escalate || (res.success === false && !res.skipped);
+  if (typeof window.paintCampaignCheckpointCue_ === 'function') {
+    window.paintCampaignCheckpointCue_();
+  }
+};
+
+window.runDalCampaignCheckpointNow_ = function(opts) {
+  opts = opts || {};
+  var projectId = (document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '') ||
+    (typeof window.dalPresenceProjectId_ === 'function' && window.dalPresenceProjectId_()) || '';
+  if (!projectId || projectId === 'NEW') return;
+  if (!window.peForkRoomActive_) return;
+  if (window.peCheckpointBusy_ || window.dalCampaignRoomClosing_) return;
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+  window.peCheckpointBusy_ = true;
+  var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME) : 'System';
+  google.script.run
+    .withFailureHandler(function(err) {
+      window.peCheckpointBusy_ = false;
+      window.peCheckpointFailAt_ = new Date().toISOString();
+      window.peCheckpointEscalate_ = true;
+      if (typeof window.paintCampaignCheckpointCue_ === 'function') {
+        window.paintCampaignCheckpointCue_();
+      }
+      if (opts.force) {
+        var msg = (err && err.message) ? String(err.message) : String(err || 'Unknown error');
+        try { alert('Checkpoint failed:\n\n' + msg); } catch (eA) { /* ignore */ }
+      }
+    })
+    .withSuccessHandler(function(res) {
+      window.peCheckpointBusy_ = false;
+      if (typeof window.applyCampaignCheckpointResult_ === 'function') {
+        window.applyCampaignCheckpointResult_(res);
+      }
+      if (opts.force && res && res.success === false && !res.skipped) {
+        try {
+          alert('Checkpoint failed on ' + (res.failedSlice || 'slice') + ':\n\n' +
+            String(res.error || 'Unknown error') +
+            '\n\nRoom stayed open — live data is still on Firebase.');
+        } catch (eA2) { /* ignore */ }
+      }
+    })
+    .runDalCampaignCheckpoint(projectId, actor, opts);
+};
+
+window.startDalCampaignCheckpointTimer_ = function() {
+  if (window.peCheckpointTimer_) return;
+  window.peCheckpointTimer_ = setInterval(function() {
+    if (!window.peForkRoomActive_) return;
+    if (window.dalCampaignRoomClosing_) return;
+    if (typeof window.runDalCampaignCheckpointNow_ === 'function') {
+      window.runDalCampaignCheckpointNow_({});
+    }
+  }, 60000);
+};
+
+window.stopDalCampaignCheckpointTimer_ = function() {
+  if (window.peCheckpointTimer_) {
+    try { clearInterval(window.peCheckpointTimer_); } catch (e) { /* ignore */ }
+    window.peCheckpointTimer_ = null;
+  }
+};
+
+(function wireCheckpointCueDblClick_() {
+  function bind_() {
+    var cue = document.getElementById('master-checkpoint-cue');
+    if (!cue || cue._chkBound) return;
+    cue._chkBound = true;
+    cue.addEventListener('dblclick', function() {
+      if (!window.peForkRoomActive_) return;
+      if (!confirm('Publish campaign room to Sheets now?\n\nRoom stays open for peers.')) return;
+      if (typeof window.runDalCampaignCheckpointNow_ === 'function') {
+        window.runDalCampaignCheckpointNow_({ force: true });
+      }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bind_);
+  } else {
+    bind_();
+  }
+})();
 
 window.refreshProjectEditorForkChrome_ = function(projectId) {
   projectId = projectId || activePresenceProject ||
@@ -217,6 +355,9 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
     window.peForkPrepActive_ = false;
     window.peForkTimelineActive_ = false;
     window.peForkRoomActive_ = false;
+    if (typeof window.stopDalCampaignCheckpointTimer_ === 'function') {
+      window.stopDalCampaignCheckpointTimer_();
+    }
     if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
     return;
   }
@@ -238,6 +379,16 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
       window.peForkPrepActive_ = !!prepOpen;
       window.peForkTimelineActive_ = !!tlOpen;
       window.peForkRoomActive_ = !!roomWarm;
+      if (info && info.campaignLastPublishedAt) {
+        window.peCheckpointLastPub_ = String(info.campaignLastPublishedAt);
+      }
+      if (roomWarm) {
+        if (typeof window.startDalCampaignCheckpointTimer_ === 'function') {
+          window.startDalCampaignCheckpointTimer_();
+        }
+      } else if (typeof window.stopDalCampaignCheckpointTimer_ === 'function') {
+        window.stopDalCampaignCheckpointTimer_();
+      }
       if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
       if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') window.dalPaintCampaignEndBtnLabels_();
     })
@@ -262,6 +413,12 @@ window.openOrJoinDalCampaignRoom_ = function(projectId) {
     })
     .withSuccessHandler(function(res) {
       if (res && res.campaignRoomWarm) window.peForkRoomActive_ = true;
+      if (res && res.campaignLastPublishedAt) {
+        window.peCheckpointLastPub_ = String(res.campaignLastPublishedAt);
+      }
+      if (res && res.campaignRoomWarm && typeof window.startDalCampaignCheckpointTimer_ === 'function') {
+        window.startDalCampaignCheckpointTimer_();
+      }
       if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
         window.refreshProjectEditorForkChrome_(projectId);
       }
@@ -421,6 +578,9 @@ function stopPresencePing() {
     window.peForkPrepActive_ = false;
     window.peForkTimelineActive_ = false;
     window.peForkRoomActive_ = false;
+    if (typeof window.stopDalCampaignCheckpointTimer_ === 'function') {
+      try { window.stopDalCampaignCheckpointTimer_(); } catch (eChk) { /* ignore */ }
+    }
     window.timelineOccupants = [];
     window.isTimelineOccupiedBy = null;
     window.paPrepOccupants = [];

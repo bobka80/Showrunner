@@ -495,13 +495,15 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign Room R3b (2026-07-25):** Warm Logistics Hub via `dalEnsureWarmHubWorkspace_` — pack/arrange/generate → Firebase while room warm (**GAS v745**). **Hub smoke 2026-08-04:** headless Auto Arrange must use `paIsTruckArrangeContainer_` (include autos); warm-room Timeline open joins via Hub seed (no cold Opening UX); GENERATE with times returns timeline snap for UI.
 
-**Campaign Room five-slice (2026-07-31 docs):** Room = meta + PA + timeline + ledger + **ops**. Ops lock reopened (`warm_fifth_slice`). Meta identity elevation = **R3c**; ops Firebase path = **R3d**; checkpoint order adds ops; listeners follow active users (**R4b**); idle = single constant (**R5**). Until R3d ships, RFID ops remain Sheets-primary.
+**Campaign Room five-slice (2026-07-31 docs):** Room = meta + PA + timeline + ledger + **ops**. Ops lock reopened (`warm_fifth_slice`). Meta identity elevation = **R3c**; ops Firebase path = **R3d**; checkpoint order adds ops; listeners follow active users (**R4b**); idle = single constant (**R5**).
+
+**Campaign Room R3d (2026-08-04):** RFID `Operations_Ledger` warm slice at `projects/{id}/ops/` (`_meta` + `state` + per-row `r_{uid}`). Warm checkout/check-in batches write Firebase; Sheets lag until finalize / END ROOM / **R4 checkpoint** (`dalCommitOpsFromFirestore_` with `keepLive` on checkpoint). Fail closed on commit (pocket + throw). Cold path unchanged.
+
+**Campaign Room R4 (2026-08-04):** Keep-live ~30m publish (`DAL_CAMPAIGN_CHECKPOINT_MS_`, `runDalCampaignCheckpoint`). Dirty gate via `checkpointSigsJson`; ordered meta→PA→timeline→ledger→ops; **does not** delete Firebase forks or freeze room (END ROOM still tears down). Fail → pocket + cue; escalate if lag ≥ `DAL_CAMPAIGN_CHECKPOINT_ESCALATE_MS_` (~2h). Editor cue `#master-checkpoint-cue` (double-click force). Client timer ~60s while warm.
 
 **Campaign Room R3c (2026-08-04):** `projects/{id}/meta/state` carries project identity (name, client, location, outdoor/inSofia via readinessJson, subEventsJson) while warm. Save & Sync → Firebase when room warm; Sheets + Google Calendar lag until END ROOM (`dalCommitCampaignIdentityFromFirestore_`). `getExistingProjects` overlays live meta for warm rooms (cap 25).
 
 **PA enter thin-snap flash (2026-08-04):** Opening Project Assets briefly showed full list then collapsed to a few rows with System “removed N” — thin `assets/state` (Hub leftover) was force-applied over richer cache/UI via `dalPaPreferLiveFixturesOverCache_` / heal tick. Guard: `dalPaIsThinRemoteVsLocal_` refuses thin remotes; prefer-cache + heal tick + state apply all use it.
-
-**Campaign Room R3d (2026-08-04):** RFID `Operations_Ledger` warm slice at `projects/{id}/ops/` (`_meta` + `state` + per-row `r_{uid}`). Warm checkout/check-in batches write Firebase; Sheets lag until finalize / END ROOM (`dalCommitOpsFromFirestore_`). Fail closed on commit (pocket + throw). Cold path unchanged.
 
 **Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+):** `pagehide`/`beforeunload` writes **localStorage unload flag** (RPCs often die on refresh) + best-effort presence leave + last-leave. **PA window paints immediately**; `dalGatePrepEnterForOrphan_` still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup.
 

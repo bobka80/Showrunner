@@ -628,7 +628,8 @@ function dalWriteLogisticsStateToFirestore_(projectId, legs, actor, roomUid) {
 }
 
 /** Final-publish Firebase logistics → Sheets Logistics_Ledger (top legs for project). */
-function dalCommitLogisticsFromFirestore_(projectId, actor) {
+function dalCommitLogisticsFromFirestore_(projectId, actor, opts) {
+  opts = opts || {};
   var snap;
   try {
     snap = dalReadLogisticsStateFromFirestore_(projectId);
@@ -637,8 +638,10 @@ function dalCommitLogisticsFromFirestore_(projectId, actor) {
     throw eRead;
   }
   if (!snap || !snap.present) {
-    try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/_meta'); } catch (e0) { /* ignore */ }
-    try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state'); } catch (e1) { /* ignore */ }
+    if (!opts.keepLive) {
+      try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/_meta'); } catch (e0) { /* ignore */ }
+      try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state'); } catch (e1) { /* ignore */ }
+    }
     return { committed: false, empty: true };
   }
   var size = dalStateSizeReport_({
@@ -654,12 +657,15 @@ function dalCommitLogisticsFromFirestore_(projectId, actor) {
   logisticsLedgerReplaceProjectTopLegsOnSheet_(sheets, projectId, snap.legs || []);
   try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
   try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
-  try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/_meta'); } catch (eM) { /* ignore */ }
-  try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state'); } catch (eS) { /* ignore */ }
+  if (!opts.keepLive) {
+    try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/_meta'); } catch (eM) { /* ignore */ }
+    try { firestoreDeleteDocument_(dalFirestoreLogisticsCollection_(projectId) + '/state'); } catch (eS) { /* ignore */ }
+  }
   try { flushCache(); } catch (eC) { /* ignore */ }
-  writeToAuditLog(actor || 'System', 'CLOSE', 'LOGISTICS_LEDGER', projectId, projectId,
-    'Committed Campaign Room logistics slice to Sheets (' + (snap.legs || []).length + ' legs).');
-  return { committed: true, count: (snap.legs || []).length };
+  writeToAuditLog(actor || 'System', opts.keepLive ? 'CHECKPOINT' : 'CLOSE', 'LOGISTICS_LEDGER', projectId, projectId,
+    (opts.keepLive ? 'Checkpoint' : 'Committed Campaign Room') +
+    ' logistics slice to Sheets (' + (snap.legs || []).length + ' legs).');
+  return { committed: true, count: (snap.legs || []).length, keepLive: !!opts.keepLive };
 }
 
 // ==========================================
@@ -899,7 +905,8 @@ function dalSnapshotOpsToFirestore_(projectId, roomUid, actor) {
  * END ROOM — publish warm ops rows for active session → Sheets Operations_Ledger.
  * Fail closed: pocket + throw (no fake success / no silent scan loss).
  */
-function dalCommitOpsFromFirestore_(projectId, actor) {
+function dalCommitOpsFromFirestore_(projectId, actor, opts) {
+  opts = opts || {};
   var snap;
   try {
     snap = dalReadOpsStateFromFirestore_(projectId);
@@ -920,8 +927,10 @@ function dalCommitOpsFromFirestore_(projectId, actor) {
     throw eRead;
   }
   if (!snap || !snap.present) {
-    try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/_meta'); } catch (e0) { /* ignore */ }
-    try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/state'); } catch (e1) { /* ignore */ }
+    if (!opts.keepLive) {
+      try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/_meta'); } catch (e0) { /* ignore */ }
+      try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/state'); } catch (e1) { /* ignore */ }
+    }
     return { committed: false, empty: true };
   }
 
@@ -984,21 +993,24 @@ function dalCommitOpsFromFirestore_(projectId, actor) {
     throw eCommit;
   }
 
-  // Clear per-row docs + state/_meta after successful Sheets publish.
-  try {
-    rows.forEach(function (r) {
-      if (!r || !r.uid) return;
-      try {
-        firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/' + dalOpsRowDocId_(r.uid));
-      } catch (eR) { /* ignore */ }
-    });
-  } catch (eList) { /* ignore */ }
-  try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/_meta'); } catch (eM) { /* ignore */ }
-  try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/state'); } catch (eS) { /* ignore */ }
+  // END ROOM clears fork; R4 checkpoint keepLive leaves ops live for peers.
+  if (!opts.keepLive) {
+    try {
+      rows.forEach(function (r) {
+        if (!r || !r.uid) return;
+        try {
+          firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/' + dalOpsRowDocId_(r.uid));
+        } catch (eR) { /* ignore */ }
+      });
+    } catch (eList) { /* ignore */ }
+    try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/_meta'); } catch (eM) { /* ignore */ }
+    try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/state'); } catch (eS) { /* ignore */ }
+  }
 
-  writeToAuditLog(actor || 'System', 'CLOSE', 'OPERATIONS_LEDGER', projectId, projectId,
-    'Committed Campaign Room ops slice to Sheets (' + rows.length + ' rows).');
-  return { committed: true, count: rows.length, sessionUid: sessionUid };
+  writeToAuditLog(actor || 'System', opts.keepLive ? 'CHECKPOINT' : 'CLOSE', 'OPERATIONS_LEDGER', projectId, projectId,
+    (opts.keepLive ? 'Checkpoint' : 'Committed Campaign Room') +
+    ' ops slice to Sheets (' + rows.length + ' rows).');
+  return { committed: true, count: rows.length, sessionUid: sessionUid, keepLive: !!opts.keepLive };
 }
 
 function dalLoadPaProjectRowsFromFirestore_(projectId, header, map) {
@@ -1540,7 +1552,8 @@ function dalSnapshotPaToFirestore_(projectId, sessionUid, actor, roomUid) {
   firestoreSetSessionMeta_(projectId, meta);
 }
 
-function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
+function dalCommitPaFromFirestore_(projectId, sessionUid, actor, opts) {
+  opts = opts || {};
   var hdr = dalGetProjectAssetsHeaderAndMap_();
   var stateSnap = dalReadPaStateFixtures_(projectId);
   var stateFixtures = stateSnap.fixtures || [];
@@ -1719,8 +1732,11 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
     );
   }
 
-  // Verified — only now clear live fork + retry cue. Backup retained with needsRetry=false.
+  // Verified — only now clear live fork + retry cue (unless keepLive checkpoint).
   dalClearCommitRetryNeeded_(projectId, 'prep');
+  if (opts && opts.keepLive) {
+    return { committed: true, keepLive: true, count: (commitObjs || []).length };
+  }
   try {
     firestoreDeleteDocument_('projects/' + projectId + '/assets/_meta');
   } catch (eMeta) { /* continue */ }
@@ -1733,6 +1749,7 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor) {
         { push: false, title: 'DAL fork cleanup warn — assets' });
     } catch (eA5) { /* ignore */ }
   }
+  return { committed: true, keepLive: false, count: (commitObjs || []).length };
 }
 
 /** Commit backup — outside assets/ so fork cleanup cannot wipe the safety net. */
@@ -2093,7 +2110,8 @@ function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode, roo
   );
 }
 
-function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
+function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid, opts) {
+  opts = opts || {};
   var snap = dalReadTimelineStateFromFirestore_(projectId);
   if (!snap) {
     // Empty fork — do not touch Sheets; clear orphan meta/collection only.
@@ -2263,8 +2281,12 @@ function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {
     );
   }
   dalClearCommitRetryNeeded_(projectId, 'timeline');
+  if (opts && opts.keepLive) {
+    return { committed: true, keepLive: true };
+  }
   try { firestoreDeleteDocument_('projects/' + projectId + '/timeline/_meta'); } catch (eMeta) { /* ignore */ }
   try { firestoreDeleteCollection_(dalFirestoreTimelineCollection_(projectId)); } catch (eCol) { /* ignore */ }
+  return { committed: true, keepLive: false };
 }
 
 function getTimelineDataFirestore_(folderId, mode) {

@@ -479,6 +479,12 @@ window.closeDalCampaignRoomFromUi_ = function(opts) {
     window.dalCampaignRoomClosing_ = false;
     window.peForkRoomActive_ = false;
     window.peCampaignRoomJoinFor_ = '';
+    window.peCheckpointLastPub_ = '';
+    window.peCheckpointFailAt_ = '';
+    window.peCheckpointEscalate_ = false;
+    if (typeof window.stopDalCampaignCheckpointTimer_ === 'function') {
+      try { window.stopDalCampaignCheckpointTimer_(); } catch (eStop) { /* ignore */ }
+    }
     window.dalSkipPostCommitReopen_ = true;
     window.dalCampaignRoomEndedSkipReopen_ = true;
 

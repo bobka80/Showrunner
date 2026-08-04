@@ -1356,3 +1356,327 @@ function abandonAllOpenDalLiveForksAPI(actor) {
     count: (cleared || []).length
   };
 }
+
+// ---------------------------------------------------------------------------
+// Campaign Room R4 — ~30m keep-live publish checkpoint (room stays warm)
+// Config lock: checkpoint_interval fixed ~30m.
+// ---------------------------------------------------------------------------
+var DAL_CAMPAIGN_CHECKPOINT_MS_ = 30 * 60 * 1000;
+/** Sheets lag alarm threshold (scales with longer idle windows later). */
+var DAL_CAMPAIGN_CHECKPOINT_ESCALATE_MS_ = 2 * 60 * 60 * 1000;
+
+function dalComputeCampaignCheckpointSigs_(projectId) {
+  var out = { meta: '', pa: '', timeline: '', logistics: '', ops: '' };
+  try {
+    var m = firestoreGetCampaignMeta_(projectId);
+    if (m) {
+      out.meta = String(m.identityWriteSeq || 0) + '|' + String(m.identityUpdatedAt || '');
+    }
+  } catch (e0) { /* ignore */ }
+  try {
+    var pa = dalReadPaStateFixtures_(projectId);
+    if (pa && (pa.writeSeq || (pa.fixtures && pa.fixtures.length))) {
+      out.pa = String(pa.writeSeq || 0) + '|' + String((pa.fixtures || []).length);
+    }
+  } catch (e1) { /* ignore */ }
+  try {
+    var tl = dalReadTimelineStateFromFirestore_(projectId);
+    if (tl) {
+      out.timeline = String(tl.updatedAt || '') + '|' +
+        String((tl.shifts || []).length) + '|' + String((tl.phases || []).length);
+    }
+  } catch (e2) { /* ignore */ }
+  try {
+    var ll = dalReadLogisticsStateFromFirestore_(projectId);
+    if (ll && ll.present) {
+      out.logistics = String(ll.writeSeq || 0) + '|' + String((ll.legs || []).length);
+    }
+  } catch (e3) { /* ignore */ }
+  try {
+    var ops = dalReadOpsStateFromFirestore_(projectId);
+    if (ops && ops.present) {
+      out.ops = String(ops.writeSeq || 0) + '|' + String((ops.rows || []).length);
+    }
+  } catch (e4) { /* ignore */ }
+  return out;
+}
+
+function dalCheckpointSigsDirty_(prev, next) {
+  prev = prev || {};
+  next = next || {};
+  var keys = ['meta', 'pa', 'timeline', 'logistics', 'ops'];
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (String(prev[k] || '') !== String(next[k] || '')) return true;
+  }
+  return false;
+}
+
+function dalLagEscalate_(lastPublishedAt, failAt) {
+  var nowMs = Date.now();
+  var lag = 0;
+  if (lastPublishedAt) {
+    var t = new Date(lastPublishedAt).getTime();
+    if (!isNaN(t)) lag = Math.max(lag, nowMs - t);
+  }
+  if (failAt) {
+    var tf = new Date(failAt).getTime();
+    if (!isNaN(tf)) lag = Math.max(lag, nowMs - tf);
+  }
+  if (!lastPublishedAt && failAt) return true;
+  return lag >= DAL_CAMPAIGN_CHECKPOINT_ESCALATE_MS_;
+}
+
+function dalStampCampaignCheckpointOk_(projectId, actor, sigs, publishedAt) {
+  var meta = {};
+  try { meta = firestoreGetCampaignMeta_(projectId) || {}; } catch (e0) { meta = {}; }
+  meta.lastPublishedAt = publishedAt;
+  meta.checkpointSigsJson = JSON.stringify(sigs || {});
+  meta.checkpointFailAt = '';
+  meta.checkpointFailNote = '';
+  meta.checkpointFailSlice = '';
+  try { firestoreSetCampaignMeta_(projectId, meta); } catch (eSet) { /* Index stamp still below */ }
+  executeWithRetry(function () {
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) return;
+    dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+      campaignLastPublishedAt: publishedAt
+    });
+    try { flushCache(); } catch (eF) { /* ignore */ }
+  });
+}
+
+function dalStampCampaignCheckpointFail_(projectId, actor, slice, errMsg) {
+  var now = new Date().toISOString();
+  var note = String(errMsg || '').substring(0, 400);
+  var meta = {};
+  try { meta = firestoreGetCampaignMeta_(projectId) || {}; } catch (e0) { meta = {}; }
+  meta.checkpointFailAt = now;
+  meta.checkpointFailNote = note;
+  meta.checkpointFailSlice = String(slice || '');
+  try { firestoreSetCampaignMeta_(projectId, meta); } catch (eSet) { /* ignore */ }
+  try {
+    dalPocketFailedWrite_({
+      projectId: projectId,
+      domain: 'campaign_checkpoint',
+      sessionUid: meta.roomUid || '',
+      deltaId: 'checkpoint_' + String(slice || 'unknown'),
+      expectedSig: 'sheets_publish',
+      actualSig: 'failed',
+      mismatchNote: note,
+      actor: actor || 'System',
+      payload: { kind: 'checkpoint', slice: slice }
+    });
+  } catch (eP) { /* ignore */ }
+  try {
+    if (typeof dalAlertFailedWrite_ === 'function') {
+      dalAlertFailedWrite_(projectId, 'campaign_checkpoint', actor,
+        'Checkpoint failed on ' + slice + ' — room stays live. ' + note,
+        { push: false, title: 'DAL checkpoint fail' });
+    }
+  } catch (eA) { /* ignore */ }
+}
+
+/**
+ * google.script.run — R4 ordered keep-live publish (meta → PA → timeline → ledger → ops).
+ * Does not freeze or close the room. opts.force bypasses the 30m + dirty gates.
+ */
+function runDalCampaignCheckpoint(projectId, actor, opts) {
+  return dalPublishCampaignCheckpoint_(projectId, actor, opts || {});
+}
+
+function dalPublishCampaignCheckpoint_(projectId, actor, opts) {
+  opts = opts || {};
+  actor = actor || 'System';
+  if (!projectId || projectId === 'NEW') {
+    return { success: false, skipped: true, reason: 'no_project' };
+  }
+  if (dalLiveForksPaused_()) {
+    return { success: false, skipped: true, reason: 'paused' };
+  }
+  if (!dalCampaignRoomIsWarmForProject_(projectId)) {
+    return { success: false, skipped: true, reason: 'room_not_warm' };
+  }
+
+  var meta = {};
+  try { meta = firestoreGetCampaignMeta_(projectId) || {}; } catch (eM) { meta = {}; }
+  var lastPub = meta.lastPublishedAt || '';
+  if (!lastPub) {
+    try {
+      var sheets0 = verifyDatabaseSchema(true);
+      var row0 = dalGetProjectIndexRow_(projectId, sheets0);
+      if (row0) lastPub = dalReadCampaignRoom_(row0).campaignLastPublishedAt || '';
+    } catch (eI) { /* ignore */ }
+  }
+
+  var nowMs = Date.now();
+  if (!opts.force && lastPub) {
+    var age = nowMs - new Date(lastPub).getTime();
+    if (!isNaN(age) && age >= 0 && age < (DAL_CAMPAIGN_CHECKPOINT_MS_ * 0.9)) {
+      return {
+        success: true,
+        skipped: true,
+        reason: 'too_soon',
+        lastPublishedAt: lastPub,
+        checkpointFailAt: meta.checkpointFailAt || '',
+        escalate: dalLagEscalate_(lastPub, meta.checkpointFailAt)
+      };
+    }
+  }
+
+  var sigs = dalComputeCampaignCheckpointSigs_(projectId);
+  var prevSigs = {};
+  try { prevSigs = JSON.parse(meta.checkpointSigsJson || '{}'); } catch (eS) { prevSigs = {}; }
+  var dirty = !!opts.force || !lastPub || dalCheckpointSigsDirty_(prevSigs, sigs);
+  if (!dirty) {
+    return {
+      success: true,
+      skipped: true,
+      reason: 'clean',
+      lastPublishedAt: lastPub,
+      checkpointFailAt: meta.checkpointFailAt || '',
+      escalate: dalLagEscalate_(lastPub, meta.checkpointFailAt)
+    };
+  }
+
+  var keep = { keepLive: true };
+  var published = [];
+  var failedSlice = '';
+  var failMsg = '';
+
+  try {
+    var idRes = dalCommitCampaignIdentityFromFirestore_(projectId, actor);
+    if (idRes && idRes.committed) published.push('meta');
+    else published.push('meta:empty');
+  } catch (eMeta) {
+    failedSlice = 'meta';
+    failMsg = String(eMeta && eMeta.message ? eMeta.message : eMeta);
+  }
+
+  if (!failedSlice) {
+    try {
+      var paSnap = null;
+      try { paSnap = dalReadPaStateFixtures_(projectId); } catch (ePaR) { paSnap = null; }
+      var hasPa = !!(paSnap && (paSnap.writeSeq || (paSnap.fixtures && paSnap.fixtures.length)));
+      if (hasPa) {
+        var sessionUid = '';
+        try {
+          var sheetsPa = verifyDatabaseSchema(true);
+          var rowPa = dalGetProjectIndexRow_(projectId, sheetsPa);
+          if (rowPa) {
+            sessionUid = dalReadDomainSession_(rowPa, DAL_SESSION_TYPE.PREP).sessionUid || '';
+          }
+        } catch (eUid) { /* ignore */ }
+        dalCommitPaFromFirestore_(projectId, sessionUid, actor, keep);
+        published.push('pa');
+      } else {
+        published.push('pa:skip');
+      }
+    } catch (ePa) {
+      failedSlice = 'pa';
+      failMsg = String(ePa && ePa.message ? ePa.message : ePa);
+    }
+  }
+
+  if (!failedSlice) {
+    try {
+      var tl = null;
+      try { tl = dalReadTimelineStateFromFirestore_(projectId); } catch (eTlR) { tl = null; }
+      var hasTl = !!(tl && (tl.updatedAt || (tl.shifts && tl.shifts.length) || (tl.phases && tl.phases.length)));
+      if (hasTl) {
+        var tlUid = '';
+        try {
+          var sheetsTl = verifyDatabaseSchema(true);
+          var rowTl = dalGetProjectIndexRow_(projectId, sheetsTl);
+          if (rowTl) {
+            tlUid = dalReadDomainSession_(rowTl, DAL_SESSION_TYPE.TIMELINE_COLLAB).sessionUid || '';
+          }
+        } catch (eTlUid) { /* ignore */ }
+        dalCommitTimelineFromFirestore_(projectId, actor, tlUid, keep);
+        published.push('timeline');
+      } else {
+        published.push('timeline:skip');
+      }
+    } catch (eTl) {
+      failedSlice = 'timeline';
+      failMsg = String(eTl && eTl.message ? eTl.message : eTl);
+    }
+  }
+
+  if (!failedSlice) {
+    try {
+      var llRes = dalCommitLogisticsFromFirestore_(projectId, actor, keep);
+      if (llRes && llRes.committed) published.push('logistics');
+      else published.push('logistics:empty');
+    } catch (eLl) {
+      failedSlice = 'logistics';
+      failMsg = String(eLl && eLl.message ? eLl.message : eLl);
+    }
+  }
+
+  if (!failedSlice) {
+    try {
+      var opsRes = dalCommitOpsFromFirestore_(projectId, actor, keep);
+      if (opsRes && opsRes.committed) published.push('ops');
+      else published.push('ops:empty');
+    } catch (eOps) {
+      failedSlice = 'ops';
+      failMsg = String(eOps && eOps.message ? eOps.message : eOps);
+    }
+  }
+
+  if (failedSlice) {
+    try {
+      dalStampCampaignCheckpointFail_(projectId, actor, failedSlice, failMsg);
+    } catch (eFail) { /* ignore */ }
+    try {
+      writeToAuditLog(actor, 'ERROR', 'DAL_CAMPAIGN_CHECKPOINT', projectId, meta.roomUid || '',
+        'Checkpoint failed on ' + failedSlice + ': ' + failMsg);
+    } catch (eAudF) { /* ignore */ }
+    return {
+      success: false,
+      roomLive: true,
+      failedSlice: failedSlice,
+      error: failMsg,
+      published: published,
+      lastPublishedAt: lastPub,
+      checkpointFailAt: new Date().toISOString(),
+      escalate: true
+    };
+  }
+
+  var publishedAt = new Date().toISOString();
+  // Re-read sigs after publish so stamp matches live fork (identity seq may bump only on warm save).
+  var stampSigs = dalComputeCampaignCheckpointSigs_(projectId);
+  try {
+    dalStampCampaignCheckpointOk_(projectId, actor, stampSigs, publishedAt);
+  } catch (eOk) {
+    try {
+      dalStampCampaignCheckpointFail_(projectId, actor, 'stamp', String(eOk && eOk.message ? eOk.message : eOk));
+    } catch (e2) { /* ignore */ }
+    return {
+      success: false,
+      roomLive: true,
+      failedSlice: 'stamp',
+      error: String(eOk && eOk.message ? eOk.message : eOk),
+      published: published,
+      lastPublishedAt: lastPub,
+      escalate: true
+    };
+  }
+
+  try {
+    writeToAuditLog(actor, 'CHECKPOINT', 'DAL_CAMPAIGN_CHECKPOINT', projectId, meta.roomUid || '',
+      'Keep-live publish: ' + published.join(','));
+  } catch (eAud) { /* ignore */ }
+
+  return {
+    success: true,
+    roomLive: true,
+    published: published,
+    lastPublishedAt: publishedAt,
+    checkpointFailAt: '',
+    escalate: false
+  };
+}
