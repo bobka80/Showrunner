@@ -319,7 +319,8 @@ function dalLoadPaProjectRowsFromFirestore_(projectId, header, map) {
   }).map(function (doc) {
     var row = dalPaRowObjectToSheetArray_(doc, header, map);
     var docId = doc._docId || String(doc.uid || '');
-    return { data: row, docId: docId };
+    // writeSeq lives on the Firestore doc, not the Sheets header — keep it for batch deltas (R3e).
+    return { data: row, docId: docId, writeSeq: Number(doc.writeSeq || 0) || 0 };
   });
 }
 
@@ -399,6 +400,11 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
   }, 3, true);
 }
 
+/**
+ * Warm PA delta flush (R3e batch): one collection list, then WRITE/DELETE only for
+ * touched docs — no per-row GET for writeSeq. assets/state rebuilt from in-memory
+ * post-delta rows (no second list). Hub GENERATE + pack autosave share this path.
+ */
 function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
   return executeWithRetry(function () {
     assertActorCanEditProjectAssets(actor);
@@ -407,29 +413,26 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
     }
     var hdr = dalGetProjectAssetsHeaderAndMap_();
     var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+    var seqByDoc = {};
+    (projectRows || []).forEach(function (r) {
+      if (r && r.docId) seqByDoc[String(r.docId)] = Number(r.writeSeq || 0) || 0;
+    });
     var classified = dalApplyPaDeltas_(projectRows, deltas, hdr.map, hdr.colCount, projectId);
     var basePath = dalFirestorePaCollection_(projectId);
+    var deleteSet = {};
 
     classified.rowsToUpdate.forEach(function (r) {
       var docId = r.docId || String(r.data[hdr.map['uid']]);
       var obj = dalPaSheetRowToObject_(r.data, hdr.map);
-      // Preserve/increment writeSeq — full PATCH replace would otherwise wipe host stamps
-      // and reopen client LWW thrash against the live listener.
-      try {
-        var existing = firestoreFetch_('get', basePath + '/' + docId);
-        if (existing && existing.fields) {
-          var plain = firestoreDecodeFields_(existing.fields);
-          obj.writeSeq = (Number(plain.writeSeq || 0) || 0) + 1;
-        } else {
-          obj.writeSeq = 1;
-        }
-      } catch (eSeq) {
-        obj.writeSeq = 1;
-      }
+      // Increment from the list snapshot — avoid N× GET before PATCH (Hub pack storms).
+      obj.writeSeq = (Number(seqByDoc[String(docId)] || 0) || 0) + 1;
       obj.clientId = 'gas_' + String(actor || 'system');
       firestoreWriteDocument_(basePath + '/' + docId, obj);
+      seqByDoc[String(docId)] = obj.writeSeq;
+      r.writeSeq = obj.writeSeq;
     });
     classified.rowsToDelete.forEach(function (docId) {
+      deleteSet[String(docId)] = true;
       firestoreDeleteDocument_(basePath + '/' + docId);
     });
     classified.rowsToAppend.forEach(function (rowData) {
@@ -439,17 +442,36 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
       obj.writeSeq = 1;
       obj.clientId = 'gas_' + String(actor || 'system');
       firestoreWriteDocument_(basePath + '/' + docId, obj);
+      seqByDoc[String(docId)] = 1;
+      // Stamp the in-memory append shell (same rowData ref) — do not push a duplicate.
+      for (var ai = 0; ai < projectRows.length; ai++) {
+        var pr = projectRows[ai];
+        if (!pr || pr.docId || pr.data !== rowData) continue;
+        pr.docId = docId;
+        pr.writeSeq = 1;
+        break;
+      }
     });
 
-    writeToAuditLog(actor, "UPDATE", "PROJECT_ASSETS_FIRESTORE", projectId, projectId, 'Applied ' + deltas.length + ' delta(s) on prep fork.');
-    // Keep live state doc aligned (clients listen to assets/state, not only collection rows).
+    writeToAuditLog(actor, "UPDATE", "PROJECT_ASSETS_FIRESTORE", projectId, projectId,
+      'Batch applied ' + deltas.length + ' delta(s) on prep fork (updates=' +
+      classified.rowsToUpdate.length + ' deletes=' + classified.rowsToDelete.length +
+      ' appends=' + classified.rowsToAppend.length + ').');
+
+    // Live mirror from in-memory post-delta rows — no second collection list.
     try {
-      var allRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
-      var fixtures = (allRows || []).map(function (r) {
+      var fixtures = [];
+      (projectRows || []).forEach(function (r) {
+        if (!r || !r.data) return;
+        var uid = String(r.docId || r.data[hdr.map['uid']] || '');
+        if (!uid || deleteSet[uid]) return;
+        var qty = parseInt(r.data[hdr.map['assigned_quantity']], 10) || 0;
+        if (qty <= 0) return;
         var obj = dalPaSheetRowToObject_(r.data, hdr.map);
+        obj.writeSeq = Number(seqByDoc[uid] || r.writeSeq || 0) || 0;
         var fix = dalPaObjToLiveFixture_(obj);
-        if (!fix.uid) fix.uid = String(r.docId || '');
-        return fix;
+        if (!fix.uid) fix.uid = uid;
+        fixtures.push(fix);
       });
       // Keep Arrange placement visible on live mirror after delta flushes (ledger SoT).
       try {

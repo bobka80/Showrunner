@@ -771,8 +771,9 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
 // @INDEX: PA_ENGINE -> Master Logistics Aggregator
 
 /**
- * Campaign Room R3b — GENERATE LOGISTICS against warm PA + timeline + logistics/state.
- * Sheets Index readiness/timestamp still stamped; durable PA/timeline/ledger via END ROOM.
+ * Campaign Room R3b / R3e — GENERATE LOGISTICS against warm PA + timeline + logistics/state.
+ * PA deltas flush via batch saveProjectAssetsDeltaFirestore_ (no per-row GET). Sheets Index
+ * readiness/timestamp still stamped; durable PA/timeline/ledger via END ROOM.
  */
 function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
   return executeWithRetry(function () {

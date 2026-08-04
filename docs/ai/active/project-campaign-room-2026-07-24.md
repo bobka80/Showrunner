@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — R3e Arrange batch shipping. Campaign exit badge = **R3e** (Arrange done next; Hub batch still open).  
-**Production tip:** see RELEASES.md. Latest tip before this ship: R3b.5 @ **GAS v754**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — R3e Hub batch shipping. Exit badge R3e nearly closed (Arrange @ v755; Hub next).  
+**Production tip:** see RELEASES.md. Latest: R3e Arrange @ **GAS v755**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -292,7 +292,7 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 **Exit criteria (must ship before closing this campaign):**
 
 - [x] **Truck Arrange save** = logistics-first **batch** (placement → one `logistics/state` + `assets/state`; PA docs only on structural uid change / auto orphans; no per-case GET). Open skip hydrate when memory already has spatial.
-- [ ] **Logistics Hub** Generate / pack / arrange pipeline = **batch** commits (same doctrine) — Hub is a **big badge** surface for this rule
+- [x] **Logistics Hub** Generate / pack / arrange pipeline = **batch** commits — Arrange already via `saveTruckArrangementFirestore_`; GENERATE/pack via batch `saveProjectAssetsDeltaFirestore_` (list once, no per-row GET, in-memory `assets/state`)
 - [x] Standing note in FRAGILE: whole-operation modals batch; live multi-user floor edits stay small touch patches
 
 ### R3c — Expand meta (project identity)
@@ -383,4 +383,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-07-31 | **Arrange isAuto gate @ GAS v753** — packing shows auto cases; Arrange now treats isAuto the same and won’t wipe local cases when server hydrate has none. |
 | 2026-08-03 | Director: file **batch-dispatch** as campaign exit badge (Arrange + Hub). Arrange still not persisting (staging after save) — filed **R3b.5** + **R3e**; fix autos→ledger unmatched next. |
 | 2026-08-03 | **R3b.5 @ GAS v754** — unmatched auto `paUid` → ledger legs + upsert auto PA; merge autos on save; delta mirror re-overlays logistics. Smoke → then **R3e batch**. |
-| 2026-08-04 | **R3e Arrange batch** — placement-only warm save: logistics + assets/state (no per-PA GET/rewrite); structural path writes PA once; open skips hydrate when spatial present. Hub batch still open. |
+| 2026-08-04 | **R3e Arrange batch @ GAS v755** — placement-only warm save: logistics + assets/state (no per-PA GET/rewrite); structural path writes PA once; open skips hydrate when spatial present. Hub batch still open. |
+| 2026-08-04 | **R3e Hub batch** — `saveProjectAssetsDeltaFirestore_` list-once + no per-row GET; Hub GENERATE/pack share that path; Arrange already on v755. Exit badge R3e complete pending smoke. |
