@@ -1330,10 +1330,20 @@ window.dalColorTimelineShifts_ = function(list) {
 };
 
 window.dalApplyRemoteTimelineState_ = function(remoteShifts, remotePhases, remoteOverrides, meta) {
-  if (!window.dalTimelineLayerOpen_()) return;
-  if (window.dalTlApplyingRemote) return;
-
   meta = meta || {};
+  // Hub GENERATE often runs while Timeline layer is hidden — stash full payload
+  // (never assign roster alone without load/unload shifts).
+  if (!window.dalTimelineLayerOpen_()) {
+    if (meta.fromHubGenerate || meta.forceStash) {
+      window._hubPendingTimeline_ = {
+        shifts: Array.isArray(remoteShifts) ? remoteShifts : [],
+        phases: Array.isArray(remotePhases) ? remotePhases : [],
+        overrides: remoteOverrides && typeof remoteOverrides === 'object' ? remoteOverrides : {}
+      };
+    }
+    return;
+  }
+  if (window.dalTlApplyingRemote) return;
   if (meta.hasPendingWrites) return;
   if (meta.fromCache && window.dalTlHaveServerSnap_) return;
   if (!meta.fromCache) window.dalTlHaveServerSnap_ = true;

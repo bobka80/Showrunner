@@ -500,12 +500,22 @@ window.executeLogisticsHub = function() {
     };
 
     // Fire single optimized network request
+    let genSafetyTimer = setTimeout(function () {
+        if (btn && btn.disabled && btn.innerText === 'GENERATING...') {
+            btn.innerText = origText;
+            btn.disabled = false;
+            alert('Generate is taking too long (server may still finish). Close Hub, hard refresh, then open Timeline to check load/unload bars.');
+        }
+    }, 55000);
+
     google.script.run
         .withFailureHandler(err => {
+            clearTimeout(genSafetyTimer);
             alert("Generation Failed: " + err.message);
             if (btn) { btn.innerText = origText; btn.disabled = false; }
         })
         .withSuccessHandler(res => {
+            clearTimeout(genSafetyTimer);
             if (btn) { btn.innerText = "SUCCESS ✓"; }
             
             // ✅ SYNC THE TIMESTAMP SO WE DONT GET COLLISION LOCKOUTS
@@ -568,30 +578,36 @@ window.executeLogisticsHub = function() {
                 processFormulas(window.originalProjectAssets);
             }
 
-            // Warm GENERATE wrote AUTO truck bars — push into open Timeline (or stash for next open).
-            if (res.timelineUpdated && res.timeline) {
+            // Warm GENERATE wrote AUTO truck load/unload shifts — install full payload only
+            // (never set roster assigned alone; that showed trucks with empty strips).
+            if (res.timelineUpdated && res.timeline && Array.isArray(res.timeline.shifts)) {
                 try {
-                    if (typeof window.dalApplyRemoteTimelineState_ === 'function' &&
-                        (window.dalTimelineSessionOpen || window.dalTlOpeningUi_)) {
+                    window._hubPendingTimeline_ = {
+                        shifts: res.timeline.shifts || [],
+                        phases: res.timeline.phases || [],
+                        overrides: res.timeline.overrides || {}
+                    };
+                    if (typeof window.dalTimelineLayerOpen_ === 'function' && window.dalTimelineLayerOpen_() &&
+                        typeof window.dalTlInstallMergedLocal_ === 'function') {
+                        var pendingNow = window._hubPendingTimeline_;
+                        window._hubPendingTimeline_ = null;
+                        window.dalTlInstallMergedLocal_({
+                            shifts: pendingNow.shifts || [],
+                            phases: pendingNow.phases || [],
+                            overrides: pendingNow.overrides || {}
+                        }, { forceRebuild: true });
+                        if (typeof window.dalTlSetSyncBase_ === 'function') {
+                            window.dalTlSetSyncBase_(pendingNow);
+                        }
+                    } else if (typeof window.dalApplyRemoteTimelineState_ === 'function') {
                         window.dalApplyRemoteTimelineState_(
                             res.timeline.shifts || [],
                             res.timeline.phases || [],
                             res.timeline.overrides || {},
                             { fromHubGenerate: true }
                         );
-                    } else if (Array.isArray(res.timeline.shifts)) {
-                        window._hubPendingTimeline_ = res.timeline;
                     }
-                    if (typeof globalAssignedArr !== 'undefined' && Array.isArray(res.timeline.assigned)) {
-                        globalAssignedArr = res.timeline.assigned.slice();
-                    }
-                    if (typeof activeShifts !== 'undefined' && Array.isArray(res.timeline.shifts)) {
-                        // Only hydrate local canvas if timeline layer already has data structures.
-                        if (window.dalTimelineSessionOpen && typeof window.dalApplyRemoteTimelineState_ !== 'function') {
-                            activeShifts = res.timeline.shifts.slice();
-                        }
-                    }
-                } catch (eTlApply) { /* non-fatal */ }
+                } catch (eTlApply) { /* pending kept for Timeline open */ }
             }
             if (generateTimes && res.warm && !(res.autoShiftCount > 0)) {
                 console.warn('Hub GENERATE: times on but no AUTO shifts returned');

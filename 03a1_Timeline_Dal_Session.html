@@ -146,16 +146,31 @@ function dalTimelineCollabStarted_(joined, opts) {
     window.startDalTimelineStateSync_(projectId);
   }
   // Hub GENERATE may have written AUTO truck bars before Timeline UI joined.
-  if (window._hubPendingTimeline_ && typeof window.dalApplyRemoteTimelineState_ === 'function') {
+  if (window._hubPendingTimeline_) {
     try {
       var pending = window._hubPendingTimeline_;
       window._hubPendingTimeline_ = null;
-      window.dalApplyRemoteTimelineState_(
-        pending.shifts || [],
-        pending.phases || [],
-        pending.overrides || {},
-        { fromHubGenerate: true }
-      );
+      if (typeof window.dalTlInstallMergedLocal_ === 'function') {
+        window.dalTlInstallMergedLocal_({
+          shifts: pending.shifts || [],
+          phases: pending.phases || [],
+          overrides: pending.overrides || {}
+        }, { forceRebuild: true });
+        if (typeof window.dalTlSetSyncBase_ === 'function') {
+          window.dalTlSetSyncBase_({
+            shifts: pending.shifts || [],
+            phases: pending.phases || [],
+            overrides: pending.overrides || {}
+          });
+        }
+      } else if (typeof window.dalApplyRemoteTimelineState_ === 'function') {
+        window.dalApplyRemoteTimelineState_(
+          pending.shifts || [],
+          pending.phases || [],
+          pending.overrides || {},
+          { fromHubGenerate: true }
+        );
+      }
     } catch (ePend) { window._hubPendingTimeline_ = null; }
   }
   if (!joined) {

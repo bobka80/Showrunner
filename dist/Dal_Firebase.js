@@ -387,13 +387,16 @@ function dalFirestoreAssetFromRow_(row, map) {
   };
 }
 
-function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr) {
+function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr, opts) {
+  opts = opts || {};
   return executeWithRetry(function () {
     var hdr = dalGetProjectAssetsHeaderAndMap_();
     var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
     // Heal: if live assets/state was published thin/empty while collection still has rows,
     // rebuild the mirror so prep UI recovers without END ROOM.
-    try { dalHealPaLiveStateFromCollection_(projectId, hdr, projectRows); } catch (eHeal) { /* non-fatal */ }
+    if (!opts.skipHeal) {
+      try { dalHealPaLiveStateFromCollection_(projectId, hdr, projectRows); } catch (eHeal) { /* non-fatal */ }
+    }
     var assets = projectRows.map(function (r) {
       return dalFirestoreAssetFromRow_(r.data, hdr.map);
     });

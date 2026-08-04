@@ -774,14 +774,16 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
  * Campaign Room R3b / R3e — GENERATE LOGISTICS against warm PA + timeline + logistics/state.
  * PA deltas flush via batch saveProjectAssetsDeltaFirestore_ (no per-row GET). Sheets Index
  * readiness/timestamp still stamped; durable PA/timeline/ledger via END ROOM.
+ * opts.alreadyWarm: skip second dalEnsureWarmHubWorkspace_ when API already seeded.
  */
-function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
+function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor, opts) {
   return executeWithRetry(function () {
     assertActorCanEditProjectAssets(actor || 'System UI');
     logData = logData || {};
+    opts = opts || {};
     actor = actor || 'System UI';
     var needTl = !!logData.generateTimes;
-    if (typeof dalEnsureWarmHubWorkspace_ === 'function') {
+    if (!opts.alreadyWarm && typeof dalEnsureWarmHubWorkspace_ === 'function') {
       dalEnsureWarmHubWorkspace_(projectId, actor, { needTimeline: needTl });
     }
     if (needTl) assertActorCanEditTimeline(actor);
@@ -812,6 +814,7 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
 
     var changeMsgs = [];
     var autoCount = 0;
+    var tlSnap = null;
     if (needTl) {
       var tl = getTimelineDataFirestore_(projectId, 'main');
       if (!tl) tl = getTimelineDataSheets_(projectId, 'main');
@@ -820,11 +823,13 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
       });
       var tAssigned = (tl.assigned || []).slice();
       var oldShiftIds = (tl.shifts || []).map(function (s) { return s && s.id; }).filter(Boolean);
+      var tPhases = tl.phases || [];
+      var tOverrides = tl.overrides || {};
 
       (logData.outTrucks || []).forEach(function (tUid, idx) {
         if (tAssigned.indexOf(tUid) < 0) tAssigned.push(tUid);
-        var loadTime = logData.outStartHr;
-        var unloadTime = logData.outStartHr + logData.outDur;
+        var loadTime = Number(logData.outStartHr) || 0;
+        var unloadTime = loadTime + (Number(logData.outDur) || 1);
         tShifts.push({
           id: 's_' + Date.now() + '_L' + idx + Math.random().toString(36).substr(2, 5),
           user_uid: tUid, email: tUid, start: loadTime, duration: 2,
@@ -840,8 +845,8 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
       });
       (logData.inTrucks || []).forEach(function (tUid, idx) {
         if (tAssigned.indexOf(tUid) < 0) tAssigned.push(tUid);
-        var loadTimeIn = logData.inStartHr;
-        var unloadTimeIn = logData.inStartHr + logData.inDur;
+        var loadTimeIn = Number(logData.inStartHr) || 0;
+        var unloadTimeIn = loadTimeIn + (Number(logData.inDur) || 1);
         tShifts.push({
           id: 's_' + Date.now() + '_IL' + idx + Math.random().toString(36).substr(2, 5),
           user_uid: tUid, email: tUid, start: loadTimeIn, duration: 2,
@@ -857,7 +862,7 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
       });
 
       // replaceAll so removed AUTO notes do not linger via patch-merge
-      dalWriteTimelineStateToFirestore_(projectId, 'main', tShifts, tl.phases || [], tl.overrides || {}, actor, true);
+      dalWriteTimelineStateToFirestore_(projectId, 'main', tShifts, tPhases, tOverrides, actor, true);
 
       var newShiftIds = tShifts.map(function (s) { return s.id; });
       var addedShifts = newShiftIds.filter(function (id) { return oldShiftIds.indexOf(id) < 0; }).length;
@@ -866,11 +871,16 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
       if (addedShifts > 0) changeMsgs.push('Added ' + addedShifts + ' shift(s)');
       if (deletedShifts > 0) changeMsgs.push('Deleted ' + deletedShifts + ' shift(s)');
       if (keptShifts > 0) changeMsgs.push('Updated ' + keptShifts + ' shift(s)');
-      var autoCount = (tShifts || []).filter(function (s) {
+      autoCount = (tShifts || []).filter(function (s) {
         return s && (s.note === '⚠️ AUTO-OUTBOUND' || s.note === '⚠️ AUTO-INBOUND');
       }).length;
-    } else {
-      autoCount = 0;
+      // Return the just-written payload — skip a second Firestore timeline read (timeout budget).
+      tlSnap = {
+        shifts: tShifts,
+        phases: tPhases,
+        overrides: tOverrides,
+        assigned: tAssigned.slice()
+      };
     }
 
     // Stamp clocks on warm logistics legs (Sheets lag until END ROOM).
@@ -899,20 +909,18 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
 
     var deltaPayload = changeMsgs.join(' | ') || 'Warm hub generate (no timeline clock changes).';
     writeToAuditLog(actor, 'UPDATE', 'LOGISTICS_HUB_FIRESTORE', projectId, projectId,
-      'Logistics Generated (warm). ' + (deltas ? deltas.length : 0) + ' Asset Deltas. ' + deltaPayload);
+      'Logistics Generated (warm). ' + (deltas ? deltas.length : 0) + ' Asset Deltas. ' +
+      deltaPayload + ' autoShifts=' + autoCount);
 
-    var finalAssets = getProjectAssetsFirestore_(projectId, logData.sDateStr, logData.eDateStr);
-    var tlSnap = null;
-    if (needTl) {
-      try { tlSnap = getTimelineDataFirestore_(projectId, 'main'); } catch (eTl) { tlSnap = null; }
-    }
+    // skipHeal: GENERATE already touched PA; heal would re-list+write and risk client timeout.
+    var finalAssets = getProjectAssetsFirestore_(projectId, logData.sDateStr, logData.eDateStr, { skipHeal: true });
     return {
       success: true,
       assets: finalAssets,
       timestamp: newTimestamp,
       warm: true,
       timelineUpdated: !!needTl,
-      autoShiftCount: typeof autoCount === 'number' ? autoCount : 0,
+      autoShiftCount: autoCount,
       timeline: tlSnap
     };
   });
@@ -933,7 +941,7 @@ function generateLogisticsPayloadAPI(projectId, deltas, logData, actor = "System
       ens = null;
     }
     if (ens && ens.warm) {
-      return generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor);
+      return generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor, { alreadyWarm: true });
     }
     if (typeof dalCampaignRoomIsWarmForProject_ === 'function' && dalCampaignRoomIsWarmForProject_(projectId)) {
       throw new Error('WARM_HUB_SEED_FAILED: Campaign Room is warm but Hub workspace could not open — retry or End Room. Sheets generate blocked.');
