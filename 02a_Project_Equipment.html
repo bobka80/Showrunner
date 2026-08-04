@@ -314,6 +314,19 @@ function openProjectAssetsModal() {
 /** After orphan gate clears (no reclaim): start watcher + auto-prep. Reclaim path skips this. */
 window.openProjectAssetsModalFinishLiveJoin_ = function(projectId) {
     if (!projectId || projectId === 'NEW') return;
+    // Warm re-enter must not inherit a sticky Saving/Opening freeze from another project.
+    if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_()) {
+      window.dalPrepCommittingWait_ = false;
+      window.dalPrepClosingUi_ = false;
+      window.dalPrepClosing = false;
+      if (typeof window.dalPaApplyOpeningFreeze_ === 'function') {
+        try { window.dalPaApplyOpeningFreeze_(false); } catch (eFz) { /* ignore */ }
+      }
+      try {
+        var ov = document.getElementById('project-assets-modal-overlay');
+        if (ov) ov.style.cursor = '';
+      } catch (eCur) { /* ignore */ }
+    }
     if (typeof startDalPaSessionWatcher === 'function') startDalPaSessionWatcher(projectId);
     if (typeof window.maybeAutoOpenDalPrep_ === 'function') window.maybeAutoOpenDalPrep_();
     if (typeof window.dalRefreshCommitRetryCue_ === 'function') window.dalRefreshCommitRetryCue_(projectId);

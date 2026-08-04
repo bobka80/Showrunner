@@ -573,6 +573,19 @@ function startPresencePing(projectId) {
 }
 
 function stopPresencePing() {
+    // Soft-leave modules while room chrome is still warm — avoid last-leave Sheets commit races.
+    var leavePid = (typeof activePresenceProject !== 'undefined' && activePresenceProject)
+      ? String(activePresenceProject) : '';
+    if (leavePid && (window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_)) {
+      if (typeof window.dalSoftLeavePrepKeepRoom_ === 'function') {
+        try { window.dalSoftLeavePrepKeepRoom_(leavePid); } catch (eSoftP) { /* ignore */ }
+      }
+    }
+    if (leavePid && (window.dalTimelineSessionOpen || window.dalTlOpeningUi_)) {
+      if (typeof window.dalSoftLeaveTimelineKeepRoom_ === 'function') {
+        try { window.dalSoftLeaveTimelineKeepRoom_(leavePid); } catch (eSoftT) { /* ignore */ }
+      }
+    }
     // R4b: leave project → drop PA/TL Firebase listeners; room may stay warm with zero listeners.
     if (typeof window.dalDetachCampaignLiveListeners_ === 'function') {
       try { window.dalDetachCampaignLiveListeners_({ clearChrome: true }); } catch (eDet) { /* ignore */ }
@@ -925,6 +938,20 @@ window.cancelProjectEditor = function() {
     }
     window.isProjectDirty = false;
     window.activeProjectContext = null;
+
+    // Close Project Assets shell before clearing presence/warm chrome (avoid stuck SYNC freeze).
+    try {
+      var paOv = document.getElementById('project-assets-modal-overlay');
+      if (paOv && paOv.style.display === 'flex') {
+        if (typeof window.dalSoftLeavePrepKeepRoom_ === 'function') {
+          var softPid = (typeof window.dalPresenceProjectId_ === 'function' && window.dalPresenceProjectId_()) ||
+            (document.getElementById('edit-folder-id') ? document.getElementById('edit-folder-id').value : '');
+          if (softPid && softPid !== 'NEW') window.dalSoftLeavePrepKeepRoom_(softPid);
+        }
+        paOv.style.display = 'none';
+        paOv.style.cursor = '';
+      }
+    } catch (ePa) { /* ignore */ }
     
     document.getElementById('edit-folder-id').value = '';
     document.getElementById('edit-proj-version').value = '';

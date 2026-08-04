@@ -501,7 +501,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign Room R4 (2026-08-04):** Keep-live ~30m publish (`DAL_CAMPAIGN_CHECKPOINT_MS_`, `runDalCampaignCheckpoint`). Dirty gate via `checkpointSigsJson`; ordered meta→PA→timeline→ledger→ops; **does not** delete Firebase forks or freeze room (END ROOM still tears down). Fail → pocket + cue; escalate if lag ≥ `DAL_CAMPAIGN_CHECKPOINT_ESCALATE_MS_` (~2h). Editor cue `#master-checkpoint-cue` (double-click force). Client timer ~60s while warm.
 
-**Campaign Room R4b (2026-08-04):** Listeners follow the active user. `dalDetachCampaignLiveListeners_` on leave-project (`stopPresencePing` / CANCEL / switch project) and END ROOM. Soft leave PA now stops session watcher (parity with timeline). Room may stay warm with **zero** client listeners. Meta/logistics/ops remain GAS one-shot (no client `onSnapshot` yet).
+**Campaign Room R4b (2026-08-04):** Listeners follow the active user. `dalDetachCampaignLiveListeners_` on leave-project (`stopPresencePing` / CANCEL / switch project) and END ROOM. Soft leave PA now stops session watcher (parity with timeline). Room may stay warm with **zero** client listeners. Meta/logistics/ops remain GAS one-shot (no client `onSnapshot` yet). **Hotfix:** leave/switch must clear sticky Opening/Saving freeze + wait cursor so re-entering a warm project does not lock edits.
 
 **Campaign Room R3c (2026-08-04):** `projects/{id}/meta/state` carries project identity (name, client, location, outdoor/inSofia via readinessJson, subEventsJson) while warm. Save & Sync → Firebase when room warm; Sheets + Google Calendar lag until END ROOM (`dalCommitCampaignIdentityFromFirestore_`). `getExistingProjects` overlays live meta for warm rooms (cap 25).
 

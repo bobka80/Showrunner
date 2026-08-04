@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R4b shipping**. Next after smoke: **R5**.  
-**Production tip:** see RELEASES.md. Latest in-progress: R4b listeners-follow-user. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R4b @ GAS v765**. Next after smoke: **R5**.  
+**Production tip:** see RELEASES.md. Latest: R4b listeners-follow-user @ **GAS v765**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -334,7 +334,7 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 - [x] On enter project / warm join: subscribe to that room’s needed slices
 - [x] On leave project: unsubscribe (do not linger on warm-but-empty rooms)
 - [x] Room may stay warm with zero listeners
-- [ ] Ship + smoke: switch projects → old listeners gone; Firebase read cost tracks presence, not idle length
+- [x] Ship + smoke: switch projects → old listeners gone; Firebase read cost tracks presence, not idle length — **shipped @ v765**; smoke pending
 
 ### R5 — Idle close + Exit polish
 
@@ -396,3 +396,4 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | Director unable to scan — R3d smoke deferred; continue **R4**. |
 | 2026-08-04 | **R4 @ GAS v764** — keep-live ~30m checkpoint (`runDalCampaignCheckpoint`); dirty gate + signatures; ordered five-slice publish; editor “Last published…” cue (dbl-click force). |
 | 2026-08-04 | **R4b** — listeners follow user: detach PA/TL on leave-project / switch; soft leave PA stops session watcher; room may warm with zero listeners. |
+| 2026-08-04 | **R4b @ GAS v765** — `dalDetachCampaignLiveListeners_` on CANCEL / switch / END ROOM; soft leave PA watcher parity. |

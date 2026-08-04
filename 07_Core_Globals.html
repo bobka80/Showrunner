@@ -391,6 +391,37 @@ window.dalCampaignRoomIsWarm_ = function(info) {
  */
 window.dalDetachCampaignLiveListeners_ = function(opts) {
   opts = opts || {};
+  // Drop sticky Opening/Saving freezes from the previous project — must not block the next enter.
+  window.dalPrepCommittingWait_ = false;
+  window.dalPrepClosingUi_ = false;
+  window.dalPrepClosing = false;
+  window.dalPrepOpeningUi_ = false;
+  window.dalPrepOpeningPeerFrozen_ = false;
+  window.dalPrepOpeningIsStarter_ = false;
+  window.dalPrepOpeningWasStarter_ = false;
+  window.dalPrepOpeningFinishInFlight_ = false;
+  window.dalPrepPostCommitReenter_ = false;
+  window.dalPrepAutoStartPending_ = false;
+  window.dalPrepOrphanEnterPending_ = false;
+  window.dalTlCommittingWait_ = false;
+  window.dalTlClosingUi_ = false;
+  window.dalTlOpeningUi_ = false;
+  if (typeof window.dalClearPrepOpeningHang_ === 'function') {
+    try { window.dalClearPrepOpeningHang_(); } catch (eHang) { /* ignore */ }
+  }
+  if (typeof window.dalPaApplyOpeningFreeze_ === 'function') {
+    try { window.dalPaApplyOpeningFreeze_(false); } catch (eFz) { /* ignore */ }
+  } else if (typeof window.dalPaApplySyncBlockedUi_ === 'function') {
+    try { window.dalPaApplySyncBlockedUi_(false); } catch (eBl) { /* ignore */ }
+  }
+  try {
+    var paOv = document.getElementById('project-assets-modal-overlay');
+    if (paOv) paOv.style.cursor = '';
+  } catch (eCur) { /* ignore */ }
+  try {
+    if (document.body && document.body.style.cursor === 'wait') document.body.style.cursor = '';
+  } catch (eBody) { /* ignore */ }
+
   if (typeof window.stopDalPaSessionWatcher === 'function') {
     try { window.stopDalPaSessionWatcher({ clearLatch: true }); } catch (e0) { /* ignore */ }
   } else if (typeof window.stopDalPaLiveSync_ === 'function') {
@@ -413,6 +444,9 @@ window.dalDetachCampaignLiveListeners_ = function(opts) {
     window.peForkPrepActive_ = false;
     window.peForkTimelineActive_ = false;
   }
+  if (typeof window.dalUpdateRemotePendingBanner_ === 'function') {
+    try { window.dalUpdateRemotePendingBanner_(); } catch (eBan) { /* ignore */ }
+  }
 };
 
 /** Soft leave PA while room stays warm — detach PA watchers; no Sheets commit. */
@@ -420,6 +454,19 @@ window.dalSoftLeavePrepKeepRoom_ = function(projectId) {
   projectId = projectId || (typeof window.dalPresenceProjectId_ === 'function'
     ? window.dalPresenceProjectId_() : '');
   window.activePresenceModule = 'main';
+  // Soft leave is not a Sheets commit — never leave Saving/Opening freeze latched.
+  window.dalPrepCommittingWait_ = false;
+  window.dalPrepClosingUi_ = false;
+  window.dalPrepClosing = false;
+  window.dalPrepOpeningUi_ = false;
+  window.dalPrepOpeningPeerFrozen_ = false;
+  if (typeof window.dalPaApplyOpeningFreeze_ === 'function') {
+    try { window.dalPaApplyOpeningFreeze_(false); } catch (eFz) { /* ignore */ }
+  }
+  try {
+    var paOv = document.getElementById('project-assets-modal-overlay');
+    if (paOv) paOv.style.cursor = '';
+  } catch (eCur) { /* ignore */ }
   if (typeof window.stopDalPaSessionWatcher === 'function') {
     try { window.stopDalPaSessionWatcher({ clearLatch: true }); } catch (e0) { /* ignore */ }
   } else if (typeof window.stopDalPaLiveSync_ === 'function') {
@@ -437,6 +484,12 @@ window.dalSoftLeaveTimelineKeepRoom_ = function(projectId) {
   projectId = projectId || (typeof window.dalPresenceProjectId_ === 'function'
     ? window.dalPresenceProjectId_() : '');
   window.activePresenceModule = 'main';
+  window.dalTlCommittingWait_ = false;
+  window.dalTlClosingUi_ = false;
+  window.dalTlOpeningUi_ = false;
+  if (typeof window.dalApplyTlCommittingUi_ === 'function') {
+    try { window.dalApplyTlCommittingUi_(false); } catch (eTl) { /* ignore */ }
+  }
   if (typeof window.stopDalTimelineSessionWatcher === 'function') {
     try { window.stopDalTimelineSessionWatcher(); } catch (e0) { /* ignore */ }
   }
