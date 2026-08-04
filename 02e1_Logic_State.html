@@ -88,11 +88,16 @@ window.dalPaResolveItemDeptUid_ = function(pa) {
     return String(fallback || 'Unassigned');
 };
 
-/** Prefer live prep fixtures over stale local PA cache (overrideDept survives refresh). */
+/** Prefer live prep fixtures over stale local PA cache (overrideDept survives refresh).
+ * Never replace a rich cache/UI list with a thin live snap (Hub wipe flash). */
 window.dalPaPreferLiveFixturesOverCache_ = function(projectId, cachedCurrent) {
     if (!(window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore')) return cachedCurrent || [];
     var live = window.dalPaLastServerFixtures_;
     if (!live || !live.length) return cachedCurrent || [];
+    if (typeof window.dalPaIsThinRemoteVsLocal_ === 'function' &&
+        window.dalPaIsThinRemoteVsLocal_(live, cachedCurrent)) {
+      return cachedCurrent || [];
+    }
     if (typeof window.dalPaFixturesSig_ !== 'function') return JSON.parse(JSON.stringify(live));
     var cacheSig = window.dalPaFixturesSig_(cachedCurrent || []);
     var liveSig = window.dalPaFixturesSig_(live);

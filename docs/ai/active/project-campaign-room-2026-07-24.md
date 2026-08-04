@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — R3c meta identity @ shipping. Next after smoke: **R3d**.  
-**Production tip:** see RELEASES.md. Latest before this ship: Timeline AUTO / rest skip @ **GAS v760**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R3c @ GAS v761**. Next after smoke: **R3d**.  
+**Production tip:** see RELEASES.md. Latest: R3c meta identity @ **GAS v761**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -390,4 +390,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | Hub GENERATE stuck + truck on Timeline without load/unload bars — thin client assigned-only apply; server path too heavy (timeout). |
 | 2026-08-04 | **Hub GENERATE @ GAS v759** — faster warm path (no double ensure / skip heal / return written shifts); install full load/unload shifts (not roster-only); 55s client safety unlock. |
 | 2026-08-04 | Timeline reopen wiped Hub AUTO (Sheets snapshot); rest engine treated trucks as crew. Fix: warm-seed before load; preserve AUTO on snapshot; skip AUTO/vehicles in rest. **@ GAS v760**. |
-| 2026-08-04 | **R3c meta identity** — elevate name/client/location/readiness/sub-events to `meta/state`; warm Save & Sync → Firebase; END ROOM publishes Sheets + calendar. |
+| 2026-08-04 | **R3c @ GAS v761** — elevate name/client/location/readiness/sub-events to `meta/state`; warm Save & Sync → Firebase; END ROOM publishes Sheets + calendar; `getExistingProjects` overlays live meta. |
+| 2026-08-04 | PA enter flash: thin `assets/state` force-applied over full list → System “removed N”; refuse thin remotes. |

@@ -221,6 +221,27 @@ window.dalPaScheduleHidePeerOps_ = function() {
   }, 180);
 };
 
+/**
+ * True when remote fixture list is a thin subset of local (Hub/arrange wipe flash).
+ * Used to ignore thin live snaps over a loaded PA UI / rich cache.
+ */
+window.dalPaIsThinRemoteVsLocal_ = function(remoteFixtures, localFixtures) {
+  var isAuto = typeof window.dalPaIsAutoRow_ === 'function'
+    ? window.dalPaIsAutoRow_
+    : function () { return false; };
+  var localCount = 0;
+  (localFixtures || []).forEach(function (pa) {
+    if (pa && pa.uid && !isAuto(pa)) localCount++;
+  });
+  var remoteCount = 0;
+  (remoteFixtures || []).forEach(function (pa) {
+    if (pa && pa.uid && !isAuto(pa)) remoteCount++;
+  });
+  if (localCount < 5) return false;
+  if (remoteCount <= 0) return false;
+  return remoteCount < Math.max(2, Math.floor(localCount * 0.5));
+};
+
 window.dalPaNotifyConflict_ = function(overwritten, deleted, actorOpt, detailText) {
   overwritten = overwritten || [];
   deleted = deleted || [];
@@ -1263,6 +1284,18 @@ window.dalApplyRemotePaAssetsNow_ = function(assets, snapMeta) {
   if (!window.dalPrepUiOpen) return;
   // Per-UID hold/touch in the merge protects local rows (no global anyHold gate).
 
+  // Enter-PA wipe flash: refuse thin remotes even on forceApply from LastServerFixtures_.
+  var localGuard = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
+    return pa && !window.dalPaIsAutoRow_(pa);
+  });
+  if (typeof window.dalPaIsThinRemoteVsLocal_ === 'function' &&
+      window.dalPaIsThinRemoteVsLocal_(assets, localGuard)) {
+    try {
+      console.warn('dalApplyRemotePaAssetsNow_: refused thin remote', (assets || []).length, 'vs local', localGuard.length);
+    } catch (eThin) { /* ignore */ }
+    return;
+  }
+
   var serverAssets = JSON.parse(JSON.stringify(assets || []));
   // State-doc authority: fixtures may lack per-row writeSeq (older writes). Stamp the
   // doc writeSeq so unstamped rows still lose to a newer doc (heal missed applies).
@@ -1482,6 +1515,11 @@ window.dalPaHealTick_ = function() {
   var local = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).filter(function(pa) {
     return pa && !window.dalPaIsAutoRow_(pa);
   });
+  // Never heal-tick a thin snap over a rich local list (enter-PA wipe flash).
+  if (typeof window.dalPaIsThinRemoteVsLocal_ === 'function' &&
+      window.dalPaIsThinRemoteVsLocal_(remote, local)) {
+    return;
+  }
   var localSig = window.dalPaFixturesSig_(local);
   // Compare to last *applied* UI sig (post-recalc), not raw wire fixtures.
   if (localSig && localSig === window.dalPaLastRemoteSig) return;
@@ -1983,18 +2021,15 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
   // Empty with authority: apply empty (do not seed). Unloaded UI: wait for hydrate.
   if (fixtures.length === 0 && localSeed.length === 0 && !window.paLoadedForProject) return;
 
-  // Wipe guard: gas_* / gas_truck_* mirrors must not shrink a loaded PA list to a thin
-  // subset (Hub/arrange bug). Ignore and wait for heal republish from collection.
+  // Wipe guard: thin assets/state must not shrink a loaded PA list (Hub/arrange / early snap).
+  // Includes gas_heal_pa_state — a bad heal write is still a wipe if thinner than local UI.
   var localAll = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []) || [];
-  var localCount = localAll.filter(function (pa) { return pa && pa.uid; }).length;
-  var remoteClientLower = remoteClient.toLowerCase();
-  var fromGasMirror = remoteClientLower.indexOf('gas_') === 0 || remoteClientLower.indexOf('gas_truck') === 0 ||
-    remoteClientLower === 'gas_heal_pa_state';
-  if (fromGasMirror && localCount >= 5 && fixtures.length > 0 &&
-      fixtures.length < Math.max(2, Math.floor(localCount * 0.5)) &&
-      remoteClientLower !== 'gas_heal_pa_state') {
+  if (typeof window.dalPaIsThinRemoteVsLocal_ === 'function' &&
+      window.dalPaIsThinRemoteVsLocal_(fixtures, localAll)) {
     try {
-      console.warn('dalApplyRemotePaStateDoc_: ignored thin gas mirror', fixtures.length, 'vs local', localCount);
+      console.warn('dalApplyRemotePaStateDoc_: ignored thin remote state', fixtures.length, 'vs local',
+        localAll.filter(function (pa) { return pa && pa.uid && !window.dalPaIsAutoRow_(pa); }).length,
+        'clientId=', remoteClient);
     } catch (eW) { /* ignore */ }
     // Kick a heal-capable fetch so server can republish full state.
     try {
@@ -2008,7 +2043,14 @@ window.dalApplyRemotePaStateDoc_ = function(data, snapMeta) {
           .withSuccessHandler(function (res) {
             window._dalPaThinMirrorHealPending_ = false;
             if (!res || !res.current || !res.current.length) return;
-            if (res.current.length < localCount) return;
+            var localNow = (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []) || [];
+            var localNowCount = localNow.filter(function (pa) {
+              return pa && pa.uid && !window.dalPaIsAutoRow_(pa);
+            }).length;
+            var remoteCount = (res.current || []).filter(function (pa) {
+              return pa && pa.uid && !window.dalPaIsAutoRow_(pa);
+            }).length;
+            if (remoteCount < localNowCount) return;
             currentProjectAssets = res.current;
             if (typeof window.dalProcessPaFormulas_ === 'function') {
               window.dalProcessPaFormulas_(currentProjectAssets, { skipExplode: true });

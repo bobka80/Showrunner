@@ -484,12 +484,15 @@ window.openProjectAssetsModalAfterOrphanGate_ = function(projectId, assetsReadOn
                     try {
                         if (memoryForThisProject) {
                             // Stale cache may have wiped overrideDept — heal from state-doc fixtures.
+                            // Never forceApply a thin live snap over a richer in-memory list (wipe flash).
                             if (typeof window.dalPaPreferLiveFixturesOverCache_ === 'function' &&
                                 window.dalPaLastServerFixtures_ && window.dalPaLastServerFixtures_.length &&
                                 typeof window.dalPaFixturesSig_ === 'function') {
+                                var thinLive = typeof window.dalPaIsThinRemoteVsLocal_ === 'function' &&
+                                  window.dalPaIsThinRemoteVsLocal_(window.dalPaLastServerFixtures_, currentProjectAssets);
                                 var memSig = window.dalPaFixturesSig_(currentProjectAssets || []);
                                 var liveSig2 = window.dalPaFixturesSig_(window.dalPaLastServerFixtures_);
-                                if (liveSig2 && liveSig2 !== memSig && typeof window.dalApplyRemotePaAssetsNow_ === 'function') {
+                                if (!thinLive && liveSig2 && liveSig2 !== memSig && typeof window.dalApplyRemotePaAssetsNow_ === 'function') {
                                     window.dalApplyRemotePaAssetsNow_(window.dalPaLastServerFixtures_, {
                                         docWriteSeq: window.dalPaLastServerWriteSeq_ || 0,
                                         forceApply: true
