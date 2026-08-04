@@ -16,7 +16,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-24)
 
-**Primary campaign (ACTIVE):** **Project Campaign Room** — arrange save integrity (**R3b.5**) then **R3e batch** exit badge (Arrange + Hub). — [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md).
+**Primary campaign (ACTIVE):** **Project Campaign Room** — **R3e batch exit badge @ GAS v756** (smoke); next **R3c** meta identity. — [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md).
 
 **Operational logs:** Bug journal [error-journal/](error-journal/) · root `RELEASES.md` / `WORKS_LOG.md`.
 

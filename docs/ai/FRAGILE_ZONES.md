@@ -491,7 +491,7 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign exit badge — batch vs live touch (R3e):** Whole-operation modals (Truck Arrange, Logistics Hub generate/pack/arrange) edit locally then **one batch commit** (logistics-first; PA collection rewrite only on structural uid change / new auto docs). Do **not** chat Firebase one-row GET+WRITE per case. Warm Hub GENERATE / pack autosave share `saveProjectAssetsDeltaFirestore_` — list once, WRITE touched docs, rebuild `assets/state` in memory (no per-delta GET, no second collection list). Live multi-user floor edits stay small touch patches / absolute upserts of touched UIDs.
 
-**Campaign Room R3b (2026-07-25):** Warm Logistics Hub via `dalEnsureWarmHubWorkspace_` — pack/arrange/generate → Firebase while room warm (**GAS v745**).
+**Campaign Room R3b (2026-07-25):** Warm Logistics Hub via `dalEnsureWarmHubWorkspace_` — pack/arrange/generate → Firebase while room warm (**GAS v745**). **Hub smoke 2026-08-04:** headless Auto Arrange must use `paIsTruckArrangeContainer_` (include autos); warm-room Timeline open joins via Hub seed (no cold Opening UX); GENERATE with times returns timeline snap for UI.
 
 **Campaign Room five-slice (2026-07-31 docs):** Room = meta + PA + timeline + ledger + **ops**. Ops lock reopened (`warm_fifth_slice`). Meta identity elevation = **R3c**; ops Firebase path = **R3d**; checkpoint order adds ops; listeners follow active users (**R4b**); idle = single constant (**R5**). Until R3d ships, RFID ops remain Sheets-primary.
 

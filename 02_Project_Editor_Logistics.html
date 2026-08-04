@@ -515,7 +515,23 @@ window.executeLogisticsHub = function() {
             
             // If the backend updated assets (via deltas), refresh the local cache
             if (res.assets) {
-                currentProjectAssets = res.assets.current || [];
+                var serverList = res.assets.current || [];
+                var byUid = {};
+                serverList.forEach(function (pa) {
+                    if (pa && pa.uid) byUid[String(pa.uid)] = pa;
+                });
+                // Keep local autos missing from fixture-only returns (same as Arrange save).
+                (currentProjectAssets || []).forEach(function (pa) {
+                    if (!pa || !pa.uid) return;
+                    var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
+                        ? window.dalPaIsAutoRow_(pa)
+                        : !!(pa.isAuto || pa.isGenericAuto);
+                    if (isAuto && !byUid[String(pa.uid)]) {
+                        serverList.push(pa);
+                        byUid[String(pa.uid)] = pa;
+                    }
+                });
+                currentProjectAssets = serverList;
                 window.overlappingAllocations = res.assets.overlapping || {};
                 window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
                 
@@ -552,11 +568,41 @@ window.executeLogisticsHub = function() {
                 processFormulas(window.originalProjectAssets);
             }
 
+            // Warm GENERATE wrote AUTO truck bars — push into open Timeline (or stash for next open).
+            if (res.timelineUpdated && res.timeline) {
+                try {
+                    if (typeof window.dalApplyRemoteTimelineState_ === 'function' &&
+                        (window.dalTimelineSessionOpen || window.dalTlOpeningUi_)) {
+                        window.dalApplyRemoteTimelineState_(
+                            res.timeline.shifts || [],
+                            res.timeline.phases || [],
+                            res.timeline.overrides || {},
+                            { fromHubGenerate: true }
+                        );
+                    } else if (Array.isArray(res.timeline.shifts)) {
+                        window._hubPendingTimeline_ = res.timeline;
+                    }
+                    if (typeof globalAssignedArr !== 'undefined' && Array.isArray(res.timeline.assigned)) {
+                        globalAssignedArr = res.timeline.assigned.slice();
+                    }
+                    if (typeof activeShifts !== 'undefined' && Array.isArray(res.timeline.shifts)) {
+                        // Only hydrate local canvas if timeline layer already has data structures.
+                        if (window.dalTimelineSessionOpen && typeof window.dalApplyRemoteTimelineState_ !== 'function') {
+                            activeShifts = res.timeline.shifts.slice();
+                        }
+                    }
+                } catch (eTlApply) { /* non-fatal */ }
+            }
+            if (generateTimes && res.warm && !(res.autoShiftCount > 0)) {
+                console.warn('Hub GENERATE: times on but no AUTO shifts returned');
+            }
+
             setTimeout(() => {
                 if (btn) { btn.innerText = origText; btn.disabled = false; }
                 document.getElementById('logistics-hub-modal-overlay').style.display = 'none';
                 if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
                 if (typeof runSchedule === 'function') runSchedule();
+                if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
             }, 1500);
         })
         .generateLogisticsPayloadAPI(projectId, deltas, logData, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
@@ -672,25 +718,42 @@ window.headlessAutoArrangeAsync = function(leg, truckIds) {
         let truckW = dims.w;
         let truckL = dims.l;
 
+        // Same container gate as Truck Arrange modal (autos + nesting 3–5).
         let casesToArrange = [];
         currentProjectAssets.forEach(pa => {
-            if (pa.isShortage || pa.containerUid) return;
-            let asset = globalAssets.find(a => a.id === pa.assetId);
-            if (asset && (asset.nestingLevel == 3 || asset.nestingLevel == 4 || asset.type === 'Container')) {
-                let qty = parseInt(pa.qty, 10) || 1;
-                let w = 60, l = 120;
-                if (asset.dims) {
-                    let pts = asset.dims.split(/[*xX]/);
-                    if (pts.length >= 2) { l = parseFloat(pts[0]); w = parseFloat(pts[1]); if (l > 0 && l < 15 && w > 0 && w < 15) { l *= 100; w *= 100; } }
+            if (!pa || pa.isShortage || pa.containerUid) return;
+            let isCase = (typeof window.paIsTruckArrangeContainer_ === 'function')
+                ? window.paIsTruckArrangeContainer_(pa)
+                : !!(pa.isAuto || pa.isGenericAuto);
+            if (!isCase) return;
+            let asset = (typeof globalAssets !== 'undefined' && globalAssets)
+                ? globalAssets.find(a => a && a.id === pa.assetId) : null;
+            let qty = parseInt(pa.qty, 10) || 1;
+            let w = 60, l = 120;
+            if (asset && asset.dims) {
+                let pts = String(asset.dims).split(/[*xX]/);
+                if (pts.length >= 2) {
+                    l = parseFloat(pts[0]); w = parseFloat(pts[1]);
+                    if (l > 0 && l < 15 && w > 0 && w < 15) { l *= 100; w *= 100; }
                 }
-                let weight = parseFloat(asset.weight) || 0;
-                for (let i = 0; i < qty; i++) {
-                    casesToArrange.push({ paUid: pa.uid, weight: weight, l: Math.max(l, w), w: Math.min(l, w), dept: pa.overrideDept || asset.department || 'Z' });
-                }
+            }
+            let weight = (asset && asset.weight) ? parseFloat(asset.weight) || 0 : 0;
+            for (let i = 0; i < qty; i++) {
+                casesToArrange.push({
+                    paUid: pa.uid,
+                    paRef: pa,
+                    weight: weight,
+                    l: Math.max(l, w),
+                    w: Math.min(l, w),
+                    dept: pa.overrideDept || (asset && asset.department) || 'Z'
+                });
             }
         });
 
-        if (casesToArrange.length === 0) return resolve();
+        if (casesToArrange.length === 0) {
+            reject(new Error('No arrangeable cases found (auto-pack cases must be included). Pack first, then Auto Arrange.'));
+            return;
+        }
         
         let tempStacks = [];
         let unassigned = [...casesToArrange];
@@ -795,7 +858,23 @@ window.headlessAutoArrangeAsync = function(leg, truckIds) {
 
                 s.items.forEach((c, zIdx) => {
                     if (c.paUid) {
-                        spatialPayload.push({ paUid: c.paUid, truckUid: isStaged ? "" : targetTruckId, truckX: isStaged ? stagingCursorX : currentX, truckY: isStaged ? stagingCursorY : currentY, truckZ: zIdx, isRotated: c.isRotated || false, isStaged: isStaged });
+                        let pref = c.paRef || {};
+                        // Match Truck Arrange save payload (R3b.5 unmatched autos → ledger).
+                        spatialPayload.push({
+                            paUid: c.paUid,
+                            assetId: pref.assetId || '',
+                            formula: pref.formula || 'Standalone',
+                            location: pref.location || 'General',
+                            creator: pref.creator || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'),
+                            isAuto: !!(pref.isAuto || pref.isGenericAuto),
+                            isGenericAuto: !!pref.isGenericAuto,
+                            truckUid: isStaged ? "" : targetTruckId,
+                            truckX: isStaged ? stagingCursorX : currentX,
+                            truckY: isStaged ? stagingCursorY : currentY,
+                            truckZ: zIdx,
+                            isRotated: c.isRotated || false,
+                            isStaged: isStaged
+                        });
                         
                         let localPa = currentProjectAssets.find(pa => pa.uid === c.paUid);
                         if (localPa) {
@@ -826,13 +905,48 @@ window.headlessAutoArrangeAsync = function(leg, truckIds) {
         });
 
         if (spatialPayload.length > 0) {
+            let projectId = document.getElementById('edit-folder-id').value;
             google.script.run
-                .withSuccessHandler(function () { resolve(); })
+                .withSuccessHandler(function (res) {
+                    try {
+                        var list = (res && res.current) ? res.current : null;
+                        if (list && list.length) {
+                            var byUid = {};
+                            list.forEach(function (pa) {
+                                if (pa && pa.uid) byUid[String(pa.uid)] = pa;
+                            });
+                            (currentProjectAssets || []).forEach(function (pa) {
+                                if (!pa || !pa.uid) return;
+                                var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
+                                    ? window.dalPaIsAutoRow_(pa)
+                                    : !!(pa.isAuto || pa.isGenericAuto);
+                                if (isAuto && !byUid[String(pa.uid)]) {
+                                    list.push(pa);
+                                    byUid[String(pa.uid)] = pa;
+                                }
+                            });
+                            (spatialPayload || []).forEach(function (box) {
+                                if (!box || !box.paUid) return;
+                                var pa = byUid[String(box.paUid)];
+                                if (pa && typeof window.dalPaApplyArrangePayloadOntoAsset_ === 'function') {
+                                    window.dalPaApplyArrangePayloadOntoAsset_(pa, box, leg);
+                                }
+                            });
+                            currentProjectAssets = list;
+                            if (typeof window.dalProcessPaFormulas_ === 'function') {
+                                window.dalProcessPaFormulas_(currentProjectAssets, { skipExplode: true });
+                            }
+                            window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                            window.paLoadedForProject = projectId;
+                        }
+                    } catch (eMerge) { /* local stamps already applied */ }
+                    resolve(res);
+                })
                 .withFailureHandler(function (err) {
                     reject(err || new Error('saveTruckArrangementAPI failed'));
                 })
                 .saveTruckArrangementAPI(
-                    document.getElementById('edit-folder-id').value,
+                    projectId,
                     spatialPayload,
                     leg,
                     typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI'

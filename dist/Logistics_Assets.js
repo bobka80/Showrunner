@@ -811,6 +811,7 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
     }
 
     var changeMsgs = [];
+    var autoCount = 0;
     if (needTl) {
       var tl = getTimelineDataFirestore_(projectId, 'main');
       if (!tl) tl = getTimelineDataSheets_(projectId, 'main');
@@ -865,6 +866,11 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
       if (addedShifts > 0) changeMsgs.push('Added ' + addedShifts + ' shift(s)');
       if (deletedShifts > 0) changeMsgs.push('Deleted ' + deletedShifts + ' shift(s)');
       if (keptShifts > 0) changeMsgs.push('Updated ' + keptShifts + ' shift(s)');
+      var autoCount = (tShifts || []).filter(function (s) {
+        return s && (s.note === '⚠️ AUTO-OUTBOUND' || s.note === '⚠️ AUTO-INBOUND');
+      }).length;
+    } else {
+      autoCount = 0;
     }
 
     // Stamp clocks on warm logistics legs (Sheets lag until END ROOM).
@@ -896,7 +902,19 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor) {
       'Logistics Generated (warm). ' + (deltas ? deltas.length : 0) + ' Asset Deltas. ' + deltaPayload);
 
     var finalAssets = getProjectAssetsFirestore_(projectId, logData.sDateStr, logData.eDateStr);
-    return { success: true, assets: finalAssets, timestamp: newTimestamp, warm: true };
+    var tlSnap = null;
+    if (needTl) {
+      try { tlSnap = getTimelineDataFirestore_(projectId, 'main'); } catch (eTl) { tlSnap = null; }
+    }
+    return {
+      success: true,
+      assets: finalAssets,
+      timestamp: newTimestamp,
+      warm: true,
+      timelineUpdated: !!needTl,
+      autoShiftCount: typeof autoCount === 'number' ? autoCount : 0,
+      timeline: tlSnap
+    };
   });
 }
 

@@ -145,6 +145,19 @@ function dalTimelineCollabStarted_(joined, opts) {
   if (projectId && typeof window.startDalTimelineStateSync_ === 'function') {
     window.startDalTimelineStateSync_(projectId);
   }
+  // Hub GENERATE may have written AUTO truck bars before Timeline UI joined.
+  if (window._hubPendingTimeline_ && typeof window.dalApplyRemoteTimelineState_ === 'function') {
+    try {
+      var pending = window._hubPendingTimeline_;
+      window._hubPendingTimeline_ = null;
+      window.dalApplyRemoteTimelineState_(
+        pending.shifts || [],
+        pending.phases || [],
+        pending.overrides || {},
+        { fromHubGenerate: true }
+      );
+    } catch (ePend) { window._hubPendingTimeline_ = null; }
+  }
   if (!joined) {
     // Entry delta flush after first remote snap / when mutations pending.
     setTimeout(function() {
@@ -278,6 +291,40 @@ window.openDalTimelineCollabSession = function(opts) {
   var layer = document.getElementById('shift-layer');
   if (layer) layer.style.cursor = 'wait';
   var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+
+  // Campaign Room already warm: seed/join timeline under the room in one call.
+  // Avoids the cold "Opening Firebase fork" wait when only the timeline slice was closed.
+  if (!opts.takeOver && typeof window.dalCampaignRoomIsWarm_ === 'function' &&
+      window.dalCampaignRoomIsWarm_() &&
+      typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withFailureHandler(function(err) {
+        // Fall through to classic begin/finish below.
+        window._dalTlWarmJoinFailed_ = err;
+        window.openDalTimelineCollabSessionClassic_(opts, layer, actor, projectId);
+      })
+      .withSuccessHandler(function(ens) {
+        if (ens && ens.warm && ens.timelineOpen) {
+          if (layer) layer.style.cursor = '';
+          dalTimelineCollabStarted_(true, opts);
+          return;
+        }
+        window.openDalTimelineCollabSessionClassic_(opts, layer, actor, projectId);
+      })
+      .ensureDalWarmHubWorkspace(projectId, actor, { needTimeline: true });
+    return;
+  }
+
+  window.openDalTimelineCollabSessionClassic_(opts, layer, actor, projectId);
+};
+
+/** Classic begin/finish Opening path (cold timeline domain or take-over). */
+window.openDalTimelineCollabSessionClassic_ = function(opts, layer, actor, projectId) {
+  opts = opts || {};
+  layer = layer || document.getElementById('shift-layer');
+  actor = actor || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+  projectId = projectId || (document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '');
   var beginOpts = opts.takeOver ? { takeOver: true } : {};
 
   // Split begin/finish so each google.script.run stays under the ~30s client limit.
