@@ -573,6 +573,10 @@ function startPresencePing(projectId) {
 }
 
 function stopPresencePing() {
+    // R4b: leave project → drop PA/TL Firebase listeners; room may stay warm with zero listeners.
+    if (typeof window.dalDetachCampaignLiveListeners_ === 'function') {
+      try { window.dalDetachCampaignLiveListeners_({ clearChrome: true }); } catch (eDet) { /* ignore */ }
+    }
     if (presenceTimer) { clearInterval(presenceTimer); presenceTimer = null; }
     if (activePresenceProject) { google.script.run.reportProjectPresence(activePresenceProject, ACTIVE_USER_NAME, 'leave'); activePresenceProject = null; }
     window.peForkPrepActive_ = false;

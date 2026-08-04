@@ -384,13 +384,46 @@ window.dalCampaignRoomIsWarm_ = function(info) {
   return false;
 };
 
-/** Soft leave PA while room stays warm — detach live sync; no Sheets commit. */
+/**
+ * R4b — detach this client's Firebase / GAS live listeners for PA + timeline.
+ * Does NOT close the Campaign Room (room may stay warm with zero listeners).
+ * Call on leave-project (CANCEL / stopPresencePing), not on soft module leave alone.
+ */
+window.dalDetachCampaignLiveListeners_ = function(opts) {
+  opts = opts || {};
+  if (typeof window.stopDalPaSessionWatcher === 'function') {
+    try { window.stopDalPaSessionWatcher({ clearLatch: true }); } catch (e0) { /* ignore */ }
+  } else if (typeof window.stopDalPaLiveSync_ === 'function') {
+    try { window.stopDalPaLiveSync_(); } catch (e1) { /* ignore */ }
+  }
+  if (typeof window.stopDalTimelineSessionWatcher === 'function') {
+    try { window.stopDalTimelineSessionWatcher(); } catch (e2) { /* ignore */ }
+  }
+  if (typeof window.stopDalTimelineStateSync_ === 'function') {
+    try { window.stopDalTimelineStateSync_(); } catch (e3) { /* ignore */ }
+  }
+  window.dalPrepLeaveIntent_ = false;
+  window.dalPrepLastLeavePending_ = false;
+  window.dalTlLeaveIntent_ = false;
+  window.dalTlLastLeavePending_ = false;
+  window.activePresenceModule = 'main';
+  // Allow open/join again on next editor entry for any project.
+  window.peCampaignRoomJoinFor_ = '';
+  if (opts.clearChrome) {
+    window.peForkPrepActive_ = false;
+    window.peForkTimelineActive_ = false;
+  }
+};
+
+/** Soft leave PA while room stays warm — detach PA watchers; no Sheets commit. */
 window.dalSoftLeavePrepKeepRoom_ = function(projectId) {
   projectId = projectId || (typeof window.dalPresenceProjectId_ === 'function'
     ? window.dalPresenceProjectId_() : '');
   window.activePresenceModule = 'main';
-  if (typeof window.stopDalPaLiveSync_ === 'function') {
-    try { window.stopDalPaLiveSync_(); } catch (e0) { /* ignore */ }
+  if (typeof window.stopDalPaSessionWatcher === 'function') {
+    try { window.stopDalPaSessionWatcher({ clearLatch: true }); } catch (e0) { /* ignore */ }
+  } else if (typeof window.stopDalPaLiveSync_ === 'function') {
+    try { window.stopDalPaLiveSync_(); } catch (e1) { /* ignore */ }
   }
   window.dalPrepLeaveIntent_ = false;
   window.dalPrepLastLeavePending_ = false;
@@ -494,21 +527,24 @@ window.closeDalCampaignRoomFromUi_ = function(opts) {
     window.dalPrepClosing = false;
     window.dalPrepLeaveIntent_ = false;
     window.dalPrepLastLeavePending_ = false;
-    if (typeof stopDalPaSessionWatcher === 'function') {
-      try { stopDalPaSessionWatcher({ clearLatch: true }); } catch (eW) { /* ignore */ }
-    }
-    if (typeof window.stopDalPaLiveSync_ === 'function') {
-      try { window.stopDalPaLiveSync_(); } catch (eS) { /* ignore */ }
-    }
-
     window.dalTimelineSessionOpen = false;
     window.dalTlWasSessionOpen = false;
     window.dalTlClosingUi_ = false;
-    if (typeof window.stopDalTimelineStateSync_ === 'function') {
-      try { window.stopDalTimelineStateSync_(); } catch (eT) { /* ignore */ }
-    }
-    if (typeof window.stopDalTimelineSessionWatcher === 'function') {
-      try { window.stopDalTimelineSessionWatcher(); } catch (eTw) { /* ignore */ }
+    if (typeof window.dalDetachCampaignLiveListeners_ === 'function') {
+      try { window.dalDetachCampaignLiveListeners_({ clearChrome: true }); } catch (eDet) { /* ignore */ }
+    } else {
+      if (typeof stopDalPaSessionWatcher === 'function') {
+        try { stopDalPaSessionWatcher({ clearLatch: true }); } catch (eW) { /* ignore */ }
+      }
+      if (typeof window.stopDalPaLiveSync_ === 'function') {
+        try { window.stopDalPaLiveSync_(); } catch (eS) { /* ignore */ }
+      }
+      if (typeof window.stopDalTimelineStateSync_ === 'function') {
+        try { window.stopDalTimelineStateSync_(); } catch (eT) { /* ignore */ }
+      }
+      if (typeof window.stopDalTimelineSessionWatcher === 'function') {
+        try { window.stopDalTimelineSessionWatcher(); } catch (eTw) { /* ignore */ }
+      }
     }
 
     if (typeof window.dalCacheInvalidatePa_ === 'function') {

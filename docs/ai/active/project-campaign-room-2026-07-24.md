@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R4 shipping**. Next after smoke: **R4b** (or **R5**).  
-**Production tip:** see RELEASES.md. Latest in-progress: R4 keep-live checkpoint. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R4b shipping**. Next after smoke: **R5**.  
+**Production tip:** see RELEASES.md. Latest in-progress: R4b listeners-follow-user. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -110,7 +110,7 @@ Canonical text: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/d
 
 Pointers: [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) · [../topics/warehouse-prep-session.md](../topics/warehouse-prep-session.md) Phase D.
 
-**Production today:** R1–R3d live; R4 checkpoint shipping; 48h idle not live (R5). R3d floor smoke deferred (no scanner).
+**Production today:** R1–R4 live (@ **v764**); 48h idle not live (R5). R3d floor smoke deferred (no scanner).
 
 ---
 
@@ -227,7 +227,7 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 - [x] Director **OK go** for **R3c** (expand meta identity)
 - [x] Director **OK go** for **R3d** (ops fifth slice)
 - [x] Director **OK go** for **R4** (30m publish checkpoint, five-slice order) — continue 2026-08-04 (R3d smoke deferred)
-- [ ] Director **OK go** for **R4b** (listener-follows-user) — may ship with R5
+- [x] Director **OK go** for **R4b** (listener-follows-user) — continue 2026-08-04
 - [ ] Director **OK go** for **R5** (idle close + Exit polish)
 
 ### R0 — Doctrine + inventory (no lifecycle code)
@@ -327,13 +327,13 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 - [x] `lastPublishedAt` + per-slice content signatures
 - [x] Fail → room stays live; manager retry (B/C patterns); escalation if lag > N hours (scale with idle window)
 - [x] Subtle “Last published…” UI (alarm only on fail)
-- [ ] Ship + smoke: edit → wait/force checkpoint → Sheets match; peers stay live
+- [x] Ship + smoke: edit → wait/force checkpoint → Sheets match; peers stay live — **shipped @ v764**; smoke pending
 
 ### R4b — Listener follows active user
 
-- [ ] On enter project / warm join: subscribe to that room’s needed slices
-- [ ] On leave project: unsubscribe (do not linger on warm-but-empty rooms)
-- [ ] Room may stay warm with zero listeners
+- [x] On enter project / warm join: subscribe to that room’s needed slices
+- [x] On leave project: unsubscribe (do not linger on warm-but-empty rooms)
+- [x] Room may stay warm with zero listeners
 - [ ] Ship + smoke: switch projects → old listeners gone; Firebase read cost tracks presence, not idle length
 
 ### R5 — Idle close + Exit polish
@@ -394,3 +394,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | PA enter flash: thin `assets/state` force-applied over full list → System “removed N”; refuse thin remotes. **@ GAS v762**. |
 | 2026-08-04 | **R3d @ GAS v763** — warm RFID ops slice (`projects/{id}/ops/`); scan batches → Firebase; END ROOM / finalize publish Sheets; Firestore rules deployed. |
 | 2026-08-04 | Director unable to scan — R3d smoke deferred; continue **R4**. |
+| 2026-08-04 | **R4 @ GAS v764** — keep-live ~30m checkpoint (`runDalCampaignCheckpoint`); dirty gate + signatures; ordered five-slice publish; editor “Last published…” cue (dbl-click force). |
+| 2026-08-04 | **R4b** — listeners follow user: detach PA/TL on leave-project / switch; soft leave PA stops session watcher; room may warm with zero listeners. |

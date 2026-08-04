@@ -16,7 +16,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-07-24)
 
-**Primary campaign (ACTIVE):** **Project Campaign Room** — **R4 shipping** (R3d smoke deferred); next **R4b** / **R5**. — [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md).
+**Primary campaign (ACTIVE):** **Project Campaign Room** — **R4b shipping**; next **R5**. — [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md).
 
 **Operational logs:** Bug journal [error-journal/](error-journal/) · root `RELEASES.md` / `WORKS_LOG.md`.
 
@@ -24,7 +24,7 @@ Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Project Campaign Room** | **ACTIVE** — R4 shipping; next R4b/R5 | [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) |
+| **Project Campaign Room** | **ACTIVE** — R4b shipping; next R5 | [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) |
 | **Logistics Ledger** | **COMPLETE** (archived) | [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog brief — OK go per domain | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
@@ -36,7 +36,7 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Project Campaign Room** | **ACTIVE** — R4 shipping; next R4b/R5 | [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) |
+| **Project Campaign Room** | **ACTIVE** — R4b shipping; next R5 | [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **UI / QoL standing agent** (not a campaign) | Standing — minor polish; collision-check actives | [active/ui-qol-standing-agent.md](active/ui-qol-standing-agent.md) · rule `.cursor/rules/ui-qol-agent.mdc` |
 
