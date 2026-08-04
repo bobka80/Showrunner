@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Arrange save integrity in flight; **campaign exit badge** = batch Arrange + Hub. Next preferred after arrange sticks: **R3e batch ops** (or Hub checklist / R3c).  
-**Production tip:** see RELEASES.md. Latest: arrange isAuto gate @ **GAS v753**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — R3e Arrange batch shipping. Campaign exit badge = **R3e** (Arrange done next; Hub batch still open).  
+**Production tip:** see RELEASES.md. Latest tip before this ship: R3b.5 @ **GAS v754**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -278,10 +278,10 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 
 Director smoke (2026-08-03): cases return to **staging** after Save (board not empty, but **placement does not stick**). Root cause class: auto-packed cases are local-only on live prep → warm Arrange payload `paUid`s often **missing from Firebase PA** → `ledgerItems` empty → no logistics legs → reopen has null `outboundX` → staging.
 
-- [ ] Warm Arrange write ledger legs for **every** payload `paUid` (including autos not yet on Firebase PA)
-- [ ] Upsert minimal auto PA docs on Arrange save so overlay keys stay stable
-- [ ] Client: do **not** wipe local autos when save returns fixture-only `current`
-- [ ] Smoke: pack autos → Arrange onto truck → Save → reopen → still on truck
+- [x] Warm Arrange write ledger legs for **every** payload `paUid` (including autos not yet on Firebase PA) — **v754**
+- [x] Upsert minimal auto PA docs on Arrange save so overlay keys stay stable — **v754**
+- [x] Client: do **not** wipe local autos when save returns fixture-only `current` — **v754**
+- [x] Smoke: pack autos → Arrange onto truck → Save → reopen → still on truck — director confirmed @ **v754**
 
 ### R3e — Batch operation commits (campaign **exit badge**)
 
@@ -291,9 +291,9 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 
 **Exit criteria (must ship before closing this campaign):**
 
-- [ ] **Truck Arrange save** = logistics-first **batch** (one `logistics/state` write; PA upserts only when qty-split / new auto docs; no per-case serial GET+WRITE storm)
+- [x] **Truck Arrange save** = logistics-first **batch** (placement → one `logistics/state` + `assets/state`; PA docs only on structural uid change / auto orphans; no per-case GET). Open skip hydrate when memory already has spatial.
 - [ ] **Logistics Hub** Generate / pack / arrange pipeline = **batch** commits (same doctrine) — Hub is a **big badge** surface for this rule
-- [ ] Standing note in FRAGILE: whole-operation modals batch; live multi-user floor edits stay small touch patches
+- [x] Standing note in FRAGILE: whole-operation modals batch; live multi-user floor edits stay small touch patches
 
 ### R3c — Expand meta (project identity)
 
@@ -382,3 +382,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-07-31 | **Arrange reopen hotfix @ GAS v752** — packing explode uid strip fixed; Bugbot High (hydrate before autosave) fixed. |
 | 2026-07-31 | **Arrange isAuto gate @ GAS v753** — packing shows auto cases; Arrange now treats isAuto the same and won’t wipe local cases when server hydrate has none. |
 | 2026-08-03 | Director: file **batch-dispatch** as campaign exit badge (Arrange + Hub). Arrange still not persisting (staging after save) — filed **R3b.5** + **R3e**; fix autos→ledger unmatched next. |
+| 2026-08-03 | **R3b.5 @ GAS v754** — unmatched auto `paUid` → ledger legs + upsert auto PA; merge autos on save; delta mirror re-overlays logistics. Smoke → then **R3e batch**. |
+| 2026-08-04 | **R3e Arrange batch** — placement-only warm save: logistics + assets/state (no per-PA GET/rewrite); structural path writes PA once; open skips hydrate when spatial present. Hub batch still open. |

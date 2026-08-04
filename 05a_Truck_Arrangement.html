@@ -373,6 +373,19 @@ function openTruckArrangementDashboard() {
         window.autoSaveAndExecute(hydrateThenBoot, false, null, true);
         return;
     }
+
+    // R3e: skip full getProjectAssets hydrate when memory already has truck spatial
+    // (typical reopen after a successful save). Still hydrate when placement is blank.
+    let legCheck = window.activeArrangementLeg || 'outbound';
+    let hasSpatial = (currentProjectAssets || []).some(function (pa) {
+        if (!window.paIsTruckArrangeContainer_(pa)) return false;
+        let x = pa[legCheck + 'X'];
+        return x !== null && x !== undefined && x !== '';
+    });
+    if (hasSpatial) {
+        bootLogic();
+        return;
+    }
     hydrateThenBoot();
 }
 

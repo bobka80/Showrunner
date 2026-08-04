@@ -481,9 +481,9 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
 }
 
 /**
- * Prep-open truck arrange: rewrite Firebase PA collection + assets/state (assignment only),
- * write Logistics_Ledger to Firebase logistics/state while Campaign Room warm (R3).
- * Sheets ledger publishes on End Room / checkpoint (R4).
+ * Prep-open truck arrange (R3e batch): logistics-first.
+ * Placement → one logistics/state write. PA collection rewritten only on qty-split /
+ * deletes; auto orphans upserted without per-row GET. assets/state stamped once.
  */
 function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
   return executeWithRetry(function () {
@@ -507,8 +507,6 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
     var basePath = dalFirestorePaCollection_(projectId);
     var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
 
-    // Build next logistics legs BEFORE rewriting live PA fixtures — fixtures must mirror
-    // arrangement for UI (ledger remains SoT; empty fixture trucks made reopen → staging).
     var roomUid = '';
     try {
       var sheetsIdx = verifyDatabaseSchema(true);
@@ -533,74 +531,98 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
     );
     var legsMap = logisticsLedgerLegsMapFromObjects_(nextLegs);
 
-    var newUids = {};
-    var fixtures = [];
-
+    var resultUids = {};
     (resultRows || []).forEach(function (rowData) {
-      var docId = String(rowData[hdr.map['uid']] || Utilities.getUuid());
-      if (!rowData[hdr.map['uid']]) rowData[hdr.map['uid']] = docId;
-      newUids[docId] = true;
-      var obj = dalPaSheetRowToObject_(rowData, hdr.map);
-      try {
-        var existing = firestoreFetch_('get', basePath + '/' + docId);
-        if (existing && existing.fields) {
-          var plain = firestoreDecodeFields_(existing.fields);
-          obj.writeSeq = (Number(plain.writeSeq || 0) || 0) + 1;
-        } else {
-          obj.writeSeq = 1;
-        }
-      } catch (eSeq) {
-        obj.writeSeq = 1;
-      }
-      obj.clientId = 'gas_truck_' + String(actor || 'system');
-      firestoreWriteDocument_(basePath + '/' + docId, obj);
-      var fix = dalPaObjToLiveFixture_(obj);
-      applyLedgerLegsOntoPaAsset_(fix, legsMap);
-      fixtures.push(fix);
+      var docId = String(rowData[hdr.map['uid']] || '');
+      if (docId) resultUids[docId] = true;
+    });
+    var structuralChange = false;
+    Object.keys(resultUids).forEach(function (uid) {
+      if (!oldUids[uid]) structuralChange = true;
+    });
+    Object.keys(oldUids).forEach(function (uid) {
+      if (!resultUids[uid]) structuralChange = true;
     });
 
-    // Auto-cases often exist only in the browser. Upsert minimal PA docs so pa_uid overlay
-    // and End Room commit stay aligned with logistics legs just written.
+    var orphanItems = [];
     (arranged.ledgerItems || []).forEach(function (item) {
       if (!item) return;
       var paUid = String(item.paUid || item.pa_uid || '');
-      if (!paUid || newUids[paUid]) return;
-      var assetUid = String(item.assetUid || item.asset_uid || '');
-      if (!assetUid && !item.isAuto) return;
-      var formula = item.formula || 'Standalone';
-      if (item.isGenericAuto && String(formula).indexOf('[GEN_AUTO] ') !== 0) {
-        formula = '[GEN_AUTO] ' + formula;
-      } else if (item.isAuto && String(formula).indexOf('[AUTO] ') !== 0 && String(formula).indexOf('[GEN_AUTO] ') !== 0) {
-        formula = '[AUTO] ' + formula;
-      }
-      var obj = {
-        uid: paUid,
-        project_uid: String(projectId),
-        asset_uid: assetUid,
-        assigned_quantity: item.quantity != null ? item.quantity : 1,
-        location: item.location || 'General',
-        formula: formula,
-        creator: item.creator || actor || 'System',
-        override_dept: '',
-        container_uid: '',
-        scan_status: 'Assigned',
-        writeSeq: 1,
-        clientId: 'gas_truck_auto_' + String(actor || 'system')
-      };
-      try {
-        firestoreWriteDocument_(basePath + '/' + paUid, obj);
-      } catch (eUp) { /* continue — logistics legs still hold placement */ }
-      newUids[paUid] = true;
-      var fixAuto = dalPaObjToLiveFixture_(obj);
-      applyLedgerLegsOntoPaAsset_(fixAuto, legsMap);
-      fixtures.push(fixAuto);
+      if (!paUid || oldUids[paUid] || resultUids[paUid]) return;
+      orphanItems.push(item);
     });
 
-    Object.keys(oldUids).forEach(function (uid) {
-      if (!newUids[uid]) {
-        try { firestoreDeleteDocument_(basePath + '/' + uid); } catch (eDel) { /* continue */ }
-      }
-    });
+    var fixtures = [];
+    var newUids = {};
+
+    function stampFixtureFromRow_(rowData, docId) {
+      var obj = dalPaSheetRowToObject_(rowData, hdr.map);
+      obj.uid = docId;
+      obj.clientId = 'gas_truck_' + String(actor || 'system');
+      var fix = dalPaObjToLiveFixture_(obj);
+      applyLedgerLegsOntoPaAsset_(fix, legsMap);
+      return { obj: obj, fix: fix };
+    }
+
+    function upsertOrphanAutos_() {
+      orphanItems.forEach(function (item) {
+        var paUid = String(item.paUid || item.pa_uid || '');
+        if (!paUid || newUids[paUid]) return;
+        var assetUid = String(item.assetUid || item.asset_uid || '');
+        if (!assetUid && !item.isAuto) return;
+        var formula = item.formula || 'Standalone';
+        if (item.isGenericAuto && String(formula).indexOf('[GEN_AUTO] ') !== 0) {
+          formula = '[GEN_AUTO] ' + formula;
+        } else if (item.isAuto && String(formula).indexOf('[AUTO] ') !== 0 && String(formula).indexOf('[GEN_AUTO] ') !== 0) {
+          formula = '[AUTO] ' + formula;
+        }
+        var obj = {
+          uid: paUid,
+          project_uid: String(projectId),
+          asset_uid: assetUid,
+          assigned_quantity: item.quantity != null ? item.quantity : 1,
+          location: item.location || 'General',
+          formula: formula,
+          creator: item.creator || actor || 'System',
+          override_dept: '',
+          container_uid: '',
+          scan_status: 'Assigned',
+          writeSeq: 1,
+          clientId: 'gas_truck_auto_' + String(actor || 'system')
+        };
+        try { firestoreWriteDocument_(basePath + '/' + paUid, obj); } catch (eUp) { /* logistics still holds placement */ }
+        newUids[paUid] = true;
+        var fixAuto = dalPaObjToLiveFixture_(obj);
+        applyLedgerLegsOntoPaAsset_(fixAuto, legsMap);
+        fixtures.push(fixAuto);
+      });
+    }
+
+    if (structuralChange) {
+      (resultRows || []).forEach(function (rowData) {
+        var docId = String(rowData[hdr.map['uid']] || Utilities.getUuid());
+        if (!rowData[hdr.map['uid']]) rowData[hdr.map['uid']] = docId;
+        newUids[docId] = true;
+        var stamped = stampFixtureFromRow_(rowData, docId);
+        stamped.obj.writeSeq = 1;
+        firestoreWriteDocument_(basePath + '/' + docId, stamped.obj);
+        fixtures.push(stamped.fix);
+      });
+      Object.keys(oldUids).forEach(function (uid) {
+        if (!newUids[uid]) {
+          try { firestoreDeleteDocument_(basePath + '/' + uid); } catch (eDel) { /* continue */ }
+        }
+      });
+      upsertOrphanAutos_();
+    } else {
+      (resultRows || []).forEach(function (rowData) {
+        var docId = String(rowData[hdr.map['uid']] || '');
+        if (!docId) return;
+        newUids[docId] = true;
+        fixtures.push(stampFixtureFromRow_(rowData, docId).fix);
+      });
+      upsertOrphanAutos_();
+    }
 
     var prevSeq = 0;
     try {
@@ -618,7 +640,6 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       updatedBy: actor || 'System'
     });
 
-    // R3: warm logistics on Firebase — Sheets unchanged until End Room / checkpoint.
     try {
       dalWriteLogisticsStateToFirestore_(projectId, nextLegs, actor, roomUid);
       try {
@@ -632,7 +653,7 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
       } catch (eMeta) { /* ignore */ }
       try {
         if (roomUid) {
-          var sheetsAct = verifyDatabaseSchema();
+          var sheetsAct = verifyDatabaseSchema(true);
           var rowAct = dalGetProjectIndexRow_(projectId, sheetsAct);
           if (rowAct) {
             dalWriteCampaignRoom_(sheetsAct.index, rowAct.rowNum, rowAct.map, {
@@ -648,13 +669,13 @@ function saveTruckArrangementFirestore_(projectId, layoutData, leg, actor) {
     }
 
     writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT_FIRESTORE", projectId, projectId,
-      'Saved spatial arrangement for ' + ((layoutData && layoutData.length) || 0) + ' cases on prep fork (ledger warm).');
-    // Return overlaid fixtures so the client can replace packing-exploded memory
-    // (uid-less clones / stale qty groups) instead of reopening into staging.
+      'Batch arrange save (' + (structuralChange ? 'structural' : 'placement') + ') for ' +
+      ((layoutData && layoutData.length) || 0) + ' cases; orphans=' + orphanItems.length + '.');
     return {
       success: true,
       message: 'Saved Truck Layout',
-      current: fixtures
+      current: fixtures,
+      batchMode: structuralChange ? 'structural' : 'placement'
     };
   });
 }
