@@ -221,3 +221,14 @@ function firestoreGetLogisticsSessionMeta_(projectId) {
   if (!doc || !doc.fields) return null;
   return firestoreDecodeFields_(doc.fields);
 }
+
+/** Campaign Room R3d — RFID ops slice meta (GAS-owned). */
+function firestoreSetOpsSessionMeta_(projectId, meta) {
+  firestoreWriteDocument_('projects/' + projectId + '/ops/_meta', meta);
+}
+
+function firestoreGetOpsSessionMeta_(projectId) {
+  var doc = firestoreFetch_('get', 'projects/' + projectId + '/ops/_meta');
+  if (!doc || !doc.fields) return null;
+  return firestoreDecodeFields_(doc.fields);
+}

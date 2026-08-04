@@ -233,6 +233,182 @@ function batchProcessOperationsSheets_(projectId, batch, actor = "System UI") {
    });
 }
 
+/**
+ * Campaign Room R3d — warm RFID ops batch (Firebase ops slice; Sheets lag until END ROOM).
+ */
+function batchProcessOperationsFirestore_(projectId, batch, actor) {
+  actor = actor || 'System UI';
+  assertActorCanPerformAssetOperations(actor);
+  if (!dalFirestoreIsConfigured_()) {
+    throw new Error('Firebase not configured — cannot run ops while Campaign Room is warm.');
+  }
+
+  var peek = dalLedgerPeekActiveSession_(projectId);
+  var operationType = String(peek.operationType || '');
+  var sessionUid = String(peek.sessionUid || '');
+  if (!operationType || !sessionUid) {
+    throw new Error('No active operation for this event. Start Check-out or Check-in first.');
+  }
+
+  var roomUid = '';
+  try {
+    var sheetsAct = verifyDatabaseSchema(true);
+    var rowAct = dalGetProjectIndexRow_(projectId, sheetsAct);
+    if (rowAct) roomUid = dalReadCampaignRoom_(rowAct).campaignRoomUid || '';
+  } catch (eRoom) { /* ignore */ }
+
+  var snap = null;
+  try { snap = dalReadOpsStateFromFirestore_(projectId); } catch (eRead) { snap = null; }
+  if (!snap || !snap.present || String(snap.sessionUid || '') !== sessionUid) {
+    try {
+      if (typeof dalEnsureOpsElevated_ === 'function') {
+        dalEnsureOpsElevated_(projectId, roomUid, actor);
+      } else {
+        dalSnapshotOpsToFirestore_(projectId, roomUid, actor);
+      }
+      snap = dalReadOpsStateFromFirestore_(projectId);
+    } catch (eSnap) {
+      throw new Error('WARM_OPS_SEED_FAILED: ' + (eSnap && eSnap.message ? eSnap.message : eSnap));
+    }
+  }
+
+  var rows = (snap.rows || []).slice();
+  var vaultSheets = verifyVaultSchema(true);
+  var vaultData = getSheetData(vaultSheets.assets);
+  var vMap = vaultData.hMap;
+
+  var getMeta = function (id) {
+    for (var v = 1; v < vaultData.length; v++) {
+      if (String(vaultData[v][vMap['uid']]) === String(id)) {
+        return {
+          id: id,
+          assetCode: vaultData[v][vMap['unit_number']] || 'BULK',
+          name: vaultData[v][vMap['name']],
+          department: vaultData[v][vMap['department']],
+          tagValue: vaultData[v][vMap['rfid_tag']] || 'UNASSIGNED',
+          status: vaultData[v][vMap['status']],
+          type: vaultData[v][vMap['type']]
+        };
+      }
+    }
+    return null;
+  };
+
+  // Container children: prefer warm PA when prep open, else Sheets.
+  var childByContainer = {};
+  try {
+    var paList = [];
+    if (typeof resolveDalSessionStatus_ === 'function' &&
+        resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN &&
+        typeof getProjectAssetsFirestore_ === 'function') {
+      var paRes = getProjectAssetsFirestore_(projectId, '', '');
+      paList = (paRes && paRes.current) || [];
+      paList.forEach(function (pa) {
+        if (!pa || !pa.containerUid) return;
+        var cUid = String(pa.containerUid);
+        if (!childByContainer[cUid]) childByContainer[cUid] = [];
+        childByContainer[cUid].push({
+          assetId: pa.assetId,
+          qty: parseInt(pa.qty, 10) || 1
+        });
+      });
+    } else {
+      var sheetsPa = verifyDatabaseSchema(true);
+      var paData = sheetsPa.projectAssets.getDataRange().getValues();
+      var pMap = {};
+      if (paData.length > 0) paData[0].forEach(function (h, i) { pMap[h.toString().trim()] = i; });
+      for (var pi = 1; pi < paData.length; pi++) {
+        if (String(paData[pi][pMap['project_uid']]) !== String(projectId)) continue;
+        var cUid2 = String(paData[pi][pMap['container_uid']] || '');
+        if (!cUid2) continue;
+        if (!childByContainer[cUid2]) childByContainer[cUid2] = [];
+        childByContainer[cUid2].push({
+          assetId: paData[pi][pMap['asset_uid']],
+          qty: parseInt(paData[pi][pMap['assigned_quantity']], 10) || 1
+        });
+      }
+    }
+  } catch (ePa) { childByContainer = {}; }
+
+  (batch || []).forEach(function (op) {
+    if (!op || !op.assetId) return;
+    var meta = getMeta(op.assetId);
+    if (!meta) return;
+    var familyToProcess = [];
+    var limit = parseInt(op.scanQty || op.undoQty, 10) || 1;
+    var q;
+    for (q = 0; q < limit; q++) familyToProcess.push(meta);
+    var kids = childByContainer[String(op.assetId)] || [];
+    kids.forEach(function (kid) {
+      var cMeta = getMeta(kid.assetId);
+      if (!cMeta) return;
+      var kq;
+      for (kq = 0; kq < (kid.qty * limit); kq++) familyToProcess.push(cMeta);
+    });
+
+    if (op.action === 'scan') {
+      familyToProcess.forEach(function (m) {
+        var alreadyExists = rows.some(function (r) { return String(r.asset_uid) === String(m.id); });
+        if (!alreadyExists || m.type === 'Bulk') {
+          rows.push({
+            uid: Utilities.getUuid(),
+            session_uid: sessionUid,
+            project_uid: projectId,
+            operation_type: operationType,
+            asset_uid: m.id,
+            asset_code: m.assetCode,
+            asset_name: m.name,
+            department: m.department,
+            rfid_tag: m.tagValue,
+            timestamp: new Date().toISOString(),
+            actor: actor
+          });
+        }
+      });
+    } else if (op.action === 'undo') {
+      familyToProcess.forEach(function (m) {
+        for (var i = rows.length - 1; i >= 0; i--) {
+          if (String(rows[i].asset_uid) === String(m.id)) {
+            rows.splice(i, 1);
+            break;
+          }
+        }
+      });
+    }
+  });
+
+  var written = dalWriteOpsStateToFirestore_(projectId, rows, sessionUid, operationType, actor, roomUid);
+  try {
+    firestoreSetOpsSessionMeta_(projectId, {
+      roomUid: roomUid,
+      status: 'open',
+      domain: 'ops',
+      activeOperation: operationType,
+      activeSessionUid: sessionUid,
+      lastActivityAt: new Date().toISOString()
+    });
+  } catch (eMeta) { /* non-fatal */ }
+  try {
+    executeWithRetry(function () {
+      var sheets = verifyDatabaseSchema();
+      var row = dalGetProjectIndexRow_(projectId, sheets);
+      if (!row) return;
+      dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+        campaignLastActivityAt: new Date().toISOString()
+      });
+    });
+  } catch (eAct) { /* non-fatal */ }
+
+  writeToAuditLog(actor, 'UPDATE', 'DAL_OPS_FIRESTORE', projectId, sessionUid,
+    'Warm ops batch (R3d). rows=' + rows.length);
+  return {
+    success: true,
+    warm: true,
+    scannedCount: written.scannedCount,
+    scannedMap: written.scannedMap
+  };
+}
+
 // ==========================================
 // --- FINALIZE OPERATION & PDF GENERATION ---
 // ==========================================

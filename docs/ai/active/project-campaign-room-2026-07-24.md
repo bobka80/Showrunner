@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R3c @ GAS v761**. Next after smoke: **R3d**.  
-**Production tip:** see RELEASES.md. Latest: R3c meta identity @ **GAS v761**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — R3d ops slice shipping. Next after smoke: **R4**.  
+**Production tip:** see RELEASES.md. Latest before this ship: PA thin-snap @ **GAS v762**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -225,7 +225,7 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 - [x] Director **OK go** for **R3b** (warm Logistics Hub) — 2026-07-25
 - [x] Director **OK go** for **five-slice doctrine reframe** (docs) — 2026-07-31
 - [x] Director **OK go** for **R3c** (expand meta identity)
-- [ ] Director **OK go** for **R3d** (ops fifth slice)
+- [x] Director **OK go** for **R3d** (ops fifth slice)
 - [ ] Director **OK go** for **R4** (30m publish checkpoint, five-slice order)
 - [ ] Director **OK go** for **R4b** (listener-follows-user) — may ship with R5
 - [ ] Director **OK go** for **R5** (idle close + Exit polish)
@@ -311,13 +311,13 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 
 **Why here:** Avoid two-database sync while PA/ledger warm; snappy per-op Firebase docs; same checkpoint family; fail-safe ≥ B/C.
 
-- [ ] Director **OK go** for **R3d**
-- [ ] File Firebase shape: per-op keyed docs under `projects/{id}/ops/` (+ `_meta` / session as needed)
-- [ ] Warm path: checkout / check-in / scan batch write Firebase ops (not full Sheets rewrite)
-- [ ] Snapshot ops from Sheets on room/prep seed when needed; overlay reads while warm
-- [ ] Checkpoint + END ROOM / idle close commit ops → Sheets `Operations_Ledger`
-- [ ] Fail-safe: `dal_commit_backups` + `dal_commit_retry` + ROOT alert; **no fake success** if scans only in dying room
-- [ ] Cold / no-room fallback: existing Sheets atomic path until warm seed succeeds
+- [x] Director **OK go** for **R3d**
+- [x] File Firebase shape: per-op keyed docs under `projects/{id}/ops/` (+ `_meta` / session as needed)
+- [x] Warm path: checkout / check-in / scan batch write Firebase ops (not full Sheets rewrite)
+- [x] Snapshot ops from Sheets on room/prep seed when needed; overlay reads while warm
+- [x] Checkpoint + END ROOM / idle close commit ops → Sheets `Operations_Ledger`
+- [x] Fail-safe: `dal_commit_backups` + `dal_commit_retry` + ROOT alert; **no fake success** if scans only in dying room
+- [x] Cold / no-room fallback: existing Sheets atomic path until warm seed succeeds
 - [ ] Ship + smoke: warm room → scan wave live for peers → Sheets lag until checkpoint/End; kill network mid-commit → retry cue, no silent loss
 
 ### R4 — 30m publish checkpoint
@@ -391,4 +391,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | **Hub GENERATE @ GAS v759** — faster warm path (no double ensure / skip heal / return written shifts); install full load/unload shifts (not roster-only); 55s client safety unlock. |
 | 2026-08-04 | Timeline reopen wiped Hub AUTO (Sheets snapshot); rest engine treated trucks as crew. Fix: warm-seed before load; preserve AUTO on snapshot; skip AUTO/vehicles in rest. **@ GAS v760**. |
 | 2026-08-04 | **R3c @ GAS v761** — elevate name/client/location/readiness/sub-events to `meta/state`; warm Save & Sync → Firebase; END ROOM publishes Sheets + calendar; `getExistingProjects` overlays live meta. |
-| 2026-08-04 | PA enter flash: thin `assets/state` force-applied over full list → System “removed N”; refuse thin remotes. |
+| 2026-08-04 | PA enter flash: thin `assets/state` force-applied over full list → System “removed N”; refuse thin remotes. **@ GAS v762**. |
+| 2026-08-04 | **R3d** — warm RFID ops slice (`projects/{id}/ops/`); scan batches → Firebase; END ROOM / finalize publish Sheets. |

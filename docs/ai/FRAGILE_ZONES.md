@@ -501,6 +501,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **PA enter thin-snap flash (2026-08-04):** Opening Project Assets briefly showed full list then collapsed to a few rows with System “removed N” — thin `assets/state` (Hub leftover) was force-applied over richer cache/UI via `dalPaPreferLiveFixturesOverCache_` / heal tick. Guard: `dalPaIsThinRemoteVsLocal_` refuses thin remotes; prefer-cache + heal tick + state apply all use it.
 
+**Campaign Room R3d (2026-08-04):** RFID `Operations_Ledger` warm slice at `projects/{id}/ops/` (`_meta` + `state` + per-row `r_{uid}`). Warm checkout/check-in batches write Firebase; Sheets lag until finalize / END ROOM (`dalCommitOpsFromFirestore_`). Fail closed on commit (pocket + throw). Cold path unchanged.
+
 **Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+):** `pagehide`/`beforeunload` writes **localStorage unload flag** (RPCs often die on refresh) + best-effort presence leave + last-leave. **PA window paints immediately**; `dalGatePrepEnterForOrphan_` still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup.
 
 ```

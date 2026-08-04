@@ -15,6 +15,7 @@ var DAL_FIRESTORE_PA_COLLECTION = 'assets';
 var DAL_FIRESTORE_TIMELINE_COLLECTION = 'timeline';
 var DAL_FIRESTORE_META_COLLECTION = 'meta';
 var DAL_FIRESTORE_LOGISTICS_COLLECTION = 'logistics';
+var DAL_FIRESTORE_OPS_COLLECTION = 'ops';
 
 /** H4 — keep in sync with scripts/lib/dal-state-size-mirror-core.js */
 var DAL_STATE_WARN_BYTES = 512 * 1024;
@@ -659,6 +660,345 @@ function dalCommitLogisticsFromFirestore_(projectId, actor) {
   writeToAuditLog(actor || 'System', 'CLOSE', 'LOGISTICS_LEDGER', projectId, projectId,
     'Committed Campaign Room logistics slice to Sheets (' + (snap.legs || []).length + ' legs).');
   return { committed: true, count: (snap.legs || []).length };
+}
+
+// ==========================================
+// --- Campaign Room R3d — RFID Operations_Ledger warm slice ---
+// Shape: ops/_meta + ops/state (rowsJson) + per-row ops/r_{uid} (fail-safe).
+// Sheets lag until END ROOM / checkpoint.
+// ==========================================
+
+function dalFirestoreOpsCollection_(projectId) {
+  return 'projects/' + projectId + '/' + DAL_FIRESTORE_OPS_COLLECTION;
+}
+
+function dalOpsRowDocId_(uid) {
+  return 'r_' + String(uid || '').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 700);
+}
+
+function dalOpsPlainFromSheetRow_(row, lMap) {
+  if (!row || !lMap) return null;
+  var uid = lMap['uid'] !== undefined ? String(row[lMap['uid']] || '') : '';
+  if (!uid) uid = Utilities.getUuid();
+  return {
+    uid: uid,
+    session_uid: lMap['session_uid'] !== undefined ? String(row[lMap['session_uid']] || '') : '',
+    project_uid: lMap['project_uid'] !== undefined ? String(row[lMap['project_uid']] || '') : '',
+    operation_type: lMap['operation_type'] !== undefined ? String(row[lMap['operation_type']] || '') : '',
+    asset_uid: lMap['asset_uid'] !== undefined ? String(row[lMap['asset_uid']] || '') : '',
+    asset_code: lMap['asset_code'] !== undefined ? String(row[lMap['asset_code']] || '') : '',
+    asset_name: lMap['asset_name'] !== undefined ? String(row[lMap['asset_name']] || '') : '',
+    department: lMap['department'] !== undefined ? String(row[lMap['department']] || '') : '',
+    rfid_tag: lMap['rfid_tag'] !== undefined ? String(row[lMap['rfid_tag']] || '') : '',
+    timestamp: lMap['timestamp'] !== undefined ? String(row[lMap['timestamp']] || '') : '',
+    actor: lMap['actor'] !== undefined ? String(row[lMap['actor']] || '') : ''
+  };
+}
+
+function dalOpsScannedMapFromRows_(rows) {
+  var scannedMap = {};
+  var total = 0;
+  (rows || []).forEach(function (r) {
+    if (!r || !r.asset_uid) return;
+    var aId = String(r.asset_uid);
+    scannedMap[aId] = (scannedMap[aId] || 0) + 1;
+    total++;
+  });
+  return { scannedMap: scannedMap, scannedCount: total };
+}
+
+function dalReadOpsStateFromFirestore_(projectId) {
+  var doc;
+  try {
+    doc = firestoreFetch_('get', dalFirestoreOpsCollection_(projectId) + '/state');
+  } catch (e0) {
+    throw new Error('OPS_STATE_READ_FAILED: ' + (e0 && e0.message ? e0.message : e0));
+  }
+  if (!doc || !doc.fields) {
+    return {
+      present: false,
+      rows: [],
+      writeSeq: 0,
+      sessionUid: '',
+      operationType: '',
+      roomUid: '',
+      updatedAt: '',
+      updatedBy: ''
+    };
+  }
+  var plain = firestoreDecodeFields_(doc.fields);
+  var rows = [];
+  if (plain.rowsJson != null && plain.rowsJson !== '') {
+    try {
+      rows = JSON.parse(plain.rowsJson);
+    } catch (eParse) {
+      throw new Error('OPS_STATE_CORRUPT: rowsJson parse failed');
+    }
+  }
+  if (!Array.isArray(rows)) {
+    throw new Error('OPS_STATE_CORRUPT: rowsJson is not an array');
+  }
+  return {
+    present: true,
+    rows: rows,
+    writeSeq: Number(plain.writeSeq || 0) || 0,
+    sessionUid: plain.sessionUid || '',
+    operationType: plain.operationType || '',
+    roomUid: plain.roomUid || '',
+    updatedAt: plain.updatedAt || '',
+    updatedBy: plain.updatedBy || ''
+  };
+}
+
+/**
+ * Write warm ops working set + per-row docs (fail-safe ≥ PA B/C).
+ * rows = plain objects with uid keys.
+ */
+function dalWriteOpsStateToFirestore_(projectId, rows, sessionUid, operationType, actor, roomUid) {
+  rows = rows || [];
+  var rowsJson = JSON.stringify(rows);
+  var size = dalStateSizeReport_({ json: rowsJson, count: rows.length });
+  if (size.overMax) {
+    throw new Error(
+      'OPS_STATE_TOO_LARGE: ops state is ' + size.bytes + ' bytes / ' + size.count +
+      ' rows (max ' + DAL_STATE_MAX_BYTES + ' bytes or ' + DAL_STATE_MAX_COUNT + ').'
+    );
+  }
+  var prevSeq = 0;
+  try {
+    var st = dalReadOpsStateFromFirestore_(projectId);
+    if (st && st.present) prevSeq = Number(st.writeSeq || 0) || 0;
+  } catch (eSt) { prevSeq = 0; }
+
+  var prevIds = {};
+  try {
+    var prev = dalReadOpsStateFromFirestore_(projectId);
+    (prev.rows || []).forEach(function (r) {
+      if (r && r.uid) prevIds[String(r.uid)] = 1;
+    });
+  } catch (ePrev) { /* ignore */ }
+
+  var nextIds = {};
+  rows.forEach(function (r) {
+    if (!r || !r.uid) return;
+    var id = String(r.uid);
+    nextIds[id] = 1;
+    try {
+      firestoreWriteDocument_(dalFirestoreOpsCollection_(projectId) + '/' + dalOpsRowDocId_(id), r);
+    } catch (eRow) {
+      throw new Error('OPS_ROW_WRITE_FAILED: ' + id + ' — ' + (eRow && eRow.message ? eRow.message : eRow));
+    }
+  });
+  Object.keys(prevIds).forEach(function (id) {
+    if (nextIds[id]) return;
+    try {
+      firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/' + dalOpsRowDocId_(id));
+    } catch (eDel) { /* best-effort */ }
+  });
+
+  var counts = dalOpsScannedMapFromRows_(rows);
+  firestoreWriteDocument_(dalFirestoreOpsCollection_(projectId) + '/state', {
+    rowsJson: rowsJson,
+    writeSeq: prevSeq + 1,
+    sessionUid: String(sessionUid || ''),
+    operationType: String(operationType || ''),
+    scannedCount: counts.scannedCount,
+    scannedMapJson: JSON.stringify(counts.scannedMap || {}),
+    clientId: 'gas_ops_' + String(actor || 'system'),
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor || 'System',
+    roomUid: roomUid ? String(roomUid) : ''
+  });
+  return {
+    count: rows.length,
+    bytes: size.bytes,
+    overWarn: size.overWarn,
+    writeSeq: prevSeq + 1,
+    scannedCount: counts.scannedCount,
+    scannedMap: counts.scannedMap
+  };
+}
+
+/** Prefer live Firebase ops for active session; seed from Sheets only when missing. */
+function dalEnsureOpsElevated_(projectId, roomUid, actor) {
+  var peek = typeof dalLedgerPeekActiveSession_ === 'function'
+    ? dalLedgerPeekActiveSession_(projectId)
+    : { operationType: '', sessionUid: '' };
+  var sessionUid = String(peek.sessionUid || '');
+  try {
+    var live = dalReadOpsStateFromFirestore_(projectId);
+    if (live && live.present && sessionUid && String(live.sessionUid || '') === sessionUid) {
+      try {
+        firestoreSetOpsSessionMeta_(projectId, {
+          roomUid: roomUid ? String(roomUid) : '',
+          status: 'open',
+          domain: 'ops',
+          activeOperation: String(peek.operationType || live.operationType || ''),
+          activeSessionUid: sessionUid,
+          lastActivityAt: new Date().toISOString()
+        });
+      } catch (eM) { /* ignore */ }
+      return {
+        elevated: true,
+        already: true,
+        scannedCount: dalOpsScannedMapFromRows_(live.rows || []).scannedCount,
+        scannedMap: dalOpsScannedMapFromRows_(live.rows || []).scannedMap,
+        rows: live.rows || []
+      };
+    }
+  } catch (eLive) { /* seed below */ }
+  var seeded = dalSnapshotOpsToFirestore_(projectId, roomUid, actor);
+  var counts = dalOpsScannedMapFromRows_(
+    (dalReadOpsStateFromFirestore_(projectId).rows || [])
+  );
+  return {
+    elevated: true,
+    already: false,
+    scannedCount: counts.scannedCount,
+    scannedMap: counts.scannedMap,
+    writeSeq: seeded && seeded.writeSeq
+  };
+}
+
+/** Snapshot active-session Operations_Ledger rows → Firebase ops slice. */
+function dalSnapshotOpsToFirestore_(projectId, roomUid, actor) {
+  var peek = typeof dalLedgerPeekActiveSession_ === 'function'
+    ? dalLedgerPeekActiveSession_(projectId)
+    : { operationType: '', sessionUid: '' };
+  var sheets = verifyDatabaseSchema(true);
+  var ledgerData = sheets.opsLedger.getDataRange().getValues();
+  var lMap = {};
+  if (ledgerData.length > 0) ledgerData[0].forEach(function (h, i) { lMap[h.toString().trim()] = i; });
+  var rows = [];
+  var sessionUid = String(peek.sessionUid || '');
+  for (var i = 1; i < ledgerData.length; i++) {
+    var rowPid = lMap['project_uid'] !== undefined ? String(ledgerData[i][lMap['project_uid']] || '') : '';
+    var rowSid = lMap['session_uid'] !== undefined ? String(ledgerData[i][lMap['session_uid']] || '') : '';
+    if (sessionUid) {
+      if (rowSid !== sessionUid) continue;
+    } else if (rowPid !== String(projectId)) {
+      continue;
+    }
+    var plain = dalOpsPlainFromSheetRow_(ledgerData[i], lMap);
+    if (plain) rows.push(plain);
+  }
+  var meta = {
+    roomUid: roomUid ? String(roomUid) : '',
+    status: 'open',
+    openedAt: new Date().toISOString(),
+    openedBy: actor || 'System',
+    domain: 'ops',
+    activeOperation: String(peek.operationType || ''),
+    activeSessionUid: sessionUid
+  };
+  firestoreSetOpsSessionMeta_(projectId, meta);
+  return dalWriteOpsStateToFirestore_(projectId, rows, sessionUid, peek.operationType || '', actor, roomUid);
+}
+
+/**
+ * END ROOM — publish warm ops rows for active session → Sheets Operations_Ledger.
+ * Fail closed: pocket + throw (no fake success / no silent scan loss).
+ */
+function dalCommitOpsFromFirestore_(projectId, actor) {
+  var snap;
+  try {
+    snap = dalReadOpsStateFromFirestore_(projectId);
+  } catch (eRead) {
+    try {
+      dalPocketFailedWrite_({
+        projectId: projectId,
+        domain: 'ops',
+        sessionUid: '',
+        deltaId: 'ops_commit_read',
+        expectedSig: 'readable',
+        actualSig: 'read_failed',
+        mismatchNote: String(eRead && eRead.message ? eRead.message : eRead),
+        actor: actor || 'System',
+        payload: { kind: 'ops_commit' }
+      });
+    } catch (eP) { /* ignore */ }
+    throw eRead;
+  }
+  if (!snap || !snap.present) {
+    try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/_meta'); } catch (e0) { /* ignore */ }
+    try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/state'); } catch (e1) { /* ignore */ }
+    return { committed: false, empty: true };
+  }
+
+  var sessionUid = String(snap.sessionUid || '');
+  var rows = snap.rows || [];
+  var size = dalStateSizeReport_({ json: JSON.stringify(rows), count: rows.length });
+  if (size.overMax) {
+    throw new Error('OPS_STATE_TOO_LARGE: cannot commit — ' + size.bytes + ' bytes / ' + size.count + ' rows.');
+  }
+
+  try {
+    executeWithRetry(function () {
+      var sheets = verifyDatabaseSchema();
+      var ledgerData = sheets.opsLedger.getDataRange().getValues();
+      var lMap = {};
+      if (ledgerData.length > 0) ledgerData[0].forEach(function (h, i) { lMap[h.toString().trim()] = i; });
+      var colCount = ledgerData.length > 0 ? ledgerData[0].length : 11;
+
+      if (sessionUid) {
+        dalDeleteRowsByColumn_(sheets.opsLedger, 'session_uid', sessionUid);
+      }
+
+      if (rows.length) {
+        var sheetRows = rows.map(function (r) {
+          var arr = new Array(colCount).fill('');
+          if (lMap['uid'] !== undefined) arr[lMap['uid']] = r.uid || Utilities.getUuid();
+          if (lMap['session_uid'] !== undefined) arr[lMap['session_uid']] = r.session_uid || sessionUid;
+          if (lMap['project_uid'] !== undefined) arr[lMap['project_uid']] = r.project_uid || projectId;
+          if (lMap['operation_type'] !== undefined) arr[lMap['operation_type']] = r.operation_type || snap.operationType || '';
+          if (lMap['asset_uid'] !== undefined) arr[lMap['asset_uid']] = r.asset_uid || '';
+          if (lMap['asset_code'] !== undefined) arr[lMap['asset_code']] = r.asset_code || '';
+          if (lMap['asset_name'] !== undefined) arr[lMap['asset_name']] = r.asset_name || '';
+          if (lMap['department'] !== undefined) arr[lMap['department']] = r.department || '';
+          if (lMap['rfid_tag'] !== undefined) arr[lMap['rfid_tag']] = r.rfid_tag || '';
+          if (lMap['timestamp'] !== undefined) arr[lMap['timestamp']] = r.timestamp || new Date().toISOString();
+          if (lMap['actor'] !== undefined) arr[lMap['actor']] = r.actor || actor || 'System';
+          return arr;
+        });
+        dalAppendRows_(sheets.opsLedger, sheetRows);
+      }
+      try { flushCache(); } catch (eC) { /* ignore */ }
+    });
+  } catch (eCommit) {
+    try {
+      dalPocketFailedWrite_({
+        projectId: projectId,
+        domain: 'ops',
+        sessionUid: sessionUid,
+        deltaId: 'ops_commit',
+        expectedSig: 'sheets_write',
+        actualSig: 'failed',
+        mismatchNote: String(eCommit && eCommit.message ? eCommit.message : eCommit),
+        actor: actor || 'System',
+        payload: { kind: 'ops_commit', rows: rows, sessionUid: sessionUid }
+      });
+      if (typeof dalAlertFailedWrite_ === 'function') {
+        dalAlertFailedWrite_(projectId, 'ops', actor, 'Ops commit to Sheets failed — scans kept on Firebase.');
+      }
+    } catch (eP2) { /* ignore */ }
+    throw eCommit;
+  }
+
+  // Clear per-row docs + state/_meta after successful Sheets publish.
+  try {
+    rows.forEach(function (r) {
+      if (!r || !r.uid) return;
+      try {
+        firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/' + dalOpsRowDocId_(r.uid));
+      } catch (eR) { /* ignore */ }
+    });
+  } catch (eList) { /* ignore */ }
+  try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/_meta'); } catch (eM) { /* ignore */ }
+  try { firestoreDeleteDocument_(dalFirestoreOpsCollection_(projectId) + '/state'); } catch (eS) { /* ignore */ }
+
+  writeToAuditLog(actor || 'System', 'CLOSE', 'OPERATIONS_LEDGER', projectId, projectId,
+    'Committed Campaign Room ops slice to Sheets (' + rows.length + ' rows).');
+  return { committed: true, count: rows.length, sessionUid: sessionUid };
 }
 
 function dalLoadPaProjectRowsFromFirestore_(projectId, header, map) {

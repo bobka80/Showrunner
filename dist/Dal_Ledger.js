@@ -177,9 +177,42 @@ function dalReconcileLedgerBatch_(projectId, sessionUid, result, actor, opId, ba
 
 /**
  * Atomic hub path for scan/undo batches (design lock §2).
+ * R3d: Campaign Room warm → Firebase ops slice (Sheets lag until END ROOM).
  */
 function batchProcessOperationsAtomic_(projectId, batch, actor) {
   actor = actor || 'System UI';
+  if (typeof dalCampaignRoomIsWarmForProject_ === 'function' &&
+      dalCampaignRoomIsWarmForProject_(projectId) &&
+      typeof batchProcessOperationsFirestore_ === 'function') {
+    var opIdW = Utilities.getUuid();
+    var peekW = dalLedgerPeekActiveSession_(projectId);
+    var journaledW = dalLedgerJournalBegin_(projectId, opIdW, 'batch_warm', {
+      actor: actor,
+      sessionUid: peekW.sessionUid,
+      operationType: peekW.operationType,
+      batchJson: JSON.stringify(batch || []).slice(0, 200000)
+    });
+    try {
+      var warmRes = batchProcessOperationsFirestore_(projectId, batch, actor);
+      if (journaledW) {
+        dalLedgerJournalFinish_(projectId, opIdW, 'committed', {
+          warm: true,
+          scannedCount: (warmRes && warmRes.scannedCount) || 0
+        });
+      }
+      return warmRes;
+    } catch (eWarm) {
+      if (journaledW) {
+        dalLedgerJournalFinish_(projectId, opIdW, 'failed', {
+          error: eWarm.message || String(eWarm),
+          warm: true
+        });
+      }
+      // Fail closed while warm — do not silently grind Sheets (would fork two SoTs).
+      throw eWarm;
+    }
+  }
+
   var opId = Utilities.getUuid();
   var peek = dalLedgerPeekActiveSession_(projectId);
   var journaled = dalLedgerJournalBegin_(projectId, opId, 'batch', {
@@ -235,6 +268,34 @@ function startEventOperationAtomic_(projectId, operationType, actor) {
     throw eStart;
   }
 
+  // R3d: seed / overlay warm ops slice after Index Active_* is set.
+  if (typeof dalCampaignRoomIsWarmForProject_ === 'function' &&
+      dalCampaignRoomIsWarmForProject_(projectId) &&
+      typeof dalEnsureOpsElevated_ === 'function') {
+    try {
+      var roomUid = '';
+      try {
+        var sheetsAct = verifyDatabaseSchema(true);
+        var rowAct = dalGetProjectIndexRow_(projectId, sheetsAct);
+        if (rowAct) roomUid = dalReadCampaignRoom_(rowAct).campaignRoomUid || '';
+      } catch (eR) { /* ignore */ }
+      var seeded = dalEnsureOpsElevated_(projectId, roomUid, actor);
+      if (result && seeded) {
+        result.scannedCount = seeded.scannedCount;
+        result.scannedMap = seeded.scannedMap;
+        result.warm = true;
+      }
+    } catch (eOpsSeed) {
+      if (journaled) {
+        dalLedgerJournalFinish_(projectId, opId, 'failed', {
+          error: 'ops_seed: ' + (eOpsSeed.message || eOpsSeed),
+          warm: true
+        });
+      }
+      throw new Error('WARM_OPS_SEED_FAILED: ' + (eOpsSeed && eOpsSeed.message ? eOpsSeed.message : eOpsSeed));
+    }
+  }
+
   if (journaled && result && result.success) {
     var peek = dalLedgerPeekActiveSession_(projectId);
     var ok = String(peek.operationType) === String(operationType) && !!peek.sessionUid;
@@ -261,7 +322,8 @@ function startEventOperationAtomic_(projectId, operationType, actor) {
     } else {
       dalLedgerJournalFinish_(projectId, opId, 'committed', {
         sessionUid: peek.sessionUid,
-        operationType: peek.operationType
+        operationType: peek.operationType,
+        warm: !!result.warm
       });
     }
   }
@@ -278,6 +340,27 @@ function finalizeEventOperationAtomic_(projectId, actor) {
     operationType: before.operationType,
     note: 'finalizeEventOperation'
   });
+
+  var warm = typeof dalCampaignRoomIsWarmForProject_ === 'function' &&
+    dalCampaignRoomIsWarmForProject_(projectId);
+
+  // R3d: publish warm ops to Sheets before finalize clears the session.
+  if (warm && typeof dalCommitOpsFromFirestore_ === 'function') {
+    try {
+      var commitRes = dalCommitOpsFromFirestore_(projectId, actor);
+      if (commitRes && commitRes.empty && before.sessionUid) {
+        // Warm session with no Firebase rows — may still have Sheets rows; Sheets finalize OK.
+      }
+    } catch (eOpsCommit) {
+      if (journaled) {
+        dalLedgerJournalFinish_(projectId, opId, 'failed', {
+          error: eOpsCommit.message || String(eOpsCommit),
+          warm: true
+        });
+      }
+      throw eOpsCommit;
+    }
+  }
 
   var result;
   try {
@@ -311,7 +394,8 @@ function finalizeEventOperationAtomic_(projectId, actor) {
     } else {
       dalLedgerJournalFinish_(projectId, opId, 'committed', {
         previousSessionUid: before.sessionUid,
-        previousOperationType: before.operationType
+        previousOperationType: before.operationType,
+        warm: warm
       });
     }
   }

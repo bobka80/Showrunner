@@ -677,6 +677,14 @@ function finishDalSession(projectId, sessionUid, actor) {
             'Logistics snapshot skipped: ' + (eLlSnap && eLlSnap.message ? eLlSnap.message : eLlSnap));
         } catch (eAud) { /* ignore */ }
       }
+      try {
+        if (typeof dalEnsureOpsElevated_ === 'function') dalEnsureOpsElevated_(projectId, roomUid, actor);
+      } catch (eOpsSnap) {
+        try {
+          writeToAuditLog(actor, 'WARN', 'OPERATIONS_LEDGER', projectId, sessionUid,
+            'Ops snapshot skipped: ' + (eOpsSnap && eOpsSnap.message ? eOpsSnap.message : eOpsSnap));
+        } catch (eAud2) { /* ignore */ }
+      }
     } else if (sessionType === DAL_SESSION_TYPE.TIMELINE_COLLAB) {
       dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, 'main', roomUid);
     } else {
@@ -933,6 +941,21 @@ function closeDalCampaignRoom(projectId, actor) {
         'Logistics commit failed: ' + (eLlCommit && eLlCommit.message ? eLlCommit.message : eLlCommit));
     } catch (eAudLl) { /* ignore */ }
     throw eLlCommit;
+  }
+
+  // R3d: publish warm RFID ops slice.
+  try {
+    if (typeof dalCommitOpsFromFirestore_ === 'function') {
+      var opsRes = dalCommitOpsFromFirestore_(projectId, actor);
+      if (opsRes && opsRes.committed) closed.push('ops');
+      else if (opsRes && opsRes.empty) closed.push('ops:empty');
+    }
+  } catch (eOpsCommit) {
+    try {
+      writeToAuditLog(actor, 'ERROR', 'DAL_CAMPAIGN_ROOM', projectId, plan.roomUid || '',
+        'Ops commit failed: ' + (eOpsCommit && eOpsCommit.message ? eOpsCommit.message : eOpsCommit));
+    } catch (eAudOps) { /* ignore */ }
+    throw eOpsCommit;
   }
 
   executeWithRetry(function () {
@@ -1222,6 +1245,12 @@ function dalEnsureWarmHubWorkspace_(projectId, actor, opts) {
       try { dalSnapshotLogisticsToFirestore_(projectId, roomUid, actor); } catch (eLl2) { /* arrange seeds */ }
     }
   }
+
+  try {
+    if (typeof dalEnsureOpsElevated_ === 'function') {
+      dalEnsureOpsElevated_(projectId, roomUid, actor);
+    }
+  } catch (eOps) { /* ops seed non-fatal until first scan */ }
 
   if (opts.needTimeline && !timelineOpen) {
     dalOpenTimelineForWarmHub_(projectId, actor);

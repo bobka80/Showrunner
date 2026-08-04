@@ -26,5 +26,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isShowrunnerClient() && docId != '_meta';
     }
+    // Campaign Room R3d — RFID ops live slice; _meta GAS-only.
+    match /projects/{projectId}/ops/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isShowrunnerClient() && docId != '_meta';
+    }
   }
 }
