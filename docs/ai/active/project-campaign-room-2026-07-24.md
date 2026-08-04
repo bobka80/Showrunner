@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Hub GENERATE fix @ **GAS v759**. Next after smoke: **R3c**.  
-**Production tip:** see RELEASES.md. Latest: Hub GENERATE @ **GAS v759**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — R3c meta identity @ shipping. Next after smoke: **R3d**.  
+**Production tip:** see RELEASES.md. Latest before this ship: Timeline AUTO / rest skip @ **GAS v760**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -224,7 +224,7 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 - [x] Director **OK go** for **R3** (ledger slice in room) — 2026-07-24
 - [x] Director **OK go** for **R3b** (warm Logistics Hub) — 2026-07-25
 - [x] Director **OK go** for **five-slice doctrine reframe** (docs) — 2026-07-31
-- [ ] Director **OK go** for **R3c** (expand meta identity)
+- [x] Director **OK go** for **R3c** (expand meta identity)
 - [ ] Director **OK go** for **R3d** (ops fifth slice)
 - [ ] Director **OK go** for **R4** (30m publish checkpoint, five-slice order)
 - [ ] Director **OK go** for **R4b** (listener-follows-user) — may ship with R5
@@ -299,12 +299,12 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 
 **Why here:** Timeline/sub-events and peers need live identity without Sheets round-trip; checkpoint should publish a complete meta slice.
 
-- [ ] Director **OK go** for **R3c**
-- [ ] Elevate name, client, location, inside/outside into Firebase `meta` on warm
-- [ ] Elevate sub-events (`Project_Timelines` calendar blocks) into meta (or agreed meta sub-doc) while warm
-- [ ] Writers: project editor Save & Sync / identity edits → warm meta when room open
-- [ ] Readers: warm peers / timeline context read Firebase meta, not Sheets lag
-- [ ] END ROOM / checkpoint publish identity back to Index + `Project_Timelines` as needed
+- [x] Director **OK go** for **R3c**
+- [x] Elevate name, client, location, inside/outside into Firebase `meta` on warm
+- [x] Elevate sub-events (`Project_Timelines` calendar blocks) into meta (or agreed meta sub-doc) while warm
+- [x] Writers: project editor Save & Sync / identity edits → warm meta when room open
+- [x] Readers: warm peers / timeline context read Firebase meta, not Sheets lag
+- [x] END ROOM / checkpoint publish identity back to Index + `Project_Timelines` as needed
 - [ ] Ship + smoke: edit name/client/sub-event mid-warm → peer sees live; Sheets lag until publish
 
 ### R3d — Ops fifth slice (RFID Operations_Ledger)
@@ -389,4 +389,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | **PA wipe hotfix @ GAS v758** — thin `assets/state` after Hub/arrange wiped prep UI; heal from collection on get; refuse thin gas mirrors; re-list for state rebuild. |
 | 2026-08-04 | Hub GENERATE stuck + truck on Timeline without load/unload bars — thin client assigned-only apply; server path too heavy (timeout). |
 | 2026-08-04 | **Hub GENERATE @ GAS v759** — faster warm path (no double ensure / skip heal / return written shifts); install full load/unload shifts (not roster-only); 55s client safety unlock. |
-| 2026-08-04 | Timeline reopen wiped Hub AUTO (Sheets snapshot); rest engine treated trucks as crew. Fix: warm-seed before load; preserve AUTO on snapshot; skip AUTO/vehicles in rest. |
+| 2026-08-04 | Timeline reopen wiped Hub AUTO (Sheets snapshot); rest engine treated trucks as crew. Fix: warm-seed before load; preserve AUTO on snapshot; skip AUTO/vehicles in rest. **@ GAS v760**. |
+| 2026-08-04 | **R3c meta identity** — elevate name/client/location/readiness/sub-events to `meta/state`; warm Save & Sync → Firebase; END ROOM publishes Sheets + calendar. |

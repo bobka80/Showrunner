@@ -10,129 +10,154 @@
 function saveProjectData(projectData, timelinesArray, actor = "System UI") {
   return executeWithRetry(() => {
     projectData = enforceCrossRentOnlyProjectFields_(actor, projectData || {});
-    const sheets = verifyDatabaseSchema();
-    const projectId = projectData.Project_ID || Utilities.getUuid();
     const isNewProject = !projectData.Project_ID;
-    let newTimestamp = new Date().toISOString();
-    let resolvedProjectId = projectId;
-    let mergedFromDuplicate = false;
-    
-    // 1. UPSERT PARENT (Projects_Index)
-    let indexData = sheets.index.getDataRange().getValues();
-    let iCols = indexData.length > 0 ? indexData[0].length : 8;
-    let iMap = {};
-    if(indexData.length > 0) indexData[0].forEach((h,i)=>iMap[h.toString().trim()]=i);
-    let rowIndex = -1;
-    let existingState = ""; // Deprecated JSON State
-    let existingReadiness = "{}";
-    
-    // --- ANTI-DUPLICATION ENGINE (NEW PROJECTS) ---
-    // Double-submit guard: reuse the row created in the last 60s, but still save timelines.
-    if (isNewProject) {
-        let targetName = String(projectData.Project_Name || "Unnamed Event").toLowerCase().trim();
-        let nowEpoch = new Date().getTime();
-        for (let i = 1; i < indexData.length; i++) {
-            let dbName = String(indexData[i][iMap['Project_Name']] || "").toLowerCase().trim();
-            if (dbName === targetName) {
-                let dbTime = new Date(indexData[i][iMap['Last_Updated']]).getTime();
-                if (nowEpoch - dbTime < 60000) {
-                    resolvedProjectId = indexData[i][iMap['uid']];
-                    mergedFromDuplicate = true;
-                    break;
+    const existingId = projectData.Project_ID || '';
+    // R3c: warm room → Firebase meta identity (Sheets lag until END ROOM).
+    if (!isNewProject && existingId && existingId !== 'NEW' &&
+        typeof dalCampaignRoomIsWarmForProject_ === 'function' &&
+        dalCampaignRoomIsWarmForProject_(existingId) &&
+        typeof dalSaveProjectIdentityWarm_ === 'function') {
+      return dalSaveProjectIdentityWarm_(projectData, timelinesArray, actor);
+    }
+    return saveProjectDataSheets_(projectData, timelinesArray, actor, {});
+  });
+}
+
+/**
+ * Sheets SoT write for project identity + Project_Timelines fragments.
+ * opts.skipCollision — END ROOM meta commit (Sheets Last_Updated may lag).
+ */
+function saveProjectDataSheets_(projectData, timelinesArray, actor, opts) {
+  return executeWithRetry(function () {
+  opts = opts || {};
+  projectData = enforceCrossRentOnlyProjectFields_(actor, projectData || {});
+  const sheets = verifyDatabaseSchema();
+  const projectId = projectData.Project_ID || Utilities.getUuid();
+  const isNewProject = !projectData.Project_ID;
+  let newTimestamp = new Date().toISOString();
+  let resolvedProjectId = projectId;
+  let mergedFromDuplicate = false;
+  
+  // 1. UPSERT PARENT (Projects_Index)
+  let indexData = sheets.index.getDataRange().getValues();
+  let iCols = indexData.length > 0 ? indexData[0].length : 8;
+  let iMap = {};
+  if(indexData.length > 0) indexData[0].forEach((h,i)=>iMap[h.toString().trim()]=i);
+  let rowIndex = -1;
+  let existingState = ""; // Deprecated JSON State
+  let existingReadiness = "{}";
+  
+  // --- ANTI-DUPLICATION ENGINE (NEW PROJECTS) ---
+  // Double-submit guard: reuse the row created in the last 60s, but still save timelines.
+  if (isNewProject) {
+      let targetName = String(projectData.Project_Name || "Unnamed Event").toLowerCase().trim();
+      let nowEpoch = new Date().getTime();
+      for (let i = 1; i < indexData.length; i++) {
+          let dbName = String(indexData[i][iMap['Project_Name']] || "").toLowerCase().trim();
+          if (dbName === targetName) {
+              let dbTime = new Date(indexData[i][iMap['Last_Updated']]).getTime();
+              if (nowEpoch - dbTime < 60000) {
+                  resolvedProjectId = indexData[i][iMap['uid']];
+                  mergedFromDuplicate = true;
+                  break;
+              }
+          }
+      }
+  }
+  // ----------------------------------------------
+
+  // Find the row and perform concurrency check
+  let existingDbName = "";
+  let existingDbStatus = "";
+  for (let i = 1; i < indexData.length; i++) {
+    if (indexData[i][iMap['uid']] === resolvedProjectId) {
+        if (!opts.skipCollision && !isNewProject && !mergedFromDuplicate && iMap['Last_Updated'] !== undefined) {
+            let dbTimestamp = indexData[i][iMap['Last_Updated']];
+            let clientTimestamp = projectData.Last_Updated;
+            if (dbTimestamp && clientTimestamp) {
+                let t1 = new Date(dbTimestamp).getTime();
+                let t2 = new Date(clientTimestamp).getTime();
+                if (Math.abs(t1 - t2) > 2000) {
+                    throw new Error("COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.");
                 }
             }
         }
+        if (iMap['Project_Name'] !== undefined) existingDbName = String(indexData[i][iMap['Project_Name']] || "");
+        if (iMap['Status'] !== undefined) existingDbStatus = String(indexData[i][iMap['Status']] || "");
+        rowIndex = i + 1;
+        if (iMap['Checklist_State'] !== undefined) existingState = indexData[i][iMap['Checklist_State']];
+        if (iMap['Readiness_State'] !== undefined) existingReadiness = indexData[i][iMap['Readiness_State']];
+        break;
     }
-    // ----------------------------------------------
+  }
 
-    // Find the row and perform concurrency check
-    let existingDbName = "";
-    let existingDbStatus = "";
-    for (let i = 1; i < indexData.length; i++) {
-      if (indexData[i][iMap['uid']] === resolvedProjectId) {
-          if (!isNewProject && !mergedFromDuplicate && iMap['Last_Updated'] !== undefined) {
-              let dbTimestamp = indexData[i][iMap['Last_Updated']];
-              let clientTimestamp = projectData.Last_Updated;
-              if (dbTimestamp && clientTimestamp) {
-                  let t1 = new Date(dbTimestamp).getTime();
-                  let t2 = new Date(clientTimestamp).getTime();
-                  if (Math.abs(t1 - t2) > 2000) {
-                      throw new Error("COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.");
-                  }
-              }
-          }
-          if (iMap['Project_Name'] !== undefined) existingDbName = String(indexData[i][iMap['Project_Name']] || "");
-          if (iMap['Status'] !== undefined) existingDbStatus = String(indexData[i][iMap['Status']] || "");
-          rowIndex = i + 1;
-          if (iMap['Checklist_State'] !== undefined) existingState = indexData[i][iMap['Checklist_State']];
-          if (iMap['Readiness_State'] !== undefined) existingReadiness = indexData[i][iMap['Readiness_State']];
-          break;
-      }
-    }
-
-    if (!isNewProject && !verifyBackendPrivilege(actor, 'MANAGER')) {
-      projectData.Project_Name = existingDbName || projectData.Project_Name;
-      projectData.Status = existingDbStatus || projectData.Status;
-    }
-    
-    let rowContent = new Array(iCols).fill("");
-    if(iMap['uid'] !== undefined) rowContent[iMap['uid']] = resolvedProjectId;
-    if(iMap['Project_Name'] !== undefined) rowContent[iMap['Project_Name']] = projectData.Project_Name || "Unnamed Event";
-    if(iMap['Client'] !== undefined) rowContent[iMap['Client']] = projectData.Client || "";
-    if(iMap['Status'] !== undefined) rowContent[iMap['Status']] = projectData.Status || "Draft";
-    if(iMap['Folder_ID'] !== undefined) rowContent[iMap['Folder_ID']] = projectData.Folder_ID || "";
-    if(iMap['Manager_Email'] !== undefined) rowContent[iMap['Manager_Email']] = projectData.Manager_Email || "";
-    if(iMap['Project_Type'] !== undefined) rowContent[iMap['Project_Type']] = projectData.Type || "Event";
-    if(iMap['Checklist_State'] !== undefined) rowContent[iMap['Checklist_State']] = existingState;
-    if(iMap['Last_Updated'] !== undefined) rowContent[iMap['Last_Updated']] = newTimestamp;
-    if(iMap['Readiness_State'] !== undefined) rowContent[iMap['Readiness_State']] = projectData.Readiness_State || existingReadiness;
-    if(iMap['Location_URL'] !== undefined) rowContent[iMap['Location_URL']] = projectData.Location_URL || "";
-    if(iMap['Difficulty_Multiplier'] !== undefined) rowContent[iMap['Difficulty_Multiplier']] = projectData.Difficulty_Multiplier || 1.0;
-    
-    if (rowIndex > -1) {
-      sheets.index.getRange(rowIndex, 1, 1, rowContent.length).setValues([rowContent]);
-    } else {
-      sheets.index.appendRow(rowContent);
-    }
-    
-    // 2. SYNC FRAGMENTED CHILDREN (Project_Timelines)
-    let timelineData = sheets.timelines.getDataRange().getValues();
-    let tCols = timelineData.length > 0 ? timelineData[0].length : 7;
-    let tMap = {};
-    if(timelineData.length > 0) timelineData[0].forEach((h,i)=>tMap[h.toString().trim()]=i);
-    let tPidCol = tMap['project_uid'] !== undefined ? tMap['project_uid'] : tMap['Project_ID'];
-    let keptRows = [timelineData[0]];
-    
-    // Identify existing rows for this project to wipe them (Swiss Cheese Sync)
-    for (let i = 1; i < timelineData.length; i++) {
-      let rowPid = (tPidCol !== undefined) ? timelineData[i][tPidCol] : timelineData[i][1];
-      if (rowPid !== resolvedProjectId) keptRows.push(timelineData[i]);
-    }
-    sheets.timelines.clearContents();
-    if (keptRows.length > 0) sheets.timelines.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
-    
-    // Inject new fragmented rows
-    if (timelinesArray && timelinesArray.length > 0) {
-      let newRows = timelinesArray.map(t => {
-        let r = new Array(tCols).fill("");
-        if(tMap['uid'] !== undefined) r[tMap['uid']] = t.uid || t.id || Utilities.getUuid();
-        if(tPidCol !== undefined) r[tPidCol] = resolvedProjectId;
-        else if (r.length > 1) r[1] = resolvedProjectId;
-        if(tMap['Sub_Event_Type'] !== undefined) r[tMap['Sub_Event_Type']] = t.Sub_Event_Type || "MAIN";
-        if(tMap['Event_Date'] !== undefined) r[tMap['Event_Date']] = t.Event_Date || "";
-        if(tMap['Start_Time'] !== undefined) r[tMap['Start_Time']] = t.Start_Time ? `'${t.Start_Time}` : "";
-        if(tMap['End_Time'] !== undefined) r[tMap['End_Time']] = t.End_Time ? `'${t.End_Time}` : "";
-        if(tMap['Note'] !== undefined) r[tMap['Note']] = t.Note || "";
-        return r;
-      });
-      sheets.timelines.getRange(keptRows.length + 1, 1, newRows.length, tCols).setValues(newRows);
-    }
-    
-    if (typeof flushCache !== 'undefined') flushCache();
-    SpreadsheetApp.flush();
-    let actionLabel = (isNewProject && !mergedFromDuplicate) ? "CREATE" : "UPDATE";
-    writeToAuditLog(actor, actionLabel, "PROJECTS", resolvedProjectId, resolvedProjectId, `Saved project data & ${timelinesArray ? timelinesArray.length : 0} timeline fragment(s).`);
-    return JSON.stringify({ id: resolvedProjectId, timestamp: newTimestamp });
+  if (!isNewProject && !verifyBackendPrivilege(actor, 'MANAGER')) {
+    projectData.Project_Name = existingDbName || projectData.Project_Name;
+    projectData.Status = existingDbStatus || projectData.Status;
+  }
+  
+  let rowContent = new Array(iCols).fill("");
+  if(iMap['uid'] !== undefined) rowContent[iMap['uid']] = resolvedProjectId;
+  if(iMap['Project_Name'] !== undefined) rowContent[iMap['Project_Name']] = projectData.Project_Name || "Unnamed Event";
+  if(iMap['Client'] !== undefined) rowContent[iMap['Client']] = projectData.Client || "";
+  if(iMap['Status'] !== undefined) rowContent[iMap['Status']] = projectData.Status || "Draft";
+  if(iMap['Folder_ID'] !== undefined) rowContent[iMap['Folder_ID']] = projectData.Folder_ID || "";
+  if(iMap['Manager_Email'] !== undefined) rowContent[iMap['Manager_Email']] = projectData.Manager_Email || "";
+  if(iMap['Project_Type'] !== undefined) rowContent[iMap['Project_Type']] = projectData.Type || "Event";
+  if(iMap['Checklist_State'] !== undefined) rowContent[iMap['Checklist_State']] = existingState;
+  if(iMap['Last_Updated'] !== undefined) rowContent[iMap['Last_Updated']] = newTimestamp;
+  if(iMap['Readiness_State'] !== undefined) rowContent[iMap['Readiness_State']] = projectData.Readiness_State || existingReadiness;
+  if(iMap['Location_URL'] !== undefined) rowContent[iMap['Location_URL']] = projectData.Location_URL || "";
+  if(iMap['Difficulty_Multiplier'] !== undefined) rowContent[iMap['Difficulty_Multiplier']] = projectData.Difficulty_Multiplier || 1.0;
+  
+  if (rowIndex > -1) {
+    sheets.index.getRange(rowIndex, 1, 1, rowContent.length).setValues([rowContent]);
+  } else {
+    sheets.index.appendRow(rowContent);
+  }
+  
+  // 2. SYNC FRAGMENTED CHILDREN (Project_Timelines)
+  let timelineData = sheets.timelines.getDataRange().getValues();
+  let tCols = timelineData.length > 0 ? timelineData[0].length : 7;
+  let tMap = {};
+  if(timelineData.length > 0) timelineData[0].forEach((h,i)=>tMap[h.toString().trim()]=i);
+  let tPidCol = tMap['project_uid'] !== undefined ? tMap['project_uid'] : tMap['Project_ID'];
+  let keptRows = [timelineData[0]];
+  
+  // Identify existing rows for this project to wipe them (Swiss Cheese Sync)
+  for (let i = 1; i < timelineData.length; i++) {
+    let rowPid = (tPidCol !== undefined) ? timelineData[i][tPidCol] : timelineData[i][1];
+    if (rowPid !== resolvedProjectId) keptRows.push(timelineData[i]);
+  }
+  sheets.timelines.clearContents();
+  if (keptRows.length > 0) sheets.timelines.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
+  
+  // Inject new fragmented rows
+  if (timelinesArray && timelinesArray.length > 0) {
+    let newRows = timelinesArray.map(t => {
+      let r = new Array(tCols).fill("");
+      if(tMap['uid'] !== undefined) r[tMap['uid']] = t.uid || t.id || Utilities.getUuid();
+      if(tPidCol !== undefined) r[tPidCol] = resolvedProjectId;
+      else if (r.length > 1) r[1] = resolvedProjectId;
+      if(tMap['Sub_Event_Type'] !== undefined) r[tMap['Sub_Event_Type']] = t.Sub_Event_Type || "MAIN";
+      if(tMap['Event_Date'] !== undefined) r[tMap['Event_Date']] = t.Event_Date || "";
+      if(tMap['Start_Time'] !== undefined) r[tMap['Start_Time']] = t.Start_Time ? `'${t.Start_Time}` : "";
+      if(tMap['End_Time'] !== undefined) r[tMap['End_Time']] = t.End_Time ? `'${t.End_Time}` : "";
+      if(tMap['Note'] !== undefined) r[tMap['Note']] = t.Note || "";
+      return r;
+    });
+    sheets.timelines.getRange(keptRows.length + 1, 1, newRows.length, tCols).setValues(newRows);
+  }
+  
+  if (typeof flushCache !== 'undefined') flushCache();
+  SpreadsheetApp.flush();
+  let actionLabel = opts.fromMetaCommit
+    ? "COMMIT"
+    : ((isNewProject && !mergedFromDuplicate) ? "CREATE" : "UPDATE");
+  writeToAuditLog(actor, actionLabel, "PROJECTS", resolvedProjectId, resolvedProjectId,
+    (opts.fromMetaCommit ? 'Published warm meta identity (R3c). ' : '') +
+    `Saved project data & ${timelinesArray ? timelinesArray.length : 0} timeline fragment(s).`);
+  return JSON.stringify({ id: resolvedProjectId, timestamp: newTimestamp });
   });
 }
 
@@ -149,6 +174,20 @@ function updateProjectFolderId(projectId, folderId) {
       }
     }
     if (typeof flushCache !== 'undefined') flushCache();
+    // R3c: keep warm meta folderId in sync (Sheets-only write would be lost on END ROOM).
+    try {
+      if (typeof dalCampaignRoomIsWarmForProject_ === 'function' &&
+          dalCampaignRoomIsWarmForProject_(projectId) &&
+          typeof firestoreGetCampaignMeta_ === 'function' &&
+          typeof firestoreSetCampaignMeta_ === 'function') {
+        var meta = firestoreGetCampaignMeta_(projectId);
+        if (meta && meta.identityUpdatedAt) {
+          meta.folderId = String(folderId || '');
+          meta.lastActivityAt = new Date().toISOString();
+          firestoreSetCampaignMeta_(projectId, meta);
+        }
+      }
+    } catch (eMetaF) { /* non-fatal */ }
   });
 }
 
@@ -180,6 +219,7 @@ function getExistingProjects() {
       status: indexData[i][iMap['Status']],
       lastUpdated: indexData[i][iMap['Last_Updated']] || null,
       type: indexData[i][iMap['Project_Type']] || "Event",
+      client: (iMap['Client'] !== undefined ? (indexData[i][iMap['Client']] || "") : ""),
       locationUrl: indexData[i][iMap['Location_URL']] || "",
       difficultyMultiplier: parseFloat(indexData[i][iMap['Difficulty_Multiplier']]) || 1.0,
       checklistState: {},
@@ -289,6 +329,22 @@ function getExistingProjects() {
       if (!p.start || eDate < p.start) p.start = eDate;
       if (!p.end || eDate > p.end) p.end = eDate;
     }
+  }
+
+  // R3c: warm rooms — overlay live Firebase identity (Sheets may lag until END ROOM).
+  if (typeof firestoreGetCampaignMeta_ === 'function' && typeof dalApplyCampaignIdentityOverlay_ === 'function') {
+    var warmOverlay = 0;
+    Object.keys(projectMap).forEach(function (pid) {
+      if (warmOverlay >= 25) return;
+      if (!projectMap[pid] || !projectMap[pid].dalCampaignRoom) return;
+      try {
+        var meta = firestoreGetCampaignMeta_(pid);
+        if (meta && meta.identityUpdatedAt) {
+          dalApplyCampaignIdentityOverlay_(projectMap[pid], meta);
+          warmOverlay++;
+        }
+      } catch (eMeta) { /* Sheets fallthrough */ }
+    });
   }
   
   return Object.values(projectMap);
@@ -465,10 +521,17 @@ function saveEventFromUI(projectData, timelinesArray, actor = "System UI") {
   try {
     assertActorCanSaveProject(actor, projectData || {});
     let newId = saveProjectData(projectData, timelinesArray, actor);
-    
-    // 2. Sync fragments natively to Google Calendar
-    syncCalendarFromDatabase();
-    
+
+    // Warm identity stays on Firebase until END ROOM — don't rebuild Google Calendar from stale Sheets.
+    var warmSave = false;
+    try {
+      if (typeof newId === 'string' && newId.charAt(0) === '{') {
+        var parsed = JSON.parse(newId);
+        warmSave = !!(parsed && parsed.warm);
+      }
+    } catch (eWarm) { warmSave = false; }
+    if (!warmSave) syncCalendarFromDatabase();
+
     return newId;
   } catch (e) {
     return "Error: " + e.toString();

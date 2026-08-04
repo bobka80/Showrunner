@@ -872,18 +872,36 @@ function closeDalCampaignRoom(projectId, actor) {
     return { success: true, alreadyClosed: true, closed: [], campaignRoomUid: '' };
   }
 
+  var closed = [];
+
+  // R3c: publish warm identity BEFORE meta status rewrite (PATCH replaces fields).
+  try {
+    if (typeof dalCommitCampaignIdentityFromFirestore_ === 'function') {
+      var idRes = dalCommitCampaignIdentityFromFirestore_(projectId, actor);
+      if (idRes && idRes.committed) closed.push('meta-identity');
+      else if (idRes && idRes.empty) closed.push('meta-identity:empty');
+    }
+  } catch (eIdCommit) {
+    try {
+      writeToAuditLog(actor, 'ERROR', 'DAL_CAMPAIGN_ROOM', projectId, plan.roomUid || '',
+        'Meta identity commit failed: ' + (eIdCommit && eIdCommit.message ? eIdCommit.message : eIdCommit));
+    } catch (eAudId) { /* ignore */ }
+    throw eIdCommit;
+  }
+
   try {
     if (typeof firestoreSetCampaignMeta_ === 'function' && plan.roomUid) {
-      firestoreSetCampaignMeta_(projectId, {
-        roomUid: plan.roomUid,
-        status: 'committing',
-        lastActivityAt: new Date().toISOString(),
-        domain: 'meta'
-      });
+      // Merge lifecycle stamp onto existing identity fields (do not drop identity mid-End).
+      var metaNow = {};
+      try { metaNow = firestoreGetCampaignMeta_(projectId) || {}; } catch (eGet) { metaNow = {}; }
+      metaNow.roomUid = plan.roomUid;
+      metaNow.status = 'committing';
+      metaNow.lastActivityAt = new Date().toISOString();
+      metaNow.domain = 'meta';
+      firestoreSetCampaignMeta_(projectId, metaNow);
     }
   } catch (eMetaC) { /* Index already committing */ }
 
-  var closed = [];
   var closeDomainSafe_ = function (sessionType) {
     try {
       closeDalSession(projectId, actor, sessionType);
@@ -1005,6 +1023,11 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
   });
 
   if (phase.joined) {
+    try {
+      if (typeof dalEnsureCampaignIdentityElevated_ === 'function') {
+        dalEnsureCampaignIdentityElevated_(projectId, phase.roomUid, actor);
+      }
+    } catch (eJoinId) { /* non-fatal — Sheets still SoT until elevated */ }
     return {
       success: true,
       joined: true,
@@ -1030,6 +1053,9 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
         lastPublishedAt: '',
         domain: 'meta'
       });
+    }
+    if (typeof dalEnsureCampaignIdentityElevated_ === 'function') {
+      dalEnsureCampaignIdentityElevated_(projectId, phase.roomUid, actor);
     }
   } catch (eMeta) {
     try {

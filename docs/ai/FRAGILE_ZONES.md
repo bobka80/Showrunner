@@ -497,6 +497,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign Room five-slice (2026-07-31 docs):** Room = meta + PA + timeline + ledger + **ops**. Ops lock reopened (`warm_fifth_slice`). Meta identity elevation = **R3c**; ops Firebase path = **R3d**; checkpoint order adds ops; listeners follow active users (**R4b**); idle = single constant (**R5**). Until R3d ships, RFID ops remain Sheets-primary.
 
+**Campaign Room R3c (2026-08-04):** `projects/{id}/meta/state` carries project identity (name, client, location, outdoor/inSofia via readinessJson, subEventsJson) while warm. Save & Sync → Firebase when room warm; Sheets + Google Calendar lag until END ROOM (`dalCommitCampaignIdentityFromFirestore_`). `getExistingProjects` overlays live meta for warm rooms (cap 25).
+
 **Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+):** `pagehide`/`beforeunload` writes **localStorage unload flag** (RPCs often die on refresh) + best-effort presence leave + last-leave. **PA window paints immediately**; `dalGatePrepEnterForOrphan_` still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup.
 
 ```

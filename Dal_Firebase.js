@@ -201,6 +201,336 @@ function dalFirestoreLogisticsCollection_(projectId) {
   return 'projects/' + projectId + '/' + DAL_FIRESTORE_LOGISTICS_COLLECTION;
 }
 
+// ==========================================
+// --- Campaign Room R3c — project identity on meta/state ---
+// Room lifecycle fields stay flat on meta/state.
+// Nested identity uses *Json string fields (same pattern as logistics legsJson).
+// ==========================================
+
+function dalNormalizeSubEventFragment_(t) {
+  if (!t) return null;
+  var date = String(t.Event_Date || t.date || '').trim();
+  if (!date) return null;
+  return {
+    uid: String(t.uid || t.id || ''),
+    type: String(t.Sub_Event_Type || t.type || 'MAIN'),
+    date: date,
+    startTime: String(t.Start_Time || t.startTime || '').replace(/^'/, ''),
+    endTime: String(t.End_Time || t.endTime || '').replace(/^'/, ''),
+    note: String(t.Note || t.note || '')
+  };
+}
+
+function dalParseSubEventsFromMeta_(meta) {
+  if (!meta || meta.subEventsJson == null || meta.subEventsJson === '') return [];
+  try {
+    var arr = JSON.parse(meta.subEventsJson);
+    if (!Array.isArray(arr)) return [];
+    return arr.map(dalNormalizeSubEventFragment_).filter(Boolean);
+  } catch (eParse) {
+    return [];
+  }
+}
+
+/** Sheets → plain identity for elevation / commit compare. */
+function dalReadProjectIdentityFromSheets_(projectId) {
+  var sheets = verifyDatabaseSchema(true);
+  var indexData = getSheetData(sheets.index);
+  var timelineData = getSheetData(sheets.timelines);
+  var iMap = indexData.hMap || {};
+  var tMap = timelineData.hMap || {};
+  var out = {
+    name: '',
+    client: '',
+    projectStatus: 'Draft',
+    type: 'Event',
+    locationUrl: '',
+    difficultyMultiplier: 1,
+    folderId: '',
+    managerEmail: '',
+    readinessState: {},
+    lastUpdated: '',
+    subEvents: []
+  };
+  for (var i = 1; i < indexData.length; i++) {
+    if (String(indexData[i][iMap['uid']] || '') !== String(projectId)) continue;
+    out.name = String(indexData[i][iMap['Project_Name']] || '');
+    out.client = iMap['Client'] !== undefined ? String(indexData[i][iMap['Client']] || '') : '';
+    out.projectStatus = String(indexData[i][iMap['Status']] || 'Draft');
+    out.type = String(indexData[i][iMap['Project_Type']] || 'Event');
+    out.locationUrl = iMap['Location_URL'] !== undefined ? String(indexData[i][iMap['Location_URL']] || '') : '';
+    out.difficultyMultiplier = parseFloat(indexData[i][iMap['Difficulty_Multiplier']]) || 1;
+    out.folderId = iMap['Folder_ID'] !== undefined ? String(indexData[i][iMap['Folder_ID']] || '') : '';
+    out.managerEmail = iMap['Manager_Email'] !== undefined ? String(indexData[i][iMap['Manager_Email']] || '') : '';
+    out.lastUpdated = iMap['Last_Updated'] !== undefined ? String(indexData[i][iMap['Last_Updated']] || '') : '';
+    try {
+      if (iMap['Readiness_State'] !== undefined && indexData[i][iMap['Readiness_State']]) {
+        out.readinessState = JSON.parse(indexData[i][iMap['Readiness_State']]);
+      }
+    } catch (eR) { out.readinessState = {}; }
+    break;
+  }
+  var tPidCol = tMap['project_uid'] !== undefined ? tMap['project_uid'] : tMap['Project_ID'];
+  for (var ti = 1; ti < timelineData.length; ti++) {
+    var rowPid = tPidCol !== undefined ? timelineData[ti][tPidCol] : '';
+    if (String(rowPid || '') !== String(projectId)) continue;
+    var frag = dalNormalizeSubEventFragment_({
+      uid: tMap['uid'] !== undefined ? timelineData[ti][tMap['uid']] : '',
+      type: tMap['Sub_Event_Type'] !== undefined ? timelineData[ti][tMap['Sub_Event_Type']] : 'MAIN',
+      date: tMap['Event_Date'] !== undefined ? timelineData[ti][tMap['Event_Date']] : '',
+      startTime: tMap['Start_Time'] !== undefined ? timelineData[ti][tMap['Start_Time']] : '',
+      endTime: tMap['End_Time'] !== undefined ? timelineData[ti][tMap['End_Time']] : '',
+      note: tMap['Note'] !== undefined ? timelineData[ti][tMap['Note']] : ''
+    });
+    if (frag) {
+      // Normalize Date objects from Sheets into YYYY-MM-DD
+      if (timelineData[ti][tMap['Event_Date']] instanceof Date) {
+        var d = timelineData[ti][tMap['Event_Date']];
+        if (!isNaN(d.getTime())) {
+          frag.date = d.getFullYear() + '-' +
+            String(d.getMonth() + 1).padStart(2, '0') + '-' +
+            String(d.getDate()).padStart(2, '0');
+        }
+      } else {
+        var ds = String(frag.date || '');
+        var iso = ds.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (iso) frag.date = iso[1];
+      }
+      if (frag.date) out.subEvents.push(frag);
+    }
+  }
+  return out;
+}
+
+/** Overlay live Firebase identity onto a getExistingProjects row. */
+function dalApplyCampaignIdentityOverlay_(projectObj, meta) {
+  if (!projectObj || !meta || !meta.identityUpdatedAt) return projectObj;
+  if (meta.name) {
+    projectObj.title = meta.name;
+    projectObj.fullTitle = meta.name;
+  }
+  if (meta.client !== undefined) projectObj.client = meta.client;
+  if (meta.projectStatus) projectObj.status = meta.projectStatus;
+  if (meta.type) projectObj.type = meta.type;
+  if (meta.locationUrl !== undefined) projectObj.locationUrl = meta.locationUrl;
+  if (meta.difficultyMultiplier !== undefined && meta.difficultyMultiplier !== '') {
+    projectObj.difficultyMultiplier = parseFloat(meta.difficultyMultiplier) || 1;
+  }
+  if (meta.folderId) projectObj.folderId = meta.folderId;
+  if (meta.readinessJson) {
+    try { projectObj.readinessState = JSON.parse(meta.readinessJson); } catch (e0) { /* keep */ }
+  }
+  var frags = dalParseSubEventsFromMeta_(meta);
+  if (frags.length) {
+    projectObj.fragments = frags;
+    projectObj.start = null;
+    projectObj.end = null;
+    frags.forEach(function (f) {
+      if (!projectObj.start || f.date < projectObj.start) projectObj.start = f.date;
+      if (!projectObj.end || f.date > projectObj.end) projectObj.end = f.date;
+    });
+  }
+  projectObj.lastUpdated = meta.identityUpdatedAt || projectObj.lastUpdated;
+  projectObj.identityFromMeta = true;
+  return projectObj;
+}
+
+/**
+ * Seed Sheets identity into meta/state when room opens (skip if already elevated).
+ */
+function dalSnapshotCampaignIdentityToFirestore_(projectId, roomUid, actor) {
+  var cur = {};
+  try { cur = firestoreGetCampaignMeta_(projectId) || {}; } catch (e0) { cur = {}; }
+  if (cur.identityUpdatedAt) {
+    return { elevated: true, already: true, skipped: true };
+  }
+  var id = dalReadProjectIdentityFromSheets_(projectId);
+  var now = new Date().toISOString();
+  var patch = {
+    roomUid: String(roomUid || cur.roomUid || ''),
+    status: cur.status || 'open',
+    openedAt: cur.openedAt || now,
+    openedBy: cur.openedBy || actor || 'System',
+    lastActivityAt: now,
+    lastPublishedAt: cur.lastPublishedAt || '',
+    domain: 'meta',
+    name: id.name || '',
+    client: id.client || '',
+    projectStatus: id.projectStatus || 'Draft',
+    type: id.type || 'Event',
+    locationUrl: id.locationUrl || '',
+    difficultyMultiplier: id.difficultyMultiplier || 1,
+    folderId: id.folderId || '',
+    managerEmail: id.managerEmail || '',
+    readinessJson: JSON.stringify(id.readinessState || {}),
+    subEventsJson: JSON.stringify(id.subEvents || []),
+    identityWriteSeq: 1,
+    identityUpdatedAt: id.lastUpdated || now,
+    identityUpdatedBy: actor || 'System'
+  };
+  firestoreSetCampaignMeta_(projectId, patch);
+  return { elevated: true, already: false, subEventCount: (id.subEvents || []).length };
+}
+
+function dalEnsureCampaignIdentityElevated_(projectId, roomUid, actor) {
+  try {
+    return dalSnapshotCampaignIdentityToFirestore_(projectId, roomUid, actor);
+  } catch (e) {
+    return { elevated: false, error: String((e && e.message) || e) };
+  }
+}
+
+/**
+ * Warm Save & Sync — identity + sub-events live on Firebase meta; Sheets lag until END ROOM.
+ */
+function dalSaveProjectIdentityWarm_(projectData, timelinesArray, actor) {
+  projectData = enforceCrossRentOnlyProjectFields_(actor, projectData || {});
+  var projectId = String(projectData.Project_ID || '');
+  if (!projectId || projectId === 'NEW') {
+    throw new Error('Warm identity save requires an existing project id.');
+  }
+  if (typeof dalCampaignRoomIsWarmForProject_ === 'function' && !dalCampaignRoomIsWarmForProject_(projectId)) {
+    throw new Error('Campaign room is not warm — use Sheets save.');
+  }
+
+  var cur = {};
+  try { cur = firestoreGetCampaignMeta_(projectId) || {}; } catch (e0) { cur = {}; }
+  if (!cur.identityUpdatedAt) {
+    try { dalSnapshotCampaignIdentityToFirestore_(projectId, cur.roomUid || '', actor); } catch (eSeed) { /* continue */ }
+    try { cur = firestoreGetCampaignMeta_(projectId) || cur; } catch (e1) { /* keep */ }
+  }
+
+  var clientTs = projectData.Last_Updated;
+  var metaTs = cur.identityUpdatedAt || '';
+  if (metaTs && clientTs) {
+    var t1 = new Date(metaTs).getTime();
+    var t2 = new Date(clientTs).getTime();
+    if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) > 2000 && t1 > t2) {
+      throw new Error('COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.');
+    }
+  }
+
+  if (!verifyBackendPrivilege(actor, 'MANAGER')) {
+    projectData.Project_Name = cur.name || projectData.Project_Name;
+    projectData.Status = cur.projectStatus || projectData.Status;
+  }
+
+  var frags = [];
+  (timelinesArray || []).forEach(function (t) {
+    var n = dalNormalizeSubEventFragment_(t);
+    if (n) frags.push(n);
+  });
+  var now = new Date().toISOString();
+  var seq = (Number(cur.identityWriteSeq) || 0) + 1;
+  var readinessJson = projectData.Readiness_State;
+  if (readinessJson && typeof readinessJson !== 'string') {
+    readinessJson = JSON.stringify(readinessJson);
+  }
+  if (!readinessJson) readinessJson = cur.readinessJson || '{}';
+
+  var patch = {
+    roomUid: cur.roomUid || '',
+    status: cur.status || 'open',
+    openedAt: cur.openedAt || now,
+    openedBy: cur.openedBy || actor || 'System',
+    lastActivityAt: now,
+    lastPublishedAt: cur.lastPublishedAt || '',
+    domain: 'meta',
+    name: projectData.Project_Name || cur.name || 'Unnamed Event',
+    client: projectData.Client != null ? String(projectData.Client) : (cur.client || ''),
+    projectStatus: projectData.Status || cur.projectStatus || 'Draft',
+    type: projectData.Type || cur.type || 'Event',
+    locationUrl: projectData.Location_URL != null ? String(projectData.Location_URL) : (cur.locationUrl || ''),
+    difficultyMultiplier: projectData.Difficulty_Multiplier != null
+      ? projectData.Difficulty_Multiplier
+      : (cur.difficultyMultiplier || 1),
+    folderId: projectData.Folder_ID || cur.folderId || '',
+    managerEmail: projectData.Manager_Email || cur.managerEmail || '',
+    readinessJson: readinessJson,
+    subEventsJson: JSON.stringify(frags),
+    identityWriteSeq: seq,
+    identityUpdatedAt: now,
+    identityUpdatedBy: actor || 'System'
+  };
+  firestoreSetCampaignMeta_(projectId, patch);
+
+  try {
+    executeWithRetry(function () {
+      var sheets = verifyDatabaseSchema();
+      var row = dalGetProjectIndexRow_(projectId, sheets);
+      if (!row) return;
+      dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+        campaignLastActivityAt: now
+      });
+      try { flushCache(); } catch (eF) { /* ignore */ }
+    });
+  } catch (eAct) { /* non-fatal */ }
+
+  writeToAuditLog(actor, 'UPDATE', 'DAL_CAMPAIGN_META', projectId, projectId,
+    'Warm identity save (R3c). subEvents=' + frags.length + ' seq=' + seq);
+  return JSON.stringify({
+    id: projectId,
+    timestamp: now,
+    warm: true,
+    identityWriteSeq: seq
+  });
+}
+
+/**
+ * END ROOM / checkpoint — publish warm identity back to Index + Project_Timelines.
+ */
+function dalCommitCampaignIdentityFromFirestore_(projectId, actor) {
+  var meta = null;
+  try { meta = firestoreGetCampaignMeta_(projectId); } catch (e0) { meta = null; }
+  if (!meta || !meta.identityUpdatedAt) {
+    return { committed: false, empty: true };
+  }
+  var sheetsId = null;
+  try { sheetsId = dalReadProjectIdentityFromSheets_(projectId); } catch (eSheets) { sheetsId = null; }
+  var frags = dalParseSubEventsFromMeta_(meta);
+  var timelinesArray = frags.map(function (f) {
+    return {
+      uid: f.uid,
+      Sub_Event_Type: f.type,
+      Event_Date: f.date,
+      Start_Time: f.startTime,
+      End_Time: f.endTime,
+      Note: f.note
+    };
+  });
+  var projectData = {
+    Project_ID: projectId,
+    Project_Name: meta.name || 'Unnamed Event',
+    Client: meta.client || '',
+    Status: meta.projectStatus || 'Draft',
+    Type: meta.type || 'Event',
+    Location_URL: meta.locationUrl || '',
+    Difficulty_Multiplier: parseFloat(meta.difficultyMultiplier) || 1,
+    Readiness_State: meta.readinessJson || '{}',
+    Folder_ID: meta.folderId || (sheetsId && sheetsId.folderId) || '',
+    Manager_Email: meta.managerEmail || (sheetsId && sheetsId.managerEmail) || '',
+    Last_Updated: meta.identityUpdatedAt || ''
+  };
+  if (typeof saveProjectDataSheets_ !== 'function') {
+    throw new Error('saveProjectDataSheets_ missing — cannot commit meta identity.');
+  }
+  saveProjectDataSheets_(projectData, timelinesArray, actor || 'System', { skipCollision: true, fromMetaCommit: true });
+  try {
+    if (typeof syncCalendarFromDatabase === 'function') syncCalendarFromDatabase();
+  } catch (eCal) { /* Sheets commit still valid */ }
+  return { committed: true, subEventCount: timelinesArray.length };
+}
+
+/** google.script.run — live meta identity for peers / debug. */
+function getCampaignRoomMeta(projectId) {
+  if (!projectId || projectId === 'NEW') return null;
+  try {
+    return firestoreGetCampaignMeta_(projectId);
+  } catch (e) {
+    return null;
+  }
+}
+
 /**
  * Campaign Room R3 — snapshot Sheets Logistics_Ledger top legs → Firebase logistics/state.
  */
