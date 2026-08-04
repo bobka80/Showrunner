@@ -31,9 +31,16 @@ function getActiveConflicts() {
     let vehicleUids = new Set();
     if (vecUidCol !== undefined) {
         for (let i = 1; i < vaultVehicles.length; i++) {
-            if (vaultVehicles[i][vecUidCol]) vehicleUids.add(vaultVehicles[i][vecUidCol]);
+            if (vaultVehicles[i][vecUidCol]) vehicleUids.add(String(vaultVehicles[i][vecUidCol]));
         }
     }
+    // Also index common alternate id columns so rest engine never treats fleet as crew.
+    ['Vehicle_UID', 'vehicle_uid', 'ID', 'Id'].forEach(function (alt) {
+        if (vecMap[alt] === undefined) return;
+        for (let i = 1; i < vaultVehicles.length; i++) {
+            if (vaultVehicles[i][vecMap[alt]]) vehicleUids.add(String(vaultVehicles[i][vecMap[alt]]));
+        }
+    });
 
     // 1. Gather Active Projects & Timelines
     let projects = {};
@@ -104,7 +111,12 @@ function getActiveConflicts() {
         if (!projects[pId]) continue; 
         
         let uid = shiftData[i][sMap['user_uid']];
-        if (!uid || uid.includes('truck') || vehicleUids.has(uid)) continue;
+        if (!uid) continue;
+        let uidStr = String(uid);
+        let noteStr = String(shiftData[i][sMap['Note']] || '');
+        // Trucks / Hub AUTO load-unload are not crew rest subjects.
+        if (uidStr.indexOf('truck') !== -1 || vehicleUids.has(uidStr)) continue;
+        if (noteStr.indexOf('AUTO-OUTBOUND') !== -1 || noteStr.indexOf('AUTO-INBOUND') !== -1) continue;
         if (!userShifts[uid]) userShifts[uid] = [];
         
         let pPhases = projects[pId].phases.sort((a,b) => a.start - b.start);

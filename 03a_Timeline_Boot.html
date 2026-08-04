@@ -200,7 +200,10 @@ function openShiftLayout(mode, isReadOnly = false) {
   document.getElementById('tt-x-hours').innerHTML = '';
   document.getElementById('tt-y-crew').innerHTML = '';
   document.getElementById('tt-rows-container').innerHTML = '<div style="color:#888; padding: 20px; font-weight: 800; font-size: 14px;">CALCULATING TIMELINE DATA...</div>';
-  
+
+  // Warm room: seed/join timeline slice FIRST so getTimelineData reads Firebase
+  // (incl. Hub AUTO load/unload) — not a cold Sheets hydrate that wipes them.
+  var loadTimelineData_ = function () {
   google.script.run
     .withFailureHandler(err => {
        document.getElementById('tt-rows-container').innerHTML = `<div style="color:#ef4444; padding:20px; font-weight:bold;">Server Error: ${err.message}</div>`;
@@ -210,6 +213,24 @@ function openShiftLayout(mode, isReadOnly = false) {
       try {
           if (!data) throw new Error("No data returned from server.");
           shifts = Array.isArray(data.shifts) ? data.shifts : [];
+
+          // Merge any Hub GENERATE payload that arrived while Timeline was closed.
+          var hubPendingPhases = null;
+          if (window._hubPendingTimeline_ && Array.isArray(window._hubPendingTimeline_.shifts)) {
+            var pendingShifts = window._hubPendingTimeline_.shifts;
+            if (Array.isArray(window._hubPendingTimeline_.phases)) {
+              hubPendingPhases = window._hubPendingTimeline_.phases;
+            }
+            var byId = {};
+            shifts.forEach(function (s) { if (s && s.id) byId[String(s.id)] = true; });
+            pendingShifts.forEach(function (s) {
+              if (!s) return;
+              if (s.id && byId[String(s.id)]) return;
+              shifts.push(s);
+              if (s.id) byId[String(s.id)] = true;
+            });
+            window._hubPendingTimeline_ = null;
+          }
           
           // Apply visual colors to loaded shifts based on their saved roles
           shifts.forEach(s => {
@@ -232,9 +253,18 @@ function openShiftLayout(mode, isReadOnly = false) {
               });
           }
           activePhases = Array.isArray(data.phases) ? data.phases : [];
+          if ((!activePhases || !activePhases.length) && hubPendingPhases && hubPendingPhases.length) {
+            activePhases = hubPendingPhases.slice();
+          }
           localDeptOverrides = data.overrides || {};
           
           globalAssignedArr = Array.isArray(data.assigned) ? data.assigned : [];
+          // Ensure trucks with AUTO shifts are assigned so rows exist for drawShifts.
+          shifts.forEach(function (s) {
+            var uid = s && (s.user_uid || s.email);
+            if (!uid || !isTruck(uid)) return;
+            if (globalAssignedArr.indexOf(uid) < 0) globalAssignedArr.push(uid);
+          });
           
           let baseDate = new Date(); 
           if(baseDateStr) {
@@ -345,8 +375,11 @@ function openShiftLayout(mode, isReadOnly = false) {
           if (typeof window.startDalTimelineSessionWatcher === 'function') {
             window.startDalTimelineSessionWatcher(targetFolderId);
           }
-          if (typeof window.maybeAutoOpenDalTimeline_ === 'function') {
+          // Only auto-open if warm seed did not already join live.
+          if (!window.dalTimelineSessionOpen && typeof window.maybeAutoOpenDalTimeline_ === 'function') {
             window.maybeAutoOpenDalTimeline_();
+          } else if (window.dalTimelineSessionOpen && typeof window.startDalTimelineStateSync_ === 'function') {
+            window.startDalTimelineStateSync_(targetFolderId);
           }
           if (typeof window.dalRefreshCommitRetryCue_ === 'function') {
             window.dalRefreshCommitRetryCue_(typeof targetFolderId !== 'undefined' ? targetFolderId : '');
@@ -357,6 +390,29 @@ function openShiftLayout(mode, isReadOnly = false) {
           if (!isReadOnly) saveBtn.innerText = "ERROR";
       }
     }).getTimelineData(targetFolderId, mode);
+  };
+
+  var warmRoom = !isReadOnly && typeof window.dalCampaignRoomIsWarm_ === 'function' &&
+    window.dalCampaignRoomIsWarm_();
+  if (warmRoom && typeof google !== 'undefined' && google.script && google.script.run) {
+    document.getElementById('tt-rows-container').innerHTML =
+      '<div style="color:#888; padding: 20px; font-weight: 800; font-size: 14px;">JOINING WARM ROOM TIMELINE…</div>';
+    var actor = typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System';
+    google.script.run
+      .withFailureHandler(function () { loadTimelineData_(); })
+      .withSuccessHandler(function (ens) {
+        if (ens && ens.warm && ens.timelineOpen) {
+          window.dalTimelineSessionOpen = true;
+          if (typeof window.dalApplyTimelineSessionUi_ === 'function') {
+            window.dalApplyTimelineSessionUi_(true, false, { localOpen: true, joined: true });
+          }
+        }
+        loadTimelineData_();
+      })
+      .ensureDalWarmHubWorkspace(targetFolderId, actor, { needTimeline: true });
+  } else {
+    loadTimelineData_();
+  }
 }
 
 function cancelShifts() {

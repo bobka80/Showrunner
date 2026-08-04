@@ -1387,6 +1387,26 @@ function dalReadTimelineStateFromFirestore_(projectId) {
 function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode, roomUid) {
   // Status is "opening" — Sheets path allowed. getTimelineDataSheets_ takes its own short lock.
   var state = getTimelineDataSheets_(projectId, mode || 'main');
+  var shiftsOut = (state && state.shifts) ? state.shifts.slice() : [];
+  // Preserve Hub AUTO load/unload bars already on Firebase (Sheets lag until END ROOM).
+  // Re-opening Timeline must not wipe warm GENERATE clocks with a cold Sheets snapshot.
+  try {
+    var existing = dalReadTimelineStateFromFirestore_(projectId);
+    if (existing && existing.shifts && existing.shifts.length) {
+      var haveId = {};
+      shiftsOut.forEach(function (s) {
+        if (s && s.id) haveId[String(s.id)] = true;
+      });
+      existing.shifts.forEach(function (s) {
+        if (!s) return;
+        var note = String(s.note || '');
+        if (note.indexOf('AUTO-OUTBOUND') === -1 && note.indexOf('AUTO-INBOUND') === -1) return;
+        if (s.id && haveId[String(s.id)]) return;
+        shiftsOut.push(s);
+        if (s.id) haveId[String(s.id)] = true;
+      });
+    }
+  } catch (eKeep) { /* Sheets-only snapshot */ }
   // Meta first so UI can see the fork sooner; state doc carries the payload.
   var meta = {
     sessionUid: sessionUid,
@@ -1398,7 +1418,9 @@ function dalSnapshotTimelineToFirestore_(projectId, sessionUid, actor, mode, roo
   };
   if (roomUid) meta.roomUid = String(roomUid);
   firestoreSetTimelineSessionMeta_(projectId, meta);
-  dalWriteTimelineStateToFirestore_(projectId, mode || 'main', state.shifts || [], state.phases || [], state.overrides || {}, actor, true);
+  dalWriteTimelineStateToFirestore_(
+    projectId, mode || 'main', shiftsOut, state.phases || [], state.overrides || {}, actor, true
+  );
 }
 
 function dalCommitTimelineFromFirestore_(projectId, actor, sessionUid) {

@@ -833,13 +833,13 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor, o
         tShifts.push({
           id: 's_' + Date.now() + '_L' + idx + Math.random().toString(36).substr(2, 5),
           user_uid: tUid, email: tUid, start: loadTime, duration: 2,
-          role: (logData.truckNames && logData.truckNames[tUid]) || 'TRUCK',
+          role: 'LOAD',
           color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-OUTBOUND'
         });
         tShifts.push({
           id: 's_' + Date.now() + '_U' + idx + Math.random().toString(36).substr(2, 5),
           user_uid: tUid, email: tUid, start: unloadTime, duration: 2,
-          role: (logData.truckNames && logData.truckNames[tUid]) || 'TRUCK',
+          role: 'UNLOAD',
           color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-OUTBOUND'
         });
       });
@@ -850,13 +850,13 @@ function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor, o
         tShifts.push({
           id: 's_' + Date.now() + '_IL' + idx + Math.random().toString(36).substr(2, 5),
           user_uid: tUid, email: tUid, start: loadTimeIn, duration: 2,
-          role: (logData.truckNames && logData.truckNames[tUid]) || 'TRUCK',
+          role: 'LOAD',
           color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-INBOUND'
         });
         tShifts.push({
           id: 's_' + Date.now() + '_IU' + idx + Math.random().toString(36).substr(2, 5),
           user_uid: tUid, email: tUid, start: unloadTimeIn, duration: 2,
-          role: (logData.truckNames && logData.truckNames[tUid]) || 'TRUCK',
+          role: 'UNLOAD',
           color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-INBOUND'
         });
       });

@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — PA wipe hotfix @ **GAS v758**. Next after smoke: **R3c**.  
-**Production tip:** see RELEASES.md. Latest: PA wipe heal @ **GAS v758**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — Hub GENERATE fix @ **GAS v759**. Next after smoke: **R3c**.  
+**Production tip:** see RELEASES.md. Latest: Hub GENERATE @ **GAS v759**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -388,3 +388,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | **Hub smoke @ GAS v757** — Auto Arrange includes autos + full save payload; warm Timeline joins via Hub seed (no cold Opening); GENERATE returns timeline snap for UI. Smoke → then **R3c**. |
 | 2026-08-04 | **PA wipe hotfix @ GAS v758** — thin `assets/state` after Hub/arrange wiped prep UI; heal from collection on get; refuse thin gas mirrors; re-list for state rebuild. |
 | 2026-08-04 | Hub GENERATE stuck + truck on Timeline without load/unload bars — thin client assigned-only apply; server path too heavy (timeout). |
+| 2026-08-04 | **Hub GENERATE @ GAS v759** — faster warm path (no double ensure / skip heal / return written shifts); install full load/unload shifts (not roster-only); 55s client safety unlock. |
+| 2026-08-04 | Timeline reopen wiped Hub AUTO (Sheets snapshot); rest engine treated trucks as crew. Fix: warm-seed before load; preserve AUTO on snapshot; skip AUTO/vehicles in rest. |

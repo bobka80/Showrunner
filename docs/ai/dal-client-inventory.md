@@ -56,7 +56,7 @@
 | `saveEventFromUI` | `02_Project_Editor_Core.html` |
 | `setProjectStatus` | `02_Project_Editor_Core.html` |
 | `triggerManualCrewEmail` | `02_Project_Editor_Core.html` |
-| `ensureDalWarmHubWorkspace` | `02_Project_Editor_Logistics.html`, `03a1_Timeline_Dal_Session.html` |
+| `ensureDalWarmHubWorkspace` | `02_Project_Editor_Logistics.html`, `03a1_Timeline_Dal_Session.html`, `03a_Timeline_Boot.html` |
 | `generateLogisticsPayloadAPI` | `02_Project_Editor_Logistics.html` |
 | `getTimelineData` | `02_Project_Editor_Logistics.html`, `03a2_Timeline_Dal_Live.html`, `03a_Timeline_Boot.html` |
 | `saveTimelineData` | `02_Project_Editor_Logistics.html`, `03a_Timeline_Boot.html` |
@@ -212,7 +212,7 @@
 | 02e6_Dal_Session.html | 6 | 1 |
 | 02e7_Dal_Firestore_Client.html | 2 | 0 |
 | 02g_Project_Reports.html | 0 | 2 |
-| 03a_Timeline_Boot.html | 4 | 0 |
+| 03a_Timeline_Boot.html | 5 | 0 |
 | 03a1_Timeline_Dal_Session.html | 5 | 0 |
 | 03a2_Timeline_Dal_Live.html | 2 | 0 |
 | 03b_Timeline_Shifts.html | 0 | 0 |

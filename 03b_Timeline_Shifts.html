@@ -142,7 +142,7 @@ function drawShifts() {
     let txtCol = s.textCol || '#064e3b';
     let timeLabel = `${formatShiftTime(s.start)} - ${formatShiftTime(s.start + s.duration)}`;
     
-    if (isTruck(s.email)) {
+    if (isTruck(s.user_uid || s.email)) {
       if (s.role === 'STAY') {
           block.innerHTML = `
             ${currentIsReadOnly ? '' : '<div class="shift-handle shift-handle-left"></div><div class="action-zone" onclick="openRolePicker(\''+s.id+'\', event)" style="position:absolute; top:0; left:12px; width:15px; height:100%; z-index:50; cursor:pointer;" title="Change Role"></div>'}
