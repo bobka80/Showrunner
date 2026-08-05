@@ -174,6 +174,20 @@ window.stationPickProject_ = function(pId) {
     if (fid) fid.value = pId;
   }
 
+  // R5: warm Campaign Room on station project pick + dock activity resets idle.
+  if (typeof window.openOrJoinDalCampaignRoom_ === 'function') {
+    try { window.openOrJoinDalCampaignRoom_(pId); } catch (eJoin) { /* ignore */ }
+  }
+  try {
+    if (typeof google !== 'undefined' && google.script && google.script.run) {
+      var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+        ? String(ACTIVE_USER_NAME) : 'Station';
+      google.script.run
+        .withFailureHandler(function() { /* ignore */ })
+        .touchDalCampaignActivity(pId, actor, { force: true, reason: 'station_dock' });
+    }
+  } catch (eTouch) { /* ignore */ }
+
   const shell = document.getElementById('station-shell');
   if (shell) shell.style.display = 'none';
   stationSetStatus_('Opening ' + (proj.title || proj.name || 'project') + '…', '');

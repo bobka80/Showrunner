@@ -96,36 +96,35 @@ SESSION CLOSED (fork left)
 
 ---
 
-## Future — Project Campaign Room (director brainstorm 2026-07-21)
+## Project Campaign Room (how it works now)
 
-**Status:** **ACTIVE** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (R0 filed 2026-07-24). Canonical write-up: [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md).
+**Status:** **ACTIVE** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md). R1–R5 core live (checkpoint, listeners-follow-user, 48h idle). Remaining: Tracker Live badge, Offer pull, archive.
 
 ### Problem
 
-Current model = **short sessions** per domain (prep + timeline may both be open, but separate lifecycles). Close triggers: End ∪ last-leave ∪ idle → **one commit** → room closed. Near show date, crews **revisit the same project repeatedly**; commit/reopen churn causes UX pain (committing freeze, refresh orphans, calendar dots).
+Older short-session model = prep + timeline separate lifecycles; End ∪ last-leave ∪ 45m/75m idle → commit → closed. Near show date, revisit churn caused UX pain.
 
-### Proposed direction (Option C — locks)
+### How it works now (Option C)
 
-| Element | Proposal |
-|---------|----------|
-| **Room type** | **Project Campaign Room** — one `campaignRoomUid`; **N-day idle silence** (default 48h, single constant) |
-| **Slices** | **meta** + **assets** + **timeline** + **logistics** + **ops** (five; director 2026-07-31) |
-| **Sheets** | **Publish checkpoints** ~every 30m if dirty; room stays live; order meta→PA→timeline→ledger→ops |
-| **Close** | Explicit End ∪ N-day idle → final publish → close |
-| **Outside room** | Vault, financials, cross-project tracker, crew roster, offers — **not** ops (ops is fifth slice) |
+| Element | Live |
+|---------|------|
+| **Room** | One `campaignRoomUid`; warm until End or **N-day silence** (`DAL_CAMPAIGN_IDLE_MS_`, default **48h**) |
+| **Slices** | meta + PA + timeline + logistics + ops |
+| **Sheets** | ~30m keep-live checkpoint if dirty; End / idle = final publish |
+| **Idle reset** | Five-slice WRITE or station dock — **not** presence |
+| **Listeners** | Follow active user (leave project → unsub); warm-but-empty OK |
+| **Outside room** | Vault, financials, tracker, roster, offers |
 
-### Doctrine
-
-Design-lock rules 1–2 **revised for warm rooms** — see [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision. Production still short-session until R1+.
+Change idle window: edit `DAL_CAMPAIGN_IDLE_MS_` only (`168 * 60 * 60 * 1000` = 7d, `240 * …` = 10d).
 
 ### Sequencing
 
 1. ~~Multi-user Part B~~ ✓  
 2. ~~Offer / availability~~ — off path  
 3. ~~Logistics Ledger~~ ✓  
-4. **Project Campaign Room** — active  
+4. **Project Campaign Room** — R5 shipping; Exit when director archives  
 
-Interim: Part B leave/idle-as-commit remains until Room R2+ retargets.
+Cold room still uses Part B 45m/75m. Warm room: Part B idle never ejects; last-leave soft-leaves.
 
 ---
 

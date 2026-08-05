@@ -1205,6 +1205,9 @@ window.dalFlushTimelineIfCollabOpen_ = function() {
       window.dalWriteTimelineForkToFirestore_(function(writeErr) {
         if (!writeErr) {
           if (typeof window.dalTouchRoomIdle_ === 'function') window.dalTouchRoomIdle_('timeline');
+          if (typeof window.dalTouchCampaignActivityClient_ === 'function') {
+            try { window.dalTouchCampaignActivityClient_(); } catch (eAct) { /* ignore */ }
+          }
           finish();
           return;
         }

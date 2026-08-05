@@ -560,6 +560,20 @@
       if (fid) fid.value = pId;
     }
 
+    // R5: warm Campaign Room + dock activity resets idle.
+    if (typeof window.openOrJoinDalCampaignRoom_ === 'function') {
+      try { window.openOrJoinDalCampaignRoom_(pId); } catch (eJoin) { /* ignore */ }
+    }
+    try {
+      if (typeof google !== 'undefined' && google.script && google.script.run) {
+        var dockActor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+          ? String(ACTIVE_USER_NAME) : 'Station';
+        google.script.run
+          .withFailureHandler(function() { /* ignore */ })
+          .touchDalCampaignActivity(pId, dockActor, { force: true, reason: 'station_dock' });
+      }
+    } catch (eTouch) { /* ignore */ }
+
     stationDockSetPaOpen_(true);
     var home = document.getElementById('station-dock-home');
     var prompt = document.getElementById('station-dock-host-prompt');

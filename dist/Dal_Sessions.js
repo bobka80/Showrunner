@@ -997,6 +997,9 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
     return { success: true, skipped: true, reason: 'paused', campaignRoomWarm: false };
   }
   try {
+    dalEnsureCampaignIdleTrigger_();
+  } catch (eTrig) { /* non-fatal */ }
+  try {
     dalAssertNotLiveForkExcluded_(actor);
   } catch (eEx) {
     return { success: true, skipped: true, reason: 'excluded', campaignRoomWarm: false };
@@ -1679,4 +1682,215 @@ function dalPublishCampaignCheckpoint_(projectId, actor, opts) {
     checkpointFailAt: '',
     escalate: false
   };
+}
+
+// ---------------------------------------------------------------------------
+// Campaign Room R5 — N-day idle close (default 48h)
+// Config lock: idle_ms_constant — change ONLY DAL_CAMPAIGN_IDLE_MS_ for 168h / 240h.
+//   7 days:  DAL_CAMPAIGN_IDLE_MS_ = 168 * 60 * 60 * 1000
+//   10 days: DAL_CAMPAIGN_IDLE_MS_ = 240 * 60 * 60 * 1000
+// Reset on five-slice WRITE or station dock — presence alone does NOT reset.
+// ---------------------------------------------------------------------------
+var DAL_CAMPAIGN_IDLE_MS_ = 48 * 60 * 60 * 1000;
+/** Coalesce Index stamps so busy PA deltas do not hammer ScriptLock. */
+var DAL_CAMPAIGN_ACTIVITY_COALESCE_MS_ = 5 * 60 * 1000;
+
+function dalParseIsoMs_(iso) {
+  if (!iso) return 0;
+  var t = new Date(iso).getTime();
+  return isNaN(t) ? 0 : t;
+}
+
+/**
+ * Qualifying activity for idle timer (slice write / station dock).
+ * opts.force — skip coalesce (station dock).
+ * opts.skipLock — caller already holds ScriptLock (write Index inline).
+ */
+function dalTouchCampaignActivity_(projectId, opts) {
+  opts = opts || {};
+  if (!projectId || projectId === 'NEW') return { touched: false, reason: 'no_project' };
+  if (dalLiveForksPaused_()) return { touched: false, reason: 'paused' };
+  if (!dalCampaignRoomIsWarmForProject_(projectId)) return { touched: false, reason: 'not_warm' };
+
+  var now = new Date().toISOString();
+  if (!opts.force) {
+    try {
+      var cache = CacheService.getScriptCache();
+      var key = 'dal_camp_act_' + String(projectId);
+      if (cache.get(key)) return { touched: false, reason: 'coalesced', at: now };
+      var ttl = Math.max(60, Math.floor(DAL_CAMPAIGN_ACTIVITY_COALESCE_MS_ / 1000));
+      cache.put(key, '1', ttl);
+    } catch (eC) { /* continue */ }
+  }
+
+  var stampIndex_ = function () {
+    var sheets = verifyDatabaseSchema();
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) return;
+    dalWriteCampaignRoom_(sheets.index, row.rowNum, row.map, {
+      campaignLastActivityAt: now
+    });
+    try { flushCache(); } catch (eF) { /* ignore */ }
+  };
+
+  try {
+    if (opts.skipLock) stampIndex_();
+    else executeWithRetry(stampIndex_);
+  } catch (eI) { /* meta stamp still below */ }
+
+  try {
+    var meta = firestoreGetCampaignMeta_(projectId) || {};
+    meta.lastActivityAt = now;
+    firestoreSetCampaignMeta_(projectId, meta);
+  } catch (eM) { /* ignore */ }
+
+  return { touched: true, at: now, reason: opts.force ? 'forced' : 'write' };
+}
+
+/** google.script.run — station dock / client flush activity (not presence). */
+function touchDalCampaignActivity(projectId, actor, opts) {
+  return dalTouchCampaignActivity_(projectId, opts || {});
+}
+
+function dalCampaignActivityAgeMs_(camp, meta) {
+  var best = 0;
+  best = Math.max(best, dalParseIsoMs_(camp && camp.campaignLastActivityAt));
+  best = Math.max(best, dalParseIsoMs_(camp && camp.campaignOpenedAt));
+  best = Math.max(best, dalParseIsoMs_(meta && meta.lastActivityAt));
+  best = Math.max(best, dalParseIsoMs_(meta && meta.openedAt));
+  return best ? (Date.now() - best) : 0;
+}
+
+/**
+ * If room warm and silent ≥ DAL_CAMPAIGN_IDLE_MS_ → final publish + close.
+ */
+function dalMaybeIdleCloseCampaignRoom_(projectId, actor) {
+  actor = actor || 'System';
+  if (!projectId || projectId === 'NEW') return { closed: false, reason: 'no_project' };
+  if (!dalCampaignRoomIsWarmForProject_(projectId)) return { closed: false, reason: 'not_warm' };
+
+  var camp = null;
+  try {
+    var sheets = verifyDatabaseSchema(true);
+    var row = dalGetProjectIndexRow_(projectId, sheets);
+    if (!row) return { closed: false, reason: 'missing' };
+    camp = dalReadCampaignRoom_(row);
+  } catch (eR) {
+    return { closed: false, reason: 'read_failed' };
+  }
+  if (!camp || !camp.campaignRoomWarm) return { closed: false, reason: 'not_warm' };
+
+  var meta = null;
+  try { meta = firestoreGetCampaignMeta_(projectId); } catch (eM) { meta = null; }
+  var age = dalCampaignActivityAgeMs_(camp, meta);
+  if (!age || age < DAL_CAMPAIGN_IDLE_MS_) {
+    return {
+      closed: false,
+      reason: 'active',
+      ageMs: age,
+      idleMs: DAL_CAMPAIGN_IDLE_MS_
+    };
+  }
+
+  try {
+    closeDalCampaignRoom(projectId, actor);
+    try {
+      writeToAuditLog(actor, 'CLOSE', 'DAL_CAMPAIGN_IDLE', projectId, camp.campaignRoomUid || '',
+        'Idle close after ' + Math.round(age / 3600000) + 'h silence (limit ' +
+        Math.round(DAL_CAMPAIGN_IDLE_MS_ / 3600000) + 'h).');
+    } catch (eAud) { /* ignore */ }
+    return { closed: true, ageMs: age, idleMs: DAL_CAMPAIGN_IDLE_MS_ };
+  } catch (eClose) {
+    try {
+      writeToAuditLog(actor, 'ERROR', 'DAL_CAMPAIGN_IDLE', projectId, camp.campaignRoomUid || '',
+        'Idle close failed: ' + (eClose && eClose.message ? eClose.message : eClose));
+    } catch (eAud2) { /* ignore */ }
+    return {
+      closed: false,
+      reason: 'close_failed',
+      error: String(eClose && eClose.message ? eClose.message : eClose),
+      ageMs: age
+    };
+  }
+}
+
+/**
+ * google.script.run / hourly trigger — scan warm rooms and idle-close.
+ * opts.projectId — check one project only (editor piggyback).
+ */
+function runDalCampaignIdleSweep(actor, opts) {
+  // Time-driven triggers pass an event object as the first argument.
+  if (actor && typeof actor === 'object' && (actor.triggerUid || actor.authMode != null)) {
+    opts = {};
+    actor = 'System';
+  }
+  opts = opts || {};
+  actor = actor || 'System';
+  if (dalLiveForksPaused_()) {
+    return { success: true, skipped: true, reason: 'paused', closed: [], checked: 0 };
+  }
+  if (opts.projectId) {
+    var one = dalMaybeIdleCloseCampaignRoom_(opts.projectId, actor);
+    return {
+      success: true,
+      checked: 1,
+      closed: one && one.closed ? [opts.projectId] : [],
+      results: [one]
+    };
+  }
+
+  var warmIds = [];
+  try {
+    executeWithRetry(function () {
+      var sheets = verifyDatabaseSchema(true);
+      var indexData = sheets.index.getDataRange().getValues();
+      if (!indexData.length) return;
+      var iMap = dalEnsureSessionIndexColumns_(sheets.index, indexData);
+      for (var i = 1; i < indexData.length; i++) {
+        var pid = iMap['uid'] !== undefined ? String(indexData[i][iMap['uid']] || '') : '';
+        if (!pid) continue;
+        var row = { rowNum: i + 1, map: iMap, data: indexData[i] };
+        var camp = dalReadCampaignRoom_(row);
+        if (camp.campaignRoomWarm) warmIds.push(pid);
+      }
+    });
+  } catch (eList) {
+    return { success: false, error: String(eList && eList.message ? eList.message : eList), closed: [], checked: 0 };
+  }
+
+  var closed = [];
+  var results = [];
+  for (var j = 0; j < warmIds.length; j++) {
+    var res = dalMaybeIdleCloseCampaignRoom_(warmIds[j], actor);
+    results.push({ projectId: warmIds[j], result: res });
+    if (res && res.closed) closed.push(warmIds[j]);
+  }
+  return { success: true, checked: warmIds.length, closed: closed, results: results };
+}
+
+/** Install hourly idle sweep (idempotent). */
+function setupDalCampaignIdleTrigger() {
+  var handler = 'runDalCampaignIdleSweep';
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === handler) {
+      try { ScriptApp.deleteTrigger(t); } catch (eD) { /* ignore */ }
+    }
+  });
+  ScriptApp.newTrigger(handler)
+    .timeBased()
+    .everyHours(1)
+    .create();
+  try {
+    PropertiesService.getScriptProperties().setProperty('DAL_CAMPAIGN_IDLE_TRIGGER', '1');
+  } catch (eP) { /* ignore */ }
+  return 'Campaign Room idle sweep installed (hourly) — limit ' +
+    Math.round(DAL_CAMPAIGN_IDLE_MS_ / 3600000) + 'h';
+}
+
+function dalEnsureCampaignIdleTrigger_() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('DAL_CAMPAIGN_IDLE_TRIGGER') === '1') return;
+    setupDalCampaignIdleTrigger();
+  } catch (e) { /* non-fatal */ }
 }

@@ -624,6 +624,11 @@ function dalWriteLogisticsStateToFirestore_(projectId, legs, actor, roomUid) {
     updatedBy: actor || 'System',
     roomUid: roomUid ? String(roomUid) : ''
   });
+  try {
+    if (typeof dalTouchCampaignActivity_ === 'function') {
+      dalTouchCampaignActivity_(projectId, {});
+    }
+  } catch (eTouch) { /* ignore */ }
   return { count: (legs || []).length, bytes: size.bytes, overWarn: size.overWarn, writeSeq: prevSeq + 1 };
 }
 
@@ -815,6 +820,11 @@ function dalWriteOpsStateToFirestore_(projectId, rows, sessionUid, operationType
     updatedBy: actor || 'System',
     roomUid: roomUid ? String(roomUid) : ''
   });
+  try {
+    if (typeof dalTouchCampaignActivity_ === 'function') {
+      dalTouchCampaignActivity_(projectId, {});
+    }
+  } catch (eTouch) { /* ignore */ }
   return {
     count: rows.length,
     bytes: size.bytes,
@@ -1293,6 +1303,11 @@ function saveProjectAssetsDeltaFirestore_(projectId, deltas, actor) {
         });
       }
     } catch (eState) { /* live clients may seed */ }
+    try {
+      if (typeof dalTouchCampaignActivity_ === 'function') {
+        dalTouchCampaignActivity_(projectId, { skipLock: true });
+      }
+    } catch (eTouch) { /* ignore */ }
     return "Saved Delta";
   });
 }
@@ -2037,6 +2052,11 @@ function dalWriteTimelineStateToFirestore_(projectId, mode, shifts, phases, over
     updatedAt: new Date().toISOString(),
     updatedBy: actor || 'System'
   });
+  try {
+    if (typeof dalTouchCampaignActivity_ === 'function') {
+      dalTouchCampaignActivity_(projectId, {});
+    }
+  } catch (eTouch) { /* ignore */ }
 }
 
 /** Upsert incoming by id onto remote; keep remote-only ids (never silent-drop concurrent adds). */

@@ -2814,6 +2814,9 @@ window.dalFlushPaIfPrepOpen_ = function() {
       window.dalPaFlushInFlight = false;
       if (ok) {
         if (typeof window.dalTouchRoomIdle_ === 'function') window.dalTouchRoomIdle_('prep');
+        if (typeof window.dalTouchCampaignActivityClient_ === 'function') {
+          try { window.dalTouchCampaignActivityClient_(projectId); } catch (eAct) { /* ignore */ }
+        }
         // Do not stamp mid-flight pending edits into originals (zeros next delta).
         if (!window.dalPaHasPendingTouches_()) {
           window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));

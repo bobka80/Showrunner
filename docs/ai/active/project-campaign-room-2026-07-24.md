@@ -9,8 +9,8 @@
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R4b @ GAS v765**. Next after smoke: **R5**.  
-**Production tip:** see RELEASES.md. Latest: R4b listeners-follow-user @ **GAS v765**. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R5 shipping**. Exit polish in progress.  
+**Production tip:** see RELEASES.md. Latest in-progress: R5 48h idle close. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -228,7 +228,7 @@ Lock `idle_touch` = `write_or_station`. Code in **R5**.
 - [x] Director **OK go** for **R3d** (ops fifth slice)
 - [x] Director **OK go** for **R4** (30m publish checkpoint, five-slice order) — continue 2026-08-04 (R3d smoke deferred)
 - [x] Director **OK go** for **R4b** (listener-follows-user) — continue 2026-08-04
-- [ ] Director **OK go** for **R5** (idle close + Exit polish)
+- [x] Director **OK go** for **R5** (idle close + Exit polish) — continue 2026-08-05
 
 ### R0 — Doctrine + inventory (no lifecycle code)
 
@@ -338,14 +338,21 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 
 ### R5 — Idle close + Exit polish
 
-- [ ] Single constant `DAL_CAMPAIGN_IDLE_MS_` (default 48h); document how to set 168h / 240h
-- [ ] Idle timer: reset on any of five slice WRITEs or station dock; presence alone does not
-- [ ] Auto-close: final publish (five slices) → close room → next entry from Sheets (rewarm cost OK)
-- [ ] Universal warm-on-entry complete if not done in R1.5
-- [ ] Warm-read hybrid badge for Tracker/Conflicts (optional Live preview)
-- [ ] Offer one-shot pull from warm Firebase (if Offer surface touches room)
-- [ ] Update session-fork-platform + FRAGILE “how it works now”
+- [x] Single constant `DAL_CAMPAIGN_IDLE_MS_` (default 48h); document how to set 168h / 240h
+- [x] Idle timer: reset on any of five slice WRITEs or station dock; presence alone does not
+- [x] Auto-close: final publish (five slices) → close room → next entry from Sheets (rewarm cost OK)
+- [x] Universal warm-on-entry complete if not done in R1.5 — station pick/dock + mobile hub already via presence
+- [ ] Warm-read hybrid badge for Tracker/Conflicts (optional Live preview) — **remaining / skip R5**
+- [ ] Offer one-shot pull from warm Firebase (if Offer surface touches room) — **remaining / skip R5**
+- [x] Update session-fork-platform + FRAGILE “how it works now”
 - [ ] Archive this campaign when director agrees Exit complete
+- [ ] Ship + smoke
+
+### Remaining (not blocking Exit)
+
+- Tracker/Conflicts optional Live preview badge
+- Offer one-shot warm Firebase pull
+- R3d floor RFID smoke (deferred — no scanner)
 
 ---
 
@@ -397,3 +404,5 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | **R4 @ GAS v764** — keep-live ~30m checkpoint (`runDalCampaignCheckpoint`); dirty gate + signatures; ordered five-slice publish; editor “Last published…” cue (dbl-click force). |
 | 2026-08-04 | **R4b** — listeners follow user: detach PA/TL on leave-project / switch; soft leave PA stops session watcher; room may warm with zero listeners. |
 | 2026-08-04 | **R4b @ GAS v765** — `dalDetachCampaignLiveListeners_` on CANCEL / switch / END ROOM; soft leave PA watcher parity. |
+| 2026-08-04 | Sticky Saving/Opening freeze on warm project switch — clear on leave + soft-leave before detach. **@ GAS v766**. |
+| 2026-08-05 | **R5** — `DAL_CAMPAIGN_IDLE_MS_` (48h); activity touch on writes/dock; hourly idle sweep → End; station warm-on-entry. |

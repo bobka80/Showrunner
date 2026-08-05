@@ -2,7 +2,7 @@
 
 **Regenerate:** `node scripts/dal-client-inventory.js` · **Pre-ship:** `--check` must match this file when DAL hot paths change · **Handbook:** [archive/dal-pre-ship-gates.md](archive/dal-pre-ship-gates.md)
 
-**Generated:** 2026-08-04 · **Root HTML modules scanned:** 95
+**Generated:** 2026-08-05 · **Root HTML modules scanned:** 95
 
 **Campaign:** [data-access-layer.md](data-access-layer.md) · **Server discovery:** [dal-phase0-discovery-2026-07-13.md](dal-phase0-discovery-2026-07-13.md)
 
@@ -54,8 +54,10 @@
 | `reportProjectPresence` | `02_Project_Editor_Core.html`, `03a_Timeline_Boot.html`, `07_Core_Globals.html` |
 | `restoreProjectWithConflictCheck` | `02_Project_Editor_Core.html` |
 | `runDalCampaignCheckpoint` | `02_Project_Editor_Core.html` |
+| `runDalCampaignIdleSweep` | `02_Project_Editor_Core.html` |
 | `saveEventFromUI` | `02_Project_Editor_Core.html` |
 | `setProjectStatus` | `02_Project_Editor_Core.html` |
+| `touchDalCampaignActivity` | `02_Project_Editor_Core.html`, `11_Station_Shell.html`, `11h_Station_Project_Logic_2.html`, `11m_Station_Dock_Logic.html` |
 | `triggerManualCrewEmail` | `02_Project_Editor_Core.html` |
 | `ensureDalWarmHubWorkspace` | `02_Project_Editor_Logistics.html`, `03a1_Timeline_Dal_Session.html`, `03a_Timeline_Boot.html` |
 | `generateLogisticsPayloadAPI` | `02_Project_Editor_Logistics.html` |
@@ -198,7 +200,7 @@
 | 01h_Mobile_Assets.html | 2 | 1 |
 | 01i_Desktop_Lock.html | 2 | 1 |
 | 01j_Mobile_Scan.html | 4 | 3 |
-| 02_Project_Editor_Core.html | 11 | 0 |
+| 02_Project_Editor_Core.html | 13 | 0 |
 | 02_Project_Editor_Logistics.html | 8 | 1 |
 | 02_Project_Editor_Map.html | 0 | 0 |
 | 02a_Project_Equipment.html | 1 | 1 |
@@ -246,7 +248,7 @@
 | 09_Financials_Hub.html | 5 | 0 |
 | 10a_Notifications_Boot.html | 3 | 1 |
 | 10c_Notifications_Admin.html | 8 | 0 |
-| 11_Station_Shell.html | 12 | 2 |
+| 11_Station_Shell.html | 13 | 2 |
 | 11a_Station_Gun_Drivers.html | 0 | 0 |
 | 11b_Station_Styles.html | 0 | 0 |
 | 11c_Station_Core_2.html | 4 | 2 |
@@ -262,7 +264,7 @@
 | 11g_Station_Vault_2.html | 2 | 0 |
 | 11g_Station_Vault_Crew.html | 2 | 0 |
 | 11g_Station_Vault.html | 1 | 0 |
-| 11h_Station_Project_Logic_2.html | 1 | 1 |
+| 11h_Station_Project_Logic_2.html | 2 | 1 |
 | 11h_Station_Project_Logic.html | 0 | 0 |
 | 11h_Station_Project.html | 0 | 0 |
 | 11i_Station_Settings_Logic.html | 0 | 0 |
@@ -270,7 +272,7 @@
 | 11j_Station_Phone_UI.html | 0 | 0 |
 | 11k_Station_Dock_UI.html | 0 | 0 |
 | 11l_Station_Dock_Scale.html | 0 | 0 |
-| 11m_Station_Dock_Logic.html | 0 | 1 |
+| 11m_Station_Dock_Logic.html | 1 | 1 |
 | 11n_Station_Dock_Screensaver.html | 0 | 0 |
 | Index.html | 0 | 4 |
 | Login.html | 0 | 5 |

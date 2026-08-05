@@ -312,13 +312,68 @@ window.runDalCampaignCheckpointNow_ = function(opts) {
 
 window.startDalCampaignCheckpointTimer_ = function() {
   if (window.peCheckpointTimer_) return;
+  window.peCheckpointTick_ = 0;
   window.peCheckpointTimer_ = setInterval(function() {
     if (!window.peForkRoomActive_) return;
     if (window.dalCampaignRoomClosing_) return;
     if (typeof window.runDalCampaignCheckpointNow_ === 'function') {
       window.runDalCampaignCheckpointNow_({});
     }
+    // R5: ~every 15m while in editor, ask server if this room went idle.
+    window.peCheckpointTick_ = (window.peCheckpointTick_ || 0) + 1;
+    if (window.peCheckpointTick_ % 15 === 0 && typeof window.runDalCampaignIdleCheckNow_ === 'function') {
+      window.runDalCampaignIdleCheckNow_();
+    }
   }, 60000);
+};
+
+window.runDalCampaignIdleCheckNow_ = function() {
+  var projectId = (document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '') || '';
+  if (!projectId || projectId === 'NEW' || !window.peForkRoomActive_) return;
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+  var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME) : 'System';
+  google.script.run
+    .withFailureHandler(function() { /* ignore */ })
+    .withSuccessHandler(function(res) {
+      if (!res || !(res.closed || []).length) return;
+      window.peForkRoomActive_ = false;
+      if (typeof window.stopDalCampaignCheckpointTimer_ === 'function') {
+        try { window.stopDalCampaignCheckpointTimer_(); } catch (e0) { /* ignore */ }
+      }
+      if (typeof window.dalDetachCampaignLiveListeners_ === 'function') {
+        try { window.dalDetachCampaignLiveListeners_({ clearChrome: true }); } catch (e1) { /* ignore */ }
+      }
+      if (typeof window.paintProjectEditorModuleBtns_ === 'function') {
+        window.paintProjectEditorModuleBtns_();
+      }
+      try {
+        if (typeof showToast === 'function') {
+          showToast('Campaign room closed after idle — next open rewarms from Sheets.');
+        }
+      } catch (eT) { /* ignore */ }
+    })
+    .runDalCampaignIdleSweep(actor, { projectId: projectId });
+};
+
+/** Coalesced client → GAS activity stamp (PA/timeline direct Firestore writes). */
+window.dalTouchCampaignActivityClient_ = function(projectId) {
+  projectId = projectId || (document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '');
+  if (!projectId || projectId === 'NEW') return;
+  if (!window.peForkRoomActive_ && !(typeof window.dalCampaignRoomIsWarm_ === 'function' &&
+      window.dalCampaignRoomIsWarm_())) return;
+  var now = Date.now();
+  if (window.dalCampaignActivityClientAt_ &&
+      (now - window.dalCampaignActivityClientAt_) < 60000) return;
+  window.dalCampaignActivityClientAt_ = now;
+  if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+  var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? String(ACTIVE_USER_NAME) : 'System';
+  google.script.run
+    .withFailureHandler(function() { /* ignore */ })
+    .touchDalCampaignActivity(projectId, actor, {});
 };
 
 window.stopDalCampaignCheckpointTimer_ = function() {
