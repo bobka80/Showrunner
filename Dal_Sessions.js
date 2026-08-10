@@ -1547,11 +1547,16 @@ function dalPublishCampaignCheckpoint_(projectId, actor, opts) {
   var published = [];
   var failedSlice = '';
   var failMsg = '';
+  var indexLastUpdated = '';
 
   try {
     var idRes = dalCommitCampaignIdentityFromFirestore_(projectId, actor);
-    if (idRes && idRes.committed) published.push('meta');
-    else published.push('meta:empty');
+    if (idRes && idRes.committed) {
+      published.push('meta');
+      if (idRes.indexLastUpdated) indexLastUpdated = String(idRes.indexLastUpdated);
+    } else {
+      published.push('meta:empty');
+    }
   } catch (eMeta) {
     failedSlice = 'meta';
     failMsg = String(eMeta && eMeta.message ? eMeta.message : eMeta);
@@ -1679,6 +1684,7 @@ function dalPublishCampaignCheckpoint_(projectId, actor, opts) {
     roomLive: true,
     published: published,
     lastPublishedAt: publishedAt,
+    indexLastUpdated: indexLastUpdated || publishedAt,
     checkpointFailAt: '',
     escalate: false
   };

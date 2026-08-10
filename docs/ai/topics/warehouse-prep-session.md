@@ -8,15 +8,15 @@
 
 **Status:** Partial — prep PA fork live **when not paused**; auto-fork **shipped** (Part B archived 2026-07-21) — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md).
 
-> **CURRENT:** Live prep fork is **PAUSED** (Sheets-only) during Logistics Ledger — [dal-live-forks-pause.md](dal-live-forks-pause.md).
+> **CURRENT:** Live prep fork is **ON** — [dal-live-forks-pause.md](dal-live-forks-pause.md). Campaign Room: [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md).
 
 **Live sync:** Production / prep live rollback GAS **v654** + `host-boot.js?v=653`. **Floor scope (locked):** search/formula batch absolute adds primary; packing + RFID checkout parallel; floor +/- secondary — [../archive/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../archive/multi-user-fork-industrial-and-auto.md). Banner **`live sync (patch)`**. Tech: [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md). Session banner: [FRAGILE § prep session UI](../FRAGILE_ZONES.md).
 
-**Last swept:** 2026-07-21
+**Last swept:** 2026-08-05
 
 **Dual-domain vs timeline:** **Resolved** (Slice D / GAS v603) — prep + timeline collab may both be open. Spec: [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md).
 
-**Post-campaign optional (do not build during DAL):** ~~Part B~~ **shipped** — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md). Spec: [timeline-collab-session.md § Optional update](timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject). **NEXT structural:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
+**Post-campaign optional (do not build during DAL):** ~~Part B~~ **shipped** — [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md). Spec: [timeline-collab-session.md § Optional update](timeline-collab-session.md#optional-update--auto-fork-live-pull-in--idle-eject). **NEXT structural:** [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) (Ledger + Room complete).
 
 **Design lock note:** Logistics Hub / ledger = **atomic ops, not a prep fork** ([design lock §2](../archive/dal-firebase-design-lock-2026-07-13.md)). Older bullet below about ledger/hub on the Firebase fork is aspirational floor UX; router today keeps `LEDGER` on Sheets.
 
@@ -102,7 +102,7 @@ Today `Operations_Ledger` is mostly checkout/check-in scans. During prep the led
 
 ### Phase D — Logistics hub fast path
 
-**Pulled into Campaign Room as R3b** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) (after ledger slice R3, before 30m checkpoint R4).
+**Pulled into Campaign Room as R3b** — [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md) (after ledger slice R3, before 30m checkpoint R4).
 
 - [x] Replace slow project-editor logistics hub during warm room (R3b) — code path; smoke after ship
 - [ ] Auto-arrange: batch on fork or GAS job writing results to Firebase (compute strategy TBD — Firebase does not speed GAS CPU)

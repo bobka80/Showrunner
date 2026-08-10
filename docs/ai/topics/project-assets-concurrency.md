@@ -3,7 +3,7 @@
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Related:** [logistics-warehouse.md](logistics-warehouse.md) · [warehouse-prep-session.md](warehouse-prep-session.md) · [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.md) · [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md)
 
-**Last swept:** 2026-07-19 · **Status:** Split — **prep multi-user live** is canonical on the fork campaign; this file = **normal-day Sheets** + checkout digest backlog
+**Last swept:** 2026-08-05 · **Status:** Split — **prep multi-user live** is canonical on the fork campaign; this file = **normal-day Sheets** + checkout digest backlog
 
 ---
 
@@ -13,9 +13,9 @@
 |------|----------------|
 | **START PREP open** (Firebase PA fork, live patch, search/formula batch adds, pack, floor +/-) | [../archive/multi-user-fork-industrial-and-auto.md § Warehouse prep — real multi-user scope](../archive/multi-user-fork-industrial-and-auto.md) · [../archive/dal-prep-live-sync-standards.md](../archive/dal-prep-live-sync-standards.md) · FRAGILE prep PA |
 | **Normal day** (no prep session — Sheets `saveProjectAssetsDelta`, mobile auto-save, collision gaps) | **This file** (below) |
-| **Forks paused (2026-07-21)** — Sheets-only PA + timeline | [dal-live-forks-pause.md](dal-live-forks-pause.md) |
+| **Live forks ops** (pause switch) | [dal-live-forks-pause.md](dal-live-forks-pause.md) — currently **ON** |
 
-Do **not** treat the backlog below as the prep-floor sync model. Prep live rollback: GAS **v654** + `host-boot.js?v=653`. While [dal-live-forks-pause.md](dal-live-forks-pause.md) says paused, use **this file’s Sheets path** only.
+Do **not** treat the backlog below as the prep-floor sync model. Prep live rollback: GAS **v654** + `host-boot.js?v=653`. When [dal-live-forks-pause.md](dal-live-forks-pause.md) says paused, use **this file’s Sheets path** only; when ON, prep fork is live.
 
 ---
 
@@ -109,7 +109,7 @@ See [mobile-crew.md](mobile-crew.md) and [MOBILE_CREW_UX.md](../MOBILE_CREW_UX.m
 4. Desktop auto-save + merge improvements  
 5. Checkout/list status closure  
 
-**Floor / prep mode:** Live multi-user list = [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (archived). Prep session UX shell: [warehouse-prep-session.md](warehouse-prep-session.md). **NEXT structural:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
+**Floor / prep mode:** Live multi-user list = [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (archived). Prep session UX shell: [warehouse-prep-session.md](warehouse-prep-session.md). **NEXT structural:** [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) (Ledger + Room complete).
 
 ---
 

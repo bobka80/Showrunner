@@ -1,16 +1,17 @@
-# Active — Project Campaign Room (Firebase hybrid)
+# Archive — Project Campaign Room (Firebase hybrid)
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
 **Decision brief:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)  
 **Architecture pack §4:** [../topics/architecture-multi-campaign-pack-2026-07-21.md](../topics/architecture-multi-campaign-pack-2026-07-21.md)  
 **Director locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
-**Design lock:** [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision  
-**Predecessor:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md) (M0–M5 + Exit **COMPLETE**)  
+**Design lock:** [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision  
+**Predecessor:** [logistics-ledger-2026-07-21.md](logistics-ledger-2026-07-21.md) (M0–M5 + Exit **COMPLETE**)  
+**Successor:** [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md)  
 **Live forks today:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — **LIVE** (`DAL_LIVE_FORKS_PAUSED = false`)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § DAL prep/timeline session UI · prep PA fork live sync · timeline fork live sync
 
-**Opened:** 2026-07-24 · **Status:** **ACTIVE** — **R5 shipping**. Exit polish in progress.  
-**Production tip:** see RELEASES.md. Latest in-progress: R5 48h idle close. Prep live rollback pin still **v654**.
+**Opened:** 2026-07-24 · **Closed:** 2026-08-05 · **Status:** **COMPLETE / ARCHIVED** — R0–R5 @ **GAS v767**. Leftovers (Tracker hybrid, Offer pulls, checkpoint smoke) live in successor.  
+**Production tip:** see RELEASES.md. Latest Room ship: R5 48h idle close @ **GAS v767**. Prep live rollback pin still **v654**.
 
 **Director briefing (final):** Five-Slice Warm Architecture — 2026-07-31. Supersedes prior four-slice model and the “ops forever outside” lock.
 
@@ -51,7 +52,7 @@ One warm Firebase **Project Campaign Room** per project:
 | Checkpoint | Fixed **~30m**; always **meta → PA → timeline → ledger → ops**; room **stays live** (no routine freeze) |
 | Registry | One `campaignRoomUid` for all **five** slices |
 | Warm read | Tracker/Conflicts: Sheets publish default + optional Live preview (ledger **and** timeline) |
-| Offer pull | One-shot from live Firebase, then freeze in the offer |
+| Offer pull | **Superseded** — dual manual pulls + undo; see [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) |
 | Ops ledger | **`warm_fifth_slice`** (reopened 2026-07-31) — Firebase live while warm; same checkpoint/End; fail-safe ≥ PA B/C; no silent scan loss |
 | Short idle / last-leave | **Do not** keep 45m/75m / last-leave as primary commit once Room ships |
 
@@ -97,7 +98,7 @@ One warm Firebase **Project Campaign Room** per project:
 
 ## Doctrine revisions
 
-Canonical text: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision (updated 2026-07-31).
+Canonical text: [dal-firebase-design-lock-2026-07-13.md](dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision (updated 2026-07-31).
 
 | Design lock | Room meaning |
 |-------------|--------------|
@@ -305,7 +306,7 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 - [x] Writers: project editor Save & Sync / identity edits → warm meta when room open
 - [x] Readers: warm peers / timeline context read Firebase meta, not Sheets lag
 - [x] END ROOM / checkpoint publish identity back to Index + `Project_Timelines` as needed
-- [ ] Ship + smoke: edit name/client/sub-event mid-warm → peer sees live; Sheets lag until publish
+- [x] Ship + smoke: edit name/client/sub-event mid-warm → peer sees live; Sheets lag until publish — **shipped @ v761**; director smoke welcome
 
 ### R3d — Ops fifth slice (RFID Operations_Ledger)
 
@@ -318,7 +319,7 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 - [x] Checkpoint + END ROOM / idle close commit ops → Sheets `Operations_Ledger`
 - [x] Fail-safe: `dal_commit_backups` + `dal_commit_retry` + ROOT alert; **no fake success** if scans only in dying room
 - [x] Cold / no-room fallback: existing Sheets atomic path until warm seed succeeds
-- [ ] Ship + smoke: warm room → scan wave live for peers → Sheets lag until checkpoint/End; kill network mid-commit → retry cue, no silent loss
+- [x] Ship — **@ v763**; floor RFID smoke deferred (no scanner)
 
 ### R4 — 30m publish checkpoint
 
@@ -342,17 +343,15 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 - [x] Idle timer: reset on any of five slice WRITEs or station dock; presence alone does not
 - [x] Auto-close: final publish (five slices) → close room → next entry from Sheets (rewarm cost OK)
 - [x] Universal warm-on-entry complete if not done in R1.5 — station pick/dock + mobile hub already via presence
-- [ ] Warm-read hybrid badge for Tracker/Conflicts (optional Live preview) — **remaining / skip R5**
-- [ ] Offer one-shot pull from warm Firebase (if Offer surface touches room) — **remaining / skip R5**
+- [x] Warm-read hybrid / Offer pulls — **moved** to [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) (2026-08-05)
 - [x] Update session-fork-platform + FRAGILE “how it works now”
-- [ ] Archive this campaign when director agrees Exit complete
-- [ ] Ship + smoke
+- [x] Archive this campaign — director Exit OK 2026-08-05
+- [x] Ship + smoke — **shipped @ v767**; smoke pending (48h window — use constant override to test)
 
-### Remaining (not blocking Exit)
+### Remaining (carried to successor)
 
-- Tracker/Conflicts optional Live preview badge
-- Offer one-shot warm Firebase pull
-- R3d floor RFID smoke (deferred — no scanner)
+- R3d floor RFID smoke (deferred — no scanner) — optional note only
+- Tracker hybrid + Offer pulls + checkpoint smoke → [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md)
 
 ---
 
@@ -406,3 +405,6 @@ Director lock (brainstorm 2026-08-03): whole local operations must **not** chat 
 | 2026-08-04 | **R4b @ GAS v765** — `dalDetachCampaignLiveListeners_` on CANCEL / switch / END ROOM; soft leave PA watcher parity. |
 | 2026-08-04 | Sticky Saving/Opening freeze on warm project switch — clear on leave + soft-leave before detach. **@ GAS v766**. |
 | 2026-08-05 | **R5** — `DAL_CAMPAIGN_IDLE_MS_` (48h); activity touch on writes/dock; hourly idle sweep → End; station warm-on-entry. |
+| 2026-08-05 | **R5 @ GAS v767** — idle close live; Tracker/Offer remain optional; archive when director OK. |
+| 2026-08-05 | Leftovers (Tracker hybrid, Offer pulls, checkpoint smoke) handed to successor [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md). |
+| 2026-08-05 | **Exit COMPLETE** — archived; primary build = warm-readers campaign. |

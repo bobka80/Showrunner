@@ -14,9 +14,11 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ---
 
-## Next up (director, 2026-07-24)
+## Next up (director, 2026-08-05)
 
-**Primary campaign (ACTIVE):** **Project Campaign Room** — **R5 shipping** (48h idle); Exit when archive OK. — [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md).
+**Primary campaign (ACTIVE):** **Warm readers + Offer pulls + Checkpoint smoke** — **W1** smoke in progress. — [active/warm-readers-offer-tracker-2026-08-05.md](active/warm-readers-offer-tracker-2026-08-05.md).
+
+**Predecessor (COMPLETE):** **Project Campaign Room** — R0–R5 @ **GAS v767**; archived 2026-08-05. — [archive/project-campaign-room-2026-07-24.md](archive/project-campaign-room-2026-07-24.md).
 
 **Operational logs:** Bug journal [error-journal/](error-journal/) · root `RELEASES.md` / `WORKS_LOG.md`.
 
@@ -24,7 +26,8 @@ Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Project Campaign Room** | **ACTIVE** — R5 shipping; Exit polish | [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) |
+| **Warm readers + Offer + Checkpoint** | **ACTIVE** — W1 smoke | [active/warm-readers-offer-tracker-2026-08-05.md](active/warm-readers-offer-tracker-2026-08-05.md) |
+| **Project Campaign Room** | **COMPLETE** (archived) | [archive/project-campaign-room-2026-07-24.md](archive/project-campaign-room-2026-07-24.md) |
 | **Logistics Ledger** | **COMPLETE** (archived) | [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog brief — OK go per domain | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 | **Station UI rework** | After **OK go** — Phase A shell split | [STATION_UI.md](STATION_UI.md) · [active/station-ui-handoff.md](active/station-ui-handoff.md) |
@@ -36,11 +39,11 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Project Campaign Room** | **ACTIVE** — R5 shipping; Exit polish | [active/project-campaign-room-2026-07-24.md](active/project-campaign-room-2026-07-24.md) |
+| **Warm readers + Offer pulls + Checkpoint smoke** | **ACTIVE** — primary; W1 smoke | [active/warm-readers-offer-tracker-2026-08-05.md](active/warm-readers-offer-tracker-2026-08-05.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **UI / QoL standing agent** (not a campaign) | Standing — minor polish; collision-check actives | [active/ui-qol-standing-agent.md](active/ui-qol-standing-agent.md) · rule `.cursor/rules/ui-qol-agent.mdc` |
 
-**Closed this session:** Logistics Ledger → [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) · Multi-user fork Part B → [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md).
+**Closed this session:** Project Campaign Room → [archive/project-campaign-room-2026-07-24.md](archive/project-campaign-room-2026-07-24.md) · Logistics Ledger → [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) · Multi-user fork Part B → [archive/multi-user-fork-industrial-and-auto.md](archive/multi-user-fork-industrial-and-auto.md).
 
 **Operational log (not a campaign):** [error-journal/](error-journal/) — lasting bug memory from Report → Hand over packs. Day files: [error-journal/days/](error-journal/days/).
 
@@ -55,9 +58,10 @@ Also on the board (do not mix without director pick):
 | Mobile crew UX | Shipped v314+; **phone QR scan shipped v474** (see topic) | [topics/mobile-crew.md](topics/mobile-crew.md) |
 | Database operations | Partial — backup/restore + push admin | [topics/database-ops.md](topics/database-ops.md) |
 | Financials & quoting | Partial — offer tab + print studio | [topics/financials.md](topics/financials.md) |
-| **Offer / invoice · crew swap · availability conflicts** | Future — **off critical path** (parallel or later); soft/hard defs still useful for Ledger M5 | [topics/offer-invoice-crew-availability-2026-07-20.md](topics/offer-invoice-crew-availability-2026-07-20.md) |
+| **Offer / invoice · crew swap · availability conflicts** | Partial — **Offer pulls** now in active campaign; rest of topic still backlog | [topics/offer-invoice-crew-availability-2026-07-20.md](topics/offer-invoice-crew-availability-2026-07-20.md) · [active/warm-readers-offer-tracker-2026-08-05.md](active/warm-readers-offer-tracker-2026-08-05.md) |
 | **Logistics Ledger** (movement SoT + conflict detection) | **COMPLETE** — archived 2026-07-24 | [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) · [schema](topics/logistics-ledger-schema-2026-07-20.md) |
-| **Project Campaign Room (Firebase hybrid)** | **ACTIVE** — [active brief](active/project-campaign-room-2026-07-24.md); R3c shipping; next R3d | [topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [locks](topics/architecture-campaign-director-locks-2026-07-21.md) · [pack](topics/architecture-multi-campaign-pack-2026-07-21.md) |
+| **Project Campaign Room (Firebase hybrid)** | **COMPLETE** — archived 2026-08-05 @ v767 · readers/Offer → warm-readers | [archive/project-campaign-room-2026-07-24.md](archive/project-campaign-room-2026-07-24.md) · [topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) |
+| **Warm readers + Offer + Checkpoint** | **ACTIVE** — primary | [active/warm-readers-offer-tracker-2026-08-05.md](active/warm-readers-offer-tracker-2026-08-05.md) |
 | Logistics & warehouse RFID | Active campaign — station BLE reconnect UI-restart solved (APK 0.1.36); phone QR shipped → mobile-crew | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |
@@ -75,7 +79,7 @@ Also on the board (do not mix without director pick):
 | Timeline shift confirm & field actuals | Backlog — crew ack + on-site substitutions/hours | [topics/timeline-shift-field-crew.md](topics/timeline-shift-field-crew.md) |
 | Pre-ship expansion (other domains) | Backlog brief | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |
 
-**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → ~~DAL campaign~~ ✓ → ~~warehouse prep / timeline collab Part B~~ ✓ → ~~Logistics Ledger~~ ✓ → **Project Campaign Room** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).
+**Build order (infrastructure → platform → sessions):** ~~Workspace~~ ✓ → **phone app (in flight)** → ~~DAL campaign~~ ✓ → ~~warehouse prep / timeline collab Part B~~ ✓ → ~~Logistics Ledger~~ ✓ → ~~Project Campaign Room~~ ✓ → **Warm readers + Offer pulls** → NAS year archive. **Shift confirm** can start early; **field actuals** after confirm. **Last before inviting users:** [topics/pre-beta-hardening.md](topics/pre-beta-hardening.md).
 
 ---
 

@@ -6,7 +6,7 @@ One file per feature area. **Read only the topic you need.**
 
 **Stable reference (how the system works — not backlog):** see the parent [README.md](../README.md). Topics here are **what to build**; stable docs are **how things work** and **what not to break**.
 
-**Last index sweep:** 2026-07-04 (production @ GAS **v429**)
+**Last index sweep:** 2026-08-05 (production tip @ GAS **v767**)
 
 > **Status lives in one place:** the single canonical status table is **[Project_TODO.md](../Project_TODO.md)**. This page is only a **directory of topic files** — do **not** re-add a status column here (it will drift out of sync).
 
@@ -17,10 +17,10 @@ One file per feature area. **Read only the topic you need.**
 - [mobile-crew.md](mobile-crew.md) — mobile crew UX
 - [database-ops.md](database-ops.md) — backup/restore + push admin
 - [financials.md](financials.md) — financials & quoting
-- [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — future campaign: offer/invoice, crew swap, availability (off critical path)
+- [offer-invoice-crew-availability-2026-07-20.md](offer-invoice-crew-availability-2026-07-20.md) — offer/invoice backlog; **Offer pulls** in [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md)
 - [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) — schema lock for Logistics_Ledger + PA truck-column migration · **archived:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md)
-- [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md) — sequenced pack: Ledger → Campaign Room → packet sync
-- [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — decision brief: 48h Firebase campaign room + Sheets checkpoints (after ledger; not active)
+- [architecture-multi-campaign-pack-2026-07-21.md](architecture-multi-campaign-pack-2026-07-21.md) — sequenced pack: Ledger → Campaign Room → warm readers → packet sync
+- [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — decision brief: Campaign Room (COMPLETE @ v767)
 - [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md) — director poll locks (idle, publish order, ledger↔timeline, UID preserve)
 - [architecture-campaign-fresh-agent-prompt-2026-07-21.md](architecture-campaign-fresh-agent-prompt-2026-07-21.md) — copy-paste prompt for design-only codebase sweep
 - [logistics-warehouse.md](logistics-warehouse.md) — warehouse RFID, station gun, gate
@@ -34,12 +34,12 @@ One file per feature area. **Read only the topic you need.**
 - [workspace-migration.md](workspace-migration.md) — Google Workspace migration (done)
 - [drive-nas-year-archive.md](drive-nas-year-archive.md) — Drive → NAS year archive
 - [session-fork-platform.md](session-fork-platform.md) — session fork platform
-- [dal-live-forks-pause.md](dal-live-forks-pause.md) — **CURRENT** live forks pause / Sheets-only ops + restore
+- [dal-live-forks-pause.md](dal-live-forks-pause.md) — live forks pause switch (currently **ON**)
 - [data-cache-engine.md](data-cache-engine.md) — unified data cache engine
 - [warehouse-prep-session.md](warehouse-prep-session.md) — warehouse prep session fork
 - [timeline-collab-session.md](timeline-collab-session.md) — multi-user timeline room
 - [timeline-shift-field-crew.md](timeline-shift-field-crew.md) — shift confirm & field actuals
 
-**Build order:** ~~[workspace-migration.md](workspace-migration.md)~~ ✓ → ~~DAL campaign~~ ✓ → ~~Part B multi-user fork~~ ✓ → ~~[Logistics Ledger](../archive/logistics-ledger-2026-07-21.md)~~ ✓ → **Campaign Room** → … **Last before users:** [pre-beta-hardening.md](pre-beta-hardening.md).
+**Build order:** ~~[workspace-migration.md](workspace-migration.md)~~ ✓ → ~~DAL campaign~~ ✓ → ~~Part B multi-user fork~~ ✓ → ~~[Logistics Ledger](../archive/logistics-ledger-2026-07-21.md)~~ ✓ → ~~[Campaign Room](../archive/project-campaign-room-2026-07-24.md)~~ ✓ → **[Warm readers + Offer](../active/warm-readers-offer-tracker-2026-08-05.md)** → … **Last before users:** [pre-beta-hardening.md](pre-beta-hardening.md).
 
 When adding a new area: create a topic file here, add one line to `Project_TODO.md` index (the only status table). **Do not** put canonical “how it works” docs in this folder — use [drawer placement rules](../README.md#where-to-put-new-documentation) in the parent README.

@@ -1,9 +1,9 @@
 # Architecture pack — Logistics Ledger → Campaign Room → Packet sync
 
-**Status:** Design packed & filed 2026-07-21. **Part B archived.** **Logistics Ledger COMPLETE.** **Project Campaign Room = ACTIVE** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).  
+**Status:** Design packed & filed 2026-07-21. **Part B archived.** **Logistics Ledger COMPLETE.** **Project Campaign Room COMPLETE** — [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md). **Active:** [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md).  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Locks (law):** [architecture-campaign-director-locks-2026-07-21.md](architecture-campaign-director-locks-2026-07-21.md)  
-**Active build:** Project Campaign Room — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md). Ledger archive: [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
+**Active build:** Warm readers + Offer + Checkpoint — [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md). Room archive: [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md). Ledger archive: [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
 **Companions:** [logistics-ledger-schema-2026-07-20.md](logistics-ledger-schema-2026-07-20.md) · [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) · [session-fork-platform.md](session-fork-platform.md)
 
 **Source:** Fresh design-agent codebase sweep 2026-07-21 (live root, not dist/). Director OK go to file + B7 closed + `phase_ref` UID pick = **preserve**.
@@ -154,7 +154,7 @@ One warm Firebase **Project Campaign Room** per project: less commit/reopen chur
 - **Explicit End / Publish now** — keep.
 - **Checkpoint:** fixed ~30m; always **meta → PA → timeline → ledger → ops**; room stays live.
 - **Warm read:** Sheets by default; optional Live preview = ledger **and** timeline together.
-- **Offer pull while warm:** one-shot from Firebase, then freeze.
+- **Offer pulls:** dual manual buttons + undo (warm→Firebase / cold→Sheets) — [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md).
 - **Registry:** one `campaignRoomUid` for all **five** slices.
 - **Listeners:** follow active user; do not linger on warm-but-empty rooms.
 
@@ -250,7 +250,7 @@ For **each** of meta / PA / timeline / ledger:
 
 **Project Campaign Room** — five-slice architecture filed 2026-07-31.  
 Next preferred: **OK go for R3c** (expand meta identity), then **R3d** (ops slice), then R4.  
-Brief: [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).
+Brief: [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md).
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Status:** Shared architecture for branched session types — dual-domain live @ v603+. Design lock: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md).
 
-> **CURRENT PRODUCTION (2026-07-21):** Live forks (prep **and** timeline) are **PAUSED** — Sheets-only. Canonical ops note: **[dal-live-forks-pause.md](dal-live-forks-pause.md)**. Do not open START PREP / START COLLAB until that note says restored.
+> **CURRENT PRODUCTION:** Live forks (prep **and** timeline) are **ON** (`DAL_LIVE_FORKS_PAUSED = false`). Ops: **[dal-live-forks-pause.md](dal-live-forks-pause.md)**. Campaign Room warm/cold: [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md).
 
 **Design lock (2026-07-13):** [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) — reconciliation engine, failed-writes pocket, Logistics Hub atomic ops (no fork), PA/Timeline fork lifecycle.
 
@@ -18,11 +18,11 @@
 | Timeline collaboration room | [timeline-collab-session.md](timeline-collab-session.md) |
 | **Live forks pause / restore (ops)** | [dal-live-forks-pause.md](dal-live-forks-pause.md) |
 
-**Last swept:** 2026-07-21
+**Last swept:** 2026-08-05
 
 **Firestore paths (canonical):** `projects/{projectId}/assets/` and `projects/{projectId}/timeline/` per [design lock](../archive/dal-firebase-design-lock-2026-07-13.md). The older `sessions/{projectId}/{sessionType}/` sketch is historical only.
 
-**Future architecture decision:** [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — **ACTIVE** [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md). Design-lock rules 1–2 revised for warm rooms: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision. **Ledger complete:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
+**Campaign Room (COMPLETE):** [project-campaign-firebase-hybrid-decision-2026-07-21.md](project-campaign-firebase-hybrid-decision-2026-07-21.md) — archived brief [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md). Design-lock rules 1–2 revised for warm rooms: [../archive/dal-firebase-design-lock-2026-07-13.md](../archive/dal-firebase-design-lock-2026-07-13.md) § Campaign Room revision. **Ledger complete:** [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). **Active follow-on:** [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md).
 
 **Dual-domain (Phase 4 Slice D):** prep + timeline may both be open **concurrent** on one project — [../archive/dal-phase4-slice-d-dual-domain-sessions.md](../archive/dal-phase4-slice-d-dual-domain-sessions.md) (shipped @ v603). **Auto-fork Part B:** [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md) (closed 2026-07-21).
 
@@ -98,7 +98,7 @@ SESSION CLOSED (fork left)
 
 ## Project Campaign Room (how it works now)
 
-**Status:** **ACTIVE** — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md). R1–R5 core live (checkpoint, listeners-follow-user, 48h idle). Remaining: Tracker Live badge, Offer pull, archive.
+**Status:** **COMPLETE** — [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md). R1–R5 core live (checkpoint, listeners-follow-user, 48h idle). Follow-on: Tracker hybrid + Offer pulls + checkpoint smoke — [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) (**no** Live badge).
 
 ### Problem
 

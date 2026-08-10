@@ -1,7 +1,7 @@
 # Offer / Invoice · Crew Timeline Swap · Availability Conflicts
 
-**Status:** Future campaign — **locked brainstorm** filed 2026-07-20. **Not active.** Do **not** implement until the director confirms sequencing has reached this campaign.  
-**Sequencing:** Part B **archived**. Offer remains **off critical path** (director locks 2026-07-21) — parallel or later. Soft/hard **detection implementation** depends on Logistics Ledger — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md). Part B archive: [../archive/multi-user-fork-industrial-and-auto.md](../archive/multi-user-fork-industrial-and-auto.md).  
+**Status:** Locked brainstorm 2026-07-20. **Offer manual pulls (+ undo)** promoted 2026-08-05 into active campaign [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md). Invoice / crew-swap / soft-hard conflict detection remain backlog — do **not** implement those until director OK go.  
+**Sequencing:** Part B + Logistics Ledger **archived**. Soft/hard **detection** still depends on ledger SoT — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Related area topics:** [financials.md](financials.md) · [availability-fleet.md](availability-fleet.md) · [timeline-shift-field-crew.md](timeline-shift-field-crew.md)
 
@@ -25,8 +25,8 @@ This file is the **canonical backlog campaign** for that work. Area topics keep 
 
 | Rule | Meaning |
 |------|---------|
-| **Not NEXT** | Multi-user Part B remains primary until director promotes this campaign |
-| **No code until OK go** | Brainstorm locked; planning/implementation only after director confirms sequencing |
+| **Offer pulls = active campaign** | Dual pull buttons + undo **planned** in [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) (W3/W4) — **not shipped yet** |
+| **Rest = backlog** | Invoice, crew swap, soft/hard detection — still no code until director OK go |
 | **Invoice fields not final** | §1.2 web research is a **prerequisite** before locking invoice field requirements |
 | **Conflicts need ledger** | Build soft/hard detection against Logistics_Ledger companion — **not** Project_Assets load/unload derivation / timeline walk |
 
@@ -34,15 +34,17 @@ This file is the **canonical backlog campaign** for that work. Area topics keep 
 
 ## 1. Offer / Invoice Design — locked decisions
 
-### 1.1 Crew snapshot into offer
+### 1.1 Crew / project snapshot into offer
 
-- At offer creation, manager pulls crew counts from the timeline via **one button**.
-- **Convenience pull, not live sync.** After pull, the offer is independent of the timeline.
-- Manager adjusts counts/rates in the offer, then freezes it.
-- Timeline is **not** the source of truth for a finalized offer.
-- If the timeline changes after the pull, the offer stays locked unless the manager **manually re-pulls**.
-- Same action may be repeated later (e.g. six months later) to regenerate an estimate from current timeline state.
-- **Design:** pull must be **idempotent** and clearly labeled (e.g. **Refresh from Timeline**).
+- At offer creation (and later), manager refreshes via **manual pull buttons** — **not** live sync.
+- **Active campaign shape (2026-08-05):**  
+  - **Pull Project Assets**  
+  - **Pull Timeline + logistics** (shifts; truck km / idle·stay / courses…)  
+  - **Undo** after a pull restores the prior offer snapshot for that pull  
+- After pull, the offer is independent until the manager pulls again.
+- Timeline / PA / logistics are **not** the source of truth for a finalized offer.
+- Same actions may be repeated later (e.g. six months later) to regenerate from current project state.
+- **Design:** pulls must be **idempotent** and clearly labeled. See [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md).
 
 ### 1.2 Offer → invoice conversion
 

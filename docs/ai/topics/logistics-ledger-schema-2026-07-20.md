@@ -341,7 +341,7 @@ Full pros/cons, options A–D, sequencing, open questions: **[project-campaign-f
 | 4 | AUTO-OUTBOUND / AUTO-INBOUND shifts | **Keep and link to ledger legs** |
 | — | Load/unload clocks | **Timeline truck shifts** + `phase_ref` (sub-event) for availability |
 | — | Soft conflict free-at | **Sub-event end** (not truck load alone; not `Phase_Blocks` under current lock) |
-| — | Offer before Ledger? | **No** — Offer off critical path |
+| — | Offer before Ledger? | **No** (2026-07-20). Offer **pulls** later promoted 2026-08-05 — [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) |
 | — | `Project_Timelines.uid` for `phase_ref` | **Preserve on rewrite** + expose on fragments (2026-07-21) |
 
 Remaining at promote time (if any): empty times after backfill review UI; `[TRANSFER_FROM` as ledger edges vs formula bypass only.

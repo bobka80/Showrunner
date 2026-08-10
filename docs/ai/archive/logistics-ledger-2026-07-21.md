@@ -5,7 +5,7 @@
 **Architecture pack:** [../topics/architecture-multi-campaign-pack-2026-07-21.md](../topics/architecture-multi-campaign-pack-2026-07-21.md)  
 **Director locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
 **Predecessor:** [multi-user-fork-industrial-and-auto.md](multi-user-fork-industrial-and-auto.md) (Part B closed 2026-07-21)  
-**Next after this campaign:** Project Campaign Room — [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md)
+**Next after this campaign:** Project Campaign Room — **COMPLETE** [project-campaign-room-2026-07-24.md](project-campaign-room-2026-07-24.md). Active now: [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md).
 
 **Opened:** 2026-07-21 · **Closed:** 2026-07-24 · **Status:** **COMPLETE** — M0–M5 + Exit (live forks re-enabled). **Archived** here.  
 **Production tip:** see RELEASES.md. Prep live rollback pin still **v654**. Live forks: [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md).
@@ -16,7 +16,7 @@
 
 1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → [GLOSSARY.md](../GLOSSARY.md) § sub-events vs phases → **this archive** → schema topic → architecture pack §3 → locks.  
 2. Do **not** invent columns beyond the schema topic.  
-3. Campaign complete — next structural work is Campaign Room — [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md).  
+3. Campaign complete — Room also complete — [project-campaign-room-2026-07-24.md](project-campaign-room-2026-07-24.md). Active: [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md).  
 4. **Live forks:** **LIVE** again — [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md). Flags: `DAL_LIVE_FORKS_PAUSED = false` in `Dal_Sessions.js` + `window.DAL_LIVE_FORKS_PAUSED = false` in `07_Core_Globals.html`.  
 5. After any implementation: `node milestone.js "…"`; update the owning topic same session.
 

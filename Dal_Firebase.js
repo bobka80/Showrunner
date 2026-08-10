@@ -515,11 +515,16 @@ function dalCommitCampaignIdentityFromFirestore_(projectId, actor) {
   if (typeof saveProjectDataSheets_ !== 'function') {
     throw new Error('saveProjectDataSheets_ missing — cannot commit meta identity.');
   }
-  saveProjectDataSheets_(projectData, timelinesArray, actor || 'System', { skipCollision: true, fromMetaCommit: true });
+  var saveRaw = saveProjectDataSheets_(projectData, timelinesArray, actor || 'System', { skipCollision: true, fromMetaCommit: true });
+  var indexLastUpdated = '';
+  try {
+    var parsed = (typeof saveRaw === 'string') ? JSON.parse(saveRaw) : saveRaw;
+    if (parsed && parsed.timestamp) indexLastUpdated = String(parsed.timestamp);
+  } catch (eTs) { /* ignore */ }
   try {
     if (typeof syncCalendarFromDatabase === 'function') syncCalendarFromDatabase();
   } catch (eCal) { /* Sheets commit still valid */ }
-  return { committed: true, subEventCount: timelinesArray.length };
+  return { committed: true, subEventCount: timelinesArray.length, indexLastUpdated: indexLastUpdated };
 }
 
 /** google.script.run — live meta identity for peers / debug. */

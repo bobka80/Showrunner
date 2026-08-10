@@ -19,7 +19,7 @@ Showrunner has **two live Firebase forks** (independent on one project):
 **Between sessions (NORMAL):** app → GAS → **Google Sheets** (official SoT).  
 **While a fork is open:** that domain’s live edits go to **Firebase**; Sheets for that domain are blocked until End Prep / End Collab commits Firebase → Sheets.
 
-**RFID `Operations_Ledger`:** cold Sheets until **R3d** (fifth warm slice). Logistics Hub warm under room (**R3b**). Vault / tracker / financials stay outside the room forever.
+**RFID `Operations_Ledger`:** warm fifth slice (**R3d** shipped). Vault / tracker / financials stay outside the room forever.
 
 ```text
 NORMAL (every day / forks paused)

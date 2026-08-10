@@ -13,6 +13,6 @@ Full lifecycle: [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) Rule 11.
 
 **Major rewind (2026-07-11):** [REWIND-pre-station-ui-split.md](REWIND-pre-station-ui-split.md) — GAS **530** baseline. **Station UI next:** [STATION_UI.md](../STATION_UI.md) · [station-ui-handoff.md](station-ui-handoff.md).
 
-**ACTIVE (2026-07-31):** Project Campaign Room — [project-campaign-room-2026-07-24.md](project-campaign-room-2026-07-24.md) (**five-slice**; next **R3c** meta identity). Ledger archived: [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
+**ACTIVE (2026-08-05):** Warm readers + Offer pulls + Checkpoint smoke — [warm-readers-offer-tracker-2026-08-05.md](warm-readers-offer-tracker-2026-08-05.md). Campaign Room archived: [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md). Ledger archived: [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md)

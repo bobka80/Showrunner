@@ -48,7 +48,7 @@ This file is the **map of drawers**. Do not duplicate doctrine rules here.
 | [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) | **COMPLETE** — Logistics Ledger M0–M5 + Exit (live forks re-enabled) |
 | [active/ui-qol-standing-agent.md](active/ui-qol-standing-agent.md) | **Standing agent** — UI/QoL minor polish; collision-check before edit |
 | [topics/dal-live-forks-pause.md](topics/dal-live-forks-pause.md) | Live forks architecture + **CURRENT** pause / restore |
-| [topics/architecture-multi-campaign-pack-2026-07-21.md](topics/architecture-multi-campaign-pack-2026-07-21.md) | Sequenced pack: Ledger → Campaign Room → packet sync |
+| [topics/architecture-multi-campaign-pack-2026-07-21.md](topics/architecture-multi-campaign-pack-2026-07-21.md) | Sequenced pack: Ledger → Campaign Room → warm readers → packet sync |
 | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) | Future pre-ship gates: RBAC / FCM / truck / financials |
 | [PRE_SHIP_PIPELINE.md](PRE_SHIP_PIPELINE.md) | Scoped pre-ship + Bugbot gate (all layers) |
 | [MILESTONE_NOW.md](MILESTONE_NOW.md) | Milestone-now **full protocol** (the root `../../MILESTONE_NOW.md` is the director's quick card that points here) |

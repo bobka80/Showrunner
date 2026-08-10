@@ -104,7 +104,7 @@ Sits **between UI and repos** — never inside adapters, never inside Firebase/S
 
 ### Campaign Room revision (filed R0 — 2026-07-24)
 
-**Active build:** [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) · **Locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)
+**Archived campaign:** [project-campaign-room-2026-07-24.md](project-campaign-room-2026-07-24.md) · **Locks:** [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)
 
 When **Project Campaign Room** is warm, rules **1** and **2** above are **superseded** as follows (Hub warm = **R3b**; ops warm = **R3d**):
 
@@ -117,7 +117,7 @@ When **Project Campaign Room** is warm, rules **1** and **2** above are **supers
 
 **Logistics Hub (revised 2026-07-25 — Campaign Room):** Hub pack/fuse may target warm PA + ledger + timeline; Sheets durability via End / checkpoint. See active brief **R3b**. Cold / no-room path may still use Sheets.
 
-**Operations_Ledger (revised 2026-07-31 — Campaign Room):** Older line “ops forever Sheets atomic / never a room slice” is **superseded**. Ops is the **fifth warm slice** — per-op keyed Firebase docs while room warm; Sheets via checkpoint / End / idle; commit fail-safe at least as strong as PA B/C (`dal_commit_backups` / `dal_commit_retry`); **no fake success** if scans exist only in a dying room. Ops remains a **separate journal** from Logistics_Ledger movement (do not merge domains). Cold / no-room path may still use Sheets until warm seed succeeds. See [../active/project-campaign-room-2026-07-24.md](../active/project-campaign-room-2026-07-24.md) **R3d** · locks `ops_ledger` = `warm_fifth_slice`.
+**Operations_Ledger (revised 2026-07-31 — Campaign Room):** Older line “ops forever Sheets atomic / never a room slice” is **superseded**. Ops is the **fifth warm slice** — per-op keyed Firebase docs while room warm; Sheets via checkpoint / End / idle; commit fail-safe at least as strong as PA B/C (`dal_commit_backups` / `dal_commit_retry`); **no fake success** if scans exist only in a dying room. Ops remains a **separate journal** from Logistics_Ledger movement (do not merge domains). Cold / no-room path may still use Sheets until warm seed succeeds. See [project-campaign-room-2026-07-24.md](project-campaign-room-2026-07-24.md) **R3d** · locks `ops_ledger` = `warm_fifth_slice`.
 
 **Meta (revised 2026-07-31):** Meta includes project identity (name, client, location, inside/outside, sub-events) **plus** room lifecycle stamps — not lifecycle-only. Elevation of identity fields = **R3c**.
 

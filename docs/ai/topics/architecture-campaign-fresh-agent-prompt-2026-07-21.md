@@ -44,7 +44,7 @@ Key locks (summary — full file wins):
 - One campaignRoomUid covering meta + PA + ledger + timeline
 - Checkpoint: always publish meta → PA → timeline → ledger (~30m fixed)
 - Conflicts/Tracker: Sheets by default + optional Live preview (ledger AND timeline together)
-- Offer pull while warm: one-shot from Firebase then freeze
+- Offer pulls: dual manual buttons + undo (warm→Firebase / cold→Sheets) — see warm-readers campaign
 - Ledger depends on TIMELINE: load/unload clocks from timeline truck shifts; `phase_ref` → `Project_Timelines.uid` (**sub-event**); soft conflict free-at = **sub-event END**; keep AUTO-OUTBOUND/INBOUND shifts LINKED to ledger legs
 - Terminology: **sub-events** = `Project_Timelines`; **phases** = `Phase_Blocks` (timeline header) — [GLOSSARY.md](../GLOSSARY.md)
 - Empty truck_uid allowed for continuity; dual-write mandatory M1–M3
@@ -60,7 +60,7 @@ READ FIRST (in order)
 5. docs/ai/topics/session-fork-platform.md
 6. docs/ai/archive/dal-firebase-design-lock-2026-07-13.md
 7. docs/ai/archive/multi-user-fork-industrial-and-auto.md — Part B archived; do NOT redesign
-8. docs/ai/archive/logistics-ledger-2026-07-21.md — NEXT build checklist
+8. docs/ai/archive/project-campaign-room-2026-07-24.md — Room COMPLETE; active = warm-readers-offer-tracker
 9. docs/ai/topics/architecture-multi-campaign-pack-2026-07-21.md — filed design pack
 8. docs/ai/FRAGILE_ZONES.md — DAL / prep PA / timeline sections
 9. docs/ai/EQUIPMENT_MODEL.md

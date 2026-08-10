@@ -264,8 +264,22 @@ window.applyCampaignCheckpointResult_ = function(res) {
   if (res.lastPublishedAt) window.peCheckpointLastPub_ = String(res.lastPublishedAt);
   window.peCheckpointFailAt_ = res.checkpointFailAt ? String(res.checkpointFailAt) : '';
   window.peCheckpointEscalate_ = !!res.escalate || (res.success === false && !res.skipped);
+  // Checkpoint / meta publish bumps Index Last_Updated — keep editor version in sync
+  // so Save & Sync does not false-collide with "another user".
+  if (res.indexLastUpdated || (res.success && res.lastPublishedAt && !res.skipped)) {
+    var verEl = document.getElementById('edit-proj-version');
+    if (verEl) {
+      verEl.value = String(res.indexLastUpdated || res.lastPublishedAt || verEl.value);
+    }
+  }
+  if (res.roomLive === true) {
+    window.peForkRoomActive_ = true;
+  }
   if (typeof window.paintCampaignCheckpointCue_ === 'function') {
     window.paintCampaignCheckpointCue_();
+  }
+  if (typeof window.paintProjectEditorModuleBtns_ === 'function') {
+    window.paintProjectEditorModuleBtns_();
   }
 };
 
@@ -305,6 +319,11 @@ window.runDalCampaignCheckpointNow_ = function(opts) {
             String(res.error || 'Unknown error') +
             '\n\nRoom stayed open — live data is still on Firebase.');
         } catch (eA2) { /* ignore */ }
+      }
+      // Re-read Index so END ROOM / green chrome matches keep-live truth after publish.
+      if (res && res.success && !res.skipped &&
+          typeof window.refreshProjectEditorForkChrome_ === 'function') {
+        try { window.refreshProjectEditorForkChrome_(projectId); } catch (eR) { /* ignore */ }
       }
     })
     .runDalCampaignCheckpoint(projectId, actor, opts);

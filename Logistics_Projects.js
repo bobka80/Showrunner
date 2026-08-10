@@ -69,6 +69,7 @@ function saveProjectDataSheets_(projectData, timelinesArray, actor, opts) {
   // Find the row and perform concurrency check
   let existingDbName = "";
   let existingDbStatus = "";
+  let existingIndexRow = null;
   for (let i = 1; i < indexData.length; i++) {
     if (indexData[i][iMap['uid']] === resolvedProjectId) {
         if (!opts.skipCollision && !isNewProject && !mergedFromDuplicate && iMap['Last_Updated'] !== undefined) {
@@ -85,6 +86,7 @@ function saveProjectDataSheets_(projectData, timelinesArray, actor, opts) {
         if (iMap['Project_Name'] !== undefined) existingDbName = String(indexData[i][iMap['Project_Name']] || "");
         if (iMap['Status'] !== undefined) existingDbStatus = String(indexData[i][iMap['Status']] || "");
         rowIndex = i + 1;
+        existingIndexRow = indexData[i];
         if (iMap['Checklist_State'] !== undefined) existingState = indexData[i][iMap['Checklist_State']];
         if (iMap['Readiness_State'] !== undefined) existingReadiness = indexData[i][iMap['Readiness_State']];
         break;
@@ -96,7 +98,14 @@ function saveProjectDataSheets_(projectData, timelinesArray, actor, opts) {
     projectData.Status = existingDbStatus || projectData.Status;
   }
   
-  let rowContent = new Array(iCols).fill("");
+  // Preserve unknown Index columns (DAL session + Campaign Room + future).
+  // Blank-fill then setValues used to wipe Dal_Campaign_* / prep / timeline on every Save & Sync
+  // and on checkpoint/END meta identity publish — room looked "ended" after force publish.
+  let rowContent = existingIndexRow
+    ? existingIndexRow.slice()
+    : new Array(iCols).fill("");
+  while (rowContent.length < iCols) rowContent.push("");
+  if (rowContent.length > iCols) rowContent = rowContent.slice(0, iCols);
   if(iMap['uid'] !== undefined) rowContent[iMap['uid']] = resolvedProjectId;
   if(iMap['Project_Name'] !== undefined) rowContent[iMap['Project_Name']] = projectData.Project_Name || "Unnamed Event";
   if(iMap['Client'] !== undefined) rowContent[iMap['Client']] = projectData.Client || "";
