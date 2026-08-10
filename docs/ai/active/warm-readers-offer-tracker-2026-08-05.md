@@ -108,10 +108,10 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 
 ### W1 — Checkpoint smoke (fast)
 
-- [ ] Smoke R4 on web.app (force dbl-click + optional wait) — **in progress** (director)  
-- [ ] File/fix any fail; polish cue only if needed  
-- [ ] Ship if code changes  
-- [ ] Tick complete when director reports smoke green (or after fix ship)
+- [x] Smoke R4 on web.app (force dbl-click) — **fail found** (room wiped + collision)  
+- [x] File/fix: Index row blank-fill wiped `Dal_Campaign_*`; refresh editor version after publish — **GAS v768**  
+- [ ] Director re-smoke force checkpoint → room stays warm; Save & Sync OK  
+- [ ] Tick W1 complete when re-smoke green
 
 ### W2 — Tracker / Conflicts hybrid
 
@@ -160,6 +160,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-05 | Hygiene sweep applied: Room archived; locks oneshot_hybrid / manual_dual_undo; pause banners + index gaps fixed. |
 | 2026-08-10 | Director **OK go for W1**. Code review: R4 path + cue look sound @ v767. Awaiting director smoke (force dbl-click). |
 | 2026-08-10 | **W1 smoke fail:** force checkpoint wiped Index `Dal_Campaign_*` via `saveProjectDataSheets_` blank row → room looked ended + Save & Sync collision. Fix shipping. |
+| 2026-08-10 | **Fix @ GAS v768** — preserve existing Index row on identity save; checkpoint returns `indexLastUpdated` + refreshes `#edit-proj-version`. Re-smoke force publish. |
+| 2026-08-10 | Cue chrome: larger outlined rectangle button for Last published / Not published (dbl-click unchanged). |
 
 ---
 

@@ -238,6 +238,44 @@
     }
     .btn-outline-blue:hover { background: var(--btn-outline-blue-hover-bg) !important; }
 
+    /* Campaign Room — keep-live publish cue (project editor footer) */
+    #master-checkpoint-cue.master-checkpoint-cue {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        margin: 0;
+        padding: 8px 14px;
+        min-height: 38px;
+        max-width: 280px;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        line-height: 1.25;
+        text-align: center;
+        color: #a1a1aa;
+        background: rgba(63, 63, 70, 0.35);
+        border: 1px solid #52525b;
+        border-radius: 6px;
+        cursor: pointer;
+        user-select: none;
+        white-space: normal;
+    }
+    #master-checkpoint-cue.master-checkpoint-cue:hover {
+        background: rgba(63, 63, 70, 0.55);
+        border-color: #71717a;
+        color: #e4e4e7;
+    }
+    #master-checkpoint-cue.master-checkpoint-cue.is-fail {
+        color: #fecaca;
+        border-color: #ef4444;
+        background: rgba(239, 68, 68, 0.15);
+    }
+    #master-checkpoint-cue.master-checkpoint-cue.is-fail:hover {
+        background: rgba(239, 68, 68, 0.25);
+        color: #fee2e2;
+    }
+
     /* --- HUB TAB BUTTONS --- */
     .btn-tab {
         background: var(--btn-tab-bg) !important;
