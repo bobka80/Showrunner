@@ -6,7 +6,7 @@
 **Room decision / locks:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
-**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W1** checkpoint smoke (director).  
+**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W2** Tracker/Conflicts hybrid (build).  
 **Production tip:** see RELEASES.md. Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
@@ -110,15 +110,15 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 
 - [x] Smoke R4 on web.app (force dbl-click) — **fail found** (room wiped + collision)  
 - [x] File/fix: Index row blank-fill wiped `Dal_Campaign_*`; refresh editor version after publish — **GAS v768**  
-- [ ] Director re-smoke force checkpoint → room stays warm; Save & Sync OK  
-- [ ] Tick W1 complete when re-smoke green
+- [x] Cue polish + `publishing…` / stamp fix — **GAS v769–v771**  
+- [x] Director continued past W1 (2026-08-10) — treat smoke green for sequencing
 
 ### W2 — Tracker / Conflicts hybrid
 
-- [ ] Inventory current Tracker + Conflicts read entry points  
-- [ ] Warm detect via Index / `getDalSessionInfo` campaign fields  
-- [ ] One-shot Firebase overlay helpers (ledger / timeline / PA as needed)  
-- [ ] Cap + fail-open to Sheets  
+- [x] Inventory current Tracker + Conflicts read entry points  
+- [x] Warm detect via Index `Dal_Campaign_Room_Status` / `dalStatusIsForkLive_`  
+- [x] One-shot Firebase overlay helpers (`dalWarmReaderOneShotOverlay_` — meta sub-events, PA, ledger; Conflicts + timeline shifts)  
+- [x] Cap 25 + fail-open to Sheets  
 - [ ] Ship + smoke: warm project shows fresher than Sheets; cold unchanged
 
 ### W3 — Offer pull PA
@@ -133,7 +133,16 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 - [ ] Pre-pull snapshot + Undo (same undo model as W3)  
 - [ ] Ship + smoke
 
-### W5 — Exit polish
+### W5 — Warm project editor autosave (filed 2026-08-10)
+
+**Shape:** NEW project → one explicit Save & Sync (create). After room is warm → debounced auto-save of identity + mini-cal sub-events via existing `dalSaveProjectIdentityWarm_`. Cold / briefing keep explicit save. Show Saving…/Saved. Do not autosave mid mini-cal drag.
+
+- [ ] Debounced warm auto-save on identity fields + mini-cal settle  
+- [ ] Hide/soften Save & Sync while warm; keep for NEW + cold  
+- [ ] Fail toast if warm write fails  
+- [ ] Ship + smoke
+
+### W6 — Exit polish
 
 - [ ] FRAGILE + offer topic notes for this campaign Exit  
 - [ ] Archive this campaign when director agrees Exit complete  
@@ -164,6 +173,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-10 | Cue chrome: larger outlined rectangle button for Last published / Not published (dbl-click unchanged). |
 | 2026-08-10 | Cue: one-click; label `{time} publish` (drop “Last published”). @ GAS v770. |
 | 2026-08-10 | Cue feedback: `publishing…` while busy; Index refresh must not clobber newer stamp. |
+| 2026-08-10 | Filed **W5** warm editor autosave. W1 closed for sequencing. Next build: **W2** Tracker hybrid. |
+| 2026-08-10 | **W2** implemented: `dalWarmReaderOneShotOverlay_` in Tracker + Conflicts (cap 25, fail-open). |
 
 ---
 
@@ -175,4 +186,5 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | W2 | Tracker/Conflicts hybrid live |
 | W3 | Offer PA pull + undo live |
 | W4 | Offer timeline/logistics pull + undo live |
-| W5 | Docs archived; predecessor Room archive asked |
+| W5 | Warm editor autosave live |
+| W6 | Docs archived |

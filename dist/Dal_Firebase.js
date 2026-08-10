@@ -233,6 +233,134 @@ function dalParseSubEventsFromMeta_(meta) {
   }
 }
 
+/** Cap concurrent warm Firebase overlays per Tracker/Conflicts open (meta calendar family). */
+var DAL_WARM_READER_OVERLAY_CAP_ = 25;
+
+function dalIndexRowCampaignWarm_(row, iMap) {
+  if (!row || !iMap) return false;
+  var col = iMap['Dal_Campaign_Room_Status'];
+  if (col === undefined) return false;
+  var roomSt = String(row[col] || '');
+  if (typeof dalStatusIsForkLive_ === 'function') return dalStatusIsForkLive_(roomSt);
+  var s = roomSt.toLowerCase();
+  return s === 'open' || s === 'opening' || s === 'committing';
+}
+
+/** Warm Campaign Room project ids from Index sheet data (skip cancelled/trashed). */
+function dalListWarmCampaignProjectIds_(indexData, iMap) {
+  var out = [];
+  if (!indexData || !iMap) return out;
+  var uidCol = iMap['uid'] !== undefined ? iMap['uid'] : iMap['Project_ID'];
+  var statusCol = iMap['Status'];
+  for (var i = 1; i < indexData.length; i++) {
+    var status = statusCol !== undefined ? String(indexData[i][statusCol] || '').toUpperCase() : '';
+    if (status === 'CANCELLED' || status === 'TRASHED') continue;
+    if (!dalIndexRowCampaignWarm_(indexData[i], iMap)) continue;
+    var pid = uidCol !== undefined ? String(indexData[i][uidCol] || '') : '';
+    if (!pid || pid === 'uid') continue;
+    out.push(pid);
+  }
+  return out;
+}
+
+/**
+ * W2 warm readers — one-shot Firebase overlay for Tracker/Conflicts.
+ * Fail-open per project/slice. Caps successful project overlays (default 25).
+ * PA/ledger replace only when Firebase returns non-empty rows/legs.
+ */
+function dalWarmReaderOneShotOverlay_(projectIds, opts) {
+  opts = opts || {};
+  var cap = opts.cap != null ? Number(opts.cap) : DAL_WARM_READER_OVERLAY_CAP_;
+  if (!(cap > 0)) cap = DAL_WARM_READER_OVERLAY_CAP_;
+  var wantMeta = opts.meta !== false;
+  var wantPa = opts.pa !== false;
+  var wantLl = opts.logistics !== false;
+  var wantTl = !!opts.timeline;
+  var out = {
+    subEvents: {},
+    names: {},
+    paRows: {},
+    paMap: null,
+    ledger: {},
+    timeline: {},
+    count: 0
+  };
+  if (!projectIds || !projectIds.length) return out;
+  var hdr = null;
+  for (var i = 0; i < projectIds.length; i++) {
+    if (out.count >= cap) break;
+    var pid = String(projectIds[i] || '');
+    if (!pid) continue;
+    var got = false;
+    if (wantMeta && typeof firestoreGetCampaignMeta_ === 'function') {
+      try {
+        var meta = firestoreGetCampaignMeta_(pid);
+        if (meta) {
+          if (meta.name) out.names[pid] = String(meta.name);
+          var frags = dalParseSubEventsFromMeta_(meta);
+          if (frags.length) {
+            out.subEvents[pid] = frags;
+            got = true;
+          } else if (meta.identityUpdatedAt || meta.status) {
+            got = true;
+          }
+        }
+      } catch (eMeta) { /* Sheets fallthrough */ }
+    }
+    if (wantPa && typeof dalLoadPaProjectRowsFromFirebase_ === 'function' &&
+        typeof dalGetProjectAssetsHeaderAndMap_ === 'function') {
+      try {
+        if (!hdr) hdr = dalGetProjectAssetsHeaderAndMap_();
+        var rows = dalLoadPaProjectRowsFromFirebase_(pid, hdr.header, hdr.map);
+        if (rows && rows.length) {
+          out.paRows[pid] = rows.map(function (r) { return r.data; });
+          out.paMap = hdr.map;
+          got = true;
+        }
+      } catch (ePa) { /* Sheets fallthrough */ }
+    }
+    if (wantLl && typeof dalReadLogisticsStateFromFirebase_ === 'function' &&
+        typeof logisticsLedgerLegsMapFromObjects_ === 'function') {
+      try {
+        var ll = dalReadLogisticsStateFromFirebase_(pid);
+        if (ll && ll.present && ll.legs && ll.legs.length) {
+          out.ledger[pid] = logisticsLedgerLegsMapFromObjects_(ll.legs);
+          got = true;
+        }
+      } catch (eLl) { /* Sheets fallthrough */ }
+    }
+    if (wantTl && typeof dalReadTimelineStateFromFirebase_ === 'function') {
+      try {
+        var tl = dalReadTimelineStateFromFirebase_(pid);
+        if (tl && ((tl.shifts && tl.shifts.length) || (tl.phases && tl.phases.length))) {
+          out.timeline[pid] = tl;
+          got = true;
+        }
+      } catch (eTl) { /* Sheets fallthrough */ }
+    }
+    if (got) out.count++;
+  }
+  return out;
+}
+
+/** Replace per-project PA sheet rows with warm Firebase rows (Sheets-shaped table + hMap). */
+function dalMergeWarmPaSheetRows_(paData, paMap, warmPaRowsByPid) {
+  if (!warmPaRowsByPid || !Object.keys(warmPaRowsByPid).length) return paData;
+  var out = [];
+  if (paData && paData.length) out.push(paData[0]);
+  var pidCol = paMap && (paMap['project_uid'] !== undefined ? paMap['project_uid'] : paMap['Project_ID']);
+  for (var i = 1; i < (paData ? paData.length : 0); i++) {
+    var pUid = pidCol !== undefined ? String(paData[i][pidCol] || '') : '';
+    if (warmPaRowsByPid[pUid]) continue;
+    out.push(paData[i]);
+  }
+  Object.keys(warmPaRowsByPid).forEach(function (pid) {
+    (warmPaRowsByPid[pid] || []).forEach(function (row) { out.push(row); });
+  });
+  out.hMap = paMap;
+  return out;
+}
+
 /** Sheets → plain identity for elevation / commit compare. */
 function dalReadProjectIdentityFromSheets_(projectId) {
   var sheets = verifyDatabaseSchema(true);

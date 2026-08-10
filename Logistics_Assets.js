@@ -543,6 +543,50 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             
             if(eDateStr) projects[pid].dates.push({ uid: tMap['uid'] !== undefined ? (timelineData[i][tMap['uid']] || '') : '', date: eDateStr, type: subType, startTime: extractTime(timelineData[i][tMap['Start_Time']]), endTime: extractTime(timelineData[i][tMap['End_Time']]) });
         }
+
+        // W2: warm Campaign Room → one-shot Firebase overlay (cap 25, fail-open). No badge / listeners.
+        var warmOverlay = { subEvents: {}, names: {}, paRows: {}, ledger: {}, count: 0 };
+        try {
+          if (typeof dalListWarmCampaignProjectIds_ === 'function' &&
+              typeof dalWarmReaderOneShotOverlay_ === 'function') {
+            var warmIdsAll = dalListWarmCampaignProjectIds_(indexData, iMap);
+            var warmPriority = [];
+            var warmRest = [];
+            warmIdsAll.forEach(function (wPid) {
+              var wp = projects[wPid];
+              if (!wp || !wp.dates || !wp.dates.length) {
+                warmRest.push(wPid);
+                return;
+              }
+              var wMin = wp.dates.reduce(function (min, d) { return d.date < min ? d.date : min; }, wp.dates[0].date);
+              var wMax = wp.dates.reduce(function (max, d) { return d.date > max ? d.date : max; }, wp.dates[0].date);
+              if (wMax >= startStr && wMin <= endStr) warmPriority.push(wPid);
+              else warmRest.push(wPid);
+            });
+            warmOverlay = dalWarmReaderOneShotOverlay_(warmPriority.concat(warmRest), {
+              meta: true, pa: true, logistics: true, timeline: false
+            });
+            Object.keys(warmOverlay.subEvents || {}).forEach(function (wPid) {
+              if (!projects[wPid]) return;
+              var frags = warmOverlay.subEvents[wPid] || [];
+              if (!frags.length) return;
+              projects[wPid].dates = frags.map(function (f) {
+                return {
+                  uid: f.uid || '',
+                  date: f.date,
+                  type: f.type || 'MAIN_EVENT',
+                  startTime: extractTime(f.startTime),
+                  endTime: extractTime(f.endTime)
+                };
+              });
+            });
+            Object.keys(warmOverlay.names || {}).forEach(function (wPid) {
+              if (projects[wPid] && warmOverlay.names[wPid]) {
+                projects[wPid].name = warmOverlay.names[wPid];
+              }
+            });
+          }
+        } catch (eWarmTrk) { warmOverlay = { subEvents: {}, names: {}, paRows: {}, ledger: {}, count: 0 }; }
         
         // Filter to overlapping projects only
         let activeProjects = {};
@@ -647,14 +691,35 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
         }
         
         // 4. Fetch Assignments (Project Assets)
-        const paData = getSheetData(dbSheets.projectAssets);
-        const paMap = paData.hMap;
+        const paDataSheets = getSheetData(dbSheets.projectAssets);
+        const paMap = paDataSheets.hMap;
+        let paData = paDataSheets;
+        try {
+          if (warmOverlay && warmOverlay.paRows && Object.keys(warmOverlay.paRows).length &&
+              typeof dalMergeWarmPaSheetRows_ === 'function') {
+            // Only replace PA for warm projects that land in this Tracker window
+            var warmPaActive = {};
+            Object.keys(warmOverlay.paRows).forEach(function (wPid) {
+              if (activeProjects[wPid]) warmPaActive[wPid] = warmOverlay.paRows[wPid];
+            });
+            paData = dalMergeWarmPaSheetRows_(paDataSheets, paMap, warmPaActive);
+          }
+        } catch (eWarmPa) { paData = paDataSheets; }
 
         // M4: ledger truck UIDs for active projects
         var ledgerByProject = {};
         try {
           ledgerByProject = logisticsLedgerLegsByProjects_(dbSheets, Object.keys(activeProjects || {}));
         } catch (eLlTrk) { ledgerByProject = {}; }
+        try {
+          if (warmOverlay && warmOverlay.ledger) {
+            Object.keys(warmOverlay.ledger).forEach(function (wPid) {
+              if (activeProjects[wPid] && warmOverlay.ledger[wPid]) {
+                ledgerByProject[String(wPid)] = warmOverlay.ledger[wPid];
+              }
+            });
+          }
+        } catch (eWarmLl) { /* keep Sheets ledger */ }
         
         // --- 🏗️ MATRYOSHKA INHERITANCE: Map Container Truck Assignments ---
         let containerTrucks = {};
