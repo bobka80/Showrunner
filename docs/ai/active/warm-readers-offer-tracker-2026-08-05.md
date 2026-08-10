@@ -84,7 +84,7 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 
 ### C — 30m checkpoint smoke + polish
 
-**Already shipped:** R4 @ GAS v764 — `runDalCampaignCheckpoint`, dirty gate, five-slice keep-live publish, editor “Last published…” cue (dbl-click force).
+**Already shipped:** R4 @ GAS v764 — `runDalCampaignCheckpoint`, dirty gate, five-slice keep-live publish, editor cue `{time} publish` (one-click force @ v770).
 
 **This campaign still does:**
 
@@ -162,6 +162,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-10 | **W1 smoke fail:** force checkpoint wiped Index `Dal_Campaign_*` via `saveProjectDataSheets_` blank row → room looked ended + Save & Sync collision. Fix shipping. |
 | 2026-08-10 | **Fix @ GAS v768** — preserve existing Index row on identity save; checkpoint returns `indexLastUpdated` + refreshes `#edit-proj-version`. Re-smoke force publish. |
 | 2026-08-10 | Cue chrome: larger outlined rectangle button for Last published / Not published (dbl-click unchanged). |
+| 2026-08-10 | Cue: one-click; label `{time} publish` (drop “Last published”). @ GAS v770. |
+| 2026-08-10 | Cue feedback: `publishing…` while busy; Index refresh must not clobber newer stamp. |
 
 ---
 

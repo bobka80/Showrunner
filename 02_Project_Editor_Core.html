@@ -230,7 +230,8 @@ window.paintCampaignCheckpointCue_ = function() {
   if (!roomWarm) {
     cue.style.display = 'none';
     cue.textContent = '';
-    cue.classList.remove('is-fail');
+    cue.classList.remove('is-fail', 'is-busy');
+    cue.disabled = false;
     return;
   }
   cue.style.display = 'inline-flex';
@@ -242,6 +243,16 @@ window.paintCampaignCheckpointCue_ = function() {
       return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     } catch (e) { return ''; }
   };
+  if (window.peCheckpointBusy_) {
+    cue.classList.remove('is-fail');
+    cue.classList.add('is-busy');
+    cue.disabled = true;
+    cue.textContent = 'publishing…';
+    cue.title = 'Publishing to Sheets — room stays open';
+    return;
+  }
+  cue.classList.remove('is-busy');
+  cue.disabled = false;
   if (window.peCheckpointEscalate_ || window.peCheckpointFailAt_) {
     cue.classList.add('is-fail');
     var failT = fmt_(window.peCheckpointFailAt_);
@@ -292,6 +303,9 @@ window.runDalCampaignCheckpointNow_ = function(opts) {
   if (window.peCheckpointBusy_ || window.dalCampaignRoomClosing_) return;
   if (typeof google === 'undefined' || !google.script || !google.script.run) return;
   window.peCheckpointBusy_ = true;
+  if (typeof window.paintCampaignCheckpointCue_ === 'function') {
+    window.paintCampaignCheckpointCue_();
+  }
   var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
     ? String(ACTIVE_USER_NAME) : 'System';
   google.script.run
@@ -319,7 +333,7 @@ window.runDalCampaignCheckpointNow_ = function(opts) {
             '\n\nRoom stayed open — live data is still on Firebase.');
         } catch (eA2) { /* ignore */ }
       }
-      // Re-read Index so END ROOM / green chrome matches keep-live truth after publish.
+      // Re-read Index for room chrome — do not clobber a newer cue stamp (see refresh).
       if (res && res.success && !res.skipped &&
           typeof window.refreshProjectEditorForkChrome_ === 'function') {
         try { window.refreshProjectEditorForkChrome_(projectId); } catch (eR) { /* ignore */ }
@@ -407,7 +421,7 @@ window.stopDalCampaignCheckpointTimer_ = function() {
     if (!cue || cue._chkBound) return;
     cue._chkBound = true;
     cue.addEventListener('click', function() {
-      if (!window.peForkRoomActive_) return;
+      if (!window.peForkRoomActive_ || window.peCheckpointBusy_) return;
       if (!confirm('Publish campaign room to Sheets now?\n\nRoom stays open for peers.')) return;
       if (typeof window.runDalCampaignCheckpointNow_ === 'function') {
         window.runDalCampaignCheckpointNow_({ force: true });
@@ -452,8 +466,15 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
       window.peForkPrepActive_ = !!prepOpen;
       window.peForkTimelineActive_ = !!tlOpen;
       window.peForkRoomActive_ = !!roomWarm;
+      // Never overwrite a newer cue stamp with a lagging Index read (checkpoint race).
       if (info && info.campaignLastPublishedAt) {
-        window.peCheckpointLastPub_ = String(info.campaignLastPublishedAt);
+        var incoming = String(info.campaignLastPublishedAt);
+        var cur = window.peCheckpointLastPub_ ? String(window.peCheckpointLastPub_) : '';
+        var inMs = Date.parse(incoming);
+        var curMs = cur ? Date.parse(cur) : NaN;
+        if (!cur || isNaN(curMs) || (!isNaN(inMs) && inMs >= curMs)) {
+          window.peCheckpointLastPub_ = incoming;
+        }
       }
       if (roomWarm) {
         if (typeof window.startDalCampaignCheckpointTimer_ === 'function') {
