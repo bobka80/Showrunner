@@ -116,7 +116,7 @@
          <button id="master-timeline-btn" class="btn-outline" style="margin:0; width: 200px !important; flex-shrink: 0;" onclick="launchMasterTimeline()">OPEN TIMELINE</button>
          <button id="master-assets-btn" class="btn-outline" style="margin:0;" onclick="openProjectAssetsModal()">PROJECT ASSETS</button>
          <button id="master-end-room-btn" class="btn-outline" style="margin:0; border-color:#ef4444; color:#ef4444; display:none;" onclick="closeDalCampaignRoomFromUi_()" title="Publish Project Assets + Timeline to Sheets and close the campaign room">END ROOM</button>
-         <button type="button" id="master-checkpoint-cue" class="master-checkpoint-cue" style="display:none;" title="Double-click to publish Sheets now (room stays open)"></button>
+         <button type="button" id="master-checkpoint-cue" class="master-checkpoint-cue" style="display:none;" title="Click to publish Sheets now (room stays open)"></button>
       </div>
       <div style="display:flex; gap:12px; flex-wrap: wrap; justify-content: flex-end; align-items: center; flex: 1;">
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
@@ -245,18 +245,16 @@ window.paintCampaignCheckpointCue_ = function() {
   if (window.peCheckpointEscalate_ || window.peCheckpointFailAt_) {
     cue.classList.add('is-fail');
     var failT = fmt_(window.peCheckpointFailAt_);
-    cue.textContent = failT
-      ? ('Publish failed · ' + failT + ' — retry')
-      : 'Publish lagging — retry';
-    cue.title = 'Sheets publish failed or lagging. Double-click to retry now (room stays open).';
+    cue.textContent = failT ? (failT + ' retry') : 'retry publish';
+    cue.title = 'Sheets publish failed or lagging. Click to retry now (room stays open).';
   } else if (window.peCheckpointLastPub_) {
     cue.classList.remove('is-fail');
-    cue.textContent = 'Last published ' + (fmt_(window.peCheckpointLastPub_) || '…');
-    cue.title = 'Double-click to publish Sheets now (room stays open)';
+    cue.textContent = (fmt_(window.peCheckpointLastPub_) || '…') + ' publish';
+    cue.title = 'Click to publish Sheets now (room stays open)';
   } else {
     cue.classList.remove('is-fail');
-    cue.textContent = 'Not published yet';
-    cue.title = 'Double-click to publish Sheets now (room stays open)';
+    cue.textContent = '… publish';
+    cue.title = 'Click to publish Sheets now (room stays open)';
   }
 };
 
@@ -403,12 +401,12 @@ window.stopDalCampaignCheckpointTimer_ = function() {
   }
 };
 
-(function wireCheckpointCueDblClick_() {
+(function wireCheckpointCueClick_() {
   function bind_() {
     var cue = document.getElementById('master-checkpoint-cue');
     if (!cue || cue._chkBound) return;
     cue._chkBound = true;
-    cue.addEventListener('dblclick', function() {
+    cue.addEventListener('click', function() {
       if (!window.peForkRoomActive_) return;
       if (!confirm('Publish campaign room to Sheets now?\n\nRoom stays open for peers.')) return;
       if (typeof window.runDalCampaignCheckpointNow_ === 'function') {
