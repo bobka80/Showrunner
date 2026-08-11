@@ -289,6 +289,38 @@ window.updatePrintPreview = function() {
             });
         });
 
+        // W4: labor + transport snapshot lines
+        let offerTl = fin.offerTl || null;
+        if (offerTl && ((offerTl.labor && offerTl.labor.length) || (offerTl.transport && offerTl.transport.length))) {
+            html += `<tr><td colspan="${hidePrices ? '2' : '4'}" style="padding:15px 0 5px 0; font-weight:bold; font-size:13px; border-bottom:1px solid #ccc;">LABOR & TRANSPORT</td></tr>`;
+            (offerTl.labor || []).forEach(function(line) {
+                let qty = parseFloat(line.qty) || 0;
+                let unit = parseFloat(line.unitPrice) || 0;
+                let amt = (line.amount != null) ? parseFloat(line.amount) : (qty * unit);
+                if (isNaN(amt)) amt = 0;
+                subtotal += amt;
+                html += `<tr>
+                    <td style="padding:6px 0; border-bottom:1px solid #eee;">${qty}</td>
+                    <td style="padding:6px 0; border-bottom:1px solid #eee;">${line.tierOrRole || 'Labor'}</td>
+                    ${hidePrices ? '' : `<td style="padding:6px 0; text-align:right; border-bottom:1px solid #eee;">€${unit.toFixed(2)}</td>`}
+                    ${hidePrices ? '' : `<td style="padding:6px 0; text-align:right; border-bottom:1px solid #eee;">€${amt.toFixed(2)}</td>`}
+                </tr>`;
+            });
+            (offerTl.transport || []).forEach(function(line) {
+                let qty = parseFloat(line.qty) || 0;
+                let unit = parseFloat(line.unitPrice) || 0;
+                let amt = (line.amount != null) ? parseFloat(line.amount) : (qty * unit);
+                if (isNaN(amt)) amt = 0;
+                subtotal += amt;
+                html += `<tr>
+                    <td style="padding:6px 0; border-bottom:1px solid #eee;">${qty}</td>
+                    <td style="padding:6px 0; border-bottom:1px solid #eee;">${line.label || 'Transport'}</td>
+                    ${hidePrices ? '' : `<td style="padding:6px 0; text-align:right; border-bottom:1px solid #eee;">€${unit.toFixed(2)}</td>`}
+                    ${hidePrices ? '' : `<td style="padding:6px 0; text-align:right; border-bottom:1px solid #eee;">€${amt.toFixed(2)}</td>`}
+                </tr>`;
+            });
+        }
+
         let afterDays = subtotal * fin.daysCharged;
         let discountAmt = afterDays * (fin.discountPct / 100);
         let afterDiscount = afterDays - discountAmt;

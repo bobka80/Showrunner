@@ -1441,6 +1441,51 @@ window.undoOfferPaPull_ = function() {
     renderOfferUI();
 };
 
+window.pullOfferTimelineLogistics_ = function() {
+    var projectId = document.getElementById('edit-folder-id')
+        ? document.getElementById('edit-folder-id').value : '';
+    if (!projectId || projectId === 'NEW') {
+        return alert('Save the project first.');
+    }
+    var fin = window.offerPaEnsureFin_();
+    fin.offerTlUndo = fin.offerTl ? JSON.parse(JSON.stringify(fin.offerTl)) : null;
+    var btn = document.getElementById('offer-pull-tl-btn');
+    if (btn) { btn.disabled = true; btn.innerText = 'Pulling…'; }
+    google.script.run
+        .withFailureHandler(function(err) {
+            if (btn) { btn.disabled = false; btn.innerText = 'Pull Timeline + logistics'; }
+            alert('Offer timeline pull failed: ' + (err && err.message ? err.message : err));
+        })
+        .withSuccessHandler(function(res) {
+            fin.offerTl = {
+                pulledAt: (res && res.pulledAt) || new Date().toISOString(),
+                source: (res && res.source) || 'sheets',
+                facts: (res && res.facts) || { inSofia: true, distanceKm: 0 },
+                labor: (res && res.labor) ? res.labor.slice() : [],
+                transport: (res && res.transport) ? res.transport.slice() : [],
+                transportDetail: (res && res.transportDetail) ? res.transportDetail.slice() : []
+            };
+            window.isProjectDirty = true;
+            if (typeof updateEqReadinessToDatabase === 'function') updateEqReadinessToDatabase();
+            if (btn) { btn.disabled = false; btn.innerText = 'Pull Timeline + logistics'; }
+            renderOfferUI();
+        })
+        .getOfferTlPullSnapshot(
+            projectId,
+            typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+        );
+};
+
+window.undoOfferTlPull_ = function() {
+    var fin = window.offerPaEnsureFin_();
+    if (!fin.offerTlUndo) return;
+    fin.offerTl = fin.offerTlUndo;
+    fin.offerTlUndo = null;
+    window.isProjectDirty = true;
+    if (typeof updateEqReadinessToDatabase === 'function') updateEqReadinessToDatabase();
+    renderOfferUI();
+};
+
 window.renderOfferUI = function() {
     const offerContainer = document.getElementById('pa-view-offer');
     if (!offerContainer) return;
@@ -1471,7 +1516,11 @@ window.renderOfferUI = function() {
             ? 'Няма редове в офертата. Натиснете Pull Project Assets.'
             : 'No offer lines yet. Press Pull Project Assets.',
         pull: LANG === 'bg' ? 'Pull Project Assets' : 'Pull Project Assets',
-        undo: LANG === 'bg' ? 'Undo Pull' : 'Undo Pull'
+        undo: LANG === 'bg' ? 'Undo PA Pull' : 'Undo PA Pull',
+        pullTl: LANG === 'bg' ? 'Pull Timeline + logistics' : 'Pull Timeline + logistics',
+        undoTl: LANG === 'bg' ? 'Undo TL Pull' : 'Undo TL Pull',
+        laborEmpty: LANG === 'bg' ? 'Няма труд — Pull Timeline + logistics.' : 'No labor lines — Pull Timeline + logistics.',
+        fleetEmpty: LANG === 'bg' ? 'Няма транспорт — Pull Timeline + logistics.' : 'No transport — Pull Timeline + logistics.'
     };
 
     const AVAILABLE_LEGAL_NOTES = [
@@ -1505,11 +1554,17 @@ window.renderOfferUI = function() {
     });
     
     let canUndo = !!fin.offerPaUndo;
+    let canUndoTl = !!fin.offerTlUndo;
     let pullMeta = '';
     if (fin.offerPa && fin.offerPa.pulledAt) {
         let src = fin.offerPa.source === 'firebase' ? 'warm' : 'Sheets';
-        pullMeta = '<span style="color:#71717a; font-size:10px; margin-right:8px;">' + src + ' · ' +
+        pullMeta = '<span style="color:#71717a; font-size:10px; margin-right:8px;">PA ' + src + ' · ' +
             String(fin.offerPa.pulledAt).replace('T', ' ').slice(0, 16) + '</span>';
+    }
+    if (fin.offerTl && fin.offerTl.pulledAt) {
+        let srcTl = fin.offerTl.source === 'firebase' ? 'warm' : 'Sheets';
+        pullMeta += '<span style="color:#71717a; font-size:10px; margin-right:8px;">TL ' + srcTl + ' · ' +
+            String(fin.offerTl.pulledAt).replace('T', ' ').slice(0, 16) + '</span>';
     }
 
     let subtotal = 0;
@@ -1520,6 +1575,8 @@ window.renderOfferUI = function() {
             ${pullMeta}
             <button id="offer-pull-pa-btn" class="btn-main btn-sm" style="margin:0; padding:4px 10px !important; font-size:10px !important;" onclick="pullOfferProjectAssets_()">${t.pull}</button>
             <button id="offer-undo-pa-btn" class="btn-outline btn-sm" style="margin:0; padding:4px 10px !important; font-size:10px !important; ${canUndo ? '' : 'opacity:0.4; pointer-events:none;'}" onclick="undoOfferPaPull_()" ${canUndo ? '' : 'disabled'}>${t.undo}</button>
+            <button id="offer-pull-tl-btn" class="btn-main btn-sm" style="margin:0; padding:4px 10px !important; font-size:10px !important; background:#1d4ed8;" onclick="pullOfferTimelineLogistics_()">${t.pullTl}</button>
+            <button id="offer-undo-tl-btn" class="btn-outline btn-sm" style="margin:0; padding:4px 10px !important; font-size:10px !important; ${canUndoTl ? '' : 'opacity:0.4; pointer-events:none;'}" onclick="undoOfferTlPull_()" ${canUndoTl ? '' : 'disabled'}>${t.undoTl}</button>
             <div style="display:flex; background:#18181b; padding:2px; border-radius:4px; border:1px solid #333;">
                 <button class="${LANG === 'bg' ? 'btn-main' : 'btn-outline'} btn-sm" style="margin:0; padding:2px 8px !important; font-size:10px !important;" onclick="switchOfferLanguage('bg')">BG</button>
                 <button class="${LANG === 'en' ? 'btn-main' : 'btn-outline'} btn-sm" style="margin:0; padding:2px 8px !important; font-size:10px !important;" onclick="switchOfferLanguage('en')">EN</button>
@@ -1593,19 +1650,72 @@ window.renderOfferUI = function() {
     <div style="margin-bottom: 20px; background: #151518; border: 1px solid #333; border-radius: 6px; overflow: hidden;">
         <div style="background: #1a1a1e; padding: 10px 15px; border-bottom: 2px solid #ef4444; color: #ef4444; font-weight: 900; font-size: 12px; text-transform: uppercase;">
             ${t.labor}
-        </div>
-        <div style="padding: 20px; text-align: center; color: #888; font-size: 11px; font-style: italic;">
-            ${t.laborSub}
-        </div>
-    </div>
+        </div>`;
+    let laborLines = (fin.offerTl && Array.isArray(fin.offerTl.labor)) ? fin.offerTl.labor : [];
+    if (!laborLines.length) {
+        html += `<div style="padding: 20px; text-align: center; color: #888; font-size: 11px; font-style: italic;">${t.laborEmpty}</div>`;
+    } else {
+        html += `<table style="width: 100%; border-collapse: collapse; color: #fff; font-size: 12px;">
+            <thead><tr style="border-bottom: 1px solid #333; color: #a1a1aa; text-align: left; background: #111;">
+                <th style="padding: 8px 15px; width: 60px;">${t.qty}</th>
+                <th style="padding: 8px 15px;">${t.item}</th>
+                <th style="padding: 8px 15px; text-align: right; width: 120px;">${t.price}</th>
+                <th style="padding: 8px 15px; text-align: right; width: 120px;">${t.total}</th>
+            </tr></thead><tbody>`;
+        laborLines.forEach(function(line) {
+            let qty = parseFloat(line.qty) || 0;
+            let unit = parseFloat(line.unitPrice) || 0;
+            let amt = (line.amount != null) ? parseFloat(line.amount) : (qty * unit);
+            if (isNaN(amt)) amt = 0;
+            subtotal += amt;
+            html += `<tr style="border-bottom: 1px solid #222;">
+                <td style="padding: 8px 15px; font-weight: bold; color: #10b981;">${qty}</td>
+                <td style="padding: 8px 15px;">${line.tierOrRole || line.label || 'Labor'}</td>
+                <td style="padding: 8px 15px; text-align: right;">$ ${unit.toFixed(2)}</td>
+                <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">$ ${amt.toFixed(2)}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+    html += `</div>
     <div style="margin-bottom: 20px; background: #151518; border: 1px solid #333; border-radius: 6px; overflow: hidden;">
         <div style="background: #1a1a1e; padding: 10px 15px; border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: 900; font-size: 12px; text-transform: uppercase;">
             ${t.fleet}
-        </div>
-        <div style="padding: 20px; text-align: center; color: #888; font-size: 11px; font-style: italic;">
-            ${t.fleetSub}
-        </div>
-    </div>`;
+        </div>`;
+    let transportLines = (fin.offerTl && Array.isArray(fin.offerTl.transport)) ? fin.offerTl.transport : [];
+    let facts = (fin.offerTl && fin.offerTl.facts) ? fin.offerTl.facts : null;
+    if (facts) {
+        let loc = facts.inSofia === false
+            ? ((LANG === 'bg' ? 'Извън София' : 'Out of Sofia') + (facts.distanceKm ? (' · ' + facts.distanceKm + ' km') : ''))
+            : (LANG === 'bg' ? 'В София' : 'In Sofia');
+        html += `<div style="padding: 8px 15px; color: #a1a1aa; font-size: 11px; border-bottom: 1px solid #222;">${loc}</div>`;
+    }
+    if (!transportLines.length) {
+        html += `<div style="padding: 20px; text-align: center; color: #888; font-size: 11px; font-style: italic;">${t.fleetEmpty}</div>`;
+    } else {
+        html += `<table style="width: 100%; border-collapse: collapse; color: #fff; font-size: 12px;">
+            <thead><tr style="border-bottom: 1px solid #333; color: #a1a1aa; text-align: left; background: #111;">
+                <th style="padding: 8px 15px; width: 60px;">${t.qty}</th>
+                <th style="padding: 8px 15px;">${t.item}</th>
+                <th style="padding: 8px 15px; text-align: right; width: 120px;">${t.price}</th>
+                <th style="padding: 8px 15px; text-align: right; width: 120px;">${t.total}</th>
+            </tr></thead><tbody>`;
+        transportLines.forEach(function(line) {
+            let qty = parseFloat(line.qty) || 0;
+            let unit = parseFloat(line.unitPrice) || 0;
+            let amt = (line.amount != null) ? parseFloat(line.amount) : (qty * unit);
+            if (isNaN(amt)) amt = 0;
+            subtotal += amt;
+            html += `<tr style="border-bottom: 1px solid #222;">
+                <td style="padding: 8px 15px; font-weight: bold; color: #10b981;">${qty}</td>
+                <td style="padding: 8px 15px;">${line.label || 'Transport'}</td>
+                <td style="padding: 8px 15px; text-align: right;">$ ${unit.toFixed(2)}</td>
+                <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">$ ${amt.toFixed(2)}</td>
+            </tr>`;
+        });
+        html += `</tbody></table>`;
+    }
+    html += `</div>`;
 
     let activeNotes = AVAILABLE_LEGAL_NOTES.filter(n => fin.legalNotes && fin.legalNotes.includes(n.id));
     if (activeNotes.length > 0) {

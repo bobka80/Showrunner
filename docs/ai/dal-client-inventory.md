@@ -41,6 +41,7 @@
 | `saveProjectAssetsDelta` | `02c_Project_Operations.html`, `02e5_Logic_Sync.html` |
 | `startEventOperation` | `02c_Project_Operations.html` |
 | `getOfferPaPullSnapshot` | `02d_Equipment_Render.html` |
+| `getOfferTlPullSnapshot` | `02d_Equipment_Render.html` |
 | `beginDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `closeDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
 | `finishDalSession` | `02e6_Dal_Session.html`, `03a1_Timeline_Dal_Session.html` |
@@ -207,7 +208,7 @@
 | 02a_Project_Equipment.html | 1 | 1 |
 | 02b_Project_Syntax.html | 0 | 0 |
 | 02c_Project_Operations.html | 5 | 0 |
-| 02d_Equipment_Render.html | 2 | 1 |
+| 02d_Equipment_Render.html | 3 | 1 |
 | 02e1_Logic_State.html | 0 | 1 |
 | 02e2_Logic_CRUD.html | 0 | 0 |
 | 02e3_Logic_Clipboard.html | 0 | 0 |

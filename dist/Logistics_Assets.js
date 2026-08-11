@@ -213,6 +213,275 @@ function getOfferPaPullSnapshot(projectId, actor) {
     });
 }
 
+/**
+ * W4 Offer — one-shot Timeline + logistics snapshot.
+ * Warm room → Firebase timeline + meta readiness; cold → Sheets. Fail-open Sheets.
+ * Does not call GENERATE / Hub writers.
+ */
+function getOfferTlPullSnapshot(projectId, actor) {
+    return executeWithRetry(function () {
+        assertActorCanViewLogistics(actor || 'System');
+        if (!projectId || projectId === 'NEW') {
+            throw new Error('Save the project before pulling into Offer.');
+        }
+
+        var warm = false;
+        try {
+            warm = (typeof dalCampaignRoomIsWarmForProject_ === 'function') &&
+                dalCampaignRoomIsWarmForProject_(projectId);
+        } catch (eWarm) { warm = false; }
+
+        var shifts = [];
+        var source = 'sheets';
+        var facts = { inSofia: true, distanceKm: 0, regionZone: '' };
+
+        // Readiness facts (km / Sofia)
+        try {
+            if (warm && typeof firestoreGetCampaignMeta_ === 'function') {
+                var meta = firestoreGetCampaignMeta_(projectId);
+                if (meta && meta.readinessJson) {
+                    var rMeta = {};
+                    try { rMeta = JSON.parse(meta.readinessJson); } catch (e0) { rMeta = {}; }
+                    if (rMeta && typeof rMeta === 'object') {
+                        facts.inSofia = rMeta.inSofia !== false;
+                        facts.distanceKm = parseFloat(rMeta.distanceKm) || 0;
+                        facts.regionZone = String(rMeta.regionZone || '');
+                        source = 'firebase';
+                    }
+                }
+            }
+        } catch (eMeta) { /* Sheets fallthrough */ }
+
+        if (source !== 'firebase') {
+            try {
+                var id = dalReadProjectIdentityFromSheets_
+                    ? dalReadProjectIdentityFromSheets_(projectId)
+                    : null;
+                if (id && id.readinessState) {
+                    facts.inSofia = id.readinessState.inSofia !== false;
+                    facts.distanceKm = parseFloat(id.readinessState.distanceKm) || 0;
+                    facts.regionZone = String(id.readinessState.regionZone || '');
+                }
+            } catch (eId) { /* defaults */ }
+        } else {
+            // Warm meta may lack readiness — fill gaps from Sheets
+            try {
+                if (!(facts.distanceKm > 0) || facts.regionZone === '') {
+                    var id2 = dalReadProjectIdentityFromSheets_
+                        ? dalReadProjectIdentityFromSheets_(projectId)
+                        : null;
+                    if (id2 && id2.readinessState) {
+                        if (facts.distanceKm == null || facts.distanceKm === 0) {
+                            facts.distanceKm = parseFloat(id2.readinessState.distanceKm) || 0;
+                        }
+                        if (!facts.regionZone) {
+                            facts.regionZone = String(id2.readinessState.regionZone || '');
+                        }
+                        if (id2.readinessState.inSofia === false) facts.inSofia = false;
+                    }
+                }
+            } catch (eId2) { /* ignore */ }
+        }
+
+        // Timeline shifts
+        if (warm && typeof dalReadTimelineStateFromFirebase_ === 'function') {
+            try {
+                var tlFs = dalReadTimelineStateFromFirebase_(projectId);
+                if (tlFs && tlFs.shifts && tlFs.shifts.length) {
+                    shifts = tlFs.shifts.slice();
+                    source = 'firebase';
+                }
+            } catch (eTl) { shifts = []; }
+        }
+        if (!shifts.length && typeof getTimelineDataSheets_ === 'function') {
+            var prevDirect = (typeof __dalTimelineSheetsDirect_ !== 'undefined') ? __dalTimelineSheetsDirect_ : false;
+            try {
+                if (typeof __dalTimelineSheetsDirect_ !== 'undefined') __dalTimelineSheetsDirect_ = true;
+                var tlSh = getTimelineDataSheets_(projectId, 'main');
+                shifts = (tlSh && tlSh.shifts) ? tlSh.shifts.slice() : [];
+                if (source !== 'firebase') source = 'sheets';
+            } catch (eSh) {
+                shifts = [];
+            } finally {
+                if (typeof __dalTimelineSheetsDirect_ !== 'undefined') __dalTimelineSheetsDirect_ = prevDirect;
+            }
+        }
+
+        var settings = { trucks: {}, globals: {}, roles: {} };
+        try {
+            settings = getFinancialSettings() || settings;
+        } catch (eFin) { /* defaults */ }
+        var trucksConfig = settings.trucks || {};
+        var globals = settings.globals || {};
+        var roleMults = settings.roles || {};
+
+        // Fleet map uid → { name, tier }
+        var fleetByUid = {};
+        try {
+            var vt = verifyVaultSchema(true);
+            if (vt && vt.vehicles) {
+                var vData = getSheetData(vt.vehicles);
+                var vMap = vData.hMap || {};
+                var vUidCol = vMap['uid'] !== undefined ? vMap['uid'] : vMap['id'];
+                var vNameCol = vMap['Name'] !== undefined ? vMap['Name'] : vMap['name'];
+                var vTierCol = vMap['Vehicle_Tier'];
+                for (var vi = 1; vi < vData.length; vi++) {
+                    var vu = vUidCol !== undefined ? String(vData[vi][vUidCol] || '') : '';
+                    if (!vu) continue;
+                    fleetByUid[vu] = {
+                        name: vNameCol !== undefined ? String(vData[vi][vNameCol] || 'Vehicle') : 'Vehicle',
+                        tier: vTierCol !== undefined ? String(vData[vi][vTierCol] || 'Tier 1') : 'Tier 1'
+                    };
+                }
+            }
+        } catch (eFleet) { fleetByUid = {}; }
+
+        var inSofia = facts.inSofia !== false;
+        var dist = parseFloat(facts.distanceKm) || 0;
+        var laborMap = {};
+        var transport = [];
+        var transportTotal = 0;
+
+        // Pre-group non-STAY truck shifts per vehicle for LOAD/UNLOAD index
+        var truckDriveByEmail = {};
+        shifts.forEach(function (s) {
+            if (!s) return;
+            var email = String(s.user_uid || s.email || '');
+            if (!fleetByUid[email]) return;
+            var roleU = String(s.role || '').toUpperCase();
+            var noteU = String(s.note || '').toUpperCase();
+            if (roleU === 'STAY' || noteU.indexOf('STAY') !== -1) return;
+            if (!truckDriveByEmail[email]) truckDriveByEmail[email] = [];
+            truckDriveByEmail[email].push(s);
+        });
+        Object.keys(truckDriveByEmail).forEach(function (em) {
+            truckDriveByEmail[em].sort(function (a, b) {
+                return Number(a.start) - Number(b.start);
+            });
+        });
+
+        shifts.forEach(function (s) {
+            if (!s) return;
+            var email = String(s.user_uid || s.email || '');
+            var note = String(s.note || '');
+            // Skip Hub AUTO clock bars from offer labor/transport (clocks only)
+            if (note.indexOf('AUTO-OUTBOUND') !== -1 || note.indexOf('AUTO-INBOUND') !== -1) return;
+
+            var vehicle = fleetByUid[email];
+            if (vehicle) {
+                var tMatch = vehicle.tier ? String(vehicle.tier).match(/Tier\s*(\d)/i) : null;
+                var tKey = tMatch ? 'truck_t' + tMatch[1] : 'truck_t1';
+                var roleU = String(s.role || '').toUpperCase();
+                var noteU = note.toUpperCase();
+                var isStay = roleU === 'STAY' || noteU.indexOf('STAY') !== -1;
+                var dur = parseFloat(s.duration) || 0;
+                var amount = 0;
+                var label = '';
+                var kind = 'course';
+                var qty = 1;
+                var unitPrice = 0;
+
+                if (isStay) {
+                    var stayDays = Math.ceil(dur / 24);
+                    if (stayDays < 1) stayDays = 1;
+                    unitPrice = parseFloat(trucksConfig[tKey + '_stay']) || 0;
+                    qty = stayDays;
+                    amount = stayDays * unitPrice;
+                    kind = 'stay';
+                    label = 'Stay / idle — ' + vehicle.name + ' (' + vehicle.tier + ')';
+                } else {
+                    var driveList = truckDriveByEmail[email] || [];
+                    var sIndex = -1;
+                    for (var di = 0; di < driveList.length; di++) {
+                        if (driveList[di] && String(driveList[di].id) === String(s.id)) {
+                            sIndex = di;
+                            break;
+                        }
+                    }
+                    var roleText = roleU;
+                    if (roleText !== 'LOAD' && roleText !== 'UNLOAD') {
+                        roleText = (sIndex % 2 === 0) ? 'LOAD' : 'UNLOAD';
+                    }
+                    if (roleText === 'UNLOAD') return;
+                    kind = 'course';
+                    if (inSofia) {
+                        unitPrice = parseFloat(trucksConfig[tKey + '_in']) || 0;
+                        qty = 1;
+                        amount = unitPrice;
+                        label = 'Course (in Sofia) — ' + vehicle.name;
+                    } else {
+                        unitPrice = parseFloat(trucksConfig[tKey + '_out']) || 0;
+                        qty = dist;
+                        amount = unitPrice * dist;
+                        label = 'Course (' + dist + ' km) — ' + vehicle.name;
+                    }
+                }
+                transportTotal += amount;
+                transport.push({
+                    lineId: 'tl_' + String(s.id || (email + '_' + kind + '_' + transport.length)),
+                    kind: kind,
+                    label: label,
+                    vehicleUid: email,
+                    tier: vehicle.tier,
+                    qty: qty,
+                    unitPrice: unitPrice,
+                    amount: amount
+                });
+                return;
+            }
+
+            // Crew labor — rough crew-days by role
+            var role = String(s.role || 'Technician').trim() || 'Technician';
+            var crewDays = Math.ceil((parseFloat(s.duration) || 0) / 24);
+            if (crewDays < 1) crewDays = 1;
+            var baseRate = parseFloat(globals.build_rate) || 100;
+            var rMult = 1;
+            if (roleMults && roleMults[role] != null) {
+                rMult = parseFloat(roleMults[role]) || 1;
+            }
+            var dayRate = baseRate * rMult;
+            if (!laborMap[role]) {
+                laborMap[role] = {
+                    lineId: 'labor_' + role.replace(/[^a-zA-Z0-9]+/g, '_'),
+                    kind: 'labor',
+                    tierOrRole: role,
+                    qty: 0,
+                    unitPrice: dayRate,
+                    amount: 0
+                };
+            }
+            laborMap[role].qty += crewDays;
+            laborMap[role].amount = laborMap[role].qty * laborMap[role].unitPrice;
+        });
+
+        var labor = Object.keys(laborMap).map(function (k) { return laborMap[k]; });
+        labor.sort(function (a, b) {
+            return String(a.tierOrRole).localeCompare(String(b.tierOrRole));
+        });
+
+        // §1.3 default: single Transport rollup (detail kept for transparency / undo)
+        var transportRollup = [{
+            lineId: 'transport_total',
+            kind: 'transport',
+            label: 'Transport',
+            qty: 1,
+            unitPrice: transportTotal,
+            amount: transportTotal
+        }];
+
+        return {
+            projectId: String(projectId),
+            source: source,
+            warm: !!warm,
+            pulledAt: new Date().toISOString(),
+            facts: facts,
+            labor: labor,
+            transport: transportRollup,
+            transportDetail: transport
+        };
+    });
+}
+
 function getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets) {
     let overlappingMap = {};
     if (startDateStr && endDateStr) {

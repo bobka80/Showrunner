@@ -124,14 +124,15 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 
 ### W3 — Offer pull PA
 
-- [ ] Button + one-shot pull from warm Firebase or Sheets  
-- [ ] Pre-pull snapshot + Undo  
-- [ ] Ship + smoke
+- [x] Button + one-shot pull from warm Firebase or Sheets  
+- [x] Pre-pull snapshot + Undo  
+- [x] Ship **GAS v775** — smoke: Pull fills offer; Undo restores; PA edits without Pull leave offer alone  
+- [x] Director smoke green 2026-08-11
 
 ### W4 — Offer pull Timeline + logistics
 
-- [ ] Button + pull shifts + truck/logistics facts (km, idle/stay, courses…)  
-- [ ] Pre-pull snapshot + Undo (same undo model as W3)  
+- [x] Button + pull shifts + truck/logistics facts (km, idle/stay, courses…)  
+- [x] Pre-pull snapshot + Undo (same undo model as W3)  
 - [ ] Ship + smoke
 
 ### W5 — Warm project editor autosave (filed 2026-08-10)
@@ -180,6 +181,7 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | Smoke miss: Tracker lagged warm PA. Fix: prefer `assets/state` + paginate collection list. |
 | 2026-08-11 | Root cause: PA edits lost on refresh (pending flush died). Urgent unload PA_PATCH + state hydrate. |
 | 2026-08-11 | Director smoke green: PA→Tracker + refresh durability. Next: **W3** Offer PA pull. |
+| 2026-08-11 | **W3 @ GAS v775** — Offer Pull Project Assets + Undo (snapshot in readiness financials). |
 
 ---
 
