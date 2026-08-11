@@ -192,6 +192,7 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | Director: W4 fine; **Undo stays**; Offer autosave belongs in **W5** (not a side fix). Continue → W5. |
 | 2026-08-11 | **W5 @ GAS v778** — warm debounced autosave (identity + mini-cal + readiness/Offer); Save & Sync only NEW/cold; `updateProjectReadiness` warm → Firebase meta. |
 | 2026-08-11 | Save chrome: button + autosave cue hidden except **NEW** (empty calendar create); deeper entry gated until first Save. |
+| 2026-08-11 | Fix: Cancel on saved project no longer false-warns after mini-cal edit — flush autosave quietly; identity autosave for all non-NEW. |
 
 ---
 

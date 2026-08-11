@@ -1331,8 +1331,8 @@ window.toggleEqDeptFinished = function(deptUid, isFinished) {
 window.updateEqReadinessToDatabase = function() {
     let pId = document.getElementById('edit-folder-id').value;
     if (pId && pId !== 'NEW') {
-        // Warm room: Offer/readiness must land in Firebase meta via identity autosave (W5).
-        if (typeof window.peIsWarmEditorAutosave_ === 'function' && window.peIsWarmEditorAutosave_()) {
+        // Saved projects: Offer/readiness via identity autosave (warm Firebase / cold Sheets).
+        if (typeof window.peCanIdentityAutosave_ === 'function' && window.peCanIdentityAutosave_()) {
             window.isProjectDirty = true;
             if (typeof window.peScheduleWarmIdentityAutosave_ === 'function') {
                 window.peScheduleWarmIdentityAutosave_();

@@ -762,6 +762,16 @@ window.peIsWarmEditorAutosave_ = function() {
   return !!(typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_());
 };
 
+/** Any saved (non-NEW) project may identity-autosave — warm → Firebase meta, cold → Sheets. */
+window.peCanIdentityAutosave_ = function() {
+  if (typeof window.peIsNewUnsavedProject_ === 'function' && window.peIsNewUnsavedProject_()) return false;
+  var folderEl = document.getElementById('edit-folder-id');
+  var id = folderEl ? folderEl.value : '';
+  if (!id) return false;
+  if (typeof isBriefingMode === 'function' && isBriefingMode(id)) return false;
+  return true;
+};
+
 window.peMarkIdentityDirty_ = function() {
   window.isProjectDirty = true;
   if (typeof window.peScheduleWarmIdentityAutosave_ === 'function') {
@@ -926,7 +936,7 @@ window.peGatherIdentitySavePayload_ = function() {
 };
 
 window.peScheduleWarmIdentityAutosave_ = function() {
-  if (!window.peIsWarmEditorAutosave_()) return;
+  if (!window.peCanIdentityAutosave_ || !window.peCanIdentityAutosave_()) return;
   window.peWarmAutosavePending_ = true;
   if (window.peWarmAutosaveTimer_) {
     try { clearTimeout(window.peWarmAutosaveTimer_); } catch (eT) { /* ignore */ }
@@ -939,7 +949,7 @@ window.peScheduleWarmIdentityAutosave_ = function() {
 
 window.peFlushWarmIdentityAutosave_ = function(opts) {
   opts = opts || {};
-  if (!window.peIsWarmEditorAutosave_()) return;
+  if (!window.peCanIdentityAutosave_ || !window.peCanIdentityAutosave_()) return;
   if (window.peMiniCalDragging_ && !opts.force) {
     window.peScheduleWarmIdentityAutosave_();
     return;
@@ -1267,11 +1277,15 @@ window.cancelProjectEditor = function() {
       try { clearTimeout(window.peWarmAutosaveTimer_); } catch (eT) { /* ignore */ }
       window.peWarmAutosaveTimer_ = null;
     }
-    if (typeof window.peIsWarmEditorAutosave_ === 'function' && window.peIsWarmEditorAutosave_() &&
-        (window.isProjectDirty || window.peWarmAutosavePending_)) {
+    var canAuto = typeof window.peCanIdentityAutosave_ === 'function' && window.peCanIdentityAutosave_();
+    var needsFlush = !!(window.isProjectDirty || window.peWarmAutosavePending_ || window.peWarmAutosaveBusy_);
+    if (canAuto && needsFlush) {
+      // Autosave owns persistence — flush quietly and leave (do not show discard confirm).
       try { window.peFlushWarmIdentityAutosave_({ force: true }); } catch (eF) { /* ignore */ }
-    }
-    if (window.isProjectDirty) {
+      window.isProjectDirty = false;
+      window.peWarmAutosavePending_ = false;
+    } else if (window.isProjectDirty) {
+        // NEW create (or briefing) — still warn before discarding.
         if (!confirm("⚠️ You have unsaved event changes. Are you sure you want to discard them and leave?")) {
             return false;
         }
