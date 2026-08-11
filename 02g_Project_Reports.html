@@ -242,23 +242,36 @@ window.updatePrintPreview = function() {
         `;
 
         let subtotal = 0;
-        // Group Physical Items
+        // W3: print from frozen offer snapshot (not live PA)
         let deptGroups = {};
-        currentProjectAssets.forEach(pa => {
-            let asset = globalAssets.find(a => a.id === pa.assetId);
-            if (!asset) return;
-            let basePrice = parseFloat(asset.rental) || 0;
-            let isOverride = pa.overridePrice !== undefined && pa.overridePrice !== null && pa.overridePrice !== "";
-            let finalPrice = isOverride ? parseFloat(pa.overridePrice) : basePrice;
-            if (hideZeros && asset.type === 'Consumable' || (basePrice === 0 && !isOverride)) return;
-
-            let d = pa.overrideDept || asset.department || 'Unassigned';
+        let offerLines = (typeof window.offerPaGetLines_ === 'function')
+            ? window.offerPaGetLines_()
+            : ((fin.offerPa && fin.offerPa.lines) || []);
+        (offerLines || []).forEach(function(line) {
+            if (!line) return;
+            let asset = globalAssets.find(a => a.id === line.assetId);
+            let name = line.name || (asset && asset.name) || line.assetId;
+            let finalPrice = parseFloat(line.unitPrice);
+            if (isNaN(finalPrice)) finalPrice = 0;
+            let qty = parseInt(line.qty, 10) || 0;
+            if (qty <= 0) return;
+            if (hideZeros && finalPrice === 0) return;
+            let d = line.overrideDept || (asset && asset.department) || 'Unassigned';
             if (!deptGroups[d]) deptGroups[d] = [];
-            let key = asset.id + "_" + finalPrice;
+            let key = String(line.assetId) + '_' + finalPrice;
             let existing = deptGroups[d].find(i => i.key === key);
-            let qty = parseInt(pa.qty, 10) || 1;
-            if (existing) { existing.qty += qty; existing.lineTotal = existing.qty * finalPrice; } 
-            else { deptGroups[d].push({ key: key, asset: asset, qty: qty, unitPrice: finalPrice, lineTotal: qty * finalPrice }); }
+            if (existing) {
+                existing.qty += qty;
+                existing.lineTotal = existing.qty * finalPrice;
+            } else {
+                deptGroups[d].push({
+                    key: key,
+                    asset: { name: name },
+                    qty: qty,
+                    unitPrice: finalPrice,
+                    lineTotal: qty * finalPrice
+                });
+            }
         });
 
         Object.keys(deptGroups).sort().forEach(deptUid => {

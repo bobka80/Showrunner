@@ -25,7 +25,7 @@ This file is the **canonical backlog campaign** for that work. Area topics keep 
 
 | Rule | Meaning |
 |------|---------|
-| **Offer pulls = active campaign** | Dual pull buttons + undo **planned** in [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) (W3/W4) — **not shipped yet** |
+| **Offer pulls = active campaign** | Dual pull buttons + undo — **W3 PA pull shipping**; W4 timeline/logistics still next — [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) |
 | **Rest = backlog** | Invoice, crew swap, soft/hard detection — still no code until director OK go |
 | **Invoice fields not final** | §1.2 web research is a **prerequisite** before locking invoice field requirements |
 | **Conflicts need ledger** | Build soft/hard detection against Logistics_Ledger companion — **not** Project_Assets load/unload derivation / timeline walk |

@@ -26,7 +26,7 @@ Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Warm readers + Offer + Checkpoint** | **ACTIVE** — W2 hybrid | [active/warm-readers-offer-tracker-2026-08-05.md](active/warm-readers-offer-tracker-2026-08-05.md) |
+| **Warm readers + Offer + Checkpoint** | **ACTIVE** — W3 Offer PA pull | [active/warm-readers-offer-tracker-2026-08-05.md](active/warm-readers-offer-tracker-2026-08-05.md) |
 | **Project Campaign Room** | **COMPLETE** (archived) | [archive/project-campaign-room-2026-07-24.md](archive/project-campaign-room-2026-07-24.md) |
 | **Logistics Ledger** | **COMPLETE** (archived) | [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) |
 | **Pre-ship expansion** (RBAC → FCM → truck → financials) | Backlog brief — OK go per domain | [topics/pre-ship-pipeline-expansion-2026-07-18.md](topics/pre-ship-pipeline-expansion-2026-07-18.md) |

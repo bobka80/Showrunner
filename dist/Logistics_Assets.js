@@ -161,6 +161,58 @@ function getProjectAssets(projectId, startDateStr, endDateStr) {
     return getProjectAssetsRepo().getForProject(projectId, startDateStr, endDateStr);
 }
 
+/**
+ * W3 Offer — one-shot PA snapshot for Pull Project Assets.
+ * Warm Campaign Room → Firebase assets/state (fail-open Sheets). Cold → Sheets.
+ * Does not open sessions or listen.
+ */
+function getOfferPaPullSnapshot(projectId, actor) {
+    return executeWithRetry(function () {
+        assertActorCanViewLogistics(actor || 'System');
+        if (!projectId || projectId === 'NEW') {
+            throw new Error('Save the project before pulling into Offer.');
+        }
+        var fixtures = [];
+        var source = 'sheets';
+        var warm = false;
+        try {
+            warm = (typeof dalCampaignRoomIsWarmForProject_ === 'function') &&
+                dalCampaignRoomIsWarmForProject_(projectId);
+        } catch (eWarm) { warm = false; }
+
+        if (warm && typeof dalWarmPaSheetRowsFromFirebase_ === 'function' &&
+            typeof dalGetProjectAssetsHeaderAndMap_ === 'function' &&
+            typeof dalFirestoreAssetFromRow_ === 'function') {
+            try {
+                var hdr = dalGetProjectAssetsHeaderAndMap_();
+                var rows = dalWarmPaSheetRowsFromFirebase_(projectId, hdr);
+                if (rows && rows.length) {
+                    fixtures = rows.map(function (row) {
+                        return dalFirestoreAssetFromRow_(row, hdr.map);
+                    }).filter(function (a) {
+                        return a && a.assetId && (parseInt(a.qty, 10) || 0) > 0;
+                    });
+                    if (fixtures.length) source = 'firebase';
+                }
+            } catch (eFs) { fixtures = []; source = 'sheets'; }
+        }
+
+        if (!fixtures.length) {
+            var sheetRes = getProjectAssetsSheets_(projectId, '', '');
+            fixtures = (sheetRes && sheetRes.current) ? sheetRes.current.slice() : [];
+            source = 'sheets';
+        }
+
+        return {
+            projectId: String(projectId),
+            source: source,
+            warm: !!warm,
+            pulledAt: new Date().toISOString(),
+            fixtures: fixtures
+        };
+    });
+}
+
 function getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets) {
     let overlappingMap = {};
     if (startDateStr && endDateStr) {

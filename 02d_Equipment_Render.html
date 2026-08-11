@@ -1346,16 +1346,106 @@ window.updateEqReadinessToDatabase = function() {
 
 // ==========================================
 // --- FINANCIAL / OFFER RENDER ENGINE ---
+// Snapshot offer (W3): Pull Project Assets + one-step Undo.
 // ==========================================
-window.renderOfferUI = function() {
-    const offerContainer = document.getElementById('pa-view-offer');
-    if (!offerContainer) return;
-    
+window.offerPaEnsureFin_ = function() {
     if (!window.currentReadinessState) window.currentReadinessState = {};
     if (!window.currentReadinessState.financials) {
         window.currentReadinessState.financials = { daysCharged: 1, discountPct: 0, taxPct: 0 };
     }
-    let fin = window.currentReadinessState.financials;
+    return window.currentReadinessState.financials;
+};
+
+window.offerPaGetLines_ = function() {
+    var fin = window.offerPaEnsureFin_();
+    return (fin.offerPa && Array.isArray(fin.offerPa.lines)) ? fin.offerPa.lines : [];
+};
+
+/** Build frozen offer lines from PA fixtures (warm Firebase or Sheets pull). */
+window.offerPaBuildLinesFromFixtures_ = function(fixtures) {
+    var groups = {};
+    (fixtures || []).forEach(function(pa) {
+        if (!pa) return;
+        var asset = (typeof globalAssets !== 'undefined')
+            ? globalAssets.find(function(a) { return a.id === pa.assetId; })
+            : null;
+        if (!asset) return;
+        var basePrice = parseFloat(asset.rental) || 0;
+        var isOverride = pa.overridePrice !== undefined && pa.overridePrice !== null && pa.overridePrice !== '';
+        var finalPrice = isOverride ? parseFloat(pa.overridePrice) : basePrice;
+        if (asset.type === 'Consumable' || (basePrice === 0 && !isOverride)) return;
+        var deptUid = pa.overrideDept || asset.department || 'Unassigned';
+        var key = String(asset.id) + '_' + String(finalPrice) + '_' + String(deptUid);
+        var qty = parseInt(pa.qty, 10) || 1;
+        if (groups[key]) {
+            groups[key].qty += qty;
+            if (pa.uid) groups[key].paUids.push(String(pa.uid));
+        } else {
+            groups[key] = {
+                lineId: key,
+                assetId: String(asset.id),
+                name: asset.name || '',
+                qty: qty,
+                unitPrice: finalPrice,
+                overrideDept: deptUid,
+                paUids: pa.uid ? [String(pa.uid)] : []
+            };
+        }
+    });
+    return Object.keys(groups).map(function(k) { return groups[k]; });
+};
+
+window.pullOfferProjectAssets_ = function() {
+    var projectId = document.getElementById('edit-folder-id')
+        ? document.getElementById('edit-folder-id').value : '';
+    if (!projectId || projectId === 'NEW') {
+        return alert('Save the project first.');
+    }
+    var fin = window.offerPaEnsureFin_();
+    fin.offerPaUndo = fin.offerPa ? JSON.parse(JSON.stringify(fin.offerPa)) : null;
+    var btn = document.getElementById('offer-pull-pa-btn');
+    var undoBtn = document.getElementById('offer-undo-pa-btn');
+    if (btn) { btn.disabled = true; btn.innerText = 'Pulling…'; }
+    if (undoBtn) undoBtn.disabled = true;
+    google.script.run
+        .withFailureHandler(function(err) {
+            if (btn) { btn.disabled = false; btn.innerText = 'Pull Project Assets'; }
+            if (undoBtn) undoBtn.disabled = !fin.offerPaUndo;
+            alert('Offer pull failed: ' + (err && err.message ? err.message : err));
+        })
+        .withSuccessHandler(function(res) {
+            var lines = window.offerPaBuildLinesFromFixtures_((res && res.fixtures) || []);
+            fin.offerPa = {
+                pulledAt: (res && res.pulledAt) || new Date().toISOString(),
+                source: (res && res.source) || 'sheets',
+                lines: lines
+            };
+            window.isProjectDirty = true;
+            if (typeof updateEqReadinessToDatabase === 'function') updateEqReadinessToDatabase();
+            if (btn) { btn.disabled = false; btn.innerText = 'Pull Project Assets'; }
+            renderOfferUI();
+        })
+        .getOfferPaPullSnapshot(
+            projectId,
+            typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'
+        );
+};
+
+window.undoOfferPaPull_ = function() {
+    var fin = window.offerPaEnsureFin_();
+    if (!fin.offerPaUndo) return;
+    fin.offerPa = fin.offerPaUndo;
+    fin.offerPaUndo = null;
+    window.isProjectDirty = true;
+    if (typeof updateEqReadinessToDatabase === 'function') updateEqReadinessToDatabase();
+    renderOfferUI();
+};
+
+window.renderOfferUI = function() {
+    const offerContainer = document.getElementById('pa-view-offer');
+    if (!offerContainer) return;
+    
+    let fin = window.offerPaEnsureFin_();
 
     window.offerLanguage = window.offerLanguage || localStorage.getItem('sm_offer_lang') || 'bg';
     const LANG = window.offerLanguage;
@@ -1377,7 +1467,11 @@ window.renderOfferUI = function() {
         fleet: LANG === 'bg' ? 'ТРАНСПОРТ И ЛОГИСТИКА' : 'FLEET & LOGISTICS',
         fleetSub: LANG === 'bg' ? 'Очаква се интеграция с превозни средства...' : 'Integration with assigned vehicles pending...',
         legalTitle: LANG === 'bg' ? 'Общи условия / Бележки' : 'Terms & Conditions / Legal Notes',
-        empty: LANG === 'bg' ? 'Няма остойностени артикули в проекта.' : 'No priced items assigned to project.'
+        empty: LANG === 'bg'
+            ? 'Няма редове в офертата. Натиснете Pull Project Assets.'
+            : 'No offer lines yet. Press Pull Project Assets.',
+        pull: LANG === 'bg' ? 'Pull Project Assets' : 'Pull Project Assets',
+        undo: LANG === 'bg' ? 'Undo Pull' : 'Undo Pull'
     };
 
     const AVAILABLE_LEGAL_NOTES = [
@@ -1389,45 +1483,43 @@ window.renderOfferUI = function() {
     ];
 
     let deptGroups = {};
-    currentProjectAssets.forEach(pa => {
-        let asset = globalAssets.find(a => a.id === pa.assetId);
-        if (!asset) return;
-        
-        let basePrice = parseFloat(asset.rental) || 0;
-        let isOverride = pa.overridePrice !== undefined && pa.overridePrice !== null && pa.overridePrice !== "";
-        let finalPrice = isOverride ? parseFloat(pa.overridePrice) : basePrice;
-        
-        // Hide consumables or 0 price items unless they have an active override
-        if (asset.type === 'Consumable' || (basePrice === 0 && !isOverride)) return;
-
-        let deptUid = pa.overrideDept || asset.department || 'Unassigned';
+    (window.offerPaGetLines_() || []).forEach(function(line) {
+        if (!line) return;
+        var asset = (typeof globalAssets !== 'undefined')
+            ? globalAssets.find(function(a) { return a.id === line.assetId; })
+            : null;
+        var name = line.name || (asset && asset.name) || line.assetId;
+        var deptUid = line.overrideDept || (asset && asset.department) || 'Unassigned';
+        var unitPrice = parseFloat(line.unitPrice);
+        if (isNaN(unitPrice)) unitPrice = 0;
+        var qty = parseInt(line.qty, 10) || 0;
+        if (qty <= 0) return;
         if (!deptGroups[deptUid]) deptGroups[deptUid] = [];
-
-        let key = asset.id + "_" + finalPrice;
-        let existing = deptGroups[deptUid].find(i => i.key === key);
-        let qty = parseInt(pa.qty, 10) || 1;
-        
-        if (existing) {
-            existing.qty += qty;
-            existing.lineTotal = existing.qty * finalPrice;
-            existing.paUids.push(pa.uid); // Keep array of all UIDs to update overrides globally
-        } else {
-            deptGroups[deptUid].push({
-                key: key,
-                paUids: [pa.uid],
-                asset: asset,
-                qty: qty,
-                unitPrice: finalPrice,
-                lineTotal: qty * finalPrice
-            });
-        }
+        deptGroups[deptUid].push({
+            lineId: line.lineId || (String(line.assetId) + '_' + unitPrice + '_' + deptUid),
+            asset: { id: line.assetId, name: name },
+            qty: qty,
+            unitPrice: unitPrice,
+            lineTotal: qty * unitPrice
+        });
     });
     
+    let canUndo = !!fin.offerPaUndo;
+    let pullMeta = '';
+    if (fin.offerPa && fin.offerPa.pulledAt) {
+        let src = fin.offerPa.source === 'firebase' ? 'warm' : 'Sheets';
+        pullMeta = '<span style="color:#71717a; font-size:10px; margin-right:8px;">' + src + ' · ' +
+            String(fin.offerPa.pulledAt).replace('T', ' ').slice(0, 16) + '</span>';
+    }
+
     let subtotal = 0;
     let html = `
-    <div style="padding: 10px 20px; background: #111; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 10;">
+    <div style="padding: 10px 20px; background: #111; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; z-index: 10; gap: 10px; flex-wrap: wrap;">
         <span style="color:#d8b4fe; font-weight: 800; font-size: 12px; letter-spacing: 1px;">${t.title}</span>
-        <div style="display:flex; gap: 10px; align-items: center;">
+        <div style="display:flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            ${pullMeta}
+            <button id="offer-pull-pa-btn" class="btn-main btn-sm" style="margin:0; padding:4px 10px !important; font-size:10px !important;" onclick="pullOfferProjectAssets_()">${t.pull}</button>
+            <button id="offer-undo-pa-btn" class="btn-outline btn-sm" style="margin:0; padding:4px 10px !important; font-size:10px !important; ${canUndo ? '' : 'opacity:0.4; pointer-events:none;'}" onclick="undoOfferPaPull_()" ${canUndo ? '' : 'disabled'}>${t.undo}</button>
             <div style="display:flex; background:#18181b; padding:2px; border-radius:4px; border:1px solid #333;">
                 <button class="${LANG === 'bg' ? 'btn-main' : 'btn-outline'} btn-sm" style="margin:0; padding:2px 8px !important; font-size:10px !important;" onclick="switchOfferLanguage('bg')">BG</button>
                 <button class="${LANG === 'en' ? 'btn-main' : 'btn-outline'} btn-sm" style="margin:0; padding:2px 8px !important; font-size:10px !important;" onclick="switchOfferLanguage('en')">EN</button>
@@ -1479,14 +1571,15 @@ window.renderOfferUI = function() {
             
             items.forEach(item => {
                 subtotal += item.lineTotal;
+                let safeId = String(item.lineId).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                 html += `
                     <tr style="border-bottom: 1px solid #222;" onmouseover="this.style.background='#1a1a1e'" onmouseout="this.style.background='transparent'">
                         <td style="padding: 8px 15px; font-weight: bold; color: #10b981;">${item.qty}</td>
                         <td style="padding: 8px 15px;">${item.asset.name}</td>
                         <td style="padding: 8px 15px; text-align: right;">
                             $ <input type="number" step="0.01" value="${item.unitPrice.toFixed(2)}" 
-                                onchange="updateOverridePrice('${item.paUids.join(',')}', this.value)" 
-                                style="width: 70px; background: #27272a; color: #fff; border: 1px solid #3f3f46; text-align: right; padding: 4px; border-radius: 4px; outline:none;" title="Edit Unit Price (Overrides Vault Price)">
+                                onchange="updateOverridePrice('${safeId}', this.value)" 
+                                style="width: 70px; background: #27272a; color: #fff; border: 1px solid #3f3f46; text-align: right; padding: 4px; border-radius: 4px; outline:none;" title="Edit Unit Price (offer snapshot)">
                         </td>
                         <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">$ ${(item.lineTotal).toFixed(2)}</td>
                     </tr>`;
@@ -1537,26 +1630,25 @@ window.renderOfferUI = function() {
     <div style="background: #111; border-top: 1px solid #333; padding: 15px 25px; display: flex; justify-content: flex-end; align-items: flex-end; flex-direction: column; gap: 8px; flex-shrink: 0; box-shadow: 0 -4px 12px rgba(0,0,0,0.5);">
         <div style="display: flex; justify-content: space-between; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.subtotal}</span><span>$ ${subtotal.toFixed(2)}</span></div>
         <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.days}</span><input type="number" min="0" step="0.5" value="${fin.daysCharged}" onchange="updateFinancials('daysCharged', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
-        <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.discount}</span><input type="number" min="0" max="100" value="${fin.discountPct}" onchange="updateFinancials('discountPct', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
-        <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.tax}</span><input type="number" min="0" max="100" value="${fin.taxPct}" onchange="updateFinancials('taxPct', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
-        <div style="width: 300px; height: 1px; background: #333; margin: 5px 0;"></div>
-        <div style="display: flex; justify-content: space-between; width: 300px; color: #10b981; font-size: 18px; font-weight: 900;"><span>${t.grand}</span><span>$ ${grandTotal.toFixed(2)}</span></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.discount}</span><input type="number" min="0" max="100" step="1" value="${fin.discountPct}" onchange="updateFinancials('discountPct', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.tax}</span><input type="number" min="0" max="100" step="1" value="${fin.taxPct}" onchange="updateFinancials('taxPct', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
+        <div style="display: flex; justify-content: space-between; width: 300px; color: #d8b4fe; font-size: 16px; font-weight: 900; margin-top: 6px;"><span>${t.grand}</span><span>$ ${grandTotal.toFixed(2)}</span></div>
     </div>`;
 
     offerContainer.innerHTML = html;
 };
 
-window.updateOverridePrice = function(paUidsStr, newPrice) {
-    let uids = paUidsStr.split(',');
-    let numericPrice = (newPrice === "" || isNaN(newPrice)) ? null : parseFloat(newPrice);
-    
-    currentProjectAssets.forEach(pa => {
-        if (uids.includes(pa.uid)) {
-            pa.overridePrice = numericPrice;
+window.updateOverridePrice = function(lineId, newPrice) {
+    let fin = window.offerPaEnsureFin_();
+    if (!fin.offerPa || !Array.isArray(fin.offerPa.lines)) return;
+    let numericPrice = (newPrice === '' || isNaN(newPrice)) ? 0 : parseFloat(newPrice);
+    fin.offerPa.lines.forEach(function(line) {
+        if (line && String(line.lineId) === String(lineId)) {
+            line.unitPrice = numericPrice;
         }
     });
-    
     window.isProjectDirty = true;
+    if (typeof updateEqReadinessToDatabase === 'function') updateEqReadinessToDatabase();
     renderOfferUI();
 };
 
@@ -1567,19 +1659,16 @@ window.switchOfferLanguage = function(lang) {
 };
 
 window.updateFinancials = function(key, val) {
-    if (!window.currentReadinessState) window.currentReadinessState = {};
-    if (!window.currentReadinessState.financials) window.currentReadinessState.financials = { daysCharged: 1, discountPct: 0, taxPct: 0 };
+    let fin = window.offerPaEnsureFin_();
     let num = parseFloat(val);
-    window.currentReadinessState.financials[key] = (isNaN(num) || num < 0) ? 0 : num;
+    fin[key] = (isNaN(num) || num < 0) ? 0 : num;
     window.isProjectDirty = true;
     if (typeof updateEqReadinessToDatabase === 'function') updateEqReadinessToDatabase();
     renderOfferUI();
 };
 
 window.toggleLegalNote = function(noteId, isChecked) {
-    if (!window.currentReadinessState) window.currentReadinessState = {};
-    if (!window.currentReadinessState.financials) window.currentReadinessState.financials = { daysCharged: 1, discountPct: 0, taxPct: 0 };
-    let fin = window.currentReadinessState.financials;
+    let fin = window.offerPaEnsureFin_();
     if (!fin.legalNotes) fin.legalNotes = [];
     
     if (isChecked) {
