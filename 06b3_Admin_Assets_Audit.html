@@ -322,8 +322,8 @@ function openSmartMerge(groupId) {
         { prop: 'dims', label: 'Dimensions', formatter: a => a.dims || '-' },
         { prop: 'capacity', label: 'Capacity', formatter: a => a.capacity !== undefined ? a.capacity : '-' },
         { prop: 'power', label: 'Power', formatter: a => a.power ? a.power + 'W' : '-' },
-        { prop: 'price', label: 'Price', formatter: a => a.price ? '$'+parseFloat(a.price).toFixed(2) : '-' },
-        { prop: 'rental', label: 'Rental', formatter: a => a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-' }
+        { prop: 'price', label: 'Price', formatter: a => a.price ? '€'+parseFloat(a.price).toFixed(2) : '-' },
+        { prop: 'rental', label: 'Rental', formatter: a => a.rental ? '€'+parseFloat(a.rental).toFixed(2) : '-' }
     ];
 
     let html = '<table style="width: 100%; border-collapse: collapse; text-align: left; color: #fff; font-size: 13px;">';

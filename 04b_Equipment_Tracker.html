@@ -522,9 +522,9 @@ function renderTrackerList() {
             } else if (key === 'level') {
                 rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;">${asset.nestingLevel !== undefined ? asset.nestingLevel : 6}</div>`;
             } else if (key === 'price') {
-                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.price ? '$'+parseFloat(asset.price).toFixed(2) : '-'}</div>`;
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.price ? '€'+parseFloat(asset.price).toFixed(2) : '-'}</div>`;
             } else if (key === 'rental') {
-                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.rental ? '$'+parseFloat(asset.rental).toFixed(2) : '-'}</div>`;
+                rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${asset.rental ? '€'+parseFloat(asset.rental).toFixed(2) : '-'}</div>`;
             } else if (key === 'dept') {
                 rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${typeof getDeptObj === 'function' ? getDeptObj(asset.department).name : '-'}</div>`;
             } else if (key === 'vendor') {

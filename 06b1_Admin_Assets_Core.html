@@ -480,8 +480,8 @@ function renderAssetRegistry() {
             else if (key === 'dims') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dims || '-'}</div>`;
             else if (key === 'capacity') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.capacity !== undefined ? a.capacity : '-'}</div>`;
             else if (key === 'power') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.power || '-'}</div>`;
-            else if (key === 'price') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '$'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
-            else if (key === 'rental') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
+            else if (key === 'price') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '€'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
+            else if (key === 'rental') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '€'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
             else if (key === 'dateBought') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dateBought || '-'}</div>`;
             else if (key === 'lastService') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.lastService || '-'}</div>`;
             else if (key === 'interval') rowHtml += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.serviceInterval ? a.serviceInterval+' Mo' : '-'}</div>`;
@@ -636,8 +636,8 @@ function renderAssetRegistry() {
                     else if (key === 'dims') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dims || '-'}</div>`;
                     else if (key === 'capacity') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.capacity !== undefined ? a.capacity : '-'}</div>`;
                     else if (key === 'power') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.power || '-'}</div>`;
-                    else if (key === 'price') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '$'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
-                    else if (key === 'rental') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
+                    else if (key === 'price') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '€'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
+                    else if (key === 'rental') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '€'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
                     else if (key === 'dateBought') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dateBought || '-'}</div>`;
                     else if (key === 'lastService') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.lastService || '-'}</div>`;
                     else if (key === 'interval') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.serviceInterval ? a.serviceInterval+' Mo' : '-'}</div>`;

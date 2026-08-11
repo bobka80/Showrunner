@@ -347,8 +347,8 @@ function renderProjectAssetsUI() {
             else if (key === 'weight') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.weight || '-'}</div>`;
             else if (key === 'dims') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dims || '-'}</div>`;
             else if (key === 'power') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.power || '-'}</div>`;
-            else if (key === 'price') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '$'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
-            else if (key === 'rental') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
+            else if (key === 'price') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '€'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
+            else if (key === 'rental') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '€'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
             else if (key === 'dateBought') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.dateBought || '-'}</div>`;
             else if (key === 'lastService') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.lastService || '-'}</div>`;
             else if (key === 'interval') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.serviceInterval ? a.serviceInterval+' Mo' : '-'}</div>`;
@@ -473,8 +473,8 @@ function renderProjectAssetsUI() {
                     }
                 }
             }
-            else if (key === 'price') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '$'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
-            else if (key === 'rental') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '$'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
+            else if (key === 'price') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.price ? '€'+parseFloat(a.price).toFixed(2) : '-'}</div>`;
+            else if (key === 'rental') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.rental ? '€'+parseFloat(a.rental).toFixed(2) : '-'}</div>`;
             else if (key === 'interval') html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a.serviceInterval ? a.serviceInterval+' Mo' : '-'}</div>`;
             else html += `<div style="${widthStyle} color:#a1a1aa; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${a[key] !== undefined ? a[key] : '-'}</div>`;
             
@@ -1634,11 +1634,11 @@ window.renderOfferUI = function() {
                         <td style="padding: 8px 15px; font-weight: bold; color: #10b981;">${item.qty}</td>
                         <td style="padding: 8px 15px;">${item.asset.name}</td>
                         <td style="padding: 8px 15px; text-align: right;">
-                            $ <input type="number" step="0.01" value="${item.unitPrice.toFixed(2)}" 
+                            € <input type="number" step="0.01" value="${item.unitPrice.toFixed(2)}" 
                                 onchange="updateOverridePrice('${safeId}', this.value)" 
                                 style="width: 70px; background: #27272a; color: #fff; border: 1px solid #3f3f46; text-align: right; padding: 4px; border-radius: 4px; outline:none;" title="Edit Unit Price (offer snapshot)">
                         </td>
-                        <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">$ ${(item.lineTotal).toFixed(2)}</td>
+                        <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">€ ${(item.lineTotal).toFixed(2)}</td>
                     </tr>`;
             });
             
@@ -1671,8 +1671,8 @@ window.renderOfferUI = function() {
             html += `<tr style="border-bottom: 1px solid #222;">
                 <td style="padding: 8px 15px; font-weight: bold; color: #10b981;">${qty}</td>
                 <td style="padding: 8px 15px;">${line.tierOrRole || line.label || 'Labor'}</td>
-                <td style="padding: 8px 15px; text-align: right;">$ ${unit.toFixed(2)}</td>
-                <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">$ ${amt.toFixed(2)}</td>
+                <td style="padding: 8px 15px; text-align: right;">€ ${unit.toFixed(2)}</td>
+                <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">€ ${amt.toFixed(2)}</td>
             </tr>`;
         });
         html += `</tbody></table>`;
@@ -1709,8 +1709,8 @@ window.renderOfferUI = function() {
             html += `<tr style="border-bottom: 1px solid #222;">
                 <td style="padding: 8px 15px; font-weight: bold; color: #10b981;">${qty}</td>
                 <td style="padding: 8px 15px;">${line.label || 'Transport'}</td>
-                <td style="padding: 8px 15px; text-align: right;">$ ${unit.toFixed(2)}</td>
-                <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">$ ${amt.toFixed(2)}</td>
+                <td style="padding: 8px 15px; text-align: right;">€ ${unit.toFixed(2)}</td>
+                <td style="padding: 8px 15px; text-align: right; color: #d8b4fe; font-weight: bold;">€ ${amt.toFixed(2)}</td>
             </tr>`;
         });
         html += `</tbody></table>`;
@@ -1738,11 +1738,11 @@ window.renderOfferUI = function() {
 
     html += `</div>
     <div style="background: #111; border-top: 1px solid #333; padding: 15px 25px; display: flex; justify-content: flex-end; align-items: flex-end; flex-direction: column; gap: 8px; flex-shrink: 0; box-shadow: 0 -4px 12px rgba(0,0,0,0.5);">
-        <div style="display: flex; justify-content: space-between; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.subtotal}</span><span>$ ${subtotal.toFixed(2)}</span></div>
+        <div style="display: flex; justify-content: space-between; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.subtotal}</span><span>€ ${subtotal.toFixed(2)}</span></div>
         <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.days}</span><input type="number" min="0" step="0.5" value="${fin.daysCharged}" onchange="updateFinancials('daysCharged', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
         <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.discount}</span><input type="number" min="0" max="100" step="1" value="${fin.discountPct}" onchange="updateFinancials('discountPct', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
         <div style="display: flex; justify-content: space-between; align-items: center; width: 300px; color: #a1a1aa; font-size: 12px;"><span>${t.tax}</span><input type="number" min="0" max="100" step="1" value="${fin.taxPct}" onchange="updateFinancials('taxPct', this.value)" style="width: 60px; background: #1a1a1e; color: #fff; border: 1px solid #333; text-align: center; padding: 4px; border-radius: 4px; outline:none;"></div>
-        <div style="display: flex; justify-content: space-between; width: 300px; color: #d8b4fe; font-size: 16px; font-weight: 900; margin-top: 6px;"><span>${t.grand}</span><span>$ ${grandTotal.toFixed(2)}</span></div>
+        <div style="display: flex; justify-content: space-between; width: 300px; color: #d8b4fe; font-size: 16px; font-weight: 900; margin-top: 6px;"><span>${t.grand}</span><span>€ ${grandTotal.toFixed(2)}</span></div>
     </div>`;
 
     offerContainer.innerHTML = html;

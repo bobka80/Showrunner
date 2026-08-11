@@ -6,8 +6,8 @@
 **Room decision / locks:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
-**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W3** Offer PA pull (build).  
-**Production tip:** see RELEASES.md. Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
+**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W4** shipped; awaiting director smoke → **W5**.  
+**Production tip:** see RELEASES.md (**GAS v776** W4). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
 
@@ -133,7 +133,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 
 - [x] Button + pull shifts + truck/logistics facts (km, idle/stay, courses…)  
 - [x] Pre-pull snapshot + Undo (same undo model as W3)  
-- [ ] Ship + smoke
+- [x] Ship **GAS v776** — smoke: Pull fills Labor/Fleet; Undo restores; PA-only edits leave TL alone; warm Firebase / cold Sheets  
+- [ ] Director smoke
 
 ### W5 — Warm project editor autosave (filed 2026-08-10)
 
@@ -182,6 +183,9 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | Root cause: PA edits lost on refresh (pending flush died). Urgent unload PA_PATCH + state hydrate. |
 | 2026-08-11 | Director smoke green: PA→Tracker + refresh durability. Next: **W3** Offer PA pull. |
 | 2026-08-11 | **W3 @ GAS v775** — Offer Pull Project Assets + Undo (snapshot in readiness financials). |
+| 2026-08-11 | Director W3 smoke green → **W4**. |
+| 2026-08-11 | **W4 @ GAS v776** — Offer Pull Timeline + logistics + Undo (`getOfferTlPullSnapshot`; labor + transport snapshot; Print Studio lines). Awaiting director smoke → **W5**. |
+| 2026-08-11 | Currency display: all remaining `$` price prefixes → `€` (Offer UI + asset/tracker/audit columns). Print/Financials Hub were already €. |
 
 ---
 
