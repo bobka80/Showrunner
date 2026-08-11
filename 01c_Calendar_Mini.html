@@ -17,6 +17,8 @@ let currentEditingEvent = null;
 function bootMiniCalendar(targetDateString, projectId, focusCue) {
     const container = document.getElementById('mini-project-calendar');
     if (!container) return;
+    window.peMiniCalPaintReady_ = false;
+    window.peMiniCalDragging_ = false;
     
     const miniReadOnly = (typeof canPaintMiniCalendar === 'function')
       ? !canPaintMiniCalendar(projectId)
@@ -136,6 +138,12 @@ function bootMiniCalendar(targetDateString, projectId, focusCue) {
                 window.peMiniCalDragging_ = true;
                 closeEventMenu();
             },
+            eventDragStop: function() {
+                window.peMiniCalDragging_ = false;
+            },
+            eventResizeStop: function() {
+                window.peMiniCalDragging_ = false;
+            },
             eventDrop: function(info) {
                 window.peMiniCalDragging_ = false;
                 if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
@@ -221,6 +229,12 @@ function bootMiniCalendar(targetDateString, projectId, focusCue) {
                 cueCell.classList.add('mini-press-cue');
                 setTimeout(function() { cueCell.classList.remove('mini-press-cue'); }, 3200);
             }
+        }
+
+        window.peMiniCalPaintReady_ = true;
+        // Catch up any identity autosave that fired while unpack was in flight.
+        if (window.isProjectDirty && typeof window.peScheduleWarmIdentityAutosave_ === 'function') {
+            window.peScheduleWarmIdentityAutosave_();
         }
 
     }, 150); 

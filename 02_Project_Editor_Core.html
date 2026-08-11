@@ -161,6 +161,7 @@ window.peWarmAutosaveTimer_ = null;   // W5 — debounced warm identity/offer sa
 window.peWarmAutosaveBusy_ = false;
 window.peWarmAutosavePending_ = false;
 window.peMiniCalDragging_ = false;
+window.peMiniCalPaintReady_ = false;
 window.peAutosaveCueState_ = '';      // '' | saving | saved | error
 window.peLeaveSavePayload_ = null;    // Cancel leave — send after in-flight settles
 window.peLeaveSaveQuiet_ = false;
@@ -778,15 +779,11 @@ window.peMarkIdentityDirty_ = function() {
 };
 
 window.pePaintAutosaveCue_ = function(state, detail) {
-  // W5 polish: autosave cue stays in DOM for rollback, but is never shown.
   window.peAutosaveCueState_ = state || '';
   var cue = document.getElementById('pe-autosave-cue');
   if (!cue) return;
-  cue.style.display = 'none';
-  cue.textContent = '';
-  return;
-  /* rollback cue paint:
-  if (!window.peIsWarmEditorAutosave_()) {
+  // Cue only for saved projects (NEW still uses the Save button).
+  if (!window.peCanIdentityAutosave_ || !window.peCanIdentityAutosave_()) {
     cue.style.display = 'none';
     cue.textContent = '';
     return;
@@ -805,7 +802,6 @@ window.pePaintAutosaveCue_ = function(state, detail) {
     cue.style.color = '#a1a1aa';
     cue.textContent = 'Auto-save on';
   }
-  */
 };
 
 window.peIsNewUnsavedProject_ = function() {
@@ -837,8 +833,9 @@ window.peSyncSaveBtnChrome_ = function() {
       btn.disabled = true;
     }
   }
-  // Autosave cue always hidden (background autosave still runs when warm).
-  window.pePaintAutosaveCue_('');
+  // Autosave cue for saved projects (hidden while NEW — Save button is the signal).
+  if (!isNew) window.pePaintAutosaveCue_(window.peAutosaveCueState_ || '');
+  else window.pePaintAutosaveCue_('');
 
   // Soft-disable deeper entry chrome while NEW (clicks still gated).
   var deeperIds = ['master-timeline-btn', 'master-assets-btn', 'logistics-hub-btn-layers', 'print-eq-btn', 'master-end-room-btn'];
@@ -856,6 +853,37 @@ window.peSyncSaveBtnChrome_ = function() {
   });
 };
 
+/** Build timeline fragments from main-calendar rawDbData when mini-cal paint is empty. */
+window.peTimelinesFromRawFragments_ = function(projectId) {
+  var out = [];
+  if (!projectId || projectId === 'NEW' || typeof calendar === 'undefined' || !calendar) return out;
+  try {
+    var projectEvent = calendar.getEventById(projectId);
+    if (!projectEvent) {
+      projectEvent = calendar.getEvents().find(function(e) {
+        return e.id === projectId ||
+          (e.extendedProps && e.extendedProps.rawDbData &&
+            String(e.extendedProps.rawDbData.id) === String(projectId));
+      });
+    }
+    var raw = projectEvent && projectEvent.extendedProps && projectEvent.extendedProps.rawDbData;
+    var frags = raw && raw.fragments;
+    if (!frags || !frags.length) return out;
+    frags.forEach(function(f) {
+      if (!f || !f.date) return;
+      out.push({
+        uid: f.uid || '',
+        Sub_Event_Type: f.type || 'MAIN_EVENT',
+        Event_Date: f.date,
+        Start_Time: f.startTime || '',
+        End_Time: f.endTime || '',
+        Note: f.note || ''
+      });
+    });
+  } catch (eRaw) { /* empty */ }
+  return out;
+};
+
 /** Gather the same payload as explicit Save & Sync. Returns null if not saveable. */
 window.peGatherIdentitySavePayload_ = function() {
   var folderEl = document.getElementById('edit-folder-id');
@@ -863,9 +891,6 @@ window.peGatherIdentitySavePayload_ = function() {
   var nameEl = document.getElementById('edit-proj-name');
   var newT = nameEl ? String(nameEl.value || '').trim() : '';
   if (!newT) return null;
-  if (typeof miniCalendar === 'undefined' || !miniCalendar) return null;
-  var paintedEvents = miniCalendar.getEvents();
-  if (!paintedEvents || paintedEvents.length === 0) return null;
 
   var activeState = window.currentReadinessState || {};
   var outdoorEl = document.getElementById('edit-proj-outdoor');
@@ -905,32 +930,44 @@ window.peGatherIdentitySavePayload_ = function() {
 
   var timelines = [];
   var phaseMap = { wh: 'WAREHOUSE', main: 'MAIN_EVENT', show: 'SHOW_DAY', recovery: 'RECOVERY', transit: 'TRANSIT' };
-  paintedEvents.forEach(function(ev) {
-    var phaseCode = ev.extendedProps.phaseType;
-    var note = ev.extendedProps.note || '';
-    var sTime = ev.extendedProps.startTime || '';
-    var eTime = ev.extendedProps.endTime || '';
-    var backendType = phaseMap[phaseCode] || phaseCode;
-    if (!backendType) return;
-    var startD = ev.start;
-    var endD = ev.end ? ev.end : new Date(startD.getTime() + 86400000);
-    if (endD <= startD) endD = new Date(startD.getTime() + 86400000);
-    var currentD = new Date(startD);
-    while (currentD < endD) {
-      var isoDay = currentD.getFullYear() + '-' +
-        String(currentD.getMonth() + 1).padStart(2, '0') + '-' +
-        String(currentD.getDate()).padStart(2, '0');
-      timelines.push({
-        uid: (ev.extendedProps.uidsByDate && ev.extendedProps.uidsByDate[isoDay]) || ev.extendedProps.uid || '',
-        Sub_Event_Type: backendType,
-        Event_Date: isoDay,
-        Start_Time: sTime,
-        End_Time: eTime,
-        Note: note
-      });
-      currentD.setDate(currentD.getDate() + 1);
-    }
-  });
+  var paintedEvents = (typeof miniCalendar !== 'undefined' && miniCalendar)
+    ? miniCalendar.getEvents()
+    : [];
+  if (paintedEvents && paintedEvents.length) {
+    paintedEvents.forEach(function(ev) {
+      var phaseCode = ev.extendedProps.phaseType;
+      var note = ev.extendedProps.note || '';
+      var sTime = ev.extendedProps.startTime || '';
+      var eTime = ev.extendedProps.endTime || '';
+      var backendType = phaseMap[phaseCode] || phaseCode;
+      if (!backendType) return;
+      var startD = ev.start;
+      var endD = ev.end ? ev.end : new Date(startD.getTime() + 86400000);
+      if (endD <= startD) endD = new Date(startD.getTime() + 86400000);
+      var currentD = new Date(startD);
+      while (currentD < endD) {
+        var isoDay = currentD.getFullYear() + '-' +
+          String(currentD.getMonth() + 1).padStart(2, '0') + '-' +
+          String(currentD.getDate()).padStart(2, '0');
+        timelines.push({
+          uid: (ev.extendedProps.uidsByDate && ev.extendedProps.uidsByDate[isoDay]) || ev.extendedProps.uid || '',
+          Sub_Event_Type: backendType,
+          Event_Date: isoDay,
+          Start_Time: sTime,
+          End_Time: eTime,
+          Note: note
+        });
+        currentD.setDate(currentD.getDate() + 1);
+      }
+    });
+  }
+  // Only before mini-cal unpack finishes — never after user cleared all phases (would restore stale raw).
+  if (!timelines.length && id && id !== 'NEW' && !window.peMiniCalPaintReady_) {
+    timelines = window.peTimelinesFromRawFragments_(id);
+  }
+  // NEW create still requires painted phases; saved projects need at least one fragment.
+  if (!timelines.length) return null;
+
   return { projectData: projectData, timelines: timelines, id: id, newT: newT };
 };
 
@@ -961,11 +998,18 @@ window.peSendIdentitySavePayload_ = function(payload, opts) {
     return;
   }
   if (typeof window.guardDatabaseBackupLock === 'function' &&
-      window.guardDatabaseBackupLock(quiet ? 'project leave save' : 'project autosave')) return;
+      window.guardDatabaseBackupLock(quiet ? 'project leave save' : 'project autosave')) {
+    window.peWarmAutosavePending_ = true;
+    if (!quiet) window.peScheduleWarmIdentityAutosave_();
+    return;
+  }
 
   window.peWarmAutosaveBusy_ = true;
   window.peWarmAutosavePending_ = false;
-  if (!quiet) window.pePaintAutosaveCue_('saving');
+  if (!quiet) {
+    window.peLeaveSaveQuiet_ = false;
+    window.pePaintAutosaveCue_('saving');
+  }
 
   var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
     ? ACTIVE_USER_NAME
@@ -1040,8 +1084,9 @@ window.peSendIdentitySavePayload_ = function(payload, opts) {
           window.peLeaveSavePayload_.projectData.Last_Updated = resObj.timestamp;
         }
       }
+      // Clear dirty on any successful identity write (quiet leave/nav included).
+      window.isProjectDirty = false;
       if (!quiet) {
-        window.isProjectDirty = false;
         window.pePaintAutosaveCue_('saved');
         window.peSyncSaveBtnChrome_();
       }
@@ -1086,7 +1131,19 @@ window.peFlushWarmIdentityAutosave_ = function(opts) {
   if (!window.isProjectDirty && !window.peWarmAutosavePending_ && !opts.force) return;
 
   var payload = window.peGatherIdentitySavePayload_();
-  if (!payload) return;
+  if (!payload) {
+    // Mini-cal may still be unpacking — retry once shortly; don't leave pending stuck forever.
+    if (!opts._gatherRetry) {
+      window.peWarmAutosavePending_ = true;
+      setTimeout(function() {
+        window.peFlushWarmIdentityAutosave_({ force: !!opts.force, quiet: !!opts.quiet, _gatherRetry: true });
+      }, 1200);
+    } else {
+      window.peWarmAutosavePending_ = false;
+      if (!opts.quiet) window.pePaintAutosaveCue_('error', 'Save waiting on calendar');
+    }
+    return;
+  }
   window.peSendIdentitySavePayload_(payload, { quiet: !!opts.quiet });
 };
 
@@ -1106,10 +1163,12 @@ window.peQuietFlushIdentityForNav_ = function() {
   try { payload = window.peGatherIdentitySavePayload_(); } catch (eG) { payload = null; }
   window.isProjectDirty = false;
   window.peWarmAutosavePending_ = false;
-  window.peLeaveSaveQuiet_ = true;
   window.peLeaveSaveRetried_ = false;
   if (payload && typeof window.peSendIdentitySavePayload_ === 'function') {
+    window.peLeaveSaveQuiet_ = true;
     window.peSendIdentitySavePayload_(payload, { quiet: true });
+  } else {
+    window.peLeaveSaveQuiet_ = false;
   }
   return true;
 };
