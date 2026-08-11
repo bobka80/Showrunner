@@ -694,13 +694,15 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
         const paDataSheets = getSheetData(dbSheets.projectAssets);
         const paMap = paDataSheets.hMap;
         let paData = paDataSheets;
+        // W2: prefer warm Firebase PA rows when present (String-key safe)
         try {
           if (warmOverlay && warmOverlay.paRows && Object.keys(warmOverlay.paRows).length &&
               typeof dalMergeWarmPaSheetRows_ === 'function') {
-            // Only replace PA for warm projects that land in this Tracker window
             var warmPaActive = {};
             Object.keys(warmOverlay.paRows).forEach(function (wPid) {
-              if (activeProjects[wPid]) warmPaActive[wPid] = warmOverlay.paRows[wPid];
+              if (activeProjects[wPid] || activeProjects[String(wPid)]) {
+                warmPaActive[String(wPid)] = warmOverlay.paRows[wPid];
+              }
             });
             paData = dalMergeWarmPaSheetRows_(paDataSheets, paMap, warmPaActive);
           }

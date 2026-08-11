@@ -150,13 +150,23 @@ function firestoreCollectionParent_(collectionPath) {
 
 function firestoreListCollection_(collectionPath) {
   var path = String(collectionPath || '').replace(/\/+$/, '');
-  var result = firestoreFetch_('get', path);
-  if (!result || !result.documents) return [];
-  return result.documents.map(function (doc) {
-    var plain = firestoreDecodeFields_(doc.fields);
-    plain._docId = firestoreDocIdFromName_(doc.name);
-    return plain;
-  });
+  var out = [];
+  var pageToken = '';
+  // Firestore REST defaults to a small page; warm readers / commit must see the full collection.
+  for (var guard = 0; guard < 50; guard++) {
+    var url = path + '?pageSize=300';
+    if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+    var result = firestoreFetch_('get', url);
+    if (!result) break;
+    (result.documents || []).forEach(function (doc) {
+      var plain = firestoreDecodeFields_(doc.fields);
+      plain._docId = firestoreDocIdFromName_(doc.name);
+      out.push(plain);
+    });
+    pageToken = result.nextPageToken || '';
+    if (!pageToken) break;
+  }
+  return out;
 }
 
 function firestoreWriteDocument_(docPath, obj) {

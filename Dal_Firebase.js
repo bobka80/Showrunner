@@ -264,6 +264,42 @@ function dalListWarmCampaignProjectIds_(indexData, iMap) {
 }
 
 /**
+ * Warm PA rows for Tracker/Conflicts — prefer live `assets/state` (PA flush SoT),
+ * fall back to collection list. Returns sheet-shaped rows or null.
+ */
+function dalWarmPaSheetRowsFromFirebase_(projectId, hdr) {
+  if (!projectId || !hdr || !hdr.header || !hdr.map) return null;
+  try {
+    if (typeof dalReadPaStateFixtures_ === 'function' &&
+        typeof dalPaFixtureToCommitObj_ === 'function' &&
+        typeof dalPaRowObjectToSheetArray_ === 'function') {
+      var snap = dalReadPaStateFixtures_(projectId);
+      var fixtures = (snap && snap.fixtures) || [];
+      if (fixtures.length) {
+        var fromState = [];
+        fixtures.forEach(function (pa) {
+          if (!pa) return;
+          var obj = dalPaFixtureToCommitObj_(pa, projectId);
+          var row = dalPaRowObjectToSheetArray_(obj, hdr.header, hdr.map);
+          var qty = parseInt(row[hdr.map['assigned_quantity']], 10) || 0;
+          if (qty > 0) fromState.push(row);
+        });
+        if (fromState.length) return fromState;
+      }
+    }
+  } catch (eState) { /* collection fallthrough */ }
+  try {
+    if (typeof dalLoadPaProjectRowsFromFirebase_ === 'function') {
+      var rows = dalLoadPaProjectRowsFromFirebase_(projectId, hdr.header, hdr.map);
+      if (rows && rows.length) {
+        return rows.map(function (r) { return r.data; });
+      }
+    }
+  } catch (eCol) { /* ignore */ }
+  return null;
+}
+
+/**
  * W2 warm readers — one-shot Firebase overlay for Tracker/Conflicts.
  * Fail-open per project/slice. Caps successful project overlays (default 25).
  * PA/ledger replace only when Firebase returns non-empty rows/legs.
@@ -307,13 +343,13 @@ function dalWarmReaderOneShotOverlay_(projectIds, opts) {
         }
       } catch (eMeta) { /* Sheets fallthrough */ }
     }
-    if (wantPa && typeof dalLoadPaProjectRowsFromFirebase_ === 'function' &&
-        typeof dalGetProjectAssetsHeaderAndMap_ === 'function') {
+    if (wantPa && typeof dalGetProjectAssetsHeaderAndMap_ === 'function' &&
+        typeof dalWarmPaSheetRowsFromFirebase_ === 'function') {
       try {
         if (!hdr) hdr = dalGetProjectAssetsHeaderAndMap_();
-        var rows = dalLoadPaProjectRowsFromFirebase_(pid, hdr.header, hdr.map);
-        if (rows && rows.length) {
-          out.paRows[pid] = rows.map(function (r) { return r.data; });
+        var paRows = dalWarmPaSheetRowsFromFirebase_(pid, hdr);
+        if (paRows && paRows.length) {
+          out.paRows[pid] = paRows;
           out.paMap = hdr.map;
           got = true;
         }

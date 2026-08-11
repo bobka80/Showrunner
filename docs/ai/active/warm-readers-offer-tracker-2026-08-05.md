@@ -6,7 +6,7 @@
 **Room decision / locks:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
-**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W2** Tracker/Conflicts hybrid (build).  
+**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W2** shipped **GAS v772**; director smoke next.  
 **Production tip:** see RELEASES.md. Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
@@ -119,7 +119,7 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 - [x] Warm detect via Index `Dal_Campaign_Room_Status` / `dalStatusIsForkLive_`  
 - [x] One-shot Firebase overlay helpers (`dalWarmReaderOneShotOverlay_` — meta sub-events, PA, ledger; Conflicts + timeline shifts)  
 - [x] Cap 25 + fail-open to Sheets  
-- [ ] Ship + smoke: warm project shows fresher than Sheets; cold unchanged
+- [x] Ship **GAS v772** — smoke: warm project shows fresher than Sheets; cold unchanged
 
 ### W3 — Offer pull PA
 
@@ -175,6 +175,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-10 | Cue feedback: `publishing…` while busy; Index refresh must not clobber newer stamp. |
 | 2026-08-10 | Filed **W5** warm editor autosave. W1 closed for sequencing. Next build: **W2** Tracker hybrid. |
 | 2026-08-10 | **W2** implemented: `dalWarmReaderOneShotOverlay_` in Tracker + Conflicts (cap 25, fail-open). |
+| 2026-08-10 | Shipped **GAS v772** — W2 Tracker/Conflicts warm hybrid. Next: director smoke, then **W3** Offer PA pull. |
+| 2026-08-11 | Smoke miss: Tracker lagged warm PA. Fix: prefer `assets/state` + paginate collection list. |
 
 ---
 
