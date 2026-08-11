@@ -162,6 +162,9 @@ window.peWarmAutosaveBusy_ = false;
 window.peWarmAutosavePending_ = false;
 window.peMiniCalDragging_ = false;
 window.peAutosaveCueState_ = '';      // '' | saving | saved | error
+window.peLeaveSavePayload_ = null;    // Cancel leave — send after in-flight settles
+window.peLeaveSaveQuiet_ = false;
+window.peLeaveSaveRetried_ = false;
 
 /** Paint OPEN TIMELINE / PROJECT ASSETS / END ROOM chrome from fork + presence flags (never disables click). */
 window.paintProjectEditorModuleBtns_ = function() {
@@ -421,11 +424,6 @@ window.stopDalCampaignCheckpointTimer_ = function() {
   if (window.peCheckpointTimer_) {
     try { clearInterval(window.peCheckpointTimer_); } catch (e) { /* ignore */ }
     window.peCheckpointTimer_ = null;
-window.peWarmAutosaveTimer_ = null;   // W5 — debounced warm identity/offer save
-window.peWarmAutosaveBusy_ = false;
-window.peWarmAutosavePending_ = false;
-window.peMiniCalDragging_ = false;
-window.peAutosaveCueState_ = '';      // '' | saving | saved | error
   }
 };
 
@@ -947,44 +945,83 @@ window.peScheduleWarmIdentityAutosave_ = function() {
   }, 800);
 };
 
-window.peFlushWarmIdentityAutosave_ = function(opts) {
+/** Send identity payload; queue behind in-flight. opts.quiet = Cancel leave (no alerts). */
+window.peSendIdentitySavePayload_ = function(payload, opts) {
   opts = opts || {};
-  if (!window.peCanIdentityAutosave_ || !window.peCanIdentityAutosave_()) return;
-  if (window.peMiniCalDragging_ && !opts.force) {
-    window.peScheduleWarmIdentityAutosave_();
-    return;
-  }
+  var quiet = !!opts.quiet;
+  if (!payload || !payload.projectData) return;
   if (window.peWarmAutosaveBusy_) {
-    window.peWarmAutosavePending_ = true;
+    if (quiet) {
+      window.peLeaveSavePayload_ = payload;
+      window.peLeaveSaveQuiet_ = true;
+    } else {
+      window.peWarmAutosavePending_ = true;
+    }
     return;
   }
-  if (!window.isProjectDirty && !window.peWarmAutosavePending_ && !opts.force) return;
-
-  var payload = window.peGatherIdentitySavePayload_();
-  if (!payload) return;
   if (typeof window.guardDatabaseBackupLock === 'function' &&
-      window.guardDatabaseBackupLock('project autosave')) return;
+      window.guardDatabaseBackupLock(quiet ? 'project leave save' : 'project autosave')) return;
 
   window.peWarmAutosaveBusy_ = true;
   window.peWarmAutosavePending_ = false;
-  window.pePaintAutosaveCue_('saving');
+  if (!quiet) window.pePaintAutosaveCue_('saving');
 
   var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
     ? ACTIVE_USER_NAME
     : 'System UI';
+  var sent = payload;
 
   google.script.run
     .withFailureHandler(function(err) {
       window.peWarmAutosaveBusy_ = false;
       var msg = (err && err.message) ? err.message : String(err || 'Save failed');
+      if (quiet || window.peLeaveSaveQuiet_) {
+        // Cancel leave: one retry with a fresh stamp avoids in-flight race COLLISION.
+        if (!window.peLeaveSaveRetried_ && sent && sent.projectData) {
+          window.peLeaveSaveRetried_ = true;
+          sent.projectData.Last_Updated = new Date().toISOString();
+          window.peSendIdentitySavePayload_(sent, { quiet: true });
+          return;
+        }
+        window.peLeaveSaveQuiet_ = false;
+        if (window.peLeaveSavePayload_) {
+          var leaveFail = window.peLeaveSavePayload_;
+          window.peLeaveSavePayload_ = null;
+          window.peLeaveSaveRetried_ = false;
+          window.peSendIdentitySavePayload_(leaveFail, { quiet: true });
+        }
+        return;
+      }
       window.pePaintAutosaveCue_('error', 'Save failed');
       if (typeof showToast === 'function') showToast('Autosave failed: ' + msg);
       else alert('Autosave failed: ' + msg);
       window.peSyncSaveBtnChrome_();
+      if (window.peLeaveSavePayload_) {
+        var leave = window.peLeaveSavePayload_;
+        window.peLeaveSavePayload_ = null;
+        window.peLeaveSaveRetried_ = false;
+        window.peSendIdentitySavePayload_(leave, { quiet: true });
+      }
     })
     .withSuccessHandler(function(res) {
       window.peWarmAutosaveBusy_ = false;
       if (res && res.toString().startsWith('Error')) {
+        if (quiet || window.peLeaveSaveQuiet_) {
+          if (!window.peLeaveSaveRetried_ && sent && sent.projectData) {
+            window.peLeaveSaveRetried_ = true;
+            sent.projectData.Last_Updated = new Date().toISOString();
+            window.peSendIdentitySavePayload_(sent, { quiet: true });
+            return;
+          }
+          window.peLeaveSaveQuiet_ = false;
+          if (window.peLeaveSavePayload_) {
+            var leaveErr = window.peLeaveSavePayload_;
+            window.peLeaveSavePayload_ = null;
+            window.peLeaveSaveRetried_ = false;
+            window.peSendIdentitySavePayload_(leaveErr, { quiet: true });
+          }
+          return;
+        }
         window.pePaintAutosaveCue_('error', 'Save failed');
         if (typeof showToast === 'function') showToast(String(res));
         else alert(String(res));
@@ -998,19 +1035,58 @@ window.peFlushWarmIdentityAutosave_ = function(opts) {
       if (resObj.timestamp) {
         var verEl = document.getElementById('edit-proj-version');
         if (verEl) verEl.value = resObj.timestamp;
+        if (window.peLeaveSavePayload_ && window.peLeaveSavePayload_.projectData) {
+          window.peLeaveSavePayload_.projectData.Last_Updated = resObj.timestamp;
+        }
       }
-      window.isProjectDirty = false;
-      window.pePaintAutosaveCue_('saved');
-      window.peSyncSaveBtnChrome_();
+      if (!quiet) {
+        window.isProjectDirty = false;
+        window.pePaintAutosaveCue_('saved');
+        window.peSyncSaveBtnChrome_();
+      }
+      window.peLeaveSaveQuiet_ = false;
+      if (window.peLeaveSavePayload_) {
+        var leave2 = window.peLeaveSavePayload_;
+        window.peLeaveSavePayload_ = null;
+        window.peLeaveSaveRetried_ = false;
+        window.peSendIdentitySavePayload_(leave2, { quiet: true });
+        return;
+      }
       if (window.peWarmAutosavePending_) {
         window.peScheduleWarmIdentityAutosave_();
-      } else {
+      } else if (!quiet) {
         setTimeout(function() {
           if (window.peAutosaveCueState_ === 'saved') window.pePaintAutosaveCue_('');
         }, 2500);
       }
     })
     .saveEventFromUI(payload.projectData, payload.timelines, actor);
+};
+
+window.peFlushWarmIdentityAutosave_ = function(opts) {
+  opts = opts || {};
+  if (!window.peCanIdentityAutosave_ || !window.peCanIdentityAutosave_()) return;
+  if (window.peMiniCalDragging_ && !opts.force) {
+    window.peScheduleWarmIdentityAutosave_();
+    return;
+  }
+  if (window.peWarmAutosaveBusy_) {
+    if (opts.quiet) {
+      var leavePayload = window.peGatherIdentitySavePayload_();
+      if (leavePayload) {
+        window.peLeaveSavePayload_ = leavePayload;
+        window.peLeaveSaveQuiet_ = true;
+      }
+    } else {
+      window.peWarmAutosavePending_ = true;
+    }
+    return;
+  }
+  if (!window.isProjectDirty && !window.peWarmAutosavePending_ && !opts.force) return;
+
+  var payload = window.peGatherIdentitySavePayload_();
+  if (!payload) return;
+  window.peSendIdentitySavePayload_(payload, { quiet: !!opts.quiet });
 };
 
 // @INDEX: PROJECT_CRUD -> Schedule Save & Sync
@@ -1280,10 +1356,16 @@ window.cancelProjectEditor = function() {
     var canAuto = typeof window.peCanIdentityAutosave_ === 'function' && window.peCanIdentityAutosave_();
     var needsFlush = !!(window.isProjectDirty || window.peWarmAutosavePending_ || window.peWarmAutosaveBusy_);
     if (canAuto && needsFlush) {
-      // Autosave owns persistence — flush quietly and leave (do not show discard confirm).
-      try { window.peFlushWarmIdentityAutosave_({ force: true }); } catch (eF) { /* ignore */ }
+      // Gather BEFORE clearing editor fields; queue behind any in-flight autosave (quiet — no collision alerts).
+      var leavePayload = null;
+      try { leavePayload = window.peGatherIdentitySavePayload_(); } catch (eG) { leavePayload = null; }
       window.isProjectDirty = false;
       window.peWarmAutosavePending_ = false;
+      window.peLeaveSaveQuiet_ = true; // silence in-flight autosave collision alerts while leaving
+      window.peLeaveSaveRetried_ = false;
+      if (leavePayload && typeof window.peSendIdentitySavePayload_ === 'function') {
+        window.peSendIdentitySavePayload_(leavePayload, { quiet: true });
+      }
     } else if (window.isProjectDirty) {
         // NEW create (or briefing) — still warn before discarding.
         if (!confirm("⚠️ You have unsaved event changes. Are you sure you want to discard them and leave?")) {
