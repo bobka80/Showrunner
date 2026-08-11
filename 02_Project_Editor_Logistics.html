@@ -619,7 +619,11 @@ window.executeLogisticsHub = function() {
                 if (btn) { btn.innerText = origText; btn.disabled = false; }
                 document.getElementById('logistics-hub-modal-overlay').style.display = 'none';
                 if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
-                if (typeof runSchedule === 'function') runSchedule();
+                if (typeof window.peQuietFlushIdentityForNav_ === 'function' && window.peQuietFlushIdentityForNav_()) {
+                    // quiet — avoid Save & Sync collision after GENERATE bumped stamps
+                } else if (typeof runSchedule === 'function') {
+                    runSchedule();
+                }
                 if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
             }, 1500);
         })
@@ -1067,7 +1071,16 @@ window.revertAutoArrange = function(leg) {
     
     if (!window.currentReadinessState) window.currentReadinessState = {};
     window.currentReadinessState.truck = 'assigned';
-    google.script.run.updateProjectReadiness(projectId, JSON.stringify(window.currentReadinessState), typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+    if (typeof window.peCanIdentityAutosave_ === 'function' && window.peCanIdentityAutosave_()) {
+        window.isProjectDirty = true;
+        if (typeof window.peFlushWarmIdentityAutosave_ === 'function') {
+            window.peFlushWarmIdentityAutosave_({ force: true, quiet: true });
+        } else if (typeof window.peScheduleWarmIdentityAutosave_ === 'function') {
+            window.peScheduleWarmIdentityAutosave_();
+        }
+    } else {
+        google.script.run.updateProjectReadiness(projectId, JSON.stringify(window.currentReadinessState), typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+    }
     if (typeof calendar !== 'undefined' && calendar) {
         let ev = calendar.getEventById(projectId);
         if (ev) { let raw = ev.extendedProps.rawDbData; raw.readinessState = window.currentReadinessState; ev.setExtendedProp('rawDbData', raw); calendar.render(); }

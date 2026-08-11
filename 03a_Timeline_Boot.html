@@ -463,10 +463,14 @@ function launchMasterTimeline() {
         || (typeof isMobileViewport === 'function' && isMobileViewport());
 
     if (window.isProjectDirty && !forceReadOnly) {
-        if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {
-            if (typeof runSchedule === 'function') runSchedule();
+        if (typeof window.peQuietFlushIdentityForNav_ === 'function' && window.peQuietFlushIdentityForNav_()) {
+            // Autosave projects: quiet flush, then open Timeline.
+        } else {
+            if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {
+                if (typeof runSchedule === 'function') runSchedule();
+            }
+            return;
         }
-        return;
     }
 
     // 2. If it is an official, saved project, hide the modal safely
@@ -679,9 +683,18 @@ function saveAndCloseShifts() {
     saveBtn.disabled = true;
   }
   
-  // Asynchronously push readiness status 
+  // Push readiness with identity autosave (immediate flush — leave Timeline may close editor chrome).
   if (!quietFlush) {
-    google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState), ACTIVE_USER_NAME);
+    if (typeof window.peCanIdentityAutosave_ === 'function' && window.peCanIdentityAutosave_()) {
+      window.isProjectDirty = true;
+      if (typeof window.peFlushWarmIdentityAutosave_ === 'function') {
+        window.peFlushWarmIdentityAutosave_({ force: true, quiet: true });
+      } else if (typeof window.peScheduleWarmIdentityAutosave_ === 'function') {
+        window.peScheduleWarmIdentityAutosave_();
+      }
+    } else {
+      google.script.run.updateProjectReadiness(targetFolderId, JSON.stringify(window.currentReadinessState), ACTIVE_USER_NAME);
+    }
   }
   
   google.script.run

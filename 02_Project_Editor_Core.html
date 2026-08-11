@@ -899,7 +899,8 @@ window.peGatherIdentitySavePayload_ = function() {
     Location_URL: locEl ? locEl.value : '',
     Last_Updated: verEl ? verEl.value : '',
     Difficulty_Multiplier: multEl ? parseFloat(multEl.value) : 1.0,
-    Readiness_State: JSON.stringify(activeState)
+    Readiness_State: JSON.stringify(activeState),
+    _gatheredAt: new Date().toISOString()
   };
 
   var timelines = [];
@@ -1087,6 +1088,30 @@ window.peFlushWarmIdentityAutosave_ = function(opts) {
   var payload = window.peGatherIdentitySavePayload_();
   if (!payload) return;
   window.peSendIdentitySavePayload_(payload, { quiet: !!opts.quiet });
+};
+
+/**
+ * Quiet gather+flush for Cancel / open PA / Timeline / Logistics post-save.
+ * Returns true when autosave handled dirty (caller may proceed without runSchedule).
+ * Returns false when caller should use the legacy confirm + runSchedule path (NEW / briefing).
+ */
+window.peQuietFlushIdentityForNav_ = function() {
+  if (!window.peCanIdentityAutosave_ || !window.peCanIdentityAutosave_()) return false;
+  if (!(window.isProjectDirty || window.peWarmAutosavePending_ || window.peWarmAutosaveBusy_)) return true;
+  if (window.peWarmAutosaveTimer_) {
+    try { clearTimeout(window.peWarmAutosaveTimer_); } catch (eT) { /* ignore */ }
+    window.peWarmAutosaveTimer_ = null;
+  }
+  var payload = null;
+  try { payload = window.peGatherIdentitySavePayload_(); } catch (eG) { payload = null; }
+  window.isProjectDirty = false;
+  window.peWarmAutosavePending_ = false;
+  window.peLeaveSaveQuiet_ = true;
+  window.peLeaveSaveRetried_ = false;
+  if (payload && typeof window.peSendIdentitySavePayload_ === 'function') {
+    window.peSendIdentitySavePayload_(payload, { quiet: true });
+  }
+  return true;
 };
 
 // @INDEX: PROJECT_CRUD -> Schedule Save & Sync
@@ -1349,23 +1374,10 @@ function openUnscheduledModal(pId, title, fullTitle) {
 }
 
 window.cancelProjectEditor = function() {
-    if (window.peWarmAutosaveTimer_) {
-      try { clearTimeout(window.peWarmAutosaveTimer_); } catch (eT) { /* ignore */ }
-      window.peWarmAutosaveTimer_ = null;
-    }
     var canAuto = typeof window.peCanIdentityAutosave_ === 'function' && window.peCanIdentityAutosave_();
     var needsFlush = !!(window.isProjectDirty || window.peWarmAutosavePending_ || window.peWarmAutosaveBusy_);
-    if (canAuto && needsFlush) {
-      // Gather BEFORE clearing editor fields; queue behind any in-flight autosave (quiet — no collision alerts).
-      var leavePayload = null;
-      try { leavePayload = window.peGatherIdentitySavePayload_(); } catch (eG) { leavePayload = null; }
-      window.isProjectDirty = false;
-      window.peWarmAutosavePending_ = false;
-      window.peLeaveSaveQuiet_ = true; // silence in-flight autosave collision alerts while leaving
-      window.peLeaveSaveRetried_ = false;
-      if (leavePayload && typeof window.peSendIdentitySavePayload_ === 'function') {
-        window.peSendIdentitySavePayload_(leavePayload, { quiet: true });
-      }
+    if (canAuto && needsFlush && typeof window.peQuietFlushIdentityForNav_ === 'function') {
+      window.peQuietFlushIdentityForNav_();
     } else if (window.isProjectDirty) {
         // NEW create (or briefing) — still warn before discarding.
         if (!confirm("⚠️ You have unsaved event changes. Are you sure you want to discard them and leave?")) {

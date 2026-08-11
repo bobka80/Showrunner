@@ -293,10 +293,14 @@ function openProjectAssetsModal() {
     window.projectAssetsReadOnly = assetsReadOnly;
     
     if (window.isProjectDirty && !assetsReadOnly) {
-        if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {
-            if (typeof runSchedule === 'function') runSchedule();
+        if (typeof window.peQuietFlushIdentityForNav_ === 'function' && window.peQuietFlushIdentityForNav_()) {
+            // Autosave projects: quiet flush, then open (no Save & Sync collision alert).
+        } else {
+            if (confirm("⚠️ You have unsaved changes in the Project Editor. Would you like to save them now?")) {
+                if (typeof runSchedule === 'function') runSchedule();
+            }
+            return;
         }
-        return;
     }
 
     // Open the window immediately. Orphan reclaim still runs before soft-join / auto-prep

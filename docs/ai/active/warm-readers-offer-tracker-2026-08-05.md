@@ -7,7 +7,7 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
 **Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W5** shipped; awaiting director smoke → **W6**.  
-**Production tip:** see RELEASES.md (**GAS v778** W5). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
+**Production tip:** see RELEASES.md (**GAS v781** Cancel collision). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
 
@@ -193,7 +193,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | **W5 @ GAS v778** — warm debounced autosave (identity + mini-cal + readiness/Offer); Save & Sync only NEW/cold; `updateProjectReadiness` warm → Firebase meta. |
 | 2026-08-11 | Save chrome: button + autosave cue hidden except **NEW** (empty calendar create); deeper entry gated until first Save. |
 | 2026-08-11 | Fix: Cancel on saved project no longer false-warns after mini-cal edit — flush autosave quietly; identity autosave for all non-NEW. |
-| 2026-08-11 | Fix: Cancel after edit no longer shows COLLISION refresh alert — gather-before-clear, queue behind in-flight, quiet handlers + stamp handoff. |
+| 2026-08-11 | Fix: Cancel after edit no longer shows COLLISION refresh alert — gather-before-clear, queue behind in-flight, quiet handlers + stamp handoff. **@ GAS v781**. |
+| 2026-08-11 | Fix: nested editor views (Offer/PA/Timeline/Logistics) — readiness no longer poisons identity stamp; quiet nav flush on open/Cancel/GENERATE. |
 
 ---
 

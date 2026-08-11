@@ -592,6 +592,18 @@ function dalSaveProjectIdentityWarm_(projectData, timelinesArray, actor) {
     readinessJson = JSON.stringify(readinessJson);
   }
   if (!readinessJson) readinessJson = cur.readinessJson || '{}';
+  // Prefer server readiness when a readiness-only write landed after this client gather.
+  try {
+    var gatheredAt = projectData._gatheredAt || '';
+    var readyAt = cur.readinessUpdatedAt || '';
+    if (readyAt && gatheredAt) {
+      var tReady = new Date(readyAt).getTime();
+      var tGather = new Date(gatheredAt).getTime();
+      if (!isNaN(tReady) && !isNaN(tGather) && tReady > tGather && cur.readinessJson) {
+        readinessJson = cur.readinessJson;
+      }
+    }
+  } catch (eReady) { /* keep client readiness */ }
 
   var patch = {
     roomUid: cur.roomUid || '',
@@ -612,6 +624,7 @@ function dalSaveProjectIdentityWarm_(projectData, timelinesArray, actor) {
     folderId: projectData.Folder_ID || cur.folderId || '',
     managerEmail: projectData.Manager_Email || cur.managerEmail || '',
     readinessJson: readinessJson,
+    readinessUpdatedAt: now,
     subEventsJson: JSON.stringify(frags),
     identityWriteSeq: seq,
     identityUpdatedAt: now,

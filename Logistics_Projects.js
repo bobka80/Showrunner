@@ -518,12 +518,14 @@ function updateProjectReadiness(projectId, stateStr, actor = "System UI") {
           typeof firestoreSetCampaignMeta_ === 'function') {
         var cur = firestoreGetCampaignMeta_(projectId) || {};
         var now = new Date().toISOString();
-        var seq = (Number(cur.identityWriteSeq) || 0) + 1;
         var readinessJson = stateStr;
         if (readinessJson && typeof readinessJson !== 'string') {
           readinessJson = JSON.stringify(readinessJson);
         }
         if (!readinessJson) readinessJson = cur.readinessJson || '{}';
+        // Do NOT advance identityUpdatedAt / identityWriteSeq — readiness-only writes must
+        // not poison editor Last_Updated collision checks (Offer / Timeline / Logistics).
+        // Stamp readinessUpdatedAt so identity saves can prefer newer server readiness.
         firestoreSetCampaignMeta_(projectId, {
           roomUid: cur.roomUid || '',
           status: cur.status || 'open',
@@ -541,10 +543,11 @@ function updateProjectReadiness(projectId, stateStr, actor = "System UI") {
           folderId: cur.folderId || '',
           managerEmail: cur.managerEmail || '',
           readinessJson: readinessJson,
+          readinessUpdatedAt: now,
           subEventsJson: cur.subEventsJson || '[]',
-          identityWriteSeq: seq,
-          identityUpdatedAt: now,
-          identityUpdatedBy: actor || 'System'
+          identityWriteSeq: Number(cur.identityWriteSeq) || 0,
+          identityUpdatedAt: cur.identityUpdatedAt || '',
+          identityUpdatedBy: cur.identityUpdatedBy || actor || 'System'
         });
         try {
           var sheetsWarm = verifyDatabaseSchema();
