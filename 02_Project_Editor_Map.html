@@ -133,6 +133,7 @@ window.calculateDistanceAndZone = async function(lat, lng) {
     inSofiaCheckbox.checked = inSofia;
     if (zoneHidden) zoneHidden.value = zone;
     window.isProjectDirty = true;
+    if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
     
     if (inSofia) {
         distanceInput.value = '';
@@ -247,7 +248,8 @@ window.saveLocationModal = function() {
     if (mainInput.value !== val) {
         mainInput.value = val;
         mainInput.title = val;
-        window.isProjectDirty = true;
+        if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
+        else window.isProjectDirty = true;
     }
     window.closeLocationModal();
     if (typeof updateLocationRegionLabel === 'function') updateLocationRegionLabel();

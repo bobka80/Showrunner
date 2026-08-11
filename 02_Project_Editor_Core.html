@@ -35,10 +35,10 @@
     <input type="hidden" id="edit-proj-type" value="Event">
     
     <div class="pe-editor-toolbar-row">
-      <input type="text" id="edit-proj-name" placeholder="Title" oninput="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; box-sizing: border-box;">
+      <input type="text" id="edit-proj-name" placeholder="Title" oninput="peMarkIdentityDirty_()" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; box-sizing: border-box;">
       
       <div class="pe-mgr-only" style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
-          <input list="edit-proj-client-list" id="edit-proj-client" placeholder="Select Client..." oninput="window.isProjectDirty=true" onchange="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:6px; box-sizing: border-box;">
+          <input list="edit-proj-client-list" id="edit-proj-client" placeholder="Select Client..." oninput="peMarkIdentityDirty_()" onchange="peMarkIdentityDirty_()" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:6px; box-sizing: border-box;">
           <datalist id="edit-proj-client-list"></datalist>
           <button class="btn-outline" style="width:auto; margin:0; padding: 0 10px; height: 42px; box-sizing: border-box; flex-shrink: 0;" onclick="openClientModal()" title="New Client">+ NEW CLIENT</button>
       </div>
@@ -46,10 +46,10 @@
       <div class="pe-location-col">
           <div id="pe-location-region-label" class="pe-location-region-label">IN SOFIA</div>
           <div class="pe-location-row">
-              <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="window.isProjectDirty=true" title="">
+              <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="peMarkIdentityDirty_()" title="">
               <button type="button" class="btn-outline pe-mgr-only pe-location-pin-btn" onclick="window.openLocationMap()" title="Set location on map">📍</button>
               <div id="edit-proj-distance-container" class="pe-distance-inline">
-                  <input type="number" id="edit-proj-distance" placeholder="km" title="Driving distance from warehouse (km)" oninput="window.isProjectDirty=true">
+                  <input type="number" id="edit-proj-distance" placeholder="km" title="Driving distance from warehouse (km)" oninput="peMarkIdentityDirty_()">
               </div>
           </div>
       </div>
@@ -65,14 +65,14 @@
               <div id="weather-widget-detail" class="weather-widget-detail"></div>
           </div>
           <label class="crew-cb-container weather-outdoor-label">
-             <input type="checkbox" id="edit-proj-outdoor" class="crew-cb" onchange="window.isProjectDirty=true; if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();" style="margin-right: 8px;">
+             <input type="checkbox" id="edit-proj-outdoor" class="crew-cb" onchange="peMarkIdentityDirty_(); if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();" style="margin-right: 8px;">
              <span style="color:#fff; font-size:11px; font-weight:bold; white-space:nowrap; margin-top: 1px;">OUTDOOR</span>
           </label>
       </div>
       
       <div class="pe-mgr-only pe-multiplier-col">
           <div class="input-label pe-multiplier-label">DIFF. MULT</div>
-          <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="window.isProjectDirty=true">
+          <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="peMarkIdentityDirty_()">
       </div>
       
       <div id="pe-event-meta-right" style="position:absolute; right:0; top:0; display:flex; gap:5px; align-items:center; flex-shrink:0; height:42px;">
@@ -122,6 +122,7 @@
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
          
          <button class="btn-close" style="margin: 0; width:auto;" onclick="cancelProjectEditor()">CANCEL</button>
+         <span id="pe-autosave-cue" class="pe-mgr-only" style="display:none; color:#a1a1aa; font-size:11px; font-weight:700; letter-spacing:0.04em; min-width:72px; text-align:right;" title="Warm room autosaves identity, mini-cal, and Offer"></span>
          <button id="update-btn" class="btn-main pe-mgr-only" style="margin: 0; width:auto;" onclick="runSchedule()">SAVE & SYNC CALENDAR</button>
       </div>
     </div>
@@ -156,6 +157,11 @@ window.peCheckpointFailAt_ = '';
 window.peCheckpointEscalate_ = false;
 window.peCheckpointBusy_ = false;
 window.peCheckpointTimer_ = null;
+window.peWarmAutosaveTimer_ = null;   // W5 — debounced warm identity/offer save
+window.peWarmAutosaveBusy_ = false;
+window.peWarmAutosavePending_ = false;
+window.peMiniCalDragging_ = false;
+window.peAutosaveCueState_ = '';      // '' | saving | saved | error
 
 /** Paint OPEN TIMELINE / PROJECT ASSETS / END ROOM chrome from fork + presence flags (never disables click). */
 window.paintProjectEditorModuleBtns_ = function() {
@@ -220,6 +226,9 @@ window.paintProjectEditorModuleBtns_ = function() {
 
   if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') {
     window.dalPaintCampaignEndBtnLabels_();
+  }
+  if (typeof window.peSyncSaveBtnChrome_ === 'function') {
+    window.peSyncSaveBtnChrome_();
   }
 };
 
@@ -412,6 +421,11 @@ window.stopDalCampaignCheckpointTimer_ = function() {
   if (window.peCheckpointTimer_) {
     try { clearInterval(window.peCheckpointTimer_); } catch (e) { /* ignore */ }
     window.peCheckpointTimer_ = null;
+window.peWarmAutosaveTimer_ = null;   // W5 — debounced warm identity/offer save
+window.peWarmAutosaveBusy_ = false;
+window.peWarmAutosavePending_ = false;
+window.peMiniCalDragging_ = false;
+window.peAutosaveCueState_ = '';      // '' | saving | saved | error
   }
 };
 
@@ -485,6 +499,7 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
       }
       if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
       if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') window.dalPaintCampaignEndBtnLabels_();
+      if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
     })
     .getDalSessionInfo(projectId);
 };
@@ -519,6 +534,7 @@ window.openOrJoinDalCampaignRoom_ = function(projectId) {
       if (typeof window.refreshCalForkFlagsNow_ === 'function') {
         try { window.refreshCalForkFlagsNow_(); } catch (eCal) { /* ignore */ }
       }
+      if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
     })
     .openOrJoinDalCampaignRoom(projectId, actor);
 };
@@ -731,6 +747,230 @@ window.toggleDistanceInput = function() {
     window.applyProjectDistanceFieldVisibility();
 };
 
+
+// ==========================================
+// --- W5 WARM IDENTITY / OFFER AUTOSAVE ---
+// ==========================================
+window.peIsWarmEditorAutosave_ = function() {
+  var folderEl = document.getElementById('edit-folder-id');
+  var id = folderEl ? folderEl.value : '';
+  if (!id || id === 'NEW') return false;
+  if (typeof isBriefingMode === 'function' && isBriefingMode(id)) return false;
+  if (window.peForkRoomActive_) return true;
+  return !!(typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_());
+};
+
+window.peMarkIdentityDirty_ = function() {
+  window.isProjectDirty = true;
+  if (typeof window.peScheduleWarmIdentityAutosave_ === 'function') {
+    window.peScheduleWarmIdentityAutosave_();
+  }
+};
+
+window.pePaintAutosaveCue_ = function(state, detail) {
+  window.peAutosaveCueState_ = state || '';
+  var cue = document.getElementById('pe-autosave-cue');
+  if (!cue) return;
+  if (!window.peIsWarmEditorAutosave_()) {
+    cue.style.display = 'none';
+    cue.textContent = '';
+    return;
+  }
+  cue.style.display = 'inline';
+  if (state === 'saving') {
+    cue.style.color = '#f59e0b';
+    cue.textContent = 'Saving…';
+  } else if (state === 'error') {
+    cue.style.color = '#ef4444';
+    cue.textContent = detail || 'Save failed';
+  } else if (state === 'saved') {
+    cue.style.color = '#10b981';
+    cue.textContent = 'Saved';
+  } else {
+    cue.style.color = '#a1a1aa';
+    cue.textContent = 'Auto-save on';
+  }
+};
+
+window.peSyncSaveBtnChrome_ = function() {
+  var btn = document.getElementById('update-btn');
+  var warm = window.peIsWarmEditorAutosave_();
+  if (btn) {
+    if (warm) {
+      btn.style.display = 'none';
+      btn.disabled = true;
+    } else {
+      btn.style.display = '';
+      if (!window.peWarmAutosaveBusy_) btn.disabled = false;
+      if (btn.innerText !== 'SAVING...' && btn.innerText !== 'SAVED') {
+        btn.innerText = 'SAVE & SYNC CALENDAR';
+      }
+    }
+  }
+  if (!window.peWarmAutosaveBusy_ && window.peAutosaveCueState_ !== 'error') {
+    window.pePaintAutosaveCue_(warm ? (window.peAutosaveCueState_ === 'saved' ? 'saved' : '') : '');
+  } else if (warm) {
+    window.pePaintAutosaveCue_(window.peAutosaveCueState_ || '');
+  } else {
+    window.pePaintAutosaveCue_('');
+  }
+};
+
+/** Gather the same payload as explicit Save & Sync. Returns null if not saveable. */
+window.peGatherIdentitySavePayload_ = function() {
+  var folderEl = document.getElementById('edit-folder-id');
+  var id = folderEl ? folderEl.value : '';
+  var nameEl = document.getElementById('edit-proj-name');
+  var newT = nameEl ? String(nameEl.value || '').trim() : '';
+  if (!newT) return null;
+  if (typeof miniCalendar === 'undefined' || !miniCalendar) return null;
+  var paintedEvents = miniCalendar.getEvents();
+  if (!paintedEvents || paintedEvents.length === 0) return null;
+
+  var activeState = window.currentReadinessState || {};
+  var outdoorEl = document.getElementById('edit-proj-outdoor');
+  var sofiaEl = document.getElementById('edit-proj-in-sofia');
+  var zoneEl = document.getElementById('edit-proj-region-zone');
+  var distEl = document.getElementById('edit-proj-distance');
+  var latEl = document.getElementById('edit-proj-lat');
+  var lngEl = document.getElementById('edit-proj-lng');
+  if (outdoorEl) activeState.isOutdoor = outdoorEl.checked;
+  if (sofiaEl) activeState.inSofia = sofiaEl.checked;
+  activeState.regionZone = zoneEl ? zoneEl.value : (activeState.inSofia ? 'sofia' : 'outside_sofia');
+  activeState.distanceKm = distEl ? (parseFloat(distEl.value) || 0) : 0;
+  var lat = latEl ? latEl.value : '';
+  var lng = lngEl ? lngEl.value : '';
+  if (lat && lng) activeState.coords = { lat: lat, lng: lng };
+  window.currentReadinessState = activeState;
+
+  var statusEl = document.getElementById('display-event-status');
+  var typeEl = document.getElementById('edit-proj-type');
+  var clientEl = document.getElementById('edit-proj-client');
+  var locEl = document.getElementById('edit-proj-location');
+  var verEl = document.getElementById('edit-proj-version');
+  var multEl = document.getElementById('edit-proj-multiplier');
+
+  var projectData = {
+    Project_ID: (id === 'NEW') ? '' : id,
+    Project_Name: newT,
+    Status: statusEl ? statusEl.innerText : 'Draft',
+    Type: typeEl ? typeEl.value : 'Event',
+    Client: clientEl ? clientEl.value : '',
+    Location_URL: locEl ? locEl.value : '',
+    Last_Updated: verEl ? verEl.value : '',
+    Difficulty_Multiplier: multEl ? parseFloat(multEl.value) : 1.0,
+    Readiness_State: JSON.stringify(activeState)
+  };
+
+  var timelines = [];
+  var phaseMap = { wh: 'WAREHOUSE', main: 'MAIN_EVENT', show: 'SHOW_DAY', recovery: 'RECOVERY', transit: 'TRANSIT' };
+  paintedEvents.forEach(function(ev) {
+    var phaseCode = ev.extendedProps.phaseType;
+    var note = ev.extendedProps.note || '';
+    var sTime = ev.extendedProps.startTime || '';
+    var eTime = ev.extendedProps.endTime || '';
+    var backendType = phaseMap[phaseCode] || phaseCode;
+    if (!backendType) return;
+    var startD = ev.start;
+    var endD = ev.end ? ev.end : new Date(startD.getTime() + 86400000);
+    if (endD <= startD) endD = new Date(startD.getTime() + 86400000);
+    var currentD = new Date(startD);
+    while (currentD < endD) {
+      var isoDay = currentD.getFullYear() + '-' +
+        String(currentD.getMonth() + 1).padStart(2, '0') + '-' +
+        String(currentD.getDate()).padStart(2, '0');
+      timelines.push({
+        uid: (ev.extendedProps.uidsByDate && ev.extendedProps.uidsByDate[isoDay]) || ev.extendedProps.uid || '',
+        Sub_Event_Type: backendType,
+        Event_Date: isoDay,
+        Start_Time: sTime,
+        End_Time: eTime,
+        Note: note
+      });
+      currentD.setDate(currentD.getDate() + 1);
+    }
+  });
+  return { projectData: projectData, timelines: timelines, id: id, newT: newT };
+};
+
+window.peScheduleWarmIdentityAutosave_ = function() {
+  if (!window.peIsWarmEditorAutosave_()) return;
+  window.peWarmAutosavePending_ = true;
+  if (window.peWarmAutosaveTimer_) {
+    try { clearTimeout(window.peWarmAutosaveTimer_); } catch (eT) { /* ignore */ }
+  }
+  window.peWarmAutosaveTimer_ = setTimeout(function() {
+    window.peWarmAutosaveTimer_ = null;
+    window.peFlushWarmIdentityAutosave_();
+  }, 800);
+};
+
+window.peFlushWarmIdentityAutosave_ = function(opts) {
+  opts = opts || {};
+  if (!window.peIsWarmEditorAutosave_()) return;
+  if (window.peMiniCalDragging_ && !opts.force) {
+    window.peScheduleWarmIdentityAutosave_();
+    return;
+  }
+  if (window.peWarmAutosaveBusy_) {
+    window.peWarmAutosavePending_ = true;
+    return;
+  }
+  if (!window.isProjectDirty && !window.peWarmAutosavePending_ && !opts.force) return;
+
+  var payload = window.peGatherIdentitySavePayload_();
+  if (!payload) return;
+  if (typeof window.guardDatabaseBackupLock === 'function' &&
+      window.guardDatabaseBackupLock('project autosave')) return;
+
+  window.peWarmAutosaveBusy_ = true;
+  window.peWarmAutosavePending_ = false;
+  window.pePaintAutosaveCue_('saving');
+
+  var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? ACTIVE_USER_NAME
+    : 'System UI';
+
+  google.script.run
+    .withFailureHandler(function(err) {
+      window.peWarmAutosaveBusy_ = false;
+      var msg = (err && err.message) ? err.message : String(err || 'Save failed');
+      window.pePaintAutosaveCue_('error', 'Save failed');
+      if (typeof showToast === 'function') showToast('Autosave failed: ' + msg);
+      else alert('Autosave failed: ' + msg);
+      window.peSyncSaveBtnChrome_();
+    })
+    .withSuccessHandler(function(res) {
+      window.peWarmAutosaveBusy_ = false;
+      if (res && res.toString().startsWith('Error')) {
+        window.pePaintAutosaveCue_('error', 'Save failed');
+        if (typeof showToast === 'function') showToast(String(res));
+        else alert(String(res));
+        window.peSyncSaveBtnChrome_();
+        return;
+      }
+      var resObj = { id: res };
+      try {
+        if (typeof res === 'string' && res.charAt(0) === '{') resObj = JSON.parse(res);
+      } catch (eP) { /* keep */ }
+      if (resObj.timestamp) {
+        var verEl = document.getElementById('edit-proj-version');
+        if (verEl) verEl.value = resObj.timestamp;
+      }
+      window.isProjectDirty = false;
+      window.pePaintAutosaveCue_('saved');
+      window.peSyncSaveBtnChrome_();
+      if (window.peWarmAutosavePending_) {
+        window.peScheduleWarmIdentityAutosave_();
+      } else {
+        setTimeout(function() {
+          if (window.peAutosaveCueState_ === 'saved') window.pePaintAutosaveCue_('');
+        }, 2500);
+      }
+    })
+    .saveEventFromUI(payload.projectData, payload.timelines, actor);
+};
+
 // @INDEX: PROJECT_CRUD -> Schedule Save & Sync
 function runSchedule() {
     const folderId = document.getElementById('edit-folder-id').value;
@@ -740,17 +980,22 @@ function runSchedule() {
     if (typeof canCreateOnCalendar === 'function' && folderId === 'NEW' && !canCreateOnCalendar()) {
         return alert('🛑 Permission Denied: You cannot create new events.');
     }
+    if (window.peIsWarmEditorAutosave_ && window.peIsWarmEditorAutosave_()) {
+        window.isProjectDirty = true;
+        window.peFlushWarmIdentityAutosave_({ force: true });
+        return;
+    }
     const btn = document.getElementById('update-btn'); 
     const id = folderId; 
-    const newT = document.getElementById('edit-proj-name').value; 
-    
-    if (!newT) return alert("⚠️ A Project Title is required!");
-    if (!miniCalendar) return alert("⚠️ The Calendar Engine is offline.");
-    
-    const paintedEvents = miniCalendar.getEvents();
-    if (paintedEvents.length === 0) {
+    const gathered = window.peGatherIdentitySavePayload_();
+    if (!gathered) {
+        if (!document.getElementById('edit-proj-name').value) return alert("⚠️ A Project Title is required!");
+        if (!miniCalendar) return alert("⚠️ The Calendar Engine is offline.");
         return alert("⚠️ You must paint at least one phase on the calendar before saving!");
     }
+    const newT = gathered.newT;
+    const projectData = gathered.projectData;
+    const timelines = gathered.timelines;
 
     if (window.guardDatabaseBackupLock && window.guardDatabaseBackupLock('project save')) return;
 
@@ -762,52 +1007,6 @@ function runSchedule() {
         btn.innerText = "SAVE & SYNC CALENDAR"; 
         alert("Network Timeout: The server took too long to respond. Please check your connection.");
     }, 20000);
-    
-    let activeState = window.currentReadinessState || {};
-    activeState.isOutdoor = document.getElementById('edit-proj-outdoor').checked;
-    activeState.inSofia = document.getElementById('edit-proj-in-sofia').checked;
-    const zoneEl = document.getElementById('edit-proj-region-zone');
-    activeState.regionZone = zoneEl ? zoneEl.value : (activeState.inSofia ? 'sofia' : 'outside_sofia');
-    activeState.distanceKm = parseFloat(document.getElementById('edit-proj-distance').value) || 0;
-    let lat = document.getElementById('edit-proj-lat').value; let lng = document.getElementById('edit-proj-lng').value;
-    if (lat && lng) activeState.coords = { lat: lat, lng: lng };
-
-    const projectData = {
-        Project_ID: (id === 'NEW') ? '' : id,
-        Project_Name: newT,
-        Status: document.getElementById('display-event-status').innerText,
-        Type: document.getElementById('edit-proj-type').value,
-        Client: document.getElementById('edit-proj-client') ? document.getElementById('edit-proj-client').value : '',
-        Location_URL: document.getElementById('edit-proj-location') ? document.getElementById('edit-proj-location').value : '',
-        Last_Updated: document.getElementById('edit-proj-version').value,
-        Difficulty_Multiplier: document.getElementById('edit-proj-multiplier') ? parseFloat(document.getElementById('edit-proj-multiplier').value) : 1.0,
-        Readiness_State: JSON.stringify(activeState)
-    };
-
-    const timelines = [];
-    const phaseMap = { 'wh': 'WAREHOUSE', 'main': 'MAIN_EVENT', 'show': 'SHOW_DAY', 'recovery': 'RECOVERY', 'transit': 'TRANSIT' };
-
-    paintedEvents.forEach(ev => {
-        let phaseCode = ev.extendedProps.phaseType;
-        let note = ev.extendedProps.note || '';
-        let sTime = ev.extendedProps.startTime || '';
-        let eTime = ev.extendedProps.endTime || '';
-        let backendType = phaseMap[phaseCode] || phaseCode;
-        if (!backendType) return; 
-        
-        let startD = ev.start;
-        let endD = ev.end ? ev.end : new Date(startD.getTime() + 86400000); 
-        if (endD <= startD) endD = new Date(startD.getTime() + 86400000);
-        
-        let currentD = new Date(startD);
-        while (currentD < endD) {
-            let isoDay = currentD.getFullYear() + "-" + 
-                         String(currentD.getMonth() + 1).padStart(2, '0') + "-" + 
-                         String(currentD.getDate()).padStart(2, '0');
-            timelines.push({ uid: (ev.extendedProps.uidsByDate && ev.extendedProps.uidsByDate[isoDay]) || ev.extendedProps.uid || '', Sub_Event_Type: backendType, Event_Date: isoDay, Start_Time: sTime, End_Time: eTime, Note: note });
-            currentD.setDate(currentD.getDate() + 1);
-        }
-    });
     
     google.script.run
         .withFailureHandler(err => { 
@@ -853,13 +1052,17 @@ function runSchedule() {
                     .generateProjectFolders(ACTIVE_USER_NAME, finalId, newT, timelines);
 
                 if (id === 'NEW' && typeof startPresencePing === 'function') startPresencePing(finalId);
+                if (id === 'NEW' && typeof window.openOrJoinDalCampaignRoom_ === 'function') {
+                    try { window.openOrJoinDalCampaignRoom_(finalId); } catch (eJoin) { /* ignore */ }
+                }
             }
             
             if (resObj.timestamp) {
                 document.getElementById('edit-proj-version').value = resObj.timestamp;
             }
 
-            refreshData(); 
+            refreshData();
+            if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
             
         }).saveEventFromUI(projectData, timelines, ACTIVE_USER_NAME); 
 }
@@ -897,7 +1100,7 @@ function toggleStatusMenu() {
 function setEventType(type) {
   if (typeof canEditEventType === 'function' && !canEditEventType()) return;
   if (typeof isCrossRentOnlyCreator === 'function' && isCrossRentOnlyCreator()) return;
-  window.isProjectDirty = true;
+  peMarkIdentityDirty_();
   document.getElementById('edit-proj-type').value = type;
   document.getElementById('display-event-type').innerText = type.toUpperCase();
   document.getElementById('type-dropdown').style.display = 'none';
@@ -1025,6 +1228,14 @@ function openUnscheduledModal(pId, title, fullTitle) {
 }
 
 window.cancelProjectEditor = function() {
+    if (window.peWarmAutosaveTimer_) {
+      try { clearTimeout(window.peWarmAutosaveTimer_); } catch (eT) { /* ignore */ }
+      window.peWarmAutosaveTimer_ = null;
+    }
+    if (typeof window.peIsWarmEditorAutosave_ === 'function' && window.peIsWarmEditorAutosave_() &&
+        (window.isProjectDirty || window.peWarmAutosavePending_)) {
+      try { window.peFlushWarmIdentityAutosave_({ force: true }); } catch (eF) { /* ignore */ }
+    }
     if (window.isProjectDirty) {
         if (!confirm("⚠️ You have unsaved event changes. Are you sure you want to discard them and leave?")) {
             return false;

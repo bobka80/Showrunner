@@ -129,17 +129,23 @@ function bootMiniCalendar(targetDateString, projectId, focusCue) {
             },
             
             eventDragStart: function(info) {
+                window.peMiniCalDragging_ = true;
                 closeEventMenu();
             },
             eventResizeStart: function(info) {
+                window.peMiniCalDragging_ = true;
                 closeEventMenu();
             },
             eventDrop: function(info) {
-                window.isProjectDirty = true;
+                window.peMiniCalDragging_ = false;
+                if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
+                else window.isProjectDirty = true;
                 closeEventMenu();
             },
             eventResize: function(info) {
-                window.isProjectDirty = true;
+                window.peMiniCalDragging_ = false;
+                if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
+                else window.isProjectDirty = true;
                 closeEventMenu();
             }
             
@@ -240,7 +246,8 @@ window.applyMiniPhaseMenuVisibility = function() {
 };
 
 window.updateEventTime = function(type, val) {
-    window.isProjectDirty = true;
+    if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
+    else window.isProjectDirty = true;
     if (!currentEditingEvent) return;
     if (type === 'start') currentEditingEvent.setExtendedProp('startTime', val);
     if (type === 'end') currentEditingEvent.setExtendedProp('endTime', val);
@@ -253,7 +260,8 @@ document.addEventListener('click', function(e) {
 });
 
 function updateEventPhase(newPhase) {
-    window.isProjectDirty = true;
+    if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
+    else window.isProjectDirty = true;
     if (!currentEditingEvent) return;
 
     const allowed = (typeof allowedMiniCalPhases === 'function') ? allowedMiniCalPhases() : ['main', 'show', 'wh', 'recovery', 'transit'];
@@ -277,6 +285,7 @@ document.addEventListener('keydown', function(e) {
     if ((e.key === 'Delete' || e.key === 'Backspace') && currentEditingEvent) {
         if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
             window.isProjectDirty = true;
+            if (typeof peMarkIdentityDirty_ === 'function') peMarkIdentityDirty_();
             e.preventDefault(); 
             currentEditingEvent.remove();
             closeEventMenu();

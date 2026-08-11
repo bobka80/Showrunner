@@ -508,6 +508,60 @@ function updateProjectReadiness(projectId, stateStr, actor = "System UI") {
         && !verifyBackendPrivilege(actor, 'MANAGER')) {
       throw new Error('🛑 PERMISSION DENIED: Cannot update project readiness.');
     }
+
+    // W5: while Campaign Room is warm, readiness/Offer live on Firebase meta (Sheets lag until publish).
+    try {
+      if (projectId && projectId !== 'NEW' &&
+          typeof dalCampaignRoomIsWarmForProject_ === 'function' &&
+          dalCampaignRoomIsWarmForProject_(projectId) &&
+          typeof firestoreGetCampaignMeta_ === 'function' &&
+          typeof firestoreSetCampaignMeta_ === 'function') {
+        var cur = firestoreGetCampaignMeta_(projectId) || {};
+        var now = new Date().toISOString();
+        var seq = (Number(cur.identityWriteSeq) || 0) + 1;
+        var readinessJson = stateStr;
+        if (readinessJson && typeof readinessJson !== 'string') {
+          readinessJson = JSON.stringify(readinessJson);
+        }
+        if (!readinessJson) readinessJson = cur.readinessJson || '{}';
+        firestoreSetCampaignMeta_(projectId, {
+          roomUid: cur.roomUid || '',
+          status: cur.status || 'open',
+          openedAt: cur.openedAt || now,
+          openedBy: cur.openedBy || actor || 'System',
+          lastActivityAt: now,
+          lastPublishedAt: cur.lastPublishedAt || '',
+          domain: 'meta',
+          name: cur.name || 'Unnamed Event',
+          client: cur.client || '',
+          projectStatus: cur.projectStatus || 'Draft',
+          type: cur.type || 'Event',
+          locationUrl: cur.locationUrl || '',
+          difficultyMultiplier: cur.difficultyMultiplier != null ? cur.difficultyMultiplier : 1,
+          folderId: cur.folderId || '',
+          managerEmail: cur.managerEmail || '',
+          readinessJson: readinessJson,
+          subEventsJson: cur.subEventsJson || '[]',
+          identityWriteSeq: seq,
+          identityUpdatedAt: now,
+          identityUpdatedBy: actor || 'System'
+        });
+        try {
+          var sheetsWarm = verifyDatabaseSchema();
+          var rowWarm = (typeof dalGetProjectIndexRow_ === 'function')
+            ? dalGetProjectIndexRow_(projectId, sheetsWarm)
+            : null;
+          if (rowWarm && typeof dalWriteCampaignRoom_ === 'function') {
+            dalWriteCampaignRoom_(sheetsWarm.index, rowWarm.rowNum, rowWarm.map, {
+              campaignLastActivityAt: now
+            });
+          }
+          if (typeof flushCache !== 'undefined') flushCache();
+        } catch (eAct) { /* non-fatal */ }
+        return "Success";
+      }
+    } catch (eWarmR) { /* fall through to Sheets */ }
+
     const sheets = verifyDatabaseSchema();
     let indexData = sheets.index.getDataRange().getValues();
     let iMap = {};

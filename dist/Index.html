@@ -8913,10 +8913,10 @@ body.station-dock-screensaver-active #station-dock-shell {
     <input type="hidden" id="edit-proj-type" value="Event">
     
     <div class="pe-editor-toolbar-row">
-      <input type="text" id="edit-proj-name" placeholder="Title" oninput="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; box-sizing: border-box;">
+      <input type="text" id="edit-proj-name" placeholder="Title" oninput="peMarkIdentityDirty_()" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; box-sizing: border-box;">
       
       <div class="pe-mgr-only" style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
-          <input list="edit-proj-client-list" id="edit-proj-client" placeholder="Select Client..." oninput="window.isProjectDirty=true" onchange="window.isProjectDirty=true" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:6px; box-sizing: border-box;">
+          <input list="edit-proj-client-list" id="edit-proj-client" placeholder="Select Client..." oninput="peMarkIdentityDirty_()" onchange="peMarkIdentityDirty_()" style="width: 240px; flex-shrink: 0; margin:0; padding:12px; background:#1a1a1e; border:1px solid #333; color:#fff; border-radius:6px; box-sizing: border-box;">
           <datalist id="edit-proj-client-list"></datalist>
           <button class="btn-outline" style="width:auto; margin:0; padding: 0 10px; height: 42px; box-sizing: border-box; flex-shrink: 0;" onclick="openClientModal()" title="New Client">+ NEW CLIENT</button>
       </div>
@@ -8924,10 +8924,10 @@ body.station-dock-screensaver-active #station-dock-shell {
       <div class="pe-location-col">
           <div id="pe-location-region-label" class="pe-location-region-label">IN SOFIA</div>
           <div class="pe-location-row">
-              <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="window.isProjectDirty=true" title="">
+              <input type="text" id="edit-proj-location" placeholder="Location or Map Link..." oninput="peMarkIdentityDirty_()" title="">
               <button type="button" class="btn-outline pe-mgr-only pe-location-pin-btn" onclick="window.openLocationMap()" title="Set location on map">📍</button>
               <div id="edit-proj-distance-container" class="pe-distance-inline">
-                  <input type="number" id="edit-proj-distance" placeholder="km" title="Driving distance from warehouse (km)" oninput="window.isProjectDirty=true">
+                  <input type="number" id="edit-proj-distance" placeholder="km" title="Driving distance from warehouse (km)" oninput="peMarkIdentityDirty_()">
               </div>
           </div>
       </div>
@@ -8943,14 +8943,14 @@ body.station-dock-screensaver-active #station-dock-shell {
               <div id="weather-widget-detail" class="weather-widget-detail"></div>
           </div>
           <label class="crew-cb-container weather-outdoor-label">
-             <input type="checkbox" id="edit-proj-outdoor" class="crew-cb" onchange="window.isProjectDirty=true; if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();" style="margin-right: 8px;">
+             <input type="checkbox" id="edit-proj-outdoor" class="crew-cb" onchange="peMarkIdentityDirty_(); if(window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();" style="margin-right: 8px;">
              <span style="color:#fff; font-size:11px; font-weight:bold; white-space:nowrap; margin-top: 1px;">OUTDOOR</span>
           </label>
       </div>
       
       <div class="pe-mgr-only pe-multiplier-col">
           <div class="input-label pe-multiplier-label">DIFF. MULT</div>
-          <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="window.isProjectDirty=true">
+          <input type="number" step="0.1" id="edit-proj-multiplier" value="1.0" oninput="peMarkIdentityDirty_()">
       </div>
       
       <div id="pe-event-meta-right" style="position:absolute; right:0; top:0; display:flex; gap:5px; align-items:center; flex-shrink:0; height:42px;">
@@ -9000,6 +9000,7 @@ body.station-dock-screensaver-active #station-dock-shell {
          <button id="manual-crew-email-btn" class="btn-outline pe-mgr-only" style="margin: 0; width:auto;" onclick="sendManualCrewEmailUI()">EMAIL CREW</button>
          
          <button class="btn-close" style="margin: 0; width:auto;" onclick="cancelProjectEditor()">CANCEL</button>
+         <span id="pe-autosave-cue" class="pe-mgr-only" style="display:none; color:#a1a1aa; font-size:11px; font-weight:700; letter-spacing:0.04em; min-width:72px; text-align:right;" title="Warm room autosaves identity, mini-cal, and Offer"></span>
          <button id="update-btn" class="btn-main pe-mgr-only" style="margin: 0; width:auto;" onclick="runSchedule()">SAVE & SYNC CALENDAR</button>
       </div>
     </div>

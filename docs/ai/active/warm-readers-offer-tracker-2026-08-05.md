@@ -6,8 +6,8 @@
 **Room decision / locks:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
-**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W4** shipped; awaiting director smoke → **W5**.  
-**Production tip:** see RELEASES.md (**GAS v776** W4). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
+**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W5** warm autosave (build).  
+**Production tip:** see RELEASES.md (**GAS v777** currency). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
 
@@ -134,15 +134,17 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 - [x] Button + pull shifts + truck/logistics facts (km, idle/stay, courses…)  
 - [x] Pre-pull snapshot + Undo (same undo model as W3)  
 - [x] Ship **GAS v776** — smoke: Pull fills Labor/Fleet; Undo restores; PA-only edits leave TL alone; warm Firebase / cold Sheets  
-- [ ] Director smoke
+- [x] Director: working fine 2026-08-11 (smoke closed for sequencing); Undo **stays**
 
 ### W5 — Warm project editor autosave (filed 2026-08-10)
 
-**Shape:** NEW project → one explicit Save & Sync (create). After room is warm → debounced auto-save of identity + mini-cal sub-events via existing `dalSaveProjectIdentityWarm_`. Cold / briefing keep explicit save. Show Saving…/Saved. Do not autosave mid mini-cal drag.
+**Shape:** NEW project → one explicit Save & Sync (create). After room is warm → debounced auto-save of identity + mini-cal sub-events + **readiness/Offer** via existing `dalSaveProjectIdentityWarm_` (not Sheets-only `updateProjectReadiness`). Cold / briefing keep explicit save. Show Saving…/Saved. Do not autosave mid mini-cal drag.
 
-- [ ] Debounced warm auto-save on identity fields + mini-cal settle  
-- [ ] Hide/soften Save & Sync while warm; keep for NEW + cold  
-- [ ] Fail toast if warm write fails  
+**Director lock (2026-08-11):** Offer Undo stays. Today “don’t hit Save” is the mistake-safety net; once warm autosave lands, Undo is that net. Offer persistence belongs in **this** slice (warm path writes `readinessJson`), not a separate Offer hack.
+
+- [x] Debounced warm auto-save on identity fields + mini-cal settle + Offer/readiness mutations  
+- [x] Hide/soften Save & Sync while warm; keep for NEW + cold  
+- [x] Fail toast if warm write fails  
 - [ ] Ship + smoke
 
 ### W6 — Exit polish
@@ -186,6 +188,7 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | Director W3 smoke green → **W4**. |
 | 2026-08-11 | **W4 @ GAS v776** — Offer Pull Timeline + logistics + Undo (`getOfferTlPullSnapshot`; labor + transport snapshot; Print Studio lines). Awaiting director smoke → **W5**. |
 | 2026-08-11 | Currency display: all remaining `$` price prefixes → `€` (Offer UI + asset/tracker/audit columns). Print/Financials Hub were already €. |
+| 2026-08-11 | Director: W4 fine; **Undo stays**; Offer autosave belongs in **W5** (not a side fix). Continue → W5. |
 
 ---
 
