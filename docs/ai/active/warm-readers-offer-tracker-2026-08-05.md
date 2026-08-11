@@ -7,7 +7,7 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
 **Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W5** shipped; awaiting director smoke → **W6**.  
-**Production tip:** see RELEASES.md (**GAS v782** nested quiet flush). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
+**Production tip:** see RELEASES.md (**GAS v783** autosave cue/fix). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
 
@@ -195,7 +195,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | Fix: Cancel on saved project no longer false-warns after mini-cal edit — flush autosave quietly; identity autosave for all non-NEW. |
 | 2026-08-11 | Fix: Cancel after edit no longer shows COLLISION refresh alert — gather-before-clear, queue behind in-flight, quiet handlers + stamp handoff. **@ GAS v781**. |
 | 2026-08-11 | Fix: nested editor views (Offer/PA/Timeline/Logistics) — readiness no longer poisons identity stamp; quiet nav flush on open/Cancel/GENERATE. **@ GAS v782**. |
-| 2026-08-11 | Fix: identity autosave looked dead — restore Saving/Saved cue; unstick mini-cal drag flag; gather fallback from raw fragments; quiet-nav flag hygiene. |
+| 2026-08-11 | Fix: identity autosave looked dead — restore Saving/Saved cue; unstick mini-cal drag flag; gather fallback from raw fragments; quiet-nav flag hygiene. **@ GAS v783**. |
+| 2026-08-11 | Fix: Saved cue but reopen showed old values — patch FullCalendar rawDbData after identity autosave (reopen was reading stale cache). |
 
 ---
 

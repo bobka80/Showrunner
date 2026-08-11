@@ -971,6 +971,110 @@ window.peGatherIdentitySavePayload_ = function() {
   return { projectData: projectData, timelines: timelines, id: id, newT: newT };
 };
 
+/**
+ * Reopen reads FullCalendar rawDbData (not a live server fetch). After identity
+ * autosave / leave flush, patch that cache so Cancel → re-open shows the new values.
+ * Updates rollup + every phase-fragment event that shares this project id.
+ */
+window.pePatchLocalCalendarAfterIdentitySave_ = function(payload, timestamp) {
+  if (!payload || !payload.projectData) return;
+  var pd = payload.projectData;
+  var id = String(pd.Project_ID || '');
+  if (!id || id === 'NEW') return;
+  if (typeof calendar === 'undefined' || !calendar || typeof calendar.getEvents !== 'function') return;
+  try {
+    var seedEv = calendar.getEventById(id);
+    if (!seedEv) {
+      seedEv = calendar.getEvents().find(function(e) {
+        var r = e && e.extendedProps && e.extendedProps.rawDbData;
+        return r && String(r.id) === id;
+      });
+    }
+    var raw = (seedEv && seedEv.extendedProps && seedEv.extendedProps.rawDbData) || {};
+    var next = {};
+    for (var k in raw) {
+      if (Object.prototype.hasOwnProperty.call(raw, k)) next[k] = raw[k];
+    }
+    next.id = next.id || id;
+
+    if (pd.Project_Name) {
+      next.title = pd.Project_Name;
+      next.fullTitle = pd.Project_Name;
+    }
+    if (pd.Client !== undefined) next.client = pd.Client;
+    if (pd.Status) next.status = pd.Status;
+    if (pd.Type) next.type = pd.Type;
+    if (pd.Location_URL !== undefined) next.locationUrl = pd.Location_URL;
+    if (pd.Difficulty_Multiplier !== undefined && pd.Difficulty_Multiplier !== '') {
+      next.difficultyMultiplier = parseFloat(pd.Difficulty_Multiplier) || 1;
+    }
+    if (timestamp) next.lastUpdated = timestamp;
+
+    if (pd.Readiness_State) {
+      try {
+        next.readinessState = (typeof pd.Readiness_State === 'string')
+          ? JSON.parse(pd.Readiness_State)
+          : pd.Readiness_State;
+      } catch (eR) { /* keep prior readiness */ }
+    }
+
+    if (payload.timelines && payload.timelines.length) {
+      next.fragments = payload.timelines.map(function(t) {
+        return {
+          uid: t.uid || '',
+          type: t.Sub_Event_Type || 'MAIN_EVENT',
+          date: t.Event_Date || '',
+          startTime: t.Start_Time || '',
+          endTime: t.End_Time || '',
+          note: t.Note || ''
+        };
+      });
+      var start = null;
+      var end = null;
+      next.fragments.forEach(function(f) {
+        if (!f.date) return;
+        if (!start || f.date < start) start = f.date;
+        if (!end || f.date > end) end = f.date;
+      });
+      if (start) next.start = start;
+      if (end) next.end = end;
+    }
+
+    calendar.getEvents().forEach(function(e) {
+      if (!e || !e.extendedProps) return;
+      var r = e.extendedProps.rawDbData;
+      if (!r) return;
+      if (String(r.id || '') !== id && String(e.id || '') !== id) return;
+      e.setExtendedProp('rawDbData', next);
+      if (pd.Project_Name) {
+        try { e.setExtendedProp('fullTitle', pd.Project_Name); } catch (eF) { /* ignore */ }
+      }
+      if (pd.Status) {
+        try { e.setExtendedProp('status', pd.Status); } catch (eS) { /* ignore */ }
+      }
+      if (e.extendedProps.isRollup && pd.Project_Name) {
+        try { e.setProp('title', pd.Project_Name); } catch (eT) { /* ignore */ }
+      }
+    });
+
+    // Keep rollup bar span in sync with new fragment range (FC all-day end is exclusive).
+    var rollup = calendar.getEventById(id);
+    if (rollup && next.start) {
+      try {
+        rollup.setStart(next.start);
+        if (next.end) {
+          var endExclusive = new Date(next.end + 'T00:00:00');
+          endExclusive.setDate(endExclusive.getDate() + 1);
+          var y = endExclusive.getFullYear();
+          var m = String(endExclusive.getMonth() + 1).padStart(2, '0');
+          var d = String(endExclusive.getDate()).padStart(2, '0');
+          rollup.setEnd(y + '-' + m + '-' + d);
+        }
+      } catch (eSpan) { /* non-fatal */ }
+    }
+  } catch (ePatch) { /* non-fatal */ }
+};
+
 window.peScheduleWarmIdentityAutosave_ = function() {
   if (!window.peCanIdentityAutosave_ || !window.peCanIdentityAutosave_()) return;
   window.peWarmAutosavePending_ = true;
@@ -1083,6 +1187,9 @@ window.peSendIdentitySavePayload_ = function(payload, opts) {
         if (window.peLeaveSavePayload_ && window.peLeaveSavePayload_.projectData) {
           window.peLeaveSavePayload_.projectData.Last_Updated = resObj.timestamp;
         }
+      }
+      if (typeof window.pePatchLocalCalendarAfterIdentitySave_ === 'function') {
+        window.pePatchLocalCalendarAfterIdentitySave_(sent, resObj.timestamp || '');
       }
       // Clear dirty on any successful identity write (quiet leave/nav included).
       window.isProjectDirty = false;
