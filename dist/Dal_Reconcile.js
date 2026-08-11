@@ -41,14 +41,19 @@ function dalFwQueueDocPath_(itemId) {
 
 function dalPaRowSignature_(obj) {
   if (!obj) return '';
+  var qtyRaw = obj.assigned_quantity != null ? obj.assigned_quantity : '';
+  var qtyNum = parseInt(qtyRaw, 10);
+  var qty = isNaN(qtyNum) ? String(qtyRaw) : String(qtyNum);
+  var loc = String(obj.location || '').trim() || 'General';
+  var scan = String(obj.scan_status || '').trim() || 'Assigned';
   return [
     String(obj.uid || ''),
     String(obj.asset_uid || ''),
-    String(obj.assigned_quantity != null ? obj.assigned_quantity : ''),
-    String(obj.location || ''),
+    qty,
+    loc,
     String(obj.formula || ''),
     String(obj.container_uid || ''),
-    String(obj.scan_status || '')
+    scan
   ].join('|');
 }
 
@@ -299,8 +304,8 @@ function dalReconcilePaCommit_(projectId, sessionUid, intendedRowObjects, actor)
     mismatchNote: note,
     payload: { rows: intendedRowObjects || [] }
   });
-  dalAlertFailedWrite_(projectId, 'assets', actor, note + ' Pocket: ' + pocket.path);
-  return { ok: false, pocket: pocket };
+  dalAlertFailedWrite_(projectId, 'assets', actor, note + ' Pocket: ' + pocket.path, { push: false });
+  return { ok: false, pocket: pocket, mismatchNote: note };
 }
 
 function dalReconcileTimelineCommit_(projectId, sessionUid, intendedSnap, actor) {

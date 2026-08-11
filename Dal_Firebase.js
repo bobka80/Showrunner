@@ -38,6 +38,8 @@ function dalStateSizeReport_(opts) {
 
 function dalPaFormulaIsAuto_(formula) {
   var f = String(formula || '');
+  // Client may stack shortage before auto: "[SHORT] [AUTO] …" / "[SHORT] Auto-Container"
+  if (f.indexOf('[SHORT] ') === 0) f = f.substring(8);
   return f === 'Auto-Container' || f === 'Gen-Auto-Container' ||
     f.indexOf('[AUTO] ') === 0 || f.indexOf('[GEN_AUTO] ') === 0;
 }
@@ -171,19 +173,38 @@ function dalPaFixtureToCommitObj_(pa, projectId) {
   if ((pa.isShortage === true || pa.isShortage === 'true') && String(formula).indexOf('[SHORT] ') !== 0) {
     formula = '[SHORT] ' + formula;
   }
+  var qtyRaw = pa.qty != null ? pa.qty : (pa.assigned_quantity != null ? pa.assigned_quantity : 1);
+  var qtyNum = parseInt(qtyRaw, 10);
   var obj = {
     uid: String(pa.uid || ''),
     project_uid: String(projectId || ''),
     asset_uid: String(pa.assetId || pa.asset_uid || ''),
-    assigned_quantity: pa.qty != null ? pa.qty : (pa.assigned_quantity != null ? pa.assigned_quantity : 1),
-    location: pa.location || 'General',
+    assigned_quantity: isNaN(qtyNum) ? 1 : qtyNum,
+    location: String(pa.location || 'General').trim() || 'General',
     formula: formula,
     creator: pa.creator || 'System',
     override_dept: pa.overrideDept || pa.override_dept || '',
     container_uid: pa.containerUid || pa.container_uid || '',
-    scan_status: pa.scanStatus || pa.scan_status || 'Assigned'
+    scan_status: String(pa.scanStatus || pa.scan_status || 'Assigned').trim() || 'Assigned'
   };
   // M4: movement lives on Logistics_Ledger — never commit truck cols onto Project_Assets
+  return obj;
+}
+
+/** Normalize sheet/collection row objects before write + reconcile (stable qty/scan/location). */
+function dalPaNormalizeCommitObj_(obj, projectId) {
+  if (!obj) return obj;
+  var qtyNum = parseInt(obj.assigned_quantity != null ? obj.assigned_quantity : 1, 10);
+  obj.assigned_quantity = isNaN(qtyNum) ? 1 : qtyNum;
+  obj.location = String(obj.location || 'General').trim() || 'General';
+  obj.scan_status = String(obj.scan_status || 'Assigned').trim() || 'Assigned';
+  obj.uid = String(obj.uid || '');
+  obj.project_uid = String(obj.project_uid || projectId || '');
+  obj.asset_uid = String(obj.asset_uid || '');
+  obj.formula = obj.formula || 'Standalone';
+  obj.creator = obj.creator || 'System';
+  obj.override_dept = obj.override_dept || '';
+  obj.container_uid = obj.container_uid || '';
   return obj;
 }
 
@@ -1847,6 +1868,9 @@ function dalCommitPaFromFirestore_(projectId, sessionUid, actor, opts) {
   });
   colAutoRows.forEach(function (r) {
     commitObjs.push(dalPaSheetRowToObject_(r.data, hdr.map));
+  });
+  commitObjs = commitObjs.map(function (o) {
+    return dalPaNormalizeCommitObj_(o, projectId);
   });
 
   // B fail-safe: snapshot current Sheets BEFORE mutate; refuse empty wipe.

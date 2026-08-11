@@ -1,23 +1,24 @@
-# Active — Warm readers + Offer pulls + Checkpoint smoke
+# Archive — Warm readers + Offer pulls + Checkpoint smoke
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Map:** [../README.md](../README.md)  
-**Predecessor:** [../archive/project-campaign-room-2026-07-24.md](../archive/project-campaign-room-2026-07-24.md) (R0–R5 core @ **GAS v767** — room warm/cold + 30m checkpoint + 48h idle; **COMPLETE**)  
+**Predecessor:** [project-campaign-room-2026-07-24.md](project-campaign-room-2026-07-24.md) (R0–R5 core @ **GAS v767** — room warm/cold + 30m checkpoint + 48h idle; **COMPLETE**)  
 **Offer topic (existing locks):** [../topics/offer-invoice-crew-availability-2026-07-20.md](../topics/offer-invoice-crew-availability-2026-07-20.md)  
 **Room decision / locks:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
-**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W5** shipped; awaiting director smoke → **W6**.  
-**Production tip:** see RELEASES.md (**GAS v783** autosave cue/fix). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
+**Opened:** 2026-08-05 · **Archived:** 2026-08-11 · **Status:** **COMPLETE** — W1–W5 shipped (tip **GAS v784**); **W6 Exit** closed.  
+**Production tip at archive:** see RELEASES.md (**GAS v784**). Campaign Room core live @ **GAS v767**. Prep rollback pin still **v654**.  
+**Successor (ACTIVE):** [../active/warm-live-completion-2026-08-11.md](../active/warm-live-completion-2026-08-11.md) — true live Firebase wire; first code slice **L0** PA failed-commit.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
 
 1. **Offer** — manual one-shot pulls (not live link), with undo  
 2. **Tracker / Conflicts** — warm → one-shot Firebase; cold → Sheets (no badge, no listeners)  
-3. **30m checkpoint** — already shipped (R4 @ v764); this campaign **smokes + polishes** consumer awareness
+3. **30m checkpoint** — already shipped (R4 @ v764); this campaign **smoked + polished** consumer awareness
 
 ---
 
-## Fresh-agent start
+## Fresh-agent start (historical)
 
 1. Read [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) → **this file** → predecessor Campaign Room brief § five slices + checkpoint + idle.  
 2. Do **not** reopen Campaign Room lifecycle locks (`idle_touch`, `checkpoint_interval`, `room_registry`) without director.  
@@ -77,86 +78,63 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
   - if **cold** → existing Sheets path  
   - if live read fails → Sheets  
 - No badge UI  
-- No long-lived Tracker listeners  
-- Cap warm overlays per open  
+- Cap concurrent warm overlays (~25)
 
-**Truth reminder:** Warm Firebase = now. Cold Sheets = last published Firebase. Do not expect a kept Firebase archive after End/idle.
+### C — Checkpoint smoke / polish
 
-### C — 30m checkpoint smoke + polish
-
-**Already shipped:** R4 @ GAS v764 — `runDalCampaignCheckpoint`, dirty gate, five-slice keep-live publish, editor cue `{time} publish` (one-click force @ v770).
-
-**This campaign still does:**
-
-- Director smoke: edit → wait/force checkpoint → Sheets match; peers stay live; cue updates  
-- Fix any checkpoint bugs found in smoke  
-- Light polish only if smoke shows cue/copy gaps  
-- Document for Tracker/Offer authors: Sheets may lag ≤ checkpoint while warm  
-
-**Do not:** change interval, freeze users on checkpoint, or dual-write Sheets on every edit.
+R4 checkpoint already ships. This campaign smokes force publish + cue polish only — does not change interval.
 
 ---
 
-## Build slices (propose)
+## Slices (all closed)
 
-### W0 — Docs + inventory (this file)
+### W1 — Checkpoint smoke + cue polish
 
-- [x] File campaign brief + locks  
-- [x] Point Campaign Room leftovers here  
-- [x] Update [Project_TODO.md](../Project_TODO.md)  
-- [x] Director **OK go for W1** (2026-08-10)
+- [x] Force checkpoint smoke + Index identity preserve @ **v768**+  
+- [x] Cue chrome polish (`{time} publish`)  
+- [x] Closed for sequencing 2026-08-10
 
-### W1 — Checkpoint smoke (fast)
+### W2 — Tracker / Conflicts warm hybrid
 
-- [x] Smoke R4 on web.app (force dbl-click) — **fail found** (room wiped + collision)  
-- [x] File/fix: Index row blank-fill wiped `Dal_Campaign_*`; refresh editor version after publish — **GAS v768**  
-- [x] Cue polish + `publishing…` / stamp fix — **GAS v769–v771**  
-- [x] Director continued past W1 (2026-08-10) — treat smoke green for sequencing
+- [x] `dalWarmReaderOneShotOverlay_` (cap 25, fail-open)  
+- [x] Ship **GAS v772** + director smoke green 2026-08-11
 
-### W2 — Tracker / Conflicts hybrid
+### W3 — Offer pull Project Assets
 
-- [x] Inventory current Tracker + Conflicts read entry points  
-- [x] Warm detect via Index `Dal_Campaign_Room_Status` / `dalStatusIsForkLive_`  
-- [x] One-shot Firebase overlay helpers (`dalWarmReaderOneShotOverlay_` — meta sub-events, PA, ledger; Conflicts + timeline shifts)  
-- [x] Cap 25 + fail-open to Sheets  
-- [x] Ship **GAS v772** — smoke: warm project shows fresher than Sheets; cold unchanged  
-- [x] Director smoke green 2026-08-11 (PA → Tracker; refresh-loss fix @ v774)
-
-### W3 — Offer pull PA
-
-- [x] Button + one-shot pull from warm Firebase or Sheets  
-- [x] Pre-pull snapshot + Undo  
-- [x] Ship **GAS v775** — smoke: Pull fills offer; Undo restores; PA edits without Pull leave offer alone  
-- [x] Director smoke green 2026-08-11
+- [x] Button + Pull PA + Undo  
+- [x] Ship **GAS v775** — director smoke green 2026-08-11
 
 ### W4 — Offer pull Timeline + logistics
 
-- [x] Button + pull shifts + truck/logistics facts (km, idle/stay, courses…)  
-- [x] Pre-pull snapshot + Undo (same undo model as W3)  
-- [x] Ship **GAS v776** — smoke: Pull fills Labor/Fleet; Undo restores; PA-only edits leave TL alone; warm Firebase / cold Sheets  
-- [x] Director: working fine 2026-08-11 (smoke closed for sequencing); Undo **stays**
+- [x] Button + pull shifts + truck/logistics facts  
+- [x] Pre-pull snapshot + Undo  
+- [x] Ship **GAS v776** — director: working fine 2026-08-11; Undo **stays**
 
 ### W5 — Warm project editor autosave (filed 2026-08-10)
 
-**Shape:** NEW project → one explicit Save & Sync (create). After room is warm → debounced auto-save of identity + mini-cal sub-events + **readiness/Offer** via existing `dalSaveProjectIdentityWarm_` (not Sheets-only `updateProjectReadiness`). Cold / briefing keep explicit save. Show Saving…/Saved. Do not autosave mid mini-cal drag.
+**Shape:** NEW project → one explicit Save & Sync (create). After save → debounced auto-save of identity + mini-cal + readiness/Offer (warm → Firebase meta via GAS; cold → Sheets). Cue Saving…/Saved. Do not autosave mid mini-cal drag.
 
-**Director lock (2026-08-11):** Offer Undo stays. Today “don’t hit Save” is the mistake-safety net; once warm autosave lands, Undo is that net. Offer persistence belongs in **this** slice (warm path writes `readinessJson`), not a separate Offer hack.
+**Director lock (2026-08-11):** Offer Undo stays. Offer persistence in this slice.
 
-- [x] Debounced warm auto-save on identity fields + mini-cal settle + Offer/readiness mutations  
-- [x] Hide/soften Save & Sync while warm; keep for NEW + cold  
-- [x] Fail toast if warm write fails  
-- [x] Ship **GAS v778** — smoke: warm edits show Saving…/Saved; Save hidden when warm; NEW still has Save; Offer Pull sticks after refresh without Save; Undo still works  
-- [ ] Director smoke
+**Follow-on:** true browser↔Firebase identity wire = successor **Warm Live Completion L2**.
+
+- [x] Debounced auto-save on identity + mini-cal + Offer/readiness  
+- [x] Save & Sync only for NEW; cue restored @ v783; reopen cache patch @ v784  
+- [x] Collision / Cancel / nested-view quiet flush fixes v780–v782  
+- [x] Remaining feel-issues fold into successor L2 (director closed W6 2026-08-11)
 
 ### W6 — Exit polish
 
-- [ ] FRAGILE + offer topic notes for this campaign Exit  
-- [ ] Archive this campaign when director agrees Exit complete  
-- [x] Predecessor Campaign Room archived 2026-08-05
+- [x] FRAGILE + offer topic notes for this campaign Exit  
+- [x] Archive this campaign (director: close warm readers → continue fixing) — 2026-08-11  
+- [x] Predecessor Campaign Room archived 2026-08-05  
+- [x] Successor ACTIVE: [../active/warm-live-completion-2026-08-11.md](../active/warm-live-completion-2026-08-11.md)
+
+**After W6 archive:** primary active = Warm Live Completion; first code slice **L0** = PA failed-commit toast.
 
 ---
 
-## What NOT to do
+## What NOT to do (still true)
 
 - Do not put Tracker/Conflicts/Offer **inside** the Campaign Room as live slices  
 - Do not add Tracker `onSnapshot` / permanent multi-room listeners  
@@ -196,7 +174,9 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | Fix: Cancel after edit no longer shows COLLISION refresh alert — gather-before-clear, queue behind in-flight, quiet handlers + stamp handoff. **@ GAS v781**. |
 | 2026-08-11 | Fix: nested editor views (Offer/PA/Timeline/Logistics) — readiness no longer poisons identity stamp; quiet nav flush on open/Cancel/GENERATE. **@ GAS v782**. |
 | 2026-08-11 | Fix: identity autosave looked dead — restore Saving/Saved cue; unstick mini-cal drag flag; gather fallback from raw fragments; quiet-nav flag hygiene. **@ GAS v783**. |
-| 2026-08-11 | Fix: Saved cue but reopen showed old values — patch FullCalendar rawDbData after identity autosave (reopen was reading stale cache). |
+| 2026-08-11 | Fix: Saved cue but reopen showed old values — patch FullCalendar rawDbData after identity autosave (reopen was reading stale cache). **@ GAS v784**. |
+| 2026-08-11 | Director approved successor **Warm Live Completion** (true live Firebase wire). Finish **W6** → archive → L0 PA failed-commit. |
+| 2026-08-11 | **W6 Exit COMPLETE** — archived; primary build = Warm Live Completion. |
 
 ---
 
@@ -208,5 +188,5 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | W2 | Tracker/Conflicts hybrid live |
 | W3 | Offer PA pull + undo live |
 | W4 | Offer timeline/logistics pull + undo live |
-| W5 | Warm editor autosave live |
-| W6 | Docs archived |
+| W5 | Warm editor autosave live (GAS path; true client wire → successor L2) |
+| W6 | Docs archived → hand off Warm Live Completion |

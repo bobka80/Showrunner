@@ -1,6 +1,7 @@
 # Offer / Invoice · Crew Timeline Swap · Availability Conflicts
 
-**Status:** Locked brainstorm 2026-07-20. **Offer manual pulls (+ undo)** promoted 2026-08-05 into active campaign [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md). Invoice / crew-swap / soft-hard conflict detection remain backlog — do **not** implement those until director OK go.  
+**Status:** Locked brainstorm 2026-07-20. **Offer manual pulls (+ undo) COMPLETE** — shipped in warm-readers (archived 2026-08-11) [../archive/warm-readers-offer-tracker-2026-08-05.md](../archive/warm-readers-offer-tracker-2026-08-05.md). Invoice / crew-swap / soft-hard conflict detection remain backlog — do **not** implement those until director OK go.  
+**Active build after Exit:** [../active/warm-live-completion-2026-08-11.md](../active/warm-live-completion-2026-08-11.md) — Offer stays frozen Pull+Undo (not live).  
 **Sequencing:** Part B + Logistics Ledger **archived**. Soft/hard **detection** still depends on ledger SoT — [../archive/logistics-ledger-2026-07-21.md](../archive/logistics-ledger-2026-07-21.md).  
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Index:** [Project_TODO.md](../Project_TODO.md)  
 **Related area topics:** [financials.md](financials.md) · [availability-fleet.md](availability-fleet.md) · [timeline-shift-field-crew.md](timeline-shift-field-crew.md)
@@ -25,7 +26,7 @@ This file is the **canonical backlog campaign** for that work. Area topics keep 
 
 | Rule | Meaning |
 |------|---------|
-| **Offer pulls = active campaign** | Dual pull buttons + undo — **W3 PA pull shipping**; W4 timeline/logistics still next — [../active/warm-readers-offer-tracker-2026-08-05.md](../active/warm-readers-offer-tracker-2026-08-05.md) |
+| **Offer pulls = COMPLETE** | Dual pull buttons + undo shipped (warm-readers archive) — [../archive/warm-readers-offer-tracker-2026-08-05.md](../archive/warm-readers-offer-tracker-2026-08-05.md) |
 | **Rest = backlog** | Invoice, crew swap, soft/hard detection — still no code until director OK go |
 | **Invoice fields not final** | §1.2 web research is a **prerequisite** before locking invoice field requirements |
 | **Conflicts need ledger** | Build soft/hard detection against Logistics_Ledger companion — **not** Project_Assets load/unload derivation / timeline walk |
