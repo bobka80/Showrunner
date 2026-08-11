@@ -497,6 +497,10 @@ window.dalPaNoteTouch_ = function(uid) {
   delete window.dalPaDeletedUids_[uid];
   window.dalPaHoldEntities_([uid], 3000);
   if (typeof window.dalPaArmLwwWatch_ === 'function') window.dalPaArmLwwWatch_([uid], 12000);
+  // Refresh-safe: keep local cache at last UI truth before debounce flush lands.
+  try {
+    if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
+  } catch (eCacheT) { /* ignore */ }
 };
 
 window.dalPaNoteDelete_ = function(uid) {
@@ -512,6 +516,9 @@ window.dalPaNoteDelete_ = function(uid) {
   if (window.dalPaRecentEditUntil_) delete window.dalPaRecentEditUntil_[uid];
   window.dalPaHoldEntities_([uid], 3000);
   window.dalPaMarkDeleted_([uid], 8000);
+  try {
+    if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
+  } catch (eCacheD) { /* ignore */ }
 };
 
 window.dalPaHasPendingTouches_ = function() {
@@ -2860,6 +2867,89 @@ window.dalFlushPaIfPrepOpen_ = function() {
     // Not in patch mode — do not saveProjectAssets (would be silent GAS multi-edit).
     finish(false);
   }, 150);
+};
+
+/**
+ * Refresh / tab-close durability: post pending PA_PATCH immediately (no 150ms debounce).
+ * Host shell outlives the GAS iframe and can finish the txn after pagehide.
+ * Fire-and-forget — do not wait for WRITE_RESULT (iframe is dying).
+ */
+window.dalFlushPaUrgentUnload_ = function() {
+  try {
+    if (!window.dalPrepUiOpen) return false;
+    if (window.dalPaLiveSyncMode !== 'firestore') return false;
+    if (!window.dalPaLiveWritesAllowed_ || !window.dalPaLiveWritesAllowed_()) return false;
+    if (!window.dalPaHasPendingTouches_ || !window.dalPaHasPendingTouches_()) return false;
+    if (typeof window.dalHostFsPaPatchWrite_ !== 'function') return false;
+
+    clearTimeout(window.dalPaFlushTimer);
+    window.dalPaFlushTimer = null;
+
+    var projectId = document.getElementById('edit-folder-id')
+      ? document.getElementById('edit-folder-id').value
+      : '';
+    if (!projectId || projectId === 'NEW') return false;
+
+    var touched = Object.assign({}, window.dalPaTouchedUids_ || {});
+    var deleted = Object.assign({}, window.dalPaDeletedUids_ || {});
+    if (!Object.keys(touched).length && !Object.keys(deleted).length) return false;
+
+    var localFixtures = [];
+    var currentByUid = {};
+    (Array.isArray(currentProjectAssets) ? currentProjectAssets : []).forEach(function(pa) {
+      if (!pa || (window.dalPaIsAutoRow_ && window.dalPaIsAutoRow_(pa))) return;
+      if (!pa.uid && typeof window.dalNewUid_ === 'function') pa.uid = window.dalNewUid_();
+      if (!pa.uid) return;
+      currentByUid[String(pa.uid)] = pa;
+      var fixLive = {
+        uid: String(pa.uid),
+        assetId: String(pa.assetId || ''),
+        qty: pa.qty != null ? pa.qty : 1,
+        location: pa.location || 'General',
+        formula: window.dalPaEncodeFormulaForFs_ ? window.dalPaEncodeFormulaForFs_(pa) : (pa.formula || ''),
+        creator: pa.creator || (typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System'),
+        overrideDept: pa.overrideDept || '',
+        isShortage: !!pa.isShortage,
+        containerUid: pa.containerUid || '',
+        scanStatus: pa.scanStatus || 'Assigned'
+      };
+      localFixtures.push(window.dalPaCopyTruckOntoFixture_ ? window.dalPaCopyTruckOntoFixture_(fixLive, pa) : fixLive);
+    });
+
+    var origByUid = {};
+    (window.originalProjectAssets || []).forEach(function(pa) {
+      if (pa && pa.uid && !(window.dalPaIsAutoRow_ && window.dalPaIsAutoRow_(pa))) {
+        origByUid[String(pa.uid)] = pa;
+      }
+    });
+    var qtyDeltas = {};
+    Object.keys(touched).forEach(function(uid) {
+      var cur = currentByUid[uid];
+      if (!cur) return;
+      var curQ = Number(cur.qty != null ? cur.qty : 1);
+      var orig = origByUid[uid];
+      var baseQ = orig ? Number(orig.qty != null ? orig.qty : 1) : 0;
+      qtyDeltas[uid] = curQ - baseQ;
+    });
+
+    var path = 'projects/' + String(projectId) + '/assets/state';
+    var meta = {
+      clientId: window.dalPaClientId || '',
+      actor: typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System',
+      urgentUnload: true
+    };
+    var mutations = { touched: touched, deleted: deleted, qtyDeltas: qtyDeltas };
+
+    // Sync postMessage to host — txn continues after iframe teardown.
+    window.dalHostFsPaPatchWrite_(path, localFixtures, mutations, meta, function() { /* unload */ });
+    try {
+      if (typeof window.dalPaUpdateLocalCache_ === 'function') window.dalPaUpdateLocalCache_();
+    } catch (eCacheU) { /* ignore */ }
+    return true;
+  } catch (eUrgent) {
+    try { console.warn('DAL PA urgent unload flush failed', eUrgent); } catch (e0) { /* ignore */ }
+    return false;
+  }
 };
 
 /** Kept for prep-open call sites; flush is wired inside renderProjectAssetsUI. */

@@ -177,6 +177,7 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-10 | **W2** implemented: `dalWarmReaderOneShotOverlay_` in Tracker + Conflicts (cap 25, fail-open). |
 | 2026-08-10 | Shipped **GAS v772** — W2 Tracker/Conflicts warm hybrid. Next: director smoke, then **W3** Offer PA pull. |
 | 2026-08-11 | Smoke miss: Tracker lagged warm PA. Fix: prefer `assets/state` + paginate collection list. |
+| 2026-08-11 | Root cause: PA edits lost on refresh (pending flush died). Urgent unload PA_PATCH + state hydrate. |
 
 ---
 

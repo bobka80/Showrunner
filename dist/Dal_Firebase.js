@@ -1252,15 +1252,32 @@ function getProjectAssetsFirestore_(projectId, startDateStr, endDateStr, opts) {
   opts = opts || {};
   return executeWithRetry(function () {
     var hdr = dalGetProjectAssetsHeaderAndMap_();
-    var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
-    // Heal: if live assets/state was published thin/empty while collection still has rows,
-    // rebuild the mirror so prep UI recovers without END ROOM.
-    if (!opts.skipHeal) {
-      try { dalHealPaLiveStateFromCollection_(projectId, hdr, projectRows); } catch (eHeal) { /* non-fatal */ }
+    var assets = [];
+    var usedState = false;
+    // Live flush SoT is assets/state — prefer it on hydrate (same as Tracker warm overlay).
+    try {
+      if (typeof dalWarmPaSheetRowsFromFirebase_ === 'function') {
+        var warmRows = dalWarmPaSheetRowsFromFirebase_(projectId, hdr);
+        if (warmRows && warmRows.length) {
+          assets = warmRows.map(function (row) {
+            return dalFirestoreAssetFromRow_(row, hdr.map);
+          });
+          usedState = assets.length > 0;
+        }
+      }
+    } catch (eStateHyd) { usedState = false; }
+
+    if (!usedState) {
+      var projectRows = dalLoadPaProjectRowsFromFirestore_(projectId, hdr.header, hdr.map);
+      // Heal: if live assets/state was published thin/empty while collection still has rows,
+      // rebuild the mirror so prep UI recovers without END ROOM.
+      if (!opts.skipHeal) {
+        try { dalHealPaLiveStateFromCollection_(projectId, hdr, projectRows); } catch (eHeal) { /* non-fatal */ }
+      }
+      assets = projectRows.map(function (r) {
+        return dalFirestoreAssetFromRow_(r.data, hdr.map);
+      });
     }
-    var assets = projectRows.map(function (r) {
-      return dalFirestoreAssetFromRow_(r.data, hdr.map);
-    });
 
     var sheets = verifyDatabaseSchema(true);
     // R3: prefer warm logistics/state when it has legs. Present-but-empty must not blank

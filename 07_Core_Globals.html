@@ -654,6 +654,13 @@ window.dalOnBrowserLeaveLiveRooms_ = function(reason) {
   var inPrepLive = !!(window.dalPrepUiOpen || window.dalPrepLatched || window.dalPrepOpeningUi_);
   var inTlLive = !!(window.dalTimelineSessionOpen || window.dalTlOpeningUi_);
 
+  // Before presence leave / teardown: flush pending PA touches (host finishes after iframe dies).
+  if (inPrepLive) {
+    try {
+      if (typeof window.dalFlushPaUrgentUnload_ === 'function') window.dalFlushPaUrgentUnload_();
+    } catch (eFlush) { /* ignore */ }
+  }
+
   if (inPrepLive && pid) window.dalMarkUnloadLivePrep_(pid);
   if (inTlLive && pid) window.dalMarkUnloadLiveTimeline_(pid);
 
