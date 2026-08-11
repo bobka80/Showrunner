@@ -284,7 +284,7 @@ function applyProjectAssetsReadOnly(readOnly) {
 function openProjectAssetsModal() {
     const projectId = document.getElementById('edit-folder-id').value;
     if (!projectId || projectId === 'NEW') {
-        alert("⚠️ Please SAVE the project first to generate a Project ID before assigning equipment.");
+        alert("⚠️ Save the project first before opening Project Assets.");
         return;
     }
 

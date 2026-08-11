@@ -1,4 +1,4 @@
-<div id="edit-modal-overlay" class="modal-overlay">
+﻿<div id="edit-modal-overlay" class="modal-overlay">
   <div class="modal">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 5px;">
         <div style="display:flex; align-items:center; gap: 12px; flex: 1;">
@@ -715,6 +715,8 @@ function stopPresencePing() {
 }
 
 function triggerPrint() {
+  if (typeof window.peRequireSavedProject_ === 'function' &&
+      !window.peRequireSavedProject_('printing')) return;
   const id = document.getElementById('edit-folder-id').value;
   if(!id) return;
   const btn = document.getElementById('print-eq-btn');
@@ -768,9 +770,14 @@ window.peMarkIdentityDirty_ = function() {
 };
 
 window.pePaintAutosaveCue_ = function(state, detail) {
+  // W5 polish: autosave cue stays in DOM for rollback, but is never shown.
   window.peAutosaveCueState_ = state || '';
   var cue = document.getElementById('pe-autosave-cue');
   if (!cue) return;
+  cue.style.display = 'none';
+  cue.textContent = '';
+  return;
+  /* rollback cue paint:
   if (!window.peIsWarmEditorAutosave_()) {
     cue.style.display = 'none';
     cue.textContent = '';
@@ -790,30 +797,55 @@ window.pePaintAutosaveCue_ = function(state, detail) {
     cue.style.color = '#a1a1aa';
     cue.textContent = 'Auto-save on';
   }
+  */
+};
+
+window.peIsNewUnsavedProject_ = function() {
+  var folderEl = document.getElementById('edit-folder-id');
+  var id = folderEl ? folderEl.value : '';
+  return !id || id === 'NEW';
+};
+
+/** Block deeper project entry until NEW has been saved once. */
+window.peRequireSavedProject_ = function(actionLabel) {
+  if (!window.peIsNewUnsavedProject_()) return true;
+  alert('⚠️ Save the project first before ' + (actionLabel || 'continuing') + '.');
+  return false;
 };
 
 window.peSyncSaveBtnChrome_ = function() {
   var btn = document.getElementById('update-btn');
-  var warm = window.peIsWarmEditorAutosave_();
+  var isNew = window.peIsNewUnsavedProject_();
+  // Save button: visible only for NEW (create). Markup kept for rollback.
   if (btn) {
-    if (warm) {
-      btn.style.display = 'none';
-      btn.disabled = true;
-    } else {
+    if (isNew) {
       btn.style.display = '';
       if (!window.peWarmAutosaveBusy_) btn.disabled = false;
       if (btn.innerText !== 'SAVING...' && btn.innerText !== 'SAVED') {
         btn.innerText = 'SAVE & SYNC CALENDAR';
       }
+    } else {
+      btn.style.display = 'none';
+      btn.disabled = true;
     }
   }
-  if (!window.peWarmAutosaveBusy_ && window.peAutosaveCueState_ !== 'error') {
-    window.pePaintAutosaveCue_(warm ? (window.peAutosaveCueState_ === 'saved' ? 'saved' : '') : '');
-  } else if (warm) {
-    window.pePaintAutosaveCue_(window.peAutosaveCueState_ || '');
-  } else {
-    window.pePaintAutosaveCue_('');
-  }
+  // Autosave cue always hidden (background autosave still runs when warm).
+  window.pePaintAutosaveCue_('');
+
+  // Soft-disable deeper entry chrome while NEW (clicks still gated).
+  var deeperIds = ['master-timeline-btn', 'master-assets-btn', 'logistics-hub-btn-layers', 'print-eq-btn', 'master-end-room-btn'];
+  deeperIds.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (isNew) {
+      el.style.opacity = '0.45';
+      el.style.pointerEvents = 'none';
+      el.title = 'Save the project first';
+    } else {
+      el.style.opacity = '';
+      el.style.pointerEvents = '';
+    }
+  });
 };
 
 /** Gather the same payload as explicit Save & Sync. Returns null if not saveable. */
@@ -1068,6 +1100,8 @@ function runSchedule() {
 }
 
 function openDriveFolder() {
+  if (typeof window.peRequireSavedProject_ === 'function' &&
+      !window.peRequireSavedProject_('opening the Drive folder')) return;
   const id = document.getElementById('edit-folder-id').value;
   if(id) window.open('https://drive.google.com/drive/folders/' + id, '_blank');
 }
@@ -1225,6 +1259,7 @@ function openUnscheduledModal(pId, title, fullTitle) {
     bootMiniCalendar(todayStr, pId);
     if (typeof startPresencePing === 'function') startPresencePing(pId);
     if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
+    if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
 }
 
 window.cancelProjectEditor = function() {

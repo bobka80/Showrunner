@@ -14,9 +14,11 @@ function openLogisticsHubModal() {
         alert('🛑 Permission Denied: Live logistics tracking is not enabled for your role.');
         return;
     }
+    if (typeof window.peRequireSavedProject_ === 'function' &&
+        !window.peRequireSavedProject_('opening Logistics')) return;
     let projectId = document.getElementById('edit-folder-id').value;
     if (!projectId || projectId === 'NEW') {
-        alert("⚠️ Please SAVE & SYNC the project first before opening Logistics.");
+        alert("⚠️ Save the project first before opening Logistics.");
         return;
     }
 
@@ -369,7 +371,7 @@ function saveLogisticsTimeDefault(inputId, leg, offsetId, e) {
 window.executeLogisticsHub = function() {
     let projectId = document.getElementById('edit-folder-id').value;
     if (!projectId || projectId === 'NEW') {
-        alert("⚠️ Please SAVE & SYNC the project first before generating Logistics.");
+        alert("⚠️ Save the project first before generating Logistics.");
         return;
     }
 

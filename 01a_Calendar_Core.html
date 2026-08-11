@@ -276,6 +276,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (window.updateLiveWeatherWidget) window.updateLiveWeatherWidget();
           bootMiniCalendar(info.dateStr, 'NEW', true);
           if (typeof applyProjectEditorMode === 'function') applyProjectEditorMode('NEW');
+          if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
       },
       
       eventClick: function(info) {
@@ -348,6 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
           if (typeof applyProjectEditorMode === 'function') applyProjectEditorMode(pId);
           if (typeof startPresencePing === 'function') startPresencePing(pId);
           if (typeof fetchEntitySummary === 'function') fetchEntitySummary(pId, 'project-history-btn');
+          if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
       }
   });
   calendar.render();

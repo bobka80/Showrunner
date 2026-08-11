@@ -84,7 +84,7 @@ function openShiftLayout(mode, isReadOnly = false) {
   document.getElementById('month-roster-layer').style.display = 'none';
 
   targetFolderId = document.getElementById('edit-folder-id').value;
-  if(!targetFolderId || targetFolderId === 'NEW') return alert("⚠️ Please Save & Sync the project first!");
+  if(!targetFolderId || targetFolderId === 'NEW') return alert("⚠️ Save the project first!");
   
   let bD = null, eD = null;
   let paintedEvents = [];
@@ -455,7 +455,7 @@ function launchMasterTimeline() {
     let folderId = document.getElementById('edit-folder-id').value;
     
     if (folderId === 'NEW' || !folderId) {
-        alert("⚠️ DATABASE LOCK: You cannot open the Timeline for a brand new project yet.\n\nYou must click 'SAVE & SYNC CALENDAR' first to officially create the project. Once it is saved, click it again to open the Timeline!");
+        alert("⚠️ Save the project first before opening Timeline.");
         return; 
     }
 

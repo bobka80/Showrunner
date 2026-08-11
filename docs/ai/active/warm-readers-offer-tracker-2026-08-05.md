@@ -6,8 +6,8 @@
 **Room decision / locks:** [../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](../topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) · [../topics/architecture-campaign-director-locks-2026-07-21.md](../topics/architecture-campaign-director-locks-2026-07-21.md)  
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · Tracker/Conflicts · Offer surfaces
 
-**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W5** warm autosave (build).  
-**Production tip:** see RELEASES.md (**GAS v777** currency). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
+**Opened:** 2026-08-05 · **Status:** **ACTIVE** — **W5** shipped; awaiting director smoke → **W6**.  
+**Production tip:** see RELEASES.md (**GAS v778** W5). Campaign Room core live @ **GAS v767** (archived). Prep rollback pin still **v654**.
 
 **Director briefing (2026-08-05):** Three workstreams after Campaign Room core:
 
@@ -145,7 +145,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 - [x] Debounced warm auto-save on identity fields + mini-cal settle + Offer/readiness mutations  
 - [x] Hide/soften Save & Sync while warm; keep for NEW + cold  
 - [x] Fail toast if warm write fails  
-- [ ] Ship + smoke
+- [x] Ship **GAS v778** — smoke: warm edits show Saving…/Saved; Save hidden when warm; NEW still has Save; Offer Pull sticks after refresh without Save; Undo still works  
+- [ ] Director smoke
 
 ### W6 — Exit polish
 
@@ -189,6 +190,8 @@ Make **downstream readers** honest about warm vs published truth, and give **Off
 | 2026-08-11 | **W4 @ GAS v776** — Offer Pull Timeline + logistics + Undo (`getOfferTlPullSnapshot`; labor + transport snapshot; Print Studio lines). Awaiting director smoke → **W5**. |
 | 2026-08-11 | Currency display: all remaining `$` price prefixes → `€` (Offer UI + asset/tracker/audit columns). Print/Financials Hub were already €. |
 | 2026-08-11 | Director: W4 fine; **Undo stays**; Offer autosave belongs in **W5** (not a side fix). Continue → W5. |
+| 2026-08-11 | **W5 @ GAS v778** — warm debounced autosave (identity + mini-cal + readiness/Offer); Save & Sync only NEW/cold; `updateProjectReadiness` warm → Firebase meta. |
+| 2026-08-11 | Save chrome: button + autosave cue hidden except **NEW** (empty calendar create); deeper entry gated until first Save. |
 
 ---
 
