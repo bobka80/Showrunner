@@ -353,6 +353,7 @@ document.addEventListener('DOMContentLoaded', function() {
       }
   });
   calendar.render();
+  if (typeof window.calBindLinkedEventHover_ === 'function') window.calBindLinkedEventHover_();
   
   let stripBtn = document.querySelector('.fc-customToggleStrips-button');
   if (stripBtn) {
@@ -783,6 +784,62 @@ window.calRepaintVisiblePhaseBars_ = function() {
       requestAnimationFrame(run);
     });
   } catch (ePaint) { /* ignore */ }
+};
+
+/** Multi-row rollup: hover one segment → force-hover all segments of same event id. */
+window.calClearLinkedEventHover_ = function(root) {
+  root = root || (typeof calendar !== 'undefined' && calendar && calendar.el) || document.getElementById('calendar');
+  if (!root) return;
+  var lit = root.querySelectorAll('.event-custom-frame.force-hover');
+  for (var i = 0; i < lit.length; i++) lit[i].classList.remove('force-hover');
+  window._calLinkedHoverId = '';
+};
+
+window.calSetLinkedEventHover_ = function(eventId, root) {
+  root = root || (typeof calendar !== 'undefined' && calendar && calendar.el) || document.getElementById('calendar');
+  if (!root) return;
+  var id = String(eventId || '');
+  if (!id) {
+    window.calClearLinkedEventHover_(root);
+    return;
+  }
+  if (window._calLinkedHoverId === id) return;
+  window._calLinkedHoverId = id;
+  var frames = root.querySelectorAll('.event-custom-frame[data-cal-event-id]');
+  for (var i = 0; i < frames.length; i++) {
+    var frame = frames[i];
+    if (frame.getAttribute('data-cal-event-id') === id) frame.classList.add('force-hover');
+    else frame.classList.remove('force-hover');
+  }
+};
+
+window.calBindLinkedEventHover_ = function() {
+  var root = (typeof calendar !== 'undefined' && calendar && calendar.el) || document.getElementById('calendar');
+  if (!root || root._calLinkedHoverBound) return;
+  root._calLinkedHoverBound = true;
+  root.addEventListener('mouseover', function(ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var frame = t.closest('.event-custom-frame[data-cal-event-id]');
+    if (!frame || !root.contains(frame)) return;
+    window.calSetLinkedEventHover_(frame.getAttribute('data-cal-event-id'), root);
+  });
+  root.addEventListener('mouseout', function(ev) {
+    var t = ev.target;
+    if (!t || !t.closest) return;
+    var frame = t.closest('.event-custom-frame[data-cal-event-id]');
+    if (!frame || !root.contains(frame)) return;
+    var rel = ev.relatedTarget;
+    if (rel && frame.contains(rel)) return;
+    if (rel && rel.closest) {
+      var next = rel.closest('.event-custom-frame[data-cal-event-id]');
+      if (next && root.contains(next) &&
+          next.getAttribute('data-cal-event-id') === frame.getAttribute('data-cal-event-id')) {
+        return;
+      }
+    }
+    window.calClearLinkedEventHover_(root);
+  });
 };
 
 window.calForkFlagsFromProjects_ = function(projects) {

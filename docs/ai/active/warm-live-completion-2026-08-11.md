@@ -7,8 +7,8 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · § DAL prep/timeline live sync · Triangle of Truth  
 **Live forks pause:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — check before L2/L3
 
-**Opened:** 2026-08-11 · **Status:** **ACTIVE** — warm-readers W6 closed; building **L0** PA failed-commit.  
-**Production tip:** see RELEASES.md (tip at open **GAS v784**). Prep rollback pin still **v654**.
+**Opened:** 2026-08-11 · **Status:** **ACTIVE** — warm-readers W6 closed; **L0** shipped @ **GAS v785**, awaiting smoke.  
+**Production tip:** see RELEASES.md (**GAS v785**). Prep rollback pin still **v654**.
 
 ---
 
@@ -138,6 +138,7 @@ L5 exit + archive
 |------|------|
 | 2026-08-11 | Director approved Warm Live Completion. Filed active + topic. Sequenced **after** warm-readers W6. Next: finish W6 → OK go **L0** (PA failed commit). |
 | 2026-08-11 | Director: close warm-readers → continue fixing. W6 archived; this campaign **ACTIVE**; **L0** in flight. |
+| 2026-08-11 | **L0 @ GAS v785** — PA commit reconcile: normalize qty/scan/location; `[SHORT] [AUTO]` treated as auto; single alert. Awaiting director smoke (End Prep / End Room without false DAL commit-fail toast). |
 
 ---
 
