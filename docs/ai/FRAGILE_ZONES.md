@@ -513,6 +513,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Warm Live L2 (2026-08-12):** While room warm, project-editor identity autosave writes \meta/state\ **browser <-> Firebase** (host \SHOWRUNNER_DAL_FS_META_IDENTITY_WRITE\ / iframe txn). Firestore rules allow \meta/state\ **update** only if \status\ stays \open\ and oomUid\/\openedAt\/\openedBy\ unchanged. Cold / NEW still use GAS. GAS \dalSaveProjectIdentityWarm_\ remains fallback.
 
+**Warm Live L3 (2026-08-12):** While Campaign Room warm, START PREP / START COLLAB stay hidden (dalMayShowStartForkButton_). Opening PA / Timeline auto-attaches live forks (maybeAutoOpenDal*); dalWarmLiveAttachOpenViews_ if those views are already open when the room warms. Soft leave + END ROOM unchanged. Cold short sessions still show Start.
+
 **PA enter thin-snap flash (2026-08-04):** Opening Project Assets briefly showed full list then collapsed to a few rows with System “removed N” — thin `assets/state` (Hub leftover) was force-applied over richer cache/UI via `dalPaPreferLiveFixturesOverCache_` / heal tick. Guard: `dalPaIsThinRemoteVsLocal_` refuses thin remotes; prefer-cache + heal tick + state apply all use it.
 
 **Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+; PA unload flush @ v774):** \pagehide\/\eforeunload\ writes **localStorage unload flag** + **urgent PA_PATCH** for pending touches (host finishes after iframe dies) + presence leave + last-leave. **PA window paints immediately**; \dalGatePrepEnterForOrphan_\ still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup. Hydrate prefers \ssets/state\ over collection.

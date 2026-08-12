@@ -231,6 +231,18 @@ window.dalMayManualStartFork_ = function(domain) {
   return false;
 };
 
+/**
+ * Warm Live L3 — hide Start Prep / Start Collab while room warm **and** auto-attach
+ * covers this surface. Phone PA (no auto) still shows Start so live can attach.
+ */
+window.dalMayShowStartForkButton_ = function(domain) {
+  if (typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_() &&
+      typeof window.dalMayAutoStartFork_ === 'function' && window.dalMayAutoStartFork_(domain)) {
+    return false;
+  }
+  return !!window.dalMayManualStartFork_(domain);
+};
+
 /** Auto-start when entering the view (never phone PA; never phone/station timeline). */
 window.dalMayAutoStartFork_ = function(domain) {
   if (!window.dalMayManualStartFork_(domain)) return false;
@@ -239,6 +251,34 @@ window.dalMayAutoStartFork_ = function(domain) {
   if (d === 'timeline' || d === 'timelineCollab') return surface === 'desktop';
   if (d === 'prep') return surface === 'desktop' || surface === 'station';
   return false;
+};
+
+/**
+ * Warm Live L3 — if room is warm and PA / Timeline is already on screen, auto-attach forks.
+ * Listeners still follow the open view (soft-leave on close). Does not invent cold Start.
+ */
+window.dalWarmLiveAttachOpenViews_ = function() {
+  if (typeof window.dalCampaignRoomIsWarm_ !== 'function' || !window.dalCampaignRoomIsWarm_()) return;
+  try {
+    if (typeof window.dalPaViewStillOpen_ === 'function' && window.dalPaViewStillOpen_() &&
+        typeof window.maybeAutoOpenDalPrep_ === 'function') {
+      window.maybeAutoOpenDalPrep_();
+    }
+  } catch (ePa) { /* ignore */ }
+  try {
+    var layer = document.getElementById('shift-layer');
+    var tlOpen = false;
+    if (layer) {
+      try {
+        tlOpen = layer.style.display === 'flex' || window.getComputedStyle(layer).display === 'flex';
+      } catch (eCss) {
+        tlOpen = layer.style.display === 'flex';
+      }
+    }
+    if (tlOpen && typeof window.maybeAutoOpenDalTimeline_ === 'function') {
+      window.maybeAutoOpenDalTimeline_();
+    }
+  } catch (eTl) { /* ignore */ }
 };
 
 /** Soft-join / pull-in latch allowed (not freelancer). */

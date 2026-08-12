@@ -1549,11 +1549,13 @@ window.dalApplyTimelineSessionUi_ = function(isOpen, isOpening, info) {
     window.dalUpdateTimelineLiveBanner_();
   }
   if (startBtn) {
-    var mayManual = typeof window.dalMayManualStartFork_ === 'function'
-      ? window.dalMayManualStartFork_('timeline')
-      : true;
+    var mayShowStart = typeof window.dalMayShowStartForkButton_ === 'function'
+      ? window.dalMayShowStartForkButton_('timeline')
+      : (typeof window.dalMayManualStartFork_ === 'function'
+        ? window.dalMayManualStartFork_('timeline')
+        : true);
     var blockStart = !!window.dalTlCommittingWait_ || !!window.dalTlClosingUi_ || !!isOpening;
-    startBtn.style.display = (isOpen || blockStart || !mayManual) ? 'none' : 'inline-flex';
+    startBtn.style.display = (isOpen || blockStart || !mayShowStart) ? 'none' : 'inline-flex';
   }
   if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
   if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') {

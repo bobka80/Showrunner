@@ -401,12 +401,14 @@ window.dalApplyDalPrepUiState_ = function(isPrepOpen, projectId, opts) {
     window.dalUpdateRemotePendingBanner_();
   }
   if (startBtn) {
-    var mayManual = typeof window.dalMayManualStartFork_ === 'function'
-      ? window.dalMayManualStartFork_('prep')
-      : canShow;
+    var mayShowStart = typeof window.dalMayShowStartForkButton_ === 'function'
+      ? window.dalMayShowStartForkButton_('prep')
+      : (typeof window.dalMayManualStartFork_ === 'function'
+        ? window.dalMayManualStartFork_('prep')
+        : canShow);
     var blockStart = !!window.dalPrepCommittingWait_ || !!window.dalPrepClosingUi_ ||
       !!window.dalPrepOpeningUi_;
-    startBtn.style.display = (!isPrepOpen && mayManual && !blockStart) ? 'inline-flex' : 'none';
+    startBtn.style.display = (!isPrepOpen && mayShowStart && !blockStart) ? 'inline-flex' : 'none';
   }
   if (endBtn) endBtn.style.display = isPrepOpen ? 'inline-flex' : 'none';
   if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') {
@@ -852,7 +854,9 @@ window.openDalPrepSession = function(opts) {
   if (typeof window.dalIsLiveForkExcluded_ === 'function' && window.dalIsLiveForkExcluded_()) {
     return alert('Live preparation is not available for freelancer accounts.');
   }
-  if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('prep')) {
+  if (opts.auto) {
+    if (typeof window.dalMayAutoStartFork_ === 'function' && !window.dalMayAutoStartFork_('prep')) return;
+  } else if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('prep')) {
     return alert('You cannot start preparation on this device.');
   }
   var postReenter = !!(opts.postCommitReenter || window.dalPrepPostCommitReenter_);

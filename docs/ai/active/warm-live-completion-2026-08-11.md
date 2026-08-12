@@ -7,8 +7,8 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · § DAL prep/timeline live sync · Triangle of Truth  
 **Live forks pause:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — check before L2/L3
 
-**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L2** identity live Firebase in flight (L0 @ v785).  
-**Production tip:** see RELEASES.md (**GAS v785**). Prep rollback pin still **v654**.
+**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L2** shipped @ **GAS v787** (+ hosting + firestore rules); awaiting smoke.  
+**Production tip:** see RELEASES.md (**GAS v787**). Prep rollback pin still **v654**.
 
 ---
 
@@ -93,15 +93,16 @@ L5 exit + archive
 - [x] Title, client, location, mini-cal/sub-events, readiness write Firebase meta from the browser  
 - [x] No Apps Script round-trip for routine identity edits (GAS fallback if live wire fails)  
 - [x] Reopen: calendar cache patch + warm meta overlay (getExistingProjects)  
-- [ ] Ship + smoke: edit → Cancel → reopen sticks; feels immediate  
+- [x] Ship **GAS v787** + hosting (`host-boot.js?v=671`) + firestore rules  
+- [x] Director smoke: edit → Cancel → reopen sticks; feels immediate (2026-08-12)  
 
 **Done when:** identity no longer depends on GAS autosave for warm projects.
 
 ### L3 — Auto-attach PA + Timeline with room
 
-- [ ] Opening a warm project = live PA + live Timeline without Start buttons in normal work  
-- [ ] Soft leave safe; End Room remains rare explicit action  
-- [ ] Align with live-forks pause / FRAGILE session UI  
+- [x] Opening a warm project = live PA + live Timeline without Start buttons in normal work  
+- [x] Soft leave safe; End Room remains rare explicit action  
+- [x] Align with live-forks pause / FRAGILE session UI  
 - [ ] Ship + smoke: gear + timeline edit with no prep/collab ceremony  
 
 **Done when:** floor user does not think about Start Prep / Start Collab.
@@ -140,6 +141,7 @@ L5 exit + archive
 | 2026-08-11 | Director: close warm-readers → continue fixing. W6 archived; this campaign **ACTIVE**; **L0** in flight. |
 | 2026-08-11 | **L0 @ GAS v785** — PA commit reconcile: normalize qty/scan/location; `[SHORT] [AUTO]` treated as auto; single alert. Awaiting director smoke (End Prep / End Room without false DAL commit-fail toast). |
 | 2026-08-12 | Director: continue → **L2**. Identity warm autosave → browser↔Firebase (`meta/state`); rules unlock update with locked room fields; host `META_IDENTITY_WRITE`. |
+| 2026-08-12 | **L2 @ GAS v787** + hosting + firestore rules. Manager claim on token; seq+1 rule; collision no quiet overwrite. Smoke: hard-refresh web.app → warm edit → Saved feels fast → Cancel → reopen sticks. |
 
 ---
 

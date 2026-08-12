@@ -499,6 +499,9 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
       if (typeof window.paintProjectEditorModuleBtns_ === 'function') window.paintProjectEditorModuleBtns_();
       if (typeof window.dalPaintCampaignEndBtnLabels_ === 'function') window.dalPaintCampaignEndBtnLabels_();
       if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
+      if (roomWarm && typeof window.dalWarmLiveAttachOpenViews_ === 'function') {
+        try { window.dalWarmLiveAttachOpenViews_(); } catch (eAtt2) { /* ignore */ }
+      }
     })
     .getDalSessionInfo(projectId);
 };
@@ -534,6 +537,10 @@ window.openOrJoinDalCampaignRoom_ = function(projectId) {
         try { window.refreshCalForkFlagsNow_(); } catch (eCal) { /* ignore */ }
       }
       if (typeof window.peSyncSaveBtnChrome_ === 'function') window.peSyncSaveBtnChrome_();
+      // Warm Live L3 — if gear / timeline already open, attach live forks without Start.
+      if (res && res.campaignRoomWarm && typeof window.dalWarmLiveAttachOpenViews_ === 'function') {
+        try { window.dalWarmLiveAttachOpenViews_(); } catch (eAtt) { /* ignore */ }
+      }
     })
     .openOrJoinDalCampaignRoom(projectId, actor);
 };
@@ -542,6 +549,21 @@ window.dalPaintCampaignEndBtnLabels_ = function() {
   var warm = typeof window.dalCampaignRoomIsWarm_ === 'function' && window.dalCampaignRoomIsWarm_();
   var endPrep = document.getElementById('dal-prep-end-btn');
   var endTl = document.getElementById('dal-timeline-end-btn');
+  var startPrep = document.getElementById('dal-prep-start-btn');
+  var startTl = document.getElementById('dal-timeline-start-btn');
+  // Warm Live L3 — Start ceremony hidden while room warm on auto-attach surfaces.
+  if (warm) {
+    if (startPrep) startPrep.style.display = 'none';
+    if (startTl) startTl.style.display = 'none';
+  } else {
+    // Warm → cold: re-apply domain UI so Start can return for short sessions.
+    if (typeof window.evalDalPrepButtons === 'function') {
+      try { window.evalDalPrepButtons(); } catch (ePrep) { /* ignore */ }
+    }
+    if (typeof window.refreshTimelineDalBanner === 'function') {
+      try { window.refreshTimelineDalBanner(); } catch (eTl) { /* ignore */ }
+    }
+  }
   // Primary End is on the project editor (#master-end-room-btn). Hide module Ends while warm.
   if (endPrep) {
     if (warm) {

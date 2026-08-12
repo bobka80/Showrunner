@@ -71,7 +71,9 @@ window.refreshTimelineDalBanner = function() {
       }
       window.dalTimelineSessionOpen = !!isOpen;
       if (banner) banner.style.display = 'none';
-      if (startBtn) startBtn.style.display = (isOpen || isOpening || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly)) ? 'none' : 'inline-flex';
+      if (startBtn) startBtn.style.display = (isOpen || isOpening || (typeof currentIsReadOnly !== 'undefined' && currentIsReadOnly) ||
+        (typeof window.dalMayShowStartForkButton_ === 'function' && !window.dalMayShowStartForkButton_('timeline')))
+        ? 'none' : 'inline-flex';
       if (endBtn) endBtn.style.display = (isOpen || isOpening) ? 'inline-flex' : 'none';
     })
     .getDalSessionInfo(projectId);
@@ -286,7 +288,9 @@ window.openDalTimelineCollabSession = function(opts) {
   if (typeof window.dalIsLiveForkExcluded_ === 'function' && window.dalIsLiveForkExcluded_()) {
     return alert('Live timeline collaboration is not available for freelancer accounts.');
   }
-  if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('timeline')) {
+  if (opts.auto) {
+    if (typeof window.dalMayAutoStartFork_ === 'function' && !window.dalMayAutoStartFork_('timeline')) return;
+  } else if (typeof window.dalMayManualStartFork_ === 'function' && !window.dalMayManualStartFork_('timeline')) {
     return alert('You cannot start timeline collaboration on this device.');
   }
   var postReenter = !!(opts.postCommitReenter || window.dalTlPostCommitReenter_);
