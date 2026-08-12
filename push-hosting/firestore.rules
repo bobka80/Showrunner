@@ -16,10 +16,26 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isShowrunnerClient() && docId != '_meta';
     }
-    // Campaign Room meta — GAS writes room registry; clients may read warmth stamps.
+    // Campaign Room meta — room open/close stays GAS-owned; Warm Live L2 lets clients
+    // update identity fields on meta/state only while status stays open and roomUid/opened* locked.
+    // identityWriteSeq must advance by exactly 1 (blocks clock poison / rewrite without seq).
+    // name / projectStatus require manager claim (parity with GAS warm save).
     match /projects/{projectId}/meta/{docId} {
       allow read: if request.auth != null;
-      allow write: if false;
+      allow create, delete: if false;
+      allow update: if isShowrunnerClient()
+        && docId == 'state'
+        && resource.data.status == 'open'
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.roomUid == resource.data.roomUid
+        && request.resource.data.openedAt == resource.data.openedAt
+        && request.resource.data.openedBy == resource.data.openedBy
+        && request.resource.data.identityWriteSeq == resource.data.get('identityWriteSeq', 0) + 1
+        && (
+          (request.resource.data.name == resource.data.get('name', '')
+            && request.resource.data.projectStatus == resource.data.get('projectStatus', ''))
+          || request.auth.token.manager == true
+        );
     }
     // Campaign Room R3 — logistics live slice; _meta GAS-only.
     match /projects/{projectId}/logistics/{docId} {

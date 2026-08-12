@@ -1120,99 +1120,116 @@ window.peSendIdentitySavePayload_ = function(payload, opts) {
     : 'System UI';
   var sent = payload;
 
-  google.script.run
-    .withFailureHandler(function(err) {
-      window.peWarmAutosaveBusy_ = false;
-      var msg = (err && err.message) ? err.message : String(err || 'Save failed');
-      if (quiet || window.peLeaveSaveQuiet_) {
-        // Cancel leave: one retry with a fresh stamp avoids in-flight race COLLISION.
-        if (!window.peLeaveSaveRetried_ && sent && sent.projectData) {
-          window.peLeaveSaveRetried_ = true;
-          sent.projectData.Last_Updated = new Date().toISOString();
-          window.peSendIdentitySavePayload_(sent, { quiet: true });
-          return;
-        }
-        window.peLeaveSaveQuiet_ = false;
-        if (window.peLeaveSavePayload_) {
-          var leaveFail = window.peLeaveSavePayload_;
-          window.peLeaveSavePayload_ = null;
-          window.peLeaveSaveRetried_ = false;
-          window.peSendIdentitySavePayload_(leaveFail, { quiet: true });
-        }
+  var finishFail_ = function(err) {
+    window.peWarmAutosaveBusy_ = false;
+    var msg = (err && err.message) ? err.message : String(err || 'Save failed');
+    var isCollision = /COLLISION_DETECTED/i.test(msg);
+    if (quiet || window.peLeaveSaveQuiet_) {
+      // Do NOT bump Last_Updated and resend on collision — that would overwrite a peer.
+      if (!isCollision && !window.peLeaveSaveRetried_ && sent && sent.projectData) {
+        window.peLeaveSaveRetried_ = true;
+        sent.projectData.Last_Updated = new Date().toISOString();
+        window.peSendIdentitySavePayload_(sent, { quiet: true });
         return;
-      }
-      window.pePaintAutosaveCue_('error', 'Save failed');
-      if (typeof showToast === 'function') showToast('Autosave failed: ' + msg);
-      else alert('Autosave failed: ' + msg);
-      window.peSyncSaveBtnChrome_();
-      if (window.peLeaveSavePayload_) {
-        var leave = window.peLeaveSavePayload_;
-        window.peLeaveSavePayload_ = null;
-        window.peLeaveSaveRetried_ = false;
-        window.peSendIdentitySavePayload_(leave, { quiet: true });
-      }
-    })
-    .withSuccessHandler(function(res) {
-      window.peWarmAutosaveBusy_ = false;
-      if (res && res.toString().startsWith('Error')) {
-        if (quiet || window.peLeaveSaveQuiet_) {
-          if (!window.peLeaveSaveRetried_ && sent && sent.projectData) {
-            window.peLeaveSaveRetried_ = true;
-            sent.projectData.Last_Updated = new Date().toISOString();
-            window.peSendIdentitySavePayload_(sent, { quiet: true });
-            return;
-          }
-          window.peLeaveSaveQuiet_ = false;
-          if (window.peLeaveSavePayload_) {
-            var leaveErr = window.peLeaveSavePayload_;
-            window.peLeaveSavePayload_ = null;
-            window.peLeaveSaveRetried_ = false;
-            window.peSendIdentitySavePayload_(leaveErr, { quiet: true });
-          }
-          return;
-        }
-        window.pePaintAutosaveCue_('error', 'Save failed');
-        if (typeof showToast === 'function') showToast(String(res));
-        else alert(String(res));
-        window.peSyncSaveBtnChrome_();
-        return;
-      }
-      var resObj = { id: res };
-      try {
-        if (typeof res === 'string' && res.charAt(0) === '{') resObj = JSON.parse(res);
-      } catch (eP) { /* keep */ }
-      if (resObj.timestamp) {
-        var verEl = document.getElementById('edit-proj-version');
-        if (verEl) verEl.value = resObj.timestamp;
-        if (window.peLeaveSavePayload_ && window.peLeaveSavePayload_.projectData) {
-          window.peLeaveSavePayload_.projectData.Last_Updated = resObj.timestamp;
-        }
-      }
-      if (typeof window.pePatchLocalCalendarAfterIdentitySave_ === 'function') {
-        window.pePatchLocalCalendarAfterIdentitySave_(sent, resObj.timestamp || '');
-      }
-      // Clear dirty on any successful identity write (quiet leave/nav included).
-      window.isProjectDirty = false;
-      if (!quiet) {
-        window.pePaintAutosaveCue_('saved');
-        window.peSyncSaveBtnChrome_();
       }
       window.peLeaveSaveQuiet_ = false;
-      if (window.peLeaveSavePayload_) {
-        var leave2 = window.peLeaveSavePayload_;
+      if (!isCollision && window.peLeaveSavePayload_) {
+        var leaveFail = window.peLeaveSavePayload_;
         window.peLeaveSavePayload_ = null;
         window.peLeaveSaveRetried_ = false;
-        window.peSendIdentitySavePayload_(leave2, { quiet: true });
+        window.peSendIdentitySavePayload_(leaveFail, { quiet: true });
+      } else {
+        window.peLeaveSavePayload_ = null;
+        window.peLeaveSaveRetried_ = false;
+      }
+      return;
+    }
+    window.pePaintAutosaveCue_('error', isCollision ? 'Refresh needed' : 'Save failed');
+    if (typeof showToast === 'function') showToast('Autosave failed: ' + msg);
+    else alert('Autosave failed: ' + msg);
+    window.peSyncSaveBtnChrome_();
+    if (window.peLeaveSavePayload_) {
+      var leave = window.peLeaveSavePayload_;
+      window.peLeaveSavePayload_ = null;
+      window.peLeaveSaveRetried_ = false;
+      window.peSendIdentitySavePayload_(leave, { quiet: true });
+    }
+  };
+
+  var finishOk_ = function(res) {
+    window.peWarmAutosaveBusy_ = false;
+    if (res && res.toString && res.toString().startsWith('Error')) {
+      finishFail_(new Error(String(res)));
+      return;
+    }
+    var resObj = { id: res };
+    try {
+      if (typeof res === 'string' && res.charAt(0) === '{') resObj = JSON.parse(res);
+      else if (res && typeof res === 'object') resObj = res;
+    } catch (eP) { /* keep */ }
+    if (resObj.timestamp) {
+      var verEl = document.getElementById('edit-proj-version');
+      if (verEl) verEl.value = resObj.timestamp;
+      if (window.peLeaveSavePayload_ && window.peLeaveSavePayload_.projectData) {
+        window.peLeaveSavePayload_.projectData.Last_Updated = resObj.timestamp;
+      }
+    }
+    if (typeof window.pePatchLocalCalendarAfterIdentitySave_ === 'function') {
+      window.pePatchLocalCalendarAfterIdentitySave_(sent, resObj.timestamp || '');
+    }
+    // Clear dirty on any successful identity write (quiet leave/nav included).
+    window.isProjectDirty = false;
+    if (!quiet) {
+      window.pePaintAutosaveCue_('saved');
+      window.peSyncSaveBtnChrome_();
+    }
+    window.peLeaveSaveQuiet_ = false;
+    if (window.peLeaveSavePayload_) {
+      var leave2 = window.peLeaveSavePayload_;
+      window.peLeaveSavePayload_ = null;
+      window.peLeaveSaveRetried_ = false;
+      window.peSendIdentitySavePayload_(leave2, { quiet: true });
+      return;
+    }
+    if (window.peWarmAutosavePending_) {
+      window.peScheduleWarmIdentityAutosave_();
+    } else if (!quiet) {
+      setTimeout(function() {
+        if (window.peAutosaveCueState_ === 'saved') window.pePaintAutosaveCue_('');
+      }, 2500);
+    }
+  };
+
+  var useLive = !!(typeof window.peIsWarmEditorAutosave_ === 'function' &&
+    window.peIsWarmEditorAutosave_() &&
+    typeof window.dalWriteWarmIdentityLive_ === 'function' &&
+    !opts.forceGas);
+
+  if (useLive) {
+    window.dalWriteWarmIdentityLive_(payload, function(liveErr, liveRes) {
+      if (liveErr) {
+        var liveMsg = (liveErr && liveErr.message) ? liveErr.message : String(liveErr || '');
+        // Collision is authoritative — do not re-fight via GAS with the same stamp.
+        if (/COLLISION_DETECTED/i.test(liveMsg)) {
+          finishFail_(liveErr);
+          return;
+        }
+        // Fall back to GAS warm path once if live wire fails (rules/auth/host).
+        try { console.warn('[PE] identity live write failed; falling back to GAS', liveErr); } catch (eW) { /* ignore */ }
+        google.script.run
+          .withFailureHandler(finishFail_)
+          .withSuccessHandler(finishOk_)
+          .saveEventFromUI(payload.projectData, payload.timelines, actor);
         return;
       }
-      if (window.peWarmAutosavePending_) {
-        window.peScheduleWarmIdentityAutosave_();
-      } else if (!quiet) {
-        setTimeout(function() {
-          if (window.peAutosaveCueState_ === 'saved') window.pePaintAutosaveCue_('');
-        }, 2500);
-      }
-    })
+      finishOk_(liveRes || {});
+    });
+    return;
+  }
+
+  google.script.run
+    .withFailureHandler(finishFail_)
+    .withSuccessHandler(finishOk_)
     .saveEventFromUI(payload.projectData, payload.timelines, actor);
 };
 

@@ -70,11 +70,20 @@ function getDalFirebaseClientAuth(actor) {
       throw new Error('FIREBASE_WEB_API_KEY missing in Script Properties — required for client Firestore.');
     }
     var fbUid = dalResolveFirebaseUidForActor_(name);
-    var token = dalMintFirebaseCustomToken_(fbUid, { showrunner: true, crew: name });
+    var isManager = false;
+    try {
+      isManager = !!verifyBackendPrivilege(name, 'MANAGER');
+    } catch (eMgr) { isManager = false; }
+    var token = dalMintFirebaseCustomToken_(fbUid, {
+      showrunner: true,
+      crew: name,
+      manager: isManager
+    });
     return {
       config: cfg,
       customToken: token,
-      firebaseUid: fbUid
+      firebaseUid: fbUid,
+      manager: isManager
     };
   }, 3, true);
 }

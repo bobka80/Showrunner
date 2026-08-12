@@ -1614,7 +1614,11 @@ window.dalFsBindHostMessages_ = function() {
       delete window.dalFsPending_[d.requestId];
       if (d.ok) {
         window.dalFsHostAuthReady_ = true;
-        window.dalFirestoreClient = { viaHost: true, ready: true };
+        window.dalFirestoreClient = {
+          viaHost: true,
+          ready: true,
+          manager: !!d.manager
+        };
         try { console.log('[DAL FS] host Auth OK'); } catch (eOk) { /* ignore */ }
         pend.cb(null, window.dalFirestoreClient);
       } else {
@@ -1678,7 +1682,8 @@ window.dalFsPostToHost_ = function(msg) {
  * Prefer host-shell Firebase Auth (first-party web.app). Falls back to in-iframe Auth.
  */
 window.dalEnsureFirestoreClientAuth_ = function(cb) {
-  if (window.dalFirestoreClient && window.dalFirestoreClient.ready) {
+  if (window.dalFirestoreClient && window.dalFirestoreClient.ready &&
+      window.dalFirestoreClient.manager !== undefined) {
     cb(null, window.dalFirestoreClient);
     return;
   }
@@ -1731,6 +1736,7 @@ window.dalEnsureFirestoreClientAuth_ = function(cb) {
             window.dalFirestoreClient.auth.signInWithCustomToken(res.customToken)
               .then(function() {
                 window.dalFirestoreClient.ready = true;
+                window.dalFirestoreClient.manager = !!res.manager;
                 window.__dalFsLastHostFail_ = '';
                 cb(null, window.dalFirestoreClient);
               })
@@ -1832,6 +1838,172 @@ window.dalHostFsPaPatchWrite_ = function(path, localFixtures, mutations, meta, d
     localFixtures: localFixtures || [],
     mutations: mutations || {},
     meta: meta || {}
+  });
+};
+
+/** Warm Live L2 — identity write on web.app host (meta/state transaction). */
+window.dalHostFsMetaIdentityWrite_ = function(projectId, projectData, timelines, meta, done) {
+  done = done || function() {};
+  window.dalFsBindHostMessages_();
+  var requestId = 'MI' + (window.dalFsReqSeq_++);
+  window.dalFsPending_[requestId] = { cb: done };
+  window.dalFsPostToHost_({
+    type: 'SHOWRUNNER_DAL_FS_META_IDENTITY_WRITE',
+    requestId: requestId,
+    projectId: projectId,
+    projectData: projectData || {},
+    timelines: timelines || [],
+    meta: meta || {}
+  });
+};
+
+/**
+ * Warm Live L2 — write identity + sub-events to Firebase meta from the browser.
+ * Host path preferred; iframe Firestore fallback; cb(err, resultObj).
+ */
+window.dalWriteWarmIdentityLive_ = function(payload, done) {
+  done = done || function() {};
+  if (!payload || !payload.projectData) {
+    done(new Error('missing identity payload'));
+    return;
+  }
+  var projectData = payload.projectData;
+  var timelines = payload.timelines || [];
+  var projectId = String(projectData.Project_ID || payload.id || '');
+  if (!projectId || projectId === 'NEW') {
+    done(new Error('Warm identity write requires project id'));
+    return;
+  }
+  var actor = (typeof ACTIVE_USER_NAME !== 'undefined' && ACTIVE_USER_NAME)
+    ? ACTIVE_USER_NAME
+    : 'System UI';
+  var meta = { actor: actor, clientId: window.dalPaClientId || '' };
+
+  var applyIframeTxn_ = function(client) {
+    if (!client || !client.db) {
+      done(new Error('firestore_client_unavailable'));
+      return;
+    }
+    var ref = client.db.collection('projects').doc(projectId).collection('meta').doc('state');
+    var resolveManager_ = function() {
+      if (client.manager === true || client.manager === false) return Promise.resolve(!!client.manager);
+      var auth = client.auth;
+      var user = auth && auth.currentUser;
+      if (!user || typeof user.getIdTokenResult !== 'function') return Promise.resolve(false);
+      return user.getIdTokenResult().then(function(tok) {
+        return !!(tok && tok.claims && tok.claims.manager);
+      }).catch(function() { return false; });
+    };
+    resolveManager_().then(function(isManager) {
+      return client.db.runTransaction(function(tx) {
+        return tx.get(ref).then(function(doc) {
+          if (!doc.exists) throw new Error('Campaign meta missing — open room first');
+          var cur = doc.data() || {};
+          if (String(cur.status || '') !== 'open') {
+            throw new Error('Campaign room is not open — use Sheets save');
+          }
+          var clientTs = projectData.Last_Updated || '';
+          var metaTs = cur.identityUpdatedAt || '';
+          if (metaTs && clientTs) {
+            var t1 = new Date(metaTs).getTime();
+            var t2 = new Date(clientTs).getTime();
+            if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) > 2000 && t1 > t2) {
+              throw new Error('COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.');
+            }
+          }
+          var frags = [];
+          (timelines || []).forEach(function(t) {
+            if (!t) return;
+            var date = String(t.Event_Date || t.date || '').trim();
+            if (!date) return;
+            frags.push({
+              uid: String(t.uid || t.id || ''),
+              type: String(t.Sub_Event_Type || t.type || 'MAIN'),
+              date: date,
+              startTime: String(t.Start_Time || t.startTime || '').replace(/^'/, ''),
+              endTime: String(t.End_Time || t.endTime || '').replace(/^'/, ''),
+              note: String(t.Note || t.note || '')
+            });
+          });
+          var readinessJson = projectData.Readiness_State;
+          if (readinessJson && typeof readinessJson !== 'string') {
+            readinessJson = JSON.stringify(readinessJson);
+          }
+          if (!readinessJson) readinessJson = cur.readinessJson || '{}';
+          try {
+            var gatheredAt = projectData._gatheredAt || '';
+            var readyAt = cur.readinessUpdatedAt || '';
+            if (readyAt && gatheredAt) {
+              var tReady = new Date(readyAt).getTime();
+              var tGather = new Date(gatheredAt).getTime();
+              if (!isNaN(tReady) && !isNaN(tGather) && tReady > tGather && cur.readinessJson) {
+                readinessJson = cur.readinessJson;
+              }
+            }
+          } catch (eReady) { /* keep */ }
+          var now = new Date().toISOString();
+          var seq = (Number(cur.identityWriteSeq) || 0) + 1;
+          var nextName = isManager
+            ? (projectData.Project_Name || cur.name || 'Unnamed Event')
+            : String(cur.name != null ? cur.name : '');
+          var nextStatus = isManager
+            ? (projectData.Status || cur.projectStatus || 'Draft')
+            : String(cur.projectStatus != null ? cur.projectStatus : '');
+          var patch = {
+            roomUid: cur.roomUid || '',
+            status: cur.status || 'open',
+            openedAt: cur.openedAt || now,
+            openedBy: cur.openedBy || actor,
+            lastActivityAt: now,
+            lastPublishedAt: cur.lastPublishedAt || '',
+            domain: 'meta',
+            name: nextName,
+            client: projectData.Client != null ? String(projectData.Client) : (cur.client || ''),
+            projectStatus: nextStatus,
+            type: projectData.Type || cur.type || 'Event',
+            locationUrl: projectData.Location_URL != null ? String(projectData.Location_URL) : (cur.locationUrl || ''),
+            difficultyMultiplier: projectData.Difficulty_Multiplier != null
+              ? projectData.Difficulty_Multiplier
+              : (cur.difficultyMultiplier || 1),
+            folderId: projectData.Folder_ID || cur.folderId || '',
+            managerEmail: projectData.Manager_Email || cur.managerEmail || '',
+            readinessJson: readinessJson,
+            readinessUpdatedAt: now,
+            subEventsJson: JSON.stringify(frags),
+            identityWriteSeq: seq,
+            identityUpdatedAt: now,
+            identityUpdatedBy: actor
+          };
+          tx.set(ref, patch);
+          return {
+            id: projectId,
+            timestamp: now,
+            warm: true,
+            live: true,
+            identityWriteSeq: seq
+          };
+        });
+      });
+    }).then(function(result) {
+      done(null, result);
+    }).catch(function(err) {
+      done(err || new Error('identity live write failed'));
+    });
+  };
+
+  window.dalEnsureFirestoreClientAuth_(function(authErr, client) {
+    if (authErr) {
+      done(authErr);
+      return;
+    }
+    if (client && client.viaHost && typeof window.dalHostFsMetaIdentityWrite_ === 'function') {
+      window.dalHostFsMetaIdentityWrite_(projectId, projectData, timelines, meta, function(writeErr, result) {
+        if (writeErr) done(writeErr);
+        else done(null, result);
+      });
+      return;
+    }
+    applyIframeTxn_(client);
   });
 };
 

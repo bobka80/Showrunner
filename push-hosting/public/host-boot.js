@@ -2706,17 +2706,23 @@
         reply(false, 'Missing custom token');
         return;
       }
-      // Already signed in on this host tab — answer immediately (second collab user / reopen).
-      var cur = null;
-      try { cur = firebase.auth().currentUser; } catch (eCur) { cur = null; }
-      if (cur) {
-        dalFsAuthReady_ = true;
-        reply(true);
-        return;
-      }
+      // Always sign in with the fresh mint so custom claims (manager) stay current.
       firebase.auth().signInWithCustomToken(data.customToken).then(function() {
         dalFsAuthReady_ = true;
-        reply(true);
+        var u = firebase.auth().currentUser;
+        if (!u || typeof u.getIdTokenResult !== 'function') {
+          reply(true);
+          return;
+        }
+        return u.getIdTokenResult().then(function(tok) {
+          dalFsPostToIframe_({
+            type: 'SHOWRUNNER_DAL_FS_AUTH_RESULT',
+            requestId: requestId,
+            ok: true,
+            error: '',
+            manager: !!(tok && tok.claims && tok.claims.manager)
+          }, sourceWin);
+        });
       }).catch(function(err) {
         dalFsAuthReady_ = false;
         var em = err && err.message ? err.message : String(err);
@@ -3138,6 +3144,142 @@
     }
   }
 
+  /**
+   * Warm Live L2 — identity + sub-events on projects/{id}/meta/state (transaction).
+   * Preserves room registry fields; bumps identityWriteSeq / identityUpdatedAt.
+   */
+  function dalFsHandleMetaIdentityWrite_(data, sourceWin) {
+    var requestId = data.requestId || '';
+    var projectId = String(data.projectId || '');
+    var projectData = data.projectData || {};
+    var timelines = data.timelines || [];
+    var actor = (data.meta && data.meta.actor) || 'System';
+    function reply(ok, result, errMsg) {
+      dalFsPostToIframe_({
+        type: 'SHOWRUNNER_DAL_FS_WRITE_RESULT',
+        requestId: requestId,
+        ok: !!ok,
+        result: result || null,
+        error: errMsg || ''
+      }, sourceWin);
+    }
+    if (!projectId || projectId === 'NEW') {
+      reply(false, null, 'Warm identity write requires project id');
+      return;
+    }
+    try {
+      var ref = dalFsDocRef_('projects/' + projectId + '/meta/state');
+      var authUser = firebase.auth().currentUser;
+      var resolveManager_ = function() {
+        if (!authUser || typeof authUser.getIdTokenResult !== 'function') {
+          return Promise.resolve(false);
+        }
+        return authUser.getIdTokenResult().then(function(tok) {
+          return !!(tok && tok.claims && tok.claims.manager);
+        }).catch(function() { return false; });
+      };
+      resolveManager_().then(function(isManager) {
+        return firebase.firestore().runTransaction(function(tx) {
+          return tx.get(ref).then(function(doc) {
+            if (!doc.exists) {
+              throw new Error('Campaign meta missing — open room first');
+            }
+            var cur = doc.data() || {};
+            if (String(cur.status || '') !== 'open') {
+              throw new Error('Campaign room is not open — use Sheets save');
+            }
+            var clientTs = projectData.Last_Updated || '';
+            var metaTs = cur.identityUpdatedAt || '';
+            if (metaTs && clientTs) {
+              var t1 = new Date(metaTs).getTime();
+              var t2 = new Date(clientTs).getTime();
+              if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) > 2000 && t1 > t2) {
+                throw new Error('COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.');
+              }
+            }
+            var frags = [];
+            (timelines || []).forEach(function(t) {
+              if (!t) return;
+              var date = String(t.Event_Date || t.date || '').trim();
+              if (!date) return;
+              frags.push({
+                uid: String(t.uid || t.id || ''),
+                type: String(t.Sub_Event_Type || t.type || 'MAIN'),
+                date: date,
+                startTime: String(t.Start_Time || t.startTime || '').replace(/^'/, ''),
+                endTime: String(t.End_Time || t.endTime || '').replace(/^'/, ''),
+                note: String(t.Note || t.note || '')
+              });
+            });
+            var readinessJson = projectData.Readiness_State;
+            if (readinessJson && typeof readinessJson !== 'string') {
+              readinessJson = JSON.stringify(readinessJson);
+            }
+            if (!readinessJson) readinessJson = cur.readinessJson || '{}';
+            try {
+              var gatheredAt = projectData._gatheredAt || '';
+              var readyAt = cur.readinessUpdatedAt || '';
+              if (readyAt && gatheredAt) {
+                var tReady = new Date(readyAt).getTime();
+                var tGather = new Date(gatheredAt).getTime();
+                if (!isNaN(tReady) && !isNaN(tGather) && tReady > tGather && cur.readinessJson) {
+                  readinessJson = cur.readinessJson;
+                }
+              }
+            } catch (eReady) { /* keep */ }
+            var now = new Date().toISOString();
+            var seq = (Number(cur.identityWriteSeq) || 0) + 1;
+            var nextName = isManager
+              ? (projectData.Project_Name || cur.name || 'Unnamed Event')
+              : String(cur.name != null ? cur.name : '');
+            var nextStatus = isManager
+              ? (projectData.Status || cur.projectStatus || 'Draft')
+              : String(cur.projectStatus != null ? cur.projectStatus : '');
+            var patch = {
+              roomUid: cur.roomUid || '',
+              status: cur.status || 'open',
+              openedAt: cur.openedAt || now,
+              openedBy: cur.openedBy || actor,
+              lastActivityAt: now,
+              lastPublishedAt: cur.lastPublishedAt || '',
+              domain: 'meta',
+              name: nextName,
+              client: projectData.Client != null ? String(projectData.Client) : (cur.client || ''),
+              projectStatus: nextStatus,
+              type: projectData.Type || cur.type || 'Event',
+              locationUrl: projectData.Location_URL != null ? String(projectData.Location_URL) : (cur.locationUrl || ''),
+              difficultyMultiplier: projectData.Difficulty_Multiplier != null
+                ? projectData.Difficulty_Multiplier
+                : (cur.difficultyMultiplier || 1),
+              folderId: projectData.Folder_ID || cur.folderId || '',
+              managerEmail: projectData.Manager_Email || cur.managerEmail || '',
+              readinessJson: readinessJson,
+              readinessUpdatedAt: now,
+              subEventsJson: JSON.stringify(frags),
+              identityWriteSeq: seq,
+              identityUpdatedAt: now,
+              identityUpdatedBy: actor
+            };
+            tx.set(ref, patch);
+            return {
+              id: projectId,
+              timestamp: now,
+              warm: true,
+              live: true,
+              identityWriteSeq: seq
+            };
+          });
+        });
+      }).then(function(result) {
+        reply(true, result);
+      }).catch(function(err) {
+        reply(false, null, err && err.message ? err.message : String(err));
+      });
+    } catch (e) {
+      reply(false, null, e && e.message ? e.message : String(e));
+    }
+  }
+
   window.addEventListener('message', function(ev) {
     if (!ev.data) return;
     if (ev.data.type === 'SHOWRUNNER_HOST_TOAST') {
@@ -3173,6 +3315,10 @@
     }
     if (ev.data.type === 'SHOWRUNNER_DAL_FS_PA_PATCH_WRITE') {
       dalFsHandlePaPatchWrite_(ev.data, ev.source);
+      return;
+    }
+    if (ev.data.type === 'SHOWRUNNER_DAL_FS_META_IDENTITY_WRITE') {
+      dalFsHandleMetaIdentityWrite_(ev.data, ev.source);
       return;
     }
     if (ev.data.type === 'SHOWRUNNER_SESSION_TOKEN') {

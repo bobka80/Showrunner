@@ -511,6 +511,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign Room R3c (2026-08-04):** `projects/{id}/meta/state` carries project identity (name, client, location, outdoor/inSofia via readinessJson, subEventsJson) while warm. Save & Sync → Firebase when room warm; Sheets + Google Calendar lag until END ROOM (`dalCommitCampaignIdentityFromFirestore_`). `getExistingProjects` overlays live meta for warm rooms (cap 25).
 
+**Warm Live L2 (2026-08-12):** While room warm, project-editor identity autosave writes \meta/state\ **browser <-> Firebase** (host \SHOWRUNNER_DAL_FS_META_IDENTITY_WRITE\ / iframe txn). Firestore rules allow \meta/state\ **update** only if \status\ stays \open\ and oomUid\/\openedAt\/\openedBy\ unchanged. Cold / NEW still use GAS. GAS \dalSaveProjectIdentityWarm_\ remains fallback.
+
 **PA enter thin-snap flash (2026-08-04):** Opening Project Assets briefly showed full list then collapsed to a few rows with System “removed N” — thin `assets/state` (Hub leftover) was force-applied over richer cache/UI via `dalPaPreferLiveFixturesOverCache_` / heal tick. Guard: `dalPaIsThinRemoteVsLocal_` refuses thin remotes; prefer-cache + heal tick + state apply all use it.
 
 **Refresh / tab close (2026-07-21 @ v725+; paint-first @ v740+; PA unload flush @ v774):** \pagehide\/\eforeunload\ writes **localStorage unload flag** + **urgent PA_PATCH** for pending touches (host finishes after iframe dies) + presence leave + last-leave. **PA window paints immediately**; \dalGatePrepEnterForOrphan_\ still runs **before soft-join / auto-prep** — if unload flag or empty aged room → commit orphan (do not rejoin Live). Presence ping reclaim remains as backup. Hydrate prefers \ssets/state\ over collection.
@@ -612,7 +614,7 @@ Hard-refresh **two browsers** on web.app (banner must say **live sync (patch)**)
 | `02e7_Dal_Firestore_Client.html` | Host bridge client (`SHOWRUNNER_DAL_FS_*`) + iframe Auth fallback; prep PA **collection** listen + `_meta` doc listen |
 | `push-hosting/public/host-boot.js` | Host Auth / doc listen / **collection listen** / patch-write; deep `window.frames` reply walk |
 | `Dal_Firebase.js` / `Dal_Firebase_Auth.js` | Fork snapshot/commit; custom token mint |
-| `push-hosting/firestore.rules` | Client read/write while `request.auth.token.showrunner` |
+| `push-hosting/firestore.rules` | Client read/write while `request.auth.token.showrunner`; `meta/state` update allowed only with locked room registry fields (Warm Live L2) |
 
 ### Never do
 

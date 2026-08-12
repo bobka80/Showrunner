@@ -7,7 +7,7 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · § DAL prep/timeline live sync · Triangle of Truth  
 **Live forks pause:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — check before L2/L3
 
-**Opened:** 2026-08-11 · **Status:** **ACTIVE** — warm-readers W6 closed; **L0** shipped @ **GAS v785**, awaiting smoke.  
+**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L2** identity live Firebase in flight (L0 @ v785).  
 **Production tip:** see RELEASES.md (**GAS v785**). Prep rollback pin still **v654**.
 
 ---
@@ -35,11 +35,11 @@ Warm-readers made Offer/Tracker honest and added identity autosave — but that 
 ```text
 warm-readers W6 Exit → archive  ✓
         ↓
-L0 PA failed-commit fix  ← now
+L0 PA failed-commit fix  ✓ @ v785
         ↓
 L1 design lock (this file + topic)  ✓ with W6
         ↓
-L2 identity true live Firebase
+L2 identity true live Firebase  ← now
         ↓
 L3 auto-attach PA + Timeline with room
         ↓
@@ -75,7 +75,7 @@ L5 exit + archive
 
 - [x] Root-cause (reconcile signature + SHORT auto detect)  
 - [x] Smallest safe ship (normalize commit + signature; strip `[SHORT] ` before auto check; reconcile alert once)  
-- [ ] Director smoke green  
+- [x] Director continue → L2 (smoke folded forward 2026-08-12)  
 
 **Done when:** commit no longer false-fails in director smoke.
 
@@ -90,9 +90,9 @@ L5 exit + archive
 
 ### L2 — Project editor identity = true live Firebase
 
-- [ ] Title, client, location, mini-cal/sub-events, readiness write Firebase meta from the browser  
-- [ ] No Apps Script round-trip for routine identity edits  
-- [ ] Reopen reads live meta (not only calendar cache bandage)  
+- [x] Title, client, location, mini-cal/sub-events, readiness write Firebase meta from the browser  
+- [x] No Apps Script round-trip for routine identity edits (GAS fallback if live wire fails)  
+- [x] Reopen: calendar cache patch + warm meta overlay (getExistingProjects)  
 - [ ] Ship + smoke: edit → Cancel → reopen sticks; feels immediate  
 
 **Done when:** identity no longer depends on GAS autosave for warm projects.
@@ -139,6 +139,7 @@ L5 exit + archive
 | 2026-08-11 | Director approved Warm Live Completion. Filed active + topic. Sequenced **after** warm-readers W6. Next: finish W6 → OK go **L0** (PA failed commit). |
 | 2026-08-11 | Director: close warm-readers → continue fixing. W6 archived; this campaign **ACTIVE**; **L0** in flight. |
 | 2026-08-11 | **L0 @ GAS v785** — PA commit reconcile: normalize qty/scan/location; `[SHORT] [AUTO]` treated as auto; single alert. Awaiting director smoke (End Prep / End Room without false DAL commit-fail toast). |
+| 2026-08-12 | Director: continue → **L2**. Identity warm autosave → browser↔Firebase (`meta/state`); rules unlock update with locked room fields; host `META_IDENTITY_WRITE`. |
 
 ---
 

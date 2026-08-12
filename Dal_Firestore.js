@@ -210,7 +210,9 @@ function firestoreGetTimelineSessionMeta_(projectId) {
   return firestoreDecodeFields_(doc.fields);
 }
 
-/** Campaign Room R1 — warm room meta slice (GAS-owned; clients read-only via rules). */
+/** Campaign Room R1/R3c — warm room meta slice.
+ *  Room open/close: GAS-owned. Identity fields: client-writable while open (Warm Live L2).
+ */
 function firestoreSetCampaignMeta_(projectId, meta) {
   firestoreWriteDocument_('projects/' + projectId + '/meta/state', meta);
 }

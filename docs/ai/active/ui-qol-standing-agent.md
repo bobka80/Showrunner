@@ -76,7 +76,7 @@ This is a **warning gate**, not a hard lock. Stale drawers, undocumented WIP, an
 - Sidebar setup↔lock gap match tasks↔calendar 25px (GAS v736; was 64)
 - Sidebar setup trio 50px above lock (GAS v732)
 - Project editor Assets/Timeline chrome (GAS v696)
-- Calendar multi-row strip linked hover (pending ship)
+- Calendar multi-row strip linked hover (GAS v786)
 - Calendar room-only green dot, no glow / no PA orange or timeline blue (GAS v747)
 - Phone/station bottom SYNC bar (v699)
 - Timeline selection frame (v701 / v702)
