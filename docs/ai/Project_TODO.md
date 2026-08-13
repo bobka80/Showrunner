@@ -16,7 +16,7 @@ When production is blocked, add a row here or create `active/URGENT-<name>.md`.
 
 ## Next up (director, 2026-08-11)
 
-**Primary campaign (ACTIVE):** **Warm Live Completion** — true browser↔Firebase while warm; **L4** Hub honesty in ship. — [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) · topic [topics/warm-live-firebase-completion-2026-08-11.md](topics/warm-live-firebase-completion-2026-08-11.md).
+**Primary campaign (ACTIVE):** **Warm Live Completion** — true browser↔Firebase while warm; **L4** Hub honesty @ **v790** (smoke). — [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) · topic [topics/warm-live-firebase-completion-2026-08-11.md](topics/warm-live-firebase-completion-2026-08-11.md).
 
 **Predecessor (COMPLETE):** **Warm readers + Offer + Checkpoint** — archived 2026-08-11 @ **GAS v784**. — [archive/warm-readers-offer-tracker-2026-08-05.md](archive/warm-readers-offer-tracker-2026-08-05.md).
 
@@ -28,7 +28,7 @@ Also on the board (do not mix without director pick):
 
 | Item | Status | File |
 |------|--------|------|
-| **Warm Live Completion** | **ACTIVE** — L4 Hub honesty | [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) |
+| **Warm Live Completion** | **ACTIVE** — L4 @ v790 smoke | [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) |
 | **Warm readers + Offer + Checkpoint** | **COMPLETE** (archived) | [archive/warm-readers-offer-tracker-2026-08-05.md](archive/warm-readers-offer-tracker-2026-08-05.md) |
 | **Project Campaign Room** | **COMPLETE** (archived) | [archive/project-campaign-room-2026-07-24.md](archive/project-campaign-room-2026-07-24.md) |
 | **Logistics Ledger** | **COMPLETE** (archived) | [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) |
@@ -42,7 +42,7 @@ Also on the board (do not mix without director pick):
 
 | Campaign | Status | File |
 |----------|--------|------|
-| **Warm Live Completion** | **ACTIVE** — L4 Hub honesty | [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) |
+| **Warm Live Completion** | **ACTIVE** — L4 @ v790 smoke | [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) |
 | **RFID scanning & station profiles** | **REWIND pinned @ GAS 530** — floor working. Phase A shell split when picked | [active/rfid-station-profiles.md](active/rfid-station-profiles.md) |
 | **UI / QoL standing agent** (not a campaign) | Standing — minor polish; collision-check actives | [active/ui-qol-standing-agent.md](active/ui-qol-standing-agent.md) · rule `.cursor/rules/ui-qol-agent.mdc` |
 
@@ -65,7 +65,7 @@ Also on the board (do not mix without director pick):
 | **Logistics Ledger** (movement SoT + conflict detection) | **COMPLETE** — archived 2026-07-24 | [archive/logistics-ledger-2026-07-21.md](archive/logistics-ledger-2026-07-21.md) · [schema](topics/logistics-ledger-schema-2026-07-20.md) |
 | **Project Campaign Room (Firebase hybrid)** | **COMPLETE** — archived 2026-08-05 @ v767 · readers/Offer → warm-readers archive | [archive/project-campaign-room-2026-07-24.md](archive/project-campaign-room-2026-07-24.md) · [topics/project-campaign-firebase-hybrid-decision-2026-07-21.md](topics/project-campaign-firebase-hybrid-decision-2026-07-21.md) |
 | **Warm readers + Offer + Checkpoint** | **COMPLETE** — archived 2026-08-11 @ v784 | [archive/warm-readers-offer-tracker-2026-08-05.md](archive/warm-readers-offer-tracker-2026-08-05.md) |
-| **Warm Live Completion** | **ACTIVE** — L4 Hub honesty | [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) · [topics/warm-live-firebase-completion-2026-08-11.md](topics/warm-live-firebase-completion-2026-08-11.md) |
+| **Warm Live Completion** | **ACTIVE** — L4 @ v790 smoke | [active/warm-live-completion-2026-08-11.md](active/warm-live-completion-2026-08-11.md) · [topics/warm-live-firebase-completion-2026-08-11.md](topics/warm-live-firebase-completion-2026-08-11.md) |
 | Logistics & warehouse RFID | Active campaign — station BLE reconnect UI-restart solved (APK 0.1.36); phone QR shipped → mobile-crew | [topics/logistics-warehouse.md](topics/logistics-warehouse.md) |
 | Project Assets concurrency | Backlog — normal-day Sheets; floor fork → prep session | [topics/project-assets-concurrency.md](topics/project-assets-concurrency.md) |
 | Compliance & H&S | Backlog | [topics/compliance.md](topics/compliance.md) |

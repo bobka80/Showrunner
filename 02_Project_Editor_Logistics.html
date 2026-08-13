@@ -9,14 +9,45 @@
 // ==========================================
 // @INDEX: LOGISTICS_WIZARD -> Logistics Hub & Autonomous Engine
 
-/** Warm Live L4 — room warm + prep live + PA already in memory. */
+/** Warm Live L4 — PA already in browser memory for this project (open Hub without GAS wait). */
 window.hubWarmLiveMemoryReady_ = function (projectId) {
     return !!(projectId &&
-        window.peForkRoomActive_ &&
-        window.dalPrepUiOpen &&
-        window.dalPaLiveSyncMode === 'firestore' &&
         window.paLoadedForProject === projectId &&
-        Array.isArray(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : null));
+        Array.isArray(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : null) &&
+        typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length > 0);
+};
+
+/** Soft seed warm Hub workspace in background (never blocks Hub open). */
+window.hubWarmSoftEnsure_ = function (projectId) {
+    if (!projectId) return;
+    try {
+        google.script.run
+            .withFailureHandler(function () {
+                if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
+                    window.hubWarmBackgroundRefresh_(projectId);
+                }
+            })
+            .withSuccessHandler(function (ens) {
+                if (ens && ens.warm) {
+                    window.peForkRoomActive_ = true;
+                    if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+                        try { window.refreshProjectEditorForkChrome_(projectId); } catch (eChrome0) { /* ignore */ }
+                    }
+                }
+                if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
+                    window.hubWarmBackgroundRefresh_(projectId);
+                }
+            })
+            .ensureDalWarmHubWorkspace(
+                projectId,
+                typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI',
+                {}
+            );
+    } catch (eSeed) {
+        if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
+            window.hubWarmBackgroundRefresh_(projectId);
+        }
+    }
 };
 
 /** Timeline snap for Hub UI locks (manual truck shifts) — prefer live memory. */
@@ -239,61 +270,35 @@ function openLogisticsHubModal() {
         document.getElementById('logistics-hub-modal-overlay').style.display = 'flex';
     };
 
-    // Warm Live L4: already on live PA — open Hub from memory (no blocking GAS reload).
-    if (typeof window.hubWarmLiveMemoryReady_ === 'function' && window.hubWarmLiveMemoryReady_(projectId) &&
-        typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length > 0) {
-        try {
-            google.script.run
-                .withFailureHandler(function () {
-                    if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
-                        window.hubWarmBackgroundRefresh_(projectId);
-                    }
-                })
-                .withSuccessHandler(function (ens) {
-                    if (ens && ens.warm) {
-                        window.peForkRoomActive_ = true;
-                        if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
-                            try { window.refreshProjectEditorForkChrome_(projectId); } catch (eChrome0) { /* ignore */ }
-                        }
-                    }
-                    if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
-                        window.hubWarmBackgroundRefresh_(projectId);
-                    }
-                })
-                .ensureDalWarmHubWorkspace(
-                    projectId,
-                    typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI',
-                    {}
-                );
-        } catch (eSeed) {
-            if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
-                window.hubWarmBackgroundRefresh_(projectId);
-            }
-        }
+    // Warm Live L4: PA already in memory — open Hub immediately (seed/refresh in background).
+    // Do not wait for ensureDalWarmHubWorkspace / getProjectAssets / getTimelineData.
+    if (typeof window.hubWarmLiveMemoryReady_ === 'function' && window.hubWarmLiveMemoryReady_(projectId)) {
+        if (typeof window.hubWarmSoftEnsure_ === 'function') window.hubWarmSoftEnsure_(projectId);
         proceedToHub(typeof window.hubLocalTimelineForUi_ === 'function'
             ? window.hubLocalTimelineForUi_()
             : { shifts: [], phases: [], overrides: {} });
         return;
     }
 
-    if (window.paLoadedForProject !== projectId || typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
+    // Cold / first load only — PA not in memory yet.
+    {
         let btn = document.getElementById('logistics-hub-btn-layers') || document.getElementById('logistics-hub-btn');
         let origText = btn ? btn.innerText : 'LOGISTICS HUB';
         if (btn) { btn.innerText = "LOADING GEAR..."; btn.disabled = true; }
-        
+
         let sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : "";
         let eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : "";
-        
+
         let targetAssets = null;
         let targetTimeline = null;
-        
+
         const finalizeLoad = () => {
             if (targetAssets && targetTimeline) {
                 currentProjectAssets = targetAssets.current || [];
                 window.overlappingAllocations = targetAssets.overlapping || {};
                 window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
                 window.paLoadedForProject = projectId;
-                
+
                 const processFormulas = (arr) => {
                     let exploded = [];
                     for (let i = arr.length - 1; i >= 0; i--) {
@@ -312,12 +317,12 @@ function openLogisticsHubModal() {
                         }
                     }
                     if (exploded.length > 0) arr.push(...exploded);
-                    
+
                     arr.forEach(pa => {
                         if (pa.formula === 'Manual') pa.formula = 'Standalone';
                         if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
                         if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
-                        if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } 
+                        if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; }
                         else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
                         else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
                         else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
@@ -325,27 +330,34 @@ function openLogisticsHubModal() {
                 };
                 processFormulas(currentProjectAssets);
                 processFormulas(window.originalProjectAssets);
-                
+
                 if (btn) { btn.innerText = origText; btn.disabled = false; }
                 proceedToHub(targetTimeline);
             }
         };
 
         const fetchTimeline = () => {
+            var localTl = (typeof window.hubLocalTimelineForUi_ === 'function')
+                ? window.hubLocalTimelineForUi_()
+                : null;
+            if (localTl && Array.isArray(localTl.shifts)) {
+                targetTimeline = localTl;
+                finalizeLoad();
+                return;
+            }
             google.script.run
             .withFailureHandler(err => {
-                if (btn) { btn.innerText = origText; btn.disabled = false; }
-                alert("Error loading timeline data: " + err.message);
+                targetTimeline = { shifts: [], phases: [], overrides: {} };
+                finalizeLoad();
             })
             .withSuccessHandler(res => {
-                targetTimeline = res;
+                targetTimeline = res || { shifts: [], phases: [], overrides: {} };
                 finalizeLoad();
             }).getTimelineData(projectId, 'main');
         };
 
         const fetchAssets = () => {
-            // Force warm refresh after Hub seed so truck overlay comes from logistics/state.
-            if (window.paLoadedForProject === projectId && currentProjectAssets.length >= 0 && !window._hubForcePaReload_) {
+            if (window.paLoadedForProject === projectId && currentProjectAssets && !window._hubForcePaReload_) {
                 targetAssets = { current: currentProjectAssets, overlapping: window.overlappingAllocations };
                 fetchTimeline();
                 return;
@@ -370,93 +382,9 @@ function openLogisticsHubModal() {
             }
         };
 
-        // R3b: seed prep under warm Campaign Room before Hub reads (editor-only → warm Hub).
-        google.script.run
-            .withFailureHandler(function () { startHubLoads(); })
-            .withSuccessHandler(function (ens) {
-                if (ens && ens.warm) {
-                    window._hubForcePaReload_ = true;
-                    window.peForkRoomActive_ = true;
-                    if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
-                        try { window.refreshProjectEditorForkChrome_(projectId); } catch (eChrome) { /* ignore */ }
-                    }
-                }
-                startHubLoads();
-            })
-            .ensureDalWarmHubWorkspace(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI', {});
-    } else {
-        // R3b: assets already cached — still seed warm Hub workspace, then refresh PA/timeline.
-        let btnFast = document.getElementById('logistics-hub-btn-layers') || document.getElementById('logistics-hub-btn');
-        let origFast = btnFast ? btnFast.innerText : 'LOGISTICS HUB';
-        if (btnFast) { btnFast.innerText = 'OPENING HUB...'; btnFast.disabled = true; }
-        let sDateFast = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
-        let eDateFast = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
-        const finishFastHub_ = function (tData) {
-            if (btnFast) { btnFast.innerText = origFast; btnFast.disabled = false; }
-            proceedToHub(tData);
-        };
-        const afterSeedFast_ = function () {
-            google.script.run
-                .withFailureHandler(function () {
-                    google.script.run
-                        .withFailureHandler(function () { finishFastHub_(null); })
-                        .withSuccessHandler(finishFastHub_)
-                        .getTimelineData(projectId, 'main');
-                })
-                .withSuccessHandler(function (res) {
-                    currentProjectAssets = (res && res.current) || currentProjectAssets || [];
-                    window.overlappingAllocations = (res && res.overlapping) || window.overlappingAllocations || {};
-                    const processFormulasFast = (arr) => {
-                        let exploded = [];
-                        for (let i = arr.length - 1; i >= 0; i--) {
-                            let pa = arr[i];
-                            let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
-                            if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') {
-                                let parsedQty = parseInt(pa.qty, 10);
-                                if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
-                                    arr.splice(i, 1);
-                                    for (let k = 0; k < parsedQty; k++) {
-                                        let newPa = {...pa, qty: 1};
-                                        delete newPa.uid;
-                                        exploded.push(newPa);
-                                    }
-                                }
-                            }
-                        }
-                        if (exploded.length > 0) arr.push(...exploded);
-                        arr.forEach(pa => {
-                            if (pa.formula === 'Manual') pa.formula = 'Standalone';
-                            if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
-                            if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
-                            if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; }
-                            else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
-                            else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
-                            else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
-                        });
-                    };
-                    processFormulasFast(currentProjectAssets);
-                    window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
-                    processFormulasFast(window.originalProjectAssets);
-                    window.paLoadedForProject = projectId;
-                    google.script.run
-                        .withFailureHandler(function () { finishFastHub_(null); })
-                        .withSuccessHandler(finishFastHub_)
-                        .getTimelineData(projectId, 'main');
-                })
-                .getProjectAssets(projectId, sDateFast, eDateFast);
-        };
-        google.script.run
-            .withFailureHandler(function () { afterSeedFast_(); })
-            .withSuccessHandler(function (ens) {
-                if (ens && ens.warm) {
-                    window.peForkRoomActive_ = true;
-                    if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
-                        try { window.refreshProjectEditorForkChrome_(projectId); } catch (eChrome2) { /* ignore */ }
-                    }
-                }
-                afterSeedFast_();
-            })
-            .ensureDalWarmHubWorkspace(projectId, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI', {});
+        // Seed in parallel — do not serialize behind ensure (that was the ~10s wait).
+        if (typeof window.hubWarmSoftEnsure_ === 'function') window.hubWarmSoftEnsure_(projectId);
+        startHubLoads();
     }
 }
 

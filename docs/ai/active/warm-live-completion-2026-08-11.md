@@ -7,8 +7,8 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · § DAL prep/timeline live sync · Triangle of Truth  
 **Live forks pause:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — check before L2/L3
 
-**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L4** in ship.  
-**Production tip:** see RELEASES.md. Prep rollback pin still **v654**.
+**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L4** shipped @ **GAS v790**; awaiting smoke.  
+**Production tip:** see RELEASES.md (**GAS v790**). Prep rollback pin still **v654**.
 
 ---
 
@@ -43,9 +43,9 @@ L2 identity true live Firebase  ✓ @ v787
         ↓
 L3 auto-attach PA + Timeline with room  ✓ @ v788 (+ collision @ v789)
         ↓
-L4 Hub honesty  ← now
+L4 Hub honesty  ✓ @ v790
         ↓
-L5 exit + archive
+L5 exit + archive  ← next
 ```
 
 ---
@@ -114,7 +114,8 @@ L5 exit + archive
 - [x] Hub open reuses warm live PA/TL memory (no forced GAS reload) when prep already live  
 - [x] Fixture-only Hub saves / GENERATE prep flush → browser↔Firebase; structural pack/arrange stay GAS→FS  
 - [x] GENERATE documented as accepted **one** server op (warm Firebase under the hood)  
-- [ ] Ship + smoke  
+- [x] Ship **GAS v790**  
+- [ ] Director smoke: warm Hub opens snappy; GENERATE finishes; pack/arrange still work  
 
 **Done when:** Hub is not a second slow product beside live PA/TL.
 
@@ -148,7 +149,8 @@ L5 exit + archive
 | 2026-08-12 | Director L2 smoke green → **L3**. |
 | 2026-08-13 | Collision on sub-event edit: calendar Sheets stamp lagged Firebase meta. Fix: sync `identityUpdatedAt` on room join; one stamp-adopt retry on live/GAS collision. |
 | 2026-08-13 | Director: end of L campaign = first warm feels fully live/snappy; do not reorder slices. |
-| 2026-08-13 | **L4** — Hub open from live memory; fixture flush live before GENERATE; GENERATE kept as one accepted server op; pack/arrange structural still GAS→FS. |
+| 2026-08-13 | **L4 @ GAS v790** — Hub open from live memory + background truck overlay; fixture flush live; GENERATE kept as one accepted warm server op (auto deltas only after flush). |
+| 2026-08-13 | Hub open still ~10s: gate required prep live; cached-PA branch still waited on ensure+reload. Fix: open from any in-memory PA; ensure soft/background. |
 
 ---
 
