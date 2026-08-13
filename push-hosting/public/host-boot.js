@@ -3194,7 +3194,10 @@
               var t1 = new Date(metaTs).getTime();
               var t2 = new Date(clientTs).getTime();
               if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) > 2000 && t1 > t2) {
-                throw new Error('COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.');
+                throw new Error(
+                  'COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.' +
+                  '@@identityUpdatedAt=' + metaTs
+                );
               }
             }
             var frags = [];

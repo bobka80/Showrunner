@@ -532,6 +532,9 @@ function dalSnapshotCampaignIdentityToFirestore_(projectId, roomUid, actor) {
   }
   var id = dalReadProjectIdentityFromSheets_(projectId);
   var now = new Date().toISOString();
+  // Prefer Sheets Last_Updated so editor stamps stay aligned; only fall back to now when missing.
+  var seedTs = id.lastUpdated || '';
+  if (!seedTs || String(seedTs).indexOf('T') < 0) seedTs = now;
   var patch = {
     roomUid: String(roomUid || cur.roomUid || ''),
     status: cur.status || 'open',
@@ -551,7 +554,7 @@ function dalSnapshotCampaignIdentityToFirestore_(projectId, roomUid, actor) {
     readinessJson: JSON.stringify(id.readinessState || {}),
     subEventsJson: JSON.stringify(id.subEvents || []),
     identityWriteSeq: 1,
-    identityUpdatedAt: id.lastUpdated || now,
+    identityUpdatedAt: seedTs,
     identityUpdatedBy: actor || 'System'
   };
   firestoreSetCampaignMeta_(projectId, patch);
@@ -592,7 +595,10 @@ function dalSaveProjectIdentityWarm_(projectData, timelinesArray, actor) {
     var t1 = new Date(metaTs).getTime();
     var t2 = new Date(clientTs).getTime();
     if (!isNaN(t1) && !isNaN(t2) && Math.abs(t1 - t2) > 2000 && t1 > t2) {
-      throw new Error('COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.');
+      throw new Error(
+        'COLLISION_DETECTED: This project was modified by another user. Please refresh and try again.' +
+        '@@identityUpdatedAt=' + metaTs
+      );
     }
   }
 

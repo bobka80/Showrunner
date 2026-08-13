@@ -1054,6 +1054,13 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
         dalEnsureCampaignIdentityElevated_(projectId, phase.roomUid, actor);
       }
     } catch (eJoinId) { /* non-fatal — Sheets still SoT until elevated */ }
+    var joinIdentityAt = '';
+    try {
+      var joinMeta = (typeof firestoreGetCampaignMeta_ === 'function')
+        ? (firestoreGetCampaignMeta_(projectId) || {})
+        : {};
+      joinIdentityAt = joinMeta.identityUpdatedAt || '';
+    } catch (eJoinMeta) { joinIdentityAt = ''; }
     return {
       success: true,
       joined: true,
@@ -1063,7 +1070,8 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
       campaignOpenedBy: phase.openedBy,
       campaignLastActivityAt: phase.lastActivityAt,
       campaignLastPublishedAt: phase.lastPublishedAt || '',
-      campaignRoomWarm: true
+      campaignRoomWarm: true,
+      identityUpdatedAt: joinIdentityAt
     };
   }
 
@@ -1119,6 +1127,14 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
       'Opened Project Campaign Room (R1 registry + meta).');
   } catch (eAud) { /* ignore */ }
 
+  var openIdentityAt = '';
+  try {
+    var openMeta = (typeof firestoreGetCampaignMeta_ === 'function')
+      ? (firestoreGetCampaignMeta_(projectId) || {})
+      : {};
+    openIdentityAt = openMeta.identityUpdatedAt || '';
+  } catch (eOpenMeta) { openIdentityAt = ''; }
+
   return {
     success: true,
     joined: false,
@@ -1128,7 +1144,8 @@ function openOrJoinDalCampaignRoom(projectId, actor) {
     campaignOpenedBy: phase.openedBy,
     campaignLastActivityAt: phase.lastActivityAt,
     campaignLastPublishedAt: '',
-    campaignRoomWarm: true
+    campaignRoomWarm: true,
+    identityUpdatedAt: openIdentityAt
   };
 }
 

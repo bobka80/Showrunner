@@ -506,6 +506,38 @@ window.refreshProjectEditorForkChrome_ = function(projectId) {
     .getDalSessionInfo(projectId);
 };
 
+/**
+ * Warm Live — keep editor + calendar stamp aligned with Firebase meta identityUpdatedAt.
+ * Prevents false COLLISION when calendar cache still has Sheets Last_Updated.
+ */
+window.peSyncIdentityStampFromMeta_ = function(timestamp, projectId) {
+  var ts = String(timestamp || '').trim();
+  if (!ts) return;
+  var verEl = document.getElementById('edit-proj-version');
+  if (verEl) verEl.value = ts;
+  projectId = projectId || (document.getElementById('edit-folder-id')
+    ? document.getElementById('edit-folder-id').value : '');
+  if (!projectId || projectId === 'NEW') return;
+  try {
+    if (typeof calendar === 'undefined' || !calendar || typeof calendar.getEvents !== 'function') return;
+    var seedEv = calendar.getEventById(projectId);
+    if (!seedEv) {
+      seedEv = calendar.getEvents().find(function(e) {
+        var r = e && e.extendedProps && e.extendedProps.rawDbData;
+        return r && String(r.id) === String(projectId);
+      });
+    }
+    if (!seedEv || !seedEv.extendedProps || !seedEv.extendedProps.rawDbData) return;
+    var raw = seedEv.extendedProps.rawDbData;
+    var next = {};
+    for (var k in raw) {
+      if (Object.prototype.hasOwnProperty.call(raw, k)) next[k] = raw[k];
+    }
+    next.lastUpdated = ts;
+    seedEv.setExtendedProp('rawDbData', next);
+  } catch (ePatch) { /* ignore */ }
+};
+
 /** Campaign Room R1 — open/join warm room once when entering a saved project. */
 window.openOrJoinDalCampaignRoom_ = function(projectId) {
   projectId = projectId || activePresenceProject ||
@@ -526,6 +558,9 @@ window.openOrJoinDalCampaignRoom_ = function(projectId) {
       if (res && res.campaignRoomWarm) window.peForkRoomActive_ = true;
       if (res && res.campaignLastPublishedAt) {
         window.peCheckpointLastPub_ = String(res.campaignLastPublishedAt);
+      }
+      if (res && res.identityUpdatedAt && typeof window.peSyncIdentityStampFromMeta_ === 'function') {
+        window.peSyncIdentityStampFromMeta_(res.identityUpdatedAt, projectId);
       }
       if (res && res.campaignRoomWarm && typeof window.startDalCampaignCheckpointTimer_ === 'function') {
         window.startDalCampaignCheckpointTimer_();
@@ -1145,7 +1180,19 @@ window.peSendIdentitySavePayload_ = function(payload, opts) {
   var finishFail_ = function(err) {
     window.peWarmAutosaveBusy_ = false;
     var msg = (err && err.message) ? err.message : String(err || 'Save failed');
+    var stampMatch = msg.match(/@@identityUpdatedAt=([^\s]+)/);
+    var cleanMsg = msg.replace(/@@identityUpdatedAt=[^\s]+/, '').trim();
     var isCollision = /COLLISION_DETECTED/i.test(msg);
+    // GAS fallback collision: same stamp-lag adopt + one retry as live path.
+    if (isCollision && stampMatch && stampMatch[1] && !opts._stampRetry && sent && sent.projectData) {
+      var adoptTs = stampMatch[1];
+      if (typeof window.peSyncIdentityStampFromMeta_ === 'function') {
+        window.peSyncIdentityStampFromMeta_(adoptTs, sent.projectData.Project_ID || sent.id);
+      }
+      sent.projectData.Last_Updated = adoptTs;
+      window.peSendIdentitySavePayload_(sent, { quiet: quiet, _stampRetry: true, forceGas: !!opts.forceGas });
+      return;
+    }
     if (quiet || window.peLeaveSaveQuiet_) {
       // Do NOT bump Last_Updated and resend on collision — that would overwrite a peer.
       if (!isCollision && !window.peLeaveSaveRetried_ && sent && sent.projectData) {
@@ -1167,8 +1214,8 @@ window.peSendIdentitySavePayload_ = function(payload, opts) {
       return;
     }
     window.pePaintAutosaveCue_('error', isCollision ? 'Refresh needed' : 'Save failed');
-    if (typeof showToast === 'function') showToast('Autosave failed: ' + msg);
-    else alert('Autosave failed: ' + msg);
+    if (typeof showToast === 'function') showToast('Autosave failed: ' + cleanMsg);
+    else alert('Autosave failed: ' + cleanMsg);
     window.peSyncSaveBtnChrome_();
     if (window.peLeaveSavePayload_) {
       var leave = window.peLeaveSavePayload_;
@@ -1231,9 +1278,24 @@ window.peSendIdentitySavePayload_ = function(payload, opts) {
     window.dalWriteWarmIdentityLive_(payload, function(liveErr, liveRes) {
       if (liveErr) {
         var liveMsg = (liveErr && liveErr.message) ? liveErr.message : String(liveErr || '');
-        // Collision is authoritative — do not re-fight via GAS with the same stamp.
+        // Stamp lag (calendar Sheets Last_Updated behind Firebase meta): adopt once and retry.
+        var stampMatch = liveMsg.match(/@@identityUpdatedAt=([^\s]+)/);
+        if (/COLLISION_DETECTED/i.test(liveMsg) && stampMatch && stampMatch[1] &&
+            !opts._stampRetry && sent && sent.projectData) {
+          var adoptTs = stampMatch[1];
+          if (typeof window.peSyncIdentityStampFromMeta_ === 'function') {
+            window.peSyncIdentityStampFromMeta_(adoptTs, sent.projectData.Project_ID || sent.id);
+          }
+          sent.projectData.Last_Updated = adoptTs;
+          window.peWarmAutosaveBusy_ = false;
+          window.peSendIdentitySavePayload_(sent, {
+            quiet: quiet,
+            _stampRetry: true
+          });
+          return;
+        }
         if (/COLLISION_DETECTED/i.test(liveMsg)) {
-          finishFail_(liveErr);
+          finishFail_(new Error(liveMsg.replace(/@@identityUpdatedAt=[^\s]+/, '').trim()));
           return;
         }
         // Fall back to GAS warm path once if live wire fails (rules/auth/host).

@@ -7,8 +7,8 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · § DAL prep/timeline live sync · Triangle of Truth  
 **Live forks pause:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — check before L2/L3
 
-**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L2** shipped @ **GAS v787** (+ hosting + firestore rules); awaiting smoke.  
-**Production tip:** see RELEASES.md (**GAS v787**). Prep rollback pin still **v654**.
+**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L3** shipped; awaiting smoke.  
+**Production tip:** see RELEASES.md (**GAS v788**). Prep rollback pin still **v654**.
 
 ---
 
@@ -39,9 +39,9 @@ L0 PA failed-commit fix  ✓ @ v785
         ↓
 L1 design lock (this file + topic)  ✓ with W6
         ↓
-L2 identity true live Firebase  ← now
+L2 identity true live Firebase  ✓ @ v787
         ↓
-L3 auto-attach PA + Timeline with room
+L3 auto-attach PA + Timeline with room  ← now @ v788
         ↓
 L4 Hub honesty
         ↓
@@ -103,7 +103,8 @@ L5 exit + archive
 - [x] Opening a warm project = live PA + live Timeline without Start buttons in normal work  
 - [x] Soft leave safe; End Room remains rare explicit action  
 - [x] Align with live-forks pause / FRAGILE session UI  
-- [ ] Ship + smoke: gear + timeline edit with no prep/collab ceremony  
+- [x] Ship **GAS v788**  
+- [ ] Director smoke: gear + timeline edit with no prep/collab ceremony  
 
 **Done when:** floor user does not think about Start Prep / Start Collab.
 
@@ -142,6 +143,8 @@ L5 exit + archive
 | 2026-08-11 | **L0 @ GAS v785** — PA commit reconcile: normalize qty/scan/location; `[SHORT] [AUTO]` treated as auto; single alert. Awaiting director smoke (End Prep / End Room without false DAL commit-fail toast). |
 | 2026-08-12 | Director: continue → **L2**. Identity warm autosave → browser↔Firebase (`meta/state`); rules unlock update with locked room fields; host `META_IDENTITY_WRITE`. |
 | 2026-08-12 | **L2 @ GAS v787** + hosting + firestore rules. Manager claim on token; seq+1 rule; collision no quiet overwrite. Smoke: hard-refresh web.app → warm edit → Saved feels fast → Cancel → reopen sticks. |
+| 2026-08-12 | Director L2 smoke green → **L3**. |
+| 2026-08-13 | Collision on sub-event edit: calendar Sheets stamp lagged Firebase meta. Fix: sync `identityUpdatedAt` on room join; one stamp-adopt retry on live/GAS collision. |
 
 ---
 
