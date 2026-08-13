@@ -23,7 +23,7 @@ This is the industry-normal “live notebook + durable publish” pattern. Showr
 | Where truth lives | Firebase notebook while room open |
 | How the browser reaches it | True live = browser ↔ Firebase; slow path = browser → Apps Script → Firebase |
 
-**This campaign finishes meaning #2 for identity and ceremony**, and keeps #1 from Campaign Room.
+**This campaign finishes meaning #2 for identity and ceremony**, keeps #1 from Campaign Room, and (L4) makes Hub open/fixture path honest while GENERATE stays one accepted warm server op.
 
 ---
 

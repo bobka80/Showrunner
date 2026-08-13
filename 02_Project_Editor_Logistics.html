@@ -9,6 +9,129 @@
 // ==========================================
 // @INDEX: LOGISTICS_WIZARD -> Logistics Hub & Autonomous Engine
 
+/** Warm Live L4 — room warm + prep live + PA already in memory. */
+window.hubWarmLiveMemoryReady_ = function (projectId) {
+    return !!(projectId &&
+        window.peForkRoomActive_ &&
+        window.dalPrepUiOpen &&
+        window.dalPaLiveSyncMode === 'firestore' &&
+        window.paLoadedForProject === projectId &&
+        Array.isArray(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : null));
+};
+
+/** Timeline snap for Hub UI locks (manual truck shifts) — prefer live memory. */
+window.hubLocalTimelineForUi_ = function () {
+    try {
+        if (typeof window.dalTlCaptureLocalState_ === 'function' &&
+            (window.dalTimelineSessionOpen ||
+                (typeof window.dalTimelineLayerOpen_ === 'function' && window.dalTimelineLayerOpen_()))) {
+            var st = window.dalTlCaptureLocalState_();
+            return {
+                shifts: (st && st.shifts) || [],
+                phases: (st && st.phases) || [],
+                overrides: (st && st.overrides) || {}
+            };
+        }
+    } catch (eTl) { /* fall through */ }
+    return { shifts: [], phases: [], overrides: {} };
+};
+
+/** Merge truck overlay fields from a server PA list onto local memory (uid match).
+ * Never overwrite local rows that already have truck placement (arrange may be newer). */
+window.hubMergePaTruckOverlay_ = function (serverList) {
+    if (!Array.isArray(serverList) || !Array.isArray(currentProjectAssets)) return false;
+    var byUid = {};
+    serverList.forEach(function (pa) {
+        if (pa && pa.uid) byUid[String(pa.uid)] = pa;
+    });
+    var changed = false;
+    var outFields = ['outboundTruckUid', 'outboundX', 'outboundY', 'outboundZ', 'outboundRotated', 'outboundStaged'];
+    var inFields = ['inboundTruckUid', 'inboundX', 'inboundY', 'inboundZ', 'inboundRotated', 'inboundStaged'];
+    var legacy = ['truckUid', 'truckX', 'truckY', 'truckZ', 'isRotated', 'isStaged'];
+    currentProjectAssets.forEach(function (local) {
+        if (!local || !local.uid) return;
+        var srv = byUid[String(local.uid)];
+        if (!srv) return;
+        function fill(fields, already) {
+            if (already) return;
+            fields.forEach(function (f) {
+                if (srv[f] === undefined || srv[f] === null || srv[f] === '') return;
+                if (local[f] !== undefined && local[f] !== null && local[f] !== '') return;
+                local[f] = srv[f];
+                changed = true;
+            });
+        }
+        fill(outFields, !!(local.outboundTruckUid));
+        fill(inFields, !!(local.inboundTruckUid));
+        fill(legacy, !!(local.truckUid || local.outboundTruckUid || local.inboundTruckUid));
+    });
+    if (changed) {
+        try {
+            window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+        } catch (eO) { /* ignore */ }
+        if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+    }
+    return changed;
+};
+
+/** Soft refresh Hub locks after warm open (timeline times toggle + truck overlay). */
+window.hubWarmBackgroundRefresh_ = function (projectId) {
+    if (!projectId) return;
+    window._hubWarmOpenGen_ = (window._hubWarmOpenGen_ || 0) + 1;
+    var gen = window._hubWarmOpenGen_;
+    var sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : '';
+    var eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : '';
+    var hubStillOpen_ = function () {
+        if (gen !== window._hubWarmOpenGen_) return false;
+        var ov = document.getElementById('logistics-hub-modal-overlay');
+        return !!(ov && ov.style.display !== 'none');
+    };
+    try {
+        google.script.run
+            .withFailureHandler(function () { /* ignore */ })
+            .withSuccessHandler(function (res) {
+                if (!hubStillOpen_()) return;
+                if (window.isBackgroundSyncing) return;
+                if (res && res.current && typeof window.hubMergePaTruckOverlay_ === 'function') {
+                    window.hubMergePaTruckOverlay_(res.current);
+                }
+                if (res && res.overlapping) window.overlappingAllocations = res.overlapping;
+            })
+            .getProjectAssets(projectId, sDate, eDate);
+    } catch (ePa) { /* ignore */ }
+    var localTl = typeof window.hubLocalTimelineForUi_ === 'function' ? window.hubLocalTimelineForUi_() : null;
+    if (localTl && localTl.shifts && localTl.shifts.length) return;
+    try {
+        google.script.run
+            .withFailureHandler(function () { /* ignore */ })
+            .withSuccessHandler(function (tData) {
+                if (!hubStillOpen_() || !tData) return;
+                var tShifts = tData.shifts || [];
+                var hasManualTruckShifts = false;
+                var truckMap = new Set();
+                if (typeof globalVehicles !== 'undefined') globalVehicles.forEach(function (v) { truckMap.add(v.id); });
+                tShifts.forEach(function (s) {
+                    var isTruck = truckMap.has(s.user_uid || s.email);
+                    if (isTruck && s.note !== '⚠️ AUTO-OUTBOUND' && s.note !== '⚠️ AUTO-INBOUND') {
+                        hasManualTruckShifts = true;
+                    }
+                });
+                var timeToggle = document.getElementById('logistics-enable-times-toggle');
+                if (!timeToggle) return;
+                if (hasManualTruckShifts) {
+                    timeToggle.checked = false;
+                    timeToggle.disabled = true;
+                    if (timeToggle.parentNode) timeToggle.parentNode.style.opacity = '0.5';
+                    var lockMsg = document.getElementById('logistics-times-lock-msg');
+                    if (lockMsg) lockMsg.style.display = 'block';
+                    var panel = document.getElementById('logistics-times-panel');
+                    if (panel) panel.style.display = 'none';
+                }
+            })
+            .getTimelineData(projectId, 'main');
+    } catch (eTl2) { /* ignore */ }
+};
+
 function openLogisticsHubModal() {
     if (typeof canViewLogistics === 'function' && !canViewLogistics()) {
         alert('🛑 Permission Denied: Live logistics tracking is not enabled for your role.');
@@ -115,6 +238,43 @@ function openLogisticsHubModal() {
         
         document.getElementById('logistics-hub-modal-overlay').style.display = 'flex';
     };
+
+    // Warm Live L4: already on live PA — open Hub from memory (no blocking GAS reload).
+    if (typeof window.hubWarmLiveMemoryReady_ === 'function' && window.hubWarmLiveMemoryReady_(projectId) &&
+        typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length > 0) {
+        try {
+            google.script.run
+                .withFailureHandler(function () {
+                    if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
+                        window.hubWarmBackgroundRefresh_(projectId);
+                    }
+                })
+                .withSuccessHandler(function (ens) {
+                    if (ens && ens.warm) {
+                        window.peForkRoomActive_ = true;
+                        if (typeof window.refreshProjectEditorForkChrome_ === 'function') {
+                            try { window.refreshProjectEditorForkChrome_(projectId); } catch (eChrome0) { /* ignore */ }
+                        }
+                    }
+                    if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
+                        window.hubWarmBackgroundRefresh_(projectId);
+                    }
+                })
+                .ensureDalWarmHubWorkspace(
+                    projectId,
+                    typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI',
+                    {}
+                );
+        } catch (eSeed) {
+            if (typeof window.hubWarmBackgroundRefresh_ === 'function') {
+                window.hubWarmBackgroundRefresh_(projectId);
+            }
+        }
+        proceedToHub(typeof window.hubLocalTimelineForUi_ === 'function'
+            ? window.hubLocalTimelineForUi_()
+            : { shifts: [], phases: [], overrides: {} });
+        return;
+    }
 
     if (window.paLoadedForProject !== projectId || typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
         let btn = document.getElementById('logistics-hub-btn-layers') || document.getElementById('logistics-hub-btn');
@@ -510,124 +670,174 @@ window.executeLogisticsHub = function() {
         }
     }, 55000);
 
-    google.script.run
-        .withFailureHandler(err => {
-            clearTimeout(genSafetyTimer);
-            alert("Generation Failed: " + err.message);
-            if (btn) { btn.innerText = origText; btn.disabled = false; }
-        })
-        .withSuccessHandler(res => {
-            clearTimeout(genSafetyTimer);
-            if (btn) { btn.innerText = "SUCCESS ✓"; }
-            
-            // ✅ SYNC THE TIMESTAMP SO WE DONT GET COLLISION LOCKOUTS
-            if (res.timestamp && document.getElementById('edit-proj-version')) {
-                document.getElementById('edit-proj-version').value = res.timestamp;
-            }
-            
-            // If the backend updated assets (via deltas), refresh the local cache
-            if (res.assets) {
-                var serverList = res.assets.current || [];
-                var byUid = {};
-                serverList.forEach(function (pa) {
-                    if (pa && pa.uid) byUid[String(pa.uid)] = pa;
-                });
-                // Keep local autos missing from fixture-only returns (same as Arrange save).
-                (currentProjectAssets || []).forEach(function (pa) {
-                    if (!pa || !pa.uid) return;
-                    var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
-                        ? window.dalPaIsAutoRow_(pa)
-                        : !!(pa.isAuto || pa.isGenericAuto);
-                    if (isAuto && !byUid[String(pa.uid)]) {
-                        serverList.push(pa);
-                        byUid[String(pa.uid)] = pa;
-                    }
-                });
-                currentProjectAssets = serverList;
-                window.overlappingAllocations = res.assets.overlapping || {};
-                window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+    // Warm Live L4: flush fixture touches live first so GENERATE is one server batch
+    // (timeline AUTO + logistics clocks ± structural autos) — not a second slow PA save.
+    var runGenerate_ = function (finalDeltas) {
+        google.script.run
+            .withFailureHandler(err => {
+                clearTimeout(genSafetyTimer);
+                alert("Generation Failed: " + err.message);
+                if (btn) { btn.innerText = origText; btn.disabled = false; }
+            })
+            .withSuccessHandler(res => {
+                clearTimeout(genSafetyTimer);
+                if (btn) { btn.innerText = "SUCCESS ✓"; }
                 
-                const processFormulas = (arr) => {
-                    let exploded = [];
-                    for (let i = arr.length - 1; i >= 0; i--) {
-                        let pa = arr[i];
-                        let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
-                        if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') {
-                            let parsedQty = parseInt(pa.qty, 10);
-                            if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
-                                arr.splice(i, 1);
-                                for (let k = 0; k < parsedQty; k++) {
-                                    let newPa = {...pa, qty: 1};
-                                    delete newPa.uid;
-                                    exploded.push(newPa);
+                // ✅ SYNC THE TIMESTAMP SO WE DONT GET COLLISION LOCKOUTS
+                if (res.timestamp && document.getElementById('edit-proj-version')) {
+                    document.getElementById('edit-proj-version').value = res.timestamp;
+                }
+                
+                // If the backend updated assets (via deltas), refresh the local cache
+                if (res.assets) {
+                    var serverList = res.assets.current || [];
+                    var byUid = {};
+                    serverList.forEach(function (pa) {
+                        if (pa && pa.uid) byUid[String(pa.uid)] = pa;
+                    });
+                    // Keep local autos missing from fixture-only returns (same as Arrange save).
+                    (currentProjectAssets || []).forEach(function (pa) {
+                        if (!pa || !pa.uid) return;
+                        var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
+                            ? window.dalPaIsAutoRow_(pa)
+                            : !!(pa.isAuto || pa.isGenericAuto);
+                        if (isAuto && !byUid[String(pa.uid)]) {
+                            serverList.push(pa);
+                            byUid[String(pa.uid)] = pa;
+                        }
+                    });
+                    currentProjectAssets = serverList;
+                    window.overlappingAllocations = res.assets.overlapping || {};
+                    window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+                    
+                    const processFormulas = (arr) => {
+                        let exploded = [];
+                        for (let i = arr.length - 1; i >= 0; i--) {
+                            let pa = arr[i];
+                            let asset = typeof globalAssets !== 'undefined' ? globalAssets.find(a => a.id === pa.assetId) : null;
+                            if (asset && asset.type !== 'Bulk' && asset.isConsumable !== true && asset.isConsumable !== 'true') {
+                                let parsedQty = parseInt(pa.qty, 10);
+                                if (!isNaN(parsedQty) && parsedQty > 1 && !pa.isAuto && pa.formula !== 'Auto-Container' && pa.formula !== 'Gen-Auto-Container') {
+                                    arr.splice(i, 1);
+                                    for (let k = 0; k < parsedQty; k++) {
+                                        let newPa = {...pa, qty: 1};
+                                        delete newPa.uid;
+                                        exploded.push(newPa);
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (exploded.length > 0) arr.push(...exploded);
-                    
-                    arr.forEach(pa => {
-                        if (pa.formula === 'Manual') pa.formula = 'Standalone';
-                        if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
-                        if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
-                        if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } 
-                        else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
-                        else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
-                        else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
-                    });
-                };
-                processFormulas(currentProjectAssets);
-                processFormulas(window.originalProjectAssets);
-            }
-
-            // Warm GENERATE wrote AUTO truck load/unload shifts — install full payload only
-            // (never set roster assigned alone; that showed trucks with empty strips).
-            if (res.timelineUpdated && res.timeline && Array.isArray(res.timeline.shifts)) {
-                try {
-                    window._hubPendingTimeline_ = {
-                        shifts: res.timeline.shifts || [],
-                        phases: res.timeline.phases || [],
-                        overrides: res.timeline.overrides || {}
+                        if (exploded.length > 0) arr.push(...exploded);
+                        
+                        arr.forEach(pa => {
+                            if (pa.formula === 'Manual') pa.formula = 'Standalone';
+                            if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
+                            if (pa.formula && pa.formula.startsWith('[SHORT] ')) { pa.isShortage = true; pa.formula = pa.formula.substring(8); }
+                            if (pa.formula === 'Auto-Container') { pa.isAuto = true; pa.formula = 'Standalone'; } 
+                            else if (pa.formula === 'Gen-Auto-Container') { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = 'Standalone'; }
+                            else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
+                            else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
+                        });
                     };
-                    if (typeof window.dalTimelineLayerOpen_ === 'function' && window.dalTimelineLayerOpen_() &&
-                        typeof window.dalTlInstallMergedLocal_ === 'function') {
-                        var pendingNow = window._hubPendingTimeline_;
-                        window._hubPendingTimeline_ = null;
-                        window.dalTlInstallMergedLocal_({
-                            shifts: pendingNow.shifts || [],
-                            phases: pendingNow.phases || [],
-                            overrides: pendingNow.overrides || {}
-                        }, { forceRebuild: true });
-                        if (typeof window.dalTlSetSyncBase_ === 'function') {
-                            window.dalTlSetSyncBase_(pendingNow);
-                        }
-                    } else if (typeof window.dalApplyRemoteTimelineState_ === 'function') {
-                        window.dalApplyRemoteTimelineState_(
-                            res.timeline.shifts || [],
-                            res.timeline.phases || [],
-                            res.timeline.overrides || {},
-                            { fromHubGenerate: true }
-                        );
-                    }
-                } catch (eTlApply) { /* pending kept for Timeline open */ }
-            }
-            if (generateTimes && res.warm && !(res.autoShiftCount > 0)) {
-                console.warn('Hub GENERATE: times on but no AUTO shifts returned');
-            }
-
-            setTimeout(() => {
-                if (btn) { btn.innerText = origText; btn.disabled = false; }
-                document.getElementById('logistics-hub-modal-overlay').style.display = 'none';
-                if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
-                if (typeof window.peQuietFlushIdentityForNav_ === 'function' && window.peQuietFlushIdentityForNav_()) {
-                    // quiet — avoid Save & Sync collision after GENERATE bumped stamps
-                } else if (typeof runSchedule === 'function') {
-                    runSchedule();
+                    processFormulas(currentProjectAssets);
+                    processFormulas(window.originalProjectAssets);
                 }
-                if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
-            }, 1500);
-        })
-        .generateLogisticsPayloadAPI(projectId, deltas, logData, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+
+                // Warm GENERATE wrote AUTO truck load/unload shifts — install full payload only
+                // (never set roster assigned alone; that showed trucks with empty strips).
+                if (res.timelineUpdated && res.timeline && Array.isArray(res.timeline.shifts)) {
+                    try {
+                        window._hubPendingTimeline_ = {
+                            shifts: res.timeline.shifts || [],
+                            phases: res.timeline.phases || [],
+                            overrides: res.timeline.overrides || {}
+                        };
+                        if (typeof window.dalTimelineLayerOpen_ === 'function' && window.dalTimelineLayerOpen_() &&
+                            typeof window.dalTlInstallMergedLocal_ === 'function') {
+                            var pendingNow = window._hubPendingTimeline_;
+                            window._hubPendingTimeline_ = null;
+                            window.dalTlInstallMergedLocal_({
+                                shifts: pendingNow.shifts || [],
+                                phases: pendingNow.phases || [],
+                                overrides: pendingNow.overrides || {}
+                            }, { forceRebuild: true });
+                            if (typeof window.dalTlSetSyncBase_ === 'function') {
+                                window.dalTlSetSyncBase_(pendingNow);
+                            }
+                        } else if (typeof window.dalApplyRemoteTimelineState_ === 'function') {
+                            window.dalApplyRemoteTimelineState_(
+                                res.timeline.shifts || [],
+                                res.timeline.phases || [],
+                                res.timeline.overrides || {},
+                                { fromHubGenerate: true }
+                            );
+                        }
+                    } catch (eTlApply) { /* pending kept for Timeline open */ }
+                }
+                if (generateTimes && res.warm && !(res.autoShiftCount > 0)) {
+                    console.warn('Hub GENERATE: times on but no AUTO shifts returned');
+                }
+
+                setTimeout(() => {
+                    if (btn) { btn.innerText = origText; btn.disabled = false; }
+                    document.getElementById('logistics-hub-modal-overlay').style.display = 'none';
+                    if (typeof renderProjectAssetsUI === 'function') renderProjectAssetsUI();
+                    if (typeof window.peQuietFlushIdentityForNav_ === 'function' && window.peQuietFlushIdentityForNav_()) {
+                        // quiet — avoid Save & Sync collision after GENERATE bumped stamps
+                    } else if (typeof runSchedule === 'function') {
+                        runSchedule();
+                    }
+                    if (typeof updateAutoArrangeButtonState === 'function') updateAutoArrangeButtonState();
+                }, 1500);
+            })
+            .generateLogisticsPayloadAPI(projectId, finalDeltas, logData, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System UI');
+    };
+
+    var startGenerate_ = function (liveFlushOk) {
+        var sendDeltas = (typeof calculatePaDeltas === 'function') ? calculatePaDeltas() : (deltas || []);
+        var pending = (typeof window.dalPaHasPendingTouches_ === 'function' && window.dalPaHasPendingTouches_());
+        var needGas = (typeof window.dalPaDeltasNeedGasBatch_ === 'function' &&
+            window.dalPaDeltasNeedGasBatch_(sendDeltas));
+        if (liveFlushOk && !pending) {
+            if (!needGas) {
+                try {
+                    window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+                } catch (eOrig) { /* ignore */ }
+                sendDeltas = [];
+            } else {
+                // Fixtures already live — only send auto/pack structural deltas to the server op.
+                sendDeltas = (sendDeltas || []).filter(function (d) {
+                    var f = String(d.rawFormula || '');
+                    return f.indexOf('[AUTO]') === 0 || f.indexOf('[GEN_AUTO]') === 0 ||
+                        f === 'Auto-Container' || f === 'Gen-Auto-Container' ||
+                        f.indexOf('[AUTO] ') === 0 || f.indexOf('[GEN_AUTO] ') === 0;
+                });
+            }
+        }
+        runGenerate_(sendDeltas || []);
+    };
+
+    if (window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore' &&
+        typeof window.dalPaMarkFixtureTouchesFromMemory_ === 'function' &&
+        typeof window.dalWritePaForkToFirestore_ === 'function') {
+        try { window.dalPaMarkFixtureTouchesFromMemory_(); } catch (eMark) { /* ignore */ }
+        if (typeof window.dalPaHasPendingTouches_ === 'function' && window.dalPaHasPendingTouches_()) {
+            window.dalWritePaForkToFirestore_(projectId, function (writeErr) {
+                if (writeErr) {
+                    try { console.warn('Hub GENERATE: live fixture flush failed; server will carry deltas', writeErr); } catch (eW) { /* ignore */ }
+                    startGenerate_(false);
+                    return;
+                }
+                var stillPending = (typeof window.dalPaHasPendingTouches_ === 'function' &&
+                    window.dalPaHasPendingTouches_());
+                startGenerate_(!stillPending);
+            });
+            return;
+        }
+        startGenerate_(true);
+        return;
+    }
+    startGenerate_(false);
 };
 
 window.toggleAutoArrangeHub = async function(leg) {

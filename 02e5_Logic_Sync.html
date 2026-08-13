@@ -173,6 +173,89 @@ window.calculatePaDeltas = function() {
     return deltas;
 };
 
+/** True when deltas include auto-container / pack structural rows (need GAS→FS batch). */
+window.dalPaDeltasNeedGasBatch_ = function (deltas) {
+    deltas = deltas || [];
+    var i;
+    for (i = 0; i < deltas.length; i++) {
+        var f = String(deltas[i].rawFormula || '');
+        if (f.indexOf('[AUTO]') === 0 || f.indexOf('[GEN_AUTO]') === 0 ||
+            f === 'Auto-Container' || f === 'Gen-Auto-Container' ||
+            f.indexOf('[AUTO] ') === 0 || f.indexOf('[GEN_AUTO] ') === 0) {
+            return true;
+        }
+    }
+    var origAutos = {};
+    (window.originalProjectAssets || []).forEach(function (pa) {
+        if (!pa) return;
+        var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
+            ? window.dalPaIsAutoRow_(pa)
+            : !!(pa.isAuto || pa.isGenericAuto);
+        if (isAuto && pa.uid) origAutos[String(pa.uid)] = 1;
+    });
+    var cur = typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : [];
+    var curAutos = {};
+    for (i = 0; i < cur.length; i++) {
+        var pa2 = cur[i];
+        if (!pa2) continue;
+        var isAuto2 = (typeof window.dalPaIsAutoRow_ === 'function')
+            ? window.dalPaIsAutoRow_(pa2)
+            : !!(pa2.isAuto || pa2.isGenericAuto);
+        if (!isAuto2) continue;
+        if (!pa2.uid) return true;
+        curAutos[String(pa2.uid)] = 1;
+        if (!origAutos[String(pa2.uid)]) return true;
+    }
+    var oKeys = Object.keys(origAutos);
+    for (i = 0; i < oKeys.length; i++) {
+        if (!curAutos[oKeys[i]]) return true;
+    }
+    return false;
+};
+
+/** Mark fixture uid touches from memory vs originals (Hub / pack prep for live flush). */
+window.dalPaMarkFixtureTouchesFromMemory_ = function () {
+    if (!window.dalPrepUiOpen || typeof window.dalPaNoteTouch_ !== 'function') return;
+    var origBy = {};
+    (window.originalProjectAssets || []).forEach(function (pa) {
+        if (!pa || !pa.uid) return;
+        var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
+            ? window.dalPaIsAutoRow_(pa)
+            : !!(pa.isAuto || pa.isGenericAuto);
+        if (isAuto) return;
+        origBy[String(pa.uid)] = pa;
+    });
+    var seen = {};
+    (typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : []).forEach(function (pa) {
+        if (!pa || !pa.uid) return;
+        var isAuto = (typeof window.dalPaIsAutoRow_ === 'function')
+            ? window.dalPaIsAutoRow_(pa)
+            : !!(pa.isAuto || pa.isGenericAuto);
+        if (isAuto) return;
+        var uid = String(pa.uid);
+        seen[uid] = 1;
+        var o = origBy[uid];
+        if (!o) {
+            window.dalPaNoteTouch_(uid);
+            return;
+        }
+        if (String(pa.qty != null ? pa.qty : 1) !== String(o.qty != null ? o.qty : 1) ||
+            String(pa.containerUid || '') !== String(o.containerUid || '') ||
+            String(pa.location || 'General') !== String(o.location || 'General') ||
+            String(pa.formula || 'Standalone') !== String(o.formula || 'Standalone') ||
+            String(pa.overrideDept || '') !== String(o.overrideDept || '') ||
+            String(pa.assetId || '') !== String(o.assetId || '') ||
+            !!pa.isShortage !== !!o.isShortage) {
+            window.dalPaNoteTouch_(uid);
+        }
+    });
+    Object.keys(origBy).forEach(function (uid) {
+        if (!seen[uid] && typeof window.dalPaNoteDelete_ === 'function') {
+            window.dalPaNoteDelete_(uid);
+        }
+    });
+};
+
 window.isBackgroundSyncing = false;
 
 window.autoSaveAndExecute = function(callback, optimistic = true, failureCallback = null, forceSync = false) {
@@ -200,6 +283,48 @@ window.autoSaveAndExecute = function(callback, optimistic = true, failureCallbac
     }
 
     const projectId = document.getElementById('edit-folder-id').value;
+
+    // Warm Live L4: fixture-only changes while prep live → browser↔Firebase (not GAS).
+    // Pack/auto structural deltas still use GAS→FS batch (live flush is fixtures-only).
+    var useLiveFixtureFlush_ = !!(window.dalPrepUiOpen && window.dalPaLiveSyncMode === 'firestore' &&
+        typeof window.dalWritePaForkToFirestore_ === 'function' &&
+        typeof window.dalPaDeltasNeedGasBatch_ === 'function' &&
+        !window.dalPaDeltasNeedGasBatch_(deltas));
+    if (useLiveFixtureFlush_) {
+        if (typeof window.dalPaMarkFixtureTouchesFromMemory_ === 'function') {
+            try { window.dalPaMarkFixtureTouchesFromMemory_(); } catch (eMark2) { /* ignore */ }
+        }
+        if (typeof window.dalPaHasPendingTouches_ === 'function' && window.dalPaHasPendingTouches_()) {
+            if (optimistic && callback && !forceSync) callback();
+            window.isBackgroundSyncing = true;
+            let origCursorLive = document.body.style.cursor;
+            if (!optimistic || forceSync) document.body.style.cursor = 'wait';
+            window.dalWritePaForkToFirestore_(projectId, function (writeErr) {
+                window.isBackgroundSyncing = false;
+                document.body.style.cursor = origCursorLive;
+                if (writeErr) {
+                    try { console.warn('Live PA flush failed; falling back to GAS delta save', writeErr); } catch (e1) { /* ignore */ }
+                    google.script.run
+                        .withFailureHandler(function (err) {
+                            alert("Auto-Save Failed: " + err.message);
+                            if (failureCallback) failureCallback();
+                        })
+                        .withSuccessHandler(function () {
+                            if ((!optimistic || forceSync) && callback) callback();
+                        })
+                        .saveProjectAssetsDelta(projectId, deltas, typeof ACTIVE_USER_NAME !== 'undefined' ? ACTIVE_USER_NAME : 'System');
+                    return;
+                }
+                if (!(typeof window.dalPaHasPendingTouches_ === 'function' && window.dalPaHasPendingTouches_())) {
+                    window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets || []));
+                }
+                if ((!optimistic || forceSync) && callback) callback();
+            });
+            return;
+        }
+        // No touches after mark — fall through to GAS so deltas are not dropped.
+    }
+
     window.isBackgroundSyncing = true;
     
     if (optimistic && callback && !forceSync) callback();

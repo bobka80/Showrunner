@@ -7,8 +7,8 @@
 **Fragile:** [../FRAGILE_ZONES.md](../FRAGILE_ZONES.md) § Campaign Room · § DAL prep/timeline live sync · Triangle of Truth  
 **Live forks pause:** [../topics/dal-live-forks-pause.md](../topics/dal-live-forks-pause.md) — check before L2/L3
 
-**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L3** shipped; awaiting smoke.  
-**Production tip:** see RELEASES.md (**GAS v788**). Prep rollback pin still **v654**.
+**Opened:** 2026-08-11 · **Status:** **ACTIVE** — **L4** in ship.  
+**Production tip:** see RELEASES.md. Prep rollback pin still **v654**.
 
 ---
 
@@ -41,9 +41,9 @@ L1 design lock (this file + topic)  ✓ with W6
         ↓
 L2 identity true live Firebase  ✓ @ v787
         ↓
-L3 auto-attach PA + Timeline with room  ← now @ v788
+L3 auto-attach PA + Timeline with room  ✓ @ v788 (+ collision @ v789)
         ↓
-L4 Hub honesty
+L4 Hub honesty  ← now
         ↓
 L5 exit + archive
 ```
@@ -59,7 +59,8 @@ L5 exit + archive
 | Wire while warm | Browser ↔ Firebase (not Apps Script per edit) |
 | Ceremony | Open project warms room and attaches live PA + Timeline automatically; hide Start Prep / Start Collab from normal work; **End Room** stays explicit |
 | Offer | Stays **frozen** Pull + Undo (from warm-readers) — not live multiplayer in this campaign |
-| Hub GENERATE | May keep **one** server call as exception until L4 proves otherwise |
+| Hub GENERATE | **Accepted one-server-op** (L4) — warm path still `generateLogisticsPayloadAPI` → Firebase; fixtures flushed live first when prep open |
+| Hub pack / arrange structural | Autos + truck placement still GAS→FS batch (live PA flush is fixtures-only); fixture-only Hub saves use live flush |
 | Checkpoint / idle | Do **not** change `DAL_CAMPAIGN_CHECKPOINT_MS_` / 48h idle without separate OK |
 | Tracker/Conflicts | Stay readers (warm-readers hybrid) — not live editors |
 
@@ -110,8 +111,9 @@ L5 exit + archive
 
 ### L4 — Logistics Hub honesty
 
-- [ ] Hub reads/writes warm Firebase where possible  
-- [ ] GENERATE: move client-side **or** document accepted one-server-op exception  
+- [x] Hub open reuses warm live PA/TL memory (no forced GAS reload) when prep already live  
+- [x] Fixture-only Hub saves / GENERATE prep flush → browser↔Firebase; structural pack/arrange stay GAS→FS  
+- [x] GENERATE documented as accepted **one** server op (warm Firebase under the hood)  
 - [ ] Ship + smoke  
 
 **Done when:** Hub is not a second slow product beside live PA/TL.
@@ -145,6 +147,8 @@ L5 exit + archive
 | 2026-08-12 | **L2 @ GAS v787** + hosting + firestore rules. Manager claim on token; seq+1 rule; collision no quiet overwrite. Smoke: hard-refresh web.app → warm edit → Saved feels fast → Cancel → reopen sticks. |
 | 2026-08-12 | Director L2 smoke green → **L3**. |
 | 2026-08-13 | Collision on sub-event edit: calendar Sheets stamp lagged Firebase meta. Fix: sync `identityUpdatedAt` on room join; one stamp-adopt retry on live/GAS collision. |
+| 2026-08-13 | Director: end of L campaign = first warm feels fully live/snappy; do not reorder slices. |
+| 2026-08-13 | **L4** — Hub open from live memory; fixture flush live before GENERATE; GENERATE kept as one accepted server op; pack/arrange structural still GAS→FS. |
 
 ---
 

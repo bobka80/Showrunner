@@ -495,6 +495,8 @@ The station APK ships **separately** from GAS: `node build-station-apk.js "<note
 
 **Campaign Room R3b (2026-07-25):** Warm Logistics Hub via `dalEnsureWarmHubWorkspace_` — pack/arrange/generate → Firebase while room warm (**GAS v745**). **Hub smoke 2026-08-04:** headless Auto Arrange must use `paIsTruckArrangeContainer_` (include autos); warm-room Timeline open joins via Hub seed (no cold Opening UX); GENERATE with times returns timeline snap for UI.
 
+**Warm Live L4 (2026-08-13):** Hub open reuses live PA memory when prep already firestore-live (`hubWarmLiveMemoryReady_`) — no forced `getProjectAssets` round-trip. Fixture-only Hub saves / GENERATE prep flush use `dalWritePaForkToFirestore_`. **GENERATE** remains the accepted **one** Apps Script op (writes warm Firebase). Structural pack autos + truck arrange stay GAS→FS batch (live PA flush is fixtures-only by design).
+
 **Campaign Room five-slice (2026-07-31 docs):** Room = meta + PA + timeline + ledger + **ops**. Ops lock reopened (`warm_fifth_slice`). Meta identity elevation = **R3c**; ops Firebase path = **R3d**; checkpoint order adds ops; listeners follow active users (**R4b**); idle = single constant (**R5**).
 
 **Campaign Room R3d (2026-08-04):** RFID `Operations_Ledger` warm slice at `projects/{id}/ops/` (`_meta` + `state` + per-row `r_{uid}`). Warm checkout/check-in batches write Firebase; Sheets lag until finalize / END ROOM / **R4 checkpoint** (`dalCommitOpsFromFirestore_` with `keepLive` on checkpoint). Fail closed on commit (pocket + throw). Cold path unchanged.
