@@ -9,12 +9,11 @@
 // ==========================================
 // @INDEX: LOGISTICS_WIZARD -> Logistics Hub & Autonomous Engine
 
-/** Warm Live L4 — PA already in browser memory for this project (open Hub without GAS wait). */
+/** Warm Live L4 — PA already in browser memory for this project (skip PA hydrate). */
 window.hubWarmLiveMemoryReady_ = function (projectId) {
     return !!(projectId &&
         window.paLoadedForProject === projectId &&
-        Array.isArray(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : null) &&
-        typeof globalAssets !== 'undefined' && globalAssets && globalAssets.length > 0);
+        Array.isArray(typeof currentProjectAssets !== 'undefined' ? currentProjectAssets : null));
 };
 
 /** Soft seed warm Hub workspace in background (never blocks Hub open). */
@@ -270,36 +269,47 @@ function openLogisticsHubModal() {
         document.getElementById('logistics-hub-modal-overlay').style.display = 'flex';
     };
 
-    // Warm Live L4: PA already in memory — open Hub immediately (seed/refresh in background).
-    // Do not wait for ensureDalWarmHubWorkspace / getProjectAssets / getTimelineData.
-    if (typeof window.hubWarmLiveMemoryReady_ === 'function' && window.hubWarmLiveMemoryReady_(projectId)) {
-        if (typeof window.hubWarmSoftEnsure_ === 'function') window.hubWarmSoftEnsure_(projectId);
+    // Warm Live L4: ALWAYS open Hub UI immediately. Never wait on GAS.
+    // Seed + PA hydrate run in background; truck selects refresh when data arrives.
+    if (typeof window.hubWarmSoftEnsure_ === 'function') window.hubWarmSoftEnsure_(projectId);
+
+    proceedToHub(typeof window.hubLocalTimelineForUi_ === 'function'
+        ? window.hubLocalTimelineForUi_()
+        : { shifts: [], phases: [], overrides: {} });
+
+    var memoryReady = (typeof window.hubWarmLiveMemoryReady_ === 'function' &&
+        window.hubWarmLiveMemoryReady_(projectId));
+    if (memoryReady) return;
+
+    // PA / vault not in memory yet — hydrate without blocking the modal.
+    var sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : "";
+    var eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : "";
+    var hubOpenGen = window._hubWarmOpenGen_ || 0;
+
+    var repaintHubIfStillOpen_ = function () {
+        if ((window._hubWarmOpenGen_ || 0) !== hubOpenGen && hubOpenGen !== 0) {
+            // soft ensure may have bumped gen — still OK if overlay open
+        }
+        var ov = document.getElementById('logistics-hub-modal-overlay');
+        if (!ov || ov.style.display === 'none') return;
         proceedToHub(typeof window.hubLocalTimelineForUi_ === 'function'
             ? window.hubLocalTimelineForUi_()
             : { shifts: [], phases: [], overrides: {} });
-        return;
-    }
+    };
 
-    // Cold / first load only — PA not in memory yet.
-    {
-        let btn = document.getElementById('logistics-hub-btn-layers') || document.getElementById('logistics-hub-btn');
-        let origText = btn ? btn.innerText : 'LOGISTICS HUB';
-        if (btn) { btn.innerText = "LOADING GEAR..."; btn.disabled = true; }
-
-        let sDate = document.getElementById('edit-proj-date') ? document.getElementById('edit-proj-date').value : "";
-        let eDate = document.getElementById('edit-proj-end-date') ? document.getElementById('edit-proj-end-date').value : "";
-
-        let targetAssets = null;
-        let targetTimeline = null;
-
-        const finalizeLoad = () => {
-            if (targetAssets && targetTimeline) {
-                currentProjectAssets = targetAssets.current || [];
-                window.overlappingAllocations = targetAssets.overlapping || {};
-                window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
-                window.paLoadedForProject = projectId;
-
-                const processFormulas = (arr) => {
+    var afterPa_ = function (res) {
+        if (res) {
+            currentProjectAssets = (res.current) || currentProjectAssets || [];
+            window.overlappingAllocations = res.overlapping || window.overlappingAllocations || {};
+            window.originalProjectAssets = JSON.parse(JSON.stringify(currentProjectAssets));
+            window.paLoadedForProject = projectId;
+            if (typeof window.dalProcessPaFormulas_ === 'function') {
+                try {
+                    window.dalProcessPaFormulas_(currentProjectAssets, { skipExplode: false });
+                    window.dalProcessPaFormulas_(window.originalProjectAssets, { skipExplode: true });
+                } catch (eF) { /* fall through */ }
+            } else {
+                (function processFormulas(arr) {
                     let exploded = [];
                     for (let i = arr.length - 1; i >= 0; i--) {
                         let pa = arr[i];
@@ -317,7 +327,6 @@ function openLogisticsHubModal() {
                         }
                     }
                     if (exploded.length > 0) arr.push(...exploded);
-
                     arr.forEach(pa => {
                         if (pa.formula === 'Manual') pa.formula = 'Standalone';
                         if (pa.assetId === 'DUMMY') pa.isEmptyGroup = true;
@@ -327,64 +336,29 @@ function openLogisticsHubModal() {
                         else if (pa.formula && pa.formula.startsWith('[GEN_AUTO] ')) { pa.isAuto = true; pa.isGenericAuto = true; pa.formula = pa.formula.substring(11); }
                         else if (pa.formula && pa.formula.startsWith('[AUTO] ')) { pa.isAuto = true; pa.formula = pa.formula.substring(7); }
                     });
-                };
-                processFormulas(currentProjectAssets);
-                processFormulas(window.originalProjectAssets);
-
-                if (btn) { btn.innerText = origText; btn.disabled = false; }
-                proceedToHub(targetTimeline);
+                })(currentProjectAssets);
             }
-        };
+        }
+        repaintHubIfStillOpen_();
+    };
 
-        const fetchTimeline = () => {
-            var localTl = (typeof window.hubLocalTimelineForUi_ === 'function')
-                ? window.hubLocalTimelineForUi_()
-                : null;
-            if (localTl && Array.isArray(localTl.shifts)) {
-                targetTimeline = localTl;
-                finalizeLoad();
-                return;
-            }
-            google.script.run
-            .withFailureHandler(err => {
-                targetTimeline = { shifts: [], phases: [], overrides: {} };
-                finalizeLoad();
+    var fetchPa_ = function () {
+        google.script.run
+            .withFailureHandler(function () { /* Hub already open */ })
+            .withSuccessHandler(afterPa_)
+            .getProjectAssets(projectId, sDate, eDate);
+    };
+
+    if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
+        google.script.run
+            .withFailureHandler(function () { fetchPa_(); })
+            .withSuccessHandler(function (assets) {
+                globalAssets = assets || [];
+                fetchPa_();
             })
-            .withSuccessHandler(res => {
-                targetTimeline = res || { shifts: [], phases: [], overrides: {} };
-                finalizeLoad();
-            }).getTimelineData(projectId, 'main');
-        };
-
-        const fetchAssets = () => {
-            if (window.paLoadedForProject === projectId && currentProjectAssets && !window._hubForcePaReload_) {
-                targetAssets = { current: currentProjectAssets, overlapping: window.overlappingAllocations };
-                fetchTimeline();
-                return;
-            }
-            window._hubForcePaReload_ = false;
-            google.script.run
-            .withFailureHandler(err => {
-                if (btn) { btn.innerText = origText; btn.disabled = false; }
-                alert("Error loading assignments: " + err.message);
-            })
-            .withSuccessHandler(res => {
-                targetAssets = res;
-                fetchTimeline();
-            }).getProjectAssets(projectId, sDate, eDate);
-        };
-
-        const startHubLoads = () => {
-            if (typeof globalAssets === 'undefined' || !globalAssets || globalAssets.length === 0) {
-                google.script.run.withFailureHandler(err => { if (btn) { btn.innerText = origText; btn.disabled = false; } alert("Error loading vault: " + err.message); }).withSuccessHandler(assets => { globalAssets = assets || []; fetchAssets(); }).getAssetRegistry(ACTIVE_USER_NAME);
-            } else {
-                fetchAssets();
-            }
-        };
-
-        // Seed in parallel — do not serialize behind ensure (that was the ~10s wait).
-        if (typeof window.hubWarmSoftEnsure_ === 'function') window.hubWarmSoftEnsure_(projectId);
-        startHubLoads();
+            .getAssetRegistry(ACTIVE_USER_NAME);
+    } else {
+        fetchPa_();
     }
 }
 

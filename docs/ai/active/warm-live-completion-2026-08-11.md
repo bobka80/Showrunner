@@ -151,6 +151,7 @@ L5 exit + archive  ← next
 | 2026-08-13 | Director: end of L campaign = first warm feels fully live/snappy; do not reorder slices. |
 | 2026-08-13 | **L4 @ GAS v790** — Hub open from live memory + background truck overlay; fixture flush live; GENERATE kept as one accepted warm server op (auto deltas only after flush). |
 | 2026-08-13 | Hub open still ~10s: gate required prep live; cached-PA branch still waited on ensure+reload. Fix: open from any in-memory PA; ensure soft/background. |
+| 2026-08-13 | Still slow (PA often not in memory → waited on getProjectAssets). Fix: **always** show Hub modal first; hydrate PA/vault in background. |
 
 ---
 
