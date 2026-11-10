@@ -4260,9 +4260,14 @@ body.mobile-pa-compact .pa-assigned-list div[title="Standalone Items"] {
 
 body.mobile-pa-compact #pa-view-logistics .btn-blue.btn-sm,
 body.mobile-pa-compact .pa-assigned-list .btn-blue.btn-sm,
-body.mobile-pa-compact:not(.mobile-pa-mode-operation) #pa-view-logistics .btn-delete.btn-sm,
-body.mobile-pa-compact:not(.mobile-pa-mode-operation) .pa-assigned-list .btn-delete.btn-sm {
+body.mobile-pa-compact:not(.mobile-pa-mode-operation) #pa-view-logistics .btn-delete.btn-sm:not(.pa-row-delete-btn),
+body.mobile-pa-compact:not(.mobile-pa-mode-operation) .pa-assigned-list .btn-delete.btn-sm:not(.pa-row-delete-btn) {
     display: none !important;
+}
+
+body.mobile-pa-compact #pa-view-logistics .pa-row-delete-btn,
+body.mobile-pa-compact .pa-assigned-list .pa-row-delete-btn {
+    display: inline-flex !important;
 }
 
 body.mobile-pa-compact.mobile-pa-mode-operation #pa-view-logistics .mobile-pa-undo-btn,
