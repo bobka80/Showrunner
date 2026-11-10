@@ -66,6 +66,297 @@ function TEST_AuditLogger() {
   return "Test log injected successfully!";
 }
 
+// ==========================================
+// --- USER ERROR REPORTS (Sheet inbox only) ---
+// ==========================================
+// @INDEX: ERROR_REPORTS -> User error report inbox (Error_Reports tab)
+// Campaign (archived): docs/ai/archive/user-error-reporting-journal-2026-07-19.md
+// Do NOT write lasting journal here. Do NOT touch Audit_Logs.
+
+var ERROR_REPORTS_HEADERS_ = [
+  "Report_ID",
+  "Timestamp",
+  "User_ID",
+  "User_Name",
+  "Role_Dept",
+  "View",
+  "Project_ID",
+  "Fork_ID",
+  "Main_Session_ID",
+  "Sync_Mode",
+  "Surface",
+  "App_Version",
+  "Description",
+  "Diag_JSON",
+  "Diag_Ref"
+];
+
+/** Soft cell cap — Sheets ~50k; overflow goes to Drive + Diag_Ref. */
+var ERROR_REPORT_DIAG_CELL_MAX_ = 45000;
+
+/**
+ * Ensure SM_Showrunner_LOGS has tab Error_Reports with locked headers.
+ * Does not modify Audit_Logs.
+ * @returns {GoogleAppsScript.Spreadsheet.Sheet}
+ */
+function verifyErrorReportsSchema() {
+  const ss = SpreadsheetApp.openById(getAuditLogSheetId());
+  const headers = ERROR_REPORTS_HEADERS_;
+  let sheet = ss.getSheetByName("Error_Reports");
+
+  if (!sheet) {
+    sheet = ss.insertSheet("Error_Reports");
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#991b1b").setFontColor("#ffffff");
+    sheet.setFrozenRows(1);
+  } else {
+    if (sheet.getMaxColumns() < headers.length) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), headers.length - sheet.getMaxColumns());
+    }
+    let firstRow = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+    if (String(firstRow[0] || "").trim() !== "Report_ID") {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+        .setFontWeight("bold").setBackground("#991b1b").setFontColor("#ffffff");
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}
+
+/**
+ * Append one raw error report to Error_Reports (inbox).
+ * @param {Object} payload
+ * @returns {{ok:boolean, reportId?:string, error?:string, diagRef?:string}}
+ */
+function submitErrorReport(payload) {
+  try {
+    payload = payload || {};
+    const sheet = verifyErrorReportsSchema();
+    const reportId = String(payload.reportId || payload.Report_ID || Utilities.getUuid()).trim();
+    const timestamp = payload.timestamp || payload.Timestamp || new Date().toISOString();
+
+    let diagJson = payload.diagJson != null ? payload.diagJson
+      : (payload.Diag_JSON != null ? payload.Diag_JSON : "");
+    if (typeof diagJson !== "string") {
+      try { diagJson = JSON.stringify(diagJson); } catch (e) { diagJson = String(diagJson); }
+    }
+    let diagRef = String(payload.diagRef || payload.Diag_Ref || "").trim();
+
+    if (diagJson && diagJson.length > ERROR_REPORT_DIAG_CELL_MAX_) {
+      diagRef = storeErrorReportDiagOverflow_(reportId, diagJson) || diagRef;
+      diagJson = JSON.stringify({
+        truncated: true,
+        originalChars: diagJson.length,
+        note: "Full diag in Drive — see Diag_Ref"
+      });
+    }
+
+    const row = [
+      reportId,
+      timestamp,
+      String(payload.userId || payload.User_ID || "").trim(),
+      String(payload.userName || payload.User_Name || "").trim(),
+      String(payload.roleDept || payload.Role_Dept || "").trim(),
+      String(payload.view || payload.View || "").trim(),
+      String(payload.projectId || payload.Project_ID || "").trim(),
+      String(payload.forkId || payload.Fork_ID || "").trim(),
+      String(payload.mainSessionId || payload.Main_Session_ID || "").trim(),
+      String(payload.syncMode || payload.Sync_Mode || "").trim(),
+      String(payload.surface || payload.Surface || "").trim(),
+      String(payload.appVersion || payload.App_Version || "").trim(),
+      String(payload.description || payload.Description || "").trim(),
+      diagJson,
+      diagRef
+    ];
+    sheet.appendRow(row);
+    return { ok: true, reportId: reportId, diagRef: diagRef || undefined };
+  } catch (e) {
+    console.error("submitErrorReport failed: ", e);
+    return { ok: false, error: String(e && e.message ? e.message : e) };
+  }
+}
+
+/** Put oversized diag JSON next to the live LOGS workbook; return file URL. */
+function storeErrorReportDiagOverflow_(reportId, diagJson) {
+  try {
+    const logFile = DriveApp.getFileById(getAuditLogSheetId());
+    const parents = logFile.getParents();
+    const folder = parents.hasNext() ? parents.next() : DriveApp.getFolderById(LIVE_DATABASE_FOLDER_ID);
+    const name = "Error_Report_Diag_" + reportId + ".json";
+    const blob = Utilities.newBlob(diagJson, "application/json", name);
+    const file = folder.createFile(blob);
+    return file.getUrl();
+  } catch (e) {
+    console.error("storeErrorReportDiagOverflow_ failed: ", e);
+    return "";
+  }
+}
+
+/** Phase 1 gate: create Error_Reports tab + inject one test row. Audit_Logs untouched. */
+function TEST_ErrorReport() {
+  const res = submitErrorReport({
+    userId: "SYSTEM_TEST",
+    userName: "Phase 1 Schema Test",
+    roleDept: "ROOT",
+    view: "TEST",
+    projectId: "",
+    forkId: "",
+    mainSessionId: "phase1-schema",
+    syncMode: "none",
+    surface: "web",
+    appVersion: "TEST_ErrorReport",
+    description: "Phase 1 test row — safe to delete after handoff UI exists.",
+    diagJson: { phase: 1, purpose: "verify Error_Reports tab + writer" }
+  });
+  if (!res.ok) return "TEST_ErrorReport FAILED: " + res.error;
+  return "Error_Reports ready. Test Report_ID=" + res.reportId;
+}
+
+function assertErrorReportsRoot_(actor) {
+  if (typeof verifyBackendPrivilege === 'function' && !verifyBackendPrivilege(actor, 'ROOT')) {
+    throw new Error('Permission Denied: ROOT only.');
+  }
+}
+
+function errorReportRowToObject_(row, hMap) {
+  function cell(key) {
+    var i = hMap[key];
+    if (i === undefined || i === null) return '';
+    var v = row[i];
+    if (v instanceof Date) return v.toISOString();
+    return v == null ? '' : String(v);
+  }
+  return {
+    reportId: cell('Report_ID'),
+    timestamp: cell('Timestamp'),
+    userId: cell('User_ID'),
+    userName: cell('User_Name'),
+    roleDept: cell('Role_Dept'),
+    view: cell('View'),
+    projectId: cell('Project_ID'),
+    forkId: cell('Fork_ID'),
+    mainSessionId: cell('Main_Session_ID'),
+    syncMode: cell('Sync_Mode'),
+    surface: cell('Surface'),
+    appVersion: cell('App_Version'),
+    description: cell('Description'),
+    diagJson: cell('Diag_JSON'),
+    diagRef: cell('Diag_Ref')
+  };
+}
+
+/** ROOT: list inbox rows (newest first). Does not touch Audit_Logs. */
+function listErrorReports(actor) {
+  return executeWithRetry(function () {
+    assertErrorReportsRoot_(actor);
+    const sheet = verifyErrorReportsSchema();
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length <= 1) return { ok: true, reports: [], count: 0 };
+
+    const hMap = {};
+    data[0].forEach(function (h, i) { hMap[String(h || '').trim()] = i; });
+    const reports = [];
+    for (var i = 1; i < data.length; i++) {
+      var obj = errorReportRowToObject_(data[i], hMap);
+      if (!obj.reportId) continue;
+      reports.push(obj);
+    }
+    reports.reverse();
+    return { ok: true, reports: reports, count: reports.length };
+  });
+}
+
+function buildErrorReportPackText_(reports) {
+  var lines = [];
+  lines.push('# Showrunner Error Report Pack');
+  lines.push('Generated: ' + new Date().toISOString());
+  lines.push('Count: ' + reports.length);
+  lines.push('Sheet inbox rows below were deleted after this handoff. Memory = markdown journal only.');
+  lines.push('');
+  reports.forEach(function (r, idx) {
+    lines.push('## Report ' + (idx + 1) + ' — ' + (r.reportId || '(no id)'));
+    lines.push('- Timestamp: ' + (r.timestamp || ''));
+    lines.push('- User: ' + (r.userName || '') + ' (' + (r.userId || '') + ')');
+    lines.push('- Role_Dept: ' + (r.roleDept || ''));
+    lines.push('- View: ' + (r.view || ''));
+    lines.push('- Project_ID: ' + (r.projectId || ''));
+    lines.push('- Fork_ID: ' + (r.forkId || ''));
+    lines.push('- Main_Session_ID: ' + (r.mainSessionId || ''));
+    lines.push('- Sync_Mode: ' + (r.syncMode || ''));
+    lines.push('- Surface: ' + (r.surface || ''));
+    lines.push('- App_Version: ' + (r.appVersion || ''));
+    lines.push('- Description: ' + (r.description || ''));
+    if (r.diagRef) lines.push('- Diag_Ref: ' + r.diagRef);
+    lines.push('- Diag_JSON:');
+    lines.push('```json');
+    lines.push(r.diagJson || '{}');
+    lines.push('```');
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
+/**
+ * ROOT: build pack text for selected Report_IDs, then delete those rows from Error_Reports.
+ * @returns {{ok:boolean, packText?:string, deletedCount?:number, error?:string}}
+ */
+function handoverErrorReports(actor, reportIds) {
+  return executeWithRetry(function () {
+    assertErrorReportsRoot_(actor);
+    var ids = [];
+    var seen = {};
+    (reportIds || []).forEach(function (id) {
+      var s = String(id || '').trim();
+      if (!s || seen[s]) return;
+      seen[s] = true;
+      ids.push(s);
+    });
+    if (!ids.length) {
+      return { ok: false, error: 'No Report_IDs selected.' };
+    }
+
+    const sheet = verifyErrorReportsSchema();
+    const data = sheet.getDataRange().getValues();
+    if (!data || data.length <= 1) {
+      return { ok: false, error: 'Error_Reports inbox is empty.' };
+    }
+
+    const hMap = {};
+    data[0].forEach(function (h, i) { hMap[String(h || '').trim()] = i; });
+    const idCol = hMap['Report_ID'];
+    if (idCol === undefined) throw new Error('Error_Reports missing Report_ID column.');
+
+    const want = {};
+    ids.forEach(function (id) { want[id] = true; });
+    const selected = [];
+    const deleteRowNumbers = []; // 1-based sheet rows
+    for (var i = 1; i < data.length; i++) {
+      var rid = data[i][idCol] == null ? '' : String(data[i][idCol]).trim();
+      if (!want[rid]) continue;
+      selected.push(errorReportRowToObject_(data[i], hMap));
+      deleteRowNumbers.push(i + 1);
+    }
+    if (!selected.length) {
+      return { ok: false, error: 'None of the selected Report_IDs were found in the inbox.' };
+    }
+
+    const packText = buildErrorReportPackText_(selected);
+
+    // Delete from bottom up so row numbers stay valid
+    deleteRowNumbers.sort(function (a, b) { return b - a; });
+    deleteRowNumbers.forEach(function (rowNum) {
+      sheet.deleteRow(rowNum);
+    });
+
+    try {
+      writeToAuditLog(actor, 'HANDOVER', 'ERROR_REPORTS', 'GLOBAL', String(selected.length),
+        'Handed ' + selected.length + ' error report(s) to Cursor; deleted from Error_Reports inbox.');
+    } catch (e) { /* ignore audit failure */ }
+
+    return { ok: true, packText: packText, deletedCount: selected.length, reportIds: selected.map(function (r) { return r.reportId; }) };
+  });
+}
+
 function getEntityAuditHistory(targetUid) {
   return executeWithRetry(() => {
     if (!targetUid || targetUid === 'NEW') return [];

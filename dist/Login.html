@@ -186,14 +186,20 @@
 
       function notifyParentSessionToken(token, crewName, expiresAt) {
         if (!token || window.parent === window) return;
+        var exp = expiresAt || (Date.now() + SESSION_MS);
         try {
-          window.parent.postMessage({
-            type: 'SHOWRUNNER_SESSION_TOKEN',
-            token: token,
-            crewName: crewName || '',
-            expiresAt: expiresAt || (Date.now() + SESSION_MS)
-          }, '*');
+          if (window.AndroidStation && typeof AndroidStation.saveSession === 'function') {
+            AndroidStation.saveSession(token, exp);
+          }
         } catch (e) { /* ignore */ }
+        var sessionMsg = {
+          type: 'SHOWRUNNER_SESSION_TOKEN',
+          token: token,
+          crewName: crewName || '',
+          expiresAt: exp
+        };
+        try { window.parent.postMessage(sessionMsg, '*'); } catch (e) { /* ignore */ }
+        try { if (window.top && window.top !== window) window.top.postMessage(sessionMsg, '*'); } catch (e) { /* ignore */ }
       }
 
       if (clearSession) {

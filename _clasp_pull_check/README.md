@@ -11,9 +11,9 @@
 
 ## Rules
 
-- **Backup only** — this folder is not the editable source tree (`*.html` modules). It is the built Apps Script shape (`dist/`-like).
-- **Do not** run `milestone.js`, `dev-push.js`, or `gas-push-sync` from the older root source while intending to “restore” this snapshot — that rebuilds from root HTML/JS and can **roll production back**.
-- **Do not** raise `RELEASES.md` table max to 792 until the real source tree matches live; the milestone guard uses that table to refuse outdated deploys.
+- This folder is the raw clasp pull (built Apps Script shape).
+- Git is also synced: root backends + `Login.html`, `frontend-lock/`, and `dist/` match this pull (**v792**). `build.js` uses `frontend-lock/` so a rebuild does not revert to older HTML modules.
+- HTML modules (`0*.html` / root `Index.html` includes) may still lag; do not delete `frontend-lock/` until those modules can reproduce production.
 - Re-pull (read-only): from this folder, with clasp logged in, `clasp pull --force`.
 
 See [DEPLOY_AND_ROLLBACK.md](../docs/ai/DEPLOY_AND_ROLLBACK.md).

@@ -440,12 +440,17 @@ function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
   const uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : '';
   const isStationDevice = !!bundle.is_station_device;
   const stationDeviceLayout = bundle.station_device_layout || '';
+  let isFreelancer = false;
+  if (cMap['IsFreelancer'] !== undefined) {
+    isFreelancer = isTruthyCell(crewData[i][cMap['IsFreelancer']]);
+  }
   return {
     success: true,
     name: crewData[i][cMap['Name']] || hardName,
     access: normalizeAccessTier(sysAccess),
     permissions: bundle,
     tunnelingActive: isTunneling,
+    isFreelancer: isFreelancer,
     uid: uid,
     email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : '',
     isStationDevice: isStationDevice,
@@ -491,6 +496,7 @@ function getAuthBundleForCrewName_(crewName) {
           task_manage_personal: true
         },
         tunnelingActive: false,
+        isFreelancer: false,
         uid: 'UID_BOGDAN',
         email: 'bobby@showrider.com'
       };
@@ -778,6 +784,14 @@ function assertActorCanManageProject(actor) {
   if (!verifyBackendPrivilege(actor, 'MANAGER')) {
     throw new Error('🛑 PERMISSION DENIED: Manager access required for project lifecycle changes.');
   }
+}
+
+/** L.O. crew (view_logistics) + managers/root — not manager-only. */
+function assertActorCanManageDalPrepSession(actor) {
+  if (verifyBackendPrivilege(actor, 'ROOT')) return;
+  if (verifyBackendPrivilege(actor, 'MANAGER')) return;
+  if (effectiveBackendPermission(actor, 'view_logistics')) return;
+  throw new Error('🛑 PERMISSION DENIED: Live logistics access required to start or end prep.');
 }
 
 function actorIsCrossRentOnlyCreator(actor) {
