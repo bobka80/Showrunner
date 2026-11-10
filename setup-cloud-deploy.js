@@ -83,16 +83,52 @@ function prependLocalBin() {
   return true;
 }
 
-function loadDeploymentId() {
-  const fromEnv = validDeploymentId(process.env.SHOWRUNNER_DEPLOYMENT_ID);
-  if (fromEnv) return fromEnv;
-  if (!fs.existsSync(DEPLOY_CONFIG)) return null;
+function knownProductionDeploymentId() {
   try {
-    const cfg = JSON.parse(fs.readFileSync(DEPLOY_CONFIG, 'utf8'));
-    return validDeploymentId(cfg.productionDeploymentId);
+    const text = fs.readFileSync(path.join(ROOT, 'push-hosting', 'prepare-hosting.js'), 'utf8');
+    const m = text.match(/script\.google\.com\/macros\/s\/(AKfycb[A-Za-z0-9_-]+)/);
+    return m ? validDeploymentId(m[1]) : null;
   } catch (e) {
     return null;
   }
+}
+
+function loadDeploymentId() {
+  const fromEnv = validDeploymentId(process.env.SHOWRUNNER_DEPLOYMENT_ID);
+  if (fromEnv) return fromEnv;
+  if (fs.existsSync(DEPLOY_CONFIG)) {
+    try {
+      const cfg = JSON.parse(fs.readFileSync(DEPLOY_CONFIG, 'utf8'));
+      const fromFile = validDeploymentId(cfg.productionDeploymentId);
+      if (fromFile) return fromFile;
+    } catch (e) { /* fall through */ }
+  }
+  return knownProductionDeploymentId();
+}
+
+function latestRecordedGasVersion(releasesText) {
+  let max = null;
+  for (const line of String(releasesText || '').split('\n')) {
+    if (!line.startsWith('|') || line.includes('---') || line.includes('| # |')) continue;
+    const cols = line.split('|').map((c) => c.trim()).filter(Boolean);
+    if (cols.length < 3 || !/^\d+$/.test(cols[0])) continue;
+    const num = parseInt(cols[2], 10);
+    if (!isNaN(num) && (max === null || num > max)) max = num;
+  }
+  return max;
+}
+
+function deployBlockReason(gasLatest, releasesMax) {
+  if (gasLatest == null || isNaN(gasLatest)) {
+    return 'Could not read Apps Script versions. Refusing to deploy.';
+  }
+  if (releasesMax == null) {
+    return 'Apps Script is at v' + gasLatest + ' and this git tree has no milestone record. Refusing to deploy.';
+  }
+  if (gasLatest > releasesMax) {
+    return 'Apps Script is at v' + gasLatest + ' but this git tree only records v' + releasesMax + '. Deploying would roll the live app back. Refusing.';
+  }
+  return null;
 }
 
 function manualSteps(state) {
@@ -108,6 +144,9 @@ function manualSteps(state) {
   if (!state.deploymentId) {
     lines.push('2. SHOWRUNNER_DEPLOYMENT_ID — the live web app id from `clasp list-deployments` (starts with AKfycb).');
     lines.push('   milestone.js reads this env var. It also writes gitignored deploy-config.json when the var is set.');
+  } else {
+    lines.push('Production deployment id is already known from push-hosting/prepare-hosting.js (' + redactId(state.deploymentId) + ').');
+    lines.push('A milestone still refuses to deploy when Apps Script is newer than RELEASES.md, so an old git tree cannot roll the live app back.');
   }
   if (!state.firebase) {
     lines.push('3. FIREBASE_TOOLS_JSON — only for hosting /station-app deploys. Contents of ~/.config/configstore/firebase-tools.json after firebase login.');
@@ -194,6 +233,9 @@ function main() {
 module.exports = {
   prepareCloudRuntime,
   loadDeploymentId,
+  knownProductionDeploymentId,
+  latestRecordedGasVersion,
+  deployBlockReason,
   prependLocalBin,
   validDeploymentId,
   manualSteps,

@@ -18,7 +18,7 @@ const path = require('path');
 const build = require('./build');
 const { pushToGitHub } = require('./git-push-backup');
 const gasPushSync = require('./gas-push-sync');
-const { prepareCloudRuntime, loadDeploymentId } = require('./setup-cloud-deploy');
+const { prepareCloudRuntime, loadDeploymentId, latestRecordedGasVersion, deployBlockReason } = require('./setup-cloud-deploy');
 
 const MAX_MILESTONE_LOG = 50;
 const LOG_PATH = path.join(__dirname, 'RELEASES.md');
@@ -124,12 +124,16 @@ if (!cloudPrep.readyForMilestone) {
 }
 
 const before = getLatestGasVersion();
-if (before) {
-  console.log(`Latest Apps Script version now: ${before.num} — "${before.desc}"`);
-  console.log(`Next version will be: ${before.num + 1}\n`);
-} else {
-  console.log('Could not read existing versions; clasp will assign the next number.\n');
+const releasesAt = latestRecordedGasVersion(fs.readFileSync(LOG_PATH, 'utf8'));
+const block = deployBlockReason(before && before.num, releasesAt);
+if (block) {
+  if (before) console.error(`Latest Apps Script version now: ${before.num} — "${before.desc}"`);
+  console.error(block);
+  console.error('Milestone stopped before any Google deploy.');
+  process.exit(1);
 }
+console.log(`Latest Apps Script version now: ${before.num} — "${before.desc}"`);
+console.log(`This git tree records v${releasesAt}. Next version will be: ${before.num + 1}\n`);
 
 build();
 (async () => {
