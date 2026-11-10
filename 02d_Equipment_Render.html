@@ -206,9 +206,9 @@ function renderProjectAssetsUI() {
         return `<button class="btn-main btn-sm mobile-pa-op-btn" style="margin:0;padding:2px 8px !important;${bs}" onclick="event.stopPropagation(); ${containerUniqueCid ? scanAllFn : `triggerManualScan('${assetId}', 1)`}" title="${manualTitle}">${opLabel}</button>`;
     };
 
+    // buildCSS updates an existing <style> in place (returns ''); only insert when missing.
+    // Do NOT remove the style tag here — that caused every-other-render column collapse.
     let dynCssAssigned = window.GridEngine.buildCSS('project_assigned');
-    let styleAssignedEl = document.getElementById('style-grid-project_assigned');
-    if (styleAssignedEl) styleAssignedEl.remove();
     if (dynCssAssigned) document.head.insertAdjacentHTML('beforeend', dynCssAssigned);
 
     const fs = typeof PA_FONT_SIZE !== 'undefined' ? PA_FONT_SIZE : 11;
