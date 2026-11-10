@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@google/clasp": "^3.4.1",
+    "firebase-tools": "^15.35.0",
     "html-minifier-terser": "^7.2.0"
   },
   "scripts": {
@@ -10,6 +12,8 @@
     "milestone": "node milestone.js",
     "rollback-works": "node rollback-works.js",
     "rollback-milestone": "node rollback-milestone.js",
-    "check-google": "node check-google-account.js"
+    "check-google": "node check-google-account.js",
+    "setup-cloud": "node setup-cloud-deploy.js",
+    "setup-cloud:check": "node setup-cloud-deploy.js --check"
   }
 }

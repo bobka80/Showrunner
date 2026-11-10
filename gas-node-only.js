@@ -19,6 +19,7 @@ module.exports = new Set([
   'gas-push-sync.js',
   'gas-node-only.js',
   'git-push-backup.js',
+  'setup-cloud-deploy.js',
   'test.js',
   'test_db.js',
   'run_test.js',

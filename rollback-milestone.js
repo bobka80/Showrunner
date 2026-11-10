@@ -9,18 +9,13 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { prepareCloudRuntime, loadDeploymentId } = require('./setup-cloud-deploy');
 
 const LOG_PATH = path.join(__dirname, 'RELEASES.md');
-const CONFIG_PATH = path.join(__dirname, 'deploy-config.json');
 const arg = process.argv[2] || '2';
 
 function runInherit(cmd) {
   execSync(cmd, { cwd: __dirname, stdio: 'inherit' });
-}
-
-function loadDeploymentId() {
-  const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-  return cfg.productionDeploymentId;
 }
 
 function parseReleases() {
@@ -36,10 +31,7 @@ function parseReleases() {
   return rows;
 }
 
-if (!fs.existsSync(CONFIG_PATH)) {
-  console.error('Missing deploy-config.json');
-  process.exit(1);
-}
+prepareCloudRuntime();
 
 const rows = parseReleases();
 if (rows.length < 1) {
@@ -55,6 +47,10 @@ if (!target) {
 }
 
 const deploymentId = loadDeploymentId();
+if (!deploymentId) {
+  console.error('Missing production deployment id. Set SHOWRUNNER_DEPLOYMENT_ID or gitignored deploy-config.json.');
+  process.exit(1);
+}
 
 console.log(`=== Rollback PRODUCTION to milestone #${target.num} (GAS v${target.version}) ===`);
 console.log('Note:', target.note, '\n');

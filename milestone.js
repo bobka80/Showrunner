@@ -18,6 +18,7 @@ const path = require('path');
 const build = require('./build');
 const { pushToGitHub } = require('./git-push-backup');
 const gasPushSync = require('./gas-push-sync');
+const { prepareCloudRuntime, loadDeploymentId } = require('./setup-cloud-deploy');
 
 const MAX_MILESTONE_LOG = 50;
 const LOG_PATH = path.join(__dirname, 'RELEASES.md');
@@ -56,13 +57,7 @@ function parseDeploymentId(output) {
 }
 
 function loadOptionalDeploymentId() {
-  if (!fs.existsSync(CONFIG_PATH)) return null;
-  try {
-    const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
-    const id = cfg.productionDeploymentId;
-    if (id && !String(id).includes('PASTE')) return id;
-  } catch (e) { /* ignore */ }
-  return null;
+  return loadDeploymentId();
 }
 
 function saveDeploymentId(deploymentId) {
@@ -119,6 +114,14 @@ function updateReleasesLog(gasVersion, deployId, text) {
 
 console.log('=== Production milestone (Apps Script layer) ===\n');
 console.log('Note:', note, '\n');
+
+const cloudPrep = prepareCloudRuntime();
+cloudPrep.lines.forEach((line) => console.log(line));
+if (!cloudPrep.readyForMilestone) {
+  console.error('\n' + cloudPrep.manualSteps);
+  console.error('\nMilestone stopped before any Google deploy.');
+  process.exit(1);
+}
 
 const before = getLatestGasVersion();
 if (before) {
