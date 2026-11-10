@@ -2,6 +2,8 @@
 
 Created only on **Milestone** / **OK ship** / **Milestone now** — not on every "This works".
 
+**Live production (2026-11-10 clasp pull — backup only, no deploy):** GAS **v792** is live (`@792` web app). Full project snapshot is in **`_clasp_pull_check/`**. This git source tree’s milestone table below still tops out at **v505** on purpose — so `milestone.js` refuses to push older source over live. Do **not** add a v792 table row until root source matches production.
+
 | # | Date | GAS version | Deployment | Note |
 |---|------|-------------|------------|------|
 | 1 | 2026-07-10 | 505 | `AKfycbxy…` | Chainway disconnect beep + no-host auto park (autoSdkPark); APK build 53 |

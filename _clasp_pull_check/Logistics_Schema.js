@@ -15,7 +15,7 @@ function verifyDatabaseSchema(readOnly = false) {
   const sm = {};
   for (let i = 0; i < sheetsArr.length; i++) sm[sheetsArr[i].getName()] = sheetsArr[i];
 
-  cachedEngineSheets = { index: sm["Projects_Index"], timelines: sm["Project_Timelines"], shifts: sm["Shift_Assignments"], blocks: sm["Phase_Blocks"], overrides: sm["Dept_Overrides"], leaves: sm["Leave_Tracker"], tasks: sm["Global_Tasks"], notifs: sm["Notifications"], taskAssignees: sm["Task_Assignees"], taskTodos: sm["Task_Todos"], taskAssets: sm["Task_Assets"], projectChecklists: sm["Project_Checklists"], projectAssets: sm["Project_Assets"], conflictOverrides: sm["Conflict_Overrides"], opsLedger: sm["Operations_Ledger"] };
+  cachedEngineSheets = { index: sm["Projects_Index"], timelines: sm["Project_Timelines"], shifts: sm["Shift_Assignments"], blocks: sm["Phase_Blocks"], overrides: sm["Dept_Overrides"], leaves: sm["Leave_Tracker"], tasks: sm["Global_Tasks"], notifs: sm["Notifications"], taskAssignees: sm["Task_Assignees"], taskTodos: sm["Task_Todos"], taskAssets: sm["Task_Assets"], projectChecklists: sm["Project_Checklists"], projectAssets: sm["Project_Assets"], conflictOverrides: sm["Conflict_Overrides"], opsLedger: sm["Operations_Ledger"], logisticsLedger: sm["Logistics_Ledger"] };
   if (readOnly) return cachedEngineSheets;
 
   let indexSheet = sm["Projects_Index"];
@@ -153,14 +153,98 @@ function verifyDatabaseSchema(readOnly = false) {
   }
 
   let projectAssetsSheet = sm["Project_Assets"];
-  const projectAssetsHeaders = ["uid", "project_uid", "asset_uid", "assigned_quantity", "location", "formula", "creator", "container_uid", "scan_status", "outbound_truck_uid", "outbound_x", "outbound_y", "outbound_z", "outbound_rotated", "outbound_staged", "inbound_truck_uid", "inbound_x", "inbound_y", "inbound_z", "inbound_rotated", "inbound_staged"];
+  const projectAssetsHeaders = ["uid", "project_uid", "asset_uid", "assigned_quantity", "location", "formula", "creator", "override_dept", "container_uid", "scan_status"];
   if (!projectAssetsSheet) { 
       projectAssetsSheet = ss.insertSheet("Project_Assets"); 
       projectAssetsSheet.appendRow(projectAssetsHeaders); 
       projectAssetsSheet.getRange(1, 1, 1, projectAssetsHeaders.length).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff"); projectAssetsSheet.setFrozenRows(1); 
   } else {
-      if (projectAssetsSheet.getMaxColumns() < projectAssetsHeaders.length) projectAssetsSheet.insertColumnsAfter(projectAssetsSheet.getMaxColumns(), projectAssetsHeaders.length - projectAssetsSheet.getMaxColumns());
-      projectAssetsSheet.getRange(1, 1, 1, projectAssetsHeaders.length).setValues([projectAssetsHeaders]).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+      // Mid-header override_dept must INSERT a real column — append+relabel shifts container_uid into override_dept.
+      (function healPaOverrideDeptCol_() {
+        var lastCol = Math.max(projectAssetsSheet.getLastColumn(), 1);
+        var header = projectAssetsSheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function (h) {
+          return h != null ? String(h).trim() : '';
+        });
+        var odIdx = header.indexOf('override_dept');
+        var creatorIdx = header.indexOf('creator');
+        var containerIdx = header.indexOf('container_uid');
+        if (odIdx === -1) {
+          if (creatorIdx >= 0) projectAssetsSheet.insertColumnAfter(creatorIdx + 1);
+          else projectAssetsSheet.insertColumnsAfter(projectAssetsSheet.getMaxColumns(), 1);
+          return;
+        }
+        if (containerIdx < 0) return;
+        var lastRow = projectAssetsSheet.getLastRow();
+        if (lastRow < 2) return;
+        var sampleN = Math.min(lastRow - 1, 40);
+        var containerVals = projectAssetsSheet.getRange(2, containerIdx + 1, sampleN, 1).getValues();
+        var odVals = projectAssetsSheet.getRange(2, odIdx + 1, sampleN, 1).getValues();
+        var scanLike = { Assigned: 1, Packed: 1, Staged: 1, 'Checked Out': 1, 'Checked In': 1, Missing: 1 };
+        var scanVotes = 0;
+        var odEmpty = 0;
+        var odLooksLikeContainer = 0;
+        for (var si = 0; si < sampleN; si++) {
+          var cv = containerVals[si][0] != null ? String(containerVals[si][0]).trim() : '';
+          var ov = odVals[si][0] != null ? String(odVals[si][0]).trim() : '';
+          if (cv && scanLike[cv]) scanVotes++;
+          if (!ov) odEmpty++;
+          else if (ov.indexOf('|||') >= 0) odLooksLikeContainer++;
+        }
+        // Only auto-shift when container_uid clearly holds scan statuses AND override_dept
+        // still looks like old container data (or is empty) — never when override already has dept uids.
+        var shifted = scanVotes >= Math.max(2, Math.ceil(sampleN * 0.25));
+        var safeToInsert = (odEmpty + odLooksLikeContainer) >= Math.ceil(sampleN * 0.8);
+        if (shifted && safeToInsert) {
+          projectAssetsSheet.insertColumnBefore(odIdx + 1);
+        }
+      })();
+      // M4: one-time rewrite — drop 12 truck/staging columns; keep assignment-only shape
+      (function stripPaTruckColumnsM4_() {
+        var want = projectAssetsHeaders;
+        var lastCol = Math.max(projectAssetsSheet.getLastColumn(), 1);
+        var lastRow = Math.max(projectAssetsSheet.getLastRow(), 1);
+        var raw = projectAssetsSheet.getRange(1, 1, lastRow, lastCol).getValues();
+        var oldHeader = (raw[0] || []).map(function (h) { return h != null ? String(h).trim() : ''; });
+        var truckNames = {
+          outbound_truck_uid: 1, outbound_x: 1, outbound_y: 1, outbound_z: 1, outbound_rotated: 1, outbound_staged: 1,
+          inbound_truck_uid: 1, inbound_x: 1, inbound_y: 1, inbound_z: 1, inbound_rotated: 1, inbound_staged: 1
+        };
+        var needsStrip = oldHeader.length !== want.length;
+        if (!needsStrip) {
+          for (var hi = 0; hi < want.length; hi++) {
+            if (oldHeader[hi] !== want[hi]) { needsStrip = true; break; }
+          }
+        }
+        if (!needsStrip) {
+          for (var ti = 0; ti < oldHeader.length; ti++) {
+            if (truckNames[oldHeader[ti]]) { needsStrip = true; break; }
+          }
+        }
+        if (!needsStrip) {
+          projectAssetsSheet.getRange(1, 1, 1, want.length).setValues([want]).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+          return;
+        }
+        var oldMap = {};
+        oldHeader.forEach(function (h, i) { if (h) oldMap[h] = i; });
+        var out = [want];
+        for (var r = 1; r < raw.length; r++) {
+          var row = [];
+          for (var c = 0; c < want.length; c++) {
+            var idx = oldMap[want[c]];
+            row.push(idx !== undefined ? raw[r][idx] : '');
+          }
+          out.push(row);
+        }
+        projectAssetsSheet.clearContents();
+        if (projectAssetsSheet.getMaxColumns() < want.length) {
+          projectAssetsSheet.insertColumnsAfter(projectAssetsSheet.getMaxColumns(), want.length - projectAssetsSheet.getMaxColumns());
+        }
+        projectAssetsSheet.getRange(1, 1, out.length, want.length).setValues(out);
+        projectAssetsSheet.getRange(1, 1, 1, want.length).setFontWeight("bold").setBackground("#10b981").setFontColor("#ffffff");
+        while (projectAssetsSheet.getMaxColumns() > want.length) {
+          projectAssetsSheet.deleteColumn(projectAssetsSheet.getMaxColumns());
+        }
+      })();
   }
   
   let conflictOverridesSheet = sm["Conflict_Overrides"];
@@ -185,6 +269,19 @@ function verifyDatabaseSchema(readOnly = false) {
       opsLedgerSheet.getRange(1, 1, 1, opsLedgerHeaders.length).setValues([opsLedgerHeaders]).setFontWeight("bold").setBackground("#059669").setFontColor("#ffffff");
   }
 
+  // Movement SoT (Logistics Ledger) — PA truck columns stripped at M4
+  let logisticsLedgerSheet = sm["Logistics_Ledger"];
+  const logisticsLedgerHeaders = ["uid", "project_uid", "parent_uid", "asset_uid", "pa_uid", "quantity", "truck_uid", "from_location", "to_location", "load_time", "unload_time", "leg_id", "phase_ref", "x", "y", "z", "rotated", "staged", "creator"];
+  if (!logisticsLedgerSheet) {
+      logisticsLedgerSheet = ss.insertSheet("Logistics_Ledger");
+      logisticsLedgerSheet.appendRow(logisticsLedgerHeaders);
+      logisticsLedgerSheet.getRange(1, 1, 1, logisticsLedgerHeaders.length).setFontWeight("bold").setBackground("#0ea5e9").setFontColor("#ffffff");
+      logisticsLedgerSheet.setFrozenRows(1);
+  } else {
+      if (logisticsLedgerSheet.getMaxColumns() < logisticsLedgerHeaders.length) logisticsLedgerSheet.insertColumnsAfter(logisticsLedgerSheet.getMaxColumns(), logisticsLedgerHeaders.length - logisticsLedgerSheet.getMaxColumns());
+      logisticsLedgerSheet.getRange(1, 1, 1, logisticsLedgerHeaders.length).setValues([logisticsLedgerHeaders]).setFontWeight("bold").setBackground("#0ea5e9").setFontColor("#ffffff");
+  }
+
   let ledgerSheet = sm["Financial_Ledger"];
   const ledgerHeaders = ["uid", "Date", "Category", "Description", "Amount", "Reference_ID", "Created_By"];
   if (!ledgerSheet) { 
@@ -196,6 +293,6 @@ function verifyDatabaseSchema(readOnly = false) {
       ledgerSheet.getRange(1, 1, 1, ledgerHeaders.length).setValues([ledgerHeaders]).setFontWeight("bold").setBackground("#eab308").setFontColor("#000000");
   }
 
-  cachedEngineSheets = { index: indexSheet, timelines: timelineSheet, shifts: shiftSheet, blocks: blockSheet, overrides: overrideSheet, leaves: leaveSheet, tasks: taskSheet, notifs: notifSheet, taskAssignees: taskAssigneesSheet, taskTodos: taskTodosSheet, taskAssets: taskAssetsSheet, projectChecklists: projectChecklistsSheet, projectAssets: projectAssetsSheet, conflictOverrides: conflictOverridesSheet, opsLedger: opsLedgerSheet, finLedger: ledgerSheet };
+  cachedEngineSheets = { index: indexSheet, timelines: timelineSheet, shifts: shiftSheet, blocks: blockSheet, overrides: overrideSheet, leaves: leaveSheet, tasks: taskSheet, notifs: notifSheet, taskAssignees: taskAssigneesSheet, taskTodos: taskTodosSheet, taskAssets: taskAssetsSheet, projectChecklists: projectChecklistsSheet, projectAssets: projectAssetsSheet, conflictOverrides: conflictOverridesSheet, opsLedger: opsLedgerSheet, logisticsLedger: logisticsLedgerSheet, finLedger: ledgerSheet };
   return cachedEngineSheets;
 }

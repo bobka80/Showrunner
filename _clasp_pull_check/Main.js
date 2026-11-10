@@ -16,6 +16,16 @@ function isValidFirebaseVapidKey_(key) {
   return /^[A-Za-z0-9_-]+$/.test(key);
 }
 
+function getStationAppUrl_() {
+  const hosting = getFirebasePublicConfig().hostingUrl || 'https://sm-showrunner-97405.web.app';
+  return String(hosting).replace(/\/$/, '') + '/station-app?install=1';
+}
+
+function applyLoginTemplateDefaults_(loginTemplate) {
+  loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+  loginTemplate.stationAppUrl = getStationAppUrl_();
+}
+
 function getFirebasePublicConfig() {
   const p = PropertiesService.getScriptProperties();
   const projectId = p.getProperty('FIREBASE_PROJECT_ID') || 'sm-showrunner-97405';
@@ -133,6 +143,17 @@ function doGet(e) {
     return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (action === 'mobscanstage') {
+    const result = stageMobileScanPending_(e.parameter.token || '', e.parameter.tag || '');
+    const json = JSON.stringify(result);
+    const callback = e.parameter.callback;
+    if (callback) {
+      return ContentService.createTextOutput(String(callback) + '(' + json + ');')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON);
+  }
+
   if (action === 'fcmping') {
     const result = pingFcmDeviceForCrew_(e.parameter.crew || '', e.parameter.tp || '');
     const json = JSON.stringify(result);
@@ -149,7 +170,7 @@ function doGet(e) {
     const crewName = validateUserSession_(sessionToken);
     if (!crewName) {
       let loginTemplate = HtmlService.createTemplateFromFile('Login');
-      loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+      applyLoginTemplateDefaults_(loginTemplate);
       loginTemplate.errorMsg = 'Session expired — please log in again.';
       loginTemplate.clearSession = true;
       return loginTemplate.evaluate()
@@ -161,7 +182,7 @@ function doGet(e) {
     if (!authResult.success) {
       revokeUserSession_(sessionToken);
       let loginTemplate = HtmlService.createTemplateFromFile('Login');
-      loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+      applyLoginTemplateDefaults_(loginTemplate);
       loginTemplate.errorMsg = authResult.error || 'Account not found.';
       loginTemplate.clearSession = true;
       return loginTemplate.evaluate()
@@ -169,11 +190,12 @@ function doGet(e) {
         .addMetaTag('viewport', 'width=device-width, initial-scale=1')
         .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
     }
-    return renderIndexForAuth_(authResult, sessionToken);
+    const pendingScan = e.parameter.srScan || '';
+    return renderIndexForAuth_(authResult, sessionToken, pendingScan);
   }
 
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
-  loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+  applyLoginTemplateDefaults_(loginTemplate);
   loginTemplate.errorMsg = "none";
   loginTemplate.clearSession = false;
   return loginTemplate.evaluate().setTitle('System Login').addMetaTag('viewport', 'width=device-width, initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -215,7 +237,7 @@ function doPost(e) {
   
   // INCORRECT CREDENTIALS ROUTE
   let loginTemplate = HtmlService.createTemplateFromFile('Login');
-  loginTemplate.scriptUrl = ScriptApp.getService().getUrl();
+  applyLoginTemplateDefaults_(loginTemplate);
   loginTemplate.errorMsg = authResult.error;
   loginTemplate.clearSession = true;
   
@@ -229,7 +251,7 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-function renderIndexForAuth_(authResult, sessionToken) {
+function renderIndexForAuth_(authResult, sessionToken, pendingScan) {
   let template = HtmlService.createTemplateFromFile('Index');
   template.userName = authResult.name;
   template.userAccess = normalizeAccessTier(authResult.access);
@@ -239,6 +261,12 @@ function renderIndexForAuth_(authResult, sessionToken) {
   template.userPermissionsB64 = Utilities.base64Encode(JSON.stringify(authResult.permissions || {}));
   template.fcmRegKey = createFcmRegistrationKey_(authResult.name);
   template.sessionToken = sessionToken || '';
+  template.isStationDevice = authResult.isStationDevice ? '1' : '0';
+  template.stationDeviceLayout = authResult.stationDeviceLayout || '';
+  template.isFreelancer = authResult.isFreelancer ? '1' : '0';
+  template.tunnelingActive = authResult.tunnelingActive ? '1' : '0';
+  const scanRaw = String(pendingScan || '').trim();
+  template.pendingMobileScanB64 = scanRaw ? Utilities.base64Encode(scanRaw) : '';
   return template.evaluate()
     .setTitle('SM Showrunner Command Center')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -300,6 +328,27 @@ function getRefreshPayload(crewName) {
   let extras = getTasksAndNotifs(crewName);
 
   return { projects: projects, monthData: monthData, managerConfig: getManagerConfig(crewName), tasks: extras.tasks, notifs: extras.notifs, conflicts: conflicts };
+}
+
+/** Fast project list for station dock / picker — skips tasks, notifs, manager config. */
+function getStationHostProjects(crewName) {
+  IS_READ_ONLY_EXECUTION = true;
+  const profile = getUserSecurityProfile(crewName);
+  let projects = getExistingProjects();
+  let monthData = getGlobalMonthData(projects);
+  let conflicts = getActiveConflicts();
+  const filtered = applyShiftCalendarFilter(profile, projects, monthData, conflicts);
+  return { projects: filtered.projects };
+}
+
+/** Warehouse dock: all active events without host badge (no shift-calendar filter). */
+function getStationWarehouseProjects() {
+  IS_READ_ONLY_EXECUTION = true;
+  const projects = getExistingProjects().filter(function(p) {
+    const st = String(p.status || 'Draft').toUpperCase();
+    return st !== 'TRASHED' && st !== 'CANCELLED';
+  });
+  return { projects: projects };
 }
 
 /** Fast path for task drawer + notification list only (avoids full calendar payload). */

@@ -9,85 +9,148 @@
 // @INDEX: PA_ENGINE -> Project Assets Logistics
 
 function saveProjectAssetsDelta(projectId, deltas, actor = "System UI") {
-    return executeWithRetry(() => {
-        assertActorCanEditProjectAssets(actor);
-        const sheets = verifyDatabaseSchema();
-        let data = sheets.projectAssets.getDataRange().getValues();
-        let map = {}; if(data.length > 0) data[0].forEach((h,i)=>map[h.toString().trim()]=i);
-        
-        let keptRows = [data[0]];
-        let projectRows = [];
-        for(let i=1; i<data.length; i++) { 
-            if(String(data[i][map['project_uid']]) !== String(projectId)) {
-                keptRows.push(data[i]); 
-            } else {
-                projectRows.push({ data: data[i] });
-            }
+    return getProjectAssetsRepo().saveDelta(projectId, deltas, actor);
+}
+
+function dalAssertSheetsPaNotForked_(projectId) {
+    if (resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN) {
+        throw new Error('PREP_SESSION_ACTIVE: Project Assets are on the Firebase fork — direct Sheets access blocked.');
+    }
+}
+
+function dalGetProjectAssetsHeaderAndMap_() {
+    const sheets = verifyDatabaseSchema(true);
+    const sheet = sheets.projectAssets;
+    const data = sheet.getDataRange().getValues();
+    if (data.length === 0) throw new Error("Project_Assets sheet has no header row.");
+    const header = data[0];
+    return { sheet: sheet, header: header, map: dalHeaderMapFromRows_(header), colCount: header.length };
+}
+
+function dalLoadPaProjectRowsFromSheet_(sheet, map, projectId) {
+    const data = sheet.getDataRange().getValues();
+    const projectRows = [];
+    for (let i = 1; i < data.length; i++) {
+        if (String(data[i][map['project_uid']]) === String(projectId)) {
+            projectRows.push({ data: data[i].slice(), sheetRow: i + 1 });
         }
-        
-        deltas.forEach(d => {
-            if (d.isBulk) {
-                let match = projectRows.find(r => 
-                    String(r.data[map['asset_uid']]) === String(d.assetId) &&
-                    String(r.data[map['location']] || "General") === String(d.location || "General") &&
-                    String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
-                    String(r.data[map['container_uid']] || "") === String(d.containerUid || "")
-                );
-                
-                if (match) {
-                    let currentQty = parseInt(match.data[map['assigned_quantity']], 10) || 0;
-                    match.data[map['assigned_quantity']] = currentQty + d.deltaQty;
-                } else if (d.deltaQty > 0) {
-                    let r = new Array(data[0].length).fill("");
-                    if(map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
-                    if(map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
-                    if(map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
-                    if(map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = d.deltaQty;
-                    if(map['location'] !== undefined) r[map['location']] = d.location || "General";
-                    if(map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
-                    if(map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
-                    if(map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
-                    if(map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
+    }
+    return projectRows;
+}
+
+function dalApplyPaDeltas_(projectRows, deltas, map, colCount, projectId) {
+    deltas.forEach(d => {
+        if (d.metaOnly && d.uid) {
+            let match = projectRows.find(r => String(r.data[map['uid']]) === String(d.uid));
+            if (match && map['override_dept'] !== undefined) {
+                match.data[map['override_dept']] = d.overrideDept != null ? d.overrideDept : '';
+            }
+            return;
+        }
+        if (d.isBulk) {
+            let match = projectRows.find(r =>
+                String(r.data[map['asset_uid']]) === String(d.assetId) &&
+                String(r.data[map['location']] || "General") === String(d.location || "General") &&
+                String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
+                String(r.data[map['container_uid']] || "") === String(d.containerUid || "")
+            );
+            if (match) {
+                let currentQty = parseInt(match.data[map['assigned_quantity']], 10) || 0;
+                match.data[map['assigned_quantity']] = currentQty + d.deltaQty;
+                if (d.overrideDept != null && map['override_dept'] !== undefined) {
+                    match.data[map['override_dept']] = d.overrideDept;
+                }
+            } else if (d.deltaQty > 0) {
+                let r = new Array(colCount).fill("");
+                if (map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
+                if (map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
+                if (map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
+                if (map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = d.deltaQty;
+                if (map['location'] !== undefined) r[map['location']] = d.location || "General";
+                if (map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
+                if (map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
+                if (map['override_dept'] !== undefined) r[map['override_dept']] = d.overrideDept || "";
+                if (map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
+                if (map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
+                projectRows.push({ data: r });
+            }
+        } else {
+            if (d.deltaQty > 0) {
+                for (let k = 0; k < d.deltaQty; k++) {
+                    let r = new Array(colCount).fill("");
+                    if (map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
+                    if (map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
+                    if (map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
+                    if (map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = 1;
+                    if (map['location'] !== undefined) r[map['location']] = d.location || "General";
+                    if (map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
+                    if (map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
+                    if (map['override_dept'] !== undefined) r[map['override_dept']] = d.overrideDept || "";
+                    if (map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
+                    if (map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
                     projectRows.push({ data: r });
                 }
-            } else {
-                if (d.deltaQty > 0) {
-                    for (let k = 0; k < d.deltaQty; k++) {
-                        let r = new Array(data[0].length).fill("");
-                        if(map['uid'] !== undefined) r[map['uid']] = Utilities.getUuid();
-                        if(map['project_uid'] !== undefined) r[map['project_uid']] = String(projectId);
-                        if(map['asset_uid'] !== undefined) r[map['asset_uid']] = String(d.assetId);
-                        if(map['assigned_quantity'] !== undefined) r[map['assigned_quantity']] = 1;
-                        if(map['location'] !== undefined) r[map['location']] = d.location || "General";
-                        if(map['formula'] !== undefined) r[map['formula']] = d.rawFormula || "Manual";
-                        if(map['creator'] !== undefined) r[map['creator']] = d.creator || "System";
-                        if(map['container_uid'] !== undefined) r[map['container_uid']] = d.containerUid || "";
-                        if(map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
-                        projectRows.push({ data: r });
-                    }
-                } else if (d.deltaQty < 0) {
-                    let removeCount = Math.abs(d.deltaQty);
-                    for (let i = projectRows.length - 1; i >= 0 && removeCount > 0; i--) {
-                        let r = projectRows[i];
-                        if (String(r.data[map['asset_uid']]) === String(d.assetId) &&
-                            String(r.data[map['location']] || "General") === String(d.location || "General") &&
-                            String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
-                            String(r.data[map['container_uid']] || "") === String(d.containerUid || "")) 
-                        {
-                            r.data[map['assigned_quantity']] = 0;
-                            removeCount--;
-                        }
+            } else if (d.deltaQty < 0) {
+                let removeCount = Math.abs(d.deltaQty);
+                for (let i = projectRows.length - 1; i >= 0 && removeCount > 0; i--) {
+                    let r = projectRows[i];
+                    if (String(r.data[map['asset_uid']]) === String(d.assetId) &&
+                        String(r.data[map['location']] || "General") === String(d.location || "General") &&
+                        String(r.data[map['formula']] || "Manual") === String(d.rawFormula || "Manual") &&
+                        String(r.data[map['container_uid']] || "") === String(d.containerUid || "")) {
+                        r.data[map['assigned_quantity']] = 0;
+                        removeCount--;
                     }
                 }
             }
-        });
-        
-        projectRows = projectRows.filter(r => (parseInt(r.data[map['assigned_quantity']], 10) || 0) > 0);
-        projectRows.forEach(r => keptRows.push(r.data));
-        
-        sheets.projectAssets.clearContents();
-        if(keptRows.length > 0) sheets.projectAssets.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
-        
+        }
+    });
+
+    const rowsToUpdate = [];
+    const rowsToDelete = [];
+    const rowsToAppend = [];
+    projectRows.forEach(r => {
+        const qty = parseInt(r.data[map['assigned_quantity']], 10) || 0;
+        if (qty <= 0) {
+            if (r.sheetRow) rowsToDelete.push(r.sheetRow);
+            else if (r.docId) rowsToDelete.push(r.docId);
+        } else if (r.sheetRow || r.docId) {
+            rowsToUpdate.push(r);
+        } else {
+            rowsToAppend.push(r.data);
+        }
+    });
+    return { rowsToUpdate, rowsToDelete, rowsToAppend };
+}
+
+function dalPaRowObjectToSheetArray_(obj, header, map) {
+    const r = new Array(header.length).fill("");
+    Object.keys(map).forEach(function (key) {
+        if (obj[key] !== undefined && obj[key] !== null) r[map[key]] = obj[key];
+    });
+    return r;
+}
+
+function dalPaSheetRowToObject_(row, map) {
+    const obj = {};
+    Object.keys(map).forEach(function (key) {
+        obj[key] = row[map[key]];
+    });
+    return obj;
+}
+
+function saveProjectAssetsDeltaSheets_(projectId, deltas, actor = "System UI") {
+    return executeWithRetry(() => {
+        assertActorCanEditProjectAssets(actor);
+        dalAssertSheetsPaNotForked_(projectId);
+        const hdr = dalGetProjectAssetsHeaderAndMap_();
+        let projectRows = dalLoadPaProjectRowsFromSheet_(hdr.sheet, hdr.map, projectId);
+        const classified = dalApplyPaDeltas_(projectRows, deltas, hdr.map, hdr.colCount, projectId);
+
+        classified.rowsToUpdate.forEach(r => dalUpdateSheetRow_(hdr.sheet, r.sheetRow, r.data));
+        dalDeleteSheetRows_(hdr.sheet, classified.rowsToDelete);
+        dalAppendRows_(hdr.sheet, classified.rowsToAppend);
+
         flushCache();
         writeToAuditLog(actor, "UPDATE", "PROJECT_ASSETS", projectId, projectId, `Applied ${deltas.length} delta change(s) to event assets.`);
         return "Saved Delta";
@@ -95,7 +158,380 @@ function saveProjectAssetsDelta(projectId, deltas, actor = "System UI") {
 }
 
 function getProjectAssets(projectId, startDateStr, endDateStr) {
+    return getProjectAssetsRepo().getForProject(projectId, startDateStr, endDateStr);
+}
+
+/**
+ * W3 Offer — one-shot PA snapshot for Pull Project Assets.
+ * Warm Campaign Room → Firebase assets/state (fail-open Sheets). Cold → Sheets.
+ * Does not open sessions or listen.
+ */
+function getOfferPaPullSnapshot(projectId, actor) {
+    return executeWithRetry(function () {
+        assertActorCanViewLogistics(actor || 'System');
+        if (!projectId || projectId === 'NEW') {
+            throw new Error('Save the project before pulling into Offer.');
+        }
+        var fixtures = [];
+        var source = 'sheets';
+        var warm = false;
+        try {
+            warm = (typeof dalCampaignRoomIsWarmForProject_ === 'function') &&
+                dalCampaignRoomIsWarmForProject_(projectId);
+        } catch (eWarm) { warm = false; }
+
+        if (warm && typeof dalWarmPaSheetRowsFromFirebase_ === 'function' &&
+            typeof dalGetProjectAssetsHeaderAndMap_ === 'function' &&
+            typeof dalFirestoreAssetFromRow_ === 'function') {
+            try {
+                var hdr = dalGetProjectAssetsHeaderAndMap_();
+                var rows = dalWarmPaSheetRowsFromFirebase_(projectId, hdr);
+                if (rows && rows.length) {
+                    fixtures = rows.map(function (row) {
+                        return dalFirestoreAssetFromRow_(row, hdr.map);
+                    }).filter(function (a) {
+                        return a && a.assetId && (parseInt(a.qty, 10) || 0) > 0;
+                    });
+                    if (fixtures.length) source = 'firebase';
+                }
+            } catch (eFs) { fixtures = []; source = 'sheets'; }
+        }
+
+        if (!fixtures.length) {
+            var sheetRes = getProjectAssetsSheets_(projectId, '', '');
+            fixtures = (sheetRes && sheetRes.current) ? sheetRes.current.slice() : [];
+            source = 'sheets';
+        }
+
+        return {
+            projectId: String(projectId),
+            source: source,
+            warm: !!warm,
+            pulledAt: new Date().toISOString(),
+            fixtures: fixtures
+        };
+    });
+}
+
+/**
+ * W4 Offer — one-shot Timeline + logistics snapshot.
+ * Warm room → Firebase timeline + meta readiness; cold → Sheets. Fail-open Sheets.
+ * Does not call GENERATE / Hub writers.
+ */
+function getOfferTlPullSnapshot(projectId, actor) {
+    return executeWithRetry(function () {
+        assertActorCanViewLogistics(actor || 'System');
+        if (!projectId || projectId === 'NEW') {
+            throw new Error('Save the project before pulling into Offer.');
+        }
+
+        var warm = false;
+        try {
+            warm = (typeof dalCampaignRoomIsWarmForProject_ === 'function') &&
+                dalCampaignRoomIsWarmForProject_(projectId);
+        } catch (eWarm) { warm = false; }
+
+        var shifts = [];
+        var source = 'sheets';
+        var facts = { inSofia: true, distanceKm: 0, regionZone: '' };
+
+        // Readiness facts (km / Sofia)
+        try {
+            if (warm && typeof firestoreGetCampaignMeta_ === 'function') {
+                var meta = firestoreGetCampaignMeta_(projectId);
+                if (meta && meta.readinessJson) {
+                    var rMeta = {};
+                    try { rMeta = JSON.parse(meta.readinessJson); } catch (e0) { rMeta = {}; }
+                    if (rMeta && typeof rMeta === 'object') {
+                        facts.inSofia = rMeta.inSofia !== false;
+                        facts.distanceKm = parseFloat(rMeta.distanceKm) || 0;
+                        facts.regionZone = String(rMeta.regionZone || '');
+                        source = 'firebase';
+                    }
+                }
+            }
+        } catch (eMeta) { /* Sheets fallthrough */ }
+
+        if (source !== 'firebase') {
+            try {
+                var id = dalReadProjectIdentityFromSheets_
+                    ? dalReadProjectIdentityFromSheets_(projectId)
+                    : null;
+                if (id && id.readinessState) {
+                    facts.inSofia = id.readinessState.inSofia !== false;
+                    facts.distanceKm = parseFloat(id.readinessState.distanceKm) || 0;
+                    facts.regionZone = String(id.readinessState.regionZone || '');
+                }
+            } catch (eId) { /* defaults */ }
+        } else {
+            // Warm meta may lack readiness — fill gaps from Sheets
+            try {
+                if (!(facts.distanceKm > 0) || facts.regionZone === '') {
+                    var id2 = dalReadProjectIdentityFromSheets_
+                        ? dalReadProjectIdentityFromSheets_(projectId)
+                        : null;
+                    if (id2 && id2.readinessState) {
+                        if (facts.distanceKm == null || facts.distanceKm === 0) {
+                            facts.distanceKm = parseFloat(id2.readinessState.distanceKm) || 0;
+                        }
+                        if (!facts.regionZone) {
+                            facts.regionZone = String(id2.readinessState.regionZone || '');
+                        }
+                        if (id2.readinessState.inSofia === false) facts.inSofia = false;
+                    }
+                }
+            } catch (eId2) { /* ignore */ }
+        }
+
+        // Timeline shifts
+        if (warm && typeof dalReadTimelineStateFromFirebase_ === 'function') {
+            try {
+                var tlFs = dalReadTimelineStateFromFirebase_(projectId);
+                if (tlFs && tlFs.shifts && tlFs.shifts.length) {
+                    shifts = tlFs.shifts.slice();
+                    source = 'firebase';
+                }
+            } catch (eTl) { shifts = []; }
+        }
+        if (!shifts.length && typeof getTimelineDataSheets_ === 'function') {
+            var prevDirect = (typeof __dalTimelineSheetsDirect_ !== 'undefined') ? __dalTimelineSheetsDirect_ : false;
+            try {
+                if (typeof __dalTimelineSheetsDirect_ !== 'undefined') __dalTimelineSheetsDirect_ = true;
+                var tlSh = getTimelineDataSheets_(projectId, 'main');
+                shifts = (tlSh && tlSh.shifts) ? tlSh.shifts.slice() : [];
+                if (source !== 'firebase') source = 'sheets';
+            } catch (eSh) {
+                shifts = [];
+            } finally {
+                if (typeof __dalTimelineSheetsDirect_ !== 'undefined') __dalTimelineSheetsDirect_ = prevDirect;
+            }
+        }
+
+        var settings = { trucks: {}, globals: {}, roles: {} };
+        try {
+            settings = getFinancialSettings() || settings;
+        } catch (eFin) { /* defaults */ }
+        var trucksConfig = settings.trucks || {};
+        var globals = settings.globals || {};
+        var roleMults = settings.roles || {};
+
+        // Fleet map uid → { name, tier }
+        var fleetByUid = {};
+        try {
+            var vt = verifyVaultSchema(true);
+            if (vt && vt.vehicles) {
+                var vData = getSheetData(vt.vehicles);
+                var vMap = vData.hMap || {};
+                var vUidCol = vMap['uid'] !== undefined ? vMap['uid'] : vMap['id'];
+                var vNameCol = vMap['Name'] !== undefined ? vMap['Name'] : vMap['name'];
+                var vTierCol = vMap['Vehicle_Tier'];
+                for (var vi = 1; vi < vData.length; vi++) {
+                    var vu = vUidCol !== undefined ? String(vData[vi][vUidCol] || '') : '';
+                    if (!vu) continue;
+                    fleetByUid[vu] = {
+                        name: vNameCol !== undefined ? String(vData[vi][vNameCol] || 'Vehicle') : 'Vehicle',
+                        tier: vTierCol !== undefined ? String(vData[vi][vTierCol] || 'Tier 1') : 'Tier 1'
+                    };
+                }
+            }
+        } catch (eFleet) { fleetByUid = {}; }
+
+        var inSofia = facts.inSofia !== false;
+        var dist = parseFloat(facts.distanceKm) || 0;
+        var laborMap = {};
+        var transport = [];
+        var transportTotal = 0;
+
+        // Pre-group non-STAY truck shifts per vehicle for LOAD/UNLOAD index
+        var truckDriveByEmail = {};
+        shifts.forEach(function (s) {
+            if (!s) return;
+            var email = String(s.user_uid || s.email || '');
+            if (!fleetByUid[email]) return;
+            var roleU = String(s.role || '').toUpperCase();
+            var noteU = String(s.note || '').toUpperCase();
+            if (roleU === 'STAY' || noteU.indexOf('STAY') !== -1) return;
+            if (!truckDriveByEmail[email]) truckDriveByEmail[email] = [];
+            truckDriveByEmail[email].push(s);
+        });
+        Object.keys(truckDriveByEmail).forEach(function (em) {
+            truckDriveByEmail[em].sort(function (a, b) {
+                return Number(a.start) - Number(b.start);
+            });
+        });
+
+        shifts.forEach(function (s) {
+            if (!s) return;
+            var email = String(s.user_uid || s.email || '');
+            var note = String(s.note || '');
+            // Skip Hub AUTO clock bars from offer labor/transport (clocks only)
+            if (note.indexOf('AUTO-OUTBOUND') !== -1 || note.indexOf('AUTO-INBOUND') !== -1) return;
+
+            var vehicle = fleetByUid[email];
+            if (vehicle) {
+                var tMatch = vehicle.tier ? String(vehicle.tier).match(/Tier\s*(\d)/i) : null;
+                var tKey = tMatch ? 'truck_t' + tMatch[1] : 'truck_t1';
+                var roleU = String(s.role || '').toUpperCase();
+                var noteU = note.toUpperCase();
+                var isStay = roleU === 'STAY' || noteU.indexOf('STAY') !== -1;
+                var dur = parseFloat(s.duration) || 0;
+                var amount = 0;
+                var label = '';
+                var kind = 'course';
+                var qty = 1;
+                var unitPrice = 0;
+
+                if (isStay) {
+                    var stayDays = Math.ceil(dur / 24);
+                    if (stayDays < 1) stayDays = 1;
+                    unitPrice = parseFloat(trucksConfig[tKey + '_stay']) || 0;
+                    qty = stayDays;
+                    amount = stayDays * unitPrice;
+                    kind = 'stay';
+                    label = 'Stay / idle — ' + vehicle.name + ' (' + vehicle.tier + ')';
+                } else {
+                    var driveList = truckDriveByEmail[email] || [];
+                    var sIndex = -1;
+                    for (var di = 0; di < driveList.length; di++) {
+                        if (driveList[di] && String(driveList[di].id) === String(s.id)) {
+                            sIndex = di;
+                            break;
+                        }
+                    }
+                    var roleText = roleU;
+                    if (roleText !== 'LOAD' && roleText !== 'UNLOAD') {
+                        roleText = (sIndex % 2 === 0) ? 'LOAD' : 'UNLOAD';
+                    }
+                    if (roleText === 'UNLOAD') return;
+                    kind = 'course';
+                    if (inSofia) {
+                        unitPrice = parseFloat(trucksConfig[tKey + '_in']) || 0;
+                        qty = 1;
+                        amount = unitPrice;
+                        label = 'Course (in Sofia) — ' + vehicle.name;
+                    } else {
+                        unitPrice = parseFloat(trucksConfig[tKey + '_out']) || 0;
+                        qty = dist;
+                        amount = unitPrice * dist;
+                        label = 'Course (' + dist + ' km) — ' + vehicle.name;
+                    }
+                }
+                transportTotal += amount;
+                transport.push({
+                    lineId: 'tl_' + String(s.id || (email + '_' + kind + '_' + transport.length)),
+                    kind: kind,
+                    label: label,
+                    vehicleUid: email,
+                    tier: vehicle.tier,
+                    qty: qty,
+                    unitPrice: unitPrice,
+                    amount: amount
+                });
+                return;
+            }
+
+            // Crew labor — rough crew-days by role
+            var role = String(s.role || 'Technician').trim() || 'Technician';
+            var crewDays = Math.ceil((parseFloat(s.duration) || 0) / 24);
+            if (crewDays < 1) crewDays = 1;
+            var baseRate = parseFloat(globals.build_rate) || 100;
+            var rMult = 1;
+            if (roleMults && roleMults[role] != null) {
+                rMult = parseFloat(roleMults[role]) || 1;
+            }
+            var dayRate = baseRate * rMult;
+            if (!laborMap[role]) {
+                laborMap[role] = {
+                    lineId: 'labor_' + role.replace(/[^a-zA-Z0-9]+/g, '_'),
+                    kind: 'labor',
+                    tierOrRole: role,
+                    qty: 0,
+                    unitPrice: dayRate,
+                    amount: 0
+                };
+            }
+            laborMap[role].qty += crewDays;
+            laborMap[role].amount = laborMap[role].qty * laborMap[role].unitPrice;
+        });
+
+        var labor = Object.keys(laborMap).map(function (k) { return laborMap[k]; });
+        labor.sort(function (a, b) {
+            return String(a.tierOrRole).localeCompare(String(b.tierOrRole));
+        });
+
+        // §1.3 default: single Transport rollup (detail kept for transparency / undo)
+        var transportRollup = [{
+            lineId: 'transport_total',
+            kind: 'transport',
+            label: 'Transport',
+            qty: 1,
+            unitPrice: transportTotal,
+            amount: transportTotal
+        }];
+
+        return {
+            projectId: String(projectId),
+            source: source,
+            warm: !!warm,
+            pulledAt: new Date().toISOString(),
+            facts: facts,
+            labor: labor,
+            transport: transportRollup,
+            transportDetail: transport
+        };
+    });
+}
+
+function getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets) {
+    let overlappingMap = {};
+    if (startDateStr && endDateStr) {
+        const indexData = getSheetData(sheets.index);
+        const iMap = indexData.hMap;
+        const timelineData = getSheetData(sheets.timelines);
+        const tMap = timelineData.hMap;
+
+        let projectDates = {};
+        for (let i = 1; i < timelineData.length; i++) {
+            let pid = timelineData[i][tMap['project_uid']];
+            let dStr = timelineData[i][tMap['Event_Date']];
+            let eDateStr = "";
+            if (dStr instanceof Date) eDateStr = `${dStr.getFullYear()}-${String(dStr.getMonth() + 1).padStart(2, '0')}-${String(dStr.getDate()).padStart(2, '0')}`;
+            else if (dStr) { let match = String(dStr).match(/^(\d{4})-(\d{2})-(\d{2})/); if (match) eDateStr = match[0]; }
+
+            if (eDateStr) {
+                if (!projectDates[pid]) projectDates[pid] = { start: eDateStr, end: eDateStr };
+                else {
+                    if (eDateStr < projectDates[pid].start) projectDates[pid].start = eDateStr;
+                    if (eDateStr > projectDates[pid].end) projectDates[pid].end = eDateStr;
+                }
+            }
+        }
+
+        let overlappingPids = new Set();
+        for (let i = 1; i < indexData.length; i++) {
+            let pid = String(indexData[i][iMap['uid']]);
+            if (pid === String(projectId)) continue;
+            let status = String(indexData[i][iMap['Status']] || 'Draft').toUpperCase();
+            if (status === 'CANCELLED' || status === 'TRASHED') continue;
+
+            let pDates = projectDates[pid];
+            if (pDates && pDates.start <= endDateStr && pDates.end >= startDateStr) {
+                overlappingPids.add(pid);
+            }
+        }
+
+        otherAssets.forEach(pa => {
+            if (overlappingPids.has(pa.pid)) {
+                overlappingMap[pa.aId] = (overlappingMap[pa.aId] || 0) + pa.qty;
+            }
+        });
+    }
+    return { current: assets, overlapping: overlappingMap };
+}
+
+function getProjectAssetsSheets_(projectId, startDateStr, endDateStr) {
     return executeWithRetry(() => {
+        dalAssertSheetsPaNotForked_(projectId);
         const sheets = verifyDatabaseSchema(true);
         const data = getSheetData(sheets.projectAssets);
         const map = data.hMap;
@@ -114,20 +550,22 @@ function getProjectAssets(projectId, startDateStr, endDateStr) {
                     location: data[i][map['location']] || "",
                     formula: data[i][map['formula']] || "",
                     creator: data[i][map['creator']] || "System",
+                    overrideDept: map['override_dept'] !== undefined ? (data[i][map['override_dept']] || "") : "",
                     containerUid: data[i][map['container_uid']] || "",
                     scanStatus: data[i][map['scan_status']] || "Assigned",
-                    outboundTruckUid: map['outbound_truck_uid'] !== undefined ? (data[i][map['outbound_truck_uid']] || "") : "",
-                    outboundX: map['outbound_x'] !== undefined && data[i][map['outbound_x']] !== "" ? Number(data[i][map['outbound_x']]) : null,
-                    outboundY: map['outbound_y'] !== undefined && data[i][map['outbound_y']] !== "" ? Number(data[i][map['outbound_y']]) : null,
-                    outboundZ: map['outbound_z'] !== undefined && data[i][map['outbound_z']] !== "" ? Number(data[i][map['outbound_z']]) : null,
-                    outboundRotated: map['outbound_rotated'] !== undefined && (data[i][map['outbound_rotated']] === true || data[i][map['outbound_rotated']] === 'true'),
-                    outboundStaged: map['outbound_staged'] !== undefined && (data[i][map['outbound_staged']] === true || data[i][map['outbound_staged']] === 'true'),
-                    inboundTruckUid: map['inbound_truck_uid'] !== undefined ? (data[i][map['inbound_truck_uid']] || "") : "",
-                    inboundX: map['inbound_x'] !== undefined && data[i][map['inbound_x']] !== "" ? Number(data[i][map['inbound_x']]) : null,
-                    inboundY: map['inbound_y'] !== undefined && data[i][map['inbound_y']] !== "" ? Number(data[i][map['inbound_y']]) : null,
-                    inboundZ: map['inbound_z'] !== undefined && data[i][map['inbound_z']] !== "" ? Number(data[i][map['inbound_z']]) : null,
-                    inboundRotated: map['inbound_rotated'] !== undefined && (data[i][map['inbound_rotated']] === true || data[i][map['inbound_rotated']] === 'true'),
-                    inboundStaged: map['inbound_staged'] !== undefined && (data[i][map['inbound_staged']] === true || data[i][map['inbound_staged']] === 'true')
+                    // M4: movement from Logistics_Ledger overlay below
+                    outboundTruckUid: "",
+                    outboundX: null,
+                    outboundY: null,
+                    outboundZ: null,
+                    outboundRotated: false,
+                    outboundStaged: false,
+                    inboundTruckUid: "",
+                    inboundX: null,
+                    inboundY: null,
+                    inboundZ: null,
+                    inboundRotated: false,
+                    inboundStaged: false
                 });
             } else if (!isShortage) {
                 otherAssets.push({
@@ -137,64 +575,148 @@ function getProjectAssets(projectId, startDateStr, endDateStr) {
                 });
             }
         }
-        
-        let overlappingMap = {};
-        if (startDateStr && endDateStr) {
-            const indexData = getSheetData(sheets.index);
-            const iMap = indexData.hMap;
-            const timelineData = getSheetData(sheets.timelines);
-            const tMap = timelineData.hMap;
-            
-            let projectDates = {};
-            for (let i=1; i<timelineData.length; i++) {
-                let pid = timelineData[i][tMap['project_uid']];
-                let dStr = timelineData[i][tMap['Event_Date']];
-                let eDateStr = "";
-                if (dStr instanceof Date) eDateStr = `${dStr.getFullYear()}-${String(dStr.getMonth() + 1).padStart(2, '0')}-${String(dStr.getDate()).padStart(2, '0')}`;
-                else if (dStr) { let match = String(dStr).match(/^(\d{4})-(\d{2})-(\d{2})/); if (match) eDateStr = match[0]; }
-                
-                if (eDateStr) {
-                    if (!projectDates[pid]) projectDates[pid] = { start: eDateStr, end: eDateStr };
-                    else {
-                        if (eDateStr < projectDates[pid].start) projectDates[pid].start = eDateStr;
-                        if (eDateStr > projectDates[pid].end) projectDates[pid].end = eDateStr;
-                    }
-                }
-            }
-            
-            let overlappingPids = new Set();
-            for (let i=1; i<indexData.length; i++) {
-                let pid = String(indexData[i][iMap['uid']]);
-                if (pid === String(projectId)) continue;
-                let status = String(indexData[i][iMap['Status']] || 'Draft').toUpperCase();
-                if (status === 'CANCELLED' || status === 'TRASHED') continue;
-                
-                let pDates = projectDates[pid];
-                if (pDates && pDates.start <= endDateStr && pDates.end >= startDateStr) {
-                    overlappingPids.add(pid);
-                }
-            }
-            
-            otherAssets.forEach(pa => {
-                if (overlappingPids.has(pa.pid)) {
-                    overlappingMap[pa.aId] = (overlappingMap[pa.aId] || 0) + pa.qty;
-                }
-            });
-        }
-        
-        return { current: assets, overlapping: overlappingMap };
+
+        // M4: Logistics_Ledger overlay (PA no longer stores truck cols)
+        try {
+          var legsMap = logisticsLedgerLegsByProject_(sheets, projectId);
+          assets.forEach(function (a) { applyLedgerLegsOntoPaAsset_(a, legsMap); });
+        } catch (eLlRead) { /* empty truck fields */ }
+
+        return getProjectAssetsSheets_buildOverlapResult_(projectId, startDateStr, endDateStr, assets, otherAssets, sheets);
     });
 }
 
 // ==========================================
-// --- TRUCK ARRANGEMENT SPATIAL SAVING ---
+// --- TRUCK ARRANGEMENT (PA split + ledger write) ---
 // ==========================================
+
+/**
+ * Build a ledger layout item from a PA row + arrange box (M4 — not stamped onto PA).
+ */
+function logisticsLedgerItemFromArrangeBox_(paRow, map, leg, box) {
+  var assetUid = map['asset_uid'] !== undefined ? String(paRow[map['asset_uid']] || '') : '';
+  var paUid = map['uid'] !== undefined ? String(paRow[map['uid']] || '') : '';
+  if (!paUid && box && (box.paUid || box.pa_uid)) paUid = String(box.paUid || box.pa_uid || '');
+  var qty = map['assigned_quantity'] !== undefined ? (paRow[map['assigned_quantity']] || 1) : 1;
+  var creator = map['creator'] !== undefined ? (paRow[map['creator']] || '') : '';
+  var item = { assetUid: assetUid, paUid: paUid, quantity: qty, creator: creator, legs: {} };
+  if (leg === 'both') {
+    if (box && box.outbound) item.legs.outbound = box.outbound;
+    if (box && box.inbound) item.legs.inbound = box.inbound;
+  } else {
+    item.legs[String(leg || 'outbound')] = box;
+  }
+  return item;
+}
+
+/**
+ * Apply truck layout to a uid→row map. May mint new UIDs when splitting bulk qty>1.
+ * Does NOT stamp truck onto PA (M4). Returns { rows, ledgerItems }.
+ * Orphan layout paUids (common: auto-cases not yet on Firebase PA) still emit ledgerItems
+ * so warm Arrange placement is not silently dropped.
+ */
+function applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map) {
+    var paUpdates = {};
+    (layoutData || []).forEach(function (item) {
+        if (!item) return;
+        var key = String(item.paUid || item.pa_uid || '');
+        if (!key) return;
+        if (!paUpdates[key]) paUpdates[key] = [];
+        paUpdates[key].push(item);
+    });
+    var out = [];
+    var ledgerItems = [];
+    var matched = {};
+    Object.keys(projectRowsMap).forEach(function (uidKey) {
+        var origRow = projectRowsMap[uidKey];
+        var uid = String(origRow[map['uid']] || uidKey || '');
+        if (uid && paUpdates[uid]) {
+            matched[uid] = true;
+            if (paUpdates[uid].length === 1 && parseInt(origRow[map['assigned_quantity']], 10) === 1) {
+                var kept = origRow.slice();
+                out.push(kept);
+                ledgerItems.push(logisticsLedgerItemFromArrangeBox_(kept, map, leg, paUpdates[uid][0]));
+            } else {
+                paUpdates[uid].forEach(function (box) {
+                    var newRow = origRow.slice();
+                    newRow[map['uid']] = Utilities.getUuid();
+                    newRow[map['assigned_quantity']] = 1;
+                    out.push(newRow);
+                    ledgerItems.push(logisticsLedgerItemFromArrangeBox_(newRow, map, leg, box));
+                });
+            }
+        } else {
+            out.push(origRow);
+        }
+    });
+
+    Object.keys(paUpdates).forEach(function (key) {
+        if (matched[key]) return;
+        paUpdates[key].forEach(function (box) {
+            if (!box) return;
+            var item = {
+                assetUid: String(box.assetId || box.assetUid || box.asset_uid || ''),
+                paUid: key,
+                quantity: 1,
+                creator: box.creator || 'System',
+                isAuto: !!(box.isAuto || box.isGenericAuto),
+                isGenericAuto: !!box.isGenericAuto,
+                location: box.location || 'General',
+                formula: box.formula || 'Standalone',
+                legs: {}
+            };
+            if (leg === 'both') {
+                if (box.outbound) item.legs.outbound = box.outbound;
+                if (box.inbound) item.legs.inbound = box.inbound;
+            } else {
+                item.legs[String(leg || 'outbound')] = box;
+            }
+            ledgerItems.push(item);
+        });
+    });
+    return { rows: out, ledgerItems: ledgerItems };
+}
+
+/** Truncate PA rows to current header width (drops orphan truck cells after M4 strip). */
+function paTruncateRowsToHeader_(rows, colCount) {
+  return (rows || []).map(function (r) {
+    if (!r) return r;
+    if (r.length === colCount) return r;
+    if (r.length > colCount) return r.slice(0, colCount);
+    var padded = r.slice();
+    while (padded.length < colCount) padded.push('');
+    return padded;
+  });
+}
+
 function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor = "System UI") {
+    assertActorCanEditProjectAssets(actor);
+    // R3 / R3b: prep open OR Campaign Room warm → Firebase PA + logistics (seed Hub workspace if needed).
+    var prepOpen = resolveDalSessionStatus_(projectId, DAL_DOMAIN.PROJECT_ASSETS) === DAL_SESSION.SESSION_OPEN;
+    var roomWarm = typeof dalCampaignRoomIsWarmForProject_ === 'function' && dalCampaignRoomIsWarmForProject_(projectId);
+    if (!prepOpen && typeof dalEnsureWarmHubWorkspace_ === 'function') {
+      try {
+        var ens = dalEnsureWarmHubWorkspace_(projectId, actor, {});
+        if (ens && ens.warm && ens.prepOpen) prepOpen = true;
+        roomWarm = !!(ens && ens.warm) || roomWarm;
+      } catch (eEns) {
+        if (roomWarm || (typeof dalCampaignRoomIsWarmForProject_ === 'function' && dalCampaignRoomIsWarmForProject_(projectId))) {
+          throw eEns;
+        }
+      }
+    }
+    if (prepOpen) {
+        return saveTruckArrangementFirestore_(projectId, layoutData, leg, actor);
+    }
+    if (roomWarm || (typeof dalCampaignRoomIsWarmForProject_ === 'function' && dalCampaignRoomIsWarmForProject_(projectId))) {
+      throw new Error('WARM_HUB_SEED_FAILED: Campaign Room is warm but prep workspace did not open — retry Hub or End Room. Sheets arrange blocked.');
+    }
     return executeWithRetry(() => {
-        assertActorCanEditProjectAssets(actor);
+        dalAssertSheetsPaNotForked_(projectId);
         const sheets = verifyDatabaseSchema();
         let data = sheets.projectAssets.getDataRange().getValues();
         let map = {}; if(data.length > 0) data[0].forEach((h,i)=>map[h.toString().trim()]=i);
+        var colCount = data[0] ? data[0].length : 0;
 
         let keptRows = [data[0]];
         let projectRowsMap = {}; 
@@ -207,97 +729,35 @@ function saveTruckArrangementAPI(projectId, layoutData, leg = 'outbound', actor 
             }
         }
 
-        let paUpdates = {};
-        layoutData.forEach(item => {
-            if (!paUpdates[item.paUid]) paUpdates[item.paUid] = [];
-            paUpdates[item.paUid].push(item);
-        });
-
-        let tUid = leg + '_truck_uid';
-        let tX = leg + '_x';
-        let tY = leg + '_y';
-        let tZ = leg + '_z';
-        let tRot = leg + '_rotated';
-        let tStaged = leg + '_staged';
-
-        Object.values(projectRowsMap).forEach(origRow => {
-            let uid = origRow[map['uid']];
-            if (paUpdates[uid]) {
-                if (paUpdates[uid].length === 1 && parseInt(origRow[map['assigned_quantity']], 10) === 1) {
-                    // PRESERVE UID: Do not generate a new UID if it's already an Individual Virtual ID!
-                    let box = paUpdates[uid][0];
-                    let newRow = [...origRow];
-                    if (leg === 'both') {
-                        if (box.outbound) {
-                            if (map['outbound_truck_uid'] !== undefined) newRow[map['outbound_truck_uid']] = box.outbound.truckUid || "";
-                            if (map['outbound_x'] !== undefined) newRow[map['outbound_x']] = box.outbound.truckX !== null ? box.outbound.truckX : "";
-                            if (map['outbound_y'] !== undefined) newRow[map['outbound_y']] = box.outbound.truckY !== null ? box.outbound.truckY : "";
-                            if (map['outbound_z'] !== undefined) newRow[map['outbound_z']] = box.outbound.truckZ !== null ? box.outbound.truckZ : "";
-                            if (map['outbound_rotated'] !== undefined) newRow[map['outbound_rotated']] = box.outbound.isRotated || false;
-                            if (map['outbound_staged'] !== undefined) newRow[map['outbound_staged']] = box.outbound.isStaged || false;
-                        }
-                        if (box.inbound) {
-                            if (map['inbound_truck_uid'] !== undefined) newRow[map['inbound_truck_uid']] = box.inbound.truckUid || "";
-                            if (map['inbound_x'] !== undefined) newRow[map['inbound_x']] = box.inbound.truckX !== null ? box.inbound.truckX : "";
-                            if (map['inbound_y'] !== undefined) newRow[map['inbound_y']] = box.inbound.truckY !== null ? box.inbound.truckY : "";
-                            if (map['inbound_z'] !== undefined) newRow[map['inbound_z']] = box.inbound.truckZ !== null ? box.inbound.truckZ : "";
-                            if (map['inbound_rotated'] !== undefined) newRow[map['inbound_rotated']] = box.inbound.isRotated || false;
-                            if (map['inbound_staged'] !== undefined) newRow[map['inbound_staged']] = box.inbound.isStaged || false;
-                        }
-                    } else {
-                        if (map[tUid] !== undefined) newRow[map[tUid]] = box.truckUid || "";
-                        if (map[tX] !== undefined) newRow[map[tX]] = box.truckX !== null ? box.truckX : "";
-                        if (map[tY] !== undefined) newRow[map[tY]] = box.truckY !== null ? box.truckY : "";
-                        if (map[tZ] !== undefined) newRow[map[tZ]] = box.truckZ !== null ? box.truckZ : "";
-                        if (map[tRot] !== undefined) newRow[map[tRot]] = box.isRotated || false;
-                        if (map[tStaged] !== undefined) newRow[map[tStaged]] = box.isStaged || false;
-                    }
-                    keptRows.push(newRow);
-                } else {
-                    // Legacy fallback for splitting grouped Bulk items on the truck
-                    paUpdates[uid].forEach(box => {
-                        let newRow = [...origRow];
-                        newRow[map['uid']] = Utilities.getUuid(); 
-                        newRow[map['assigned_quantity']] = 1; 
-                        if (leg === 'both') {
-                            if (box.outbound) {
-                                if (map['outbound_truck_uid'] !== undefined) newRow[map['outbound_truck_uid']] = box.outbound.truckUid || "";
-                                if (map['outbound_x'] !== undefined) newRow[map['outbound_x']] = box.outbound.truckX !== null ? box.outbound.truckX : "";
-                                if (map['outbound_y'] !== undefined) newRow[map['outbound_y']] = box.outbound.truckY !== null ? box.outbound.truckY : "";
-                                if (map['outbound_z'] !== undefined) newRow[map['outbound_z']] = box.outbound.truckZ !== null ? box.outbound.truckZ : "";
-                                if (map['outbound_rotated'] !== undefined) newRow[map['outbound_rotated']] = box.outbound.isRotated || false;
-                                if (map['outbound_staged'] !== undefined) newRow[map['outbound_staged']] = box.outbound.isStaged || false;
-                            }
-                            if (box.inbound) {
-                                if (map['inbound_truck_uid'] !== undefined) newRow[map['inbound_truck_uid']] = box.inbound.truckUid || "";
-                                if (map['inbound_x'] !== undefined) newRow[map['inbound_x']] = box.inbound.truckX !== null ? box.inbound.truckX : "";
-                                if (map['inbound_y'] !== undefined) newRow[map['inbound_y']] = box.inbound.truckY !== null ? box.inbound.truckY : "";
-                                if (map['inbound_z'] !== undefined) newRow[map['inbound_z']] = box.inbound.truckZ !== null ? box.inbound.truckZ : "";
-                                if (map['inbound_rotated'] !== undefined) newRow[map['inbound_rotated']] = box.inbound.isRotated || false;
-                                if (map['inbound_staged'] !== undefined) newRow[map['inbound_staged']] = box.inbound.isStaged || false;
-                            }
-                        } else {
-                            if (map[tUid] !== undefined) newRow[map[tUid]] = box.truckUid || "";
-                            if (map[tX] !== undefined) newRow[map[tX]] = box.truckX !== null ? box.truckX : "";
-                            if (map[tY] !== undefined) newRow[map[tY]] = box.truckY !== null ? box.truckY : "";
-                            if (map[tZ] !== undefined) newRow[map[tZ]] = box.truckZ !== null ? box.truckZ : "";
-                            if (map[tRot] !== undefined) newRow[map[tRot]] = box.isRotated || false;
-                            if (map[tStaged] !== undefined) newRow[map[tStaged]] = box.isStaged || false;
-                        }
-                        keptRows.push(newRow);
-                    });
-                }
-            } else {
-                keptRows.push(origRow);
-            }
-        });
+        var arranged = applyTruckLayoutToProjectRowsMap_(projectRowsMap, layoutData, leg, map);
+        arranged.rows.forEach(function (r) { keptRows.push(r); });
+        keptRows = paTruncateRowsToHeader_(keptRows, colCount);
 
         sheets.projectAssets.clearContents();
         if(keptRows.length > 0) sheets.projectAssets.getRange(1, 1, keptRows.length, keptRows[0].length).setValues(keptRows);
 
+        // M4: ledger-only movement write — must succeed (PA no longer holds truck)
+        var dualLegs = (leg === 'both') ? ['outbound', 'inbound'] : [String(leg || 'outbound')];
+        try {
+          logisticsLedgerWriteFromLayoutItems_(sheets, projectId, arranged.ledgerItems, dualLegs, actor);
+          try { logisticsLedgerStampClocksFromShiftSheet_(sheets, projectId); } catch (eClk) { /* optional */ }
+          try { logisticsLedgerStampPhaseRefBestEffort_(sheets, projectId); } catch (ePh) { /* optional */ }
+        } catch (eLl) {
+          writeToAuditLog(actor, "ERROR", "LOGISTICS_LEDGER", projectId, projectId, "Ledger write failed: " + (eLl && eLl.message ? eLl.message : eLl));
+          throw eLl;
+        }
+
         flushCache();
         writeToAuditLog(actor, "UPDATE", "TRUCK_ARRANGEMENT", projectId, projectId, `Saved spatial arrangement for ${layoutData.length} cases.`);
-        return "Saved Truck Layout";
+        var refreshed = null;
+        try {
+          refreshed = getProjectAssets(projectId, '', '');
+        } catch (eRef) { refreshed = null; }
+        return {
+          success: true,
+          message: 'Saved Truck Layout',
+          current: (refreshed && refreshed.current) ? refreshed.current : null
+        };
     });
 }
 
@@ -324,6 +784,7 @@ function saveProjectAssetsAPI(projectId, assignedList, actor = "System UI") {
                 if(map['location'] !== undefined) r[map['location']] = a.location || "";
                 if(map['formula'] !== undefined) r[map['formula']] = a.formula || "";
                 if(map['creator'] !== undefined) r[map['creator']] = a.creator || "System";
+                if(map['override_dept'] !== undefined) r[map['override_dept']] = a.overrideDept || "";
                 if(map['container_uid'] !== undefined) r[map['container_uid']] = a.containerUid || "";
                 if(map['scan_status'] !== undefined) r[map['scan_status']] = "Assigned";
                 return r;
@@ -401,8 +862,52 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             if(dStr instanceof Date) eDateStr = `${dStr.getFullYear()}-${String(dStr.getMonth() + 1).padStart(2, '0')}-${String(dStr.getDate()).padStart(2, '0')}`;
             else if(dStr) { let match = String(dStr).match(/^(\d{4})-(\d{2})-(\d{2})/); if(match) eDateStr = match[0]; }
             
-            if(eDateStr) projects[pid].dates.push({ date: eDateStr, type: subType, startTime: extractTime(timelineData[i][tMap['Start_Time']]), endTime: extractTime(timelineData[i][tMap['End_Time']]) });
+            if(eDateStr) projects[pid].dates.push({ uid: tMap['uid'] !== undefined ? (timelineData[i][tMap['uid']] || '') : '', date: eDateStr, type: subType, startTime: extractTime(timelineData[i][tMap['Start_Time']]), endTime: extractTime(timelineData[i][tMap['End_Time']]) });
         }
+
+        // W2: warm Campaign Room → one-shot Firebase overlay (cap 25, fail-open). No badge / listeners.
+        var warmOverlay = { subEvents: {}, names: {}, paRows: {}, ledger: {}, count: 0 };
+        try {
+          if (typeof dalListWarmCampaignProjectIds_ === 'function' &&
+              typeof dalWarmReaderOneShotOverlay_ === 'function') {
+            var warmIdsAll = dalListWarmCampaignProjectIds_(indexData, iMap);
+            var warmPriority = [];
+            var warmRest = [];
+            warmIdsAll.forEach(function (wPid) {
+              var wp = projects[wPid];
+              if (!wp || !wp.dates || !wp.dates.length) {
+                warmRest.push(wPid);
+                return;
+              }
+              var wMin = wp.dates.reduce(function (min, d) { return d.date < min ? d.date : min; }, wp.dates[0].date);
+              var wMax = wp.dates.reduce(function (max, d) { return d.date > max ? d.date : max; }, wp.dates[0].date);
+              if (wMax >= startStr && wMin <= endStr) warmPriority.push(wPid);
+              else warmRest.push(wPid);
+            });
+            warmOverlay = dalWarmReaderOneShotOverlay_(warmPriority.concat(warmRest), {
+              meta: true, pa: true, logistics: true, timeline: false
+            });
+            Object.keys(warmOverlay.subEvents || {}).forEach(function (wPid) {
+              if (!projects[wPid]) return;
+              var frags = warmOverlay.subEvents[wPid] || [];
+              if (!frags.length) return;
+              projects[wPid].dates = frags.map(function (f) {
+                return {
+                  uid: f.uid || '',
+                  date: f.date,
+                  type: f.type || 'MAIN_EVENT',
+                  startTime: extractTime(f.startTime),
+                  endTime: extractTime(f.endTime)
+                };
+              });
+            });
+            Object.keys(warmOverlay.names || {}).forEach(function (wPid) {
+              if (projects[wPid] && warmOverlay.names[wPid]) {
+                projects[wPid].name = warmOverlay.names[wPid];
+              }
+            });
+          }
+        } catch (eWarmTrk) { warmOverlay = { subEvents: {}, names: {}, paRows: {}, ledger: {}, count: 0 }; }
         
         // Filter to overlapping projects only
         let activeProjects = {};
@@ -507,8 +1012,37 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
         }
         
         // 4. Fetch Assignments (Project Assets)
-        const paData = getSheetData(dbSheets.projectAssets);
-        const paMap = paData.hMap;
+        const paDataSheets = getSheetData(dbSheets.projectAssets);
+        const paMap = paDataSheets.hMap;
+        let paData = paDataSheets;
+        // W2: prefer warm Firebase PA rows when present (String-key safe)
+        try {
+          if (warmOverlay && warmOverlay.paRows && Object.keys(warmOverlay.paRows).length &&
+              typeof dalMergeWarmPaSheetRows_ === 'function') {
+            var warmPaActive = {};
+            Object.keys(warmOverlay.paRows).forEach(function (wPid) {
+              if (activeProjects[wPid] || activeProjects[String(wPid)]) {
+                warmPaActive[String(wPid)] = warmOverlay.paRows[wPid];
+              }
+            });
+            paData = dalMergeWarmPaSheetRows_(paDataSheets, paMap, warmPaActive);
+          }
+        } catch (eWarmPa) { paData = paDataSheets; }
+
+        // M4: ledger truck UIDs for active projects
+        var ledgerByProject = {};
+        try {
+          ledgerByProject = logisticsLedgerLegsByProjects_(dbSheets, Object.keys(activeProjects || {}));
+        } catch (eLlTrk) { ledgerByProject = {}; }
+        try {
+          if (warmOverlay && warmOverlay.ledger) {
+            Object.keys(warmOverlay.ledger).forEach(function (wPid) {
+              if (activeProjects[wPid] && warmOverlay.ledger[wPid]) {
+                ledgerByProject[String(wPid)] = warmOverlay.ledger[wPid];
+              }
+            });
+          }
+        } catch (eWarmLl) { /* keep Sheets ledger */ }
         
         // --- 🏗️ MATRYOSHKA INHERITANCE: Map Container Truck Assignments ---
         let containerTrucks = {};
@@ -516,8 +1050,9 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             let pUid = paData[i][paMap['project_uid']] || paData[i][paMap['Project_ID']];
             let aUid = paData[i][paMap['asset_uid']] || paData[i][paMap['Asset_ID']];
             let form = paData[i][paMap['formula']] || 'Standalone';
-            let outT = paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "";
-            let inT = paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "";
+            let legsMap = ledgerByProject[String(pUid)] || {};
+            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound');
+            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound');
             if (outT || inT) {
                 let cid = form !== 'Standalone' ? (aUid + "|||" + form) : aUid;
                 containerTrucks[pUid + "|||" + cid] = { out: outT, in: inT };
@@ -536,9 +1071,10 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
             
             let qty = parseInt(paData[i][paMap['assigned_quantity']], 10) || 0;
             if(qty <= 0) continue;
-            
-            let outT = paMap['outbound_truck_uid'] !== undefined ? (paData[i][paMap['outbound_truck_uid']] || "") : "";
-            let inT = paMap['inbound_truck_uid'] !== undefined ? (paData[i][paMap['inbound_truck_uid']] || "") : "";
+
+            let legsMap = ledgerByProject[String(pUid)] || {};
+            let outT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'outbound');
+            let inT = logisticsLedgerResolveTruckUid_(legsMap, aUid, 'inbound');
             let cUid = paData[i][paMap['container_uid']];
             if (cUid) {
                 let parentKey = pUid + "|||" + cUid;
@@ -621,7 +1157,183 @@ function getUnifiedTrackerData(startStr, endStr, searchTerms, actor) {
 // --- MASTER LOGISTICS AGGREGATOR ---
 // ==========================================
 // @INDEX: PA_ENGINE -> Master Logistics Aggregator
+
+/**
+ * Campaign Room R3b / R3e — GENERATE LOGISTICS against warm PA + timeline + logistics/state.
+ * PA deltas flush via batch saveProjectAssetsDeltaFirestore_ (no per-row GET). Sheets Index
+ * readiness/timestamp still stamped; durable PA/timeline/ledger via END ROOM.
+ * opts.alreadyWarm: skip second dalEnsureWarmHubWorkspace_ when API already seeded.
+ */
+function generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor, opts) {
+  return executeWithRetry(function () {
+    assertActorCanEditProjectAssets(actor || 'System UI');
+    logData = logData || {};
+    opts = opts || {};
+    actor = actor || 'System UI';
+    var needTl = !!logData.generateTimes;
+    if (!opts.alreadyWarm && typeof dalEnsureWarmHubWorkspace_ === 'function') {
+      dalEnsureWarmHubWorkspace_(projectId, actor, { needTimeline: needTl });
+    }
+    if (needTl) assertActorCanEditTimeline(actor);
+
+    var sheets = verifyDatabaseSchema();
+    var newTimestamp = new Date().toISOString();
+
+    var indexData = sheets.index.getDataRange().getValues();
+    var iMap = {};
+    if (indexData.length > 0) indexData[0].forEach(function (h, i) { iMap[h.toString().trim()] = i; });
+    var projRowIndex = -1;
+    for (var i = 1; i < indexData.length; i++) {
+      if (indexData[i][iMap['uid']] === projectId) {
+        projRowIndex = i + 1;
+                // Warm room: Index Last_Updated can move from room activity; Firebase is SoT — no Sheets collision gate.
+                sheets.index.getRange(projRowIndex, iMap['Last_Updated'] + 1).setValue(newTimestamp);
+        if (logData.readinessStateStr && iMap['Readiness_State'] !== undefined) {
+          sheets.index.getRange(projRowIndex, iMap['Readiness_State'] + 1).setValue(logData.readinessStateStr);
+        }
+        break;
+      }
+    }
+    if (projRowIndex === -1) throw new Error('Project not found.');
+
+    if (deltas && deltas.length > 0) {
+      saveProjectAssetsDeltaFirestore_(projectId, deltas, actor);
+    }
+
+    var changeMsgs = [];
+    var autoCount = 0;
+    var tlSnap = null;
+    if (needTl) {
+      var tl = getTimelineDataFirestore_(projectId, 'main');
+      if (!tl) tl = getTimelineDataSheets_(projectId, 'main');
+      var tShifts = (tl.shifts || []).filter(function (s) {
+        return s && s.note !== '⚠️ AUTO-OUTBOUND' && s.note !== '⚠️ AUTO-INBOUND';
+      });
+      var tAssigned = (tl.assigned || []).slice();
+      var oldShiftIds = (tl.shifts || []).map(function (s) { return s && s.id; }).filter(Boolean);
+      var tPhases = tl.phases || [];
+      var tOverrides = tl.overrides || {};
+
+      (logData.outTrucks || []).forEach(function (tUid, idx) {
+        if (tAssigned.indexOf(tUid) < 0) tAssigned.push(tUid);
+        var loadTime = Number(logData.outStartHr) || 0;
+        var unloadTime = loadTime + (Number(logData.outDur) || 1);
+        tShifts.push({
+          id: 's_' + Date.now() + '_L' + idx + Math.random().toString(36).substr(2, 5),
+          user_uid: tUid, email: tUid, start: loadTime, duration: 2,
+          role: 'LOAD',
+          color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-OUTBOUND'
+        });
+        tShifts.push({
+          id: 's_' + Date.now() + '_U' + idx + Math.random().toString(36).substr(2, 5),
+          user_uid: tUid, email: tUid, start: unloadTime, duration: 2,
+          role: 'UNLOAD',
+          color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-OUTBOUND'
+        });
+      });
+      (logData.inTrucks || []).forEach(function (tUid, idx) {
+        if (tAssigned.indexOf(tUid) < 0) tAssigned.push(tUid);
+        var loadTimeIn = Number(logData.inStartHr) || 0;
+        var unloadTimeIn = loadTimeIn + (Number(logData.inDur) || 1);
+        tShifts.push({
+          id: 's_' + Date.now() + '_IL' + idx + Math.random().toString(36).substr(2, 5),
+          user_uid: tUid, email: tUid, start: loadTimeIn, duration: 2,
+          role: 'LOAD',
+          color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-INBOUND'
+        });
+        tShifts.push({
+          id: 's_' + Date.now() + '_IU' + idx + Math.random().toString(36).substr(2, 5),
+          user_uid: tUid, email: tUid, start: unloadTimeIn, duration: 2,
+          role: 'UNLOAD',
+          color: '#e5e7eb', textCol: '#18181b', hasArrow: false, note: '⚠️ AUTO-INBOUND'
+        });
+      });
+
+      // replaceAll so removed AUTO notes do not linger via patch-merge
+      dalWriteTimelineStateToFirestore_(projectId, 'main', tShifts, tPhases, tOverrides, actor, true);
+
+      var newShiftIds = tShifts.map(function (s) { return s.id; });
+      var addedShifts = newShiftIds.filter(function (id) { return oldShiftIds.indexOf(id) < 0; }).length;
+      var deletedShifts = oldShiftIds.filter(function (id) { return newShiftIds.indexOf(id) < 0; }).length;
+      var keptShifts = newShiftIds.filter(function (id) { return oldShiftIds.indexOf(id) >= 0; }).length;
+      if (addedShifts > 0) changeMsgs.push('Added ' + addedShifts + ' shift(s)');
+      if (deletedShifts > 0) changeMsgs.push('Deleted ' + deletedShifts + ' shift(s)');
+      if (keptShifts > 0) changeMsgs.push('Updated ' + keptShifts + ' shift(s)');
+      autoCount = (tShifts || []).filter(function (s) {
+        return s && (s.note === '⚠️ AUTO-OUTBOUND' || s.note === '⚠️ AUTO-INBOUND');
+      }).length;
+      // Return the just-written payload — skip a second Firestore timeline read (timeout budget).
+      tlSnap = {
+        shifts: tShifts,
+        phases: tPhases,
+        overrides: tOverrides,
+        assigned: tAssigned.slice()
+      };
+    }
+
+    // Stamp clocks on warm logistics legs (Sheets lag until END ROOM).
+    try {
+      var roomUid = '';
+      try {
+        var idxRow = dalGetProjectIndexRow_(projectId, sheets);
+        if (idxRow) roomUid = dalReadCampaignRoom_(idxRow).campaignRoomUid || '';
+      } catch (eRoom) { /* ignore */ }
+      var existingLl = null;
+      try { existingLl = dalReadLogisticsStateFromFirestore_(projectId); } catch (eExist) { existingLl = null; }
+      var baseLegs = (existingLl && existingLl.present) ? (existingLl.legs || []) : (logisticsLedgerLoadProjectLegObjects_(sheets, projectId) || []);
+      var stamped = logisticsLedgerStampClocksOnObjects_(baseLegs, projectId, logData);
+      dalWriteLogisticsStateToFirestore_(projectId, stamped.legs || baseLegs, actor, roomUid);
+      if (roomUid) {
+        try {
+          var rowAct = dalGetProjectIndexRow_(projectId, sheets);
+          if (rowAct) {
+            dalWriteCampaignRoom_(sheets.index, rowAct.rowNum, rowAct.map, {
+              campaignLastActivityAt: new Date().toISOString()
+            });
+          }
+        } catch (eAct) { /* ignore */ }
+      }
+    } catch (eStamp) { /* non-fatal if no legs yet */ }
+
+    var deltaPayload = changeMsgs.join(' | ') || 'Warm hub generate (no timeline clock changes).';
+    writeToAuditLog(actor, 'UPDATE', 'LOGISTICS_HUB_FIRESTORE', projectId, projectId,
+      'Logistics Generated (warm). ' + (deltas ? deltas.length : 0) + ' Asset Deltas. ' +
+      deltaPayload + ' autoShifts=' + autoCount);
+
+    // skipHeal: GENERATE already touched PA; heal would re-list+write and risk client timeout.
+    var finalAssets = getProjectAssetsFirestore_(projectId, logData.sDateStr, logData.eDateStr, { skipHeal: true });
+    return {
+      success: true,
+      assets: finalAssets,
+      timestamp: newTimestamp,
+      warm: true,
+      timelineUpdated: !!needTl,
+      autoShiftCount: autoCount,
+      timeline: tlSnap
+    };
+  });
+}
+
 function generateLogisticsPayloadAPI(projectId, deltas, logData, actor = "System UI") {
+    // R3b: Campaign Room warm → Firebase slices; else cold Sheets grind.
+    // Never grind Sheets while room is warm (even if seed soft-returns warm:false).
+    var ens = null;
+    try {
+      ens = (typeof dalEnsureWarmHubWorkspace_ === 'function')
+        ? dalEnsureWarmHubWorkspace_(projectId, actor, { needTimeline: !!(logData && logData.generateTimes) })
+        : null;
+    } catch (eWarm) {
+      if (typeof dalCampaignRoomIsWarmForProject_ === 'function' && dalCampaignRoomIsWarmForProject_(projectId)) {
+        throw eWarm;
+      }
+      ens = null;
+    }
+    if (ens && ens.warm) {
+      return generateLogisticsPayloadFirestore_(projectId, deltas, logData, actor, { alreadyWarm: true });
+    }
+    if (typeof dalCampaignRoomIsWarmForProject_ === 'function' && dalCampaignRoomIsWarmForProject_(projectId)) {
+      throw new Error('WARM_HUB_SEED_FAILED: Campaign Room is warm but Hub workspace could not open — retry or End Room. Sheets generate blocked.');
+    }
     return executeWithRetry(() => {
         const sheets = verifyDatabaseSchema();
         
@@ -801,6 +1513,11 @@ function generateLogisticsPayloadAPI(projectId, deltas, logData, actor = "System
         }
         sheets.shifts.clearContents();
         if (keptShiftRows.length > 0) sheets.shifts.getRange(1, 1, keptShiftRows.length, keptShiftRows[0].length).setValues(keptShiftRows);
+
+        // M1: link AUTO truck clocks onto matching Logistics_Ledger legs (leg_id + truck_uid)
+        try {
+          logisticsLedgerStampClocksFromHub_(sheets, projectId, logData);
+        } catch (eStamp) { /* non-fatal during dual-write window */ }
 
         // Notify changes
         let oldShiftIds = deletedShiftRows.map(r => r[sMap['uid']]);

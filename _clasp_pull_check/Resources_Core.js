@@ -136,6 +136,215 @@ let cachedVaultSheets = null;
 let vaultAssetCache = null;
 let sheetDataCache = {};
 
+function normalizeVaultHeaderKey_(header) {
+  return String(header || '').trim().toLowerCase().replace(/[\s_]+/g, '');
+}
+
+const CREW_CANONICAL_HEADERS_ = {
+  uid: 'uid',
+  email: 'Email',
+  name: 'Name',
+  jobtitle: 'Job_Title',
+  department: 'Department',
+  meal: 'Meal',
+  ismanager: 'IsManager',
+  isfreelancer: 'IsFreelancer',
+  systemaccess: 'System_Access',
+  roleid: 'Role_ID',
+  passcode: 'Passcode',
+  orderindex: 'OrderIndex',
+  payrollmultiplier: 'Payroll_Multiplier',
+  rfidtag: 'rfid_tag',
+  rfidtid: 'rfid_tid'
+};
+
+function isRfidLikeHeader_(header) {
+  const key = normalizeVaultHeaderKey_(header);
+  return key === 'rfidtag' || key === 'rfid' || key === 'lfid' || key === 'lfidtag';
+}
+
+/** Classify a crew column from body rows only — data beats header labels. */
+function classifyCrewColumnData_(columnValues) {
+  let checked = 0;
+  let payroll = 0;
+  let rfid = 0;
+  let dept = 0;
+  for (let i = 0; i < columnValues.length; i++) {
+    const s = String(columnValues[i] === null || columnValues[i] === undefined ? '' : columnValues[i]).trim();
+    if (!s) continue;
+    checked++;
+    const low = s.toLowerCase();
+    if (low.indexOf('dept_') === 0) {
+      dept++;
+      continue;
+    }
+    if (/^[0-9a-f]{10,}$/i.test(s)) {
+      rfid++;
+      continue;
+    }
+    const n = parseFloat(s);
+    if (!isNaN(n) && /^-?\d+(\.\d+)?$/.test(s) && n >= 0 && n <= 10) {
+      payroll++;
+    }
+  }
+  if (checked === 0) return 'empty';
+  if (payroll / checked >= 0.5) return 'payroll';
+  if (dept / checked >= 0.5) return 'department';
+  if (rfid / checked >= 0.5) return 'rfid';
+  return 'other';
+}
+
+function readCrewRosterGrid_(crewSheet) {
+  const lastCol = Math.max(crewSheet.getLastColumn(), 1);
+  const lastRow = Math.max(crewSheet.getLastRow(), 1);
+  const grid = crewSheet.getRange(1, 1, lastRow, lastCol).getValues();
+  const headers = grid[0].map(h => String(h || '').trim());
+  const colClass = [];
+  for (let c = 0; c < headers.length; c++) {
+    const vals = [];
+    for (let r = 1; r < grid.length; r++) vals.push(grid[r][c]);
+    colClass[c] = classifyCrewColumnData_(vals);
+  }
+  return { headers: headers, colClass: colClass, lastRow: lastRow };
+}
+
+function canonicalCrewHeader_(header) {
+  const key = normalizeVaultHeaderKey_(header);
+  return CREW_CANONICAL_HEADERS_[key] || '';
+}
+
+/**
+ * One-shot Crew_Roster repair:
+ * - Payroll column = where multiplier numbers live (always renamed, even if rfid/LFID header).
+ * - rfid_tag = always the last column (insert column J if needed).
+ * - Idempotent: safe to run on every vault sync.
+ */
+function repairAndEnsureCrewRosterSchema_(crewSheet) {
+  const PAY = 'Payroll_Multiplier';
+  const RFID = 'rfid_tag';
+  const RFID_TID = 'rfid_tid';
+
+  let state = readCrewRosterGrid_(crewSheet);
+  let headers = state.headers;
+  let colClass = state.colClass;
+
+  let payCol = -1;
+  for (let c = 0; c < headers.length; c++) {
+    if (colClass[c] === 'payroll') {
+      payCol = c;
+      break;
+    }
+  }
+
+  let rfidDataCol = -1;
+  for (let c = 0; c < headers.length; c++) {
+    if (c === payCol) continue;
+    if (colClass[c] === 'rfid') {
+      rfidDataCol = c;
+      break;
+    }
+  }
+
+  // Drop empty duplicate PAY / RFID columns left by earlier bad migrations.
+  for (let c = headers.length - 1; c >= 0; c--) {
+    const hKey = normalizeVaultHeaderKey_(headers[c]);
+    const empty = colClass[c] === 'empty';
+    const dupPay = hKey === 'payrollmultiplier' && c !== payCol && empty;
+    const dupRfid = (hKey === 'rfidtag' || isRfidLikeHeader_(headers[c])) && c !== payCol && c !== rfidDataCol && empty;
+    if (!dupPay && !dupRfid) continue;
+    crewSheet.deleteColumn(c + 1);
+    if (payCol > c) payCol--;
+    if (rfidDataCol > c) rfidDataCol--;
+    state = readCrewRosterGrid_(crewSheet);
+    headers = state.headers;
+    colClass = state.colClass;
+  }
+
+  const fixed = headers.slice();
+
+  if (payCol >= 0) {
+    fixed[payCol] = PAY;
+  }
+
+  for (let c = 0; c < fixed.length; c++) {
+    if (c === payCol) continue;
+    if (colClass[c] === 'department') {
+      fixed[c] = 'Department';
+      continue;
+    }
+    if (!isRfidLikeHeader_(fixed[c]) && normalizeVaultHeaderKey_(fixed[c]) !== 'rfidtag') continue;
+    if (colClass[c] === 'rfid') continue;
+    const canon = canonicalCrewHeader_(headers[c]);
+    fixed[c] = canon || (colClass[c] === 'department' ? 'Department' : '');
+  }
+
+  const lastRow = Math.max(crewSheet.getLastRow(), 1);
+
+  let tagIdx = -1;
+  let tidIdx = -1;
+  for (let c = 0; c < fixed.length; c++) {
+    const k = normalizeVaultHeaderKey_(fixed[c]);
+    if (k === 'rfidtag') tagIdx = c;
+    if (k === 'rfidtid') tidIdx = c;
+  }
+
+  let rfidAtEnd = fixed.length > 0 && normalizeVaultHeaderKey_(fixed[fixed.length - 1]) === 'rfidtag';
+
+  if (rfidDataCol >= 0 && rfidDataCol !== fixed.length - 1 && tidIdx !== fixed.length - 1) {
+    if (!rfidAtEnd && tidIdx !== fixed.length - 1) {
+      crewSheet.insertColumnAfter(crewSheet.getLastColumn());
+      fixed.push(RFID);
+      rfidAtEnd = true;
+      tagIdx = fixed.length - 1;
+    }
+    const destCol = crewSheet.getLastColumn();
+    if (lastRow >= 2) {
+      const moved = crewSheet.getRange(2, rfidDataCol + 1, lastRow, rfidDataCol + 1).getValues();
+      crewSheet.getRange(2, destCol, lastRow, destCol).setValues(moved);
+      crewSheet.getRange(2, rfidDataCol + 1, lastRow, rfidDataCol + 1).clearContent();
+    }
+    if (rfidDataCol !== payCol) {
+      const restore = canonicalCrewHeader_(headers[rfidDataCol]);
+      fixed[rfidDataCol] = restore || '';
+    }
+  }
+
+  tagIdx = -1;
+  tidIdx = -1;
+  for (let c = 0; c < fixed.length; c++) {
+    const k = normalizeVaultHeaderKey_(fixed[c]);
+    if (k === 'rfidtag') tagIdx = c;
+    if (k === 'rfidtid') tidIdx = c;
+  }
+
+  if (tagIdx < 0) {
+    crewSheet.insertColumnAfter(crewSheet.getLastColumn());
+    fixed.push(RFID);
+    tagIdx = fixed.length - 1;
+  } else {
+    fixed[tagIdx] = RFID;
+  }
+
+  tidIdx = -1;
+  for (let c = 0; c < fixed.length; c++) {
+    if (normalizeVaultHeaderKey_(fixed[c]) === 'rfidtid') tidIdx = c;
+  }
+  if (tidIdx < 0) {
+    crewSheet.insertColumnAfter(tagIdx + 1);
+    fixed.splice(tagIdx + 1, 0, RFID_TID);
+  } else {
+    fixed[tidIdx] = RFID_TID;
+  }
+
+  const colCount = crewSheet.getLastColumn();
+  while (fixed.length < colCount) fixed.push('');
+  if (fixed.length > colCount) fixed.length = colCount;
+
+  crewSheet.getRange(1, 1, 1, fixed.length).setValues([fixed]);
+  crewSheet.getRange(1, 1, 1, fixed.length)
+    .setFontWeight('bold').setBackground('#064e3b').setFontColor('#ffffff');
+}
+
 // @INDEX: SCHEMA_VAULT -> Relational Schema Engine
 function verifyVaultSchema(readOnly = false) {
   if (cachedVaultSheets && readOnly) return cachedVaultSheets;
@@ -192,15 +401,17 @@ function verifyVaultSchema(readOnly = false) {
 
   // TABLE 1: CREW ROSTER
   let crewSheet = sm["Crew_Roster"];
-  const crewHeaders = ["uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer", "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier"];
-  if (!crewSheet) { 
-    crewSheet = ss.insertSheet("Crew_Roster"); 
-    crewSheet.appendRow(crewHeaders); 
-    crewSheet.getRange(1, 1, 1, crewHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff"); 
-    crewSheet.setFrozenRows(1); 
-  } else {
-    if (crewSheet.getMaxColumns() < crewHeaders.length) crewSheet.insertColumnsAfter(crewSheet.getMaxColumns(), crewHeaders.length - crewSheet.getMaxColumns());
+  const crewHeaders = [
+    "uid", "Email", "Name", "Job_Title", "Department", "Meal", "IsManager", "IsFreelancer",
+    "System_Access", "Role_ID", "Passcode", "OrderIndex", "Payroll_Multiplier", "rfid_tag", "rfid_tid"
+  ];
+  if (!crewSheet) {
+    crewSheet = ss.insertSheet("Crew_Roster");
+    crewSheet.appendRow(crewHeaders);
     crewSheet.getRange(1, 1, 1, crewHeaders.length).setFontWeight("bold").setBackground("#064e3b").setFontColor("#ffffff");
+    crewSheet.setFrozenRows(1);
+  } else {
+    repairAndEnsureCrewRosterSchema_(crewSheet);
   }
 
   // TABLE 2: IAM ROLES (current credential matrix — legacy Role_Permissions is ignored)
@@ -331,7 +542,7 @@ function verifyVaultSchema(readOnly = false) {
   }
 
   let assetSheet = sm["Assets"];
-  const assetHeaders = ["uid", "kit_uid", "case_uid", "area_uid", "name", "manufacturer", "type", "weight_kg", "power_w", "rfid_tag", "status", "container_type", "nesting_level", "department", "wh_uid", "zone_uid", "dims", "price", "rental", "date_bought", "last_service", "service_interval", "tags", "unit_number", "total_quantity", "length_m", "capacity", "Serial_Number", "vendor_uid", "components"];
+  const assetHeaders = ["uid", "kit_uid", "case_uid", "area_uid", "name", "manufacturer", "type", "weight_kg", "power_w", "rfid_tag", "status", "status_note", "container_type", "nesting_level", "department", "wh_uid", "zone_uid", "dims", "price", "rental", "date_bought", "last_service", "service_interval", "tags", "unit_number", "total_quantity", "length_m", "capacity", "Serial_Number", "vendor_uid", "components"];
   if (!assetSheet) {
       assetSheet = ss.insertSheet("Assets");
       assetSheet.appendRow(assetHeaders);
@@ -348,7 +559,7 @@ function verifyVaultSchema(readOnly = false) {
 function getCacheVersion() {
   try {
     let cache = CacheService.getScriptCache();
-    let v = cache.get('DB_CACHE_VERSION');
+    let v = cache.get('DB_CACHE_VERSION_V2');
     if (!v) { 
       let props = PropertiesService.getScriptProperties();
       v = props.getProperty('DB_CACHE_VERSION_V2');
@@ -374,18 +585,37 @@ function flushCache() {
   } catch(e) {}
 }
 
+/**
+ * Debug bypass: ScriptProperties DAL_SHEET_CACHE_DISABLED=1 forces live sheet reads.
+ * Phase 6B re-enabled CacheService + in-memory sheet cache (tag-aware purge via Dal_Cache.js).
+ */
+function isDalSheetCacheDisabled_() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty('DAL_SHEET_CACHE_DISABLED') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
 // @INDEX: CACHE -> Sheet Data Caching
 function getSheetData(sheet) {
   if (!sheet) { let empty = []; empty.hMap = {}; return empty; }
-  
-  // 🔥 CACHE TEMPORARILY DISABLED FOR DEBUGGING
-  // Always fetch live data directly from the spreadsheet
-  let dataMatrix = sheet.getDataRange().getValues();
-  dataMatrix.hMap = getHeaderMap(dataMatrix);
-  return dataMatrix;
-  
-  // -- CACHE LOGIC BYPASSED BELOW --
-  
+
+  let name = '';
+  try { name = sheet.getName(); } catch (eName) { name = 'unknown'; }
+  let version = getCacheVersion();
+
+  if (isDalSheetCacheDisabled_()) {
+    let live = sheet.getDataRange().getValues();
+    live.hMap = getHeaderMap(live);
+    return live;
+  }
+
+  // In-memory warm hit (same Apps Script instance)
+  if (sheetDataCache[name] && sheetDataCache[name].version === version && sheetDataCache[name].data) {
+    return sheetDataCache[name].data;
+  }
+
   let cache = CacheService.getScriptCache();
   let cacheKey = 'DB_' + version + '_' + name;
   
@@ -398,7 +628,7 @@ function getSheetData(sheet) {
           let valid = true;
           for (let i = 0; i < chunks; i++) {
               let chunk = cache.get(cacheKey + '_' + i);
-              if (!chunk) { valid = false; break; } // FIX: Prevent silent chunk corruption
+              if (!chunk) { valid = false; break; }
               assembled += chunk;
           }
           if (valid && assembled.length > 0) cachedStr = assembled;
@@ -414,8 +644,7 @@ function getSheetData(sheet) {
   if (!data) {
       data = sheet.getDataRange().getValues();
       
-      // SURGICAL FIX: Prevent Google Sheets Date objects from shifting -1 day during JSON.stringify
-      // by flattening them into exact local-time strings before caching.
+      // Prevent Google Sheets Date objects from shifting -1 day during JSON.stringify
       for (let r = 0; r < data.length; r++) {
           for (let c = 0; c < data[r].length; c++) {
               if (data[r][c] instanceof Date) {
@@ -437,7 +666,6 @@ function getSheetData(sheet) {
              cache.put(cacheKey, str, 21600); // 6 Hours
              cache.remove(cacheKey + '_chunks');
          } else {
-             // CHUNKING: Bypass Google's 100KB CacheService Limit
              let chunkSize = 90000;
              let chunks = Math.ceil(str.length / chunkSize);
              let cacheObj = {};
@@ -451,7 +679,6 @@ function getSheetData(sheet) {
       } catch(e) {}
   }
 
-  // PHASE 1: Build Map dynamically and augment the array so backward compatibility is 100% safe
   let map = {};
   if (data.length > 0) {
       data[0].forEach((header, index) => {
@@ -496,6 +723,24 @@ function executeWithRetry(operation, maxRetries = 5) {
       return result;
     } catch (e) {
           if (e.message && e.message.includes("COLLISION_DETECTED")) throw e; // Instantly abort on collision
+      if (e.message && (
+        e.message.includes("Firestore") && (e.message.includes("(403)") || e.message.includes("(401)") || e.message.includes("(400)")) ||
+        e.message.includes("Firebase service account") ||
+        e.message.includes("Firebase not configured") ||
+        // DAL session lifecycle — business rules, not lock contention
+        e.message.includes("Preparation is still active") ||
+        e.message.includes("Timeline collab is still active") ||
+        e.message.includes("session is already") ||
+        // "No open prep session" / "No open timelineCollab session" (not the old "No open session" wording)
+        (e.message.includes("No open") && e.message.includes("session")) ||
+        e.message.includes("Commit already in progress") ||
+        e.message.includes("Session open raced") ||
+        e.message.includes("Session is not opening") ||
+        e.message.includes("Project not found") ||
+        e.message.includes("Unknown session type") ||
+        e.message.includes("not authorized") ||
+        e.message.includes("Permission")
+      )) throw e; // Config / permission / business errors — do not retry
       attempt++;
       if (attempt >= maxRetries) {
           let errType = bypassLock ? "Read Timeout" : "Lockout";
@@ -511,26 +756,33 @@ function executeWithRetry(operation, maxRetries = 5) {
 // ==========================================
 // --- REAL-TIME PRESENCE ENGINE (CACHE) ---
 // ==========================================
-function reportProjectPresence(projectId, userName, action, activeModule) {
+function reportProjectPresence(projectId, userName, action, activeModule, subMode) {
   try {
     let cache = CacheService.getScriptCache();
     let key = 'PRESENCE_' + projectId;
     let lock = LockService.getScriptLock();
     
-    // Try to lock RAM for 2 seconds to prevent read/write overlap
-    if (lock.tryLock(2000)) {
+    // Presence must not lose to DAL Firestore holds — open/close no longer hold ScriptLock across UrlFetch.
+    // Still wait longer than before so a brief sheet write does not leave the door stuck on the timeline.
+    if (lock.tryLock(8000)) {
         try {
             let activeStr = cache.get(key);
             let activeUsers = activeStr ? JSON.parse(activeStr) : {};
             let now = Date.now();
             
-            if (action === 'join' || action === 'ping') activeUsers[userName] = { time: now, module: activeModule || 'main' };
-            else if (action === 'leave') delete activeUsers[userName];
+            if (action === 'join' || action === 'ping') {
+              activeUsers[userName] = {
+                time: now,
+                module: activeModule || 'main',
+                subMode: subMode != null ? String(subMode) : ''
+              };
+            } else if (action === 'leave') delete activeUsers[userName];
             
-            // Cleanup disconnected users (no ping in last 90 seconds)
+            // Cleanup disconnected users (Part B4: ~150s stale with ~45s client ping)
+            var staleMs = 150000;
             let activeList = {};
             for (let user in activeUsers) {
-                if (now - activeUsers[user].time > 90000) delete activeUsers[user];
+                if (now - activeUsers[user].time > staleMs) delete activeUsers[user];
                 else if (user !== userName) activeList[user] = activeUsers[user]; // Keep track of OTHERS and their modules
             }
             
@@ -541,9 +793,10 @@ function reportProjectPresence(projectId, userName, action, activeModule) {
             lock.releaseLock();
         }
     }
-    return {};
+    // Lock miss — must not look like "nobody else here" (empty {}).
+    return null;
   } catch (e) {
-    return {};
+    return null;
   }
 }
 

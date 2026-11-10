@@ -193,6 +193,7 @@ A phone can start an agent, but it cannot open the Google login browser. This ma
 | Job | Command | Notes |
 |-----|---------|--------|
 | Git checkpoint | `node works-save.js "note"` | No Google login. Needs GitHub, which the agent remote already has. |
+| Live GAS → GitHub backup (no deploy) | `clasp pull` into `_clasp_pull_check/` → commit + push | When live Apps Script is ahead of this git tree. **Never** `gas-push-sync` / milestone from older source afterward. See `_clasp_pull_check/README.md`. |
 | Production milestone | `node milestone.js "note"` | Needs clasp login. The production deployment id is the one already in `push-hosting/prepare-hosting.js` (the `@792` web app, `AKfycbxy…`). Stops before Google if clasp is missing, or if Apps Script is newer than `RELEASES.md`, so an old git tree cannot roll the live app back. |
 | Dev push | `node dev-push.js` | Same clasp login. No version, no Git save. |
 | Account check | `node check-google-account.js` | Read-only clasp calls. |
