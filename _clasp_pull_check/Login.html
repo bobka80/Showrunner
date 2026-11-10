@@ -35,12 +35,24 @@
         <input type="password" name="passcode" id="pass-input" placeholder="••••••" maxlength="6" required style="width: 100%; padding: 14px; margin-top: 5px; background: #27272a; border: 1px solid #333; color: white; border-radius: 6px; box-sizing: border-box; letter-spacing: 4px; font-size: 18px; text-align: center;">
       </div>
 
-      <p style="font-size:11px; font-weight:700; color:#71717a; margin:0 0 20px 0; line-height:1.45;">
+      <p id="stay-signed-in-note" style="font-size:11px; font-weight:700; color:#71717a; margin:0 0 20px 0; line-height:1.45;">
         Stay signed in on this device for <strong style="color:#10b981;">30 days</strong> after login.
       </p>
+      <div id="stay-signed-in-reenable" style="display:none; text-align:left; margin:0 0 20px 0;">
+        <label style="font-size:11px; font-weight:700; color:#71717a; display:flex; align-items:flex-start; gap:8px; cursor:pointer; line-height:1.45;">
+          <input type="checkbox" id="reenable-auto-login-chk" style="margin-top:2px; flex-shrink:0;">
+          <span>Stay signed in on this device for <strong style="color:#10b981;">30 days</strong> after login</span>
+        </label>
+      </div>
 
       <button type="submit" id="login-btn" class="btn-main">AUTHENTICATE</button>
     </form>
+
+    <p style="margin: 22px 0 0; padding-top: 18px; border-top: 1px solid #27272a;">
+      <a href="<?!= stationAppUrl ?>" style="font-size: 11px; font-weight: 800; color: #f97316; text-decoration: none; letter-spacing: 0.03em; text-transform: uppercase;">
+        Warehouse gun — install station app
+      </a>
+    </p>
 
   <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -58,22 +70,76 @@
 
       const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 
+      function crewKeyFromName(name) {
+        return String(name || '').toLowerCase().trim().replace(/\s+/g, '_');
+      }
+
+      function isDesktopLoginContext() {
+        try { return window.matchMedia('(min-width: 769px)').matches; } catch (e) { return true; }
+      }
+
+      function isLoginAutoBootBlocked() {
+        if (!isDesktopLoginContext()) return false;
+        var crewKey = '';
+        try {
+          crewKey = crewKeyFromName(localStorage.getItem('sm_crew_name') || nameInput.value || '');
+        } catch (e) { /* ignore */ }
+        if (!crewKey) return false;
+        try {
+          return localStorage.getItem('sm_auto_login_off_' + crewKey) === '1';
+        } catch (e) { return false; }
+      }
+
+      function updateStaySignedInUI() {
+        var blocked = isLoginAutoBootBlocked();
+        var note = document.getElementById('stay-signed-in-note');
+        var reenable = document.getElementById('stay-signed-in-reenable');
+        if (note) note.style.display = blocked ? 'none' : '';
+        if (reenable) reenable.style.display = blocked ? 'block' : 'none';
+      }
+
       function sessionCheckJsonp(token) {
         return new Promise(function(resolve) {
           if (!token || !scriptUrl) return resolve({ valid: false });
           var cb = '__srSessChk_' + Date.now();
-          window[cb] = function(res) {
-            delete window[cb];
+          var settled = false;
+          function finish(res) {
+            if (settled) return;
+            settled = true;
+            try { delete window[cb]; } catch (e) { /* ignore */ }
             resolve(res || { valid: false });
+          }
+          window[cb] = function(res) {
+            finish(res || { valid: false });
           };
           var s = document.createElement('script');
           s.src = scriptUrl + '?action=sessioncheck&token=' + encodeURIComponent(token) + '&callback=' + encodeURIComponent(cb);
           s.onerror = function() {
-            delete window[cb];
-            resolve({ valid: false });
+            finish({ valid: false, networkError: true });
           };
           document.head.appendChild(s);
+          setTimeout(function() {
+            try { if (s.parentNode) s.parentNode.removeChild(s); } catch (e) { /* ignore */ }
+            finish({ valid: false, networkError: true });
+          }, 8000);
         });
+      }
+
+      function showLoginForm() {
+        if (form) form.style.display = '';
+        if (bootMsg) bootMsg.style.display = 'none';
+        updateStaySignedInUI();
+      }
+
+      function postLoginState(loggedIn, withClear) {
+        if (window.parent === window) return;
+        try {
+          window.parent.postMessage({
+            type: 'SHOWRUNNER_LOGIN_STATE',
+            loggedIn: loggedIn,
+            clearSession: !!withClear
+          }, '*');
+        } catch (e) { /* ignore */ }
       }
 
       function beginSessionBoot(token, crewName, expiresAt) {
@@ -85,17 +151,34 @@
 
       function clearStoredSession() {
         try {
+          var savedCrew = localStorage.getItem('sm_crew_name') || '';
+          var crewKey = String(savedCrew).toLowerCase().trim().replace(/\s+/g, '_');
           localStorage.removeItem('sm_session_token');
           localStorage.removeItem('sm_session_expires');
           localStorage.removeItem('sm_crew_name');
           localStorage.removeItem('sm_crew_pass');
           localStorage.removeItem('sm_crew_timestamp');
+          if (crewKey) {
+            localStorage.removeItem('sm_lock_prefix_' + crewKey);
+            sessionStorage.removeItem('sm_lock_prefix_' + crewKey);
+          }
         } catch (e) { /* ignore */ }
       }
 
       function notifyParentSessionClear() {
         if (window.parent && window.parent !== window) {
           try {
+            if (/ShowrunnerStation/i.test(navigator.userAgent || '')) {
+              if (window.AndroidStation && typeof AndroidStation.getSavedSession === 'function') {
+                var saved = AndroidStation.getSavedSession();
+                if (saved) {
+                  try {
+                    var parsed = JSON.parse(saved);
+                    if (parsed && parsed.token && parseInt(parsed.expiresAt, 10) > Date.now()) return;
+                  } catch (e) { /* ignore */ }
+                }
+              }
+            }
             window.parent.postMessage({ type: 'SHOWRUNNER_SESSION_CLEAR' }, '*');
           } catch (e) { /* ignore */ }
         }
@@ -103,14 +186,20 @@
 
       function notifyParentSessionToken(token, crewName, expiresAt) {
         if (!token || window.parent === window) return;
+        var exp = expiresAt || (Date.now() + SESSION_MS);
         try {
-          window.parent.postMessage({
-            type: 'SHOWRUNNER_SESSION_TOKEN',
-            token: token,
-            crewName: crewName || '',
-            expiresAt: expiresAt || (Date.now() + SESSION_MS)
-          }, '*');
+          if (window.AndroidStation && typeof AndroidStation.saveSession === 'function') {
+            AndroidStation.saveSession(token, exp);
+          }
         } catch (e) { /* ignore */ }
+        var sessionMsg = {
+          type: 'SHOWRUNNER_SESSION_TOKEN',
+          token: token,
+          crewName: crewName || '',
+          expiresAt: exp
+        };
+        try { window.parent.postMessage(sessionMsg, '*'); } catch (e) { /* ignore */ }
+        try { if (window.top && window.top !== window) window.top.postMessage(sessionMsg, '*'); } catch (e) { /* ignore */ }
       }
 
       if (clearSession) {
@@ -122,12 +211,16 @@
          document.getElementById('error-display').innerText = errorDisplay;
          document.getElementById('error-display').style.display = 'block';
          btn.innerText = 'AUTHENTICATE';
+         postLoginState(false, !!clearSession);
       } else {
          try {
            const savedName = localStorage.getItem('sm_crew_name');
            if (savedName) nameInput.value = savedName;
          } catch (e) { /* ignore */ }
 
+         updateStaySignedInUI();
+
+         if (!isLoginAutoBootBlocked()) {
          const token = localStorage.getItem('sm_session_token');
          const exp = parseInt(localStorage.getItem('sm_session_expires') || '0', 10);
          if (token && exp > Date.now() && scriptUrl) {
@@ -144,16 +237,24 @@
                beginSessionBoot(token, crew, newExp);
                return;
              }
+             if (res && res.networkError) {
+               var crewNet = localStorage.getItem('sm_crew_name') || nameInput.value;
+               beginSessionBoot(token, crewNet, exp);
+               return;
+             }
              clearStoredSession();
              notifyParentSessionClear();
-             if (form) form.style.display = '';
-             if (bootMsg) bootMsg.style.display = 'none';
+             showLoginForm();
+             postLoginState(false, true);
            });
            return;
          }
          if (token && exp <= Date.now()) {
            clearStoredSession();
          }
+         }
+
+         postLoginState(false, !!clearSession);
       }
 
       passInput.addEventListener('input', function(e) {
@@ -167,7 +268,18 @@
 
       form.addEventListener('submit', function() {
         try {
+          var crewKey = crewKeyFromName(nameInput.value);
+          var reenable = document.getElementById('reenable-auto-login-chk');
+          if (reenable && reenable.checked && crewKey) {
+            localStorage.removeItem('sm_auto_login_off_' + crewKey);
+          }
           localStorage.setItem('sm_crew_name', nameInput.value);
+          var p = String(passInput.value || '').trim();
+          if (p.length >= 2 && crewKey) {
+            var prefix = p.substring(0, 2);
+            localStorage.setItem('sm_lock_prefix_' + crewKey, prefix);
+            sessionStorage.setItem('sm_lock_prefix_' + crewKey, prefix);
+          }
         } catch (e) { /* ignore */ }
         if (window.parent && window.parent !== window) {
           try {
@@ -188,15 +300,6 @@
         btn.disabled = true;
       });
 
-      if (window.parent && window.parent !== window) {
-        try {
-          window.parent.postMessage({
-            type: 'SHOWRUNNER_LOGIN_STATE',
-            loggedIn: false,
-            clearSession: !!clearSession
-          }, '*');
-        } catch (e) { /* ignore */ }
-      }
     });
   </script>
 </body>

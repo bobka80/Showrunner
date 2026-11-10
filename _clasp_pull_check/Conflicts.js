@@ -15,7 +15,7 @@ function getActiveConflicts() {
     const overrideData = getSheetData(eSheets.conflictOverrides);
     const indexData = getSheetData(eSheets.index);
     const timelineData = getSheetData(eSheets.timelines);
-    const projectAssets = getSheetData(eSheets.projectAssets);
+    let projectAssets = getSheetData(eSheets.projectAssets);
     const vaultAssets = getSheetData(vSheets.assets);
     const vaultVehicles = getSheetData(vSheets.vehicles);
     
@@ -31,9 +31,16 @@ function getActiveConflicts() {
     let vehicleUids = new Set();
     if (vecUidCol !== undefined) {
         for (let i = 1; i < vaultVehicles.length; i++) {
-            if (vaultVehicles[i][vecUidCol]) vehicleUids.add(vaultVehicles[i][vecUidCol]);
+            if (vaultVehicles[i][vecUidCol]) vehicleUids.add(String(vaultVehicles[i][vecUidCol]));
         }
     }
+    // Also index common alternate id columns so rest engine never treats fleet as crew.
+    ['Vehicle_UID', 'vehicle_uid', 'ID', 'Id'].forEach(function (alt) {
+        if (vecMap[alt] === undefined) return;
+        for (let i = 1; i < vaultVehicles.length; i++) {
+            if (vaultVehicles[i][vecMap[alt]]) vehicleUids.add(String(vaultVehicles[i][vecMap[alt]]));
+        }
+    });
 
     // 1. Gather Active Projects & Timelines
     let projects = {};
@@ -46,6 +53,45 @@ function getActiveConflicts() {
                 phases: []
             };
         }
+    }
+
+    const extractTime = (val) => {
+        if (val === undefined || val === null || val === "") return "";
+        if (val instanceof Date) return ("0" + val.getHours()).slice(-2) + ":" + ("0" + val.getMinutes()).slice(-2);
+        if (typeof val === 'number') {
+            let totalMinutes = Math.round(val * 24 * 60);
+            let h = Math.floor(totalMinutes / 60);
+            let m = totalMinutes % 60;
+            return ("0" + h).slice(-2) + ":" + ("0" + m).slice(-2);
+        }
+        let s = String(val).trim();
+        let m = s.match(/(\d{1,2}):(\d{2})/);
+        if (m) return ("0" + m[1]).slice(-2) + ":" + m[2];
+        return s;
+    };
+
+    function conflictPhasesFromFragments_(frags) {
+        let phases = [];
+        (frags || []).forEach(function (f) {
+            if (!f || !f.date) return;
+            let dateStr = String(f.date);
+            let isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) dateStr = isoMatch[0];
+            let sTime = extractTime(f.startTime) || "00:00";
+            let eTime = extractTime(f.endTime) || "23:59";
+            let sEpoch = new Date(`${dateStr}T${sTime}:00Z`).getTime();
+            let eEpoch = new Date(`${dateStr}T${eTime}:00Z`).getTime();
+            if (eEpoch <= sEpoch) eEpoch += 86400000;
+            if (!isNaN(sEpoch) && !isNaN(eEpoch)) {
+                phases.push({
+                    uid: f.uid || '',
+                    type: f.type || f.Sub_Event_Type,
+                    start: sEpoch,
+                    end: eEpoch
+                });
+            }
+        });
+        return phases;
     }
 
     // 2. Resolve Exact Epoch Timeframes per Project
@@ -62,21 +108,6 @@ function getActiveConflicts() {
                 let isoMatch = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
                 if (isoMatch) dateStr = isoMatch[0];
             }
-            
-            const extractTime = (val) => {
-                if (val === undefined || val === null || val === "") return "";
-                if (val instanceof Date) return ("0" + val.getHours()).slice(-2) + ":" + ("0" + val.getMinutes()).slice(-2);
-                if (typeof val === 'number') {
-                    let totalMinutes = Math.round(val * 24 * 60);
-                    let h = Math.floor(totalMinutes / 60);
-                    let m = totalMinutes % 60;
-                    return ("0" + h).slice(-2) + ":" + ("0" + m).slice(-2);
-                }
-                let s = String(val).trim();
-                let m = s.match(/(\d{1,2}):(\d{2})/);
-                if (m) return ("0" + m[1]).slice(-2) + ":" + m[2];
-                return s;
-            };
 
             let sTime = extractTime(timelineData[i][tMap['Start_Time']]) || "00:00";
             let eTime = extractTime(timelineData[i][tMap['End_Time']]) || "23:59";
@@ -88,6 +119,7 @@ function getActiveConflicts() {
             
             if (!isNaN(sEpoch) && !isNaN(eEpoch)) {
                 projects[pId].phases.push({
+                    uid: tMap['uid'] !== undefined ? (timelineData[i][tMap['uid']] || '') : '',
                     type: timelineData[i][tMap['Sub_Event_Type']],
                     start: sEpoch,
                     end: eEpoch
@@ -96,32 +128,86 @@ function getActiveConflicts() {
         }
     }
 
+    // W2: warm Campaign Room → one-shot Firebase overlay (cap 25, fail-open).
+    var warmOverlay = { subEvents: {}, names: {}, paRows: {}, ledger: {}, timeline: {}, count: 0 };
+    try {
+      if (typeof dalListWarmCampaignProjectIds_ === 'function' &&
+          typeof dalWarmReaderOneShotOverlay_ === 'function') {
+        var warmIds = dalListWarmCampaignProjectIds_(indexData, iMap);
+        warmOverlay = dalWarmReaderOneShotOverlay_(warmIds, {
+          meta: true, pa: true, logistics: true, timeline: true
+        });
+        Object.keys(warmOverlay.names || {}).forEach(function (wPid) {
+          if (projects[wPid] && warmOverlay.names[wPid]) {
+            projects[wPid].name = warmOverlay.names[wPid];
+          }
+        });
+        Object.keys(warmOverlay.subEvents || {}).forEach(function (wPid) {
+          if (!projects[wPid]) return;
+          var warmPhases = conflictPhasesFromFragments_(warmOverlay.subEvents[wPid]);
+          if (warmPhases.length) projects[wPid].phases = warmPhases;
+        });
+      }
+    } catch (eWarmConf) {
+      warmOverlay = { subEvents: {}, names: {}, paRows: {}, ledger: {}, timeline: {}, count: 0 };
+    }
+
     // 3. Evaluate Crew Rest Conflicts (Soft)
     let userShifts = {};
-    for (let i = 1; i < shiftData.length; i++) {
-        let pId = shiftData[i][sMap['project_uid']];
-        if (!projects[pId]) continue; 
-        
-        let uid = shiftData[i][sMap['user_uid']];
-        if (!uid || uid.includes('truck') || vehicleUids.has(uid)) continue;
+    var warmShiftPids = {};
+    Object.keys(warmOverlay.timeline || {}).forEach(function (wPid) {
+      var tl = warmOverlay.timeline[wPid];
+      if (tl && tl.shifts && tl.shifts.length) warmShiftPids[String(wPid)] = true;
+    });
+
+    function pushConflictShift_(pId, uid, startRaw, durRaw, shiftId, noteStr) {
+        if (!projects[pId] || !uid) return;
+        let uidStr = String(uid);
+        noteStr = String(noteStr || '');
+        if (uidStr.indexOf('truck') !== -1 || vehicleUids.has(uidStr)) return;
+        if (noteStr.indexOf('AUTO-OUTBOUND') !== -1 || noteStr.indexOf('AUTO-INBOUND') !== -1) return;
         if (!userShifts[uid]) userShifts[uid] = [];
-        
-        let pPhases = projects[pId].phases.sort((a,b) => a.start - b.start);
+        let pPhases = projects[pId].phases.slice().sort((a,b) => a.start - b.start);
         if (pPhases.length > 0) {
             let baseStart = pPhases[0].start;
-            let startRaw = Number(shiftData[i][sMap['Start']]);
-            let durRaw = Number(shiftData[i][sMap['Duration']]);
-            let shiftEpoch = baseStart + (startRaw * 3600000);
-            
+            let shiftEpoch = baseStart + (Number(startRaw) * 3600000);
             userShifts[uid].push({
-                shiftId: shiftData[i][sMap['uid']],
+                shiftId: shiftId,
                 projectId: pId,
                 projectName: projects[pId].name,
                 startEpoch: shiftEpoch,
-                endEpoch: shiftEpoch + (durRaw * 3600000)
+                endEpoch: shiftEpoch + (Number(durRaw) * 3600000)
             });
         }
     }
+
+    for (let i = 1; i < shiftData.length; i++) {
+        let pId = shiftData[i][sMap['project_uid']];
+        if (!projects[pId]) continue;
+        if (warmShiftPids[String(pId)]) continue; // replaced by Firebase timeline shifts
+        pushConflictShift_(
+          pId,
+          shiftData[i][sMap['user_uid']],
+          shiftData[i][sMap['Start']],
+          shiftData[i][sMap['Duration']],
+          shiftData[i][sMap['uid']],
+          shiftData[i][sMap['Note']]
+        );
+    }
+    Object.keys(warmShiftPids).forEach(function (wPid) {
+      var tl = warmOverlay.timeline[wPid];
+      (tl.shifts || []).forEach(function (s) {
+        if (!s) return;
+        pushConflictShift_(
+          wPid,
+          s.user_uid || s.email,
+          s.start,
+          s.duration,
+          s.id || s.uid,
+          s.note
+        );
+      });
+    });
     
     for (let uid in userShifts) {
         let shifts = userShifts[uid].sort((a,b) => a.startEpoch - b.startEpoch);
@@ -195,7 +281,27 @@ function getActiveConflicts() {
     let paFormCol = paMap['formula'] !== undefined ? paMap['formula'] : 5;
     let paLocCol = paMap['location'] !== undefined ? paMap['location'] : 4;
 
-    // Calculate Equipment Windows (From first WH phase to last Recovery phase)
+    // W2: prefer warm Firebase PA rows when present
+    try {
+      if (warmOverlay && warmOverlay.paRows && Object.keys(warmOverlay.paRows).length &&
+          typeof dalMergeWarmPaSheetRows_ === 'function') {
+        projectAssets = dalMergeWarmPaSheetRows_(projectAssets, paMap, warmOverlay.paRows);
+      }
+    } catch (eWarmPaConf) { /* keep Sheets PA */ }
+
+    // Calculate Equipment Windows + M5 free-at (ledger phase_ref → sub-event end)
+    var ledgerByProject = {};
+    try {
+      ledgerByProject = logisticsLedgerLegsByProjects_(eSheets, Object.keys(projects));
+    } catch (eLlConf) { ledgerByProject = {}; }
+    try {
+      if (warmOverlay && warmOverlay.ledger) {
+        Object.keys(warmOverlay.ledger).forEach(function (wPid) {
+          if (warmOverlay.ledger[wPid]) ledgerByProject[String(wPid)] = warmOverlay.ledger[wPid];
+        });
+      }
+    } catch (eWarmLlConf) { /* keep Sheets ledger */ }
+
     for (let pId in projects) {
         if (projects[pId].phases.length > 0) {
             projects[pId].equipStart = Math.min(...projects[pId].phases.map(p => p.start));
@@ -208,6 +314,19 @@ function getActiveConflicts() {
             } else {
                 projects[pId].coreStart = projects[pId].equipStart;
                 projects[pId].coreEnd = projects[pId].equipEnd;
+            }
+
+            var freeRes = logisticsLedgerResolveProjectFreeAt_(
+              projects[pId].phases,
+              ledgerByProject[String(pId)] || {}
+            );
+            if (freeRes.freeAtResolved && freeRes.freeAt) {
+              projects[pId].freeAt = freeRes.freeAt;
+              projects[pId].freeAtResolved = true;
+            } else {
+              // Sweep still needs an in-time; unresolved soft conflicts are suppressed below
+              projects[pId].freeAt = projects[pId].equipEnd;
+              projects[pId].freeAtResolved = false;
             }
         }
     }
@@ -246,7 +365,8 @@ function getActiveConflicts() {
         for (let pId in assetUsage[poolKey]) {
             let qty = assetUsage[poolKey][pId];
             events.push({ time: projects[pId].equipStart, type: 'out', qty: qty, pId: pId });
-            events.push({ time: projects[pId].equipEnd, type: 'in', qty: qty, pId: pId });
+            // M5: return at free-at (phase_ref sub-event end), not coarse equipEnd alone
+            events.push({ time: projects[pId].freeAt, type: 'in', qty: qty, pId: pId });
         }
 
         // Sort: Chronological. If simultaneous, process 'in' (returns) before 'out' (deployments)
@@ -268,12 +388,17 @@ function getActiveConflicts() {
                 let groupKey = `ASSET_${triggerId}_${pairNames.replace(/[^a-zA-Z0-9]/g, '')}_${poolKey}`;
                 let key = `${poolKey}_${triggerId}`;
                 
-                // Evaluate if the CORE SHOW DAYS actually overlap, or if it's just a prep/recovery turnaround
+                // Hard = cores overlap (two places at once). Soft = free-at turnaround.
                 let activeArr = Array.from(activeProjects);
                 let coreOverlap = false;
+
+                // Unique cannot be double-booked inside one project (false badge fix)
+                if (activeArr.length === 1 && !isBulk) {
+                    continue;
+                }
                 
                 if (activeArr.length === 1) {
-                    coreOverlap = true; // The project ITSELF requested more than the warehouse owns! Hard shortage.
+                    coreOverlap = true; // Bulk: project exceeds warehouse stock
                 } else {
                     for (let j = 0; j < activeArr.length; j++) {
                         for (let k = j + 1; k < activeArr.length; k++) {
@@ -288,6 +413,14 @@ function getActiveConflicts() {
                         if (coreOverlap) break;
                     }
                 }
+
+                // Soft only when free-at resolved for all holding projects (no silent coarse soft)
+                if (!coreOverlap) {
+                    let allFreeResolved = activeArr.every(function (id) {
+                        return projects[id] && projects[id].freeAtResolved;
+                    });
+                    if (!allFreeResolved) continue;
+                }
                 
                 if (!flaggedShortages.has(key)) {
                     flaggedShortages.add(key);
@@ -298,9 +431,11 @@ function getActiveConflicts() {
                     
                     let cDesc = "";
                     if (activeArr.length === 1) {
-                        cDesc = isBulk ? `${shortage}x ${assetName} short. Project exceeds total warehouse stock.` : `Unique Unit [${assetName}] is double-booked inside the same project.`;
+                        cDesc = `${shortage}x ${assetName} short. Project exceeds total warehouse stock.`;
                     } else {
-                        cDesc = isBulk ? `${shortage}x ${assetName} short. ${coreOverlap ? 'Demand' : 'Turnaround overlap'} between: ${pairNames}.` : `Unique Unit [${assetName}] is ${coreOverlap ? 'double-booked' : 'in a tight turnaround'} between: ${pairNames}.`;
+                        cDesc = isBulk
+                          ? `${shortage}x ${assetName} short. ${coreOverlap ? 'Demand' : 'Turnaround (free-at)'} between: ${pairNames}.`
+                          : `Unique Unit [${assetName}] is ${coreOverlap ? 'double-booked' : 'in a tight turnaround (still committed past free-at)'} between: ${pairNames}.`;
                     }
 
                     conflicts.push({

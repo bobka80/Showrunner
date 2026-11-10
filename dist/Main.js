@@ -263,6 +263,8 @@ function renderIndexForAuth_(authResult, sessionToken, pendingScan) {
   template.sessionToken = sessionToken || '';
   template.isStationDevice = authResult.isStationDevice ? '1' : '0';
   template.stationDeviceLayout = authResult.stationDeviceLayout || '';
+  template.isFreelancer = authResult.isFreelancer ? '1' : '0';
+  template.tunnelingActive = authResult.tunnelingActive ? '1' : '0';
   const scanRaw = String(pendingScan || '').trim();
   template.pendingMobileScanB64 = scanRaw ? Utilities.base64Encode(scanRaw) : '';
   return template.evaluate()
@@ -326,6 +328,27 @@ function getRefreshPayload(crewName) {
   let extras = getTasksAndNotifs(crewName);
 
   return { projects: projects, monthData: monthData, managerConfig: getManagerConfig(crewName), tasks: extras.tasks, notifs: extras.notifs, conflicts: conflicts };
+}
+
+/** Fast project list for station dock / picker — skips tasks, notifs, manager config. */
+function getStationHostProjects(crewName) {
+  IS_READ_ONLY_EXECUTION = true;
+  const profile = getUserSecurityProfile(crewName);
+  let projects = getExistingProjects();
+  let monthData = getGlobalMonthData(projects);
+  let conflicts = getActiveConflicts();
+  const filtered = applyShiftCalendarFilter(profile, projects, monthData, conflicts);
+  return { projects: filtered.projects };
+}
+
+/** Warehouse dock: all active events without host badge (no shift-calendar filter). */
+function getStationWarehouseProjects() {
+  IS_READ_ONLY_EXECUTION = true;
+  const projects = getExistingProjects().filter(function(p) {
+    const st = String(p.status || 'Draft').toUpperCase();
+    return st !== 'TRASHED' && st !== 'CANCELLED';
+  });
+  return { projects: projects };
 }
 
 /** Fast path for task drawer + notification list only (avoids full calendar payload). */

@@ -89,6 +89,12 @@ function provisionNewAsset(adminName, payload, existingId = null, quantity = 1) 
                 if(map['rental'] !== undefined && payload.hasOwnProperty('rental')) row[map['rental']] = payload.rental;
                 if(map['date_bought'] !== undefined && payload.hasOwnProperty('dateBought')) row[map['date_bought']] = payload.dateBought;
                 if(map['status'] !== undefined && payload.hasOwnProperty('lifecycle')) row[map['status']] = payload.lifecycle;
+                if(map['status_note'] !== undefined && payload.hasOwnProperty('statusNote')) row[map['status_note']] = payload.statusNote;
+                if(map['status_note'] !== undefined && payload.hasOwnProperty('lifecycle')) {
+                  const life = String(payload.lifecycle || '').trim();
+                  if (life === 'Active' || life === 'Repaired') row[map['status_note']] = '';
+                  else if (life === 'Damaged' && payload.hasOwnProperty('statusNote')) row[map['status_note']] = payload.statusNote;
+                }
                 if(map['last_service'] !== undefined && payload.hasOwnProperty('lastService')) row[map['last_service']] = payload.lastService;
                 if(map['service_interval'] !== undefined && payload.hasOwnProperty('serviceInterval')) row[map['service_interval']] = payload.serviceInterval;
                 if(map['tags'] !== undefined && payload.hasOwnProperty('tags')) row[map['tags']] = payload.tags;
@@ -178,6 +184,7 @@ function provisionNewAsset(adminName, payload, existingId = null, quantity = 1) 
             if(map['rental'] !== undefined) nRow[map['rental']] = payload.rental;
             if(map['date_bought'] !== undefined) nRow[map['date_bought']] = payload.dateBought;
             if(map['status'] !== undefined) nRow[map['status']] = payload.lifecycle;
+            if(map['status_note'] !== undefined && payload.hasOwnProperty('statusNote')) nRow[map['status_note']] = payload.statusNote;
             if(map['last_service'] !== undefined) nRow[map['last_service']] = payload.lastService;
             if(map['service_interval'] !== undefined) nRow[map['service_interval']] = payload.serviceInterval;
             if(map['tags'] !== undefined) nRow[map['tags']] = payload.tags;
@@ -391,6 +398,7 @@ function getAssetRegistry(adminName) {
     let cServInt = getCol(['serviceinterval']) ?? map['service_interval'];
     let cTags = getCol(['tags', 'tagids']) ?? map['tags'];
     let cStatus = getCol(['status', 'lifecycle']) ?? map['status'];
+    let cStatusNote = getCol(['statusnote', 'issuenote', 'defectnote']) ?? map['status_note'];
     let cTotQty = getCol(['totalquantity', 'qty', 'quantity']) ?? map['total_quantity'];
     let cCap = getCol(['capacity']) ?? map['capacity'];
     let cIsFixed = getCol(['isfixedrack', 'isfixed', 'fixedrack']) ?? map['isFixedRack'] ?? 30;
@@ -431,6 +439,7 @@ function getAssetRegistry(adminName) {
                 serviceInterval: cServInt !== undefined ? data[i][cServInt] : "",
                 tags: cTags !== undefined ? data[i][cTags] : "",
                 status: cStatus !== undefined ? data[i][cStatus] : "",
+                statusNote: cStatusNote !== undefined ? String(data[i][cStatusNote] || '') : '',
                 totalQuantity: cTotQty !== undefined ? (data[i][cTotQty] || 1) : 1,
                 capacity: cCap !== undefined ? data[i][cCap] : "",
                 isFixedRack: cIsFixed !== undefined ? (data[i][cIsFixed] === true || data[i][cIsFixed] === 'true' || data[i][cIsFixed] === 1) : false,

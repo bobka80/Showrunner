@@ -1,14 +1,34 @@
 const fs = require('fs');
 const path = require('path');
 
-function build() {
-  const DIST_DIR = path.join(__dirname, 'dist');
-  if (!fs.existsSync(DIST_DIR)) {
-    fs.mkdirSync(DIST_DIR);
+function clearDistLogicPayloads_(distDir) {
+  if (fs.existsSync(path.join(distDir, 'LogicPayload.js'))) {
+    fs.unlinkSync(path.join(distDir, 'LogicPayload.js'));
   }
+  for (const name of fs.readdirSync(distDir)) {
+    if (/^LogicPayload(_\d+|_Master)?\.js$/i.test(name)) {
+      fs.unlinkSync(path.join(distDir, name));
+    }
+  }
+}
 
-  console.log('Building project...');
+function applyFrontendLock_(distDir, lockDir) {
+  clearDistLogicPayloads_(distDir);
+  const locked = fs.readdirSync(lockDir).filter((name) => {
+    return name === 'Index.html' || /^LogicPayload(_\d+|_Master)?\.js$/i.test(name);
+  });
+  if (!locked.includes('Index.html') || !locked.includes('LogicPayload_Master.js')) {
+    throw new Error('frontend-lock/ is incomplete (need Index.html + LogicPayload_Master.js)');
+  }
+  for (const name of locked) {
+    fs.copyFileSync(path.join(lockDir, name), path.join(distDir, name));
+    const kb = (fs.statSync(path.join(distDir, name)).size / 1024).toFixed(2);
+    console.log(`Locked ${name} (${kb} KB)`);
+  }
+  console.log(`Using frontend-lock/ (${locked.length} file(s)) — HTML module compile skipped`);
+}
 
+function compileFrontendFromHtmlModules_(distDir) {
   // 1. Combine all HTML templates
   let htmlContent = fs.readFileSync('Index.html', 'utf8');
   const includeRegex = /<\?\!\=\s+include\(['"](.*?)['"]\)[^>]*\?>/g;
@@ -145,13 +165,14 @@ function build() {
   htmlContent = htmlContent.replace('</body>', bootloader + '\n</body>');
 
   // 4. Write the clean HTML shell (which is now just a tiny bootloader)
-  fs.writeFileSync(path.join(DIST_DIR, 'Index.html'), htmlContent);
+  clearDistLogicPayloads_(distDir);
+  fs.writeFileSync(path.join(distDir, 'Index.html'), htmlContent);
   console.log(`Compiled Index.html (${(htmlContent.length / 1024).toFixed(2)} KB)`);
 
   // 5. Wrap the extracted Javascript into multiple backend Google Apps Script files
   // This bypasses the Google Apps Script 1MB file size limit which silently truncates large .js files
-  if (fs.existsSync(path.join(DIST_DIR, 'LogicPayload.js'))) {
-      fs.unlinkSync(path.join(DIST_DIR, 'LogicPayload.js'));
+  if (fs.existsSync(path.join(distDir, 'LogicPayload.js'))) {
+      fs.unlinkSync(path.join(distDir, 'LogicPayload.js'));
   }
   
   const CHUNK_SIZE = 500000;
@@ -167,7 +188,7 @@ function getFrontendLogicChunk(index) {
 `;
 
   chunkArray.forEach((chunk, index) => {
-      const chunkFile = path.join(DIST_DIR, `LogicPayload_${index}.js`);
+      const chunkFile = path.join(distDir, `LogicPayload_${index}.js`);
       const chunkContent = `const FRONTEND_CHUNK_${index} = ${JSON.stringify(chunk)};\n`;
       fs.writeFileSync(chunkFile, chunkContent);
       console.log(`Compiled LogicPayload_${index}.js (${(chunkContent.length / 1024).toFixed(2)} KB)`);
@@ -177,8 +198,25 @@ function getFrontendLogicChunk(index) {
 
   masterLogic += `  return "";\n}\n`;
   
-  fs.writeFileSync(path.join(DIST_DIR, 'LogicPayload_Master.js'), masterLogic);
+  fs.writeFileSync(path.join(distDir, 'LogicPayload_Master.js'), masterLogic);
   console.log(`Compiled LogicPayload_Master.js`);
+
+}
+
+function build() {
+  const DIST_DIR = path.join(__dirname, 'dist');
+  if (!fs.existsSync(DIST_DIR)) {
+    fs.mkdirSync(DIST_DIR);
+  }
+
+  console.log('Building project...');
+
+  const LOCK_DIR = path.join(__dirname, 'frontend-lock');
+  if (fs.existsSync(path.join(LOCK_DIR, 'Index.html'))) {
+    applyFrontendLock_(DIST_DIR, LOCK_DIR);
+  } else {
+    compileFrontendFromHtmlModules_(DIST_DIR);
+  }
 
   // 6. Copy backend .js files, appsscript.json, and Login.html (never Node tooling)
   const NODE_ONLY = require('./gas-node-only');

@@ -559,7 +559,7 @@ function verifyVaultSchema(readOnly = false) {
 function getCacheVersion() {
   try {
     let cache = CacheService.getScriptCache();
-    let v = cache.get('DB_CACHE_VERSION');
+    let v = cache.get('DB_CACHE_VERSION_V2');
     if (!v) { 
       let props = PropertiesService.getScriptProperties();
       v = props.getProperty('DB_CACHE_VERSION_V2');
@@ -585,18 +585,37 @@ function flushCache() {
   } catch(e) {}
 }
 
+/**
+ * Debug bypass: ScriptProperties DAL_SHEET_CACHE_DISABLED=1 forces live sheet reads.
+ * Phase 6B re-enabled CacheService + in-memory sheet cache (tag-aware purge via Dal_Cache.js).
+ */
+function isDalSheetCacheDisabled_() {
+  try {
+    return PropertiesService.getScriptProperties().getProperty('DAL_SHEET_CACHE_DISABLED') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
 // @INDEX: CACHE -> Sheet Data Caching
 function getSheetData(sheet) {
   if (!sheet) { let empty = []; empty.hMap = {}; return empty; }
-  
-  // 🔥 CACHE TEMPORARILY DISABLED FOR DEBUGGING
-  // Always fetch live data directly from the spreadsheet
-  let dataMatrix = sheet.getDataRange().getValues();
-  dataMatrix.hMap = getHeaderMap(dataMatrix);
-  return dataMatrix;
-  
-  // -- CACHE LOGIC BYPASSED BELOW --
-  
+
+  let name = '';
+  try { name = sheet.getName(); } catch (eName) { name = 'unknown'; }
+  let version = getCacheVersion();
+
+  if (isDalSheetCacheDisabled_()) {
+    let live = sheet.getDataRange().getValues();
+    live.hMap = getHeaderMap(live);
+    return live;
+  }
+
+  // In-memory warm hit (same Apps Script instance)
+  if (sheetDataCache[name] && sheetDataCache[name].version === version && sheetDataCache[name].data) {
+    return sheetDataCache[name].data;
+  }
+
   let cache = CacheService.getScriptCache();
   let cacheKey = 'DB_' + version + '_' + name;
   
@@ -609,7 +628,7 @@ function getSheetData(sheet) {
           let valid = true;
           for (let i = 0; i < chunks; i++) {
               let chunk = cache.get(cacheKey + '_' + i);
-              if (!chunk) { valid = false; break; } // FIX: Prevent silent chunk corruption
+              if (!chunk) { valid = false; break; }
               assembled += chunk;
           }
           if (valid && assembled.length > 0) cachedStr = assembled;
@@ -625,8 +644,7 @@ function getSheetData(sheet) {
   if (!data) {
       data = sheet.getDataRange().getValues();
       
-      // SURGICAL FIX: Prevent Google Sheets Date objects from shifting -1 day during JSON.stringify
-      // by flattening them into exact local-time strings before caching.
+      // Prevent Google Sheets Date objects from shifting -1 day during JSON.stringify
       for (let r = 0; r < data.length; r++) {
           for (let c = 0; c < data[r].length; c++) {
               if (data[r][c] instanceof Date) {
@@ -648,7 +666,6 @@ function getSheetData(sheet) {
              cache.put(cacheKey, str, 21600); // 6 Hours
              cache.remove(cacheKey + '_chunks');
          } else {
-             // CHUNKING: Bypass Google's 100KB CacheService Limit
              let chunkSize = 90000;
              let chunks = Math.ceil(str.length / chunkSize);
              let cacheObj = {};
@@ -662,7 +679,6 @@ function getSheetData(sheet) {
       } catch(e) {}
   }
 
-  // PHASE 1: Build Map dynamically and augment the array so backward compatibility is 100% safe
   let map = {};
   if (data.length > 0) {
       data[0].forEach((header, index) => {
@@ -707,6 +723,24 @@ function executeWithRetry(operation, maxRetries = 5) {
       return result;
     } catch (e) {
           if (e.message && e.message.includes("COLLISION_DETECTED")) throw e; // Instantly abort on collision
+      if (e.message && (
+        e.message.includes("Firestore") && (e.message.includes("(403)") || e.message.includes("(401)") || e.message.includes("(400)")) ||
+        e.message.includes("Firebase service account") ||
+        e.message.includes("Firebase not configured") ||
+        // DAL session lifecycle — business rules, not lock contention
+        e.message.includes("Preparation is still active") ||
+        e.message.includes("Timeline collab is still active") ||
+        e.message.includes("session is already") ||
+        // "No open prep session" / "No open timelineCollab session" (not the old "No open session" wording)
+        (e.message.includes("No open") && e.message.includes("session")) ||
+        e.message.includes("Commit already in progress") ||
+        e.message.includes("Session open raced") ||
+        e.message.includes("Session is not opening") ||
+        e.message.includes("Project not found") ||
+        e.message.includes("Unknown session type") ||
+        e.message.includes("not authorized") ||
+        e.message.includes("Permission")
+      )) throw e; // Config / permission / business errors — do not retry
       attempt++;
       if (attempt >= maxRetries) {
           let errType = bypassLock ? "Read Timeout" : "Lockout";
@@ -722,26 +756,33 @@ function executeWithRetry(operation, maxRetries = 5) {
 // ==========================================
 // --- REAL-TIME PRESENCE ENGINE (CACHE) ---
 // ==========================================
-function reportProjectPresence(projectId, userName, action, activeModule) {
+function reportProjectPresence(projectId, userName, action, activeModule, subMode) {
   try {
     let cache = CacheService.getScriptCache();
     let key = 'PRESENCE_' + projectId;
     let lock = LockService.getScriptLock();
     
-    // Try to lock RAM for 2 seconds to prevent read/write overlap
-    if (lock.tryLock(2000)) {
+    // Presence must not lose to DAL Firestore holds — open/close no longer hold ScriptLock across UrlFetch.
+    // Still wait longer than before so a brief sheet write does not leave the door stuck on the timeline.
+    if (lock.tryLock(8000)) {
         try {
             let activeStr = cache.get(key);
             let activeUsers = activeStr ? JSON.parse(activeStr) : {};
             let now = Date.now();
             
-            if (action === 'join' || action === 'ping') activeUsers[userName] = { time: now, module: activeModule || 'main' };
-            else if (action === 'leave') delete activeUsers[userName];
+            if (action === 'join' || action === 'ping') {
+              activeUsers[userName] = {
+                time: now,
+                module: activeModule || 'main',
+                subMode: subMode != null ? String(subMode) : ''
+              };
+            } else if (action === 'leave') delete activeUsers[userName];
             
-            // Cleanup disconnected users (no ping in last 90 seconds)
+            // Cleanup disconnected users (Part B4: ~150s stale with ~45s client ping)
+            var staleMs = 150000;
             let activeList = {};
             for (let user in activeUsers) {
-                if (now - activeUsers[user].time > 90000) delete activeUsers[user];
+                if (now - activeUsers[user].time > staleMs) delete activeUsers[user];
                 else if (user !== userName) activeList[user] = activeUsers[user]; // Keep track of OTHERS and their modules
             }
             
@@ -752,9 +793,10 @@ function reportProjectPresence(projectId, userName, action, activeModule) {
             lock.releaseLock();
         }
     }
-    return {};
+    // Lock miss — must not look like "nobody else here" (empty {}).
+    return null;
   } catch (e) {
-    return {};
+    return null;
   }
 }
 

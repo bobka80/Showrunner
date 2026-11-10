@@ -2,7 +2,7 @@
 
 **Entry:** [AI_DOCTRINE.md](../../../AI_DOCTRINE.md) · **Canonical topic (target architecture):** [../topics/data-cache-engine.md](../topics/data-cache-engine.md) · **Session fork:** [../topics/session-fork-platform.md](../topics/session-fork-platform.md) · **Files:** [../FILE_MAP.md](../FILE_MAP.md)
 
-**Opened:** 2026-07-05 · **Status:** **Planned — not executing yet** (director finishing phone app work first)
+**Opened:** 2026-07-05 · **Status:** **Live code present on production v792** (`Dal_*.js` synced into git 2026-11-10) — campaign checklist below still needs director review / catch-up against what already shipped
 
 This is the **live campaign file** for the single database layer. It does **not** duplicate [FRAGILE_ZONES.md](../FRAGILE_ZONES.md), [ARCHITECTURE.md](../ARCHITECTURE.md), or [EQUIPMENT_MODEL.md](../EQUIPMENT_MODEL.md) — it **links** to them and adds inventory + migration steps.
 

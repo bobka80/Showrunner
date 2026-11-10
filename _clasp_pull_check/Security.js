@@ -23,6 +23,8 @@ function getHeaderMap(dataMatrix) {
     map['Name'] = map['name'] !== undefined ? map['name'] : map['crewname'] !== undefined ? map['crewname'] : map['Name'];
     map['Passcode'] = map['passcode'] !== undefined ? map['passcode'] : map['password'] !== undefined ? map['password'] : map['Passcode'];
     map['uid'] = map['uid'] !== undefined ? map['uid'] : (map['UID'] !== undefined ? map['UID'] : map['Uid']);
+    map['rfid_tag'] = map['rfidtag'] !== undefined ? map['rfidtag'] : map['rfid_tag'];
+    map['rfid_tid'] = map['rfidtid'] !== undefined ? map['rfidtid'] : map['rfid_tid'];
   }
   return map;
 }
@@ -203,6 +205,12 @@ function buildRoleDirectory(roleData, rMap) {
     IAM_PERMISSION_KEYS.forEach(k => {
       if (rMap[k] !== undefined) entry[k] = isTruthyCell(roleData[i][rMap[k]]);
     });
+    if (rMap['is_station_device'] !== undefined) {
+      entry.is_station_device = isTruthyCell(roleData[i][rMap['is_station_device']]);
+    }
+    if (rMap['station_device_layout'] !== undefined) {
+      entry.station_device_layout = roleData[i][rMap['station_device_layout']] || '';
+    }
     rolesList.push(entry);
   }
   return { rolesList, roleMap };
@@ -217,11 +225,13 @@ function authenticateUser(crewName, passcode) {
   return executeWithRetry(() => {
     const sheets = verifyVaultSchema(true); 
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
-    const rMap = getHeaderMap(roleData);
-    
-    let debugLog = [];
+    let rMap = getHeaderMap(roleData);
+    if (typeof ensureStationRoleColumns === 'function') {
+      rMap = ensureStationRoleColumns(sheets.roles);
+      roleData = sheets.roles.getDataRange().getValues();
+    }
     
     // Start at i=0 in case they don't have headers at all
     for (let i = 0; i < crewData.length; i++) {
@@ -247,18 +257,80 @@ function authenticateUser(crewName, passcode) {
       let sysAccess = crewData[i][cMap['System_Access']] ? crewData[i][cMap['System_Access']].toString().toUpperCase().trim() : "";
       let roleId = crewData[i][cMap['Role_ID']] ? crewData[i][cMap['Role_ID']].toString().trim() : "";
       let dbPass = dbPassRaw ? dbPassRaw.toString().trim() : "";
-      
-      if (i === 1 || i === 0) {
-          debugLog.push(`Row ${i} Name: '${dbName}', Pass: '${dbPass}'`);
-      }
-      
+
       if (dbName === crewName.toLowerCase().trim() && dbPass === passcode.trim()) {
         return buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap);
       }
     }
-    
-    let headerKeys = Object.keys(cMap).filter(k => k.length > 0 && !k.includes(' ')).join(', ');
-    return { success: false, error: `Login Failed. Checked ${crewData.length - 1} rows. Input: '${crewName}'/'${passcode}'. Headers: [${headerKeys}]. ` + debugLog.join(' | ') };
+
+    // Never echo the input, the roster, headers, or any stored passcode back to the client.
+    return { success: false, error: 'Incorrect crew name or passcode.' };
+  });
+}
+
+/** Desktop lock: verify 2-char prefix or full 6-char PIN (session stays on success). */
+function verifyDesktopLockUnlock(crewName, code, mode) {
+  return executeWithRetry(() => {
+    const trimmedName = String(crewName || '').toLowerCase().trim();
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+
+    for (let i = 0; i < crewData.length; i++) {
+      let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
+      let mappedPass = cMap['Passcode'] !== undefined ? crewData[i][cMap['Passcode']] : undefined;
+      let hardName = crewData[i][2];
+      let hardPass = crewData[i][7];
+      let dbNameRaw = mappedName || hardName;
+      let dbPassRaw = mappedPass || hardPass;
+      if ((!mappedPass || mappedPass.toString().trim() === '') && hardPass && hardPass.toString().trim() !== '') {
+        dbPassRaw = hardPass;
+      }
+      if ((!mappedName || mappedName.toString().trim() === '') && hardName && hardName.toString().trim() !== '') {
+        dbNameRaw = hardName;
+      }
+      let dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : '';
+      let dbPass = dbPassRaw ? dbPassRaw.toString().trim() : '';
+      if (dbName !== trimmedName || !dbPass) continue;
+
+      if (mode === 'prefix') {
+        const prefix = String(code || '').substring(0, 2);
+        if (prefix.length < 2) return { success: false };
+        return { success: dbPass.substring(0, 2) === prefix };
+      }
+      return { success: dbPass === String(code || '').trim() };
+    }
+    return { success: false };
+  });
+}
+
+/** Desktop lock: first 2 PIN chars for local quick-unlock (logged-in screensaver only). */
+function getDesktopLockPrefix(crewName) {
+  return executeWithRetry(() => {
+    const trimmedName = String(crewName || '').toLowerCase().trim();
+    const sheets = verifyVaultSchema(true);
+    const crewData = getSheetData(sheets.crew);
+    const cMap = getHeaderMap(crewData);
+
+    for (let i = 0; i < crewData.length; i++) {
+      let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
+      let mappedPass = cMap['Passcode'] !== undefined ? crewData[i][cMap['Passcode']] : undefined;
+      let hardName = crewData[i][2];
+      let hardPass = crewData[i][7];
+      let dbNameRaw = mappedName || hardName;
+      let dbPassRaw = mappedPass || hardPass;
+      if ((!mappedPass || mappedPass.toString().trim() === '') && hardPass && hardPass.toString().trim() !== '') {
+        dbPassRaw = hardPass;
+      }
+      if ((!mappedName || mappedName.toString().trim() === '') && hardName && hardName.toString().trim() !== '') {
+        dbNameRaw = hardName;
+      }
+      let dbName = dbNameRaw ? dbNameRaw.toString().toLowerCase().trim() : '';
+      let dbPass = dbPassRaw ? dbPassRaw.toString().trim() : '';
+      if (dbName !== trimmedName || !dbPass || dbPass.length < 2) continue;
+      return { prefix: dbPass.substring(0, 2) };
+    }
+    return { prefix: '' };
   });
 }
 
@@ -331,6 +403,17 @@ function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
         if (roleSys) sysAccess = roleSys.toUpperCase();
         isTunneling = isTruthyCell(roleData[r][rMap['Is_Tunneling']]);
         bundle = loadRolePermissionsBundle(roleData[r], rMap);
+        if (typeof isStationDeviceProfileRow === 'function' && isStationDeviceProfileRow(roleData[r], rMap)) {
+          bundle.is_station_device = true;
+          bundle.station_device_layout = typeof normalizeStationDeviceLayout === 'function'
+            ? normalizeStationDeviceLayout(roleData[r][rMap['station_device_layout']])
+            : 'chainway_handheld';
+          if (typeof STATION_IAM_PERMISSION_KEYS !== 'undefined') {
+            STATION_IAM_PERMISSION_KEYS.forEach(k => {
+              if (rMap[k] !== undefined) bundle[k] = isTruthyCell(roleData[r][rMap[k]]);
+            });
+          }
+        }
         break;
       }
     }
@@ -355,14 +438,23 @@ function buildAuthBundleFromCrewRow_(crewData, i, cMap, roleData, rMap) {
   bundle.task_view_all = accessTierAtLeastValue(normalizeAccessTier(sysAccess), 'MANAGER') || isManager;
 
   const uid = crewData[i][cMap['uid']] ? crewData[i][cMap['uid']].toString().trim() : '';
+  const isStationDevice = !!bundle.is_station_device;
+  const stationDeviceLayout = bundle.station_device_layout || '';
+  let isFreelancer = false;
+  if (cMap['IsFreelancer'] !== undefined) {
+    isFreelancer = isTruthyCell(crewData[i][cMap['IsFreelancer']]);
+  }
   return {
     success: true,
     name: crewData[i][cMap['Name']] || hardName,
     access: normalizeAccessTier(sysAccess),
     permissions: bundle,
     tunnelingActive: isTunneling,
+    isFreelancer: isFreelancer,
     uid: uid,
-    email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : ''
+    email: crewData[i][cMap['Email']] ? crewData[i][cMap['Email']].toString().trim() : '',
+    isStationDevice: isStationDevice,
+    stationDeviceLayout: stationDeviceLayout
   };
 }
 
@@ -372,9 +464,13 @@ function getAuthBundleForCrewName_(crewName) {
     if (!target) return { success: false, error: 'Missing crew name.' };
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
-    const rMap = getHeaderMap(roleData);
+    let rMap = getHeaderMap(roleData);
+    if (typeof ensureStationRoleColumns === 'function') {
+      rMap = ensureStationRoleColumns(sheets.roles);
+      roleData = sheets.roles.getDataRange().getValues();
+    }
 
     for (let i = 0; i < crewData.length; i++) {
       let mappedName = cMap['Name'] !== undefined ? crewData[i][cMap['Name']] : undefined;
@@ -400,6 +496,7 @@ function getAuthBundleForCrewName_(crewName) {
           task_manage_personal: true
         },
         tunnelingActive: false,
+        isFreelancer: false,
         uid: 'UID_BOGDAN',
         email: 'bobby@showrider.com'
       };
@@ -558,7 +655,7 @@ function verifyBackendPrivilege(crewName, requiredTier) {
 
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
     const rMap = getHeaderMap(roleData);
 
@@ -574,7 +671,7 @@ function verifyBackendPermission(crewName, permissionKey) {
 
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
     const rMap = getHeaderMap(roleData);
     const bundle = resolveCrewPermissionBundle(crewName, crewData, roleData, cMap, rMap);
@@ -689,6 +786,14 @@ function assertActorCanManageProject(actor) {
   }
 }
 
+/** L.O. crew (view_logistics) + managers/root — not manager-only. */
+function assertActorCanManageDalPrepSession(actor) {
+  if (verifyBackendPrivilege(actor, 'ROOT')) return;
+  if (verifyBackendPrivilege(actor, 'MANAGER')) return;
+  if (effectiveBackendPermission(actor, 'view_logistics')) return;
+  throw new Error('🛑 PERMISSION DENIED: Live logistics access required to start or end prep.');
+}
+
 function actorIsCrossRentOnlyCreator(actor) {
   if (!actor) return false;
   return verifyBackendPermission(actor, 'event_create_crossrent')
@@ -773,6 +878,7 @@ function getUserSecurityProfile(crewName) {
       return {
         email: email,
         uid: uid,
+        roleId: roleId,
         tunneling: isTunneling,
         isFreelancer: isFreelancer,
         isManager: isManager,
@@ -790,7 +896,7 @@ function getSystemDirectory() {
   return executeWithRetry(() => {
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
     const rMap = getHeaderMap(roleData);
 
@@ -846,18 +952,24 @@ function getSecureIamDirectory(adminName) {
     }
     const sheets = verifyVaultSchema(true);
     const crewData = getSheetData(sheets.crew);
-    const roleData = getSheetData(sheets.roles);
+    let roleData = getSheetData(sheets.roles);
     const cMap = getHeaderMap(crewData);
-    const rMap = getHeaderMap(roleData);
+    let rMap = getHeaderMap(roleData);
+    if (typeof ensureStationRoleColumns === 'function') {
+      rMap = ensureStationRoleColumns(sheets.roles);
+      roleData = sheets.roles.getDataRange().getValues();
+    }
     
     let crewList = [];
     for (let i = 1; i < crewData.length; i++) {
       let row = crewData[i];
-      if (row[cMap['Email']]) {
+      const rowEmail = row[cMap['Email']] ? row[cMap['Email']].toString().trim() : '';
+      const rowName = row[cMap['Name']] ? row[cMap['Name']].toString().trim() : '';
+      if (!rowEmail && !rowName) continue;
         crewList.push({
           uid: row[cMap['uid']] ? row[cMap['uid']].toString().trim() : "",
-          email: row[cMap['Email']].toString().trim(), 
-          name: row[cMap['Name']] ? row[cMap['Name']].toString().trim() : "", 
+          email: rowEmail, 
+          name: rowName, 
           jobTitle: row[cMap['Job_Title']] ? row[cMap['Job_Title']].toString().trim() : "",
           dept: row[cMap['Department']] ? row[cMap['Department']].toString().trim() : "", 
           meal: row[cMap['Meal']] ? row[cMap['Meal']].toString().trim() : "",
@@ -865,9 +977,11 @@ function getSecureIamDirectory(adminName) {
           roleId: row[cMap['Role_ID']] ? row[cMap['Role_ID']].toString().trim() : "",
           roleName: "",
           payrollMultiplier: row[cMap['Payroll_Multiplier']] ? parseFloat(row[cMap['Payroll_Multiplier']]) || 1.0 : 1.0,
-          passcode: row[cMap['Passcode']] ? row[cMap['Passcode']].toString().trim() : ""   
+          passcode: row[cMap['Passcode']] ? row[cMap['Passcode']].toString().trim() : "",
+          rfidTag: cMap['rfid_tag'] !== undefined && row[cMap['rfid_tag']]
+            ? row[cMap['rfid_tag']].toString().trim()
+            : ""
         });
-      }
     }
     const { rolesList, roleMap } = buildRoleDirectory(roleData, rMap);
 
@@ -894,26 +1008,58 @@ function saveDirectoryUpdate(adminName, updates) {
     
     let hasChanges = false;
     let updatedUids = [];
-    updates.forEach(update => {
+    let auditNotes = [];
+
+    for (let u = 0; u < updates.length; u++) {
+      const update = updates[u];
       const normalizedRoleId = normalizeCrewRoleId(update.roleId, roleData, rMap);
-      for(let i = 1; i < data.length; i++) {
-         if (data[i][cMap['uid']] && data[i][cMap['uid']].toString().trim() === update.uid.trim()) {
-            if(cMap['Job_Title'] !== undefined) data[i][cMap['Job_Title']] = update.jobTitle;  
-            if(cMap['Department'] !== undefined) data[i][cMap['Department']] = update.dept;      
-            if(cMap['Meal'] !== undefined) data[i][cMap['Meal']] = update.meal;      
-            if(cMap['Role_ID'] !== undefined) data[i][cMap['Role_ID']] = normalizedRoleId;    
-            if(cMap['Passcode'] !== undefined) data[i][cMap['Passcode']] = update.passcode; 
-            if(cMap['Payroll_Multiplier'] !== undefined) data[i][cMap['Payroll_Multiplier']] = update.payrollMultiplier; 
-            if(cMap['uid'] !== undefined) updatedUids.push(data[i][cMap['uid']]);
-            hasChanges = true;
-            break;
-         }
+      const newName = update.name !== undefined ? String(update.name || '').trim() : null;
+      if (newName !== null && !newName) {
+        return { success: false, message: "Name cannot be empty." };
       }
-    });
+
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][cMap['uid']] && data[i][cMap['uid']].toString().trim() === String(update.uid || '').trim()) {
+          rowIndex = i;
+          break;
+        }
+      }
+      if (rowIndex < 0) continue;
+
+      if (newName !== null && cMap['Name'] !== undefined) {
+        const targetName = newName.toLowerCase();
+        for (let j = 1; j < data.length; j++) {
+          if (j === rowIndex) continue;
+          const otherName = data[j][cMap['Name']] ? data[j][cMap['Name']].toString().trim().toLowerCase() : '';
+          if (otherName && otherName === targetName) {
+            return { success: false, message: 'Another crew member already uses the name "' + newName + '".' };
+          }
+        }
+        const oldName = data[rowIndex][cMap['Name']] ? data[rowIndex][cMap['Name']].toString().trim() : '';
+        if (oldName !== newName) {
+          data[rowIndex][cMap['Name']] = newName;
+          auditNotes.push(oldName + ' -> ' + newName);
+        }
+      }
+
+      if (cMap['Job_Title'] !== undefined) data[rowIndex][cMap['Job_Title']] = update.jobTitle;
+      if (cMap['Department'] !== undefined) data[rowIndex][cMap['Department']] = update.dept;
+      if (cMap['Meal'] !== undefined) data[rowIndex][cMap['Meal']] = update.meal;
+      if (cMap['Role_ID'] !== undefined) data[rowIndex][cMap['Role_ID']] = normalizedRoleId;
+      if (cMap['Passcode'] !== undefined) data[rowIndex][cMap['Passcode']] = update.passcode;
+      if (cMap['Payroll_Multiplier'] !== undefined) data[rowIndex][cMap['Payroll_Multiplier']] = update.payrollMultiplier;
+      if (cMap['uid'] !== undefined) updatedUids.push(data[rowIndex][cMap['uid']]);
+      hasChanges = true;
+    }
+
     if (hasChanges) {
         crewSheet.getRange(1, 1, data.length, data[0].length).setValues(data);
         if (typeof flushCache !== 'undefined') flushCache();
-        writeToAuditLog(adminName, "UPDATE", "IAM", "GLOBAL", updatedUids.length > 0 ? updatedUids.join(', ') : "Directory Sync", `Updated ${updates.length} user profile(s).`);
+        const detail = auditNotes.length
+          ? `Updated ${updates.length} user profile(s). Renamed: ${auditNotes.join('; ')}.`
+          : `Updated ${updates.length} user profile(s).`;
+        writeToAuditLog(adminName, "UPDATE", "IAM", "GLOBAL", updatedUids.length > 0 ? updatedUids.join(', ') : "Directory Sync", detail);
         return { success: true, message: "Vault updated successfully." };
     }
     return { success: false, message: "No matching user found to update. Please refresh and try again." };
@@ -1022,39 +1168,64 @@ function provisionNewUser(adminName, payload) {
     const sheets = verifyVaultSchema();
     const crewSheet = sheets.crew;
     const roleSheet = sheets.roles;
+    const rMap = typeof ensureStationRoleColumns === 'function'
+      ? ensureStationRoleColumns(roleSheet)
+      : getHeaderMap(roleSheet.getDataRange().getValues());
     const roleData = roleSheet.getDataRange().getValues();
-    const rMap = getHeaderMap(roleData);
     const data = crewSheet.getDataRange().getValues();
     const cMap = getHeaderMap(data);
-    
-    // --- ANTI-DUPLICATION ENGINE ---
-    let targetEmail = payload.email.trim().toLowerCase();
-    for (let i = 1; i < data.length; i++) {
-        if (data[i][cMap['Email']] && data[i][cMap['Email']].toString().trim().toLowerCase() === targetEmail) {
-            return { success: false, error: "A user with this email address already exists in the Vault." };
-        }
+
+    const name = (payload.name || '').toString().trim();
+    const passcode = (payload.passcode || '').toString().trim();
+    if (!name || passcode.length !== 6 || !payload.roleId) {
+      return { success: false, error: "Name, 6-char Passcode, and Role are required." };
     }
-    // -------------------------------
-    
+
+    const isStationDevice = typeof isStationRoleRef === 'function'
+      ? isStationRoleRef(payload.roleId, roleData, rMap)
+      : !!payload.isStationDevice;
+
+    let email = (payload.email || '').toString().trim();
     let newUid = Utilities.getUuid();
+    if (isStationDevice) {
+      if (!email) email = buildSyntheticStationEmail(name, newUid);
+    } else if (!email) {
+      return { success: false, error: "Email is required for office crew members." };
+    }
+
+    const targetEmail = email.toLowerCase();
+    const targetName = name.toLowerCase();
+    for (let i = 1; i < data.length; i++) {
+      const rowEmail = data[i][cMap['Email']] ? data[i][cMap['Email']].toString().trim().toLowerCase() : '';
+      if (rowEmail && rowEmail === targetEmail) {
+        return { success: false, error: "A user with this email address already exists in the Vault." };
+      }
+      const rowName = data[i][cMap['Name']] ? data[i][cMap['Name']].toString().trim().toLowerCase() : '';
+      if (isStationDevice && rowName && rowName === targetName) {
+        return { success: false, error: "A station device with this login name already exists." };
+      }
+    }
+
     let newRow = new Array(data[0].length).fill("");
     if(cMap['uid'] !== undefined) newRow[cMap['uid']] = newUid;
-    if(cMap['Email'] !== undefined) newRow[cMap['Email']] = payload.email.trim();
-    if(cMap['Name'] !== undefined) newRow[cMap['Name']] = payload.name.trim();
+    if(cMap['Email'] !== undefined) newRow[cMap['Email']] = email;
+    if(cMap['Name'] !== undefined) newRow[cMap['Name']] = name;
     if(cMap['Job_Title'] !== undefined) newRow[cMap['Job_Title']] = payload.jobTitle || "";
     if(cMap['Department'] !== undefined) newRow[cMap['Department']] = payload.department || "";
     if(cMap['Meal'] !== undefined) newRow[cMap['Meal']] = payload.meal || "";
     if(cMap['IsManager'] !== undefined) newRow[cMap['IsManager']] = false;
     if(cMap['IsFreelancer'] !== undefined) newRow[cMap['IsFreelancer']] = (payload.systemAccess === "VIEWER");
     if(cMap['Role_ID'] !== undefined) newRow[cMap['Role_ID']] = normalizeCrewRoleId(payload.roleId, roleData, rMap);
-    if(cMap['Passcode'] !== undefined) newRow[cMap['Passcode']] = payload.passcode.trim();
-    if(cMap['Payroll_Multiplier'] !== undefined) newRow[cMap['Payroll_Multiplier']] = payload.payrollMultiplier;
+    if(cMap['Passcode'] !== undefined) newRow[cMap['Passcode']] = passcode;
+    if(cMap['Payroll_Multiplier'] !== undefined) newRow[cMap['Payroll_Multiplier']] = payload.payrollMultiplier || 1.0;
     if(cMap['OrderIndex'] !== undefined) newRow[cMap['OrderIndex']] = "";
     
     crewSheet.appendRow(newRow);
     if (typeof flushCache !== 'undefined') flushCache();
-    writeToAuditLog(adminName, "CREATE", "IAM", "GLOBAL", newUid, `Provisioned new user as ${payload.roleId}.`);
-    return { success: true, message: "User securely added to the Vault." };
+    writeToAuditLog(adminName, "CREATE", "IAM", "GLOBAL", newUid, isStationDevice
+      ? `Provisioned station device login as ${payload.roleId}.`
+      : `Provisioned new user as ${payload.roleId}.`);
+    return { success: true, message: isStationDevice ? "Station device login added." : "User securely added to the Vault." };
   });
 }
 

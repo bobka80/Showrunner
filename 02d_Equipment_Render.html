@@ -125,12 +125,12 @@ function renderProjectAssetsUI() {
         ['name', 'qty', 'unit', 'action'].forEach(function(k) {
             if (!gridConfAssigned.cols[k]) gridConfAssigned.cols[k] = {};
             gridConfAssigned.cols[k].vis = true;
-            gridConfAssigned.cols[k].w = (k === 'name') ? 150 : (k === 'action' ? 140 : 56);
+            gridConfAssigned.cols[k].w = (k === 'name') ? 150 : (k === 'action' ? 168 : 56);
         });
         if (window.currentPaMode === 'operation') {
             gridConfAssigned.cols['unit'].vis = false;
             gridConfAssigned.cols['name'].w = 130;
-            gridConfAssigned.cols['action'].w = 118;
+            gridConfAssigned.cols['action'].w = 156;
             gridConfAssigned.order = ['name', 'qty', 'action'];
             visibleColsAssigned = ['name', 'qty', 'action'];
         } else {
@@ -143,6 +143,14 @@ function renderProjectAssetsUI() {
         let el = document.getElementById('style-grid-project_assigned');
         if (el) el.remove();
     }
+
+    // Action must fit − / qty / + / × (saved PA widths often clip the delete control on PC)
+    if (!gridConfAssigned.cols['action']) gridConfAssigned.cols['action'] = {};
+    (function() {
+        var minW = isMobPa ? (window.currentPaMode === 'operation' ? 156 : 168) : 172;
+        var cur = parseInt(gridConfAssigned.cols['action'].w, 10) || 0;
+        if (cur < minW) gridConfAssigned.cols['action'].w = minW;
+    })();
 
     const mobOpLabel = function() {
         return window.currentOperationType === 'CHECK-IN' ? 'CHECK IN' : 'CHECK OUT';
@@ -198,8 +206,10 @@ function renderProjectAssetsUI() {
         return `<button class="btn-main btn-sm mobile-pa-op-btn" style="margin:0;padding:2px 8px !important;${bs}" onclick="event.stopPropagation(); ${containerUniqueCid ? scanAllFn : `triggerManualScan('${assetId}', 1)`}" title="${manualTitle}">${opLabel}</button>`;
     };
 
+    // buildCSS updates an existing <style> in place (returns ''); only insert when missing.
+    // Do NOT remove the style tag here — that caused every-other-render column collapse.
     let dynCssAssigned = window.GridEngine.buildCSS('project_assigned');
-    if (dynCssAssigned && !document.getElementById('style-grid-project_assigned')) document.head.insertAdjacentHTML('beforeend', dynCssAssigned);
+    if (dynCssAssigned) document.head.insertAdjacentHTML('beforeend', dynCssAssigned);
 
     const fs = typeof PA_FONT_SIZE !== 'undefined' ? PA_FONT_SIZE : 11;
     const pad = typeof PA_ROW_PADDING !== 'undefined' ? PA_ROW_PADDING : 6;
@@ -317,7 +327,7 @@ function renderProjectAssetsUI() {
         visCols.forEach((key, idx) => {
             let isLastDataCol = (idx === visCols.length - 2 && visCols[visCols.length - 1] === 'action');
             let isActionCol = (key === 'action');
-            let widthStyle = isActionCol ? `width: var(--${gridId}-w-${key}); margin-left: var(--${gridId}-ml-${key}); flex-shrink: 0; text-align:center; justify-content:center;` : `width: var(--${gridId}-w-${key}); margin-left: var(--${gridId}-ml-${key}); flex-shrink: 1; min-width: 0px;`;
+            let widthStyle = isActionCol ? `width: var(--${gridId}-w-${key}); min-width: var(--${gridId}-w-${key}); margin-left: var(--${gridId}-ml-${key}); flex-shrink: 0; overflow: visible; text-align:center; justify-content:center; display:flex; align-items:center;` : `width: var(--${gridId}-w-${key}); margin-left: var(--${gridId}-ml-${key}); flex-shrink: 1; min-width: 0px;`;
             
             if (key === 'name') {
                 let pLeft = isChild ? 'padding-left:14px; box-sizing:border-box;' : '';
@@ -419,15 +429,15 @@ function renderProjectAssetsUI() {
                                 html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
                                             ${autoBadge}
                                             <input type="number" step="0.01" id="${uniqueI}" value="${displayQty}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); updateConsumableUsage('assigned', '${paIndex}', this.value)" style="width:50px; padding:2px; height:22px; background:#111; color:#10b981; border:1px solid #10b981; border-radius:4px; text-align:center; font-size:11px; margin:0; font-weight:bold;">
-                                            <button class="btn-delete btn-sm" style="margin:0; padding:2px 6px !important; font-weight:bold; margin-left:4px;" onclick="event.stopPropagation(); removePa(${paIndex})">DEL</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePa(${paIndex})" title="Remove">×</button>
                                          </div>`;
                             } else {
-                                html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px; flex-wrap:nowrap;">
                                             ${autoBadge}
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${paIndex}', -1)">-</button>
                                             <span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${displayQty}</span>
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${paIndex}', 1)">+</button>
-                                            <button class="btn-delete btn-sm" style="margin:0; padding:2px 6px !important; font-weight:bold; margin-left:4px;" onclick="event.stopPropagation(); removePa(${paIndex})">DEL</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePa(${paIndex})" title="Remove">×</button>
                                          </div>`;
                             }
                         }
@@ -452,15 +462,15 @@ function renderProjectAssetsUI() {
                                 html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
                                             ${autoBadge}
                                             <input type="number" step="0.01" id="${uniqueI}" value="${displayQty}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); updateConsumableUsage('summed', '${a.id}', this.value)" style="width:50px; padding:2px; height:22px; background:#111; color:#10b981; border:1px solid #10b981; border-radius:4px; text-align:center; font-size:11px; margin:0; font-weight:bold;">
-                                            <button class="btn-delete btn-sm" style="margin:0; padding:2px 6px !important; font-weight:bold; margin-left:4px;" onclick="removePaGeneric('${a.id}')">DEL</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePaGeneric('${a.id}')" title="Remove">×</button>
                                          </div>`;
                             } else {
-                                html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
+                                html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px; flex-wrap:nowrap;">
                                             ${autoBadge}
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); updatePaQtyGeneric('${a.id}', -1)">-</button>
                                             <span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${displayQty}</span>
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); updatePaQtyGeneric('${a.id}', 1)">+</button>
-                                            <button class="btn-delete btn-sm" style="margin:0; padding:2px 6px !important; font-weight:bold; margin-left:4px;" onclick="removePaGeneric('${a.id}')">DEL</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePaGeneric('${a.id}')" title="Remove">×</button>
                                          </div>`;
                             }
                         }
@@ -722,7 +732,7 @@ function renderProjectAssetsUI() {
             visibleColsAssigned.forEach((key, idx) => {
                 let isLastDataCol = (idx === visibleColsAssigned.length - 2 && visibleColsAssigned[visibleColsAssigned.length - 1] === 'action');
                 let isActionCol = (key === 'action');
-                let widthStyle = isActionCol ? `width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 0; text-align:center; justify-content:center;` : `width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 1; min-width: 0px;`;
+                let widthStyle = isActionCol ? `width: var(--project_assigned-w-${key}); min-width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 0; overflow: visible; text-align:center; justify-content:center; display:flex; align-items:center;` : `width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 1; min-width: 0px;`;
 
                 if (key === 'name') {
                     if (isTarget) {
@@ -1019,7 +1029,7 @@ function renderProjectAssetsUI() {
                 visibleColsAssigned.forEach((key, idx) => {
                     let isLastDataCol = (idx === visibleColsAssigned.length - 2 && visibleColsAssigned[visibleColsAssigned.length - 1] === 'action');
                     let isActionCol = (key === 'action');
-                    let widthStyle = isActionCol ? `width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 0; text-align:center; justify-content:center;` : `width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 1; min-width: 0px;`;
+                    let widthStyle = isActionCol ? `width: var(--project_assigned-w-${key}); min-width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 0; overflow: visible; text-align:center; justify-content:center; display:flex; align-items:center;` : `width: var(--project_assigned-w-${key}); margin-left: var(--project_assigned-ml-${key}); flex-shrink: 1; min-width: 0px;`;
                     
                     if (key === 'name') assignedHtml += `<div style="${widthStyle} display:flex; align-items:center;"><div id="pa-icon-${rollId}" style="width:14px; text-align:center; color:#e4e4e7; flex-shrink:0; margin-left:-14px; margin-right:4px;">${iconTextChild}</div><div style="flex:1; color:#fff; font-weight:bold; font-size:${fs + 1}px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${safeName}">${safeName}</div></div>`;
                     else if (key === 'qty') assignedHtml += `<div style="${widthStyle} color:#86efac; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sumQty}</div>`;
@@ -1040,7 +1050,7 @@ function renderProjectAssetsUI() {
                                 assignedHtml += buildOpActionCell(widthStyle, autoBadge, a.id, sumQty, sumScanned);
                             } else {
                                 let indicesStr = items.map(x => x.originalIndex).join(',');
-                                assignedHtml += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">${autoBadge}<button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', -1)">-</button><span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${sumQty}</span><button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', 1)">+</button><button class="btn-delete btn-sm" style="margin:0; padding:2px 6px !important; font-weight:bold; margin-left:4px;" onclick="event.stopPropagation(); removePaIndices('${indicesStr}')" title="Remove all">DEL</button></div>`;
+                                assignedHtml += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">${autoBadge}<button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', -1)">-</button><span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${sumQty}</span><button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', 1)">+</button><button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePaIndices('${indicesStr}')" title="Remove">×</button></div>`;
                             }
                     }
                     else assignedHtml += `<div style="${widthStyle} color:#a1a1aa;">-</div>`;
