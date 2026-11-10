@@ -146,11 +146,13 @@ function renderProjectAssetsUI() {
 
     // PC + mobile: Action must fit − / qty / + / × (saved widths often clip the delete control)
     if (!gridConfAssigned.cols['action']) gridConfAssigned.cols['action'] = {};
-    (function() {
-        var minW = isMobPa ? (window.currentPaMode === 'operation' ? 156 : 168) : 172;
-        var cur = parseInt(gridConfAssigned.cols['action'].w, 10) || 0;
-        if (cur < minW) gridConfAssigned.cols['action'].w = minW;
-    })();
+    if (isMobPa) {
+        (function() {
+            var minW = window.currentPaMode === 'operation' ? 156 : 168;
+            var cur = parseInt(gridConfAssigned.cols['action'].w, 10) || 0;
+            if (cur < minW) gridConfAssigned.cols['action'].w = minW;
+        })();
+    }
 
     const mobOpLabel = function() {
         return window.currentOperationType === 'CHECK-IN' ? 'CHECK IN' : 'CHECK OUT';
@@ -429,7 +431,7 @@ function renderProjectAssetsUI() {
                                 html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
                                             ${autoBadge}
                                             <input type="number" step="0.01" id="${uniqueI}" value="${displayQty}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); updateConsumableUsage('assigned', '${paIndex}', this.value)" style="width:50px; padding:2px; height:22px; background:#111; color:#10b981; border:1px solid #10b981; border-radius:4px; text-align:center; font-size:11px; margin:0; font-weight:bold;">
-                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; margin-left:4px; padding:0 !important; width:22px; height:22px; min-width:22px; display:inline-flex; align-items:center; justify-content:center; background:#ef4444 !important; border:1px solid #b91c1c !important; color:#ffffff !important; font-weight:900; font-size:14px !important; line-height:1; border-radius:3px;" onclick="event.stopPropagation(); removePa(${paIndex})" title="Remove">×</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePa(${paIndex})" title="Remove">×</button>
                                          </div>`;
                             } else {
                                 html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
@@ -437,7 +439,7 @@ function renderProjectAssetsUI() {
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${paIndex}', -1)">-</button>
                                             <span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${displayQty}</span>
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${paIndex}', 1)">+</button>
-                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; margin-left:4px; padding:0 !important; width:22px; height:22px; min-width:22px; display:inline-flex; align-items:center; justify-content:center; background:#ef4444 !important; border:1px solid #b91c1c !important; color:#ffffff !important; font-weight:900; font-size:14px !important; line-height:1; border-radius:3px;" onclick="event.stopPropagation(); removePa(${paIndex})" title="Remove">×</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePa(${paIndex})" title="Remove">×</button>
                                          </div>`;
                             }
                         }
@@ -462,7 +464,7 @@ function renderProjectAssetsUI() {
                                 html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
                                             ${autoBadge}
                                             <input type="number" step="0.01" id="${uniqueI}" value="${displayQty}" onclick="event.stopPropagation()" onchange="event.stopPropagation(); updateConsumableUsage('summed', '${a.id}', this.value)" style="width:50px; padding:2px; height:22px; background:#111; color:#10b981; border:1px solid #10b981; border-radius:4px; text-align:center; font-size:11px; margin:0; font-weight:bold;">
-                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; margin-left:4px; padding:0 !important; width:22px; height:22px; min-width:22px; display:inline-flex; align-items:center; justify-content:center; background:#ef4444 !important; border:1px solid #b91c1c !important; color:#ffffff !important; font-weight:900; font-size:14px !important; line-height:1; border-radius:3px;" onclick="event.stopPropagation(); removePaGeneric('${a.id}')" title="Remove">×</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePaGeneric('${a.id}')" title="Remove">×</button>
                                          </div>`;
                             } else {
                                 html += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">
@@ -470,7 +472,7 @@ function renderProjectAssetsUI() {
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); updatePaQtyGeneric('${a.id}', -1)">-</button>
                                             <span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${displayQty}</span>
                                             <button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); updatePaQtyGeneric('${a.id}', 1)">+</button>
-                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; margin-left:4px; padding:0 !important; width:22px; height:22px; min-width:22px; display:inline-flex; align-items:center; justify-content:center; background:#ef4444 !important; border:1px solid #b91c1c !important; color:#ffffff !important; font-weight:900; font-size:14px !important; line-height:1; border-radius:3px;" onclick="event.stopPropagation(); removePaGeneric('${a.id}')" title="Remove">×</button>
+                                            <button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePaGeneric('${a.id}')" title="Remove">×</button>
                                          </div>`;
                             }
                         }
@@ -1050,7 +1052,7 @@ function renderProjectAssetsUI() {
                                 assignedHtml += buildOpActionCell(widthStyle, autoBadge, a.id, sumQty, sumScanned);
                             } else {
                                 let indicesStr = items.map(x => x.originalIndex).join(',');
-                                assignedHtml += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">${autoBadge}<button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', -1)">-</button><span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${sumQty}</span><button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', 1)">+</button><button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; margin-left:4px; padding:0 !important; width:22px; height:22px; min-width:22px; display:inline-flex; align-items:center; justify-content:center; background:#ef4444 !important; border:1px solid #b91c1c !important; color:#ffffff !important; font-weight:900; font-size:14px !important; line-height:1; border-radius:3px;" onclick="event.stopPropagation(); removePaIndices('${indicesStr}')" title="Remove">×</button></div>`;
+                                assignedHtml += `<div style="${widthStyle} text-align:center; display:flex; align-items:center; justify-content:center; gap:5px;">${autoBadge}<button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#ef4444;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', -1)">-</button><span style="font-size:13px; font-weight:bold; color:#10b981; min-width: 20px;">${sumQty}</span><button class="btn-outline btn-sm" style="border:none; padding:2px 8px !important; margin:0; font-size:16px !important; color:#10b981;" onclick="event.stopPropagation(); modifyPaIndices('${indicesStr}', 1)">+</button><button class="btn-delete btn-sm pa-row-delete-btn" style="margin:0; padding:2px 6px !important;" onclick="event.stopPropagation(); removePaIndices('${indicesStr}')" title="Remove">×</button></div>`;
                             }
                     }
                     else assignedHtml += `<div style="${widthStyle} color:#a1a1aa;">-</div>`;
