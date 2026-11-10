@@ -7,10 +7,12 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const build = require('./build');
+require('./setup-cloud-deploy').prepareCloudRuntime();
 
 const NODE_ONLY = new Set([
   'build.js', 'watch.js', 'dev-push.js',
   'works-save.js', 'milestone.js', 'rollback-works.js', 'rollback-milestone.js',
+  'setup-cloud-deploy.js', 'git-push-backup.js', 'gas-push-sync.js', 'gas-node-only.js',
   'test.js', 'test_db.js', 'run_test.js'
 ]);
 

@@ -176,6 +176,40 @@ node git-push-backup.js
 
 ---
 
+## Phone and cloud agents (cursor.com/agents)
+
+A phone can start an agent, but it cannot open the Google login browser. This machine also has no clasp session until a secret is provided. `setup-cloud-deploy.js` is the entry point. It never commits secrets and it never deploys.
+
+| Secret (Cursor environment) | Taken from the desktop that is already logged in | Written locally as |
+|-----------------------------|--------------------------------------------------|--------------------|
+| `CLASPRC_JSON` | Home file `.clasprc.json` after `clasp login` | `~/.clasprc.json` (outside the repo) |
+| `SHOWRUNNER_DEPLOYMENT_ID` | Live web app id from `clasp list-deployments` (`AKfycb…`) | gitignored `deploy-config.json`, and read directly by `milestone.js` |
+| `FIREBASE_TOOLS_JSON` | `~/.config/configstore/firebase-tools.json` after `firebase login` | home Firebase config store (hosting deploys only) |
+
+`.clasp.json` (script id) is already on GitHub. `deploy-config.json` is not, and `.gitignore` keeps it that way. `deploy-config.example.json` is only a placeholder.
+
+**What a phone agent can run after those secrets exist**
+
+| Job | Command | Notes |
+|-----|---------|--------|
+| Git checkpoint | `node works-save.js "note"` | No Google login. Needs GitHub, which the agent remote already has. |
+| Production milestone | `node milestone.js "note"` | Needs clasp login + deployment id. Stops before Google if either is missing. |
+| Dev push | `node dev-push.js` | Same clasp login. No version, no Git save. |
+| Account check | `node check-google-account.js` | Read-only clasp calls. |
+| Hosting | `node deploy-hosting.js` | Needs the Firebase secret. CLI comes from `npm install` (`firebase-tools`). |
+| Production rollback | `node rollback-milestone.js` | Same deployment id. |
+| Code rollback re-ship | `node rollback.js --to <ver> --yes` | No keyboard on an agent. `--yes` is required. `--dry-run` only previews. |
+
+**Still not a phone job**
+
+- `node watch.js` — stays running and pushes on every save. Desktop only.
+- `node build-station-apk.js` — needs the Android SDK. Java may be present; the SDK is not part of this repo.
+- `node build-station-desktop.js` — needs the .NET SDK (`dotnet`), which is not installed on a stock cloud agent.
+
+`clasp login` and `firebase login` are interactive. There is no supported way to complete them on the agent. Copy the files the desktop login already created.
+
+---
+
 ## Google Drive note
 
 The project folder may sync via Google Drive. Use **one main PC** for Git commits to avoid sync conflicts.

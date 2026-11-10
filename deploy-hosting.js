@@ -138,6 +138,7 @@ async function verifyLive() {
 }
 
 async function main() {
+  require('./setup-cloud-deploy').prepareCloudRuntime();
   console.log('\n=== Firebase Hosting deploy ===\n');
   execSync('node generate-icons.js', { cwd: hostingDir, stdio: 'inherit' });
   execSync('node push-hosting/prepare-hosting.js', { cwd: root, stdio: 'inherit' });

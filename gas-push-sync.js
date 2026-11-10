@@ -53,7 +53,7 @@ function postForm(url, form) {
 
 async function getAccessToken() {
   if (!fs.existsSync(CLASP_RC)) {
-    throw new Error('Not logged in to clasp. Run: clasp login');
+    throw new Error('Not logged in to clasp. On a phone or cloud agent, set the CLASPRC_JSON secret (contents of ~/.clasprc.json). On a desktop, run: clasp login');
   }
   const rc = readJson(CLASP_RC);
   const creds = rc.tokens?.default || rc.token;

@@ -25,7 +25,8 @@ When adding a new `.html` module: update this file **and** add the include to `I
 - **`Main.js`**: GAS backend entry point. Handles HTTP GET/POST routing and the high-speed boot payload.
 - **`build.js`**: The local Node.js compiler. Packages HTML/JS into `dist/` to bypass Google Apps Script size limits. Copies backend `.js` + `Login.html` to `dist/`; excludes Node tooling via **`gas-node-only.js`**.
 - **`gas-node-only.js`**: Canonical list of root `.js` files that must **never** ship to Apps Script (PC-only / `require`). Shared by `build.js` and `check-google-account.js`.
-- **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md`.
+- **`milestone.js`**: GAS deploy + appends row to root `RELEASES.md`. Reads `SHOWRUNNER_DEPLOYMENT_ID` or gitignored `deploy-config.json`. Stops before Google if clasp is not logged in.
+- **`setup-cloud-deploy.js`**: Node-only. Copies Cursor secrets `CLASPRC_JSON`, `SHOWRUNNER_DEPLOYMENT_ID`, and `FIREBASE_TOOLS_JSON` into the home directory / gitignored `deploy-config.json`. Does not log in and does not deploy. Run: `node setup-cloud-deploy.js` or `--check`. Phone agents: [DEPLOY_AND_ROLLBACK.md](DEPLOY_AND_ROLLBACK.md) § Phone and cloud agents.
 - **`check-google-account.js`**: Node-only (not deployed to GAS). Three checks: (1) clasp login, (2) email matches `google-account.json` + project reachable, (3) **no PC-only scripts on live GAS** (white-screen guard). Run: `node check-google-account.js` or `npm run check-google`.
 - **`gas-push-sync.js`**: Node-only. Replaces all Apps Script project files from `dist/` via API (deletes orphans). Used by `milestone.js` and `dev-push.js` instead of bare `clasp push`.
 - **`Security.js`**: Manages user authentication and extracts security profiles.

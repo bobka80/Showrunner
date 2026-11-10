@@ -98,6 +98,7 @@ function nodeOnlyLeakedOnGas(remoteFiles) {
 }
 
 async function main() {
+  require('./setup-cloud-deploy').prepareCloudRuntime();
   const lines = [];
   const issues = [];
   let ok = true;

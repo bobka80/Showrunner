@@ -23,3 +23,9 @@ Desktop.ini
 deploy-config.json
 push-hosting/.env.local
 push-hosting/firebase-public-config.json
+
+# Login files for clasp / Firebase. Cloud agents write these from secrets.
+# Never commit them.
+.clasprc.json
+clasprc.json
+firebase-tools.json
